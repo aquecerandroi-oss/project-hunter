@@ -1,0 +1,788 @@
+{
+ "run": 11,
+ "lane": 3,
+ "start_utc": "2026-09-12T15:08:00Z",
+ "start_brt": "12:08:00",
+ "pumpfun_host_requests": 14,
+ "requests": [
+  {
+   "file": "20_jito_tip_floor.json",
+   "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:00.713Z",
+   "response_received_utc": "2026-09-12T15:08:00.928Z",
+   "read_brt": "12:08:00",
+   "bytes": 330
+  },
+  {
+   "file": "21_status_solana_summary.json",
+   "url": "https://status.solana.com/api/v2/summary.json",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:00.929Z",
+   "response_received_utc": "2026-09-12T15:08:00.992Z",
+   "read_brt": "12:08:00",
+   "bytes": 2973,
+   "headers": {
+    "server": "AtlassianEdge"
+   }
+  },
+  {
+   "file": "22_rpc_prioritization_fees.json",
+   "url": "https://api.mainnet-beta.solana.com",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:01.000Z",
+   "response_received_utc": "2026-09-12T15:08:01.409Z",
+   "read_brt": "12:08:01",
+   "bytes": 6212,
+   "headers": {
+    "x-ratelimit-tier": "free",
+    "x-ratelimit-method-limit": "20",
+    "x-ratelimit-method-remaining": "19",
+    "x-ratelimit-rps-limit": "250",
+    "x-ratelimit-rps-remaining": "249",
+    "x-ratelimit-endpoint-limit": "unlimited",
+    "x-ratelimit-endpoint-remaining": "-5668",
+    "x-ratelimit-conn-limit": "40",
+    "x-ratelimit-conn-remaining": "39",
+    "x-ratelimit-connrate-limit": "40",
+    "x-ratelimit-connrate-remaining": "39",
+    "x-ratelimit-pubsub-limit": "10",
+    "x-ratelimit-pubsub-remaining": "10"
+   }
+  },
+  {
+   "file": "23_rpc_perf_samples.json",
+   "url": "https://api.mainnet-beta.solana.com",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:01.415Z",
+   "response_received_utc": "2026-09-12T15:08:01.820Z",
+   "read_brt": "12:08:01",
+   "bytes": 598,
+   "headers": {
+    "x-ratelimit-tier": "free",
+    "x-ratelimit-method-limit": "150",
+    "x-ratelimit-method-remaining": "149",
+    "x-ratelimit-rps-limit": "250",
+    "x-ratelimit-rps-remaining": "248",
+    "x-ratelimit-endpoint-limit": "unlimited",
+    "x-ratelimit-endpoint-remaining": "-5738",
+    "x-ratelimit-conn-limit": "40",
+    "x-ratelimit-conn-remaining": "39",
+    "x-ratelimit-connrate-limit": "40",
+    "x-ratelimit-connrate-remaining": "39",
+    "x-ratelimit-pubsub-limit": "10",
+    "x-ratelimit-pubsub-remaining": "10"
+   }
+  },
+  {
+   "file": "01_boards_movers.json",
+   "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=50",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:01.821Z",
+   "response_received_utc": "2026-09-12T15:08:02.203Z",
+   "read_brt": "12:08:02",
+   "bytes": 46101,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd33fbe0f8051-GRU"
+   },
+   "serverTs": 1789225681967,
+   "serverTs_brt": "12/09 12:08:01"
+  },
+  {
+   "file": "01_boards_graduating.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduating?offset=0&limit=50",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:03.354Z",
+   "response_received_utc": "2026-09-12T15:08:03.591Z",
+   "read_brt": "12:08:03",
+   "bytes": 43687,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3497ffff183-GRU"
+   },
+   "serverTs": 1789225683503,
+   "serverTs_brt": "12/09 12:08:03"
+  },
+  {
+   "file": "01_boards_graduated.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=0&limit=50",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:04.741Z",
+   "response_received_utc": "2026-09-12T15:08:04.968Z",
+   "read_brt": "12:08:04",
+   "bytes": 44904,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd351fc04c76a-GRU"
+   },
+   "serverTs": 1789225684878,
+   "serverTs_brt": "12/09 12:08:04"
+  },
+  {
+   "file": "02_sol_price.json",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:06.120Z",
+   "response_received_utc": "2026-09-12T15:08:06.303Z",
+   "read_brt": "12:08:06",
+   "bytes": 75,
+   "headers": {
+    "x-ratelimit-limit": "50",
+    "x-ratelimit-remaining": "49",
+    "x-ratelimit-reset": "60",
+    "server": "cloudflare",
+    "cf-ray": "a39fd35a9be6c089-GRU"
+   }
+  },
+  {
+   "file": "03_imc_01_月薪喵.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/5KjeZ4JzTJWyHcKwjcPimApPvY3ASmoJKMGDQat1dFUx",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:07.454Z",
+   "response_received_utc": "2026-09-12T15:08:07.702Z",
+   "read_brt": "12:08:07",
+   "bytes": 1757,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd363498c2507-GRU"
+   }
+  },
+  {
+   "file": "03_imc_02_PONYX.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/f14BwNmcgdqJ1y8htHbcnNtsuN1HM81vJrrG7K6pump",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:08.863Z",
+   "response_received_utc": "2026-09-12T15:08:09.045Z",
+   "read_brt": "12:08:09",
+   "bytes": 1832,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd36bbf2d6eb1-GRU"
+   }
+  },
+  {
+   "file": "03_imc_03_VRCAT.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/2Ek943F8zqj2zWvYPu9JMbog1u1tLfYsnwNAZDp5sMfF",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:10.196Z",
+   "response_received_utc": "2026-09-12T15:08:10.414Z",
+   "read_brt": "12:08:10",
+   "bytes": 1736,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3743d68f197-GRU"
+   }
+  },
+  {
+   "file": "03_imc_04_Frontier.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/AsSeYCDN6LyHKCGuYvTP2ngd2i9w6DUyVnGguFSZqYEA",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:11.566Z",
+   "response_received_utc": "2026-09-12T15:08:11.773Z",
+   "read_brt": "12:08:11",
+   "bytes": 1769,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd37cc97df1f6-GRU"
+   }
+  },
+  {
+   "file": "03_imc_05_ANONBATON.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:12.923Z",
+   "response_received_utc": "2026-09-12T15:08:13.141Z",
+   "read_brt": "12:08:13",
+   "bytes": 1766,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3854fa28c8e-GRU"
+   }
+  },
+  {
+   "file": "03_imc_06_TBC.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:14.293Z",
+   "response_received_utc": "2026-09-12T15:08:14.475Z",
+   "read_brt": "12:08:14",
+   "bytes": 1801,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd38dacacf2d0-GRU"
+   }
+  },
+  {
+   "file": "03_imc_07_SCAT.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/Fsey6rXphKexfVfcLWKkNZte9pKfehcG6oajGVS89nkW",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:15.626Z",
+   "response_received_utc": "2026-09-12T15:08:15.869Z",
+   "read_brt": "12:08:15",
+   "bytes": 1790,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3966821f1d2-GRU"
+   }
+  },
+  {
+   "file": "03_imc_08_BUMBLECOIN.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/2wJPoLHNkBj9h7TnAiLWun8PSHbWjtj5iBf6n4otkuEp",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:17.071Z",
+   "response_received_utc": "2026-09-12T15:08:17.270Z",
+   "read_brt": "12:08:17",
+   "bytes": 1792,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd39f2dd5f1d3-GRU"
+   }
+  },
+  {
+   "file": "03_imc_09_OOF.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/8rNg8UeVroqkgWa8mHyMVyB7hb5JDXNvS2FQgqCepoR4",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:18.420Z",
+   "response_received_utc": "2026-09-12T15:08:18.611Z",
+   "read_brt": "12:08:18",
+   "bytes": 1734,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3a7889445d3-GRU"
+   }
+  },
+  {
+   "file": "03_imc_10_GAYCOIN.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/CNhrRe6Td3727YjN5MfxcXEAPTJ4odzLu3VUdyBz3AQr",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:19.761Z",
+   "response_received_utc": "2026-09-12T15:08:20.002Z",
+   "read_brt": "12:08:20",
+   "bytes": 1790,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3b01c33add3-GRU"
+   }
+  },
+  {
+   "file": "10_rugcheck_01_月薪喵.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/5KjeZ4JzTJWyHcKwjcPimApPvY3ASmoJKMGDQat1dFUx/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:20.004Z",
+   "response_received_utc": "2026-09-12T15:08:20.944Z",
+   "read_brt": "12:08:20",
+   "bytes": 19008,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_02_PONYX.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/f14BwNmcgdqJ1y8htHbcnNtsuN1HM81vJrrG7K6pump/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:20.952Z",
+   "response_received_utc": "2026-09-12T15:08:21.616Z",
+   "read_brt": "12:08:21",
+   "bytes": 10079,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_03_VRCAT.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/2Ek943F8zqj2zWvYPu9JMbog1u1tLfYsnwNAZDp5sMfF/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:21.619Z",
+   "response_received_utc": "2026-09-12T15:08:22.305Z",
+   "read_brt": "12:08:22",
+   "bytes": 12117,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_04_Frontier.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/AsSeYCDN6LyHKCGuYvTP2ngd2i9w6DUyVnGguFSZqYEA/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:22.309Z",
+   "response_received_utc": "2026-09-12T15:08:23.181Z",
+   "read_brt": "12:08:23",
+   "bytes": 17878,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_05_ANONBATON.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:23.185Z",
+   "response_received_utc": "2026-09-12T15:08:23.833Z",
+   "read_brt": "12:08:23",
+   "bytes": 9659,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_06_TBC.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:23.837Z",
+   "response_received_utc": "2026-09-12T15:08:24.724Z",
+   "read_brt": "12:08:24",
+   "bytes": 12880,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_07_SCAT.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/Fsey6rXphKexfVfcLWKkNZte9pKfehcG6oajGVS89nkW/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:24.729Z",
+   "response_received_utc": "2026-09-12T15:08:25.581Z",
+   "read_brt": "12:08:25",
+   "bytes": 14969,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_08_BUMBLECOIN.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/2wJPoLHNkBj9h7TnAiLWun8PSHbWjtj5iBf6n4otkuEp/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:25.586Z",
+   "response_received_utc": "2026-09-12T15:08:26.308Z",
+   "read_brt": "12:08:26",
+   "bytes": 10529,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_09_OOF.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/8rNg8UeVroqkgWa8mHyMVyB7hb5JDXNvS2FQgqCepoR4/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:26.317Z",
+   "response_received_utc": "2026-09-12T15:08:27.203Z",
+   "read_brt": "12:08:27",
+   "bytes": 12808,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "10_rugcheck_10_GAYCOIN.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/CNhrRe6Td3727YjN5MfxcXEAPTJ4odzLu3VUdyBz3AQr/report",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:27.208Z",
+   "response_received_utc": "2026-09-12T15:08:28.204Z",
+   "read_brt": "12:08:28",
+   "bytes": 40978,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": "11_dexscreener_tokens_batch.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/5KjeZ4JzTJWyHcKwjcPimApPvY3ASmoJKMGDQat1dFUx,f14BwNmcgdqJ1y8htHbcnNtsuN1HM81vJrrG7K6pump,2Ek943F8zqj2zWvYPu9JMbog1u1tLfYsnwNAZDp5sMfF,AsSeYCDN6LyHKCGuYvTP2ngd2i9w6DUyVnGguFSZqYEA,DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump,57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg,Fsey6rXphKexfVfcLWKkNZte9pKfehcG6oajGVS89nkW,2wJPoLHNkBj9h7TnAiLWun8PSHbWjtj5iBf6n4otkuEp,8rNg8UeVroqkgWa8mHyMVyB7hb5JDXNvS2FQgqCepoR4,CNhrRe6Td3727YjN5MfxcXEAPTJ4odzLu3VUdyBz3AQr,8uxSg41M2rgQm7nyz5AA9iem7G8guG3Wv2Pbou9Ypump",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:28.213Z",
+   "response_received_utc": "2026-09-12T15:08:28.649Z",
+   "read_brt": "12:08:28",
+   "bytes": 11200,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3e4ceb55f28-GRU"
+   }
+  },
+  {
+   "file": "13_dexscreener_boosts_latest.json",
+   "url": "https://api.dexscreener.com/token-boosts/latest/v1",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:29.750Z",
+   "response_received_utc": "2026-09-12T15:08:29.848Z",
+   "read_brt": "12:08:29",
+   "bytes": 21971,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3ee5b6f6ea9-GRU"
+   }
+  },
+  {
+   "file": "14_dexscreener_boosts_top.json",
+   "url": "https://api.dexscreener.com/token-boosts/top/v1",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:30.949Z",
+   "response_received_utc": "2026-09-12T15:08:31.025Z",
+   "read_brt": "12:08:31",
+   "bytes": 22051,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3f5cbedf1ce-GRU"
+   }
+  },
+  {
+   "file": "15_dexscreener_profiles_latest.json",
+   "url": "https://api.dexscreener.com/token-profiles/latest/v1",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:32.125Z",
+   "response_received_utc": "2026-09-12T15:08:32.204Z",
+   "read_brt": "12:08:32",
+   "bytes": 22865,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd3fd382cdfda-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_月薪喵.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/5KjeZ4JzTJWyHcKwjcPimApPvY3ASmoJKMGDQat1dFUx",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:33.305Z",
+   "response_received_utc": "2026-09-12T15:08:33.539Z",
+   "read_brt": "12:08:33",
+   "bytes": 25,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd40489cc8bdd-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_PONYX.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/f14BwNmcgdqJ1y8htHbcnNtsuN1HM81vJrrG7K6pump",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:34.639Z",
+   "response_received_utc": "2026-09-12T15:08:34.846Z",
+   "read_brt": "12:08:34",
+   "bytes": 25,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd40cecb2a2ef-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_VRCAT.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/2Ek943F8zqj2zWvYPu9JMbog1u1tLfYsnwNAZDp5sMfF",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:35.947Z",
+   "response_received_utc": "2026-09-12T15:08:36.183Z",
+   "read_brt": "12:08:36",
+   "bytes": 25,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd4154e5a49ac-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_Frontier.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/AsSeYCDN6LyHKCGuYvTP2ngd2i9w6DUyVnGguFSZqYEA",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:37.284Z",
+   "response_received_utc": "2026-09-12T15:08:37.481Z",
+   "read_brt": "12:08:37",
+   "bytes": 25,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd41d5ac1bd9e-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_ANONBATON.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:38.581Z",
+   "response_received_utc": "2026-09-12T15:08:38.811Z",
+   "read_brt": "12:08:38",
+   "bytes": 182,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd42599ecfbee-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_TBC.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:39.912Z",
+   "response_received_utc": "2026-09-12T15:08:40.118Z",
+   "read_brt": "12:08:40",
+   "bytes": 25,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd42dcc3b1352-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_SCAT.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/Fsey6rXphKexfVfcLWKkNZte9pKfehcG6oajGVS89nkW",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:41.218Z",
+   "response_received_utc": "2026-09-12T15:08:41.515Z",
+   "read_brt": "12:08:41",
+   "bytes": 182,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd435fcec88fb-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_BUMBLECOIN.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/2wJPoLHNkBj9h7TnAiLWun8PSHbWjtj5iBf6n4otkuEp",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:42.615Z",
+   "response_received_utc": "2026-09-12T15:08:42.917Z",
+   "read_brt": "12:08:42",
+   "bytes": 182,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd43e9b0e74c3-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_OOF.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/8rNg8UeVroqkgWa8mHyMVyB7hb5JDXNvS2FQgqCepoR4",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:44.017Z",
+   "response_received_utc": "2026-09-12T15:08:44.222Z",
+   "read_brt": "12:08:44",
+   "bytes": 25,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd4476a8f480d-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_GAYCOIN.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/CNhrRe6Td3727YjN5MfxcXEAPTJ4odzLu3VUdyBz3AQr",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:45.322Z",
+   "response_received_utc": "2026-09-12T15:08:45.601Z",
+   "read_brt": "12:08:45",
+   "bytes": 182,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd45008069ddf-GRU"
+   }
+  },
+  {
+   "file": "16_dexscreener_orders_meme.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/8uxSg41M2rgQm7nyz5AA9iem7G8guG3Wv2Pbou9Ypump",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:46.702Z",
+   "response_received_utc": "2026-09-12T15:08:46.919Z",
+   "read_brt": "12:08:46",
+   "bytes": 25,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd4583847b7a9-GRU"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://photon-sol.tinyastro.io/en/lp/DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump",
+   "http": 403,
+   "request_started_utc": "2026-09-12T15:08:49.420Z",
+   "response_received_utc": "2026-09-12T15:08:49.628Z",
+   "read_brt": "12:08:49",
+   "bytes": 5905,
+   "headers": {
+    "server": "cloudflare"
+   },
+   "error": "HTTP Error 403: Forbidden"
+  },
+  {
+   "file": null,
+   "url": "https://photon-sol.tinyastro.io/en/lp/f14BwNmcgdqJ1y8htHbcnNtsuN1HM81vJrrG7K6pump",
+   "http": 403,
+   "request_started_utc": "2026-09-12T15:08:52.129Z",
+   "response_received_utc": "2026-09-12T15:08:52.203Z",
+   "read_brt": "12:08:52",
+   "bytes": 5902,
+   "headers": {
+    "server": "cloudflare"
+   },
+   "error": "HTTP Error 403: Forbidden"
+  },
+  {
+   "file": null,
+   "url": "https://photon-sol.tinyastro.io/en/lp/8uxSg41M2rgQm7nyz5AA9iem7G8guG3Wv2Pbou9Ypump",
+   "http": 403,
+   "request_started_utc": "2026-09-12T15:08:54.703Z",
+   "response_received_utc": "2026-09-12T15:08:54.792Z",
+   "read_brt": "12:08:54",
+   "bytes": 5905,
+   "headers": {
+    "server": "cloudflare"
+   },
+   "error": "HTTP Error 403: Forbidden"
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:54.792Z",
+   "response_received_utc": "2026-09-12T15:08:55.479Z",
+   "read_brt": "12:08:55",
+   "bytes": 12653,
+   "headers": {
+    "server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/fees/",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:55.486Z",
+   "response_received_utc": "2026-09-12T15:08:55.926Z",
+   "read_brt": "12:08:55",
+   "bytes": 12438,
+   "headers": {
+    "server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/data-api/real-time/",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:55.936Z",
+   "response_received_utc": "2026-09-12T15:08:56.607Z",
+   "read_brt": "12:08:56",
+   "bytes": 67764,
+   "headers": {
+    "server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/local-trading-api/trading-api/",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:56.622Z",
+   "response_received_utc": "2026-09-12T15:08:57.286Z",
+   "read_brt": "12:08:57",
+   "bytes": 53645,
+   "headers": {
+    "server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/local-trading-api/jito-bundles/",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:57.303Z",
+   "response_received_utc": "2026-09-12T15:08:58.136Z",
+   "read_brt": "12:08:58",
+   "bytes": 88509,
+   "headers": {
+    "server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://status.pumpportal.fun/",
+   "http": 0,
+   "request_started_utc": "2026-09-12T15:08:58.157Z",
+   "response_received_utc": "2026-09-12T15:08:58.180Z",
+   "read_brt": "12:08:58",
+   "bytes": 0,
+   "error": "URLError(gaierror(11001, 'getaddrinfo failed'))"
+  },
+  {
+   "file": "30_defillama_pumpfun_fees.json",
+   "url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:08:58.180Z",
+   "response_received_utc": "2026-09-12T15:09:02.152Z",
+   "read_brt": "12:09:02",
+   "bytes": 64319,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd4a008d2f203-GRU"
+   }
+  },
+  {
+   "file": "32_defillama_pumpswap_dex.json",
+   "url": "https://api.llama.fi/summary/dexs/pumpswap?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:09:02.169Z",
+   "response_received_utc": "2026-09-12T15:09:03.486Z",
+   "read_brt": "12:09:03",
+   "bytes": 14958,
+   "headers": {
+    "server": "cloudflare",
+    "cf-ray": "a39fd4bbbdfadebe-GRU"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://docs.dexscreener.com/api/reference",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:09:03.490Z",
+   "response_received_utc": "2026-09-12T15:09:04.595Z",
+   "read_brt": "12:09:04",
+   "bytes": 730307,
+   "headers": {
+    "cf-ray": "a39fd4c15ad3f24b-GRU",
+    "server": "cloudflare"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://api.rugcheck.xyz/swagger/index.html",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:09:04.813Z",
+   "response_received_utc": "2026-09-12T15:09:05.508Z",
+   "read_brt": "12:09:05",
+   "bytes": 2759,
+   "headers": {
+    "server": "nginx"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://docs.rugcheck.xyz/",
+   "http": 0,
+   "request_started_utc": "2026-09-12T15:09:05.509Z",
+   "response_received_utc": "2026-09-12T15:09:05.520Z",
+   "read_brt": "12:09:05",
+   "bytes": 0,
+   "error": "URLError(gaierror(11001, 'getaddrinfo failed'))"
+  },
+  {
+   "file": null,
+   "url": "https://docs.jito.wtf/lowlatencytxnsend/",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:09:05.520Z",
+   "response_received_utc": "2026-09-12T15:09:05.947Z",
+   "read_brt": "12:09:05",
+   "bytes": 90417,
+   "headers": {
+    "cf-ray": "a39fd4ce5f98998e-GRU",
+    "server": "cloudflare"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://solana.com/docs/references/clusters",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:09:06.223Z",
+   "response_received_utc": "2026-09-12T15:09:07.671Z",
+   "read_brt": "12:09:07",
+   "bytes": 906508,
+   "headers": {
+    "server": "Vercel"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+   "http": 200,
+   "request_started_utc": "2026-09-12T15:09:07.716Z",
+   "response_received_utc": "2026-09-12T15:09:07.973Z",
+   "read_brt": "12:09:07",
+   "bytes": 295
+  }
+ ]
+}

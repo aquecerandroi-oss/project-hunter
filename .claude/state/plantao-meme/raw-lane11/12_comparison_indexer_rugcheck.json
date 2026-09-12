@@ -1,0 +1,737 @@
+{
+ "note": "derived from 03_imc_*.json, 10_rugcheck_*.json, 11/13/14/15/16 dexscreener; top10_ex_pool excludes topHolders whose address/owner is knownAccounts type AMM; times BRT",
+ "grad_board_stats": {
+  "n_pump": 48,
+  "n_board": 50,
+  "gd_min_brt": "12/09 10:09:30",
+  "gd_max_brt": "12/09 12:07:18",
+  "delta_min": -1,
+  "q1": -1,
+  "med": 0.0,
+  "q3": 2,
+  "max": 687008,
+  "le60": 40,
+  "mid": 2,
+  "gt300": 6,
+  "rate_per_h": 25.5,
+  "span_h": 1.96,
+  "fast": {
+   "n": 40,
+   "bo_gt0": 4,
+   "bo_q3": 0,
+   "bo_max": 0.18,
+   "t10_med": 1.9269,
+   "sn_med": 15,
+   "nh_med": 378,
+   "mc_med": 2511.1002256587503
+  },
+  "slow": {
+   "n": 6,
+   "bo_gt0": 6,
+   "bo_q3": 2.1528,
+   "bo_max": 15.454,
+   "t10_med": 12.1778,
+   "sn_med": 6,
+   "nh_med": 222,
+   "mc_med": 22113.884016459167
+  }
+ },
+ "fresh": [
+  {
+   "t": "ANONBATON",
+   "mint": "DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump",
+   "gd_brt": "12/09 12:07:18",
+   "created_brt": "12/09 12:00:09",
+   "gd_minus_created_s": 428
+  },
+  {
+   "t": "PONYX",
+   "mint": "f14BwNmcgdqJ1y8htHbcnNtsuN1HM81vJrrG7K6pump",
+   "gd_brt": "12/09 12:06:57",
+   "created_brt": "12/09 12:06:56",
+   "gd_minus_created_s": 0
+  },
+  {
+   "t": "meme",
+   "mint": "8uxSg41M2rgQm7nyz5AA9iem7G8guG3Wv2Pbou9Ypump",
+   "gd_brt": "12/09 12:00:43",
+   "created_brt": "12/09 12:00:42",
+   "gd_minus_created_s": 0
+  }
+ ],
+ "rows": [
+  {
+   "t": "月薪喵",
+   "mint": "5KjeZ4JzTJWyHcKwjcPimApPvY3ASmoJKMGDQat1dFUx",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "12/09 10:42:30",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "age_at_read_s": 5198,
+   "ix_t10": 0,
+   "rc_top10_ex": 23.0,
+   "diff_t10_pp": -23.0,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 544,
+   "rc_holders": 1501,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 7,
+   "ix_kol": 1,
+   "rc_graphInsiders": 4,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 24544,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.2,
+   "ix_mcap": 78304,
+   "ix_ath": 175858,
+   "tx": 2157,
+   "pf_per_tx_lamports": 464249,
+   "tip_per_tx_lamports": 212963,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "12/09 10:47:17",
+   "dex_pair_minus_gd_s": null,
+   "dex_liq": 24194,
+   "dex_mcap": 78896,
+   "dex_boosts_field": null,
+   "dex_info_present": false,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   }
+  },
+  {
+   "t": "PONYX",
+   "mint": "f14BwNmcgdqJ1y8htHbcnNtsuN1HM81vJrrG7K6pump",
+   "pg": "pump",
+   "pl": "",
+   "created_brt": "12/09 12:06:56",
+   "gd_brt": "12/09 12:06:57",
+   "gd_minus_created_s": 1,
+   "age_at_read_s": 132,
+   "ix_t10": 0.0108,
+   "rc_top10_ex": 97.24,
+   "diff_t10_pp": -97.23,
+   "ix_dh": 0,
+   "rc_creator": 97.2263,
+   "ix_nh": 21,
+   "rc_holders": 37,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 8,
+   "ix_kol": 0,
+   "rc_graphInsiders": 0,
+   "rc_score_norm": 66,
+   "rc_risks": [
+    [
+     "High market cap per holder",
+     "warn"
+    ],
+    [
+     "Top 10 holders high ownership",
+     "danger"
+    ],
+    [
+     "Single holder ownership",
+     "danger"
+    ],
+    [
+     "High ownership",
+     "danger"
+    ]
+   ],
+   "rc_liq": 128327,
+   "rc_lp": [
+    [
+     "pump_fun_amm",
+     100
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.6,
+   "ix_mcap": 2359974,
+   "ix_ath": 2359974,
+   "tx": 10,
+   "pf_per_tx_lamports": 27910,
+   "tip_per_tx_lamports": 30000,
+   "dex_dexId": "pumpswap",
+   "dex_pairCreatedAt_brt": "12/09 12:06:56",
+   "dex_pair_minus_gd_s": -1,
+   "dex_liq": 128429,
+   "dex_mcap": 2360224,
+   "dex_boosts_field": null,
+   "dex_info_present": false,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   }
+  },
+  {
+   "t": "VRCAT",
+   "mint": "2Ek943F8zqj2zWvYPu9JMbog1u1tLfYsnwNAZDp5sMfF",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "09/09 21:56:35",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "age_at_read_s": 223953,
+   "ix_t10": 45.0097,
+   "rc_top10_ex": 23.63,
+   "diff_t10_pp": 21.38,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 180,
+   "rc_holders": 263,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 0,
+   "ix_kol": 0,
+   "rc_graphInsiders": 0,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 15391,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     99.99999998080621
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 3.0,
+   "ix_mcap": 36211,
+   "ix_ath": 53586,
+   "tx": 230,
+   "pf_per_tx_lamports": 401255,
+   "tip_per_tx_lamports": 235322,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "12/09 12:05:25",
+   "dex_pair_minus_gd_s": null,
+   "dex_liq": 15690,
+   "dex_mcap": 33332,
+   "dex_boosts_field": null,
+   "dex_info_present": false,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   }
+  },
+  {
+   "t": "Frontier",
+   "mint": "AsSeYCDN6LyHKCGuYvTP2ngd2i9w6DUyVnGguFSZqYEA",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "12/09 11:04:23",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "age_at_read_s": 3885,
+   "ix_t10": 0,
+   "rc_top10_ex": 17.91,
+   "diff_t10_pp": -17.91,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 464,
+   "rc_holders": 2136,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 14,
+   "ix_kol": 11,
+   "rc_graphInsiders": 8,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 19448,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.1,
+   "ix_mcap": 47111,
+   "ix_ath": 244833,
+   "tx": 4141,
+   "pf_per_tx_lamports": 562387,
+   "tip_per_tx_lamports": 409848,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "12/09 11:08:49",
+   "dex_pair_minus_gd_s": null,
+   "dex_liq": 19289,
+   "dex_mcap": 46073,
+   "dex_boosts_field": null,
+   "dex_info_present": false,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   }
+  },
+  {
+   "t": "ANONBATON",
+   "mint": "DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump",
+   "pg": "pump",
+   "pl": "",
+   "created_brt": "12/09 12:00:09",
+   "gd_brt": "12/09 12:07:18",
+   "gd_minus_created_s": 429,
+   "age_at_read_s": 539,
+   "ix_t10": 16.6477,
+   "rc_top10_ex": 16.79,
+   "diff_t10_pp": -0.14,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 264,
+   "rc_holders": 373,
+   "ix_bo": 1.5858,
+   "ix_so": 0,
+   "ix_sn": 0,
+   "ix_kol": 0,
+   "rc_graphInsiders": 0,
+   "rc_score_norm": 1,
+   "rc_risks": [],
+   "rc_liq": 16023,
+   "rc_lp": [
+    [
+     "pump_fun_amm",
+     100
+    ]
+   ],
+   "detectedAt_minus_created_s": 3.4,
+   "ix_mcap": 45203,
+   "ix_ath": 53345,
+   "tx": 425,
+   "pf_per_tx_lamports": 570621,
+   "tip_per_tx_lamports": 208277,
+   "dex_dexId": "pumpswap",
+   "dex_pairCreatedAt_brt": "12/09 12:07:17",
+   "dex_pair_minus_gd_s": -1,
+   "dex_liq": 16832,
+   "dex_mcap": 48275,
+   "dex_boosts_field": null,
+   "dex_info_present": true,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": true,
+   "orders": {
+    "orders": [
+     {
+      "chainId": "solana",
+      "tokenAddress": "DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump",
+      "type": "tokenProfile",
+      "status": "approved",
+      "paymentTimestamp": 1789225566502
+     }
+    ],
+    "boosts": []
+   }
+  },
+  {
+   "t": "TBC",
+   "mint": "57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "10/09 04:19:28",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "age_at_read_s": 200980,
+   "ix_t10": 0.0001,
+   "rc_top10_ex": 24.15,
+   "diff_t10_pp": -24.15,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 23,
+   "rc_holders": 327,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 19,
+   "ix_kol": 4,
+   "rc_graphInsiders": 0,
+   "rc_score_norm": 17,
+   "rc_risks": [
+    [
+     "Low Liquidity",
+     "warn"
+    ],
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 5404,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.2,
+   "ix_mcap": 4692,
+   "ix_ath": 74566,
+   "tx": 1336,
+   "pf_per_tx_lamports": 312706,
+   "tip_per_tx_lamports": 265708,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "11/09 06:35:29",
+   "dex_pair_minus_gd_s": null,
+   "dex_liq": 5832,
+   "dex_mcap": 4752,
+   "dex_boosts_field": null,
+   "dex_info_present": false,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   }
+  },
+  {
+   "t": "SCAT",
+   "mint": "Fsey6rXphKexfVfcLWKkNZte9pKfehcG6oajGVS89nkW",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "11/09 12:12:48",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "age_at_read_s": 86180,
+   "ix_t10": 0,
+   "rc_top10_ex": 38.14,
+   "diff_t10_pp": -38.14,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 1619,
+   "rc_holders": 667,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 0,
+   "ix_kol": 3,
+   "rc_graphInsiders": 4,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 14292,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.6,
+   "ix_mcap": 20654,
+   "ix_ath": 548372,
+   "tx": 1142,
+   "pf_per_tx_lamports": 376774,
+   "tip_per_tx_lamports": 118621,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "11/09 16:48:23",
+   "dex_pair_minus_gd_s": null,
+   "dex_liq": 12372,
+   "dex_mcap": 21467,
+   "dex_boosts_field": null,
+   "dex_info_present": true,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [
+     {
+      "chainId": "solana",
+      "tokenAddress": "Fsey6rXphKexfVfcLWKkNZte9pKfehcG6oajGVS89nkW",
+      "type": "tokenProfile",
+      "status": "approved",
+      "paymentTimestamp": 1789158483013
+     }
+    ],
+    "boosts": []
+   }
+  },
+  {
+   "t": "BUMBLECOIN",
+   "mint": "2wJPoLHNkBj9h7TnAiLWun8PSHbWjtj5iBf6n4otkuEp",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "10/09 17:31:27",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "age_at_read_s": 153461,
+   "ix_t10": 0.0001,
+   "rc_top10_ex": 16.27,
+   "diff_t10_pp": -16.27,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 932,
+   "rc_holders": 471,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 20,
+   "ix_kol": 4,
+   "rc_graphInsiders": 0,
+   "rc_score_norm": 21,
+   "rc_risks": [
+    [
+     "Low Liquidity",
+     "warn"
+    ],
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 4303,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.3,
+   "ix_mcap": 3499,
+   "ix_ath": 56216,
+   "tx": 1650,
+   "pf_per_tx_lamports": 402786,
+   "tip_per_tx_lamports": 218218,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "10/09 17:45:11",
+   "dex_pair_minus_gd_s": null,
+   "dex_liq": 4512,
+   "dex_mcap": 2803,
+   "dex_boosts_field": null,
+   "dex_info_present": true,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [
+     {
+      "chainId": "solana",
+      "tokenAddress": "2wJPoLHNkBj9h7TnAiLWun8PSHbWjtj5iBf6n4otkuEp",
+      "type": "tokenProfile",
+      "status": "approved",
+      "paymentTimestamp": 1789073060419
+     }
+    ],
+    "boosts": []
+   }
+  },
+  {
+   "t": "OOF",
+   "mint": "8rNg8UeVroqkgWa8mHyMVyB7hb5JDXNvS2FQgqCepoR4",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "09/09 15:21:09",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "age_at_read_s": 247679,
+   "ix_t10": 0.0001,
+   "rc_top10_ex": 27.34,
+   "diff_t10_pp": -27.34,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 33,
+   "rc_holders": 282,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 0,
+   "ix_kol": 3,
+   "rc_graphInsiders": 0,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 7824,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.8,
+   "ix_mcap": 5964,
+   "ix_ath": 63473,
+   "tx": 825,
+   "pf_per_tx_lamports": 284190,
+   "tip_per_tx_lamports": 157338,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "09/09 15:28:05",
+   "dex_pair_minus_gd_s": null,
+   "dex_liq": 6510,
+   "dex_mcap": 6092,
+   "dex_boosts_field": null,
+   "dex_info_present": false,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   }
+  },
+  {
+   "t": "GAYCOIN",
+   "mint": "CNhrRe6Td3727YjN5MfxcXEAPTJ4odzLu3VUdyBz3AQr",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "10/09 12:22:48",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "age_at_read_s": 171980,
+   "ix_t10": 0.0001,
+   "rc_top10_ex": 20.09,
+   "diff_t10_pp": -20.09,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 8509,
+   "rc_holders": 3662,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 1,
+   "ix_kol": 1,
+   "rc_graphInsiders": 0,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 7508,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.3,
+   "ix_mcap": 5542,
+   "ix_ath": 2555420,
+   "tx": 7630,
+   "pf_per_tx_lamports": 453307,
+   "tip_per_tx_lamports": 235287,
+   "dex_dexId": "meteora",
+   "dex_pairCreatedAt_brt": "10/09 12:40:57",
+   "dex_pair_minus_gd_s": null,
+   "dex_liq": 76640,
+   "dex_mcap": 1133715,
+   "dex_boosts_field": null,
+   "dex_info_present": true,
+   "boost_latest": false,
+   "boost_top": false,
+   "boost_top_amount": null,
+   "profile_latest": false,
+   "orders": {
+    "orders": [
+     {
+      "chainId": "solana",
+      "tokenAddress": "CNhrRe6Td3727YjN5MfxcXEAPTJ4odzLu3VUdyBz3AQr",
+      "type": "tokenProfile",
+      "status": "approved",
+      "paymentTimestamp": 1789054753088
+     }
+    ],
+    "boosts": []
+   }
+  }
+ ]
+}

@@ -1,0 +1,619 @@
+[
+ {
+  "url": "https://dexscreener.com/solana/apikwmrgm6xpupi6ggr9mcltzxszvnhqaqjdkgpgpump",
+  "chainId": "solana",
+  "tokenAddress": "ApikwMrgm6XPupi6ggR9mCLTzXSzvnHqAQjdKgpgpump",
+  "description": "Cat baton is coming for billions and is going to bring back pumpfun in the process.",
+  "icon": "lVyFJTF-5CIiNd2o",
+  "header": "https://cdn.dexscreener.com/cms/images/CyDEPVUscfVJK2bI?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/ApikwMrgm6XPupi6ggR9mCLTzXSzvnHqAQjdKgpgpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://catbaton.lol/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/CatBatonX"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/solana/2dv9nz8wekdx98grvpjrlub5diwbtwpz52frlqxepump",
+  "chainId": "solana",
+  "tokenAddress": "2dV9NZ8WEKDX98GrvpjRLUb5DiwBtwPZ52fRLQxEpump",
+  "description": "☀️ We Must Pace the Frontier\nBeyond the edge. Ahead of the crowd.\nA new frontier on Solana.\n$FRONTIER",
+  "icon": "GSwRyIP1GM89gfVd",
+  "header": "https://cdn.dexscreener.com/cms/images/dbBCDIz72sn4ct__?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/2dV9NZ8WEKDX98GrvpjRLUb5DiwBtwPZ52fRLQxEpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://www.frontieronsol.lol"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/sol_frontier"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/solana/8b5c8hbbckdd4f49rhjcicntjs68vro8zjlumjnfzzhg",
+  "chainId": "solana",
+  "tokenAddress": "8b5c8hbbcKdd4F49RHjCiCntJS68Vro8ZJLumJNFZZHg",
+  "description": "Burstcoin, The only coin mentioned by 4 trillion dollar company Nvidia.",
+  "icon": "nymyrPm7aoO-SIM0",
+  "header": "https://cdn.dexscreener.com/cms/images/lj2woLqKpvX5KKCA?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/8b5c8hbbcKdd4F49RHjCiCntJS68Vro8ZJLumJNFZZHg?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://github.com/NVIDIA/sentiment-discovery/blob/17bcf051648d086a39d146378cfdf8060bb33955/data/semeval/val.csv#L397"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/i/communities/2004996398610047321"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/dout3smqeeuaxrjwvfmw3uj98sbry8zaubsusi2ypump",
+  "chainId": "solana",
+  "tokenAddress": "Dout3SmQeeuaxrjwvFMW3uJ98SBry8ZAubSusi2Ypump",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/Dout3SmQeeuaxrjwvFMW3uJ98SBry8ZAubSusi2Ypump?timestamp=1789225800000",
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/3xbnqg4txddunp93ioxendturpbf2nxfbwga1t9cpump",
+  "chainId": "solana",
+  "tokenAddress": "3xbNQg4tXDdUNp93ioXeNDTURPbf2nXFbwga1t9cpump",
+  "description": "The moment memecoins started trading alongside real stocks, WALLY clocked in \n\nBorn on Solana for the moment memes and real stocks started trading on the same rails \n\nThe mascot of the crossover \nTradFi clocks out WALLY doesn’t \n\nThe opening bell just became a bark $WALLY",
+  "icon": "XnOFnz-xwzxT6B69",
+  "header": "https://cdn.dexscreener.com/cms/images/uSBLlQ2Em-NM7o3s?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/3xbNQg4tXDdUNp93ioXeNDTURPbf2nXFbwga1t9cpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://www.wallycoin.fun/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/realdogwally"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xa22723dd32af7ef51e2d2dd76cc509e11a9c8747",
+  "chainId": "robinhood",
+  "tokenAddress": "0xa22723Dd32Af7EF51E2D2Dd76CC509e11a9c8747",
+  "description": "The memecoin that feeds cats.\n\n$BANGERCAT trades against NVDA. Every trading fee funds street-cat rescues: food, shelter and medical care. No empty promises: every mission is filmed and published",
+  "icon": "icHFtBjWniGNPjiw",
+  "header": "https://cdn.dexscreener.com/cms/images/FBhMqq-93dUacgOq?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xa22723dd32af7ef51e2d2dd76cc509e11a9c8747?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://banger.cat/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Banger_Cat"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/banger_cat"
+   },
+   {
+    "type": "instagram",
+    "url": "https://www.instagram.com/banger_cat/"
+   }
+  ],
+  "totalAmount": 20,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x26ae57104396d7b438764738d6d2d0aa4b42cfd5",
+  "chainId": "robinhood",
+  "tokenAddress": "0x26ae57104396d7b438764738D6d2d0Aa4B42CFD5",
+  "description": "New nvidia mascot plushie named Morty.",
+  "icon": "lIUQfJS9OKJdvYlr",
+  "header": "https://cdn.dexscreener.com/cms/images/ZZjAKXcnNuB4B98a?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x26ae57104396d7b438764738d6d2d0aa4b42cfd5?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://mortyhoods.lol"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/mortyhoods"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x4f3081e412a6a44e33d0334a03f06284ab000220",
+  "chainId": "robinhood",
+  "tokenAddress": "0x4f3081E412a6a44e33d0334a03f06284AB000220",
+  "description": "Safemoon reflects Robinhood ETH per transaction and gives 100% of it back to the holders. Community is in control.",
+  "icon": "hQ8W8tah1PaTq2YI",
+  "header": "https://cdn.dexscreener.com/cms/images/ESSb_xrnQC0X56I0?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x4f3081e412a6a44e33d0334a03f06284ab000220?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://safemoon.world/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/safemoonrhcto"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/SafemoonRHeth"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/2g8jcxx6hcttxmz8ngs2z3qs6z2bjzlhdjt7ynsgpump",
+  "chainId": "solana",
+  "tokenAddress": "2G8jCXX6HCTtXmZ8ngS2Z3qs6z2BJzLhdJt7YNsgpump",
+  "description": "a data terminal for a learning agent.",
+  "icon": "2waG4nJfKJGNkiQ0",
+  "header": "https://cdn.dexscreener.com/cms/images/WwoZCFsgNimQoL9B?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/2G8jCXX6HCTtXmZ8ngS2Z3qs6z2BJzLhdJt7YNsgpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://datadogcoin.fun"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/SolDataDog"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xa22723dd32af7ef51e2d2dd76cc509e11a9c8747",
+  "chainId": "robinhood",
+  "tokenAddress": "0xa22723Dd32Af7EF51E2D2Dd76CC509e11a9c8747",
+  "description": "The memecoin that feeds cats.\n\n$BANGERCAT trades against NVDA. Every trading fee funds street-cat rescues: food, shelter and medical care. No empty promises: every mission is filmed and published",
+  "icon": "icHFtBjWniGNPjiw",
+  "header": "https://cdn.dexscreener.com/cms/images/FBhMqq-93dUacgOq?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xa22723dd32af7ef51e2d2dd76cc509e11a9c8747?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://banger.cat/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Banger_Cat"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/banger_cat"
+   },
+   {
+    "type": "instagram",
+    "url": "https://www.instagram.com/banger_cat/"
+   }
+  ],
+  "totalAmount": 20,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xac684eae092ccfbfd1a3857e821eb747437f6714",
+  "chainId": "robinhood",
+  "tokenAddress": "0xAc684Eae092CCfbfD1a3857e821eB747437F6714",
+  "description": "Long cat on Robin",
+  "icon": "ZdN9d0VtFRojnp5a",
+  "header": "https://cdn.dexscreener.com/cms/images/5VeRQAlH16tIcRfo?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xac684eae092ccfbfd1a3857e821eb747437f6714?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://www.longcatrobin.site/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/LONGCAT_ROBIN"
+   }
+  ],
+  "totalAmount": 50,
+  "amount": 50
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xa49e56cb03aa6690bb40b9aeefb0ca22ad8b1e18",
+  "chainId": "robinhood",
+  "tokenAddress": "0xA49e56cB03aa6690bB40B9aEEfb0ca22Ad8B1E18",
+  "description": "a new generation of intelligence",
+  "icon": "DnX8fldWwc3ZQrOf",
+  "header": "https://cdn.dexscreener.com/cms/images/ADUFTwXLU_YV6ogG?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xa49e56cb03aa6690bb40b9aeefb0ca22ad8b1e18?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://petaltman.com/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/PETaltman"
+   }
+  ],
+  "totalAmount": 50,
+  "amount": 50
+ },
+ {
+  "url": "https://dexscreener.com/solana/j34g9pftsfenidz9quvxzidl6cehjaieh35hveyy4fhm",
+  "chainId": "solana",
+  "tokenAddress": "J34G9pftSfEnidz9quVXziDL6CeHjaieh35hvEYY4FHM",
+  "icon": "dwBV3Oaw8ohv779Y",
+  "header": "https://cdn.dexscreener.com/cms/images/qSqMkCtR0wTBtKzw?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/J34G9pftSfEnidz9quVXziDL6CeHjaieh35hvEYY4FHM?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://www.stonkfun.xyz/token/J34G9pftSfEnidz9quVXziDL6CeHjaieh35hvEYY4FHM"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/STONKLET_SF"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/5eyvp6fcplacaumy9xbsbgxey3ah5kemjg9kex2gpump",
+  "chainId": "solana",
+  "tokenAddress": "5EyvP6FCPLAcAUMY9xbsbGXeY3AH5KeMJg9KEx2Gpump",
+  "description": "📦 The cat inside the machine.\n🟢 Powered by GPUs. Fueled by memes.\n⚡️ $NVICAT on Solana.",
+  "icon": "CFYQruRLw18Ve4vO",
+  "header": "https://cdn.dexscreener.com/cms/images/RvnnhbJUAGzp0vq-?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/5EyvP6FCPLAcAUMY9xbsbGXeY3AH5KeMJg9KEx2Gpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://www.nvicatonsol.lol/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/nvicatsol"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x61752da5a4c354ec73646fa2135930a2e59ef94c",
+  "chainId": "robinhood",
+  "tokenAddress": "0x61752da5A4C354EC73646FA2135930A2E59ef94C",
+  "description": "Launch via PONS. Go live with Ponstream.",
+  "icon": "1vsQzDkfR0g6Z45d",
+  "header": "https://cdn.dexscreener.com/cms/images/RGLooF4BistofT2K?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x61752da5a4c354ec73646fa2135930a2e59ef94c?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://ponstream.live/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/ponstream_rh"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/Ponstream"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/solana/7vxwhztduut85xqkwjkcbfbkx6lcrpod4sazmckspump",
+  "chainId": "solana",
+  "tokenAddress": "7VXWhZtDuUt85xqKWjkcbfBkX6LcRPod4SazmCkSpump",
+  "description": "Neko Chan ($NEKO) is a playful anime-inspired meme coin bringing cute cat energy, colorful vibes, and community spirit together in one charming digital world.",
+  "icon": "LhSdbrZINgc8x1cP",
+  "header": "https://cdn.dexscreener.com/cms/images/6jtDcz4Po3EVgJDw?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/7VXWhZtDuUt85xqKWjkcbfBkX6LcRPod4SazmCkSpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://nekochan.biz"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/neko_sol_chan"
+   }
+  ],
+  "totalAmount": 50,
+  "amount": 50
+ },
+ {
+  "url": "https://dexscreener.com/bsc/0x7d1a8dbb40b7b5518ef69b93a6faeba91eea7777",
+  "chainId": "bsc",
+  "tokenAddress": "0x7d1A8DBB40B7b5518ef69b93a6fAEba91eea7777",
+  "description": "BITCAT is a community-driven project built around Bitcoin culture. Simple meme, strong community, and fully in the hands of the people pushing it forward.",
+  "icon": "OMmoz_fqGvnas3Hk",
+  "header": "https://cdn.dexscreener.com/cms/images/59sC11Z2Xlny5B50?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/bsc/0x7d1a8dbb40b7b5518ef69b93a6faeba91eea7777?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://x.com/i/communities/1845350529490403676"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/bitcatbnb?s=11"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/solana/bszr7tcg2kefqnvzcjbcmdiloqmsf5hdhwol6w8tuebz",
+  "chainId": "solana",
+  "tokenAddress": "BSZR7tCG2KefQNVzcJbcmdiLoqmsf5hdhwoL6W8tuEbZ",
+  "description": "Buy XRP, get XRP.",
+  "icon": "OU6-jKhHiFNy4_1W",
+  "header": "https://cdn.dexscreener.com/cms/images/BIlp8wnD6i1wrwHW?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BSZR7tCG2KefQNVzcJbcmdiLoqmsf5hdhwoL6W8tuEbZ?timestamp=1789225800000",
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/fm8mttckgxpybelh68lqswxtwaw1vf8gsrjy4diqpump",
+  "chainId": "solana",
+  "tokenAddress": "FM8MTTCKGXpYbELh68LqswXTWAw1Vf8gSrJy4Diqpump",
+  "description": "Cute cats. Viral memes. Infinite purrs. OnlyCats turns every whisker into legendary crypto-powered fun.",
+  "icon": "TDY4hB_tDokfeBxX",
+  "header": "https://cdn.dexscreener.com/cms/images/A_dMYo9m5xcgqkwr?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/FM8MTTCKGXpYbELh68LqswXTWAw1Vf8gSrJy4Diqpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://www.onlycatscoin.site"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/SolOnlyCats"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x66921cd6185f9cbf524e0c9f39c204e8200919ed",
+  "chainId": "robinhood",
+  "tokenAddress": "0x66921cd6185f9cBF524e0c9F39C204e8200919eD",
+  "description": "Hold $PERDIEM and you are on the clock. Every hour on the hour, the clock claims the creator fee, buys tokenized NVDA and sends it to every holder, pro rata. No claims, no clicks, no minimum. 80% to holders, 20% to the operator, every payment on chain. Dev tokens burned at launch.",
+  "icon": "MeIQpUXMiyQiWBMx",
+  "header": "https://cdn.dexscreener.com/cms/images/kCeYZlo0cX_d49WH?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x66921cd6185f9cbf524e0c9f39c204e8200919ed?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://perdiem.fun"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/perdiemdotfun"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/solana/btdiqvagucrtyglffzmdpucxzgq1wcayt2jx3occpump",
+  "chainId": "solana",
+  "tokenAddress": "BTdiQvaguCrtygLFfZmdpUCxzGQ1WCaYT2Jx3oCcpump",
+  "description": "🍁 The little hippo in the green hat.\nCute, round & ready to roam Solana.\nWelcome to the world of $MAPLE. 🦛🌿",
+  "icon": "R6A6ZMYovgFoc1f8",
+  "header": "https://cdn.dexscreener.com/cms/images/iBcd6rxfAC3HJrJI?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BTdiQvaguCrtygLFfZmdpUCxzGQ1WCaYT2Jx3oCcpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://mapleonsol.lol"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/mableonsol"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x7b137e449fd4b48355961f192f29287fab1c5ed6",
+  "chainId": "robinhood",
+  "tokenAddress": "0x7B137E449fD4b48355961f192F29287FAB1C5ED6",
+  "description": "A card-funded token launchpad. Rono’s proposed model turns funds set aside for spending into coin backing",
+  "icon": "xibrWGB9VHwMSjgg",
+  "header": "https://cdn.dexscreener.com/cms/images/Vy_PW4NRxt4Zo4Td?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x7b137e449fd4b48355961f192f29287fab1c5ed6?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://www.ronolaunch.com/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/ronolaunch"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/bsc/0xee22fce582dc4120f07e13e42b55ee75246e7777",
+  "chainId": "bsc",
+  "tokenAddress": "0xEe22fCE582Dc4120f07e13e42B55Ee75246e7777",
+  "description": "牛梦——牛市从来不只是一场梦。牛来了。你醒了吗？ Niu Meng — 'The bull run was never just a dream.' The bull is here. Are you awake? 🐂",
+  "icon": "SW-a-k-ZzjDZAlCA",
+  "header": "https://cdn.dexscreener.com/cms/images/1pRE2ofOvGzByPdM?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/bsc/0xee22fce582dc4120f07e13e42b55ee75246e7777?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://niumengbsc.com/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/NiumengBSC"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xba527c23903eff094a987197ccd643f2da76e4ff",
+  "chainId": "robinhood",
+  "tokenAddress": "0xba527c23903EFf094A987197cCD643f2da76e4Ff",
+  "icon": "_3aHT-zuGkNa1HlT",
+  "header": "https://cdn.dexscreener.com/cms/images/vf_u3hZFcjDxfYFt?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xba527c23903eff094a987197ccd643f2da76e4ff?timestamp=1789225800000",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/i/communities/2011482903264583842"
+   }
+  ],
+  "totalAmount": 40,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/5fadznmwtqxdnxgzxbei6vctyoachszgovep1kaepump",
+  "chainId": "solana",
+  "tokenAddress": "5FaDzNmwTqxDNXGZxBEi6VCtYoAChSzgoVep1Kaepump",
+  "description": "KIMCHI: THE NASDOG",
+  "icon": "04HKa14zMZXxRgtz",
+  "header": "https://cdn.dexscreener.com/cms/images/6HWIcrl-Cezy_ggr?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/5FaDzNmwTqxDNXGZxBEi6VCtYoAChSzgoVep1Kaepump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://kimchicoin.site"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/SolKimchiCoin"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x3c68382e757193f6ddd12a72dcf0adf93c961769",
+  "chainId": "robinhood",
+  "tokenAddress": "0x3C68382e757193f6DDd12A72DCF0ADF93c961769",
+  "description": "LPAD is the Official Gold Label token of Launchpad, the first Gold Label multi-chain token launchpad. It was launched on Robinhood Chain and trades through a Uniswap V3 pool.",
+  "icon": "kNZOaw9QWdSYejjU",
+  "header": "https://cdn.dexscreener.com/cms/images/7547mEh5JBklnpyy?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x3c68382e757193f6ddd12a72dcf0adf93c961769?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://launchpad.meme/"
+   },
+   {
+    "url": "https://launchpad.meme/docs/"
+   },
+   {
+    "url": "https://linkedin.com/company/launchpadmeme"
+   },
+   {
+    "url": "https://github.com/launchpadmeme"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/launchpadmeme"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/launchpadmeme"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/solana/fvqescwppdkksg1whdzllhyqahxf8wns9xgjcnuwpump",
+  "chainId": "solana",
+  "tokenAddress": "FvqescwppdKksg1WHDzLLhYQaHxf8wNs9XgJCNuWpump",
+  "description": "CAN YOU HANDLE THE PAIN?\nEvery pump has a price.\nEvery candle leaves a crack.\nEvery smile on this chart is a lie you keep telling yourself.\n$PAIN is not a promise.\nIt’s the feeling after you ape, after you hold, after you watch green turn red and still pretend you’re fine.\nNo presale. No safety. No mercy.\nJust a metal face staring into the void, leaking mint-green light, grinning through the dump.\nWe don’t sell a moon.\nWe sell the only honest thing in this market:\nPain.\nIf you can’t handle it, don’t buy it.\nIf you can — welcome. You’re already one of us.\nNO PAIN. NO GAIN.",
+  "icon": "yMjXgeV4xKwslic7",
+  "header": "https://cdn.dexscreener.com/cms/images/3Zmt2b-76aHA_qMS?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/FvqescwppdKksg1WHDzLLhYQaHxf8wNs9XgJCNuWpump?timestamp=1789225800000",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/r3d1ne/status/2098728320196067799?s=46"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x46b6995b02b1e3afa39033243999e00d739615f1",
+  "chainId": "robinhood",
+  "tokenAddress": "0x46B6995b02B1e3Afa39033243999e00d739615F1",
+  "description": "The first ever dog of Amazon, the official ai agent.",
+  "icon": "BlIlENosO0gzt9O_",
+  "header": "https://cdn.dexscreener.com/cms/images/A5sxt1qvc_xloMwH?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x46b6995b02b1e3afa39033243999e00d739615f1?timestamp=1789225800000",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/rufusaiagent"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/RufusAiAgent"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/solana/btcnljyfhvuha7pm61gx9savo5hd44q69qdwse5ocwrp",
+  "chainId": "solana",
+  "tokenAddress": "BTCnLJYfHVuHa7PM61gx9SaVo5hd44Q69QDwSe5oCwRp",
+  "description": "PLANS $BTC ? \n\nIt was launched on Meteora with zero market cap. The community trades it organically, and 100% of the fees collected by the dev wallet are automatically routed back into the liquidity pool.\n\nOnce the LP reaches $20K, the mechanism switches to a much stronger model:\n\n50% of fees → automatic buyback & burn\n50% → automatically distributed to holders\n\nThat’s a pretty unique mechanism in this space. The main issue is simply that people haven’t discovered what $BTC actually is yet.",
+  "icon": "9pucIikMMqjiKNDt",
+  "header": "https://cdn.dexscreener.com/cms/images/q59iaH7akn26jjJX?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BTCnLJYfHVuHa7PM61gx9SaVo5hd44Q69QDwSe5oCwRp?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://unstablebtc.tech/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/UnstableBTC"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/unstablebtc"
+   }
+  ],
+  "totalAmount": 20,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/88gssgz8unpu1zgb61hyrfd7j2rats7wdnjkpxgmpump",
+  "chainId": "solana",
+  "tokenAddress": "88gsSGZ8UNpU1ZgB61HyrFd7J2RaTs7wDNJKPXGmpump",
+  "description": "commotitty",
+  "icon": "bv7kta_2EYCclMzy",
+  "header": "https://cdn.dexscreener.com/cms/images/muINKhSPMCD0WElf?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/88gsSGZ8UNpU1ZgB61HyrFd7J2RaTs7wDNJKPXGmpump?timestamp=1789225800000",
+  "links": [
+   {
+    "url": "https://commotitty.fun/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Commotitty"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/commotittyportal"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ }
+]

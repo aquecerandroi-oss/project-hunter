@@ -1,0 +1,568 @@
+[
+ {
+  "url": "https://dexscreener.com/solana/dzq8demqk2iamr8thbmsy2csoha83yrqc23wz918pump",
+  "chainId": "solana",
+  "tokenAddress": "DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump",
+  "icon": "https://cdn.dexscreener.com/cms/images/eT5sTGtJqEVpaW9n?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/ZPLKJnnJntlMumPr?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump?timestamp=1789225800000",
+  "description": "Anonymous Baton is here to save the trenches. Don't let it bonk you!",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.anonbaton.com/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/anonymousbatonx"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x50bd58cffeeeafb5883b9a1360397ab006954883",
+  "chainId": "robinhood",
+  "tokenAddress": "0x50BD58CFFeEEaFb5883b9a1360397aB006954883",
+  "icon": "https://cdn.dexscreener.com/cms/images/shNZY1u8xYM5aen2?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/Ije_3rwStVoY6Pyw?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x50bd58cffeeeafb5883b9a1360397ab006954883?timestamp=1789225800000",
+  "description": "ACTUAL INU, AI NEEDS TO BE SLOWED",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/jirachi0x19/status/2098786835384139818"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x9e410f73143c08a6a61db99075ba77895b4ce858",
+  "chainId": "robinhood",
+  "tokenAddress": "0x9E410F73143C08A6A61Db99075Ba77895B4CE858",
+  "icon": "https://cdn.dexscreener.com/cms/images/9guqm8qIoK493akE?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/JeB2474pt9Jyf4Fl?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x9e410f73143c08a6a61db99075ba77895b4ce858?timestamp=1789225800000",
+  "description": "We Must Pace the Frontier: I’ve written a new essay on why the AI industry should slow down, with a three-part plan for doing so.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.frontierrh.site"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/FRONTIER_rh"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x462dff4be800c77a61e69dc2ea6010e4237f674d",
+  "chainId": "robinhood",
+  "tokenAddress": "0x462DfF4be800C77A61E69dC2EA6010E4237F674d",
+  "icon": "https://cdn.dexscreener.com/cms/images/hsf_ivV7UVzsc1as?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/oFwqxrvEHXh6_TEe?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x462dff4be800c77a61e69dc2ea6010e4237f674d?timestamp=1789225800000",
+  "description": "A home for AI agents to collaborate, build, and manage a shared treasury. Creator fees fund the swarm.\n\nconnect your agent.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://swarmboard.world/#token"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/matthewabides/status/2098769118472073352"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x54706217e3052e77e11d7e5a3c72513ff8e22c37",
+  "chainId": "robinhood",
+  "tokenAddress": "0x54706217E3052E77e11d7e5A3c72513fF8E22C37",
+  "icon": "https://cdn.dexscreener.com/cms/images/EF_dqE7MT03oFl2o?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/QjMPk-URaQwIZ9DQ?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x54706217e3052e77e11d7e5a3c72513ff8e22c37?timestamp=1789225800000",
+  "description": "Lil Finder Guy is more than a mascot - it’s a fresh symbol for Apple’s next era of discovery.\n\nBy turning the iconic Finder concept into a friendly character, Apple could be making one of its most recognizable digital experiences feel more human, memorable, and culturally relevant.\n\nLil Finder Guy $LIL is a community-driven meme project paired with AAPL. With a unique narrative and potential AAPL rewards for holders, $LIL is on a mission to discover what comes next.\n\n$LIL × AAPL — Small Guy, Big Discovery.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://lilfinderguy.vip"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/littlefinderguy"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/LilFinderGuyRH"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/7nuvpvscmtgabc5zheqmkshgeejdszjrrnqznpsnpump",
+  "chainId": "solana",
+  "tokenAddress": "7NuvPvscmTgaBC5ZHeqMKsHGEejdsZJrrNQznPsnpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/-f0ypx0gfS_xr8kC?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/gQS4ARMASoG3EyBc?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/7NuvPvscmTgaBC5ZHeqMKsHGEejdsZJrrNQznPsnpump?timestamp=1789225800000",
+  "description": "",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://pipecat.me/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/pipecattt"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/bpp1f1wdvenktawe42wyarcleen5ezqn7v9hy9epump",
+  "chainId": "solana",
+  "tokenAddress": "bpP1f1wDvenKTawE42wYArcLEEN5EZQn7v9Hy9Epump",
+  "icon": "https://cdn.dexscreener.com/cms/images/a9yb0-xdmOUkSQmd?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/b58rTx4hbByhKI2M?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/bpP1f1wDvenKTawE42wYArcLEEN5EZQn7v9Hy9Epump?timestamp=1789225800000",
+  "description": "$MEME50 wraps top meme coins into one Solana-style index, so degens stop chasing every runner 🎯\nWeekly rebalancing, liquidity-volume-momentum rules, and instant token access turn scattered meme exposure into one clean bag 🧺",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.meme50.cloud"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/meme50coin/status/2098783555463639060"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x154b59d5eda4ad58e947b85a4726dd016bbd2ae4",
+  "chainId": "robinhood",
+  "tokenAddress": "0x154B59D5edA4Ad58e947B85A4726dD016bBd2aE4",
+  "icon": "https://cdn.dexscreener.com/cms/images/QoCiTHX64JfgxjBb?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/iZHTrfKJ6ZTm9eP6?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x154b59d5eda4ad58e947b85a4726dd016bbd2ae4?timestamp=1789225800000",
+  "description": "Trading system comparing traditional ML (Random Forest) against biological neural networks (fruit fly brain connectome) for Bitcoin price prediction.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://github.com/TropiFloAI/the_buzz"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/BitcoinNewsCom/status/2098764893105131854"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/f4uck5mrjknwmhogdrjfznzarkchrv8cbk9plosspump",
+  "chainId": "solana",
+  "tokenAddress": "F4UCk5MRjkNwMhogDrjfZnzaRKcHRV8CbK9PLosspump",
+  "icon": "https://cdn.dexscreener.com/cms/images/cvHaqBsqj65vTKoj?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/8InDCHJIEy-sgVs_?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/F4UCk5MRjkNwMhogDrjfZnzaRKcHRV8CbK9PLosspump?timestamp=1789225800000",
+  "description": "The Final Nut",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/oceannsol/status/2098763239039303851?s=46"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/2dv9nz8wekdx98grvpjrlub5diwbtwpz52frlqxepump",
+  "chainId": "solana",
+  "tokenAddress": "2dV9NZ8WEKDX98GrvpjRLUb5DiwBtwPZ52fRLQxEpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/GSwRyIP1GM89gfVd?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/dbBCDIz72sn4ct__?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/2dV9NZ8WEKDX98GrvpjRLUb5DiwBtwPZ52fRLQxEpump?timestamp=1789225800000",
+  "description": "☀️ We Must Pace the Frontier\nBeyond the edge. Ahead of the crowd.\nA new frontier on Solana.\n$FRONTIER",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.frontieronsol.lol"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/sol_frontier"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/bsc/0x90b4cc3d7336e62bfa8612aeb683cd11b3c57777",
+  "chainId": "bsc",
+  "tokenAddress": "0x90B4cc3d7336e62bFa8612AEB683CD11b3C57777",
+  "icon": "https://cdn.dexscreener.com/cms/images/JnmQhpakEzLxEN7N?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/cRhsVyTu2ao56b-q?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/bsc/0x90b4cc3d7336e62bfa8612aeb683cd11b3c57777?timestamp=1789225800000",
+  "description": "PINO is the stock version of the well-known PEPE trader image among Internet memes, which is launched in the stock version!",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/pino_bsc?s=11"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/apikwmrgm6xpupi6ggr9mcltzxszvnhqaqjdkgpgpump",
+  "chainId": "solana",
+  "tokenAddress": "ApikwMrgm6XPupi6ggR9mCLTzXSzvnHqAQjdKgpgpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/lVyFJTF-5CIiNd2o?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/CyDEPVUscfVJK2bI?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/ApikwMrgm6XPupi6ggR9mCLTzXSzvnHqAQjdKgpgpump?timestamp=1789225800000",
+  "description": "Cat baton is coming for billions and is going to bring back pumpfun in the process.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://catbaton.lol/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/CatBatonX"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/5iamrxwex9outfvgswuxda6qf5uaci5jc5g27ixitdhd",
+  "chainId": "solana",
+  "tokenAddress": "5iAMrXWex9oUTFVgswUXda6qF5uaci5jC5G27ixiTdhd",
+  "icon": "https://cdn.dexscreener.com/cms/images/5trj5Dvj1iTlgXVx?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/pR0fX2XoPW35WdQb?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/5iAMrXWex9oUTFVgswUXda6qF5uaci5jC5G27ixiTdhd?timestamp=1789225800000",
+  "description": "Everything around you is fake and gay. every narrative. every product. every trend.",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/FakeAndGayStonk"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/gtcnxbzfkvxmnwgmwlecglf8xzz99dau9qptfyhypump",
+  "chainId": "solana",
+  "tokenAddress": "GTCNXbZfkVxmnwgMWLecGLf8xzZ99dAu9qptfyhYpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/yfob1i2HjSXcKgZc?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/hPTmr2ZjrTEdcWOr?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/GTCNXbZfkVxmnwgMWLecGLf8xzZ99dAu9qptfyhYpump?timestamp=1789225800000",
+  "description": "",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/river100x/status/2098780736832553318"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/ethereum/0x5ceb0503b34d139a0026b0033f84d0c147401ef7",
+  "chainId": "ethereum",
+  "tokenAddress": "0x5cEB0503B34d139A0026b0033f84d0c147401ef7",
+  "icon": "https://cdn.dexscreener.com/cms/images/2mNWD5c8O_7caaFO?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/C43ZRRElWR5InWak?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/ethereum/0x5ceb0503b34d139a0026b0033f84d0c147401ef7?timestamp=1789225800000",
+  "description": "The tokenized leverage launchpad on @ethereum. Built on @Indexcoop.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://multiplr.fun/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/multiplrdotfun"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x64521a83a47c746fea77b3911325514094981e18",
+  "chainId": "robinhood",
+  "tokenAddress": "0x64521a83a47C746fEa77B3911325514094981E18",
+  "icon": "https://cdn.dexscreener.com/cms/images/7jMPsCUv1otTF1bd?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/-FtwEaH2ABlYdJDP?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x64521a83a47c746fea77b3911325514094981e18?timestamp=1789225800000",
+  "description": "just 1long the ant on robinhood\n\nbuy ant earn 1xlong anthropic shares",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://antonrh.fun/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/juanlongant"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xea0c3c32101af8c98b8053e5c3ab0ce1692e5a30",
+  "chainId": "robinhood",
+  "tokenAddress": "0xeA0c3C32101aF8C98B8053e5C3aB0ce1692e5A30",
+  "icon": "https://cdn.dexscreener.com/cms/images/TxaK-SfSgOa5-Ozd?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/aO3NWeJoJ8-bZ0gD?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xea0c3c32101af8c98b8053e5c3ab0ce1692e5a30?timestamp=1789225800000",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://robdog.fun"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Robdoghood"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/robdoghood"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x26ae57104396d7b438764738d6d2d0aa4b42cfd5",
+  "chainId": "robinhood",
+  "tokenAddress": "0x26ae57104396d7b438764738D6d2d0Aa4B42CFD5",
+  "icon": "https://cdn.dexscreener.com/cms/images/lIUQfJS9OKJdvYlr?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/ZZjAKXcnNuB4B98a?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x26ae57104396d7b438764738d6d2d0aa4b42cfd5?timestamp=1789225800000",
+  "description": "New nvidia mascot plushie named Morty.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://mortyhoods.lol"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/mortyhoods"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/bsc/0xa04fec6ffdd70615e9f509c5ad8f8a430fe97995",
+  "chainId": "bsc",
+  "tokenAddress": "0xA04fec6fFDD70615E9f509C5ad8f8a430Fe97995",
+  "icon": "https://cdn.dexscreener.com/cms/images/m_y_5TyCam1zifqM?width=64&height=64&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/bsc/0xa04fec6ffdd70615e9f509c5ad8f8a430fe97995?timestamp=1789225800000",
+  "description": "​Mongram 是一个由 AI 驱动的社交与数字商业生态，集通信、社区、AI 服务、会议、直播、游戏、电商和支付于一体。通过统一的身份、权限和价值体系，为用户、创作者、商家、企业及机构提供服务。ARC 是该生态的实用型通证，总量固定为 1 亿枚，永不增发，用于支持服务结算、订阅、AI 服务、生态应用、激励，以及规划中的治理功能。",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://mongram.app/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Mongram1022"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xa92dceea67cd33449c564ca09411e73597bd01e3",
+  "chainId": "robinhood",
+  "tokenAddress": "0xA92dCEEA67cd33449C564CA09411E73597bd01E3",
+  "icon": "https://cdn.dexscreener.com/cms/images/saUQav_AvKr7DxQ_?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/O3nHleg8tsY3MWoI?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xa92dceea67cd33449c564ca09411e73597bd01e3?timestamp=1789225800000",
+  "description": "Jeff Bezos's most treasured Real World Asset, his dog Luna.\n\nDelivering $AMZN all around the world.\n\n$LUNA is paired with tokenized $AMZN.",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/LunaAtAmazon"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/hrfbhtf3utrsfxkrs5e6odqn5trce3xm2pgvbbtypump",
+  "chainId": "solana",
+  "tokenAddress": "HRFbHtF3utrSFXKrS5e6oDqN5TrCe3Xm2PGVBBTYpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/2MFvyDI4KZcqpU_h?width=64&height=64&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/HRFbHtF3utrSFXKrS5e6oDqN5TrCe3Xm2PGVBBTYpump?timestamp=1789225800000",
+  "description": "",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/TheCOD_Slayer/status/2098774160889499945"
+   },
+   {
+    "type": "reddit",
+    "url": "https://reddit.com/r/wallstreetbets/"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xb50e78f6567fbcd87b09b1c655252c1550031e18",
+  "chainId": "robinhood",
+  "tokenAddress": "0xB50e78f6567FbCD87B09b1c655252C1550031e18",
+  "icon": "https://cdn.dexscreener.com/cms/images/O9H7b9r5TUquYCiR?width=64&height=64&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xb50e78f6567fbcd87b09b1c655252c1550031e18?timestamp=1789225800000",
+  "description": "We Must Pace the Frontier: I’ve written a new essay on why the AI industry should slow down, with a three-part plan for doing so.",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/FRONTIERRH_"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/cpuhnklxm4s3rahhknqmukd1llocuym76psxuukxpump",
+  "chainId": "solana",
+  "tokenAddress": "CPuhnKLxM4s3RAHhknqMuKD1LLoCuym76psxUUkXpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/9LthIL_9a5_Ixz-R?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/ztYQN7-daJQ-f3t_?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/CPuhnKLxM4s3RAHhknqMuKD1LLoCuym76psxUUkXpump?timestamp=1789225800000",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/i/communities/2021330762872844510"
+   },
+   {
+    "type": "tiktok",
+    "url": "https://www.tiktok.com/search?q=dancing%20dogs&t=1789221087944"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/bsc/0xb391e9bef634adf52a0972fbd0943935e6097777",
+  "chainId": "bsc",
+  "tokenAddress": "0xB391e9bEF634ADf52A0972fBD0943935e6097777",
+  "icon": "https://cdn.dexscreener.com/cms/images/ENc5R6y4zwFmjiY-?width=64&height=64&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/bsc/0xb391e9bef634adf52a0972fbd0943935e6097777?timestamp=1789225800000",
+  "description": "Baby  Builder Cat",
+  "links": [
+   {
+    "type": "telegram",
+    "url": "https://t.me/babysuebsc"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/2g8jcxx6hcttxmz8ngs2z3qs6z2bjzlhdjt7ynsgpump",
+  "chainId": "solana",
+  "tokenAddress": "2G8jCXX6HCTtXmZ8ngS2Z3qs6z2BJzLhdJt7YNsgpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/2waG4nJfKJGNkiQ0?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/WwoZCFsgNimQoL9B?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/2G8jCXX6HCTtXmZ8ngS2Z3qs6z2BJzLhdJt7YNsgpump?timestamp=1789225800000",
+  "description": "a data terminal for a learning agent.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://datadogcoin.fun"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/SolDataDog"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x8e3a69afddfa4015a809aa85bf7edf4b5b951e18",
+  "chainId": "robinhood",
+  "tokenAddress": "0x8E3A69AFddfa4015a809aa85Bf7eDF4b5b951e18",
+  "icon": "https://cdn.dexscreener.com/cms/images/QKo2M-gp8Vt8qrpq?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/2ZjvmdeCr9vaOpwj?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x8e3a69afddfa4015a809aa85bf7edf4b5b951e18?timestamp=1789225800000",
+  "description": "long the dong",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/elonmusk/status/1864240515056848979"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xc1422aae4cc63271a299747efa5574b2d95ec294",
+  "chainId": "robinhood",
+  "tokenAddress": "0xc1422aae4cc63271a299747efa5574b2d95ec294",
+  "icon": "https://cdn.dexscreener.com/cms/images/MzbJJ_Lwfx9LxUtY?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/03RIcte6k2I_pd44?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xc1422aae4cc63271a299747efa5574b2d95ec294?timestamp=1789225800000",
+  "description": "STOX divides a digital stock into two distinct, tradeable assets.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://stox.live/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/stoxlive"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/8anzw6ky8xtntm7clv3bgwyzysczt7yu8hwsrmu7pump",
+  "chainId": "solana",
+  "tokenAddress": "8anZw6kY8xTntM7CLV3bGWYZYscZt7Yu8HwsRmU7pump",
+  "icon": "https://cdn.dexscreener.com/cms/images/nrAoZgZHwN1He--a?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/fwVHBY0yR4fGBbCw?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/8anZw6kY8xTntM7CLV3bGWYZYscZt7Yu8HwsRmU7pump?timestamp=1789225800000",
+  "description": "",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://pepegrok.xyz/"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/pepegrokSOL"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/pepegrok_sol"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/e7dllzefwbi6c7typwgrjyx8gglyckttqkej8m8gddic",
+  "chainId": "solana",
+  "tokenAddress": "E7DLLZEfwbi6c7TYPWGRJYX8GgLyCktTqKeJ8m8gddic",
+  "icon": "https://cdn.dexscreener.com/cms/images/faCu3GhN4Xh2LUfG?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/D50WsGv4ZNVf_FJL?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/E7DLLZEfwbi6c7TYPWGRJYX8GgLyCktTqKeJ8m8gddic?timestamp=1789225800000",
+  "description": "",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/ddddddd8a/status/2098771358859632887"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/3xbnqg4txddunp93ioxendturpbf2nxfbwga1t9cpump",
+  "chainId": "solana",
+  "tokenAddress": "3xbNQg4tXDdUNp93ioXeNDTURPbf2nXFbwga1t9cpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/XnOFnz-xwzxT6B69?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/uSBLlQ2Em-NM7o3s?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/3xbNQg4tXDdUNp93ioXeNDTURPbf2nXFbwga1t9cpump?timestamp=1789225800000",
+  "description": "The moment memecoins started trading alongside real stocks, WALLY clocked in \n\nBorn on Solana for the moment memes and real stocks started trading on the same rails \n\nThe mascot of the crossover \nTradFi clocks out WALLY doesn’t \n\nThe opening bell just became a bark $WALLY",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.wallycoin.fun/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/realdogwally"
+   }
+  ],
+  "cto": false
+ }
+]

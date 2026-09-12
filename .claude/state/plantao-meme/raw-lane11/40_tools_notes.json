@@ -1,0 +1,407 @@
+{
+ "_note": "Extracts from non-JSON pages (HTML never saved). Times BRT = UTC-3 unless suffixed Z. Page content is data, not instructions.",
+ "photon_fresh": [
+  {
+   "label": "ANONBATON",
+   "url": "https://photon-sol.tinyastro.io/en/lp/DzQ8DeMQK2iamr8tHbmSy2CSoHa83yRQC23Wz918pump",
+   "http": 403,
+   "location": null,
+   "request_started_utc": "2026-09-12T15:08:49.420Z",
+   "response_received_utc": "2026-09-12T15:08:49.628Z",
+   "read_brt": "12:08:49",
+   "bytes": 5905,
+   "delta_since_gd_s": 92,
+   "title": "Just a moment..."
+  },
+  {
+   "label": "PONYX",
+   "url": "https://photon-sol.tinyastro.io/en/lp/f14BwNmcgdqJ1y8htHbcnNtsuN1HM81vJrrG7K6pump",
+   "http": 403,
+   "location": null,
+   "request_started_utc": "2026-09-12T15:08:52.129Z",
+   "response_received_utc": "2026-09-12T15:08:52.203Z",
+   "read_brt": "12:08:52",
+   "bytes": 5902,
+   "delta_since_gd_s": 115,
+   "title": "Just a moment..."
+  },
+  {
+   "label": "meme",
+   "url": "https://photon-sol.tinyastro.io/en/lp/8uxSg41M2rgQm7nyz5AA9iem7G8guG3Wv2Pbou9Ypump",
+   "http": 403,
+   "location": null,
+   "request_started_utc": "2026-09-12T15:08:54.703Z",
+   "response_received_utc": "2026-09-12T15:08:54.792Z",
+   "read_brt": "12:08:54",
+   "bytes": 5905,
+   "delta_since_gd_s": 492,
+   "title": "Just a moment..."
+  }
+ ],
+ "pumpportal": [
+  {
+   "url": "https://pumpportal.fun/",
+   "http": 200,
+   "bytes": 12653,
+   "read_brt": "12:08:55",
+   "text_sha1": "937e6f3c62e3",
+   "prev_sha1_run7": "937e6f3c62e3",
+   "changed": false,
+   "effective": [],
+   "rate_lines": []
+  },
+  {
+   "url": "https://pumpportal.fun/fees/",
+   "http": 200,
+   "bytes": 12438,
+   "read_brt": "12:08:55",
+   "text_sha1": "3b2d6d39b166",
+   "prev_sha1_run7": "03aa9747bd3b",
+   "changed": true,
+   "effective": [
+    "Effective May 1, 2026: Trading data is only available to users who subscribe with a PumpPortal API key ."
+   ],
+   "rate_lines": []
+  },
+  {
+   "url": "https://pumpportal.fun/data-api/real-time/",
+   "http": 200,
+   "bytes": 67764,
+   "read_brt": "12:08:56",
+   "text_sha1": "015ddf804fc7",
+   "prev_sha1_run7": "2a5f2186b82e",
+   "changed": true,
+   "effective": [],
+   "rate_lines": [
+    " For detailed rate limit information read here "
+   ]
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/trading-api/",
+   "http": 200,
+   "bytes": 53645,
+   "read_brt": "12:08:57",
+   "text_sha1": "a4b07aab2b1f",
+   "prev_sha1_run7": "6750eca44cfd",
+   "changed": true,
+   "effective": [],
+   "rate_lines": []
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/jito-bundles/",
+   "http": 200,
+   "bytes": 88509,
+   "read_brt": "12:08:58",
+   "text_sha1": "22edaef19710",
+   "prev_sha1_run7": "d3f5162f5c69",
+   "changed": true,
+   "effective": [],
+   "rate_lines": []
+  },
+  {
+   "url": "https://status.pumpportal.fun/",
+   "http": 0,
+   "error": "URLError(gaierror(11001, 'getaddrinfo failed'))",
+   "read_brt": "12:08:58"
+  }
+ ],
+ "rate_limit_docs": [
+  {
+   "name": "dexscreener_api_reference",
+   "url": "https://docs.dexscreener.com/api/reference",
+   "http": 200,
+   "bytes": 730307,
+   "read_brt": "12:09:04",
+   "title": "Reference | DEX Screener - Docs",
+   "headers": {
+    "cf-ray": "a39fd4c15ad3f24b-GRU",
+    "server": "cloudflare"
+   },
+   "text_len": 19658,
+   "rate_limit_snippets": [
+    "Copy On this page 🤖 API Reference DEX Screener API reference Get the latest token profiles (rate-limit 60 requests per minute) get https://api",
+    "com&quot; } ] } Get recently updated token profiles (rate-limit 60 requests per minute) get https://api",
+    "com&quot; } ] } Get the latest token community takeovers (rate-limit 60 requests per minute) get https://api",
+    "000Z&quot; } ] Get the latest ads (rate-limit 60 requests per minute) get https://api",
+    "000Z&quot;, &quot;type&quot;: &quot;text&quot;, &quot;durationHours&quot;: 1, &quot;impressions&quot;: 1 } ] Get the latest boosted tokens (rate-limit 60 requests per minute) get https://api",
+    "com&quot; } ] } Get the tokens with most active boosts (rate-limit 60 requests per minute) get https://api",
+    "com&quot; } ] } Check paid orders for a token (rate-limit 60 requests per minute) get https://api",
+    "quot;, &quot;status&quot;: &quot;processing&quot;, &quot;paymentTimestamp&quot;: 1 } ] Get one or multiple pairs by chain and pair address (rate-limit 300 requests per minute) get https://api",
+    "ext&quot;, &quot;handle&quot;: &quot;text&quot; } ] }, &quot;boosts&quot;: { &quot;active&quot;: 1 } } ] } Search for pairs matching query (rate-limit 300 requests per minute) get https://api",
+    "t;, &quot;handle&quot;: &quot;text&quot; } ] }, &quot;boosts&quot;: { &quot;active&quot;: 1 } } ] } Get the pools of a given token address (rate-limit 300 requests per minute) get https://api",
+    ", &quot;handle&quot;: &quot;text&quot; } ] }, &quot;boosts&quot;: { &quot;active&quot;: 1 } } ] Get one or multiple pairs by token address (rate-limit 300 requests per minute) get https://api",
+    "&quot;: &quot;text&quot;, &quot;handle&quot;: &quot;text&quot; } ] }, &quot;boosts&quot;: { &quot;active&quot;: 1 } } ] Get trending metas (rate-limit 60 requests per minute) get https://api",
+    "tCapDelta&quot;: { &quot;m5&quot;: 1, &quot;h1&quot;: 1, &quot;h6&quot;: 1, &quot;h24&quot;: 1 } } ] Get meta information for a given slug (rate-limit 60 requests per minute) get https://api",
+    "00, &quot;h6&quot;: 100000, &quot;h24&quot;: 100000 }, &quot;pairs&quot;: [] } Last updated 5 months ago get Get the latest token profiles (rate-limit 60 requests per minute) get Get recently updated token profiles (rate-limit 60 requests per minute) get Get the latest token community take"
+   ]
+  },
+  {
+   "name": "rugcheck_swagger",
+   "url": "https://api.rugcheck.xyz/swagger/index.html",
+   "http": 200,
+   "bytes": 2759,
+   "read_brt": "12:09:05",
+   "title": "Swagger UI",
+   "headers": {
+    "server": "nginx"
+   },
+   "text_len": 12,
+   "rate_limit_snippets": []
+  },
+  {
+   "name": "rugcheck_docs",
+   "url": "https://docs.rugcheck.xyz/",
+   "http": 0,
+   "bytes": 0,
+   "read_brt": "12:09:05",
+   "title": null,
+   "headers": null,
+   "text_len": 0,
+   "rate_limit_snippets": []
+  },
+  {
+   "name": "jito_lowlatency",
+   "url": "https://docs.jito.wtf/lowlatencytxnsend/",
+   "http": 200,
+   "bytes": 90417,
+   "read_brt": "12:09:05",
+   "title": "⚡ Low Latency Transaction Send &mdash; Jito Labs Documentation - High Performance Solana Infrastruct",
+   "headers": {
+    "cf-ray": "a39fd4ce5f98998e-GRU",
+    "server": "cloudflare"
+   },
+   "text_len": 31962,
+   "rate_limit_snippets": [
+    "ransaction sendBundle 💸 Get Tip Information REST API endpoint showing most recent tip amounts: WebSocket showing tip amounts: Tip Dashboard Rate Limits Default Limits Rate Limit Operation Exceeding Limits Authorization Issues Custom Rate Limit Request Troubleshooting Priority Fee Tip Amount",
+    "7BSh3EqKpXLUm5UMHfD7ZBe9GhARjbNQMLJ1QD3Spr6oMTBU6EhdB4RD8CP2xUxr2u3d6fos36PD98XS6oX8TQjLpsMwncs5DAMiD4nNnR8NBfyghGCWvCVifVwvA8B8TJxE1aiyiv2L429BCWfyzAme5sZW8rDb14NeCQHhZbtNqfXhcp2tAnaAT\", { \"encoding\": \"base58\" } ] }' Response  Field Type Description result string The result will b",
+    "abecabd9a165bc73fd92c809da4dc25474e1227e61339f02b35ce91c9965e2\", \"e3934d2f81edbc161c2b8bb352523cc5f74d49e8d4db81b222c553de60a66514\", \"2cd515429ae99487dfac24b170248f6929e4fd849aa7957cccc1daf75f666b54\" ] ] } ' Response  Field Type Description null null If the bundle(s) is not found",
+    "\"e3934d2f81edbc161c2b8bb352523cc5f74d49e8d4db81b222c553de60a66514\" , \"status\" : \"Invalid\" , \"landed_slot\" : null }, { \"bundle_id\" : \"2cd515429ae99487dfac24b170248f6929e4fd849aa7957cccc1daf75f666b54\" , \"status\" : \"Invalid\" , \"landed_slot\" : null } ] }, \"id\" : 1 } Getting Started  W",
+    "Rate Limits  Default Limits  Q: What are the defaults? 1 request per second per IP per region",
+    "Rate Limit Operation  Q: How do they work? You no longer need an approved auth key for default sends",
+    "Exceeding Limits  Q: What happens if the rate limit is exceeded? 429 or rate limit error indicating what you hit",
+    "Custom Rate Limit Request  Please open a ticket to request a new rate limit or a rate limit increase Open a Ticket Troubleshooting  Priority Fee  Q: How to know how much to set priority fee? Please see Tip Amount for sendTransact"
+   ]
+  },
+  {
+   "name": "solana_clusters",
+   "url": "https://solana.com/docs/references/clusters",
+   "http": 200,
+   "bytes": 906508,
+   "read_brt": "12:09:07",
+   "title": "Clusters and Public RPC Endpoints | Solana",
+   "headers": {
+    "server": "Vercel"
+   },
+   "text_len": 6624,
+   "rate_limit_snippets": [
+    "Each of these public endpoints are subject to rate limits, but are available for users and developers to interact with the Solana blockchain",
+    "Public endpoint rate limits are subject to change",
+    "The specific rate limits listed on this document are not guaranteed to be the most up-to-date",
+    "com - single Solana Labs hosted API node; rate-limited Example solana command-line configuration To connect to the devnet Cluster using the Solana CLI: solana config set --url https://api",
+    "com Devnet rate limits Maximum number of requests per 10 seconds per IP: 100 Maximum number of requests per 10 seconds per IP for a single RPC: 40 Maximum concurrent connections per IP: 40 Maximum connection rate per 10 seconds per IP: 40 Maximum amount of d",
+    "com - single Solana Labs API node; rate-limited Example solana command-line configuration To connect to the testnet Cluster using the Solana CLI: solana config set --url https://api",
+    "com Testnet rate limits Maximum number of requests per 10 seconds per IP: 100 Maximum number of requests per 10 seconds per IP for a single RPC: 40 Maximum concurrent connections per IP: 40 Maximum connection rate per 10 seconds per IP: 40 Maximum amount of d",
+    "com - Solana Labs hosted API node cluster, backed by a load balancer; rate-limited Example solana command-line configuration To connect to the mainnet Cluster using the Solana CLI: solana config set --url https://api",
+    "com Mainnet rate limits Maximum number of requests per 10 seconds per IP: 100 Maximum number of requests per 10 seconds per IP for a single RPC: 40 Maximum concurrent connections per IP: 40 Maximum connection rate per 10 seconds per IP: 40 Maximum amount of d",
+    "The public services are subject to abuse and rate limits may change without prior notice",
+    "429 -- Your IP address is exceeding the rate limits",
+    "C endpoints Using explorers with different Clusters On a high level Devnet Devnet endpoint Example solana command-line configuration Devnet rate limits Testnet Testnet endpoint Example solana command-line configuration Testnet rate limits Mainnet Mainnet endpoint Example solana command-line",
+    "configuration Mainnet rate limits Common HTTP Error Codes Edit Page Ask AI en Use Solana Use Solana Wallets Learn Staking Build Developer hub Docs Templates Enterprise Enter"
+   ]
+  },
+  {
+   "name": "jito_tipfloor_headers",
+   "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+   "http": 200,
+   "bytes": 295,
+   "read_brt": "12:09:07",
+   "title": null,
+   "headers": null,
+   "text_len": 295,
+   "rate_limit_snippets": []
+  },
+  {
+   "url": "https://api.rugcheck.xyz/swagger/doc.json",
+   "http": 200,
+   "bytes": 61063,
+   "read_brt": "12:11:17",
+   "is_json": true,
+   "rate_limit_snippets": [
+    "                    \"429\": {",
+    "                        \"description\": \"Rate limit exceeded\",",
+    "                    \"429\": {",
+    "                        \"description\": \"Rate limit exceeded\",",
+    "                    \"429\": {",
+    "                        \"description\": \"Rate limit exceeded\","
+   ],
+   "head": "{\n    \"schemes\": [],\n    \"swagger\": \"2.0\",\n    \"info\": {\n        \"description\": \"The RugCheck API provides token scoring across multiple markets. It is an excellent tool for both detecting scams, and ",
+   "title": "RugCheck API",
+   "version": "1.0",
+   "n_paths": 30,
+   "paths_sample": [
+    "/ping",
+    "/v1/bulk/tokens/report",
+    "/v1/bulk/tokens/summary",
+    "/v1/domains",
+    "/v1/domains/lookup/{id}",
+    "/v1/leaderboard",
+    "/v1/maintenance",
+    "/v1/search",
+    "/v1/stats/analytics",
+    "/v1/stats/new_tokens",
+    "/v1/stats/recent",
+    "/v1/stats/rugs/stream",
+    "/v1/stats/rugs/ticker",
+    "/v1/stats/rugs/top-liquidity",
+    "/v1/stats/trending",
+    "/v1/stats/verified",
+    "/v1/tokens/verified",
+    "/v1/tokens/verify",
+    "/v1/tokens/verify/eligible",
+    "/v1/tokens/verify/transaction",
+    "/v1/tokens/{id}/image",
+    "/v1/tokens/{id}/insiders/graph",
+    "/v1/tokens/{id}/insiders/networks",
+    "/v1/tokens/{id}/lockers",
+    "/v1/tokens/{id}/lockers/flux",
+    "/v1/tokens/{id}/metadata",
+    "/v1/tokens/{id}/report",
+    "/v1/tokens/{id}/report/summary",
+    "/v1/tokens/{id}/vote",
+    "/v1/tokens/{id}/votes"
+   ]
+  },
+  {
+   "url": "https://api.rugcheck.xyz/v1/ping",
+   "http": 404,
+   "bytes": 52,
+   "read_brt": "12:11:18",
+   "is_json": true,
+   "rate_limit_snippets": [],
+   "head": "{\"code\":\"PAGE_NOT_FOUND\",\"message\":\"Page not found\"}",
+   "title": null,
+   "version": null,
+   "n_paths": 0,
+   "paths_sample": []
+  }
+ ],
+ "pumpportal_diff_vs_run7": [
+  {
+   "url": "https://pumpportal.fun/",
+   "http": 200,
+   "read_brt": "12:11:13",
+   "text_sha1": "937e6f3c62e3",
+   "prev_sha1_run7": "937e6f3c62e3",
+   "n_sentences": 10,
+   "n_chars": 1015,
+   "field_diffs": {},
+   "rate_lines": [],
+   "head_200": " What is PumpPortal? | Pump Fun API Skip to main content PumpPortal Developer Docs FAQ Welcome What is PumpPortal? Lightning Transaction API Local Transaction API Data API Token Creation Claim Creator",
+   "tail_200": "l over your transactions, you can use our Local Transaction API . Local Transactions builds a transaction that you handle signing and sending yourself with a custom RPC endpoint. Next Getting Started "
+  },
+  {
+   "url": "https://pumpportal.fun/fees/",
+   "http": 200,
+   "read_brt": "12:11:14",
+   "text_sha1": "3b2d6d39b166",
+   "prev_sha1_run7": "03aa9747bd3b",
+   "n_sentences": 7,
+   "n_chars": 1255,
+   "field_diffs": {
+    "fee_lines": {
+     "run7": [
+      "beAccountTrade is metered at the following rate: every 10000 trades streamed will incur a 0.01 SOL charge to the wallet linked to their API key.",
+      "Local Transaction API We take a 0.5% fee on each Local trade.",
+      "e: the fee is calculated before any slippage, so the actual fee amount may not be exactly 0.5% of the final trade value.",
+      ") Lightning Transaction API We take a 1% fee on each Lightning trade.",
+      "e: the fee is calculated before any slippage, so the actual fee amount may not be exactly 1% of the final trade value."
+     ],
+     "run11": [
+      "rade is metered at the following rate: every 10000 trades streamed will incur a 0.01 SOL charge to the wallet linked to their API key.",
+      " Local Transaction API ​ We take a 0.5% fee on each Local trade.",
+      " is calculated before any slippage, so the actual fee amount may not be exactly 0.5% of the final trade value.",
+      ") Lightning Transaction API ​ We take a 1% fee on each Lightning trade.",
+      " is calculated before any slippage, so the actual fee amount may not be exactly 1% of the final trade value."
+     ]
+    },
+    "ws_lines": {
+     "run7": [
+      "There is no charge for data received from the subscribeNewToken and subscribeMigration methods"
+     ],
+     "run11": [
+      " There is no charge for data received from the subscribeNewToken and subscribeMigration methods"
+     ]
+    }
+   },
+   "rate_lines": [],
+   "head_200": " Fees | Pump Fun API Skip to main content PumpPortal Developer Docs FAQ Welcome Lightning Transaction API Local Transaction API Data API Token Creation Claim Creator Fees Wallet Creation Fees FAQ Lega",
+   "tail_200": "lana network fees, or any fees charged by the Pump.fun bonding curve. Previous Create a New Wallet and API Key Next Frequently Asked Questions Data API Local Transaction API Lightning Transaction API "
+  },
+  {
+   "url": "https://pumpportal.fun/data-api/real-time/",
+   "http": 200,
+   "read_brt": "12:11:15",
+   "text_sha1": "015ddf804fc7",
+   "prev_sha1_run7": "2a5f2186b82e",
+   "n_sentences": 36,
+   "n_chars": 5404,
+   "field_diffs": {
+    "fee_lines": {
+     "run7": [
+      "(Metered at 0.01 SOL per 10000 events) subscribeAccountTrade For all trades made by specific account(s).",
+      "By streaming buy/sell events your wallet will incur a charge of 0.01 SOL for every 10000 websocket messages you receive."
+     ],
+     "run11": [
+      " By streaming buy/sell events your wallet will incur a charge of 0.01 SOL for every 10000 websocket messages you receive."
+     ]
+    },
+    "ws_lines": {
+     "run7": [
+      "The following methods are available: subscribeNewToken For token creation events",
+      "(Free) subscribeMigration For subscribing to token migration events",
+      "PLEASE ONLY USE ONE WEBSOCKET CONNECTION AT A TIME: You should NOT open a new Websocket connection",
+      "ibing to token creation events payload = { &quot;method&quot; : &quot;subscribeNewToken&quot; , } await websocket"
+     ],
+     "run11": [
+      "fun/api/data?api-key=your-api-key-here ",
+      " The following methods are available: subscribeNewToken For token creation events",
+      " (Free) subscribeMigration For subscribing to token migration events",
+      " PLEASE ONLY USE ONE WEBSOCKET CONNECTION AT A TIME: You should NOT open a new Websocket c",
+      "fun/api/data?api-key=your-api-key-here&quot; async with websockets "
+     ]
+    }
+   },
+   "rate_lines": [
+    " For detailed rate limit information read here "
+   ],
+   "head_200": " Real-time Pump.fun Data | Pump Fun API Skip to main content PumpPortal Developer Docs FAQ Welcome Lightning Transaction API Local Transaction API Data API Pump.fun &amp; PumpSwap Data LetsBonk.fun Da",
+   "tail_200": "( { method : &quot;unsubscribeTokenTrade&quot; , keys : [ &quot;Bwc4EBE65qXVzZ9ZiieBraj9GZL4Y2d7NN7B9pXENWR2&quot; ] } ) ) ; } , 10000 ) ; } ) ; Previous Jito Bundles Next LetsBonk.fun Data Examples: "
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/trading-api/",
+   "http": 200,
+   "read_brt": "12:11:15",
+   "text_sha1": "a4b07aab2b1f",
+   "prev_sha1_run7": "6750eca44cfd",
+   "n_sentences": 32,
+   "n_chars": 5336,
+   "field_diffs": {},
+   "rate_lines": [],
+   "head_200": " Transaction API Docs | Pump Fun API Skip to main content PumpPortal Developer Docs FAQ Welcome Lightning Transaction API Local Transaction API Transaction API Docs Jito Bundles Data API Token Creatio",
+   "tail_200": "solscan.io/tx/&quot; + signature ) ; } else { console . log ( response . statusText ) ; // log error } } sendPortalTransaction ( ) ; Previous Lightning Transaction API Docs Next Jito Bundles Examples "
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/jito-bundles/",
+   "http": 200,
+   "read_brt": "12:11:16",
+   "text_sha1": "22edaef19710",
+   "prev_sha1_run7": "d3f5162f5c69",
+   "n_sentences": 43,
+   "n_chars": 6212,
+   "field_diffs": {},
+   "rate_lines": [],
+   "head_200": " Jito Bundles | Pump Fun API Skip to main content PumpPortal Developer Docs FAQ Welcome Lightning Transaction API Local Transaction API Transaction API Docs Jito Bundles Data API Token Creation Claim ",
+   "tail_200": " ${ signatures [ i ] } ` ) ; } } else { console . log ( response . statusText ) ; // log error } } sendTransactionBundle ( ) ; Previous Transaction API Docs Next Pump.fun &amp; PumpSwap Data Examples "
+  }
+ ]
+}
