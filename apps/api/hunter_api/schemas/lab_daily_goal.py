@@ -70,6 +70,12 @@ class ValueOfOneROut(BaseModel):
 
 
 class ProgressOut(BaseModel):
+    real_usdt_summed: DecimalStr | None = None
+    real_brl_summed: DecimalStr | None = None
+    """Sum of each unique r_net outcome times its own 1R size, then FX."""
+    summed_reason: str | None = None
+    """Missing sizing makes the total unavailable, never a partial sum."""
+    distance_to_goal_summed_brl: DecimalStr | None = None
     real_brl: DecimalStr | None
     """``unique_r x real_brl_p50`` — ``None`` when ``real_brl_p50`` is."""
     real_usdt: DecimalStr | None
@@ -104,10 +110,9 @@ class SeriesPointOut(BaseModel):
     unique_r: DecimalStr
     pooled_r: DecimalStr
     unique_usdt: DecimalStr | None
-    """Same USDT-before-FX arithmetic as ``progress.real_usdt``, for this
-    series day. ``"0"`` on a day with no unique bets (a real zero); ``None``
-    only when that day had bets but none were priceable (no equity/volume/
-    cost data as of that day)."""
+    """Sum of each evaluable bet at its own size, before FX, for this day.
+    Zero without evaluable bets; None when any evaluable bet lacks sizing.
+    """
 
 
 class DailyGoalOut(BaseModel):

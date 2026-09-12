@@ -33,6 +33,7 @@ from hunter_api.services.lab_daily_goal_sizing import (
     label_brl,
     percentile,
     price_bet,
+    sum_priced_bets,
     usdt_to_brl,
 )
 from hunter_risk.exposure import SAO_PAULO, sao_paulo_day_start_utc
@@ -67,7 +68,7 @@ def resolve_day_window(day: date | None, as_of_utc: datetime) -> tuple[datetime,
 async def _rows_in_window(
     repo: LabDailyGoalRepository, *, window_start: datetime, window_end: datetime
 ) -> list[DailyOutcomeRow]:
-    versions = await repo.active_versions()
+    versions = await repo.active_versions(window_start=window_start, window_end=window_end)
     rows: list[DailyOutcomeRow] = []
     for version in versions:
         rows.extend(
@@ -80,14 +81,15 @@ async def _rows_in_window(
 
 async def _price_bets(
     repo: LabDailyGoalRepository, deduped: list[DedupedBet], *, equity_usdt: Decimal | None
-) -> list[Decimal]:
+) -> tuple[list[Decimal], Decimal | None]:
     """Real-USDT value of 1R for every priceable bet, before any FX
     conversion — ``equity`` unavailable means nothing is priceable, never a
     guessed capital.
     """
     if equity_usdt is None:
-        return []
+        return [], sum_priced_bets([(bet.winner.r_multiple, None) for bet in deduped])
     priced: list[Decimal] = []
+    sized: list[tuple[Decimal | None, Decimal | None]] = []
     for bet in deduped:
         winner = bet.winner
         volume = (
@@ -106,7 +108,8 @@ async def _price_bets(
         )
         if result.value_1r_usdt is not None:
             priced.append(result.value_1r_usdt)
-    return priced
+        sized.append((winner.r_multiple, result.value_1r_usdt))
+    return priced, sum_priced_bets(sized)
 
 
 def _bucket_by_brt_day(rows: list[DailyOutcomeRow]) -> dict[date, list[DailyOutcomeRow]]:
@@ -121,21 +124,17 @@ async def _day_unique_usdt(
     repo: LabDailyGoalRepository,
     deduped: list[DedupedBet],
     *,
-    unique_r: Decimal,
     window_end: datetime,
 ) -> Decimal | None:
-    """Same USDT-before-FX arithmetic as ``progress.real_usdt``, for one
-    series day. A bet-less day is a real ``0``, never ``None``; ``None`` is
-    reserved for a day that had bets but priced none of them (no equity yet,
-    no volume/cost data) — the day's own version of ``value_of_1r``'s
-    "no_priceable_bets", without a per-point reason field to spell it in."""
+    """Sum each day's evaluable bet at its own size, before FX.
+
+    No evaluable bets means zero; incomplete sizing means unavailable.
+    """
     if not deduped:
         return _ZERO
     equity = await repo.principal_portfolio_equity_usdt(window_end)
-    priced = await _price_bets(repo, deduped, equity_usdt=equity.equity_usdt)
-    if not priced:
-        return None
-    return unique_r * percentile(priced, _PERCENTILES[1])
+    _, summed = await _price_bets(repo, deduped, equity_usdt=equity.equity_usdt)
+    return summed
 
 
 async def _series_30d(repo: LabDailyGoalRepository, *, target_day: date) -> list[SeriesPointOut]:
@@ -152,7 +151,7 @@ async def _series_30d(repo: LabDailyGoalRepository, *, target_day: date) -> list
         deduped = dedupe_bets(day_rows)
         sums = sum_axis(day_rows, deduped)
         unique_usdt = await _day_unique_usdt(
-            repo, deduped, unique_r=sums.unique_r, window_end=series_end - timedelta(days=offset)
+            repo, deduped, window_end=series_end - timedelta(days=offset)
         )
         points.append(
             SeriesPointOut(
@@ -198,7 +197,15 @@ def _value_of_1r(priced_usdt: list[Decimal], fx: FxObservation | None) -> ValueO
     )
 
 
-def _progress(*, unique_r: Decimal, value_of_1r: ValueOfOneROut, goal_brl: Decimal) -> ProgressOut:
+def _progress(
+    *,
+    unique_r: Decimal,
+    value_of_1r: ValueOfOneROut,
+    goal_brl: Decimal,
+    summed_usdt: Decimal | None = None,
+    fx: FxObservation | None = None,
+) -> ProgressOut:
+    summed_brl = None if summed_usdt is None or fx is None else usdt_to_brl(summed_usdt, fx.rate)
     label_progress = unique_r * value_of_1r.label_brl
     real_progress = (
         None if value_of_1r.real_brl_p50 is None else unique_r * value_of_1r.real_brl_p50
@@ -213,6 +220,10 @@ def _progress(*, unique_r: Decimal, value_of_1r: ValueOfOneROut, goal_brl: Decim
         else goal_brl / value_of_1r.real_brl_p50
     )
     return ProgressOut(
+        real_usdt_summed=summed_usdt,
+        real_brl_summed=summed_brl,
+        summed_reason="incomplete_bet_pricing" if summed_usdt is None else None,
+        distance_to_goal_summed_brl=None if summed_brl is None else goal_brl - summed_brl,
         real_brl=real_progress,
         real_usdt=real_progress_usdt,
         label_brl=label_progress,
@@ -233,7 +244,7 @@ async def build_daily_goal(
 
     fx = await repo.latest_fx_brl(window_end)
     equity = await repo.principal_portfolio_equity_usdt(window_end)
-    priced_usdt = await _price_bets(repo, deduped, equity_usdt=equity.equity_usdt)
+    priced_usdt, summed_usdt = await _price_bets(repo, deduped, equity_usdt=equity.equity_usdt)
     value_of_1r = _value_of_1r(priced_usdt, fx)
 
     hit_rate = RateWithCountsOut(
@@ -259,7 +270,13 @@ async def build_daily_goal(
         r_per_unique_bet=r_per_bet,
         value_of_1r=value_of_1r,
         goal_brl=goal_brl,
-        progress=_progress(unique_r=sums.unique_r, value_of_1r=value_of_1r, goal_brl=goal_brl),
+        progress=_progress(
+            unique_r=sums.unique_r,
+            value_of_1r=value_of_1r,
+            goal_brl=goal_brl,
+            summed_usdt=summed_usdt,
+            fx=fx,
+        ),
         portfolio=PortfolioReferenceOut(equity_usdt=equity.equity_usdt, source=equity.source),
         fx=_fx_out(fx),
         fx_reason=None if fx is not None else "no_fx_observation",

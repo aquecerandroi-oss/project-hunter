@@ -17,11 +17,11 @@ latest ``portfolio_equity_snapshots`` row at or before ``as_of`` (plain
 indexed read), falling back to the wallet's immutable opening anchor
 (``portfolio_currency_anchor.credited_amount``) when no snapshot exists yet.
 
-**Indexed access, per active version.** There is no index on
+**Indexed access, per historically active version.** There is no index on
 ``signal_outcomes.exit_ts`` (``lab_common.py``'s own docstring names the same
 gap for ``tracking_state``), so this repository never filters the global
-population by ``exit_ts`` directly. It walks ``strategy_versions.status =
-'active'`` (a handful of rows) and, per version, filters
+population by ``exit_ts`` directly. It walks lifecycle intervals overlapping
+the requested window (including retired versions) and, per version, filters
 ``agent_signals.emitted_at`` — the leading column of
 ``ix_agent_signals_version_cohort_emitted`` — over a window wide enough to cover the
 day plus :data:`_MAX_HOLDING_DAYS` of holding time, then narrows to the exact
@@ -37,7 +37,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from hunter_api.repositories.lab_common import COHORT
 from hunter_core.db.models.agents import AgentSignal, SignalOutcome, StrategyVersion
@@ -47,8 +47,9 @@ from hunter_core.db.models.portfolios import PortfolioEquitySnapshot
 from hunter_core.db.repositories.base import TenantRepository
 from hunter_core.db.repositories.equity import REFERENCE_RESOLUTION
 from hunter_core.db.repositories.portfolio import PortfolioRepository
-from hunter_core.domain.enums import ShadowCohort, StrategyVersionStatus, Timeframe
+from hunter_core.domain.enums import ShadowCohort, Timeframe
 from hunter_core.portfolio.opening import PAPER_FX_POLICY
+from hunter_risk.exposure import sao_paulo_day_start_utc
 
 __all__ = [
     "DailyOutcomeRow",
@@ -70,6 +71,7 @@ touches the unindexed ``exit_ts`` column directly."""
 class VersionMeta:
     id: uuid.UUID
     activated_at: datetime | None
+    deprecated_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,18 +112,34 @@ def _observation_ts(supporting_features: dict[str, Any], emitted_at: datetime) -
 
 
 class LabDailyGoalRepository(TenantRepository):
-    async def active_versions(self) -> list[VersionMeta]:
-        """Every ``active`` version, oldest activation first — the dedupe
-        order the brief asks for, computed once here rather than re-sorted by
-        every caller."""
+    async def active_versions(
+        self, *, window_start: datetime, window_end: datetime
+    ) -> list[VersionMeta]:
+        """Versions active during any part of the requested calendar window.
+
+        Historical eligibility uses lifecycle timestamps, never today's status.
+        A version activated within a day belongs to that day; retirement at
+        its opening boundary excludes it. Never-activated drafts are excluded.
+        """
         rows = (
             await self.session.execute(
-                select(StrategyVersion.id, StrategyVersion.activated_at)
-                .where(StrategyVersion.status == StrategyVersionStatus.ACTIVE)
+                select(
+                    StrategyVersion.id, StrategyVersion.activated_at, StrategyVersion.deprecated_at
+                )
+                .where(
+                    StrategyVersion.activated_at < window_end,
+                    or_(
+                        StrategyVersion.deprecated_at.is_(None),
+                        StrategyVersion.deprecated_at > window_start,
+                    ),
+                )
                 .order_by(StrategyVersion.activated_at.asc().nulls_last(), StrategyVersion.id.asc())
             )
         ).all()
-        return [VersionMeta(id=row.id, activated_at=row.activated_at) for row in rows]
+        return [
+            VersionMeta(id=row.id, activated_at=row.activated_at, deprecated_at=row.deprecated_at)
+            for row in rows
+        ]
 
     async def outcomes_for_version(
         self, version: VersionMeta, *, window_start: datetime, window_end: datetime
@@ -160,6 +178,13 @@ class LabDailyGoalRepository(TenantRepository):
         for row in rows:
             if row.exit_ts is None or not (window_start <= row.exit_ts < window_end):
                 continue
+            day_start = sao_paulo_day_start_utc(row.exit_ts)
+            if (
+                version.activated_at is None
+                or version.activated_at >= day_start + timedelta(days=1)
+                or (version.deprecated_at is not None and version.deprecated_at <= day_start)
+            ):
+                continue
             result.append(
                 DailyOutcomeRow(
                     strategy_version_id=version.id,
@@ -195,7 +220,7 @@ class LabDailyGoalRepository(TenantRepository):
             .where(
                 Candle.market_id == market_id,
                 Candle.timeframe == Timeframe.M1,
-                Candle.open_time <= entry_ts,
+                Candle.open_time <= entry_ts - timedelta(minutes=1),
                 Candle.is_final.is_(True),
             )
             .order_by(Candle.open_time.desc())

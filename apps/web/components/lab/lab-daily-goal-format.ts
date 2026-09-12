@@ -9,7 +9,7 @@
  */
 import { reasonLabel, type DecimalOrReason } from "@/components/lab/lab-format";
 import { fxSourceLabel } from "@/components/portfolio/labels";
-import { formatBrl, formatUsdt } from "@/lib/format";
+import { compareDecimalStrings, formatBrl, formatUsdt } from "@/lib/format";
 import { formatBrasiliaShort } from "@/lib/time";
 import type { DailyGoalAxis, DailyGoalFx, DailyGoalOut, DailyGoalRateWithCounts } from "@/lib/api/lab-daily-goal-types";
 
@@ -19,6 +19,8 @@ import type { DailyGoalAxis, DailyGoalFx, DailyGoalOut, DailyGoalRateWithCounts 
 // "motivo: <code>" for anything neither map recognizes (never hides an
 // unrecognized-but-real reason).
 const DAILY_GOAL_REASON_LABELS: Record<string, string> = {
+  summed_unavailable: "soma por aposta indisponível",
+  incomplete_bet_pricing: "soma indisponível: falta tamanho para uma ou mais apostas avaliáveis",
   no_fx_observation: "sem cotação USDT/BRL registrada até o fim do dia",
   no_bets: "nenhuma aposta única precificável neste dia (nenhuma aposta)",
   no_priceable_bets: "nenhuma das apostas únicas do dia pôde ser precificada",
@@ -82,12 +84,9 @@ export type GoalStatus = "met" | "below" | "unknown";
  * green only when a REAL profit figure meets or beats the goal; `null` (no
  * real profit known) is neutral, never colored as if it were progress.
  */
-export function goalStatus(progress: { real_brl: string | null }, goalBrl: string): GoalStatus {
-  if (progress.real_brl === null) return "unknown";
-  const real = Number(progress.real_brl);
-  const goal = Number(goalBrl);
-  if (!Number.isFinite(real) || !Number.isFinite(goal)) return "unknown";
-  return real >= goal ? "met" : "below";
+export function goalStatus(progress: DailyGoalOut["progress"], goalBrl: string): GoalStatus {
+  if (progress.real_brl_summed == null) return "unknown";
+  return compareDecimalStrings(progress.real_brl_summed, goalBrl) >= 0 ? "met" : "below";
 }
 
 /** Tailwind class for `goalStatus` -- `text-warning` (below, real value known), `text-fg-muted` (unknown/no real value), `text-green` (met or beat, real value known). Never `text-red`: falling short of a stretch profit goal is not an error state (docs/DESIGN.md §2: color only with meaning). */
@@ -104,12 +103,12 @@ function magnitude(decimal: string): string {
 
 /** "faltam R$X" (abaixo da meta), "meta batida, sobrou R$X" (>= meta), or the API's own reason when `distance_to_goal_real_brl` is `null` -- the single source of truth for the goal row's text, independently unit-testable from the color it renders in (`goalStatusClass`). */
 export function distanceToGoalLine(progress: DailyGoalOut["progress"], goalBrl: string, valueOfOneRReason: string | null, fxReason: string | null): DecimalOrReason {
-  if (progress.distance_to_goal_real_brl === null) {
-    const reason = valueOfOneRReason ?? fxReason;
+  if (progress.distance_to_goal_summed_brl == null || progress.real_brl_summed == null) {
+    const reason = progress.summed_reason ?? valueOfOneRReason ?? fxReason ?? "summed_unavailable";
     return { text: reason ? dailyGoalReasonLabel(reason) : "sem motivo informado", isValue: false };
   }
   const status = goalStatus(progress, goalBrl);
-  const amount = formatBrl(magnitude(progress.distance_to_goal_real_brl));
+  const amount = formatBrl(magnitude(progress.distance_to_goal_summed_brl));
   return { text: status === "met" ? `meta batida, sobrou ${amount}` : `faltam ${amount}`, isValue: true };
 }
 

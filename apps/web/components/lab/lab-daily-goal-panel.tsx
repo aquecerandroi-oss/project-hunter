@@ -33,7 +33,7 @@ function Stat({ label, item, colorClass }: { label: string; item: DecimalOrReaso
   );
 }
 
-/** "1 R real hoje", the panel's own hero number (Everton 2026-09-10: "o valor de limites reais de 1 R é o número grande"): USDT (the traded currency) as the primary figure, BRL by the observed rate right under it, the p10-p90 range in BRL, and the fixed R$250 label as a footnote -- never the other way around. */
+/** Median size is a reference, not the day's summed result. */
 function ValueOfOneRStat({ data }: { data: DailyGoalOut }) {
   const v = data.value_of_1r;
   const hero = formatUsdtOrReason(v.real_usdt_p50, v.reason);
@@ -41,8 +41,8 @@ function ValueOfOneRStat({ data }: { data: DailyGoalOut }) {
   const range = v.real_brl_p10 !== null && v.real_brl_p90 !== null ? `faixa p10-p90: ${formatBrl(v.real_brl_p10)} - ${formatBrl(v.real_brl_p90)}` : null;
   return (
     <div className="rounded-md border border-border p-3">
-      <p className="text-xs font-medium uppercase text-fg-muted">1 R real hoje (p50)</p>
-      <p className={`mt-1 text-2xl tabular-nums ${hero.isValue ? "text-fg" : "text-fg-muted"}`}>{hero.text}</p>
+      <p className="text-xs font-medium uppercase text-fg-muted">Referência de tamanho: 1 R (p50)</p>
+      <p className={`mt-1 text-sm tabular-nums ${hero.isValue ? "text-fg" : "text-fg-muted"}`}>{hero.text}</p>
       <p className="mt-0.5 text-sm tabular-nums text-fg-muted">{brl.text}</p>
       {range && <p className="mt-0.5 text-[11px] text-fg-subtle">{range}</p>}
       <p className="mt-1 text-[11px] text-fg-subtle">
@@ -52,20 +52,21 @@ function ValueOfOneRStat({ data }: { data: DailyGoalOut }) {
   );
 }
 
-/** "Lucro real hoje" -- USDT (the traded currency, always priceable once a bet has entry/stop/volume/cost data) as the primary figure, BRL by the observed rate right under it, and the FX observation's own line naming rate/source/instant (Everton, 2026-09-10: "nunca um número sem a fonte e o instante"). */
+/** Per-bet sum in USDT, then BRL at the observed FX rate. */
 function RealProfitStat({ data }: { data: DailyGoalOut }) {
-  const usdt = formatUsdtOrReason(data.progress.real_usdt, data.value_of_1r.reason ?? null);
-  const brl = formatBrlOrReason(data.progress.real_brl, data.value_of_1r.reason ?? data.fx_reason ?? null);
+  const reason = data.progress.summed_reason ?? "summed_unavailable";
+  const usdt = formatUsdtOrReason(data.progress.real_usdt_summed ?? null, reason);
+  const brl = formatBrlOrReason(data.progress.real_brl_summed ?? null, data.progress.summed_reason ?? data.fx_reason ?? reason);
   const fx = fxLine(data.fx, data.fx_reason);
   return (
     <div className="rounded-md border border-border p-3">
-      <p className="text-xs font-medium uppercase text-fg-muted">Lucro que a carteira real teria feito hoje</p>
-      <p className={`mt-1 text-xl tabular-nums ${usdt.isValue ? "text-fg" : "text-fg-muted"}`}>{usdt.text}</p>
+      <p className="text-xs font-medium uppercase text-fg-muted">Resultado hipotético somado por aposta</p>
+      <p className={`mt-1 text-2xl tabular-nums ${usdt.isValue ? "text-fg" : "text-fg-muted"}`}>{usdt.text}</p>
       <p className="mt-0.5 text-sm tabular-nums text-fg-muted">{brl.text}</p>
       <p className={`mt-1 text-[11px] ${fx.isValue ? "text-fg-subtle" : "text-fg-muted"}`}>{fx.text}</p>
       <p className="mt-1 text-[11px] text-fg-muted">
-        contrafactual: R único do Lab × valor real de 1 R (tamanho p50 sob os limites reais); nenhuma ordem foi
-        executada pela carteira paper hoje
+        contrafactual: soma do R de cada aposta única × seu próprio tamanho; p50 apenas como referência.
+        Não é resultado executado da carteira; não simula todos os limites de posições simultâneas.
       </p>
     </div>
   );
@@ -111,6 +112,7 @@ export function LabDailyGoalPanel({ day, data }: LabDailyGoalPanelProps) {
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Meta diária</p>
           <p className="text-xs text-fg-muted">Dia consultado: {formatDailyGoalDay(data.day)} (Brasília)</p>
+          <p className="text-xs text-fg-muted">versões ativas em cada dia, incluindo as aposentadas depois</p>
         </div>
         <LabDailyGoalDatePicker day={day} />
       </div>
@@ -128,7 +130,7 @@ export function LabDailyGoalPanel({ day, data }: LabDailyGoalPanelProps) {
         <RealProfitStat data={data} />
         <GoalStat data={data} />
         <Stat label="O que 1 R precisaria valer" item={required.requiredOneR} />
-        <Stat label="Quantos R únicos faltariam" item={required.requiredUniqueR} />
+        <Stat label="R únicos para a meta (referência p50)" item={required.requiredUniqueR} />
       </div>
 
       <p className="text-[11px] text-fg-subtle">{axisNoteLine(data.axis)}</p>

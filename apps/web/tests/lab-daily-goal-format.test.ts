@@ -151,6 +151,9 @@ describe("hitRateLine: numerator/denominator always shown, null carries a reason
 
 function baseProgress(): DailyGoalOut["progress"] {
   return {
+    real_brl_summed: "140",
+    real_usdt_summed: "28",
+    distance_to_goal_summed_brl: "8860",
     real_brl: "140",
     real_usdt: "28",
     label_brl: "250.00",
@@ -163,7 +166,7 @@ function baseProgress(): DailyGoalOut["progress"] {
 
 describe("goalStatus / goalStatusClass: green only when a REAL value meets or beats the goal", () => {
   it("is 'unknown' (neutral color) when real_brl is null -- never colored as progress", () => {
-    const progress = { ...baseProgress(), real_brl: null };
+    const progress = { ...baseProgress(), real_brl_summed: null };
     expect(goalStatus(progress, "9000")).toBe("unknown");
     expect(goalStatusClass("unknown")).toBe("text-fg-muted");
   });
@@ -175,7 +178,7 @@ describe("goalStatus / goalStatusClass: green only when a REAL value meets or be
   });
 
   it("is 'met' (green) only when the real value reaches or beats the goal", () => {
-    const progress = { ...baseProgress(), real_brl: "9000" };
+    const progress = { ...baseProgress(), real_brl_summed: "9000" };
     expect(goalStatus(progress, "9000")).toBe("met");
     expect(goalStatusClass("met")).toBe("text-green");
   });
@@ -189,7 +192,7 @@ describe("distanceToGoalLine: sign-aware wording, never a double negative", () =
   });
 
   it("says 'meta batida, sobrou X' (magnitude, not a negative amount) once the real value beats the goal", () => {
-    const progress = { ...baseProgress(), real_brl: "9500", distance_to_goal_real_brl: "-500" };
+    const progress = { ...baseProgress(), real_brl_summed: "9500", distance_to_goal_summed_brl: "-500" };
     const result = distanceToGoalLine(progress, "9000", null, null);
     expect(result.isValue).toBe(true);
     expect(result.text).toBe("meta batida, sobrou R$ 500,00");
@@ -198,7 +201,7 @@ describe("distanceToGoalLine: sign-aware wording, never a double negative", () =
   });
 
   it("renders the reason when distance is null (no real progress known)", () => {
-    const progress = { ...baseProgress(), real_brl: null, distance_to_goal_real_brl: null };
+    const progress = { ...baseProgress(), real_brl_summed: null, distance_to_goal_summed_brl: null };
     const result = distanceToGoalLine(progress, "9000", "no_fx_observation", null);
     expect(result.isValue).toBe(false);
     expect(result.text).toMatch(/cotação/);

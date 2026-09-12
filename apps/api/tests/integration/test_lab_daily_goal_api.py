@@ -1,43 +1,19 @@
-"""Integration tests: ``GET /api/v1/orgs/{org_id}/lab/daily-goal`` — T3.78.
-
-Three scenarios the brief names explicitly, over a real Postgres:
-
-1. Three active versions decide on the same bet the same day ->
-   ``unique_r`` counts it once, ``pooled_r`` counts all three.
-2. A market with a thin 1-minute quote volume (200 000 USDT) prices ``1R``
-   under ``max_participation_pct`` — the ceiling T3.60 found binding almost
-   everywhere.
-3. No FX observation exists by the day's end -> every ``real_brl`` field is
-   ``None`` with a named reason, never a default rate.
-
-Days are chosen far apart on the calendar (2026-01-15, 2026-01-20,
-2020-06-15) so each scenario's population, and each scenario's FX/portfolio
-state, cannot leak into another test's — including tests in other files that
-insert ``fx_observations`` at real "now" (a global, session-shared table,
-same caveat ``test_portfolio_api.py``'s ``TestBrlUnavailable`` already
-documents).
-"""
+"""Daily-goal HTTP, historical eligibility and per-bet sizing on Postgres."""
 
 from __future__ import annotations
 
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from sqlalchemy import text
 
-from hunter_core.db.models.agents import AgentSignal, SignalOutcome
 from hunter_core.db.models.market_data import Candle
 from hunter_core.db.repositories.fx import FxObservationRepository
 from hunter_core.db.session import tenant_session
-from hunter_core.domain.enums import (
-    OutcomeResult,
-    ShadowTrackingState,
-    Timeframe,
-    TradeDirection,
-)
+from hunter_core.domain.enums import StrategyVersionStatus, Timeframe
 from hunter_core.domain.types import uuid7
 from hunter_core.portfolio.opening import open_paper_wallet
 
@@ -65,43 +41,26 @@ async def _seed_bet(
     entry_ts: datetime | None,
     exit_ts: datetime,
     r_multiple: Decimal | None,
-    virtual_entry: Decimal | None = None,
-    virtual_stop: Decimal | None = None,
-    assumed_costs: Mapping[str, object] | None = None,
+    virtual_entry: Decimal | None = Decimal("100"),
+    virtual_stop: Decimal | None = Decimal("99"),
+    assumed_costs: Mapping[str, object] | None = ASSUMED_COSTS,
 ) -> None:
-    """One ``agent_signals`` + ``signal_outcomes`` row, minimal but exact
-    about the fields ``LabDailyGoalRepository`` reads."""
-    signal_id = uuid7()
+    signal, outcome = fx.build_shadow_signal(
+        strategy_version_id=version_id,
+        market_id=market_id,
+        decision_at=decision_at,
+        entry_ts=entry_ts,
+        exit_ts=exit_ts,
+        r_multiple=r_multiple,
+    )
+    signal.supporting_features = {
+        "cohort": "prospective",
+        "observation_ts": decision_at.isoformat(),
+    }
+    outcome.virtual_entry, outcome.virtual_stop = virtual_entry, virtual_stop
+    outcome.meta = {} if assumed_costs is None else {"assumed_costs": assumed_costs}
     async with session_factory() as session:
-        session.add(
-            AgentSignal(
-                id=signal_id,
-                strategy_version_id=version_id,
-                market_id=market_id,
-                params_hash="t378-fixture",
-                direction=TradeDirection.LONG,
-                confidence=Decimal("0.5"),
-                supporting_features={
-                    "cohort": "prospective",
-                    "observation_ts": decision_at.isoformat(),
-                },
-                emitted_at=decision_at,
-            )
-        )
-        session.add(
-            SignalOutcome(
-                signal_id=signal_id,
-                virtual_entry=virtual_entry,
-                virtual_stop=virtual_stop,
-                entry_ts=entry_ts,
-                exit_price=Decimal("101"),
-                exit_ts=exit_ts,
-                result=OutcomeResult.TARGET,
-                r_multiple=r_multiple,
-                tracking_state=ShadowTrackingState.TERMINAL,
-                meta={} if assumed_costs is None else {"assumed_costs": assumed_costs},
-            )
-        )
+        session.add_all([signal, outcome])
         await session.commit()
 
 
@@ -134,6 +93,15 @@ def _daily_goal_url(org_id: uuid.UUID) -> str:
     return f"/api/v1/orgs/{org_id}/lab/daily-goal"
 
 
+async def _read(client: httpx.AsyncClient, actor: Actor, day: date) -> dict[str, Any]:
+    assert actor.org_id is not None
+    response = await client.get(
+        _daily_goal_url(actor.org_id), params={"day": day.isoformat()}, headers=actor.headers
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 async def test_requires_authentication(client: httpx.AsyncClient) -> None:
     response = await client.get(_daily_goal_url(uuid.uuid4()))
     assert response.status_code == 401
@@ -148,15 +116,6 @@ async def test_a_membership_less_org_id_is_a_404(
 
 
 class TestDedupe:
-    """Three active versions, one bet, one day.
-
-    2026-09-10 is inside the hardcoded initial partitions
-    (``0001_initial_schema``: 2026-09..2026-12) — every date this file uses
-    for a row on a partitioned table (``candles``, ``portfolio_equity_snapshots``)
-    has to be, or the insert itself fails with a ``CheckViolationError``
-    before the endpoint is ever called.
-    """
-
     DAY = date(2026, 9, 10)
     BAR_CLOSE = datetime(2026, 9, 10, 14, 0, tzinfo=UTC)
     EXIT_TS = datetime(2026, 9, 10, 15, 0, tzinfo=UTC)
@@ -171,18 +130,12 @@ class TestDedupe:
             client, make_actor("t378-dedupe"), f"Dedupe {uuid.uuid4().hex[:6]}"
         )
         market_id = await fx.seed_lab_market(session_factory)
-        _, v1 = await fx.seed_strategy_version(
-            session_factory, activated_at=datetime(2026, 1, 1, tzinfo=UTC), version="v1"
-        )
-        versions = [v1]
-        for k, activated in enumerate(
-            (datetime(2026, 1, 2, tzinfo=UTC), datetime(2026, 1, 3, tzinfo=UTC)), start=2
-        ):
+        versions: list[uuid.UUID] = []
+        for k in range(1, 4):
             _, vid = await fx.seed_strategy_version(
-                session_factory, activated_at=activated, version=f"v{k}"
+                session_factory, activated_at=datetime(2026, 1, k, tzinfo=UTC), version=f"v{k}"
             )
             versions.append(vid)
-
         for r, version_id in zip((Decimal("1"), Decimal("2"), Decimal("3")), versions, strict=True):
             await _seed_bet(
                 session_factory,
@@ -193,16 +146,8 @@ class TestDedupe:
                 exit_ts=self.EXIT_TS,
                 r_multiple=r,
             )
-
         assert actor.org_id is not None
-        response = await client.get(
-            _daily_goal_url(actor.org_id),
-            params={"day": self.DAY.isoformat()},
-            headers=actor.headers,
-        )
-
-        assert response.status_code == 200, response.text
-        body = response.json()
+        body = await _read(client, actor, self.DAY)
         assert body["unique_bets"] == 1
         assert body["pooled_bets"] == 3
         assert body["unique_r"] == "1"  # v1 activated first, wins the dedupe
@@ -212,23 +157,15 @@ class TestDedupe:
     async def test_explain_uses_the_version_emitted_index(
         self, session_factory: async_sessionmaker[AsyncSession]
     ) -> None:
-        """Best-effort plan check on the seeded population (a handful of
-        rows) — not a substitute for measuring against a T3.62b-size ledger,
-        which this suite does not build (see ``notes-T3.78.md`` CONCERN)."""
         async with session_factory() as session:
             plan = (
                 await session.execute(
                     text(
                         "EXPLAIN SELECT s.id FROM agent_signals s "
                         "JOIN signal_outcomes o ON o.signal_id = s.id "
-                        "WHERE s.strategy_version_id = :vid "
-                        "AND s.emitted_at >= :start AND s.emitted_at < :end"
-                    ),
-                    {
-                        "vid": uuid.uuid4(),
-                        "start": datetime(2026, 1, 1, tzinfo=UTC),
-                        "end": datetime(2026, 1, 2, tzinfo=UTC),
-                    },
+                        "WHERE s.strategy_version_id = '00000000-0000-0000-0000-000000000000' "
+                        "AND s.emitted_at >= '2026-01-01' AND s.emitted_at < '2026-01-02'"
+                    )
                 )
             ).scalars()
             rows = "\n".join(str(line) for line in plan)
@@ -236,15 +173,6 @@ class TestDedupe:
 
 
 class TestParticipationBinds:
-    """A market whose 1-minute quote volume (200 000 USDT) makes the
-    participation ceiling win over the risk-per-trade budget.
-
-    Dated well after ``TestFxMissing``'s cutoff (2026-09-02T03:00Z) so this
-    class's own FX observation can never leak into that scenario — the
-    predicate that matters is ``available_at <= window_end`` (a value
-    comparison), never which test happened to run first.
-    """
-
     DAY = date(2026, 9, 6)
     ENTRY_TS = datetime(2026, 9, 6, 14, 5, tzinfo=UTC)
     EXIT_TS = datetime(2026, 9, 6, 15, 0, tzinfo=UTC)
@@ -285,7 +213,6 @@ class TestParticipationBinds:
                 as_of=wallet_as_of,
                 capital_brl=CAPITAL_BRL,
             )
-
         market_id = await fx.seed_lab_market(session_factory)
         _, version_id = await fx.seed_strategy_version(
             session_factory, activated_at=datetime(2026, 1, 10, tzinfo=UTC)
@@ -293,8 +220,14 @@ class TestParticipationBinds:
         await _seed_candle(
             session_factory,
             market_id=market_id,
-            open_time=self.ENTRY_TS.replace(second=0, microsecond=0),
+            open_time=self.ENTRY_TS - timedelta(minutes=1),
             quote_volume=Decimal("200000"),
+        )
+        await _seed_candle(
+            session_factory,
+            market_id=market_id,
+            open_time=self.ENTRY_TS,
+            quote_volume=Decimal("1000000"),
         )
         await _seed_bet(
             session_factory,
@@ -304,30 +237,13 @@ class TestParticipationBinds:
             entry_ts=self.ENTRY_TS,
             exit_ts=self.EXIT_TS,
             r_multiple=Decimal("1"),
-            virtual_entry=Decimal("100"),
-            virtual_stop=Decimal("99"),
-            assumed_costs=ASSUMED_COSTS,
         )
-
-        response = await client.get(
-            _daily_goal_url(actor.org_id),
-            params={"day": self.DAY.isoformat()},
-            headers=actor.headers,
-        )
-
-        assert response.status_code == 200, response.text
-        body = response.json()
-        # equity = 100_000 BRL / 5.00 = 20_000 USDT
-        # loss_fraction = 0.01 (stop) + 0.004 (round-trip cost) = 0.014
-        # participation ceiling = 1% * 200_000 = 2_000 < risk budget (3_571.43)
-        # value_1r_usdt = 2_000 * 0.014 = 28 -> value_1r_brl = 28 * 5.00 = 140
+        body = await _read(client, actor, self.DAY)
         assert body["portfolio"]["source"] == "equity_snapshot"
         assert body["value_of_1r"]["real_brl_p50"] == "140"
         assert body["value_of_1r"]["sample_size"] == 1
         assert body["progress"]["real_brl"] == "140"
         assert body["progress"]["required_1r_brl"] == "9000"
-        # T3.78b: profit is real in USDT first (before FX), then in BRL by
-        # the observed rate -- both present here, fx block names the source.
         assert body["value_of_1r"]["real_usdt_p50"] == "28"
         assert body["progress"]["real_usdt"] == "28"
         assert body["fx"] == {
@@ -337,22 +253,64 @@ class TestParticipationBinds:
             "available_at": wallet_as_of.isoformat().replace("+00:00", "Z"),
         }
         assert body["fx_reason"] is None
-        # The series day matching this scenario carries its own USDT figure.
         series_point = next(p for p in body["series_30d"] if p["day"] == self.DAY.isoformat())
         assert series_point["unique_usdt"] == "28"
+        later = self.ENTRY_TS + timedelta(minutes=2)
+        await _seed_candle(
+            session_factory,
+            market_id=market_id,
+            open_time=later - timedelta(minutes=1),
+            quote_volume=Decimal("1000000"),
+        )
+        await _seed_bet(
+            session_factory,
+            version_id=version_id,
+            market_id=market_id,
+            decision_at=later,
+            entry_ts=later,
+            exit_ts=self.EXIT_TS,
+            r_multiple=Decimal("-1"),
+        )
+        progress = (await _read(client, actor, self.DAY))["progress"]
+        assert progress["real_usdt"] == "0"
+        assert progress["real_usdt_summed"] == "-22"
+        assert progress["real_brl_summed"] == "-110"
+
+
+async def test_retired_version_counts_on_its_active_day_only(
+    client: httpx.AsyncClient,
+    make_actor: Callable[[str], Actor],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    actor = await create_org(client, make_actor("a378c-history"), f"History {uuid.uuid4().hex[:6]}")
+    market_id = await fx.seed_lab_market(session_factory)
+    _, version_id = await fx.seed_strategy_version(
+        session_factory,
+        activated_at=datetime(2026, 9, 8, 12, tzinfo=UTC),
+        deprecated_at=datetime(2026, 9, 9, 2, tzinfo=UTC),
+        status=StrategyVersionStatus.DEPRECATED,
+    )
+    for day in (8, 9):
+        ts = datetime(2026, 9, day, 15, tzinfo=UTC)
+        await _seed_bet(
+            session_factory,
+            version_id=version_id,
+            market_id=market_id,
+            decision_at=ts,
+            entry_ts=ts,
+            exit_ts=ts,
+            r_multiple=Decimal("-7"),
+        )
+    assert actor.org_id is not None
+    for day, expected in ((8, "-7"), (9, "0")):
+        body = await _read(client, actor, date(2026, 9, day))
+        assert body["unique_r"] == expected
+        assert body["series_30d"][-1]["unique_r"] == expected
+        if day == 9:
+            assert body["series_30d"][-2]["unique_r"] == "-7"
 
 
 class TestFxMissing:
-    """The earliest day inside the seeded partition range, with no
-    ``fx_observations`` row (nor any portfolio) available by its end ->
-    every real-money field is ``None`` with a reason, never a guessed rate.
-
-    2026-09-01: no test in this file (or, by convention, elsewhere in the
-    suite — every other fixture uses ``utcnow()`` or a date at/after
-    ``TestParticipationBinds``'s 2026-09-05) ever names an ``available_at``
-    at or before this day's end (2026-09-02T03:00Z).
-    """
-
     DAY = date(2026, 9, 1)
     ENTRY_TS = datetime(2026, 9, 1, 10, 0, tzinfo=UTC)
     EXIT_TS = datetime(2026, 9, 1, 11, 0, tzinfo=UTC)
@@ -369,12 +327,6 @@ class TestFxMissing:
         _, version_id = await fx.seed_strategy_version(
             session_factory, activated_at=datetime(2020, 6, 1, tzinfo=UTC)
         )
-        await _seed_candle(
-            session_factory,
-            market_id=market_id,
-            open_time=self.ENTRY_TS.replace(second=0, microsecond=0),
-            quote_volume=Decimal("200000"),
-        )
         await _seed_bet(
             session_factory,
             version_id=version_id,
@@ -383,35 +335,16 @@ class TestFxMissing:
             entry_ts=self.ENTRY_TS,
             exit_ts=self.EXIT_TS,
             r_multiple=Decimal("1"),
-            virtual_entry=Decimal("100"),
-            virtual_stop=Decimal("99"),
-            assumed_costs=ASSUMED_COSTS,
         )
-
-        response = await client.get(
-            _daily_goal_url(actor.org_id),
-            params={"day": self.DAY.isoformat()},
-            headers=actor.headers,
-        )
-
-        assert response.status_code == 200, response.text
-        body = response.json()
+        body = await _read(client, actor, self.DAY)
         assert body["unique_r"] == "1"  # the bet itself is real
         assert body["fx"] is None
         assert body["fx_reason"] == "no_fx_observation"
         assert body["portfolio"]["source"] == "no_portfolio"
-        assert body["value_of_1r"]["real_brl_p50"] is None
-        assert body["value_of_1r"]["real_brl_p10"] is None
-        assert body["value_of_1r"]["real_brl_p90"] is None
+        for field in ("real_brl_p50", "real_brl_p10", "real_brl_p90", "real_usdt_p50"):
+            assert body["value_of_1r"][field] is None
         assert body["value_of_1r"]["reason"] is not None
-        assert body["progress"]["real_brl"] is None
-        assert body["progress"]["distance_to_goal_real_brl"] is None
-        assert body["progress"]["required_unique_r"] is None
-        # T3.78b: no equity known here either (no_portfolio), so USDT pricing
-        # never even ran -- real_usdt_* is None for the same reason as
-        # real_brl_*, not a separate FX-only gap (that branch is covered
-        # without a database in test_lab_daily_goal_service.py, concern 5).
-        assert body["value_of_1r"]["real_usdt_p50"] is None
-        assert body["progress"]["real_usdt"] is None
+        for field in ("real_brl", "distance_to_goal_real_brl", "required_unique_r", "real_usdt"):
+            assert body["progress"][field] is None
         series_point = next(p for p in body["series_30d"] if p["day"] == self.DAY.isoformat())
         assert series_point["unique_usdt"] is None

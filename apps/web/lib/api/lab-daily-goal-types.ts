@@ -60,6 +60,10 @@ export const dailyGoalValueOfOneRSchema = z.object({
 export type DailyGoalValueOfOneR = z.infer<typeof dailyGoalValueOfOneRSchema>;
 
 export const dailyGoalProgressSchema = z.object({
+  real_brl_summed: decimalString.nullable().optional(),
+  real_usdt_summed: decimalString.nullable().optional(),
+  summed_reason: z.string().nullable().optional(),
+  distance_to_goal_summed_brl: decimalString.nullable().optional(),
   real_brl: decimalString.nullable(),
   real_usdt: decimalString.nullable(),
   label_brl: decimalString,

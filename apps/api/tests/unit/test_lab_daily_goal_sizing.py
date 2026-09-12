@@ -14,10 +14,24 @@ from hunter_api.services.lab_daily_goal_sizing import (
     label_brl,
     percentile,
     price_bet,
+    sum_priced_bets,
     usdt_to_brl,
 )
 
 pytestmark = pytest.mark.unit
+
+
+def test_summed_money_uses_each_bets_own_size() -> None:
+    assert sum_priced_bets(
+        [(Decimal("2"), Decimal("10")), (Decimal("-1"), Decimal("30"))]
+    ) == Decimal("-10")
+
+
+def test_summed_money_does_not_present_partial_pricing_as_total() -> None:
+    assert sum_priced_bets([(Decimal("2"), Decimal("10")), (Decimal("-1"), None)]) is None
+    assert sum_priced_bets([(None, Decimal("30"))]) == Decimal(0)
+    assert sum_priced_bets([]) == Decimal(0)
+
 
 _COSTS = {"spread_bps": "10", "slippage_bps": "5", "fee_bps": "10", "max_entry_delay_s": 30}
 _EQUITY = Decimal("100000")

@@ -116,3 +116,28 @@ class TestFxOut:
         assert out.source == "binance.spot.ticker"
         assert out.observed_at == _OBSERVED_AT
         assert out.available_at == _AVAILABLE_AT
+
+
+def test_progress_keeps_estimate_but_publishes_summed_money() -> None:
+    progress = _progress(
+        unique_r=Decimal("1"),
+        value_of_1r=_value_of_1r([Decimal("10"), Decimal("30")], _fx()),
+        goal_brl=Decimal("9000"),
+        summed_usdt=Decimal("-10"),
+        fx=_fx(),
+    )
+    assert progress.real_usdt == Decimal("10")
+    assert progress.real_brl == Decimal("50")
+    assert progress.real_usdt_summed == Decimal("-10")
+    assert progress.real_brl_summed == Decimal("-50")
+
+
+def test_summed_usdt_survives_missing_fx() -> None:
+    progress = _progress(
+        unique_r=Decimal("1"),
+        value_of_1r=_value_of_1r([Decimal("10")], None),
+        goal_brl=Decimal("9000"),
+        summed_usdt=Decimal("10"),
+    )
+    assert progress.real_usdt_summed == Decimal("10")
+    assert progress.real_brl_summed is None

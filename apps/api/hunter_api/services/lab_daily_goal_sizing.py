@@ -43,6 +43,7 @@ __all__ = [
     "label_brl",
     "percentile",
     "price_bet",
+    "sum_priced_bets",
     "usdt_to_brl",
 ]
 
@@ -51,6 +52,23 @@ LABEL_REFERENCE_EQUITY_BRL = Decimal("100000")
 convertidos em USDT") — fixed, independent of any organization's real equity."""
 
 _ZERO = Decimal(0)
+
+
+def sum_priced_bets(bets: list[tuple[Decimal | None, Decimal | None]]) -> Decimal | None:
+    """Sum each r_net outcome at its own size; never report a partial total.
+
+    Funding-null outcomes remain excluded, exactly as in the R axis. A
+    missing size for an evaluable outcome makes the total unavailable.
+    """
+    with localcontext(CONTEXT):
+        total = _ZERO
+        for r, value_1r in bets:
+            if r is None:
+                continue
+            if value_1r is None:
+                return None
+            total += r * value_1r
+        return total
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,10 +120,9 @@ def price_bet(inputs: BetPricingInput, *, equity_usdt: Decimal) -> BetPricingRes
         participation_notional = PAPER_V1.max_participation_pct * inputs.quote_volume
         risk_budget_notional = equity_usdt * PAPER_V1.risk_per_trade_pct / loss_fraction
         if participation_notional <= risk_budget_notional:
-            capped_notional, binding = participation_notional, "market_participation"
+            value_1r_usdt, binding = participation_notional * loss_fraction, "market_participation"
         else:
-            capped_notional, binding = risk_budget_notional, "risk_per_trade"
-        value_1r_usdt = capped_notional * loss_fraction
+            value_1r_usdt, binding = equity_usdt * PAPER_V1.risk_per_trade_pct, "risk_per_trade"
     return BetPricingResult(value_1r_usdt, None, binding)
 
 
