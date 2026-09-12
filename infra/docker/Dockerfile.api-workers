@@ -35,6 +35,7 @@ COPY services/strategy-worker/pyproject.toml services/strategy-worker/pyproject.
 COPY services/execution-worker/pyproject.toml services/execution-worker/pyproject.toml
 COPY services/analytics-worker/pyproject.toml services/analytics-worker/pyproject.toml
 COPY services/meme-worker/pyproject.toml services/meme-worker/pyproject.toml
+COPY services/meme-executor/pyproject.toml services/meme-executor/pyproject.toml
 
 # Third-party dependencies only — no workspace member source exists yet, so
 # skip installing the (editable) workspace packages themselves.
@@ -52,6 +53,7 @@ COPY services/strategy-worker services/strategy-worker
 COPY services/execution-worker services/execution-worker
 COPY services/analytics-worker services/analytics-worker
 COPY services/meme-worker services/meme-worker
+COPY services/meme-executor services/meme-executor
 
 RUN uv sync --all-packages --frozen --no-dev
 
@@ -88,6 +90,7 @@ COPY services/strategy-worker services/strategy-worker
 COPY services/execution-worker services/execution-worker
 COPY services/analytics-worker services/analytics-worker
 COPY services/meme-worker services/meme-worker
+COPY services/meme-executor services/meme-executor
 COPY infra/migrations infra/migrations
 COPY infra/scripts infra/scripts
 COPY infra/docker/entrypoint.sh infra/docker/entrypoint.sh
