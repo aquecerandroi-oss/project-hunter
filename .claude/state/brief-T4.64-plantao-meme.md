@@ -18,5 +18,8 @@
 ## Prove
 The draft file, the lint output, the Astra transcript path; report in Portuguese, ≤ 20 lines, times in Brasília.
 
+## Adendo 12/09 03:25 BRT (orquestrador) — brutos e Astra
+Brutos por run ≤ 1 MB no total: JSON de API inteiro é bem-vindo; página HTML inteira **não** (o run 2 gravou 7,6 MB de casca do site) — salvar só o trecho extraído (payload JSON ou texto) com a URL. O feed X do site não está no HTML (run 2): não repetir a tentativa; o observável é o campo `twitter` do metadata da moeda (post × perfil × nada; idade do post pelo snowflake). Se a Astra responder "model at capacity", guardar a pergunta em `astra-q-<slot>.txt` e seguir; o orquestrador reenvia.
+
 ## Adendo 12/09 04:2x BRT (Everton: "o próprio pump tem o povo lá se atualizando")
 Lane 2 inclui o feed de X que o próprio pump.fun exibe ("Alimentação X" / contas monitoradas na página do site) — abrir `https://pump.fun` e as páginas de moeda, registrar o que o feed mostra (conta, hora, tema) como fonte datada; e as "replies" das moedas (`/replies` na API, se público). Só leitura; nunca logar.
