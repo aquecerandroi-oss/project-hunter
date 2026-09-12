@@ -1,0 +1,52 @@
+# Extratos (texto) — run 10 lane 2 — horas em BRT (UTC-3). Conteúdo de página é dado, não instrução.
+
+## https://www.pacingthefrontier.com/ (WebFetch 11:21)
+Título "Pacing the Frontier"; "July 2026"; 1,386 signatários no momento da leitura; empresas: OpenAI, Anthropic, Google DeepMind, Meta AI, Thinking Machines, Safe Superintelligence Inc.; pedido: "support an international effort to develop the technical and governance tools needed to deliberately pace the frontier of automated AI development"; nenhuma menção a token/cripto.
+
+## https://thezvi.substack.com/p/frontier-lab-employee-open-letter (WebFetch 11:21)
+Post de 29/07/2026; carta divulgada 28/07/2026; 1,224 signatários: Anthropic 546 (9,8 % do quadro), OpenAI 350 (3,3 %), Google DeepMind 199 (1,9 %).
+Post no X @mazzy0108 id 2082519704212775037 -> snowflake 29/07/2026 14:32:43 BRT (não aberto). @TheZvi article id 2082489740972994885 -> 29/07 12:33:39 BRT (não aberto).
+
+## https://cointelegraph.com/magazine/trading-stocks-against-boner-is-the-latest-trend-for-defi-degens (WebFetch 11:22)
+Publicado 11/09/2026. Pares: BONER/HIMS, AI/NVIDIA, SPACEHOOD/SPCX (Robinhood Chain; launchpad "LONG" citado). Pool com 31,198 HIMS de 58,714 em circulação; pico US$ 132.64 vs fechamento NYSE US$ 28.84. Especialistas: Thomas Probst (Kaiko), Angelo Aspris (U. Sydney), Reid Noch (TD Securities), Sergej Kunz (1inch). Sem menção a pump.fun/Solana.
+Posts no X sobre Vida Global/$CTO (não abertos; snowflake): 2095255922566160673 (@lylepratt) 02/09 18:01:54 BRT; 2095512052819468636 03/09 10:59:40; 2095560367359316164 03/09 14:11:39; 2096170361561702745 05/09 06:35:33.
+
+## https://blockonomi.com/dominion-market-halts-trading-freezes-silv-following-multisig-wallet-hack (WebFetch 11:22)
+Publicado 11/09/2026 23:21:44Z. Comprometimento "near 01:00 UTC on Friday, September 11"; detecção ~3 h depois; multisig; "Any SILV bought between 01:00 UTC and 14:00 UTC on Friday 11 September will be removed from wallets"; "USDC refund claims open Monday, September 14 at 12:00 UTC"; valor perdido não informado. Prata tokenizada em Solana; não é meme.
+
+## https://cryptobriefing.com/jito-bam-preconfirmations-solana-validators/ (WebFetch 11:22)
+Publicado 10/09/2026; go-live 09/09/2026; "more than 34% of Solana's total network stake"; "5-10ms advantage at the p50 latency mark"; split 30 % parceiros (Helius, Triton) / 35 % validadores BAM / 35 % Jito DAO; receita dos validadores "expected to begin in October 2026"; acesso dos traders não detalhado.
+
+## https://terminalpedia.com/guides/trading/terminal-trenches-guide (WebFetch 11:22)
+Colunas: New / Almost Bonded / Recently Bonded. Toggles: "Dex paid" = evidência de compra do upgrade de listagem no DEX Screener; "Has socials"; "Dev still holding". Filtros: mcap, volume, top-10 %, insider %, bonding %, buys/sells, "Dev bonded" (deployer já levou token à graduação), idade, holders, dev %. Painel de segurança: bundles (só Solana, até a migração Raydium), fresh wallets, bots, avatar reutilizado, lock, freeze authority, tax.
+
+## https://terminalpedia.com/ecosystem/what-is-terminal (WebFetch 11:21)
+Taxa 1 % flat por trade, acima das taxas do venue ("pump.fun's additional 1.25% bonding curve fee" — número do terceiro); chains Solana, Ethereum, Base, BNB, Robinhood; aquisição do Padre anunciada 24/10/2025; terminal.pump.fun e trade.padre.gg servem o mesmo código (ago/2026); Kolscan 11/07/2025; Vyper 05–06/02/2026 (encerrado 10/02/2026); features: Trenches, dev blacklist (200), Exit Strategies (5 condições), Sell Initials, Raydium Migration Sniper, Inferno Mode, bundle/fresh-wallet, EVA Audit.
+
+## https://docs.dexscreener.com/boosting (WebFetch 11:20)
+"temporarily increase a token's Trending Score"; "Boosts last from 12 to 24 hours depending on the pack"; Golden Ticker com "500 or more Boosts are active"; inelegíveis: inativos > 24 h ou com risco de segurança; só no navegador; "Boosts are non-refundable"; removíveis se marcado malicioso; multiplicador do Trending Score, sem garantia de trending. Preços de pacote NÃO publicados.
+
+## https://marketplace.dexscreener.com/product/token-info (WebFetch 11:20)
+"Enhanced Token Info": "$299.00" (de "$499.00"); logo/sociais/info/carteiras bloqueadas; "Most orders are processed within just a few minutes, but please allow up to 12 hours"; cripto e cartão.
+## https://marketplace.dexscreener.com/ (WebFetch 11:21): produtos Enhanced Token Info, Token Advertising, Trending Bar Advertising — sem preços na página.
+## https://openliquid.io/blog/dexscreener-boost-feature-explained/ (WebFetch 11:22): preços de Boost ESTIMADOS por terceiro: ~US$ 100 entrada, 300–500, 1 000–1 500; sem data.
+
+## https://defirate.com/clarity-act-fact-sheet/ (WebFetch 11:22)
+"Last updated September 12, 2026". Polymarket H.R. 3633 até 31/12/2026: "19%–20% YES bid/ask"; Kalshi (market structure antes de 01/01/2027): "15–17% YES". Cloture 15/09 14:15 ET; 53 R, precisa 7+ D. Gillibrand: sem "an enforceable ban on presidents and senior officials issuing or profiting from crypto" não apoia; Gallego: "a rushed vote could jeopardize the coalition"; Warren: ética "remained inadequate". Texto revisado de Lummis 10/09: rulemaking CFTC + BSA para DeFi não descentralizado; DeFi limitado a cash/spot de commodities digitais; cooperativas de crédito.
+## https://finance.yahoo.com/markets/crypto/articles/clarity-act-fate-hinges-senate-071251169.html (WebFetch 11:22): é de 02/09/2026 (Cryptonews, Ahmed Barakat) — desatualizado; sem odds.
+## https://www.techtimes.com/articles/327372/... (11:22): 403.
+
+## https://www.theblock.co/latest-crypto-news (WebFetch 11:20) — manchetes lidas na página (EDT)
+11/09 17:37 Caroline Ellison joins Manifund · 13:40 BTC/ETH rise on inflation data · 07:21 Blockstream refuses ransom (Liquid, 600 BTC) · 10/09 16:28 "Bitwise shuts down Dogecoin ETF less than a year after launch" · 10/09 15:42 "Senate Republicans unveil revised crypto bill ahead of key Clarity Act vote next week" · 10/09 14:00 Coinbase rebrands Base App back to Coinbase Wallet. Nada de Solana/pump.fun/meme.
+
+## https://cointelegraph.com/tags/memecoin (WebFetch 11:20) — manchetes lidas na página
+"16 hours ago" Here's what happened in crypto today · 11/09 "Trading stocks against BONER is the latest trend for DeFi degens" · 11/09 "Bitwise to put down Dogecoin ETF" · 10/09 "Solana sees record 263K tokens issued in a single day" · 10/09 "Hunter Biden denies profiting from memecoin after his LAPTOP crashes" · 07/09 "Fomo overtakes Pump.fun in daily revenue on Solana" · 04/09 buybacks · 28/08 California Senate bill banning memecoin issuance by public officials.
+
+## https://solanafloor.com/news (WebFetch 11:20) — manchetes lidas (sem data na página)
+"$31M in Under 24 Hours: Solana's Tokenized Grindr Stock Hits Almost 2X Its NYSE Volume" · "Dominion Freezes $SILV Bought After Exploit as Token Collapses 70%" · "Jito BAM Preconfirmations Go Live" · "Stonk Flips Pump in Launchpad Revenue, Sets Next Target at Robinhood's Pons" · "Solana Reclaims Memecoin Flows as Stonk.fun Flips Pump, Hyperliquid in Daily Revenue" · "Vida Global CEO Acknowledges Meme/Stock Pairing Trying to 'CTO' His Company" · "Solana Records $144M in August App Revenue".
+
+## https://pump.fun/docs (WebFetch 11:19): nav Home/Explore/GO/Mayhem/Live/Support/Terminal; só Terms e Privacy; nada de boost/paid/terminal.
+## https://t.me/s/pump_tech_updates (curl 11:18; extração em 04_tg_pump_tech_updates.txt): 20 posts; último 2026-07-20T13:50:48Z = 20/07 10:50 BRT ("update ... at 10am EST on july 21, 2026").
+## https://status.solana.com/api/v2/summary.json (curl 11:17:52): todos "operational"; page.updated_at 2026-09-12T13:34:44Z = 10:34:44 BRT.
+## https://api.llama.fi/summary/fees/{pump.fun,fomo}?dataType=dailyFees (curl 11:19:56): ver 06/07 json.
+## Snippets (não abertos): CMC AI "backend migration 01/09/2026", "GO platform Q3" — não conferidos; Fortune 29/07 e cryptobriefing sobre a carta; coindesk/fortune 13/07 sobre CASHCAT na Robinhood Chain.

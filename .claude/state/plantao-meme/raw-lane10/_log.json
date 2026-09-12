@@ -1,0 +1,13 @@
+{"run": 10, "lane": 2, "start_utc": "2026-09-12T14:16:55Z", "start_brt": "11:16:55", "pumpfun_host_requests": 3,
+ "requests": [
+  {"t_brt": "11:17:52", "url": "https://status.solana.com/api/v2/summary.json", "status": 200, "file": "01_solana_status.json"},
+  {"t_brt": "11:17:56", "url": "https://frontend-api-v3.pump.fun/sol-price", "status": 200, "file": "02_sol_price.json", "pumpfun": true},
+  {"t_brt": "11:17:58", "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=20", "status": 200, "file": "03_boards_movers.json", "pumpfun": true},
+  {"t_brt": "11:18:33", "url": "https://t.me/s/pump_tech_updates", "status": 200, "file": "04_tg_pump_tech_updates.txt", "note": "HTML descartado; so texto extraido"},
+  {"t_brt": "11:19:10", "url": "https://api.dexscreener.com/token-boosts/top/v1", "status": 200, "file": "05_dexscreener_boosts_top.json"},
+  {"t_brt": "11:19", "url": "https://pump.fun/docs", "status": 200, "via": "WebFetch", "pumpfun": true},
+  {"t_brt": "11:19:56", "url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees", "status": 200, "file": "06_defillama_pumpfun_fees.json"},
+  {"t_brt": "11:19:56", "url": "https://api.llama.fi/summary/fees/fomo?dataType=dailyFees", "status": 200, "file": "07_defillama_fomo_fees.json"},
+  {"t_brt": "11:20-11:22", "url": "WebFetch: theblock latest, cointelegraph/tags/memecoin, solanafloor/news, docs.dexscreener.com/boosting, marketplace.dexscreener.com (2), terminalpedia (2), openliquid, pacingthefrontier.com, thezvi substack, cointelegraph magazine BONER, blockonomi SILV, cryptobriefing jito BAM, defirate clarity, yahoo clarity (02/09), techtimes (403)", "file": "08_extracts.txt"}
+ ],
+ "websearch_queries": 13, "no_login": true, "no_post": true, "no_trade": true}
