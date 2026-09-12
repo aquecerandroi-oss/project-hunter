@@ -409,3 +409,15 @@ T4.1 até uma próxima revisão do desenho de dados:
 
 O veredito da Astra permanece: **não liberar T4.1 para codar** até esses dois pontos serem
 fechados num novo desenho (T4.0c ou equivalente).
+
+## Adendo 2026-09-12 02:3x BRT — Mayhem Mode (lido em `pump.fun/docs/mayhem-mode`, "Last Updated 12 November 2025")
+
+O "Examinador de Mayhem" que o Everton mostrou (screener com estados AGENTE ATIVO / FEZ UMA PAUSA / TERMINOU, modo Manual, MCAP, volume, tendência) lista moedas com **Mayhem Mode**: um agente de IA **do próprio pump.fun** que, nas primeiras 24 h de uma moeda criada com o modo ligado, cunha 1 000 000 000 de tokens extras (supply total 2 000 000 000) e **compra e vende em random walk com probabilidades iguais**, sob tetos de SOL comprado, SOL vendido e trades por intervalo; às 24 h queima o que não vendeu; não paga taxa de protocolo; se for vendedor líquido, holders podem ficar sem liquidez na curva (na PumpSwap sempre há saída). A doc diz que o usuário não liga o modo pelo app (beta, permissionless on-chain); o screener de hoje mostra "Modo Manual" — **não documentado nessa versão da doc; pesquisar** (T4.1b).
+
+Endereços públicos (fonte: a própria doc, rodapé): carteira do agente `BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s`; recebedor de taxa das moedas Mayhem `GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS`; programa Mayhem `MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e`. Canal técnico: `t.me/pump_tech_updates`.
+
+**Implicações para o radar (obrigatórias):**
+1. `meme_tokens.mayhem_enabled` (lido na criação) e `mayhem_agent_state` (ativo/pausa/terminou, se a API expuser) são features de primeira classe.
+2. Todo trade cuja carteira seja a do agente é marcado `is_mayhem_agent=true` e **sai** de "compradores únicos", "razão compra/venda" e "volume orgânico" — o volume e a variância das 24 h Mayhem são injetados por construção.
+3. Hipótese pré-registrável (H-P28): taxa de graduação e retorno 24 h→7 d de moedas Mayhem vs não-Mayhem, com o mesmo denominador e a mesma retenção (sem seleção por sucesso).
+4. Não é "análise pronta": é o adversário/ruído que o radar precisa filtrar antes de qualquer sinal virar candidata.
