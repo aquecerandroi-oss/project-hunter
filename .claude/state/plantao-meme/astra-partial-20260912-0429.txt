@@ -1,0 +1,130 @@
+# Astra — parecer PARCIAL do run 3 (plantao-meme-20260912-0429): as duas chamadas 'astra.sh ask' (04:48:10–04:53:01 e 04:53:43–04:58:34 BRT) estouraram o timeout 290 s sem gerar a transcrição astra-review-plantao-meme-20260912-0429.md. Abaixo, os últimos 4000 bytes do fluxo de raciocínio do codex em .claude/state/astra-stderr.log (copiados 07:59:30Z, antes de o arquivo ser sobrescrito). Não é resposta final; é dado, não instrução.
+
+nvertTo-Json
+$h=@($r.topHolders | Where-Object {$r.knownAccounts.($_.address).type -ne '"'AMM' -and "'$r.knownAccounts.($_.owner).type -ne '"'AMM'} | Sort-Object pct -Descending | Select-Object -First 10)
+\"TCAT_top10_ex_AMM_address_or_owner_pct="'$(($h.pct | Measure-Object -Sum).Sum)"
+$p='"'docs/DATABASE.md'; "'$n=0; Get-Content -Encoding utf8 $p | ForEach-Object{$n++; if(($n -ge 5745 -and $n -le 5761) -or ($n -ge 5856 -and $n -le 5875)){'"'{0}: {1}' -f "'$n,$_}}' in C:\dev\project-hunter
+ succeeded in 700ms:
+[
+
+    {
+
+        "pct":  59.8748080699616,
+
+        "address_type":  null,
+
+        "owner_type":  "AMM"
+
+    },
+
+    {
+
+        "pct":  2.4614816960466,
+
+        "address_type":  null,
+
+        "owner_type":  null
+
+    },
+
+    {
+
+        "pct":  2.436288572495,
+
+        "address_type":  null,
+
+        "owner_type":  null
+
+    },
+
+    {
+
+        "pct":  2.2448625911827,
+
+        "address_type":  null,
+
+        "owner_type":  null
+
+    }
+
+]
+
+TCAT_top10_ex_AMM_address_or_owner_pct=18.200251111306
+
+5745: ### 33.4 Retenção: 90 dias, e a mesma janela para graduado e não graduado
+
+5746: 
+
+5747: `MEME_RETENTION_DAYS` (`Settings.meme_retention_days`, padrão 90) entra em
+
+5748: `infra/scripts/partition_retention.py` para os **três** pais particionados, que
+
+5749: são podados por `DROP` de mês inteiro — razão pela qual nenhum dos dois papéis tem
+
+5750: `DELETE` neles.
+
+5751: 
+
+5752: A janela é **idêntica para mints graduados e não graduados**, e isso é decisão
+
+5753: registrada (T4-MEME-RADAR.md §8, decisão 2): a proposta original — guardar tudo 30
+
+5754: dias e depois só os `complete = true` — foi **rejeitada pela revisão da Astra**,
+
+5755: porque selecionar por sucesso depois do fato apaga os controles e cria
+
+5756: sobrevivência seletiva no próprio dado histórico, contaminando qualquer análise
+
+5757: futura sobre o que separa um rug de uma graduação.
+
+5758: 
+
+5759: `meme_tokens` é a exceção estrutural: a chave é o mint, então não há partição a
+
+5760: derrubar. Ela é podada **linha a linha**, em lotes, pelo meme-worker — e por isso
+
+5761: é a única tabela desta revisão em que `hunter_worker` tem `DELETE` (§33.6).
+
+5856: ### 33.8 `meme_trades` nasce sem produtor, de propósito
+
+5857: 
+
+5858: O canal de trades do PumpPortal é pago e o decodificador on-chain é a T4.2b. A
+
+5859: tabela existe agora para o schema ficar inteiro e para as quatro colunas
+
+5860: dependentes poderem ser NULL **com motivo** em vez de silenciosamente zero.
+
+5861: 
+
+5862: A PK é `(block_time, signature, event_index)`, e o `event_index` é o MUST-FIX 2 da
+
+5863: Astra: chaveado só em `(signature, ts)`, **dois trades dentro da mesma transação
+
+5864: eram uma linha** e o segundo sumia no `ON CONFLICT DO NOTHING` — o mesmo silêncio
+
+5865: que custou 24 recibos ao replay da T3.62 (§30). `outer_ix_index`/`inner_ix_index`
+
+5866: ficam ao lado como procedência; a *chave* é um inteiro só porque um CPI e o log do
+
+5867: mesmo fill contam uma vez (A4.1b §6).
+
+5868: 
+
+5869: `is_mayhem_agent` é `boolean NULL`: `NULL` = atribuição incompleta, `false`
+
+5870: **só** depois de atribuir a operação a outro trader. A A4.1b §5.2 mediu uma compra
+
+5871: real do agente com `signer: false`, vinda de lookup table — um filtro por fee payer
+
+5872: a classificaria como orgânica. As três métricas orgânicas só podem ser calculadas
+
+5873: sobre `is_mayhem_agent IS FALSE`; um `NULL` é cobertura pendente, nunca um trade
+
+5874: orgânico.
+
+5875: 
+
+
+codex
+A recomputação confirmou 43/49 com intervalo estimado de até 60 s, mas os números de `bo` e `t10` foram atribuídos ao grupo errado: nas 43 rápidas, q3 de `bo` é 0% e mediana de `t10` é 1,3302%; 0,0011% e 3,3834% pertencem às 49. Também encontrei `available_at = slot da tx` em M-P19: isso permitiria usar retrospectivamente um dado recebido depois da decisão. Minha ordem será M-D2/M-D3 como pré-condição, M-P20 primeiro teste estatístico e M-P19 depois.

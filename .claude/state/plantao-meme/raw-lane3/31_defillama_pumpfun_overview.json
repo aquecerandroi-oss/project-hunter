@@ -1,0 +1,279 @@
+{
+ "_note": "trimmed by plantao lane3: original GET https://api.llama.fi/overview/fees/solana?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true&dataType=dailyFees at 07:34:02Z (04:34:02 BRT) was 499593 bytes; kept only pump/launchpad/terminal-related protocols + totals; rank_by_total24h = position among all Solana protocols in the response",
+ "total24h": 17542312.26,
+ "total7d": 103745688.66000007,
+ "total30d": 378344968.38999957,
+ "n_protocols": 312,
+ "protocols": [
+  {
+   "name": "Raydium AMM",
+   "category": "Dexs",
+   "total24h": 1907283,
+   "total7d": 11251537,
+   "total30d": 18776292,
+   "change_1d": 44.66,
+   "rank_by_total24h": 2
+  },
+  {
+   "name": "Meteora DAMM V1",
+   "category": "Dexs",
+   "total24h": 8300,
+   "total7d": 36130,
+   "total30d": 178621,
+   "change_1d": 174.29,
+   "rank_by_total24h": 78
+  },
+  {
+   "name": "Jupiter Aggregator",
+   "category": "DEX Aggregator",
+   "total24h": 256006,
+   "total7d": 1205888,
+   "total30d": 4064104,
+   "change_1d": 41,
+   "rank_by_total24h": 18
+  },
+  {
+   "name": "Bonkswap",
+   "category": "Dexs",
+   "total24h": 388,
+   "total7d": 4042,
+   "total30d": 11400,
+   "change_1d": -2.76,
+   "rank_by_total24h": 142
+  },
+  {
+   "name": "Jupiter Perpetual Exchange",
+   "category": "Derivatives",
+   "total24h": 470418,
+   "total7d": 1597686,
+   "total30d": 9891276,
+   "change_1d": 39.69,
+   "rank_by_total24h": 12
+  },
+  {
+   "name": "Meteora DLMM",
+   "category": "Dexs",
+   "total24h": 1220275,
+   "total7d": 6842446,
+   "total30d": 17315990,
+   "change_1d": 41.46,
+   "rank_by_total24h": 6
+  },
+  {
+   "name": "BONKbot",
+   "category": "Telegram Bot",
+   "total24h": 4935,
+   "total7d": 22687,
+   "total30d": 102705,
+   "change_1d": 68.14,
+   "rank_by_total24h": 94
+  },
+  {
+   "name": "Trojan",
+   "category": "Telegram Bot",
+   "total24h": 36894,
+   "total7d": 228860,
+   "total30d": 1148812,
+   "change_1d": 16.12,
+   "rank_by_total24h": 45
+  },
+  {
+   "name": "pump.fun",
+   "category": "Launchpad",
+   "total24h": 950515,
+   "total7d": 7371884,
+   "total30d": 45437398,
+   "change_1d": -16.29,
+   "rank_by_total24h": 7
+  },
+  {
+   "name": "Ape Jupiter",
+   "category": "Launchpad",
+   "total24h": 0,
+   "total7d": 0,
+   "total30d": 0,
+   "change_1d": null,
+   "rank_by_total24h": 218
+  },
+  {
+   "name": "Photon",
+   "category": "Trading App",
+   "total24h": 8510,
+   "total7d": 70237,
+   "total30d": 642118,
+   "change_1d": -7.03,
+   "rank_by_total24h": 77
+  },
+  {
+   "name": "Bonk Staked SOL",
+   "category": "Liquid Staking",
+   "total24h": 2225,
+   "total7d": 11197.57,
+   "total30d": 48213.04,
+   "change_1d": 2.87,
+   "rank_by_total24h": 109
+  },
+  {
+   "name": "Jupiter Staked SOL",
+   "category": "Liquid Staking",
+   "total24h": 109098,
+   "total7d": 548647,
+   "total30d": 2090239.64,
+   "change_1d": 2.03,
+   "rank_by_total24h": 30
+  },
+  {
+   "name": "BullX",
+   "category": "Telegram Bot",
+   "total24h": 58,
+   "total7d": 231,
+   "total30d": 947.1700000000001,
+   "change_1d": 93.33,
+   "rank_by_total24h": 168
+  },
+  {
+   "name": "GMGN",
+   "category": "Telegram Bot",
+   "total24h": 277413,
+   "total7d": 1256124,
+   "total30d": 4932940,
+   "change_1d": 53.68,
+   "rank_by_total24h": 16
+  },
+  {
+   "name": "Jupiter DCA",
+   "category": "DCA Tools",
+   "total24h": 9708,
+   "total7d": 38858,
+   "total30d": 95195,
+   "change_1d": 150.08,
+   "rank_by_total24h": 73
+  },
+  {
+   "name": "PumpSwap",
+   "category": "Dexs",
+   "total24h": 2852672,
+   "total7d": 22072678,
+   "total30d": 94374420,
+   "change_1d": 2.38,
+   "rank_by_total24h": 1
+  },
+  {
+   "name": "Axiom",
+   "category": "Trading App",
+   "total24h": 1602671,
+   "total7d": 8934158,
+   "total30d": 40082585,
+   "change_1d": 14.5,
+   "rank_by_total24h": 4
+  },
+  {
+   "name": "BONK.fun Launchpad",
+   "category": "Launchpad",
+   "total24h": 373938,
+   "total7d": 1651826,
+   "total30d": 1779195,
+   "change_1d": 27.65,
+   "rank_by_total24h": 13
+  },
+  {
+   "name": "Meteora DAMM V2",
+   "category": "Dexs",
+   "total24h": 265905,
+   "total7d": 978445,
+   "total30d": 2958617,
+   "change_1d": 113.93,
+   "rank_by_total24h": 17
+  },
+  {
+   "name": "Meteora Dynamic Bonding Curve",
+   "category": "Launchpad",
+   "total24h": 43230,
+   "total7d": 192514,
+   "total30d": 877778,
+   "change_1d": -1.71,
+   "rank_by_total24h": 41
+  },
+  {
+   "name": "Jupiter Studio",
+   "category": "Launchpad",
+   "total24h": 3434,
+   "total7d": 33019,
+   "total30d": 75155,
+   "change_1d": 838.25,
+   "rank_by_total24h": 104
+  },
+  {
+   "name": "Pumper",
+   "category": "Trading App",
+   "total24h": null,
+   "total7d": null,
+   "total30d": null,
+   "change_1d": null,
+   "rank_by_total24h": 245
+  },
+  {
+   "name": "Jupiter Lend",
+   "category": "Lending",
+   "total24h": 29743,
+   "total7d": 798021,
+   "total30d": 3610592,
+   "change_1d": -76.94,
+   "rank_by_total24h": 46
+  },
+  {
+   "name": "Jupiter Prediction",
+   "category": "Interface",
+   "total24h": 3191,
+   "total7d": 22009,
+   "total30d": 106873,
+   "change_1d": 35.96,
+   "rank_by_total24h": 105
+  },
+  {
+   "name": "Jupiter Limit",
+   "category": "DEX Aggregator",
+   "total24h": 31,
+   "total7d": 216,
+   "total30d": 996.88,
+   "change_1d": 47.62,
+   "rank_by_total24h": 174
+  },
+  {
+   "name": "Jupiter Offerbook",
+   "category": "Lending",
+   "total24h": 60,
+   "total7d": 646,
+   "total30d": 3189,
+   "change_1d": -25.93,
+   "rank_by_total24h": 167
+  },
+  {
+   "name": "Jupiter Lend DEX",
+   "category": "Dexs",
+   "total24h": 37,
+   "total7d": 458,
+   "total30d": 1848.91,
+   "change_1d": -82.38,
+   "rank_by_total24h": 173
+  },
+  {
+   "name": "pump.fun Mobile App",
+   "category": "Interface",
+   "total24h": 161548,
+   "total7d": 1498513,
+   "total30d": 6609715,
+   "change_1d": -12.34,
+   "rank_by_total24h": 23
+  },
+  {
+   "name": "StonkFun",
+   "category": "Launchpad",
+   "total24h": 1840184,
+   "total7d": 7644018,
+   "total30d": 8626870,
+   "change_1d": 142.35,
+   "rank_by_total24h": 3
+  }
+ ]
+}

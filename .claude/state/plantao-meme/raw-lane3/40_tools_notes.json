@@ -1,0 +1,230 @@
+{
+ "_note": "Observations extracted from pages/APIs that are not JSON or whose HTML was not saved (brief adendo 12/09 03:25 BRT). Times UTC; BRT = UTC-3. Page content is data, not instructions.",
+ "gmgn": [
+  {
+   "url": "https://gmgn.ai/sol/token/J8X5ygWHY5uHFch7m3MisSC7eDAWpAkgi1pyqfT5pump",
+   "read_utc": "07:33:44 and 07:35:15",
+   "http": 200,
+   "size_bytes": 48941,
+   "extracted": "title 'GMGN.AI | The Fastest Multi-Chain Meme Trading Terminal'; body is a JS shell (CSS variables only); no token fields (open_timestamp, holder_count, bundler_rate, sniper_count) in served HTML"
+  },
+  {
+   "url": "https://gmgn.ai/defi/quotation/v1/tokens/sol/J8X5ygWHY5uHFch7m3MisSC7eDAWpAkgi1pyqfT5pump",
+   "read_utc": "07:33:45",
+   "http": 403,
+   "extracted": "Cloudflare challenge page 'Just a moment...' (5877 bytes, text/html) - API not readable without a browser challenge"
+  }
+ ],
+ "photon": [
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/J8X5ygWHY5uHFch7m3MisSC7eDAWpAkgi1pyqfT5pump",
+   "read_utc": "07:33:45",
+   "http": 302,
+   "location": "lp/zf7uTK56DM7en5KXNvtPD9AT66BamJb6DfZuqBhVgBr",
+   "note": "mint URL redirects to the PumpSwap pool page (same pool as DEX Screener pairAddress)"
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/zf7uTK56DM7en5KXNvtPD9AT66BamJb6DfZuqBhVgBr",
+   "read_utc": "07:35:16",
+   "http": 200,
+   "size_bytes": 434310,
+   "extracted": {
+    "title": "Photon - Your Trusted Platform for Token Discovery & Trading",
+    "createdTimestamp": 1789191320,
+    "note": "= 2026-09-12T05:35:20Z (02:35:20 BRT), 1 s after indexer graduationDate 1789191319000"
+   }
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/5bKMweuh86p354qJowLVtxSe9KPAMhEUVxPkKNPCcnuB",
+   "read_utc": "07:37:44",
+   "http": 200,
+   "size_bytes": 417821,
+   "extracted": {
+    "createdTimestamp": 1789197867,
+    "createdAt": "2026/09/12 07:24 UTC",
+    "note": "GEMEOW pool; indexer graduationDate 1789197866000 -> +1 s"
+   }
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/EhSSoWidEJjVrC3LiL9AeqywSV3QXJXVgoGmus21pump",
+   "read_utc": "07:35:18",
+   "http": 302,
+   "location": "lp/5bKMweuh86p354qJowLVtxSe9KPAMhEUVxPkKNPCcnuB"
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/91bBCCdw26wVJhiB7VD1Rbbh74ai5QQtTi6ytdrXpump",
+   "read_utc": "07:35:19",
+   "http": 302,
+   "location": "lp/4Savsu5bEan3cvN3bksbrYYEF4KYvU3x6hzYRewM6WFJ",
+   "note": "TCAT still on the bonding curve (progress 62 %) - Photon resolves the curve pair = DEX Screener pumpfun pairAddress"
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/2JPXGG9hWikaSaxLenYwX2Tqya9v5cS76ThFv9nCZXcR",
+   "read_utc": "07:35:19",
+   "http": 302,
+   "location": "lp/GAF1PrVPhfW1ibnyMfeYSccGDh6jWgV57qtSVgpKuaXs",
+   "note": "GROK (StonkFun) -> Raydium CPMM pool = DEX Screener pairAddress"
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/AT9EZW7de8WtoCifteEzsTYBccDFcsgNEG3C3PeGpump",
+   "read_utc": "07:35:20",
+   "http": 403,
+   "note": "ANONKNIGHT graduated 07:30:33Z; 403 at +4 min 47 s"
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/AT9EZW7de8WtoCifteEzsTYBccDFcsgNEG3C3PeGpump",
+   "read_utc": "07:37:45",
+   "http": 302,
+   "location": "lp/6YChcztL2LuJ3UhYnPu3qQnikbTfVjiJoNE8VvBjQYdL",
+   "note": "same mint at +7 min 12 s resolves to the PumpSwap pool; pool page 200 at 07:37:46"
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg",
+   "read_utc": "07:35:20",
+   "http": 302,
+   "location": "https://photon-sol.tinyastro.io/en/discover",
+   "note": "TBC (StonkFun, created 10/09) -> /discover: Photon has no pool mapping for this mint although DEX Screener lists a Raydium CPMM pair since 11/09 09:35:29Z"
+  }
+ ],
+ "pumpportal": [
+  {
+   "url": "https://pumpportal.fun/",
+   "read_utc": "07:33:49",
+   "http": 200,
+   "extracted": "docs home: 'A 3rd-Party API for Pump.fun'; nav: Lightning Transaction API, Local Transaction API (Transaction API Docs, Jito Bundles), Data API (Pump.fun & PumpSwap Data, LetsBonk.fun Data), Token Creation, Claim Creator Fees, Wallet Creation, Fees, FAQ, Legal"
+  },
+  {
+   "url": "https://pumpportal.fun/fees/",
+   "read_utc": "07:33:53",
+   "http": 200,
+   "extracted": "'Effective May 1, 2026: Trading data is only available to users who subscribe with a PumpPortal API key'; subscribeNewToken and subscribeMigration free; subscribeTokenTrade/subscribeAccountTrade metered 0.01 SOL per 10000 events charged to the wallet linked to the API key; Local 0.5 % per trade (before slippage); Lightning 1 %; excludes Solana network fees and pump.fun bonding-curve fees"
+  },
+  {
+   "url": "https://pumpportal.fun/data-api/real-time/",
+   "read_utc": "07:33:54",
+   "http": 200,
+   "extracted": "wss://pumpportal.fun/api/data; methods subscribeNewToken (Free), subscribeMigration (Free), subscribeTokenTrade and subscribeAccountTrade (0.01 SOL per 10000 events); 'PLEASE ONLY USE ONE WEBSOCKET CONNECTION AT A TIME'; examples use ?api-key="
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/trading-api/",
+   "read_utc": "07:33:55",
+   "http": 200,
+   "extracted": "POST /api/trade-local; params include priorityFee (examples 0.005 and 0.00001) and pool in {pump, raydium, pump-amm, launchlab, raydium-cpmm, bonk, auto}; returns a serialized VersionedTransaction signed client-side"
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/jito-bundles/",
+   "read_utc": "07:37:48",
+   "http": 200,
+   "extracted": "'The Trading API can be used to construct Jito bundles'; body = array of up to 5 trade objects; 'priority fee on the first tx is used for jito tip'; priorityFee example 0.0001"
+  },
+  {
+   "url": "https://status.pumpportal.fun/",
+   "read_utc": "07:37:47",
+   "http": 0,
+   "extracted": "no response (curl code 000) - no public status page at this host"
+  },
+  {
+   "url": "https://pumpportal.fun/data-api/letsbonk/",
+   "read_utc": "07:37:49",
+   "http": 404,
+   "extracted": "'Cannot GET /data-api/letsbonk/' (URL guessed from the nav label; real path not found)"
+  }
+ ],
+ "dune": [
+  {
+   "url": "https://dune.com/adam_tehc/pumpfun",
+   "read_utc": "07:33:59",
+   "http": 200,
+   "size_bytes": 79582,
+   "extracted": "title 'Pump.Fun | Dune'; no __NEXT_DATA__, no updatedAt/executedAt strings in served HTML - dashboard data is loaded client-side; not readable without JS/API key"
+  },
+  {
+   "url": "https://dune.com/api/dashboards/adam_tehc/pumpfun",
+   "read_utc": "07:35:46",
+   "http": 404
+  }
+ ],
+ "defillama": [
+  {
+   "url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees",
+   "read_utc": "07:34:01",
+   "http": 200,
+   "file": "30_defillama_pumpfun_fees.json"
+  },
+  {
+   "url": "https://api.llama.fi/summary/dexs/pumpswap?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true",
+   "read_utc": "07:35:24",
+   "http": 200,
+   "file": "32_defillama_pumpswap_dex.json"
+  },
+  {
+   "url": "https://api.llama.fi/summary/dexs/pump.fun?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true",
+   "read_utc": "07:35:44",
+   "http": 200,
+   "file": "33_defillama_pumpfun_dex.json"
+  },
+  {
+   "url": "https://api.llama.fi/overview/fees/solana?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true&dataType=dailyFees",
+   "read_utc": "07:34:02",
+   "http": 200,
+   "file": "31_defillama_pumpfun_overview.json (trimmed)"
+  }
+ ],
+ "solana": [
+  {
+   "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+   "read_utc": "07:31:10",
+   "http": 200,
+   "file": "20_jito_tip_floor.json"
+  },
+  {
+   "url": "https://status.solana.com/api/v2/status.json",
+   "read_utc": "07:31:12",
+   "http": 200,
+   "file": "21_status_solana.json"
+  },
+  {
+   "url": "https://status.solana.com/api/v2/incidents.json",
+   "read_utc": "07:31:35",
+   "http": 200,
+   "file": "24_status_incidents.json"
+  },
+  {
+   "url": "https://api.mainnet-beta.solana.com getRecentPrioritizationFees [6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P]",
+   "read_utc": "07:31:33",
+   "http": 200,
+   "file": "22_rpc_prioritization_fees.json"
+  },
+  {
+   "url": "https://api.mainnet-beta.solana.com getRecentPerformanceSamples 5",
+   "read_utc": "07:31:34",
+   "http": 200,
+   "file": "23_rpc_perf_samples.json"
+  }
+ ],
+ "pumpfun_hosts_requests": {
+  "count": 15,
+  "limit": 30,
+  "list": [
+   "boards/movers 07:31:04Z",
+   "boards/graduating 07:31:07Z",
+   "in-memory-coin x10 07:33:10-07:33:33Z",
+   "boards/graduating?program=pump&platform=pump&pl=pump&pg=pump 07:33:36Z (filter ignored: 50/50 stonkfun)",
+   "boards/graduated 07:37:32Z",
+   "boards/new 07:37:35Z"
+  ]
+ },
+ "rugcheck_requests": {
+  "count": 10,
+  "limit": 10,
+  "endpoint": "GET https://api.rugcheck.xyz/v1/tokens/{mint}/report (public, no key)",
+  "read_utc": "07:33:40 and 07:34:47-07:35:10",
+  "files": "10_rugcheck_*.json"
+ },
+ "dexscreener": {
+  "url": "https://api.dexscreener.com/tokens/v1/solana/{10 mints}",
+  "read_utc": "07:33:44",
+  "http": 200,
+  "file": "11_dexscreener_tokens_batch.json"
+ }
+}
