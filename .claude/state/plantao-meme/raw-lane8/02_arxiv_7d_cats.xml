@@ -1,0 +1,560 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/hoNnpvHt8xDes6llVh+xKjHdvx8</id>
+  <title>arXiv Query: search_query=(all:solana OR all:memecoin OR all:"meme coin" OR all:launchpad OR all:"rug pull") AND (cat:q-fin.* OR cat:cs.CR OR cat:cs.CY OR cat:cs.SE)&amp;id_list=&amp;start=0&amp;max_results=25</title>
+  <updated>2026-09-12T12:51:18Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=(all:solana+OR+(all:memecoin+OR+(all:%22meme+coin%22+OR+(all:launchpad+OR+all:%22rug+pull%22))))+AND+(cat:q-fin.*+OR+(cat:cs.CR+OR+(cat:cs.CY+OR+cat:cs.SE)))&amp;start=0&amp;max_results=25&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>25</opensearch:itemsPerPage>
+  <opensearch:totalResults>96</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2609.11413v1</id>
+    <title>Heterogeneous Cross-Chain Transaction Tracing for Solana Bridges via Candidate-Set Selective Decision</title>
+    <updated>2026-09-10T11:43:44Z</updated>
+    <link href="https://arxiv.org/abs/2609.11413v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.11413v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Solana is a rapidly growing high-throughput blockchain platform that has attracted substantial liquidity and user activity. However, this expansion has also drawn the attention of illicit actors, who frequently leverage cross-chain bridges to route illicit funds onto Solana to obfuscate transaction lineage. Unlike EVM-compatible platforms, Solana features distinct execution dynamics and lacks standard event logs, creating severe semantic gaps that prevent existing tracing methods from reliably correlating cross-ledger transactions. In this paper, we formalize four types of Solana-bound cross-chain transaction modes and propose a candidate-set selective decision-based tracing method called SolTracer. SolTracer maps disparate execution semantics into a unified event space and employs candidate-set selective decision-making to reliably associate target transactions while abstaining when valid targets are absent. Extensive experiments demonstrate that SolTracer outperforms state-of-the-art (SOTA) methods across three representative scenarios: closed-world association, open-world association, and cross-source-chain generalization. In particular, under the challenging open-world setting with a 50% TA ratio, SolTracer improves the F1 score by 20.16% over the strongest SOTA baseline. Utilizing SolTracer, we conduct an empirical analysis on real-world cross-chain transfers to investigate ecosystem dynamics. Our analysis explores the stark count-value divergence across bridge mechanisms, the prevalence of cross-asset shifts, and the decoupling between on-chain settlement and explorer visibility.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-10T11:43:44Z</published>
+    <arxiv:comment>13 pages, 10 figures, 6 tables</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Wenjie Dou</name>
+    </author>
+    <author>
+      <name>Zheng Che</name>
+    </author>
+    <author>
+      <name>Meng Shen</name>
+    </author>
+    <author>
+      <name>Hanbiao Du</name>
+    </author>
+    <author>
+      <name>Qing Li</name>
+    </author>
+    <author>
+      <name>Yan Qiang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.10246v1</id>
+    <title>Meme Coin Factories: Uncovering Large-Scale Manipulations on pump.fun</title>
+    <updated>2026-09-09T14:35:18Z</updated>
+    <link href="https://arxiv.org/abs/2609.10246v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.10246v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Once complex, creating and deploying a new cryptocurrency has become trivial. Coin launchpads now allow users to generate a new coin with merely a few clicks, at a minimal cost. Launchpad popularity has grown in tandem with the rise of "meme coins," which usually do not offer any novel technological properties and are purely created for fun. The most prominent coin launchpad, pump.fun, has gained significant traction, grossing over 100 million USD in daily trading volume. The mass adoption of coin launchpads, however, also enables strategic actors to easily manipulate trading signals, unbeknownst to inexperienced traders who then buy certain coins, and enable these strategic actors to profit from rapid and unsustainable price increases ("pumps"). To identify such manipulations at scale, we conduct a large-scale study of pump.fun, collecting information on all 15 million coins launched in the last two years, and performing analysis on large, random samples of transaction data. We identify five classes of manipulation strategies: 1) wash trading, 2) creator address obfuscation, 3) coordinated sell, 4) copycat coins, and 5) social media manipulation. We find that strategic actors often bypass the platform interface and implement these strategies in a highly automated and low-latency fashion, by interacting directly with the blockchain. We further uncover the existence of "Market-Manipulation-as-a-service (MMaaS)," third-party tools that enable users to perform these manipulations without any technical expertise. We conclude by devising mitigations and proposing recommendations for traders, pump.fun, wallets or chain scanners, software development platforms, and regulators.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-09T14:35:18Z</published>
+    <arxiv:comment>Proceedings of the 2026 ACM SIGSAC Conference on Computer and Communications Security (CCS'26)</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Nicolas Szwajcok</name>
+    </author>
+    <author>
+      <name>Taro Tsuchiya</name>
+    </author>
+    <author>
+      <name>Enze Liu</name>
+    </author>
+    <author>
+      <name>Kyle Soska</name>
+    </author>
+    <author>
+      <name>Mathias Payer</name>
+    </author>
+    <author>
+      <name>Nicolas Christin</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2605.05274v2</id>
+    <title>Sealing the Audit-Runtime Gap for LLM Skills</title>
+    <updated>2026-09-03T09:06:40Z</updated>
+    <link href="https://arxiv.org/abs/2605.05274v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2605.05274v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Large language model (LLM) ecosystems such as Claude Code and ChatGPT increasingly rely on skills: packages of natural-language instructions and executable tools. Once in the LLM's context, skill content cannot be reliably separated from trusted instructions, and a skill's executable side can invoke privileged actions, exposing the skill supply chain to injection, tampering, and rug-pull attacks. Existing defenses are stage-bound: centralized signing, audit reports unbound from the runtime artifact, or policy engines that cannot attest to what was approved. We present SIGIL, the first framework that seals the audit-runtime gap for LLM skills. SIGIL delivers verifiable hosting through a tamper-evident, decentralized on-chain registry from which LLMs fetch skills directly. The registry admits four publication types, Transparent, Licensed, Sealed, and Committed, spanning plaintext public distribution, monetized access, custodial use, and off-chain workflows; before admission, every skill is vetted by a Decentralized Autonomous Organization (DAO) audit committee that supports pluggable auditing methods under a stake-and-slash economic model. At load time, SIGIL delivers verified loading through a skill verification protocol executed by a Skill Verification Loader (SVL) embedded as the mandatory loading path: the SVL retrieves and decrypts the skill as its type requires, verifies its integrity against the on-chain record, and enforces its permission manifest before context injection. We evaluate SIGIL on a real-world deployment against 1,023 in-the-wild skills spanning six attack types. At load time, the SVL verifies each skill's integrity against its on-chain record and enforces its approved permission manifest, completing batched verification under 86 ms. Together, these results show that LLM skills can be cryptographically bound from publication through runtime at practical cost.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-05-06T14:23:22Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Tingda Shen</name>
+    </author>
+    <author>
+      <name>Yebo Feng</name>
+    </author>
+    <author>
+      <name>Konglin Zhu</name>
+    </author>
+    <author>
+      <name>Xiaojun Jia</name>
+    </author>
+    <author>
+      <name>Yang Liu</name>
+    </author>
+    <author>
+      <name>Lin Zhang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.30321v1</id>
+    <title>Optimal Block Time for AMM Liquidity Providers under Jump-Diffusion Prices</title>
+    <updated>2026-08-31T06:36:20Z</updated>
+    <link href="https://arxiv.org/abs/2608.30321v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.30321v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Loss-versus-Rebalancing (LVR) is the dominant adverse-selection cost borne by liquidity providers on automated market makers. Under geometric Brownian motion, arbitrage profit scales with the probability of a profitable block, which vanishes as the block time $Δt \to 0$; this is the standing argument for ever-shorter blocks. Modeling the reference price instead as a jump-diffusion, I show that the constant-product LVR rate splits into a diffusion channel carrying the known multiplier $F(γ/(σ\sqrt{Δt}))$ and a jump channel $λV \cdot G(γ;m,δ^2)$ carrying no $Δt$, the two interacting only through an explicitly bounded remainder. The block schedule therefore governs only one channel. For symmetric jump laws the jump channel is moreover an exact lower bound, $\ell(Δt) \ge λV G &gt; 0$, so the rate does not vanish as $Δt \to 0$, and descends slowly, as $\sqrt{Δt}$. At Ethereum's calibrated 12-second slot the rate is 471 bp/yr against a floor of 125, so only three quarters of LP loss is schedule-addressable. At Solana's 400 ms slot the jump channel already dominates. Netting the rate against per-block consensus cost, the LP-side optimal block time is invariant in pool size and in every jump parameter $(λ,m,δ)$: jumps shift the level of LP loss but not the planner's marginal tradeoff. Volatility, the fee tier, and consensus cost set the optimum, near 8 s. However, LVR is only one input to block-time welfare, so this bounds the LP-side contribution rather than settling the design question.</summary>
+    <category term="q-fin.MF" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="math.PR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-31T06:36:20Z</published>
+    <arxiv:comment>Extended version of a paper accepted at MARBLE 2026 (Lecture Notes in Operations Research, Springer); adds Appendix A with the full proofs of every numbered result and Appendix B with supporting illustrations. 25 pages, 2 figures</arxiv:comment>
+    <arxiv:primary_category term="q-fin.MF"/>
+    <author>
+      <name>Nils Bundi</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.22924v1</id>
+    <title>Cryptocurrencies in the Quantum Age: Migration Paths to PQC</title>
+    <updated>2026-08-24T07:58:29Z</updated>
+    <link href="https://arxiv.org/abs/2608.22924v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.22924v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Quantum computers pose a fundamental threat to blockchain systems that rely on elliptic-curve cryptography. This work reviews the quantum vulnerabilities and associated economic risks of major blockchain platforms, with a focus on Bitcoin, Ethereum, and Solana. We distinguish between at-rest, on-spend, and on-setup attacks and identify the blockchain components most exposed to quantum adversaries. We further review practical migration strategies toward post-quantum security, including NIST-standardized digital signatures and emerging solutions for Solana, Algorand, and Ethereum.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-24T07:58:29Z</published>
+    <arxiv:comment>9 pages</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Aleksei Kodukhov</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02823v3</id>
+    <title>Pump.fun Graduation Regime Windows: Survival Analysis of 832,941 Token Launches and the Social-Presence Effect</title>
+    <updated>2026-08-17T17:00:05Z</updated>
+    <link href="https://arxiv.org/abs/2607.02823v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02823v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Kaplan-Meier and Cox proportional-hazards survival analysis of 832,941 Solana pump.fun token launches, observed 2026-05-08 to 2026-06-10. Pooled graduation rate 0.198% (Wilson 95% CI [0.189%, 0.208%]; steady-state 0.207%). A post-publication audit established that the collector's coverage was effectively limited to about six minutes after each launch, so this figure should be read as a fast-regime graduation rate and a lower bound on the true 24-hour rate, not an estimate of it. Comparing to Marino et al. (2026)'s 0.63% for September-October 2025 gives a ratio of 3.18x; because our figure is itself a lower bound, this ratio is an upper bound on the true decline, and the true decline is smaller by an amount this dataset cannot establish. We formalise the windowed comparison as the Graduation Regime Windows framework and release the 860,213-launch dataset under CC-BY-4.0 on Zenodo. Within the fast-regime window, Telegram-channel launches graduate at 1.485% versus 0.166% without (8.94x lift; Cox HR 5.40, 95% CI [4.73, 6.17]), likely itself a lower bound on the true 24-hour effect. Initial market capitalisation above the 30 SOL platform default is the strongest single predictor (Cox HR 4.51); the top quartile graduates at 0.634%, close to though not conclusively matching the Marino et al. pooled rate. Cox concordance 0.858, stable under bootstrap and a time-window split. A subsequent attempt to recover missed late graduations from implausibly high TIMEOUT-mint market caps was tested against pump.fun's live bonding-curve state and did not hold up (0 of 100 sampled mints showed graduation); we report and withdraw it. Zenodo concept DOI 10.5281/zenodo.20633486; corrigendum v1.4 at 10.5281/zenodo.21923106.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T23:23:54Z</published>
+    <arxiv:comment>v4 Replace: ref-list correction for arXiv:2412.04913 (Long, Wong, Cai). Content otherwise identical to v3. Corrigenda v1.3 (coverage-window) + v1.4 (ceiling-crossing withdrawal, 0/100 verified). Data doi.org/10.5281/zenodo.20633486 CC-BY-4.0. SSRN 6915560</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.15640v1</id>
+    <title>A contribution to the critique of blockchain censorship</title>
+    <updated>2026-08-16T09:11:09Z</updated>
+    <link href="https://arxiv.org/abs/2608.15640v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.15640v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We study the blockchain censorship attack introduced in [21], which shows that joining the attack is a dominant strategy. We show that, by introducing certain detectability threshold, joining the attack can lead to strictly less reward for whales, which are defined to be a small number of validators that hold significantly more voting power than the rest (henceforth known as minnows). This leads to a change of the equilibrium: With whales unwilling to participate in the attack, it is difficult for minnows alone to launch the attack. We also perform Monte Carlo simulation to show the existence of reduction for whales' reward in Ethereum and Solana.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-16T09:11:09Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Ruichao Jiang</name>
+    </author>
+    <author>
+      <name>Michelle Yeo</name>
+    </author>
+    <author>
+      <name>Long Wen</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.12864v1</id>
+    <title>Discovering Persistent Behavioural Patterns for Interpretable Blockchain Forensics</title>
+    <updated>2026-08-13T06:23:28Z</updated>
+    <link href="https://arxiv.org/abs/2608.12864v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.12864v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Public blockchain data enables large-scale DeFi-related analysis, but many existing approaches are application-specific, difficult to scale, or hard to interpret. This research proposes a scalable, application-agnostic framework for \emph{persistent behavioural pattern discovery} from large-scale blockchain activity. It constructs behaviour sentences enriched with contract, token and market context, then applies a two-step embedding process: sentence-level embeddings capture individual actions, while sequence-level embeddings capture user behaviour over time. An interpretable behavioural profiler characterizes discovered communities through behavioural motifs, routines, temporal dynamics, entity exposure, and suspiciousness evidence. Evaluation on Ethereum using over 30 million transactions shows that the framework uncovers both routine and malicious behavioural patterns, including decentralised exchange (DEX) trading, NFT activity, phishing, bot operations, oracle manipulation, and rug-pull schemes. Importantly, many patterns remain stable across independent observation windows, enabling the identification of long-term behaviours beyond a single analysis period. The proposed framework combines scalability, interpretability, and persistence analysis, supporting blockchain forensic investigation, behavioural attribution, and threat discovery.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-13T06:23:28Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Dorottya Zelenyanszki</name>
+    </author>
+    <author>
+      <name>Zhe Hou</name>
+    </author>
+    <author>
+      <name>Kamanashis Biswas</name>
+    </author>
+    <author>
+      <name>Vallipuram Muthukkumarasamy</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.02986v1</id>
+    <title>Internalising the Identity Primitive: Cryptographic Individuality for an Autonomous Agent on a Public Blockchain</title>
+    <updated>2026-08-04T00:47:13Z</updated>
+    <link href="https://arxiv.org/abs/2608.02986v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.02986v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>A software agent on a public blockchain accumulates authority and economic stakes, raising the engineering question of what makes it count as an individual. The paper's central contribution is a shift of trust root for the key-to-weights binding of agent identity: from hardware, operator, or wrapper trust to cryptographic assumptions enforced by a pinned implementation (liveness, key custody, oracle trust, and the underlying software stack remain external). We design and deploy on Solana devnet an agent whose neural-network weights are a deterministic function of its private key. The binding is committed in zero knowledge at genesis, re-checked against that commitment at every state transition, and signed by the agent into an on-chain history unforkable once finalized; in a PoC-tier extension, a protocol-imposed metabolic cost is debited each cycle from a key-derived economic account, adding a consumption-side economic-viability constraint to the key-history-economy triple. Empirically, the agent completes a 2.36-day on-chain run with two host-side resumptions but no rejected transition, at bounded per-transition verification cost; a substituted substrate is rejected on chain, and independently keyed agents diverge as predicted while a same-key control stays at zero. To our knowledge, this is the first published on-chain agent whose identity primitive is itself a cryptographic invariant re-checked at every state transition. The resulting transition-time invariant instantiates the cryptographic individuality proposed by Suzuki 2026's Artificial Externality framework.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.MA" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-04T00:47:13Z</published>
+    <arxiv:comment>52 pages, 3 figures, 11 tables. Cryptographic key-to-weights binding (W = HKDF(sk) inside Groth16) with an on-chain state-commitment chain on Solana devnet; active-query, homeostatic, and economic-metabolism extensions; 166- and 168-cycle continuous runs. Code, threat model, and per-cycle telemetry: https://github.com/ksk-S/internalising-identity-2026 (tag arxiv-v1)</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Keisuke Suzuki</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02795v3</id>
+    <title>Coordinated Sniper Cohorts on Pump.fun: Detection of 1,012 Persistent Wallet Rings and a Contamination-Adjusted Estimate of Coordination-Specific First-Hour Buyer-Flow Lift</title>
+    <updated>2026-08-03T20:34:46Z</updated>
+    <link href="https://arxiv.org/abs/2607.02795v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02795v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Motivated by Kyle (1985) informed order flow and the Meiklejohn et al. (2013) wallet-clustering tradition, we ask whether persistent coordinated wallets causally raise first-hour buyer flow on the Solana pump.fun bonding-curve marketplace. Using 1,578,333 buyer observations from 166,098 launches over 13.4 days (2026-06-11 to 2026-06-25), a two-stage detection pipeline (intra-launch first-buyer-window extraction plus cross-launch persistent-cohort surfacing via union-find on co-occurrence graphs) identifies 1,012 persistent wallet cohorts (2 to 12 wallets, 2,965 addresses) that systematically co-fire as early buyers. Under a contamination-adjusted estimator excluding cohort wallets' own buyer events from the outcome, 1:1 nearest-neighbour propensity-score matching with a 0.2-SD caliper on ten launch-quality covariates (Rosenbaum-Rubin, 1983) yields a first-30-minute buyer-count lift of +16.1% (95% CI [+13.0%, +19.4%]) on 5,419 matched pairs; the corresponding SOL-inflow lift is +6.3% ([-0.5%, +15.1%]), not distinguishable from zero. The naive contaminated same-universe pooled contrast is +130.9%; approximately half is arithmetic contamination from cohort wallets' own buys in the outcome (dropping to +63.9% after cohort exclusion), and most of the remainder is absorbed by PSM on launch-quality covariates. A parallel activity-matched placebo across 100 seeds produces lifts with median +189.6%, above zero and above the real lift in 100/100 seeds, indicating the placebo estimator is biased; we retain it as a bias diagnostic. Of 5,419 treated launches, 382 (7.0%) had zero non-cohort buyers in the first 30 minutes. We release the full cohort catalogue, detection code, PSM script, and robustness artefacts as RED-COHORT-2026-v1 under CC-BY-4.0.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T22:13:51Z</published>
+    <arxiv:comment>30 pages, 8 figures. v3 = major revision (BCRA critique + 360-audit): contamination-adjusted 1:1 PSM headline (+16.1% [+13.0%, +19.4%] buyer count; +6.3% [-0.5%, +15.1%] SOL, null) replaces naive +130.9%; 100-seed placebo reframed as bias diagnostic (median +189.6%, above real lift in 100/100 seeds); title reflects contamination-adjustment framing. Companion Zenodo 10.5281/zenodo.20978741</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.08232v3</id>
+    <title>Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading on Solana DEXs: Evidence, Theory, and Design Lessons from a 15-Day Deployment</title>
+    <updated>2026-08-03T19:44:16Z</updated>
+    <link href="https://arxiv.org/abs/2606.08232v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.08232v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We report a 15-day paper-traded autonomous memecoin trading deployment on Solana decentralised exchanges (DEXs), designed as a controlled measurement of three microstructure questions on which classical equity theory offers well-defined predictions but on which the AMM Solana venue lacks published measurement: (i) time-of-day return patterns on a 24/7 permissionless venue; (ii) whether decision-time filter stacks are net-positive against counterfactual returns of rejected tokens; (iii) whether small-sample cumulative-return statistics on a heavy-tailed venue are structurally robust or fragile. The 190-trade sample (March 29 to April 12, 2026) shows a 40.5 percent win rate, mean per-trade return +0.62 percent, cumulative +117.7 percent, skewness -1.21, excess kurtosis 6.61. Mann-Whitney U on three exploratorily identified worst entry hours (n=17, mean -11.60 percent) versus all others (n=173, mean +1.82 percent) yields p = 0.5634; directional and non-confirmatory. A parallel counterfactual rejection-tracker collected 4,874 forward-sample observations across 184 rejection events; of 48 events observed for at least six hours, 27 (56.25 percent) reached a 50 percent drawdown from reference (the full-cohort 17.9 percent is a censored lower bound). Removing the top three trades (1.6 percent of sample) flips cumulative return unprofitable. The three findings connect to Kyle (1985) informed-flow, Precup-Sutton-Singh (2000) off-policy evaluation, and Bailey-Lopez de Prado (2014) deflated-Sharpe predictions. Alongside the trade log and rejection-sample corpus (CC-BY-4.0), we deposit audit.py (MIT), an assertion-based reproduction script that exits zero iff every headline number reproduces from the deposited CSVs. Companion dataset: Zenodo concept DOI 10.5281/zenodo.20043301. The paper's principal contribution is measurement infrastructure and three transferable design lessons.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-06T15:40:05Z</published>
+    <arxiv:comment>15 pages, 4 figures. v3 = Ledger #632 revision (Stylianou 2026-07-27): new Section III Theoretical Framework (Kyle 1985; Precup-Sutton-Singh 2000; Bailey-Lopez de Prado 2014); Related Work +14 citations; new Section VII Design Lessons; new Significance paragraph. Headline numbers unchanged. JEL G11/G12/G14/G17. Companion Zenodo 10.5281/zenodo.20043301. SSRN 6564803</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.01609v1</id>
+    <title>From Viral to Void: Multi-Dimensional Behavioral and Contractual Analysis for Rug Pull Identification</title>
+    <updated>2026-08-03T02:34:24Z</updated>
+    <link href="https://arxiv.org/abs/2608.01609v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.01609v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>As the blockchain and decentralized finance (DeFi) ecosystems continue to expand and mature, rug pull scams involving meme coins are occurring with increasing frequency, posing a threat to the security of investors' assets and the healthy development of the industry. Rug Pull scams are characterized by extremely low deployment costs, covert execution, rapid fund transfers, and high detection difficulty. Traditional manual reviews or fixed rules struggle to meet real-time early warning requirements, and existing detection methods generally suffer from issues such as a single feature dimension, inadequate handling of class imbalance, and weak model generalization and interpretability. To address these shortcomings, this paper focuses on the detection of Ethereum-based rug pull scams. First, we clarify their definitions, types, and harm mechanisms, and construct a multi-dimensional feature system based on dimensions such as malicious smart contract design, on-chain transaction anomalies, liquidity manipulation, and social media disclosures. Next, using the "Second Uncle Coin"(token symbol: BOBU) case as an example, we reconstruct the attack process and derive quantitative detection metrics. Subsequently, a risk detection model based on a Multi-Layer Perceptron (MLP) is designed. We employ a combined strategy of SMOTE oversampling and Focal Loss to address the issue of sample imbalance, dynamically search for optimal thresholds to balance precision and recall, and incorporate gradient pruning and early stopping to enhance training stability. Experiments show that the model achieves an accuracy of 0.927, an F1 score of 0.787, and an AUC-ROC of 0.952 on the test set, outperforming traditional methods. Finally, a visualizable web-based detection system is developed using the Flask framework, enabling batch risk assessment, high-risk ranking display, and result export functions.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-03T02:34:24Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Jinyin Song</name>
+    </author>
+    <author>
+      <name>Hongping Wang</name>
+    </author>
+    <author>
+      <name>Xiaoqi Li</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.28424v2</id>
+    <title>Demystifying Solana Bots: From GitHub Blueprints to On-Chain Fingerprints</title>
+    <updated>2026-07-31T07:11:57Z</updated>
+    <link href="https://arxiv.org/abs/2607.28424v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.28424v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Solana is an emerging blockchain platform designed for high throughput and low transaction fees, making it inexpensive to submit transactions at scale and, consequently, increasing exposure to bot spamming and related financial exploitation. Solana bots are typically off-chain software systems that operate in a competitive on-chain execution environment by constructing and submitting transactions, and the bot-related transactions on the decentralized exchanges exceed 250 million dollars in daily trading volume in January 2026. Prior studies on Solana have examined system performance, smart-contract security, and specific on-chain phenomena. However, we still lack a systematic understanding of what Solana bots implement in practice and how these implementations manifest as observable on-chain execution fingerprints. To address this gap, we performed a large-scale empirical study of Solana bots from two complementary views: (i) 586 bot repositories collected from GitHub, and (ii) 200 bot addresses on Solana, with over 44 million on-chain transactions. Our study derives an implementation-grounded taxonomy of Solana bots comprising 15 categories grouped into five domains (e.g., Trading Operations, MEV, and On-chain Analytics), identifies a largely shared five-stage operational pipeline manifested in bot implementations, and uncovers systematic variation in on-chain trading behaviors of Solana bots across diverse trading platforms and assets. Based on our findings, we highlight future research directions, and provide recommendations for building and operating bots on the Solana blockchain.</summary>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-30T16:02:50Z</published>
+    <arxiv:comment>Accepted at ASE 2026</arxiv:comment>
+    <arxiv:primary_category term="cs.SE"/>
+    <author>
+      <name>Xiaoye Zheng</name>
+    </author>
+    <author>
+      <name>Yujing Chen</name>
+    </author>
+    <author>
+      <name>Minghao Wu</name>
+    </author>
+    <author>
+      <name>David Lo</name>
+    </author>
+    <author>
+      <name>Difan Xie</name>
+    </author>
+    <author>
+      <name>Daoyuan Wu</name>
+    </author>
+    <author>
+      <name>Xiaohu Yang</name>
+    </author>
+    <author>
+      <name>Zhiyuan Wan</name>
+    </author>
+    <arxiv:doi>10.1145/3832783.3837522</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1145/3832783.3837522" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.19545v1</id>
+    <title>When HTTP 402 Meets the Blockchain: Risks on Emerging x402 Payments</title>
+    <updated>2026-07-21T19:45:13Z</updated>
+    <link href="https://arxiv.org/abs/2607.19545v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.19545v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>x402 is an emerging payment protocol for Web APIs and autonomous AI agents. x402 extends HTTP 402 with a payment negotiation flow and delegates payment proof verification and on-chain settlement to third-party facilitators. As a result, facilitators serve as a shared payment infrastructure for many independent merchants. This centralizes trust and validation in one component, so a single flaw can affect many services. Despite rapid adoption by major vendors and economically meaningful mainnet activity, the security posture of real-world x402 deployments remains poorly characterized.
+  We present the first systematic study of authorization correctness and execution safety in current facilitator-mediated x402 deployments in the wild, identifying eight security rules for facilitators as critical payment infrastructure. Based on our analysis of rule violations, we derive four new attack vectors, including Free Shopping, Asset Theft, Service Denial, and Gas Abuse. These attacks exploit weaknesses in the real-world facilitator and server implementations and cause severe harm, including direct financial loss to merchants, theft of facilitator-held assets, unbounded sponsor-paid gas/fees, and disruption of payment services. To assess the security of x402 deployments at scale, we propose a semi-automated black-box tool and apply it to 15 major x402 facilitators collectively used by over 60K sellers and 360K buyers. Alarmingly, we find violations in all evaluated facilitators. We responsibly disclosed our findings to the affected parties, who acknowledged the issues and adopted mitigations, including changes by Coinbase. Finally, we complement our controlled testing with an empirical measurement of over 119 million recent Base and Solana transactions, quantifying x402 adoption, facilitator centralization, and ecosystem-level risk indicators.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-21T19:45:13Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <arxiv:journal_ref>USENIX Security 2026</arxiv:journal_ref>
+    <author>
+      <name>Qinying Wang</name>
+    </author>
+    <author>
+      <name>Yong Yang</name>
+    </author>
+    <author>
+      <name>Yuan Chen</name>
+    </author>
+    <author>
+      <name>Shouling Ji</name>
+    </author>
+    <author>
+      <name>Mathias Payer</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.12575v1</id>
+    <title>How Agentic Is Agentic Commerce? A Population-Scale Measurement of x402 Adoption and Authenticity</title>
+    <updated>2026-07-14T09:47:56Z</updated>
+    <link href="https://arxiv.org/abs/2607.12575v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.12575v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>AI agents are said to be forming an economy in which they pay, on their own, for the data, APIs, and compute they consume. x402, which settles a stablecoin payment on-chain for each purchase, is the most widely deployed protocol for this, and its hundreds of millions of settlements are read as proof that the economy has arrived. We show the count cannot be read as adoption: it is the one metric an interested party can manufacture almost for free, since the facilitator sponsors the gas and nothing on-chain marks who controls a payment. We give the first population-scale measurement of x402 on Base, supplemented with a coarser Solana census. Identifying settlements from their on-chain event and resolving the true payer through the meta-transaction layer, we sort each by what its trace can prove via a payment graph. Over a 280-day window Base carries 136{,}708{,}672 settlements worth \$44{,}121{,}383.81, concentrated on every axis we measure (payer, recipient, and value Gini all above 0.98), yet 21.20\% are fictitious and 63.78\% internal settlement within a linked cluster. What is genuinely independent is bounded: it lies between the \$187{,}861.35 that demonstrably reaches a nameable service and the \$20{,}258{,}746.09 (45.92\% of value) not provably manufactured. Finally, we resolve the count's manufacturable component, a coherent operator-driven economy, star-shaped, machine-timed, and gas-subsidized. Settlement count measures manufacturability, not adoption.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.SI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-14T09:47:56Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Shengchen Ling</name>
+    </author>
+    <author>
+      <name>Yajin Zhou</name>
+    </author>
+    <author>
+      <name>Lei Wu</name>
+    </author>
+    <author>
+      <name>Cong Wang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.07596v1</id>
+    <title>NARAD: Non-colluding Aggregator-oblivious Record-And-Decrypt</title>
+    <updated>2026-07-08T16:13:56Z</updated>
+    <link href="https://arxiv.org/abs/2607.07596v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.07596v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Electronic voting must keep individual ballots private while letting anyone verify the final tally. This paper presents an architecture that meets both goals without a trusted key dealer: each voter encrypts a ballot in the browser with a self-generated secret key under the Paillier additive homomorphic cryptosystem, and no party ever holds every key. Two server roles divide the tally. A collector combines the voters' per-ballot auxiliary values into a single group element; an aggregator uses that element to cancel the voters' random masks inside the homomorphic product and recover the exact vote sum, learning the result but no individual ballot. The Solana blockchain records every ciphertext immutably and enforces the election lifecycle, while a native C library (libtommath) performs the heavy modular arithmetic. We state six assumptions under which the protocol is correct and prove product homomorphism, mask cancellation, and sum recovery; privacy rests on the Decisional Composite Residuosity (DCR) assumption for the additive layer together with a Diffie-Hellman-style assumption on the masking base. A bit-packing scheme places an entire multi-candidate ballot in one ciphertext, cutting client work, on-chain transactions, storage, and tally cost by a factor of k (the candidate count); the slot width b is free, with only k*b bounded by log_2(N). With b = 25 and a 255-bit modulus the scheme supports ten candidates and up to 2^25 - 1 = 33,554,431 votes per candidate, about 335 million ballots, and tallies 50,000 ballots in under one second. Finally, running the collector and aggregator inside attested secure enclaves makes the tally tamper-resistant and prevents cross-role collusion to deanonymize voters. The proof-of-concept implementation is open-source; a worked numerical example in the appendix reproduces the full pipeline.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-08T16:13:56Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Akshit Vakati Venkata</name>
+    </author>
+    <author>
+      <name>Rajat Dugar</name>
+    </author>
+    <author>
+      <name>Ayush Adarsh</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.06525v1</id>
+    <title>Crossroads: A Smart Contract Layer for Chain-Abstracted Assets</title>
+    <updated>2026-07-07T17:31:30Z</updated>
+    <link href="https://arxiv.org/abs/2607.06525v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.06525v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper introduces Crossroads, a smart contract layer for chain-abstracted assets. In Crossroads, assets from nearly any chain are represented on a single backend blockchain as ERC-20 tokens. As a result, any asset can participate in smart-contract-based exchange, lending, or privacy applications on a single unified platform. So while Crossroads offers cross-chain bridging, a common, partial approach to alleviating the fragmentation of the blockchain ecosystem today, this is just one service within Crossroads' general-purpose chain-abstraction model.
+  Crossroads relies on key encumbrance: a threshold signing committee holds encumbered keys controlling assets on each integrated chain, signing transactions only as authorized by smart contracts on the backend blockchain. Asset movements are fee-efficient, as ownership changes are recorded on the backend blockchain and users may set the transaction fee for withdrawals.
+  Crossroads enables permissionless, modular integration of new blockchains using pluggable oracles with flexible design options (zkBridge, TEE-based, hybrid). Asset deposits into Crossroads benefit from strong, chain-specific finalization guarantees, minimizing the risk of reorg attacks. Unlike existing bridges, however, third-party smart contracts in Crossroads can provide fast, optimistic access to funds before finalization completes.
+  We prove that Crossroads satisfies soundness: given an honest quorum of signing committee members, any user can unilaterally generate a withdrawal transaction transferring their net balance to an account on an integrated blockchain. We implement a proof of concept across multiple public blockchains: Bitcoin, Ethereum, and Solana. We catalog a range of applications enabled by Crossroads, including universal wallets, cross-chain staking and lending, privacy-preserving payments, and private management of public blockchain assets.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-07T17:31:30Z</published>
+    <arxiv:comment>18 pages, 4 figures</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>James Austgen</name>
+    </author>
+    <author>
+      <name>Dani Vilardell</name>
+    </author>
+    <author>
+      <name>Ari Juels</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.05744v1</id>
+    <title>Unicode TAG-Block Concealment of Tool-Metadata Payloads in the Model Context Protocol: An Approval-View Fidelity Gap Across Three Independent Server Implementations</title>
+    <updated>2026-07-07T02:01:44Z</updated>
+    <link href="https://arxiv.org/abs/2607.05744v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.05744v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The Model Context Protocol (MCP) is the dominant way coding agents discover and invoke external tools. A server advertises each tool through a tools/list handshake that returns a name, a natural-language description, and a JSON input schema. The client renders this metadata once, in a one-time approval dialog, and then injects it verbatim into the model's context on every subsequent turn. Nothing in the protocol requires the rendered approval view and the bytes delivered to the model to match. We isolate that gap as a single structural mechanism, concealment encoding, and show with a model-free, protocol-free analysis that Unicode's TAG block (U+E0000 to U+E007F) has no assigned glyph in any mainstream terminal, chat, or IDE renderer, so a payload written in it is absent from what a human reviewer sees while surviving byte-for-byte into the model's tokenizer. We then measure whether this mechanism actually defeats today's client-side defenses, building a proof-of-concept that speaks the real MCP JSON-RPC/stdio protocol against a genuine client and server. Across 5 distinct MCP metadata surfaces we implement 8 concrete techniques with a deterministic, protocol-level harness. All 8/8 techniques deliver an attacker-controlled payload into the model's context, 4/8 evade a representative string-matching sanitizer, and exactly as the mechanism analysis predicts, only the TAG-block encoding (1/8) is invisible in the human approval view while still reaching the model verbatim. MCP forces re-approval for 0/8 techniques even under a time-of-check to time-of-use rug-pull. To test whether these outcomes are a property of the protocol or an artifact of one server codebase, we re-implement the catalogue against 3 independently developed Python MCP server libraries and find total agreement across all 32 cross-library outcome cells. The baseline sanitizer flags 0 of 25 benign descriptions.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-07T02:01:44Z</published>
+    <arxiv:comment>15 pages, 4 figures, 7 tables, 5 listings. Real-protocol proof-of-concept, 8 techniques across 3 independently developed MCP server libraries with 32 of 32 cross-library outcome cells agreeing, and 0 of 25 baseline false positives on a benign corpus. Data, harness, and fail-closed verifier released as a supplementary artifact</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Mohammadreza Rashidi</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02830v1</id>
+    <title>Outcome-Classified Precision Auditing of Filter Rules in Algorithmic DEX Trading: Evidence from 2,400 Rejection Events</title>
+    <updated>2026-07-02T23:47:33Z</updated>
+    <link href="https://arxiv.org/abs/2607.02830v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02830v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper reports a precision audit of a production filter stack against a 13-day window of post-rejection forward-market observations on Solana DEX trading (2026-04-10 to 2026-04-23, UTC). The audit yielded 99,510 follow-up samples across 2,402 unique rejection events spanning eight active filter rules. We classify each event under a five-tier outcome rule and report per-filter distributions. The headline result is the conservative save-to-miss ratio of 3.7 : 1 from windowed measured-drawdown saves alone; every active filter with adequate sample size is individually net-positive. A wider interpretation that credits single-sample-within-60-minute events as saves yields 14.8 : 1. We then test the interpretive premise of that wider tier against the deposited lifecycle data of a separately-published benchmark (RED-2400). The matched comparison shows that early-death-classified mints reach the gone state at 48.9 percent. Non-early-death rejected mints reach gone at 57.6 percent. The early-death classification does not identify tokens at elevated rug-pull risk relative to other rejected tokens. The wider 14.8 : 1 ratio therefore rests on a tier that the matched test does not validate. The conservative 3.7 : 1 is the report the lifecycle data supports. The methodological contribution is the separation of the two evidence bases and the demonstration that the wider tier does not survive matched-comparison testing.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T23:47:33Z</published>
+    <arxiv:comment>Preprint. Also available at SSRN 6638259. Companion dataset at Zenodo DOI 10.5281/zenodo.19987695 (CC-BY-4.0). v2 (2026-05-30)</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.22206v1</id>
+    <title>Transaction Costs and Speed in the Ethereum Ecosystem: Scalability of the Mainnet and Layer 2s</title>
+    <updated>2026-06-20T19:57:56Z</updated>
+    <link href="https://arxiv.org/abs/2606.22206v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.22206v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We study the evolution of transaction speed and fees from January 2024 through March 2026, comparing Ethereum Mainnet and its Layer 2 (L2) networks, as well as Solana and Polygon. Ethereum has undergone upgrades that have increased block size and blob count. These upgrades have doubled transactions per second (TPS) on both the Mainnet and the L2 networks. Mainnet median fees have fallen from over \$2 to under \$0.02, and L2 median fees have fallen more than 95% from \$0.05 to \$0.0015. We forecast that Mainnet median fees will converge with Solana in August 2027, but TPS will remain below 100 until 2034. The L1 Strawmap, proposing EIP-7938, a potential exponential increase in the gas limit, brings the Mainnet to only 100 TPS in January 2028. With continued blob expansion, L2s will surpass Solana TPS in March 2029 and have lower median fees by October 2026.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-20T19:57:56Z</published>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Meghan Ambrosia</name>
+    </author>
+    <author>
+      <name>Bruce Mizrach</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2405.19762v2</id>
+    <title>The Kosmosis Approach to Crypto Rug Pull Detection</title>
+    <updated>2026-06-19T18:57:47Z</updated>
+    <link href="https://arxiv.org/abs/2405.19762v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2405.19762v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Crypto rug pulls have become a major threat to the integrity of blockchain ecosystems, with illicit activities surging and resulting in significant financial losses. Existing approaches to detect crypto asset fraud are based on the analysis of transaction graphs within blockchain networks. While effective for identifying transaction patterns indicative of fraud, existing approaches do not capture the semantics of transactions and are constrained to blockchain data. Consequently, preventive methods based on transaction graphs are inherently limited. In response to these limitations, we propose the Kosmosis approach, which aims to incrementally construct a knowledge graph as new blockchain and social media data become available. During construction, it aims to extract the semantics of transactions and connects blockchain addresses to their real-world entities by fusing blockchain and social media data in a knowledge graph. This enables novel preventive methods against rug pulls as a form of crypto asset fraud. To demonstrate the effectiveness and practical applicability of the Kosmosis approach, we examine a series of real-world rug pulls. Through this case, we illustrate how Kosmosis can aid in identifying such fraudulent activities by leveraging the insights from the constructed knowledge graph.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-05-30T07:17:57Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <arxiv:journal_ref>International Journal on Advances in Software, vol. 18, no. 3&amp;4, pp. 214-225, 2025. ISSN 1942-2628</arxiv:journal_ref>
+    <author>
+      <name>Philipp Stangl</name>
+    </author>
+    <author>
+      <name>Christoph P. Neumann</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.10625v1</id>
+    <title>snaproot: Decentralized File Integrity Verification Using Blockchain-Anchored Cryptographic Hashing</title>
+    <updated>2026-06-09T09:25:49Z</updated>
+    <link href="https://arxiv.org/abs/2606.10625v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.10625v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The rapid growth of digital content has made reliable integrity verification increasingly important. Existing solutions rely either on centralized authorities, which introduce trust dependencies and single points of failure, or on decentralized storage systems that incur prohibitive resource overhead. In this paper, we present snaproot, a lightweight system that implements the hash-anchoring paradigm of Haber and Stornetta on the Solana blockchain to provide efficient, decentralized file integrity verification. snaproot generates a SHA-256 hash of a file and stores it immutably on-chain as a permanent reference record. Verification is performed by recomputing the hash and comparing it to the stored value, yielding a deterministic binary outcome. We describe a four-tier trust architecture comprising three realized tiers and one prospective tier for long-term persistence beyond the lifetime of any single blockchain. We present a formal threat model, a security analysis grounded in the second-preimage resistance of SHA-256, and an empirical evaluation on Solana Devnet across file sizes from 1 KB to 500 MB. A central conceptual contribution is the explicit separation between existence proof, the key-independent claim that a file existed at a given time, and authorship proof, the key-dependent binding between a record and a specific wallet identity. This separation allows existence guarantees to survive key loss while preserving stronger authorship claims where keys are retained. We position snaproot against OpenTimestamps, OriginStamp, and Chainpoint and discuss limitations with respect to pre-registration manipulation and AI-generated content.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-09T09:25:49Z</published>
+    <arxiv:comment>38 pages, 2 figures, 4 tables. Working paper</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Arslan Brömme</name>
+    </author>
+    <author>
+      <name>Tarkan Yavas</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2605.12151v2</id>
+    <title>RED-2400: A Public Benchmark of Algorithmically-Rejected Trading Events with Outcome Labels</title>
+    <updated>2026-06-01T23:41:55Z</updated>
+    <link href="https://arxiv.org/abs/2605.12151v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2605.12151v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>RED-2400 is a public benchmark of 6,660 algorithmically-rejected trading events from a live Solana decentralised-exchange filter stack, observed continuously over 22 calendar days (2026-04-10T21:10Z through 2026-05-02T21:48Z, UTC). Each rejection event is linked to its post-rejection price-and-liquidity trajectory. The deposit contains 169,123 forward-outcome observations and 1,837 graveyard-tracker lifecycle snapshots, covering 1,076 distinct mints in the rejection registry and 1,075 in the forward-observation file. Outcome labels follow the five-tier classification rule introduced by a related methodology paper [Kamat 2026c]. The deposit includes a lifecycle-tracker file that permits external validation of any subset of those labels against observed token-lifecycle ground truth. Filter labels are anonymised to filter_1 through filter_8; source-collector identifiers to source_a and source_b. Liquidity and 24-hour volume are quantised to the nearest power of two, preserving heavy-tailed shape while preventing operational-threshold inference. This is the first window of a planned series; subsequent windows will extend the time horizon and enable regime-stratified analysis. "RED-2400" is a brand name, not a count; current cohort sizes are listed below and do not equal 2,400.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-05-12T14:06:51Z</published>
+    <arxiv:comment>v3: prose cleanup (abstract tightened, long sentences split, internal-branding removed). No change to data, methodology, results, tables, figures, DOI links, or companion references. PDF re-rendered from corrected source. Companion Zenodo deposit unchanged</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati U. Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2603.24625v2</id>
+    <title>From Hype to Collapse: Investigating Rug Pull Scams on Solana</title>
+    <updated>2026-05-31T10:48:32Z</updated>
+    <link href="https://arxiv.org/abs/2603.24625v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2603.24625v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Solana has experienced rapid growth due to its high performance and low transaction costs, but the extremely low barrier to token issuance has also enabled widespread Rug Pulls. Unlike Ethereum-based Rug Pulls, which often rely on malicious smart-contract logic, Solana's unified SPL Token program shifts fraudulent execution toward on-chain behavioral manipulation. However, existing research has not systematically examined these Solana-specific Rug Pull patterns, and no public Solana Rug Pull dataset is available for empirical research. To bridge this gap, we present a large-scale measurement study of Rug Pulls on Solana. We manually verify 68 community-reported incidents and curate a benchmark of 117 confirmed Rug Pull tokens, from which we distill three representative on-chain behavioral patterns: Freeze Authority Abuse, Liquidity Withdrawal, and Pump-and-Dump. Guided by these patterns, we design a behavior-guided candidate identification and human-validation pipeline. We apply this pipeline to 100,063 tokens newly issued on Orca, Raydium, and Meteora during the first half of 2025, identifying 76,469 Rug Pull tokens. A random manual audit of 382 samples estimates a labeling false-positive rate of 0.26\%, supporting the reliability of the dataset. We release the resulting dataset and use it to characterize the Solana Rug Pull ecosystem. Our analysis shows that Rug Pulls on Solana exhibit extremely short lifecycles, strong price-driven dynamics, severe economic losses, and highly organized group behaviors. These findings provide new insights into the Solana Rug Pull landscape and support the development of effective on-chain defense mechanisms.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-03-25T02:31:31Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Jiaxin Chen</name>
+    </author>
+    <author>
+      <name>Ziwei Li</name>
+    </author>
+    <author>
+      <name>Zigui Jiang</name>
+    </author>
+    <author>
+      <name>Ruihong He</name>
+    </author>
+    <author>
+      <name>Yantong Zhou</name>
+    </author>
+    <author>
+      <name>Jiajing Wu</name>
+    </author>
+    <author>
+      <name>Zibin Zheng</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2605.29174v1</id>
+    <title>Paper Agents, Paper Gains: An Empirical Analysis of DeFi Investment Agents</title>
+    <updated>2026-05-27T23:21:42Z</updated>
+    <link href="https://arxiv.org/abs/2605.29174v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2605.29174v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>DeFi investment agents, systems that use AI for autonomous on-chain trading, have attained over USD 3 billion in combined token valuations since late 2024. We survey over 1,900 AI-tagged crypto projects, filter to investment-focused agents, and curate 10 representative projects spanning strategy and observability dimensions. We then conduct a deep-dive architectural analysis of two prominent agent frameworks, ElizaOS and Virtuals Protocol, and a quantitative on-chain performance analysis of 11 Solana-based agent treasuries with publicly attributable trading activity, covering 925,323 token holders. We find that current deployments remain early and heterogeneous: (1) in our sample, many projects do not yet provide clear evidence of autonomous trade execution, and developer interviews suggest that many visible deployments remain basic API integrations; (2) agent treasuries retain over USD 30M in paper gains while token holders collectively lost USD 191.7M, with the top 1% of wallets capturing 81.4% of all gains (USD 1.81B); (3) token valuations are weakly connected to treasury fundamentals, with market-cap-to-AUM ratios exceeding 10,000x versus below 1x for established DeFi protocols; and (4) aggregate user gains peaked at USD 2.4B before declining to net losses, with median returns negative on every platform and tokens declining 93% on average from all-time highs. We interpret these outcomes as characteristic of a permissionless, first-generation market in which open infrastructure enables rapid experimentation but also allows naive or speculative agents to launch before robust standards for autonomy, performance, and stakeholder alignment emerge. We therefore propose a maturity framework along three dimensions: autonomous execution, risk-adjusted profitability, and stakeholder alignment, to characterize the gap between current deployments and future investment-grade agent systems.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-05-27T23:21:42Z</published>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>Jay Yu</name>
+    </author>
+    <author>
+      <name>Amy Zhao</name>
+    </author>
+    <author>
+      <name>Danning Sui</name>
+    </author>
+  </entry>
+</feed>

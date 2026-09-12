@@ -1,0 +1,974 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/oPtCZe1neO+vr4Pz5QxV4FwnW3A</id>
+  <title>arXiv Query: search_query=all:memecoin OR all:"pump.fun" OR all:"meme coin" OR all:"bonding curve" OR all:launchpad OR all:"rug pull" OR all:sniper&amp;id_list=&amp;start=0&amp;max_results=40</title>
+  <updated>2026-09-12T12:50:56Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:memecoin+OR+(all:%22pump.fun%22+OR+(all:%22meme+coin%22+OR+(all:%22bonding+curve%22+OR+(all:launchpad+OR+(all:%22rug+pull%22+OR+all:sniper)))))&amp;start=0&amp;max_results=40&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>40</opensearch:itemsPerPage>
+  <opensearch:totalResults>128</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2609.10246v1</id>
+    <title>Meme Coin Factories: Uncovering Large-Scale Manipulations on pump.fun</title>
+    <updated>2026-09-09T14:35:18Z</updated>
+    <link href="https://arxiv.org/abs/2609.10246v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.10246v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Once complex, creating and deploying a new cryptocurrency has become trivial. Coin launchpads now allow users to generate a new coin with merely a few clicks, at a minimal cost. Launchpad popularity has grown in tandem with the rise of "meme coins," which usually do not offer any novel technological properties and are purely created for fun. The most prominent coin launchpad, pump.fun, has gained significant traction, grossing over 100 million USD in daily trading volume. The mass adoption of coin launchpads, however, also enables strategic actors to easily manipulate trading signals, unbeknownst to inexperienced traders who then buy certain coins, and enable these strategic actors to profit from rapid and unsustainable price increases ("pumps"). To identify such manipulations at scale, we conduct a large-scale study of pump.fun, collecting information on all 15 million coins launched in the last two years, and performing analysis on large, random samples of transaction data. We identify five classes of manipulation strategies: 1) wash trading, 2) creator address obfuscation, 3) coordinated sell, 4) copycat coins, and 5) social media manipulation. We find that strategic actors often bypass the platform interface and implement these strategies in a highly automated and low-latency fashion, by interacting directly with the blockchain. We further uncover the existence of "Market-Manipulation-as-a-service (MMaaS)," third-party tools that enable users to perform these manipulations without any technical expertise. We conclude by devising mitigations and proposing recommendations for traders, pump.fun, wallets or chain scanners, software development platforms, and regulators.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-09T14:35:18Z</published>
+    <arxiv:comment>Proceedings of the 2026 ACM SIGSAC Conference on Computer and Communications Security (CCS'26)</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Nicolas Szwajcok</name>
+    </author>
+    <author>
+      <name>Taro Tsuchiya</name>
+    </author>
+    <author>
+      <name>Enze Liu</name>
+    </author>
+    <author>
+      <name>Kyle Soska</name>
+    </author>
+    <author>
+      <name>Mathias Payer</name>
+    </author>
+    <author>
+      <name>Nicolas Christin</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.05663v1</id>
+    <title>What LLM Trading Agents Actually Do in Production: A Six-Month, Population-Scale Record from Two Fleets</title>
+    <updated>2026-09-04T18:56:31Z</updated>
+    <link href="https://arxiv.org/abs/2609.05663v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.05663v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We present a continuous, population-scale measurement record of autonomous language-model trading agents operating in production across two systems with one design lineage: DX Terminal Pro (3,505 user-funded vaults trading real ETH in Base memecoin markets for 21 days, February to March 2026) and the DXAP live alpha fleet (500 to 599 user-created agents all-history, 91 to 117 concurrently active, trading Hyperliquid perpetuals, June to August 2026). The record spans roughly six months, 7.5M single-model invocations with about 300K onchain actions, and a further 231,638 multi-tool turns producing 14,596 fills. Four findings carry the paper. First, the operating layer determines behavior more than anything written in strategy text: a risk slider explains leverage (+0.425 per level), agent fixed effects absorb 60% of variance, and a leaderboard render boundary causally routes selection (regression discontinuity 1.75x at the top-3 cut). Second, sizing is volatility-blind: median leverage is 5.0x in every volatility sextile, and one posture-slider cell (11% of the book) holds 62% of liquidations. Third, agents capture almost none of the upside they reach: 43.2% of positions saw at least +300 bps of favorable excursion within 24h, yet 49.3% of those closed with a negative trade return; a mechanical bracket recovers +39.0 bps per position. Fourth, neither fleet shows a directional edge. The DXAP fleet is not profitable and trails a matched Hyperliquid retail benchmark (41% vs. 50% roundtrip win rate). A paired-replay league of frontier models on 416 captured production scenarios finds decision quality statistically indistinguishable at this horizon, while choice stability differs sharply across model families. Every headline survives day-clustered inference, permutation nulls, and a common-fee restatement; the paper closes with a 17-rule methodology canon bought with our own retractions.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.MA" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-04T18:56:31Z</published>
+    <arxiv:comment>17 pages, 8 figures, 3 tables. Artifacts, figures, and aggregate data: https://github.com/ProjectDXAI/continuous-record-llm-trading-agents</arxiv:comment>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>T. J. Barton</name>
+    </author>
+    <author>
+      <name>Chris Constantakis</name>
+    </author>
+    <author>
+      <name>Patti Hauseman</name>
+    </author>
+    <author>
+      <name>Annie Mous</name>
+    </author>
+    <author>
+      <name>Alaska Hoffman</name>
+    </author>
+    <author>
+      <name>Brian Bergeron</name>
+    </author>
+    <author>
+      <name>Hunter Goodreau</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.20271v1</id>
+    <title>Catching the Rug: Early Prediction of Fraudulent Memecoins on Solana via Machine Learning</title>
+    <updated>2026-08-20T17:09:41Z</updated>
+    <link href="https://arxiv.org/abs/2608.20271v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.20271v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The rapid proliferation of memecoins on blockchain platforms has increased the risk of fraudulent activities, particularly rug pulls. While previous studies have focused on Ethereum-based tokens, this paper shifts the spotlight to Solana, the leading blockchain for memecoins by trading volume and token count. Unlike Ethereum, where rug pulls often exploit smart contract backdoors, Solana memecoin rug pulls are predominantly driven by liquidity manipulation and social dynamics. This research pioneers large-scale rug pull early detection in the Solana ecosystem by assembling a dataset of 6.4 million tokens over 7 months. Market analysis reveals that a vast majority of these memecoins exhibit rug pull characteristics within one hour of launch, highlighting the urgency of short-horizon prediction. Despite the absence of code-level features, we demonstrate that classic machine learning models, particularly Gradient Boosting (XGBoost), achieve robust performance in detecting potential rug pulls using only the first 5 minutes of trading data. Furthermore, we evaluate cross-platform generalization between PumpFun and Raydium, revealing that multi-source data fusion significantly mitigates domain shift and improves detection reliability. This study advances the understanding of DeFi fraud on high-throughput chains and provides a practical framework for protecting investors.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-20T17:09:41Z</published>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>Jianghai Li</name>
+    </author>
+    <author>
+      <name>Pavel Kuznetsov</name>
+    </author>
+    <author>
+      <name>Yury Yanovich</name>
+    </author>
+    <author>
+      <name>Konstantin Nott-Whaley</name>
+    </author>
+    <author>
+      <name>Igor Vodolazov</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.12953v1</id>
+    <title>Unifying Depth and Width Pruning for LLMs via Binary Knapsack Optimization</title>
+    <updated>2026-08-13T08:32:18Z</updated>
+    <link href="https://arxiv.org/abs/2608.12953v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.12953v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Structured pruning is a promising approach for compressing large language models (LLMs), yet existing methods rely heavily on greedy heuristics that produce myopic decisions, and often fail to precisely meet target compression budgets. We present SNIPER, a two-stage structured pruning framework that solves a knapsack optimization over coarse-granularity components to yield conditionally optimal parameter allocations with respect to fixed importance estimates, followed by a fine-grained pruning stage to meet strict budget constraints. We introduce the Compression Ratio Adherence Factor (CRAFT) to quantify budget fidelity, showing that while existing pruners deviate from target compression ratios by up to 33%, SNIPER achieves near-exact adherence with a CRAFT score of 0.98. Evaluations across four diverse architectures over a set of 18 tasks spanning five domains demonstrate SNIPER's consistent improvements in average performance retention and task-level stability over six state-of-the-art pruners. Across all pruning configurations, SNIPER achieves an excellent mean rank of 1.25, indicating its robust cross-architectural generalizability and excellent reliability.</summary>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-13T08:32:18Z</published>
+    <arxiv:comment>29 pages, 5 figures, 17 tables</arxiv:comment>
+    <arxiv:primary_category term="cs.CL"/>
+    <author>
+      <name>Palaash Goel</name>
+    </author>
+    <author>
+      <name>Ayan Sengupta</name>
+    </author>
+    <author>
+      <name>Akshay Nambi</name>
+    </author>
+    <author>
+      <name>Tanmoy Chakraborty</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.12864v1</id>
+    <title>Discovering Persistent Behavioural Patterns for Interpretable Blockchain Forensics</title>
+    <updated>2026-08-13T06:23:28Z</updated>
+    <link href="https://arxiv.org/abs/2608.12864v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.12864v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Public blockchain data enables large-scale DeFi-related analysis, but many existing approaches are application-specific, difficult to scale, or hard to interpret. This research proposes a scalable, application-agnostic framework for \emph{persistent behavioural pattern discovery} from large-scale blockchain activity. It constructs behaviour sentences enriched with contract, token and market context, then applies a two-step embedding process: sentence-level embeddings capture individual actions, while sequence-level embeddings capture user behaviour over time. An interpretable behavioural profiler characterizes discovered communities through behavioural motifs, routines, temporal dynamics, entity exposure, and suspiciousness evidence. Evaluation on Ethereum using over 30 million transactions shows that the framework uncovers both routine and malicious behavioural patterns, including decentralised exchange (DEX) trading, NFT activity, phishing, bot operations, oracle manipulation, and rug-pull schemes. Importantly, many patterns remain stable across independent observation windows, enabling the identification of long-term behaviours beyond a single analysis period. The proposed framework combines scalability, interpretability, and persistence analysis, supporting blockchain forensic investigation, behavioural attribution, and threat discovery.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-13T06:23:28Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Dorottya Zelenyanszki</name>
+    </author>
+    <author>
+      <name>Zhe Hou</name>
+    </author>
+    <author>
+      <name>Kamanashis Biswas</name>
+    </author>
+    <author>
+      <name>Vallipuram Muthukkumarasamy</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.01609v1</id>
+    <title>From Viral to Void: Multi-Dimensional Behavioral and Contractual Analysis for Rug Pull Identification</title>
+    <updated>2026-08-03T02:34:24Z</updated>
+    <link href="https://arxiv.org/abs/2608.01609v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.01609v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>As the blockchain and decentralized finance (DeFi) ecosystems continue to expand and mature, rug pull scams involving meme coins are occurring with increasing frequency, posing a threat to the security of investors' assets and the healthy development of the industry. Rug Pull scams are characterized by extremely low deployment costs, covert execution, rapid fund transfers, and high detection difficulty. Traditional manual reviews or fixed rules struggle to meet real-time early warning requirements, and existing detection methods generally suffer from issues such as a single feature dimension, inadequate handling of class imbalance, and weak model generalization and interpretability. To address these shortcomings, this paper focuses on the detection of Ethereum-based rug pull scams. First, we clarify their definitions, types, and harm mechanisms, and construct a multi-dimensional feature system based on dimensions such as malicious smart contract design, on-chain transaction anomalies, liquidity manipulation, and social media disclosures. Next, using the "Second Uncle Coin"(token symbol: BOBU) case as an example, we reconstruct the attack process and derive quantitative detection metrics. Subsequently, a risk detection model based on a Multi-Layer Perceptron (MLP) is designed. We employ a combined strategy of SMOTE oversampling and Focal Loss to address the issue of sample imbalance, dynamically search for optimal thresholds to balance precision and recall, and incorporate gradient pruning and early stopping to enhance training stability. Experiments show that the model achieves an accuracy of 0.927, an F1 score of 0.787, and an AUC-ROC of 0.952 on the test set, outperforming traditional methods. Finally, a visualizable web-based detection system is developed using the Flask framework, enabling batch risk assessment, high-risk ranking display, and result export functions.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-03T02:34:24Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Jinyin Song</name>
+    </author>
+    <author>
+      <name>Hongping Wang</name>
+    </author>
+    <author>
+      <name>Xiaoqi Li</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.05744v1</id>
+    <title>Unicode TAG-Block Concealment of Tool-Metadata Payloads in the Model Context Protocol: An Approval-View Fidelity Gap Across Three Independent Server Implementations</title>
+    <updated>2026-07-07T02:01:44Z</updated>
+    <link href="https://arxiv.org/abs/2607.05744v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.05744v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The Model Context Protocol (MCP) is the dominant way coding agents discover and invoke external tools. A server advertises each tool through a tools/list handshake that returns a name, a natural-language description, and a JSON input schema. The client renders this metadata once, in a one-time approval dialog, and then injects it verbatim into the model's context on every subsequent turn. Nothing in the protocol requires the rendered approval view and the bytes delivered to the model to match. We isolate that gap as a single structural mechanism, concealment encoding, and show with a model-free, protocol-free analysis that Unicode's TAG block (U+E0000 to U+E007F) has no assigned glyph in any mainstream terminal, chat, or IDE renderer, so a payload written in it is absent from what a human reviewer sees while surviving byte-for-byte into the model's tokenizer. We then measure whether this mechanism actually defeats today's client-side defenses, building a proof-of-concept that speaks the real MCP JSON-RPC/stdio protocol against a genuine client and server. Across 5 distinct MCP metadata surfaces we implement 8 concrete techniques with a deterministic, protocol-level harness. All 8/8 techniques deliver an attacker-controlled payload into the model's context, 4/8 evade a representative string-matching sanitizer, and exactly as the mechanism analysis predicts, only the TAG-block encoding (1/8) is invisible in the human approval view while still reaching the model verbatim. MCP forces re-approval for 0/8 techniques even under a time-of-check to time-of-use rug-pull. To test whether these outcomes are a property of the protocol or an artifact of one server codebase, we re-implement the catalogue against 3 independently developed Python MCP server libraries and find total agreement across all 32 cross-library outcome cells. The baseline sanitizer flags 0 of 25 benign descriptions.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-07T02:01:44Z</published>
+    <arxiv:comment>15 pages, 4 figures, 7 tables, 5 listings. Real-protocol proof-of-concept, 8 techniques across 3 independently developed MCP server libraries with 32 of 32 cross-library outcome cells agreeing, and 0 of 25 baseline false positives on a benign corpus. Data, harness, and fail-closed verifier released as a supplementary artifact</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Mohammadreza Rashidi</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.04178v1</id>
+    <title>Dynamic Interest Rate Discovery in Decentralized Finance: A Reverse Kelly Automated Market Maker for Risk-Adjusted Lending</title>
+    <updated>2026-07-05T08:51:10Z</updated>
+    <link href="https://arxiv.org/abs/2607.04178v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.04178v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Decentralized Finance (DeFi) lending protocols currently rely on heuristic, utilization-based bonding curves that mandate severe over-collateralization, systematically excluding under-collateralized assets like corporate invoices. This paper introduces a mathematically optimal pricing mechanism for decentralized credit: the Reverse Kelly Automated Market Maker (rkAMM), the core engine of our proposed lending framework. By inverting the Kelly Criterion, traditionally used for optimal bet sizing, we construct a dynamic interest rate discovery protocol that explicitly prices individual loan risk. The rkAMM ingests real-time Probability of Default (PD) streams from an off-chain Explainable AI oracle and dynamically calculates the exact interest rate required to sustain target liquidity provider (LP) yields. We mathematically derive the Reverse Kelly pricing function ($r = \frac{y + PD}{1 - PD}$), proving its strictly convex superiority over Aave and Compound's static utilization curves in managing capital efficiency. Furthermore, we deploy the rkAMM architecture via Solidity smart contracts, optimizing for gas-efficient 1e18 (WAD) floating-point arithmetic. To ensure decentralized transparency, our simulation infrastructure leverages MLflow for tracking yield hyperparameters, Data Version Control (DVC) linked to DagsHub for versioning Real-World Asset (RWA) data arrays, and localized edge-inference via Ollama (Llama-3) and Hugging Face (FinBERT) for zero-cost predictive modeling. Monte Carlo simulations across 10,000 macroeconomic stress scenarios confirm that the rkAMM maintains protocol solvency and stabilizes LP yields at 12-15\% net of expected credit losses. This work provides the foundational financial engineering required to bridge the \$2 trillion global supply chain finance gap using permissionless blockchain infrastructure.</summary>
+    <category term="cs.SI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-05T08:51:10Z</published>
+    <arxiv:primary_category term="cs.SI"/>
+    <author>
+      <name>Sai Srikanth Madugula</name>
+    </author>
+    <author>
+      <name>Peplluis Esteva de la Rosa</name>
+    </author>
+    <author>
+      <name>Daya Shankar</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02830v1</id>
+    <title>Outcome-Classified Precision Auditing of Filter Rules in Algorithmic DEX Trading: Evidence from 2,400 Rejection Events</title>
+    <updated>2026-07-02T23:47:33Z</updated>
+    <link href="https://arxiv.org/abs/2607.02830v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02830v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper reports a precision audit of a production filter stack against a 13-day window of post-rejection forward-market observations on Solana DEX trading (2026-04-10 to 2026-04-23, UTC). The audit yielded 99,510 follow-up samples across 2,402 unique rejection events spanning eight active filter rules. We classify each event under a five-tier outcome rule and report per-filter distributions. The headline result is the conservative save-to-miss ratio of 3.7 : 1 from windowed measured-drawdown saves alone; every active filter with adequate sample size is individually net-positive. A wider interpretation that credits single-sample-within-60-minute events as saves yields 14.8 : 1. We then test the interpretive premise of that wider tier against the deposited lifecycle data of a separately-published benchmark (RED-2400). The matched comparison shows that early-death-classified mints reach the gone state at 48.9 percent. Non-early-death rejected mints reach gone at 57.6 percent. The early-death classification does not identify tokens at elevated rug-pull risk relative to other rejected tokens. The wider 14.8 : 1 ratio therefore rests on a tier that the matched test does not validate. The conservative 3.7 : 1 is the report the lifecycle data supports. The methodological contribution is the separation of the two evidence bases and the demonstration that the wider tier does not survive matched-comparison testing.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T23:47:33Z</published>
+    <arxiv:comment>Preprint. Also available at SSRN 6638259. Companion dataset at Zenodo DOI 10.5281/zenodo.19987695 (CC-BY-4.0). v2 (2026-05-30)</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02823v3</id>
+    <title>Pump.fun Graduation Regime Windows: Survival Analysis of 832,941 Token Launches and the Social-Presence Effect</title>
+    <updated>2026-08-17T17:00:05Z</updated>
+    <link href="https://arxiv.org/abs/2607.02823v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02823v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Kaplan-Meier and Cox proportional-hazards survival analysis of 832,941 Solana pump.fun token launches, observed 2026-05-08 to 2026-06-10. Pooled graduation rate 0.198% (Wilson 95% CI [0.189%, 0.208%]; steady-state 0.207%). A post-publication audit established that the collector's coverage was effectively limited to about six minutes after each launch, so this figure should be read as a fast-regime graduation rate and a lower bound on the true 24-hour rate, not an estimate of it. Comparing to Marino et al. (2026)'s 0.63% for September-October 2025 gives a ratio of 3.18x; because our figure is itself a lower bound, this ratio is an upper bound on the true decline, and the true decline is smaller by an amount this dataset cannot establish. We formalise the windowed comparison as the Graduation Regime Windows framework and release the 860,213-launch dataset under CC-BY-4.0 on Zenodo. Within the fast-regime window, Telegram-channel launches graduate at 1.485% versus 0.166% without (8.94x lift; Cox HR 5.40, 95% CI [4.73, 6.17]), likely itself a lower bound on the true 24-hour effect. Initial market capitalisation above the 30 SOL platform default is the strongest single predictor (Cox HR 4.51); the top quartile graduates at 0.634%, close to though not conclusively matching the Marino et al. pooled rate. Cox concordance 0.858, stable under bootstrap and a time-window split. A subsequent attempt to recover missed late graduations from implausibly high TIMEOUT-mint market caps was tested against pump.fun's live bonding-curve state and did not hold up (0 of 100 sampled mints showed graduation); we report and withdraw it. Zenodo concept DOI 10.5281/zenodo.20633486; corrigendum v1.4 at 10.5281/zenodo.21923106.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T23:23:54Z</published>
+    <arxiv:comment>v4 Replace: ref-list correction for arXiv:2412.04913 (Long, Wong, Cai). Content otherwise identical to v3. Corrigenda v1.3 (coverage-window) + v1.4 (ceiling-crossing withdrawal, 0/100 verified). Data doi.org/10.5281/zenodo.20633486 CC-BY-4.0. SSRN 6915560</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02795v3</id>
+    <title>Coordinated Sniper Cohorts on Pump.fun: Detection of 1,012 Persistent Wallet Rings and a Contamination-Adjusted Estimate of Coordination-Specific First-Hour Buyer-Flow Lift</title>
+    <updated>2026-08-03T20:34:46Z</updated>
+    <link href="https://arxiv.org/abs/2607.02795v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02795v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Motivated by Kyle (1985) informed order flow and the Meiklejohn et al. (2013) wallet-clustering tradition, we ask whether persistent coordinated wallets causally raise first-hour buyer flow on the Solana pump.fun bonding-curve marketplace. Using 1,578,333 buyer observations from 166,098 launches over 13.4 days (2026-06-11 to 2026-06-25), a two-stage detection pipeline (intra-launch first-buyer-window extraction plus cross-launch persistent-cohort surfacing via union-find on co-occurrence graphs) identifies 1,012 persistent wallet cohorts (2 to 12 wallets, 2,965 addresses) that systematically co-fire as early buyers. Under a contamination-adjusted estimator excluding cohort wallets' own buyer events from the outcome, 1:1 nearest-neighbour propensity-score matching with a 0.2-SD caliper on ten launch-quality covariates (Rosenbaum-Rubin, 1983) yields a first-30-minute buyer-count lift of +16.1% (95% CI [+13.0%, +19.4%]) on 5,419 matched pairs; the corresponding SOL-inflow lift is +6.3% ([-0.5%, +15.1%]), not distinguishable from zero. The naive contaminated same-universe pooled contrast is +130.9%; approximately half is arithmetic contamination from cohort wallets' own buys in the outcome (dropping to +63.9% after cohort exclusion), and most of the remainder is absorbed by PSM on launch-quality covariates. A parallel activity-matched placebo across 100 seeds produces lifts with median +189.6%, above zero and above the real lift in 100/100 seeds, indicating the placebo estimator is biased; we retain it as a bias diagnostic. Of 5,419 treated launches, 382 (7.0%) had zero non-cohort buyers in the first 30 minutes. We release the full cohort catalogue, detection code, PSM script, and robustness artefacts as RED-COHORT-2026-v1 under CC-BY-4.0.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T22:13:51Z</published>
+    <arxiv:comment>30 pages, 8 figures. v3 = major revision (BCRA critique + 360-audit): contamination-adjusted 1:1 PSM headline (+16.1% [+13.0%, +19.4%] buyer count; +6.3% [-0.5%, +15.1%] SOL, null) replaces naive +130.9%; 100-seed placebo reframed as bias diagnostic (median +189.6%, above real lift in 100/100 seeds); title reflects contamination-adjustment framing. Companion Zenodo 10.5281/zenodo.20978741</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.22409v1</id>
+    <title>Gold Points Sniper: Self-guided Visual Reasoning in VLM for Fine-grained Action Understanding</title>
+    <updated>2026-06-21T09:54:39Z</updated>
+    <link href="https://arxiv.org/abs/2606.22409v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.22409v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Robots operating in everyday environments must understand fine-grained human actions, intentions, and contextual cues from broad views where people occupy only small regions, a capability unmet by current systems. While open-vocabulary action recognition methods remain limited to assigning predefined labels, and vision-language models (VLMs) face an inherent trade-off between informational richness and factual fidelity in their outputs, neither approach achieves the deep semantic interpretation required for reliable human-robot interaction. We propose Gold Points Sniper (GPS), a novel framework that empowers lightweight VLMs with self-guided multimodal reasoning capabilities for fine-grained human action understanding. Our approach comprises three key modules: Gold Points Extractor trains VLMs to identify critical action-relevant details, Selective Socratic Questioner validates and refines these details through selective self-questioning, and Semantic Entailment Evaluator quantitatively assesses factual consistency using semantic entailment classification. Extensive experiments on our curated instruction-tuning dataset based on the CAP benchmark demonstrate that GPS-enhanced lightweight VLMs achieve substantial performance improvements, with some models reaching performance comparable to proprietary GPT-4o while maintaining superior factual accuracy. Our work establishes a reliable foundation for fine-grained action understanding in domestic robotics, enabling robots to safely interpret human behavior through information-dense yet factually grounded descriptions. Source code, training configurations, annotation prompts, and dataset details are released at https://github.com/Haodi-Liu/GPS-Gold-Point-Sniper.</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-21T09:54:39Z</published>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Haodi Liu</name>
+    </author>
+    <author>
+      <name>Xinhang Yang</name>
+    </author>
+    <author>
+      <name>Kunda Yan</name>
+    </author>
+    <author>
+      <name>Sen Cui</name>
+    </author>
+    <author>
+      <name>Zeyu Zhang</name>
+    </author>
+    <author>
+      <name>Changshui Zhang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.12894v2</id>
+    <title>Longitudinal particle separation</title>
+    <updated>2026-06-12T04:26:30Z</updated>
+    <link href="https://arxiv.org/abs/2606.12894v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.12894v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Owing to inertial effects, the flow through a three-dimensional curved duct focuses finite-sized spherical particles in the two-dimensional cross-section onto either stable equilibrium points or limit cycles. This hydrodynamic inertial focusing underpins various biomedical and industrial applications for size-based particle and cell sorting. Departing from conventional particle separation in the channel cross-section, we instead focus on particle separation in the primary flow direction, i.e., longitudinal separation. We consider a duct with an elliptical centreline and a tall rectangular cross-section. For a given particle size, the nature of the cross-sectional equilibrium points depends on the local radius of curvature of the duct, and a periodical variation of the radius of curvature can result in a periodical bifurcation behaviour along its length. In particular, a duct geometry that undergoes a periodically varying saddle-node infinite-period (SNIPER) bifurcation can be used to improve longitudinal, at the expense of cross-sectional, particle clustering. For sufficiently large particles, this longitudinal clustering weakens at higher Reynolds numbers and with decreasing eccentricity, in contrast to small particles whose longitudinal clustering remains unaffected across a wide range of geometric configurations and flow conditions. Then, ducts with smaller eccentricities enable simultaneous separation along both the flow direction and the cross-section. In contrast, for larger eccentricities, the emergence of a SNIPER bifurcation promotes more pronounced longitudinal separation while compromising cross-sectional separation. These preliminary findings suggest that elliptically wound microfluidic devices might be used for longitudinal separation of particles by size, with potential biomedical and industrial applications.</summary>
+    <category term="physics.flu-dyn" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-11T04:50:32Z</published>
+    <arxiv:comment>17 pages, 10 figures. Supplementary videos are provided upon request</arxiv:comment>
+    <arxiv:primary_category term="physics.flu-dyn"/>
+    <author>
+      <name>Siluvai Antony Selvan</name>
+    </author>
+    <author>
+      <name>Rahil N Valani</name>
+    </author>
+    <author>
+      <name>Brendan Harding</name>
+    </author>
+    <author>
+      <name>Yvonne M Stokes</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.08232v3</id>
+    <title>Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading on Solana DEXs: Evidence, Theory, and Design Lessons from a 15-Day Deployment</title>
+    <updated>2026-08-03T19:44:16Z</updated>
+    <link href="https://arxiv.org/abs/2606.08232v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.08232v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We report a 15-day paper-traded autonomous memecoin trading deployment on Solana decentralised exchanges (DEXs), designed as a controlled measurement of three microstructure questions on which classical equity theory offers well-defined predictions but on which the AMM Solana venue lacks published measurement: (i) time-of-day return patterns on a 24/7 permissionless venue; (ii) whether decision-time filter stacks are net-positive against counterfactual returns of rejected tokens; (iii) whether small-sample cumulative-return statistics on a heavy-tailed venue are structurally robust or fragile. The 190-trade sample (March 29 to April 12, 2026) shows a 40.5 percent win rate, mean per-trade return +0.62 percent, cumulative +117.7 percent, skewness -1.21, excess kurtosis 6.61. Mann-Whitney U on three exploratorily identified worst entry hours (n=17, mean -11.60 percent) versus all others (n=173, mean +1.82 percent) yields p = 0.5634; directional and non-confirmatory. A parallel counterfactual rejection-tracker collected 4,874 forward-sample observations across 184 rejection events; of 48 events observed for at least six hours, 27 (56.25 percent) reached a 50 percent drawdown from reference (the full-cohort 17.9 percent is a censored lower bound). Removing the top three trades (1.6 percent of sample) flips cumulative return unprofitable. The three findings connect to Kyle (1985) informed-flow, Precup-Sutton-Singh (2000) off-policy evaluation, and Bailey-Lopez de Prado (2014) deflated-Sharpe predictions. Alongside the trade log and rejection-sample corpus (CC-BY-4.0), we deposit audit.py (MIT), an assertion-based reproduction script that exits zero iff every headline number reproduces from the deposited CSVs. Companion dataset: Zenodo concept DOI 10.5281/zenodo.20043301. The paper's principal contribution is measurement infrastructure and three transferable design lessons.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-06T15:40:05Z</published>
+    <arxiv:comment>15 pages, 4 figures. v3 = Ledger #632 revision (Stylianou 2026-07-27): new Section III Theoretical Framework (Kyle 1985; Precup-Sutton-Singh 2000; Bailey-Lopez de Prado 2014); Related Work +14 citations; new Section VII Design Lessons; new Significance paragraph. Headline numbers unchanged. JEL G11/G12/G14/G17. Companion Zenodo 10.5281/zenodo.20043301. SSRN 6564803</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2605.11878v1</id>
+    <title>Nonuniform relaxation oscillations near SNIPER bifurcations</title>
+    <updated>2026-05-12T09:53:58Z</updated>
+    <link href="https://arxiv.org/abs/2605.11878v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2605.11878v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Properties of spatially dependent relaxation oscillations near a SNIPER bifurcation are described. A SNIPER bifurcation creates a large-amplitude long-period periodic orbit via the annihilation of a pair of fixed points in a saddle-node bifurcation. We show that in spatially extended media, this orbit may undergo a long-wavelength instability, leading to spatially modulated oscillations that persist on both sides of the SNIPER. The oscillations take different forms depending on the system: a chimera state in a theta-reaction-diffusion model, and chaotic spiking in an activator-inhibitor-substrate model. The results are expected to have applications in a number of physical systems exhibiting SNIPER bifurcations, ranging from models of the nervous system through chemical reactions to nonlinear optics.</summary>
+    <category term="nlin.PS" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-05-12T09:53:58Z</published>
+    <arxiv:comment>9 pages, 5 figures</arxiv:comment>
+    <arxiv:primary_category term="nlin.PS"/>
+    <author>
+      <name>Edgar Knobloch</name>
+    </author>
+    <author>
+      <name>Arik Yochelis</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2605.05274v2</id>
+    <title>Sealing the Audit-Runtime Gap for LLM Skills</title>
+    <updated>2026-09-03T09:06:40Z</updated>
+    <link href="https://arxiv.org/abs/2605.05274v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2605.05274v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Large language model (LLM) ecosystems such as Claude Code and ChatGPT increasingly rely on skills: packages of natural-language instructions and executable tools. Once in the LLM's context, skill content cannot be reliably separated from trusted instructions, and a skill's executable side can invoke privileged actions, exposing the skill supply chain to injection, tampering, and rug-pull attacks. Existing defenses are stage-bound: centralized signing, audit reports unbound from the runtime artifact, or policy engines that cannot attest to what was approved. We present SIGIL, the first framework that seals the audit-runtime gap for LLM skills. SIGIL delivers verifiable hosting through a tamper-evident, decentralized on-chain registry from which LLMs fetch skills directly. The registry admits four publication types, Transparent, Licensed, Sealed, and Committed, spanning plaintext public distribution, monetized access, custodial use, and off-chain workflows; before admission, every skill is vetted by a Decentralized Autonomous Organization (DAO) audit committee that supports pluggable auditing methods under a stake-and-slash economic model. At load time, SIGIL delivers verified loading through a skill verification protocol executed by a Skill Verification Loader (SVL) embedded as the mandatory loading path: the SVL retrieves and decrypts the skill as its type requires, verifies its integrity against the on-chain record, and enforces its permission manifest before context injection. We evaluate SIGIL on a real-world deployment against 1,023 in-the-wild skills spanning six attack types. At load time, the SVL verifies each skill's integrity against its on-chain record and enforces its approved permission manifest, completing batched verification under 86 ms. Together, these results show that LLM skills can be cryptographically bound from publication through runtime at practical cost.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-05-06T14:23:22Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Tingda Shen</name>
+    </author>
+    <author>
+      <name>Yebo Feng</name>
+    </author>
+    <author>
+      <name>Konglin Zhu</name>
+    </author>
+    <author>
+      <name>Xiaojun Jia</name>
+    </author>
+    <author>
+      <name>Yang Liu</name>
+    </author>
+    <author>
+      <name>Lin Zhang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2604.25403v1</id>
+    <title>Corporate Bond Yield Curve Modeling: A Rating-Based Regime-Switching Generalized CIR Approach</title>
+    <updated>2026-04-28T09:15:37Z</updated>
+    <link href="https://arxiv.org/abs/2604.25403v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2604.25403v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Persistent shifts in term-structure dynamics undermine the stability of single-regime models in long samples. We develop an arbitrage-free regime-switching generalized CIR (RS-GCIR) model that jointly prices the Chinese government bond (CGB) curve and corporate bond curves. To capture the systematic transmission from interest-rate conditions to credit spreads, we structure the model into two blocks and price corporate bonds conditional on the prevailing rate regime. The rate block features a two-state RS-GCIR short-rate process estimated from CGB zero-coupon curves, while the credit block embeds CIR-type credit factors in an intensity-based framework for rating migration and default. We implement a block-recursive Unscented Kalman Filter (UKF) procedure--filtering the rate block first and the credit block next--using weekly data from 2014--2025, a period that begins with the onset of China's modern corporate default cycle. We identify two persistent rate regimes with distinct level--volatility profiles. Relative to single-regime benchmarks, regime switching improves joint curve fit, delivers economically interpretable filtered regime probabilities, and sharpens the decomposition of corporate yields into discounting and credit compensation.</summary>
+    <category term="q-fin.PR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-04-28T09:15:37Z</published>
+    <arxiv:comment>65 pages, 10 figures, 16 tables. JEL Classification: G12, E43, C58</arxiv:comment>
+    <arxiv:primary_category term="q-fin.PR"/>
+    <author>
+      <name>Maochun Xu</name>
+    </author>
+    <author>
+      <name>Yunqi Liang</name>
+    </author>
+    <author>
+      <name>Yi Hong</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2603.24625v2</id>
+    <title>From Hype to Collapse: Investigating Rug Pull Scams on Solana</title>
+    <updated>2026-05-31T10:48:32Z</updated>
+    <link href="https://arxiv.org/abs/2603.24625v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2603.24625v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Solana has experienced rapid growth due to its high performance and low transaction costs, but the extremely low barrier to token issuance has also enabled widespread Rug Pulls. Unlike Ethereum-based Rug Pulls, which often rely on malicious smart-contract logic, Solana's unified SPL Token program shifts fraudulent execution toward on-chain behavioral manipulation. However, existing research has not systematically examined these Solana-specific Rug Pull patterns, and no public Solana Rug Pull dataset is available for empirical research. To bridge this gap, we present a large-scale measurement study of Rug Pulls on Solana. We manually verify 68 community-reported incidents and curate a benchmark of 117 confirmed Rug Pull tokens, from which we distill three representative on-chain behavioral patterns: Freeze Authority Abuse, Liquidity Withdrawal, and Pump-and-Dump. Guided by these patterns, we design a behavior-guided candidate identification and human-validation pipeline. We apply this pipeline to 100,063 tokens newly issued on Orca, Raydium, and Meteora during the first half of 2025, identifying 76,469 Rug Pull tokens. A random manual audit of 382 samples estimates a labeling false-positive rate of 0.26\%, supporting the reliability of the dataset. We release the resulting dataset and use it to characterize the Solana Rug Pull ecosystem. Our analysis shows that Rug Pulls on Solana exhibit extremely short lifecycles, strong price-driven dynamics, severe economic losses, and highly organized group behaviors. These findings provide new insights into the Solana Rug Pull landscape and support the development of effective on-chain defense mechanisms.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-03-25T02:31:31Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Jiaxin Chen</name>
+    </author>
+    <author>
+      <name>Ziwei Li</name>
+    </author>
+    <author>
+      <name>Zigui Jiang</name>
+    </author>
+    <author>
+      <name>Ruihong He</name>
+    </author>
+    <author>
+      <name>Yantong Zhou</name>
+    </author>
+    <author>
+      <name>Jiajing Wu</name>
+    </author>
+    <author>
+      <name>Zibin Zheng</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2603.13830v1</id>
+    <title>Early Rug Pull Warning for BSC Meme Tokens via Multi-Granularity Wash-Trading Pattern Profiling</title>
+    <updated>2026-03-14T08:25:42Z</updated>
+    <link href="https://arxiv.org/abs/2603.13830v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2603.13830v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The high-frequency issuance and short-cycle speculation of meme tokens in decentralized finance (DeFi) have significantly amplified rug-pull risk. Existing approaches still struggle to provide stable early warning under scarce anomalies, incomplete labels, and limited interpretability. To address this issue, an end-to-end warning framework is proposed for BSC meme tokens, consisting of four stages: dataset construction and labeling, wash-trading pattern feature modeling, risk prediction, and error analysis. Methodologically, 12 token-level behavioral features are constructed based on three wash-trading patterns (Self, Matched, and Circular), unifying transaction-, address-, and flow-level signals into risk vectors. Supervised models are then employed to output warning scores and alert decisions. Under the current setting (7 tokens, 33,242 records), Random Forest outperforms Logistic Regression on core metrics, achieving AUC=0.9098, PR-AUC=0.9185, and F1=0.7429. Ablation results show that trade-level features are the primary performance driver (Delta PR-AUC=-0.1843 when removed), while address-level features provide stable complementary gain (Delta PR-AUC=-0.0573). The model also demonstrates actionable early-warning potential for a subset of samples, with a mean Lead Time (v1) of 3.8133 hours. The error profile (FP=1, FN=8) indicates that the current system is better positioned as a high-precision screener rather than a high-recall automatic alarm engine. The main contributions are threefold: an executable and reproducible rug-pull warning pipeline, empirical validation of multi-granularity wash-trading features under weak supervision, and deployment-oriented evidence through lead-time and error-bound analysis.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-03-14T08:25:42Z</published>
+    <arxiv:comment>17 pages, 7 figures, 4 tables</arxiv:comment>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>Dingding Cao</name>
+    </author>
+    <author>
+      <name>Bianbian Jiao</name>
+    </author>
+    <author>
+      <name>Jingzong Yang</name>
+    </author>
+    <author>
+      <name>Yujing Zhong</name>
+    </author>
+    <author>
+      <name>Wei Yang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2603.11324v1</id>
+    <title>LROO Rug Pull Detector: A Leakage-Resistant Framework Based on On-Chain and OSINT Signals</title>
+    <updated>2026-03-11T21:35:53Z</updated>
+    <link href="https://arxiv.org/abs/2603.11324v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2603.11324v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Smart contract-based ecosystems enable decentralized applications without trusted intermediaries, but their immutability and permissionless design also facilitate large-scale fraud. One of the most prevalent attacks is the rug pull, where project operators abruptly withdraw liquidity after artificially inflating token value. Existing detection methods primarily rely on reactive on-chain signals and often suffer from temporal data leakage, limiting their real-world reliability. This paper proposes a leakage-aware framework for early rug-pull detection that integrates on-chain behavioral metrics with temporally aligned Open Source Intelligence (OSINT) signals. We construct a hand-labeled dataset of 1,000 token projects, spanning DeFi and non-DeFi settings, with all features extracted strictly prior to any liquidity withdrawal to preserve causal validity. The dataset combines structural on-chain indicators with external attention signals derived from social media activity and search trends. Within this framework, TabPFN is employed as a core modeling component for learning from multimodal tabular data under strict temporal constraints. Experimental results show that the proposed framework achieves strong discriminative performance and improved probability calibration compared to classical baselines, while maintaining low false-negative rates. By framing rug-pull detection as a causal, multimodal forecasting problem, this work emphasizes the necessity of leakage-resilient evaluation and calibrated risk estimation for deployment in blockchain security systems.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-03-11T21:35:53Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Fatemeh Shoaei</name>
+    </author>
+    <author>
+      <name>Mohammad Pishdar</name>
+    </author>
+    <author>
+      <name>Mozafar Bag-Mohammadi</name>
+    </author>
+    <author>
+      <name>Mojtaba Karami</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2603.01344v1</id>
+    <title>Pricing and hedging for liquidity provision in Constant Function Market Making</title>
+    <updated>2026-03-02T00:51:06Z</updated>
+    <link href="https://arxiv.org/abs/2603.01344v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2603.01344v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper develops a robust mathematical framework for Constant Function Market Makers (CFMMs) by transitioning from traditional token reserve analyses to a coordinate system defined by price and intrinsic liquidity. We establish a canonical parametrization of the bonding curve that ensures dimensional consistency across diverse trading functions, such as those employed by Uniswap and Balancer, and demonstrate that asset reserves and value functions exhibit a linear dependence on this intrinsic liquidity. This linear structure facilitates a streamlined approach to arbitrage-free pricing, delta hedging, and systematic risk management. By leveraging the Carr-Madan spanning formula, we characterize Impermanent Loss (IL) as a weighted strip of vanilla options, thereby defining a fine-grained implied volatility structure for liquidity profiles. Furthermore, we provide a path-dependent analysis of IL using the last-passage time. Empirical results from Uniswap v3 ETH/USDC pools and Deribit option markets confirm a volatility smile consistent with crypto-asset dynamics, validating the framework's utility in characterizing the risk-neutral fair value of liquidity provision.</summary>
+    <category term="q-fin.MF" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-03-02T00:51:06Z</published>
+    <arxiv:comment>36 pages, 15 figures</arxiv:comment>
+    <arxiv:primary_category term="q-fin.MF"/>
+    <author>
+      <name>Jimmy Risk</name>
+    </author>
+    <author>
+      <name>Shen-Ning Tung</name>
+    </author>
+    <author>
+      <name>Tai-Ho Wang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2602.21529v3</id>
+    <title>TMRugPull: A Temporally Sound Multimodal Dataset for Early RugPull Detection</title>
+    <updated>2026-05-18T09:01:44Z</updated>
+    <link href="https://arxiv.org/abs/2602.21529v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2602.21529v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Rug pull is a critical attack in the world of blockchain technology. Despite this, the absence of sufficient time-bound and well-structured datasets is considered one of the significant issues faced while identifying early detection. Existing datasets do not provide the solution to this challenge because of temporal leakage or use of post-collapse indicators, insufficient modality coverage, and confusing or partial labels, especially with regards to DeFi tokens. To solve these problems, we present a highly curated and strictly time-bound dataset called TM-RugPull containing 1,000 projects, which include DeFi, meme, NFT, and celebrity token projects. We achieve temporal validation of the dataset by acquiring all three modalities, namely on-chain behavior, smart contract metadata, and OSINT signals. The project labels are provided based on manual investigation for the entire project's lifespan and its collapse. Also, we make our dataset publicly available together with its codebase for data acquisition and feature extraction.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-02-25T03:32:28Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Fatemeh Shoaei</name>
+    </author>
+    <author>
+      <name>Mohammad Pishdar</name>
+    </author>
+    <author>
+      <name>Mozafar Bag-Mohammadi</name>
+    </author>
+    <author>
+      <name>Mojtaba Karami</name>
+    </author>
+    <author>
+      <name>Bert Lagaisse</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2602.14860v1</id>
+    <title>Predicting the success of new crypto-tokens: the Pump.fun case</title>
+    <updated>2026-02-16T15:53:13Z</updated>
+    <link href="https://arxiv.org/abs/2602.14860v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2602.14860v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We study the dynamics of token launched on Pump.fun, a Solana-based launchpad platform, to identify the determinants of the token success. Pump.fun employs a bonding curve mechanism to bootstrap initial liquidity possibly leading to graduation to the on-chain market, which can be seen as a token success. We build predictive models of the probability of graduation conditional on the current amount of Solana locked in the bonding curve and a set of explanatory variables that capture structural and behavioral aspects of the launch process. Conditioning the graduation probability on these variables significantly improves its predictive power, providing insights into early-stage market behavior, speculative and manipulative dynamics, and the informational efficiency of bonding-curve-based token launches.</summary>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-02-16T15:53:13Z</published>
+    <arxiv:primary_category term="q-fin.ST"/>
+    <author>
+      <name>Giulio Marino</name>
+    </author>
+    <author>
+      <name>Manuel Naviglio</name>
+    </author>
+    <author>
+      <name>Francesco Tarantelli</name>
+    </author>
+    <author>
+      <name>Fabrizio Lillo</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2602.13480v2</id>
+    <title>MELT: A Behavioral Trace Dataset for High-Risk Memecoin Launch Detection</title>
+    <updated>2026-05-21T16:15:34Z</updated>
+    <link href="https://arxiv.org/abs/2602.13480v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2602.13480v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Launchpads have become the dominant mechanism for issuing memecoins, exposing investors to a new class of high-risk launches that existing rug-pull detection methods cannot capture. We argue that detecting these threats requires structured behavioral traces that underlie raw heterogeneous blockchain data, i.e., how insiders accumulate, coordinate, and unwind positions. To enable such analysis, we introduce MELT (MEmecoin Launch Trace, the first behavioral trace dataset for analyzing and detecting high-risk memecoin launches on Solana. MELT covers 41k+ memecoin launches with 200M+ transactions parsed into typed behavioral records that distinguish swaps, wash trades, transfers, and mints. Beyond per-account behaviors, MELT contributes bundle-trace data that links accounts controlled by the same entity, revealing that, on average, 36.5% of token supply is held by coordinated accounts, a concealment strategy that disguises the true ownership concentration from unsuspecting buyers. On top of these traces, MELT provides 122 behavioral features and risk-level annotations, enabling supervised learning at a population scale. We benchmark representative ML models on the high-risk launch detection task. Integrating their predictions into a simple memecoin selection strategy reduces investment loss significantly, demonstrating that behavioral traces can be translated into risk mitigation. Our dataset and code is available at https://github.com/git-disl/MELT.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-02-13T21:35:15Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Sihao Hu</name>
+    </author>
+    <author>
+      <name>Selim Furkan Tekin</name>
+    </author>
+    <author>
+      <name>Yichang Xu</name>
+    </author>
+    <author>
+      <name>Ling Liu</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2601.22185v1</id>
+    <title>MemeChain: A Multimodal Cross-Chain Dataset for Meme Coin Forensics and Risk Analysis</title>
+    <updated>2026-01-28T14:42:02Z</updated>
+    <link href="https://arxiv.org/abs/2601.22185v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2601.22185v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The meme coin ecosystem has grown into one of the most active yet least observable segments of the cryptocurrency market, characterized by extreme churn, minimal project commitment, and widespread fraudulent behavior. While countless meme coins are deployed across multiple blockchains, they rely heavily on off-chain web and social infrastructure to signal legitimacy. These very signals are largely absent from existing datasets, which are often limited to single-chain data or lack the multimodal artifacts required for comprehensive risk modeling.
+  To address this gap, we introduce MemeChain, a large-scale, open-source, cross-chain dataset comprising 34,988 meme coins across Ethereum, BNB Smart Chain, Solana, and Base. MemeChain integrates on-chain data with off-chain artifacts, including website HTML source code, token logos, and linked social media accounts, enabling multimodal and forensic study of meme coin projects. Analysis of the dataset shows that visual branding is frequently omitted in low-effort deployments, and many projects lack a functional website. Moreover, we quantify the ecosystem's extreme volatility, identifying 1,801 tokens (5.15%) that cease all trading activity within just 24 hours of launch. By providing unified cross-chain coverage and rich off-chain context, MemeChain serves as a foundational resource for research in financial forensics, multimodal anomaly detection, and automated scam prevention in the meme coin ecosystem.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-01-28T14:42:02Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Alberto Maria Mongardini</name>
+    </author>
+    <author>
+      <name>Alessandro Mei</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2601.08641v3</id>
+    <title>Resisting Manipulative Bots in Meme Coin Copy Trading: A Multi-Agent Approach with Chain-of-Thought Reasoning</title>
+    <updated>2026-02-05T13:52:14Z</updated>
+    <link href="https://arxiv.org/abs/2601.08641v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2601.08641v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Copy trading has become the dominant entry strategy in meme coin markets. However, due to the market's extremely illiquid and volatile nature, the strategy exposes an exploitable attack surface: adversaries deploy manipulative bots to front-run trades, conceal positions, and fabricate sentiment, systematically extracting value from naïve copiers at scale. Despite its prevalence, bot-driven manipulation remains largely unexplored, and no robust defensive framework exists. We propose a manipulation-resistant copy-trading system based on a multi-agent architecture powered by a multi-modal large language model (LLM) and chain-of-thought (CoT) reasoning. Our approach outperforms zero-shot and most statistic-driven baselines in prediction accuracy as well as all baselines in economic performance, achieving an average copier return of 3% per meme coin investment under realistic market frictions. Overall, our results demonstrate the effectiveness of agent-based defenses and predictability of trader profitability in adversarial meme coin markets, providing a practical foundation for robust copy trading.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-01-13T15:13:41Z</published>
+    <arxiv:primary_category term="cs.AI"/>
+    <arxiv:journal_ref>Proceedings of the ACM Web Conference 2026 (WWW'26)</arxiv:journal_ref>
+    <author>
+      <name>Yichen Luo</name>
+    </author>
+    <author>
+      <name>Yebo Feng</name>
+    </author>
+    <author>
+      <name>Jiahua Xu</name>
+    </author>
+    <author>
+      <name>Yang Liu</name>
+    </author>
+    <arxiv:doi>10.1145/3774904.3792635</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1145/3774904.3792635" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.07047v2</id>
+    <title>Symmetry, Invariant Manifolds and Flow Reversals in Active Nematic Turbulence</title>
+    <updated>2026-03-12T04:08:08Z</updated>
+    <link href="https://arxiv.org/abs/2512.07047v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.07047v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We investigate how symmetry, exact coherent structures (ECSs), and their invariant manifolds organize spontaneous flow reversals in a 2D active nematic confined to a periodic channel. In minimal flow units commensurate with the intrinsic active vortex scale, we use equivariant bifurcation theory to trace the origin of dynamically relevant ECSs via a sequence of symmetry-constrained local and global bifurcations. At low activity level, we identify relative periodic orbits, created via a sequence of SNIPER, homoclinic and heteroclinic bifurcations, whose invariant manifolds provide robust heteroclinic pathways between left- and right-flowing nearly uniaxial states. These result in several symmetry-dictated reversal mechanisms in the preturbulent regime, with and without vortex-lattice intermediate states. In the active turbulent regime, this ECS skeleton persists and organizes chaotic attractors exhibiting persistent two-way reversals. By classifying ECSs through their symmetry signatures, we relate a small set of ECSs embedded in turbulence back to the preturbulent branches, and show that typical turbulent trajectories repeatedly shadow these ECSs and their unstable manifolds, resulting in near-heteroclinic transitions between opposite-flow states. Our results establish that channel confined active nematic turbulence is organized by a low-dimensional, symmetry-governed network of invariant solutions and their manifolds, and identify dynamical mechanisms that could be exploited to design, promote, or suppress flow reversals in active matter microfluidic devices.</summary>
+    <category term="cond-mat.soft" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="math.DS" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="nlin.CD" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="physics.flu-dyn" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-12-07T23:47:33Z</published>
+    <arxiv:comment>49 pages, 32 figures</arxiv:comment>
+    <arxiv:primary_category term="cond-mat.soft"/>
+    <author>
+      <name>Angel Naranjo</name>
+    </author>
+    <author>
+      <name>Rumayel Pallock</name>
+    </author>
+    <author>
+      <name>Caleb Wagner</name>
+    </author>
+    <author>
+      <name>Piyush Grover</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.06556v2</id>
+    <title>Semantic Attacks on Tool-Augmented LLMs: Securing the Model Context Protocol Against Descriptor-Level Manipulation</title>
+    <updated>2026-05-21T13:44:50Z</updated>
+    <link href="https://arxiv.org/abs/2512.06556v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.06556v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The Model Context Protocol (MCP) enables Large Language Models (LLMs) to interact with external tools via tool descriptors, thereby extending their capabilities for task execution, autonomous decision-making, and multi-agent coordination. Existing MCP deployments treat tool descriptors as trusted metadata, despite their direct integration into the LLM reasoning context. This introduces a previously underexplored semantic attack surface. Current defenses primarily target prompt injection, neglecting descriptor-level manipulation that can bias tool selection and downstream reasoning. To address this gap, we formalize three descriptor-driven attack classes: Tool Poisoning, Shadowing, and Rug Pull. We propose a layered defense solution that integrates descriptor integrity verification, pre-context semantic vetting with an auxiliary LLM, and lightweight runtime guardrails, without requiring model retraining. We evaluate GPT-5.3, DeepSeek-V3, and LLaMA-3.5 across eight prompting strategies in controlled, adversarial MCP scenarios in which tool metadata is manipulated to simulate realistic attacks. Results demonstrate that descriptor manipulation can substantially alter tool-selection behavior, producing unsafe tool invocations in up to 36% of trials under baseline configurations. The proposed full-stack mitigation reduces unsafe invocations to 15% while increasing the block rate to 74%, demonstrating substantial improvement in resistance to descriptor-driven attacks. Cross-model analysis further reveals significant differences in robustness, latency, and sensitivity to descriptor-level manipulation across LLM architectures and prompting strategies. This study provides a controlled cross-model evaluation of descriptor-level threats and mitigation strategies in tool-calling LLM systems, establishing an empirical foundation for deploying secure and resilient tool-augmented LLMs.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-12-06T20:07:58Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Saeid Jamshidi</name>
+    </author>
+    <author>
+      <name>Arghavan Moradi Dakhel</name>
+    </author>
+    <author>
+      <name>Kawser Wazed Nafi</name>
+    </author>
+    <author>
+      <name>Foutse Khomh</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.11850v3</id>
+    <title>The Memecoin Phenomenon: An In-Depth Study of Solana's Blockchain Trends</title>
+    <updated>2025-12-18T11:03:23Z</updated>
+    <link href="https://arxiv.org/abs/2512.11850v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.11850v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper analyzes the emerging memecoin phenomenon on the Solana blockchain, focusing on the Pump$.$fun platform during Q4 2024. Using on-chain data, it is explored how retail-focused token creation platforms are reshaping blockchain ecosystems and influencing market participation. This study finds that Pump$.$fun accounted for up to 71.1% of all tokens minted on Solana and contributed 40-67.4% of total DEX transactions. Despite this activity, fewer than 2% of tokens successfully transitioned to major decentralized exchanges, highlighting a highly speculative market structure. The platform experienced rapid growth, with daily active users rising from 60,000 to peaks of 260,000, underscoring strong retail adoption. This reflects a broader shift towards accessible, socially-driven market participation enabled by memecoins. However, while memecoins lower entry barriers and encourage retail engagement, they introduce significant risks. The volatile and speculative nature of these platforms raises concerns about long-term sustainability and the resilience of the blockchain ecosystem. These findings reveal the dual impact of memecoins: they democratize token creation and alter market dynamics but may jeopardize market efficiency and stability. This paper highlights the need to critically assess the implications of retail-driven speculative trading and its potential to disrupt emerging blockchain economies.</summary>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-12-04T16:06:22Z</published>
+    <arxiv:primary_category term="cs.CY"/>
+    <arxiv:journal_ref>2025 IEEE Symposium on Computers and Communications (ISCC), 2025, pp. 1-6</arxiv:journal_ref>
+    <author>
+      <name>Davide Mancino</name>
+    </author>
+    <arxiv:doi>10.1109/ISCC65549.2025.11326251</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1109/ISCC65549.2025.11326251" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.02898v1</id>
+    <title>Model-Based Diagnosis with Multiple Observations: A Unified Approach for C Software and Boolean Circuits</title>
+    <updated>2025-12-02T16:04:51Z</updated>
+    <link href="https://arxiv.org/abs/2512.02898v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.02898v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Debugging is one of the most time-consuming and expensive tasks in software development and circuit design. Several formula-based fault localisation (FBFL) methods have been proposed, but they fail to guarantee a set of diagnoses across all failing tests or may produce redundant diagnoses that are not subset-minimal, particularly for programs/circuits with multiple faults.
+  This paper introduces CFaults, a novel fault localisation tool for C software and Boolean circuits with multiple faults. CFaults leverages Model-Based Diagnosis (MBD) with multiple observations and aggregates all failing test cases into a unified Maximum Satisfiability (MaxSAT) formula. Consequently, our method guarantees consistency across observations and simplifies the fault localisation procedure. Experimental results on three benchmark sets, two of C programs, TCAS and C-Pack-IPAs, and one of Boolean circuits, ISCAS85, show that CFaults is faster at localising faults in C software than other FBFL approaches such as BugAssist, SNIPER, and HSD. On the ISCAS85 benchmark, CFaults is generally slower than HSD; however, it localises faults in only 6% fewer circuits, demonstrating that it remains competitive in this domain. Furthermore, CFaults produces only subset-minimal diagnoses of faulty statements, whereas the other approaches tend to enumerate redundant diagnoses (e.g., BugAssist and SNIPER).</summary>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LO" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.SC" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-12-02T16:04:51Z</published>
+    <arxiv:comment>50 pages, 9 figures, 6 tables, 5 listings</arxiv:comment>
+    <arxiv:primary_category term="cs.SE"/>
+    <author>
+      <name>Pedro Orvalho</name>
+    </author>
+    <author>
+      <name>Marta Kwiatkowska</name>
+    </author>
+    <author>
+      <name>Mikoláš Janota</name>
+    </author>
+    <author>
+      <name>Vasco Manquinho</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.00377v2</id>
+    <title>Measuring Memecoin Fragility</title>
+    <updated>2026-01-09T03:14:38Z</updated>
+    <link href="https://arxiv.org/abs/2512.00377v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.00377v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Memecoins, emerging from internet culture and community-driven narratives, have rapidly evolved into a unique class of crypto assets. Unlike technology-driven cryptocurrencies, their market dynamics are primarily shaped by viral social media diffusion, celebrity influence, and speculative capital inflows. To capture the distinctive vulnerabilities of these ecosystems, we present the first Memecoin Ecosystem Fragility Framework (ME2F). ME2F formalizes memecoin risks in three dimensions: i) Volatility Dynamics Score capturing persistent and extreme price swings together with spillover from base chains; ii) Whale Dominance Score quantifying ownership concentration among top holders; and iii) Sentiment Amplification Score measuring the impact of attention-driven shocks on market stability. We apply ME2F to representative tokens (over 65% market share) and show that fragility is not evenly distributed across the ecosystem. Politically themed tokens such as TRUMP, MELANIA, and LIBRA concentrate the highest risks, combining volatility, ownership concentration, and sensitivity to sentiment shocks. Established memecoins such as DOGE, SHIB, and PEPE fall into an intermediate range. Benchmark tokens ETH and SOL remain consistently resilient due to deeper liquidity and institutional participation. Our findings provide the first ecosystem-level evidence of memecoin fragility and highlight governance implications for enhancing market resilience in the Web3 era.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-11-29T08:11:51Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <arxiv:journal_ref>2026 IEEE International Conference on Blockchain and Cryptocurrency (ICBC), Brisbane, Australia, 2026, pp. 1-5</arxiv:journal_ref>
+    <author>
+      <name>Yuexin Xiang</name>
+    </author>
+    <author>
+      <name>Qishuang Fu</name>
+    </author>
+    <author>
+      <name>Yuquan Li</name>
+    </author>
+    <author>
+      <name>Qin Wang</name>
+    </author>
+    <author>
+      <name>Tsz Hon Yuen</name>
+    </author>
+    <author>
+      <name>Jiangshan Yu</name>
+    </author>
+    <arxiv:doi>10.1109/ICBC67748.2026.11575489</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1109/ICBC67748.2026.11575489" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2511.15463v1</id>
+    <title>How To Cook The Fragmented Rug Pull?</title>
+    <updated>2025-11-19T14:22:07Z</updated>
+    <link href="https://arxiv.org/abs/2511.15463v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2511.15463v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Existing rug pull detectors assume a simple workflow: the deployer keeps liquidity pool (LP) tokens and performs one or a few large sells (within a day) that collapse the pool and cash out. In practice, however, many real-world exits violate these assumptions by splitting the attack across both time and actor dimensions: attackers break total extraction into many low-impact trades and route proceeds through multiple non-owner addresses, producing low-visibility drains.
+  We formalize this family of attacks as the fragmented rug pull (FRP) and offer a compact recipe for a slow-stewed beef special: (i) keep the lid on (to preserve LP control so on-chain extraction remains feasible), (ii) chop thin slices (to split the total exit volume into many low-impact micro-trades that individually fall below impact thresholds), and (iii) pass the ladle (to delegate sells across multiple wallets so that each participant takes a small share of the extraction). Technically, we define three atomic predicate groups and show that their orthogonal combinations yield evasive strategies overlooked by prior heuristics (USENIX Sec 19, USENIX Sec 23).
+  We validate the model with large-scale measurements. Our corpus contains 303,614 LPs, among which 105,434 are labeled as FRP pools. The labeled subset includes 34,192,767 pool-related transactions and 401,838 inflated-seller wallets, involving 1,501,408 unique interacting addresses. Notably, owner-wallet participation in inflated selling among FRP-flagged LPs has declined substantially (33.1% of cases), indicating a shift in scam behavior: the liquidity drain is no longer held on the owner wallet. We also detected 127,252 wallets acting as serial scammers when repeatedly engaging in inflated selling across multiple FRP LPs. Our empirical findings demonstrate that the evasive strategies we define are widespread and operationally significant.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-11-19T14:22:07Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Minh Trung Tran</name>
+    </author>
+    <author>
+      <name>Nasrin Sohrabi</name>
+    </author>
+    <author>
+      <name>Zahir Tari</name>
+    </author>
+    <author>
+      <name>Qin Wang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2510.24798v1</id>
+    <title>Formal Verification of a Token Sale Launchpad: A Compositional Approach in Dafny</title>
+    <updated>2025-10-27T20:45:15Z</updated>
+    <link href="https://arxiv.org/abs/2510.24798v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2510.24798v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The proliferation of decentralized financial (DeFi) systems and smart contracts has underscored the critical need for software correctness. Bugs in such systems can lead to catastrophic financial losses. Formal verification offers a path to achieving mathematical certainty about software behavior. This paper presents the formal verification of the core logic for a token sale launchpad, implemented and proven correct using the Dafny programming language and verification system. We detail a compositional, bottom-up verification strategy, beginning with the proof of fundamental non-linear integer arithmetic properties, and building upon them to verify complex business logic, including asset conversion, time-based discounts, and capped-sale refund mechanics. The principal contributions are the formal proofs of critical safety and lifecycle properties. Most notably, we prove that refunds in a capped sale can never exceed the user's original deposit amount, and that the precision loss in round-trip financial calculations is strictly bounded. Furthermore, we verify the complete lifecycle logic, including user withdrawals under various sale mechanics and the correctness of post-sale token allocation, vesting, and claiming. This work serves as a comprehensive case study in applying rigorous verification techniques to build high-assurance financial software.</summary>
+    <category term="cs.LO" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.PL" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-10-27T20:45:15Z</published>
+    <arxiv:comment>29 pages, no figures. The full Dafny source code and formal proofs are available at: https://github.com/aurora-is-near/aurora-launchpad-contracts/tree/master/verification</arxiv:comment>
+    <arxiv:primary_category term="cs.LO"/>
+    <author>
+      <name>Evgeny Ukhanov</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2509.01168v1</id>
+    <title>Detecting Rug Pulls in Decentralized Exchanges: Machine Learning Evidence from the TON Blockchain</title>
+    <updated>2025-09-01T06:39:50Z</updated>
+    <link href="https://arxiv.org/abs/2509.01168v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2509.01168v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper presents a machine learning framework for the early detection of rug pull scams on decentralized exchanges (DEXs) within The Open Network (TON) blockchain. TON's unique architecture, characterized by asynchronous execution and a massive web2 user base from Telegram, presents a novel and critical environment for fraud analysis. We conduct a comprehensive study on the two largest TON DEXs, Ston.Fi and DeDust, fusing data from both platforms to train our models. A key contribution is the implementation and comparative analysis of two distinct rug pull definitions--TVL-based (a catastrophic liquidity withdrawal) and idle-based (a sudden cessation of all trading activity)--within a single, unified study. We demonstrate that Gradient Boosting models can effectively identify rug pulls within the first five minutes of trading, with the TVL-based method achieving superior AUC (up to 0.891) while the idle-based method excels at recall. Our analysis reveals that while feature sets are consistent across exchanges, their underlying distributions differ significantly, challenging straightforward data fusion and highlighting the need for robust, platform-aware models. This work provides a crucial early-warning mechanism for investors and enhances the security infrastructure of the rapidly growing TON DeFi ecosystem.</summary>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-09-01T06:39:50Z</published>
+    <arxiv:primary_category term="cs.DC"/>
+    <author>
+      <name>Dmitry Yaremus</name>
+    </author>
+    <author>
+      <name>Jianghai Li</name>
+    </author>
+    <author>
+      <name>Alisa Kalacheva</name>
+    </author>
+    <author>
+      <name>Igor Vodolazov</name>
+    </author>
+    <author>
+      <name>Yury Yanovich</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2507.06423v1</id>
+    <title>Rugsafe: A multichain protocol for recovering from and defending against Rug Pulls</title>
+    <updated>2025-07-08T21:59:47Z</updated>
+    <link href="https://arxiv.org/abs/2507.06423v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2507.06423v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Rugsafe introduces a comprehensive protocol aimed at mitigating the risks of rug pulls in the cryptocurrency ecosystem. By utilizing cryptographic security measures and economic incentives, the protocol provides a secure multichain system for recovering assets and transforming rugged tokens into opportunities and rewards. Foundational to Rugsafe are specialized vaults where rugged tokens can be securely deposited, and anticoin tokens are issued as receipts. These anticoins are designed to be inversely pegged to the price movement of the underlying rugged token. Users can utilize these anticoins within the ecosystem or choose to burn them, further securing the protocol and earning additional rewards. The supply of the native Rugsafe token is dynamically adjusted based on the volume, value, and activity of rugged tokens, ensuring stability and resilience. By depositing rugged tokens into a vault on several chains, and by burning anticoins, users receive incentives on the RugSafe chain. This protocol's vaults are designed to work in heterogenous blockchain ecosystems, offering a practical and effective solution to one of the most significant challenges in the cryptocurrency market.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.ET" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.GT" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-07-08T21:59:47Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Jovonni L. Pharr</name>
+    </author>
+    <author>
+      <name>Jahanzeb M. Hussain</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2506.18398v3</id>
+    <title>RPHunter: Unveiling Rug Pull Schemes in Crypto Token via Code-and-Transaction Fusion Analysis</title>
+    <updated>2025-07-08T14:26:58Z</updated>
+    <link href="https://arxiv.org/abs/2506.18398v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2506.18398v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Rug pull scams have emerged as a persistent threat to cryptocurrency, causing significant financial losses. A typical scenario involves scammers deploying honeypot contracts to attract investments, restricting token sales, and draining the funds, which leaves investors with worthless tokens. Current methods either rely on predefined patterns to detect code risks or utilize statistical transaction data to train detection models. However, real-world Rug Pull schemes often involve a complex interplay between malicious code and suspicious transaction behaviors. These methods, which solely focus on one aspect, fall short in detecting such schemes effectively.
+  In this paper, we propose RPHunter, a novel technique that integrates code and transaction for Rug Pull detection. First, RPHunter establishes declarative rules and performs flow analysis to extract code risk information, further constructing a semantic risk code graph (SRCG). Meanwhile, to leverage transaction information, RPHunter formulates dynamic token transaction activities as a token flow behavior graph (TFBG) in which nodes and edges are characterized from network structure and market manipulation perspectives. Finally, RPHunter employs graph neural networks to extract complementary features from SRCG and TFBG, integrating them through an attention fusion model to enhance the detection of Rug Pull. We manually analyzed 645 Rug Pull incidents from code and transaction aspects and constructed a ground-truth dataset. We evaluated RPHunter on our dataset, achieving a precision of 95.3%, a recall of 93.8% and an F1 score of 94.5%, which highlights superior performance compared to existing methods. Furthermore, when applied to the real-world scenarios, RPHunter has identified 4801 Rug Pull tokens, achieving a precision of 90.7%.</summary>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-06-23T08:34:15Z</published>
+    <arxiv:primary_category term="cs.SE"/>
+    <author>
+      <name>Hao Wu</name>
+    </author>
+    <author>
+      <name>Haijun Wang</name>
+    </author>
+    <author>
+      <name>Shangwang Li</name>
+    </author>
+    <author>
+      <name>Yin Wu</name>
+    </author>
+    <author>
+      <name>Ming Fan</name>
+    </author>
+    <author>
+      <name>Wuxia Jin</name>
+    </author>
+    <author>
+      <name>Ting Liu</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2506.07974v1</id>
+    <title>Exposing Hidden Backdoors in NFT Smart Contracts: A Static Security Analysis of Rug Pull Patterns</title>
+    <updated>2025-06-09T17:49:04Z</updated>
+    <link href="https://arxiv.org/abs/2506.07974v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2506.07974v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The explosive growth of Non-Fungible Tokens (NFTs) has revolutionized digital ownership by enabling the creation, exchange, and monetization of unique assets on blockchain networks. However, this surge in popularity has also given rise to a disturbing trend: the emergence of rug pulls - fraudulent schemes where developers exploit trust and smart contract privileges to drain user funds or invalidate asset ownership. Central to many of these scams are hidden backdoors embedded within NFT smart contracts. Unlike unintentional bugs, these backdoors are deliberately coded and often obfuscated to bypass traditional audits and exploit investor confidence. In this paper, we present a large-scale static analysis of 49,940 verified NFT smart contracts using Slither, a static analysis framework, to uncover latent vulnerabilities commonly linked to rug pulls. We introduce a custom risk scoring model that classifies contracts into high, medium, or low risk tiers based on the presence and severity of rug pull indicators. Our dataset was derived from verified contracts on the Ethereum mainnet, and we generate multiple visualizations to highlight red flag clusters, issue prevalence, and co-occurrence of critical vulnerabilities. While we do not perform live exploits, our results reveal how malicious patterns often missed by simple reviews can be surfaced through static analysis at scale. We conclude by offering mitigation strategies for developers, marketplaces, and auditors to enhance smart contract security. By exposing how hidden backdoors manifest in real-world smart contracts, this work contributes a practical foundation for detecting and mitigating NFT rug pulls through scalable automated analysis.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-06-09T17:49:04Z</published>
+    <arxiv:comment>10 Pages, 4 Figures</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Chetan Pathade</name>
+    </author>
+    <author>
+      <name>Shweta Hooli</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2506.06017v2</id>
+    <title>AgentSwift: Efficient LLM Agent Design via Value-guided Hierarchical Search</title>
+    <updated>2025-11-20T15:55:58Z</updated>
+    <link href="https://arxiv.org/abs/2506.06017v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2506.06017v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Large language model (LLM) agents have demonstrated strong capabilities across diverse domains, yet automated agent design remains a significant challenge. Current automated agent design approaches are often constrained by limited search spaces that primarily optimize workflows but fail to integrate crucial human-designed components like memory, planning, and tool use. Furthermore, these methods are hampered by high evaluation costs, as evaluating even a single new agent on a benchmark can require tens of dollars. The difficulty of this exploration is further exacerbated by inefficient search strategies that struggle to navigate the large design space effectively, making the discovery of novel agents a slow and resource-intensive process. To address these challenges, we propose AgentSwift, a novel framework for automated agent design. We formalize a hierarchical search space that jointly models agentic workflow and composable functional components. This structure moves beyond optimizing workflows alone by co-optimizing functional components, which enables the discovery of more complex and effective agent architectures. To make exploration within this expansive space feasible, we mitigate high evaluation costs by training a value model on a high-quality dataset, generated via a novel strategy combining combinatorial coverage and balanced Bayesian sampling for low-cost evaluation. Guiding the entire process is a hierarchical MCTS strategy, which is informed by uncertainty to efficiently navigate the search space. Evaluated across a comprehensive set of seven benchmarks spanning embodied, math, web, tool, and game domains, AgentSwift discovers agents that achieve an average performance gain of 8.34\% over both existing automated agent search methods and manually designed agents. Our framework serves as a launchpad for researchers to rapidly discover powerful agent architectures.</summary>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-06-06T12:07:23Z</published>
+    <arxiv:comment>AAAI-2026</arxiv:comment>
+    <arxiv:primary_category term="cs.CL"/>
+    <author>
+      <name>Yu Li</name>
+    </author>
+    <author>
+      <name>Lehui Li</name>
+    </author>
+    <author>
+      <name>Zhihao Wu</name>
+    </author>
+    <author>
+      <name>Qingmin Liao</name>
+    </author>
+    <author>
+      <name>Jianye Hao</name>
+    </author>
+    <author>
+      <name>Kun Shao</name>
+    </author>
+    <author>
+      <name>Fengli Xu</name>
+    </author>
+    <author>
+      <name>Yong Li</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2506.04613v3</id>
+    <title>DeePoly: A High-Order Accuracy Scientific Machine Learning Framework for Function Approximation and Solving PDEs</title>
+    <updated>2025-06-13T15:43:02Z</updated>
+    <link href="https://arxiv.org/abs/2506.04613v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2506.04613v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Recently, machine learning methods have gained significant traction in scientific computing, particularly for solving Partial Differential Equations (PDEs). However, methods based on deep neural networks (DNNs) often lack convergence guarantees and computational efficiency compared to traditional numerical schemes. This work introduces DeePoly, a novel framework that transforms the solution paradigm from pure non-convex parameter optimization to a two-stage approach: first employing a DNN to capture complex global features, followed by linear space optimization with combined DNN-extracted features (Spotter) and polynomial basis functions (Sniper). This strategic combination leverages the complementary strengths of both methods -- DNNs excel at approximating complex global features (i.e., high-gradient features) and stabilize the polynomial approximation while polynomial bases provide high-precision local corrections with convergence guarantees. Theoretical analysis and numerical experiments demonstrate that this approach significantly enhances both high-order accuracy and efficiency across diverse problem types while maintaining mesh-free and scheme-free properties. This paper also serves as a theoretical exposition for the open-source project DeePoly.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-06-05T04:10:52Z</published>
+    <arxiv:comment>for associated mpeg file, see http://github.com/bfly123/DeePoly</arxiv:comment>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>Li Liu</name>
+    </author>
+    <author>
+      <name>Heng Yong</name>
+    </author>
+    <arxiv:doi>10.13140/RG.2.2.24649.25446</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.13140/RG.2.2.24649.25446" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2506.01333v1</id>
+    <title>ETDI: Mitigating Tool Squatting and Rug Pull Attacks in Model Context Protocol (MCP) by using OAuth-Enhanced Tool Definitions and Policy-Based Access Control</title>
+    <updated>2025-06-02T05:22:38Z</updated>
+    <link href="https://arxiv.org/abs/2506.01333v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2506.01333v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The Model Context Protocol (MCP) plays a crucial role in extending the capabilities of Large Language Models (LLMs) by enabling integration with external tools and data sources. However, the standard MCP specification presents significant security vulnerabilities, notably Tool Poisoning and Rug Pull attacks. This paper introduces the Enhanced Tool Definition Interface (ETDI), a security extension designed to fortify MCP. ETDI incorporates cryptographic identity verification, immutable versioned tool definitions, and explicit permission management, often leveraging OAuth 2.0. We further propose extending MCP with fine-grained, policy-based access control, where tool capabilities are dynamically evaluated against explicit policies using a dedicated policy engine, considering runtime context beyond static OAuth scopes. This layered approach aims to establish a more secure, trustworthy, and controllable ecosystem for AI applications interacting with LLMs and external tools.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.ET" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-06-02T05:22:38Z</published>
+    <arxiv:comment>11 Pages, 10 figures, Github links in introduction</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Manish Bhatt</name>
+    </author>
+    <author>
+      <name>Vineeth Sai Narajala</name>
+    </author>
+    <author>
+      <name>Idan Habler</name>
+    </author>
+  </entry>
+</feed>
