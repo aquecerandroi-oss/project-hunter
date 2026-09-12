@@ -212,3 +212,13 @@ inclui as 17 fixtures `t42e_*`, `mayhem_state.py`, `mayhem.py`, `test_mayhem.py`
 8. **`test_lab_persistence.py` estava quebrado desde a T4.2d** (10/12) — corrigi o helper (1 linha, arquivo
    de teste, fora da lista proibida); o orquestrador decide se leva no mesmo commit.
 9. Astra não consultada (`SendMessage` desabilitado); a revisão do diff foi minha.
+
+## Medição do orquestrador — ANTES × DEPOIS na VPS (12/09/2026)
+
+`infra/scripts/sql/research/2026-09-12-t42e-cobertura.sql` via `docker exec -i hunter-postgres-1 psql`.
+
+**ANTES** (imagem `eeb566c`, leitura 09:50 BRT, minutos 12:43–12:49Z): linhas do portão 122–140/min; **com progresso 12–34 %** (15/122 … 47/140); **com fita 36–54 %**; `progress_denominator_source`: global_params 550, observed_virgin 152 (+9 Mayhem), unknown 1 340 Mayhem; `mayhem_state` escritos: 0; lacunas `curve_poll/budget_exhausted`: 13 em 15 min (780 mints não alcançados).
+
+**DEPOIS** (imagem `8478eef`, deploy 09:50–09:53 BRT, leitura 10:00 BRT, ≥ 5 min após o restart): worker 0 restarts, 0 `meme_loop_failed`, 0 tracebacks; heartbeat `progress_coverage_pct` **43,3**, `tape_coverage_pct` **38,8**, `tape_cycle_s` 4,0 (era ~90 s por ciclo), `swap_api_used_60s` 238; `mayhem_state` escritos: **57** (12:51:52Z → 12:55:56Z, 16–19/min); denominador: global_params 602, observed_virgin 153+9, mayhem_state 57, unknown 1 720 padrão + 1 321 Mayhem (histórico, sem backfill); §4 progresso negativo em 17 linhas Mayhem (mín −41,31 %, mediana −1,21 %) — o portão recusa por `progress_below_min`, não por `unknown`; laço: 262 linhas/tick, `progress_unknown` 113 → **74**, `curve_volume_1m_unknown` 109 → **70**, `creator_is_net_seller` 7 → 23, `curve_volume_1m_zero` 15 → 55 (a fita agora diz "zero" em vez de "desconhecido").
+
+**O que ficou (para a T4.2f):** §2a — a razão dominante de progresso ausente é **`not_polled` 1 267 linhas/15 min** (o poll REST de 60 req/min não alcança 130 mints) e não mais o denominador (213); §2b — a razão dominante de fita ausente é **`rate_limited` 1 069 linhas/15 min** com ~238 req/min usadas: o limite real do `swap-api` é ≈ 240/min por IP (não os 1 000/60 s documentados) e as páginas extras dos mints quentes consomem o resto.

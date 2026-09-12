@@ -1,0 +1,54 @@
+BEGIN
+SET
+== §0 versao do esquema e do worker (alembic + heartbeat nao entra aqui) ==
+0024_meme_graduation
+== §1 cobertura por minuto fechado, ultimos 15 min (o que o portao le) ==
+2026-09-12 12:49:00+00|122|15|59|58|12.3|48.4|24
+2026-09-12 12:48:00+00|125|35|64|63|28.0|51.2|59
+2026-09-12 12:47:00+00|126|36|47|47|28.6|37.3|59
+2026-09-12 12:46:00+00|125|32|45|45|25.6|36.0|54
+2026-09-12 12:45:00+00|140|47|58|58|33.6|41.4|75
+2026-09-12 12:44:00+00|127|33|61|61|26.0|48.0|55
+2026-09-12 12:43:00+00|135|37|73|73|27.4|54.1|57
+2026-09-12 12:42:00+00|134|37|67|67|27.6|50.0|55
+2026-09-12 12:41:00+00|137|15|80|80|10.9|58.4|21
+2026-09-12 12:40:00+00|122|29|71|71|23.8|58.2|41
+2026-09-12 12:39:00+00|124|38|66|66|30.6|53.2|65
+2026-09-12 12:38:00+00|124|40|54|54|32.3|43.5|59
+2026-09-12 12:37:00+00|128|29|49|49|22.7|38.3|55
+2026-09-12 12:36:00+00|129|40|47|47|31.0|36.4|60
+2026-09-12 12:35:00+00|135|33|44|44|24.4|32.6|57
+2026-09-12 12:34:00+00|129|43|57|56|33.3|44.2|69
+== §1b o mesmo, agregado: ANTES x DEPOIS e uma linha so ==
+16|2062|26.1|45.7|45.5
+== §2a motivos do progresso ausente, ultimos 15 min ==
+not_polled|1156|305
+(tem progresso)|539|180
+denominator_unknown|326|118
+unsupported_quote|41|28
+== §2b motivos da fita ausente, ultimos 15 min (not_polled = orcamento nao alcancou) ==
+rate_limited|1052|235
+(tem fita)|942|193
+unsupported_quote|44|28
+no_trade_feed|24|24
+== §2c fita presente mas creator desconhecido (creator_net_seller NULL com fita) ==
+0|0
+== §3a denominador em meme_tokens, por fonte x Mayhem (toda a tabela) ==
+unknown|f|1697
+global_params|f|550
+observed_virgin|f|152
+unknown|t|1340
+observed_virgin|t|9
+== §3b o mesmo so nos mints criados nas ultimas 24 h (o conjunto rastreavel) ==
+unknown|f|1697
+global_params|f|550
+observed_virgin|f|152
+unknown|t|1340
+observed_virgin|t|9
+== §4 progresso negativo (Mayhem com o agente vendedor liquido), ultimos 15 min ==
+0|0||
+== §5 o laco Mayhem rodou? primeiro/ultimo denominador mayhem_state e ritmo (30 min) ==
+0||
+== §6 lacunas do orcamento da curva e da fita, ultimos 15 min (meme_ingest_gaps) ==
+curve_poll|budget_exhausted|13|780
+COMMIT

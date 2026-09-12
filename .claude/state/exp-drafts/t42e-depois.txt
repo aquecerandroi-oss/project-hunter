@@ -1,0 +1,61 @@
+BEGIN
+SET
+== §0 versao do esquema e do worker (alembic + heartbeat nao entra aqui) ==
+0025_meme_mayhem_denominator
+== §1 cobertura por minuto fechado, ultimos 15 min (o que o portao le) ==
+2026-09-12 12:56:00+00|136|58|39|39|42.6|28.7|58
+2026-09-12 12:55:00+00|134|58|52|52|43.3|38.8|58
+2026-09-12 12:54:00+00|131|57|61|61|43.5|46.6|57
+2026-09-12 12:53:00+00|132|56|78|78|42.4|59.1|56
+2026-09-12 12:52:00+00|150|26|63|63|17.3|42.0|26
+2026-09-12 12:51:00+00|135|26|40|40|19.3|29.6|49
+2026-09-12 12:50:00+00|129|24|63|62|18.6|48.8|42
+2026-09-12 12:49:00+00|122|15|59|58|12.3|48.4|24
+2026-09-12 12:48:00+00|125|35|64|63|28.0|51.2|59
+2026-09-12 12:47:00+00|126|36|47|47|28.6|37.3|59
+2026-09-12 12:46:00+00|125|32|45|45|25.6|36.0|54
+2026-09-12 12:45:00+00|140|47|58|58|33.6|41.4|75
+2026-09-12 12:44:00+00|127|33|61|61|26.0|48.0|55
+2026-09-12 12:43:00+00|135|37|73|73|27.4|54.1|57
+2026-09-12 12:42:00+00|134|37|67|67|27.6|50.0|55
+2026-09-12 12:41:00+00|137|15|80|80|10.9|58.4|21
+== §1b o mesmo, agregado: ANTES x DEPOIS e uma linha so ==
+16|2118|28.0|44.9|44.7
+== §2a motivos do progresso ausente, ultimos 15 min ==
+not_polled|1267|340
+(tem progresso)|592|246
+denominator_unknown|213|85
+unsupported_quote|45|31
+rate_limited|1|1
+== §2b motivos da fita ausente, ultimos 15 min (not_polled = orcamento nao alcancou) ==
+rate_limited|1069|237
+(tem fita)|950|228
+unsupported_quote|58|33
+no_trade_feed|41|41
+== §2c fita presente mas creator desconhecido (creator_net_seller NULL com fita) ==
+0|0
+== §3a denominador em meme_tokens, por fonte x Mayhem (toda a tabela) ==
+unknown|f|1720
+global_params|f|602
+observed_virgin|f|153
+unknown|t|1321
+mayhem_state|t|57
+observed_virgin|t|9
+== §3b o mesmo so nos mints criados nas ultimas 24 h (o conjunto rastreavel) ==
+unknown|f|1720
+global_params|f|602
+observed_virgin|f|153
+unknown|t|1321
+mayhem_state|t|57
+observed_virgin|t|9
+== §4 progresso negativo (Mayhem com o agente vendedor liquido), ultimos 15 min ==
+17|15|-41.31|-1.21
+== §5 o laco Mayhem rodou? primeiro/ultimo denominador mayhem_state e ritmo (30 min) ==
+57|2026-09-12 12:51:52.250427+00|2026-09-12 12:55:56.539955+00
+2026-09-12 12:55:00+00|19
+2026-09-12 12:54:00+00|16
+2026-09-12 12:52:00+00|2
+2026-09-12 12:51:00+00|20
+== §6 lacunas do orcamento da curva e da fita, ultimos 15 min (meme_ingest_gaps) ==
+curve_poll|budget_exhausted|13|780
+COMMIT
