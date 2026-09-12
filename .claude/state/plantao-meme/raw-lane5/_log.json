@@ -1,0 +1,202 @@
+{
+ "now_ms": 1789203074670,
+ "requests": 16,
+ "log": [
+  {
+   "n": 1,
+   "name": "sol_price",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:50:57+00:00",
+   "observed_at_brt": "05:50:57",
+   "err": null,
+   "bytes": 75,
+   "ratelimit": {
+    "x-ratelimit-limit": "50",
+    "x-ratelimit-remaining": "49",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 2,
+   "name": "mayhem_overview",
+   "url": "https://frontend-api-v3.pump.fun/mayhem/overview",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:50:59+00:00",
+   "observed_at_brt": "05:50:59",
+   "err": null,
+   "bytes": 276,
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 3,
+   "name": "coins_newest70",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=70&sort=created_timestamp&order=DESC&includeNsfw=false",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:00+00:00",
+   "observed_at_brt": "05:51:00",
+   "err": null,
+   "bytes": 133236,
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 4,
+   "name": "boards_new",
+   "url": "https://advanced-indexer.pump.fun/boards/new?offset=0&limit=50",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:01+00:00",
+   "observed_at_brt": "05:51:01",
+   "err": null,
+   "bytes": 41494,
+   "ratelimit": {}
+  },
+  {
+   "n": 5,
+   "name": "boards_graduated_p1",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=0&limit=50",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:02+00:00",
+   "observed_at_brt": "05:51:02",
+   "err": null,
+   "bytes": 43703,
+   "ratelimit": {}
+  },
+  {
+   "n": 6,
+   "name": "boards_graduated_p2",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=50&limit=50",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:03+00:00",
+   "observed_at_brt": "05:51:03",
+   "err": null,
+   "bytes": 42124,
+   "ratelimit": {}
+  },
+  {
+   "n": 7,
+   "name": "boards_graduated_p3",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=100&limit=50",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:04+00:00",
+   "observed_at_brt": "05:51:04",
+   "err": null,
+   "bytes": 43534,
+   "ratelimit": {}
+  },
+  {
+   "n": 8,
+   "name": "boards_movers",
+   "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=50",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:05+00:00",
+   "observed_at_brt": "05:51:05",
+   "err": null,
+   "bytes": 45556,
+   "ratelimit": {}
+  },
+  {
+   "n": 9,
+   "name": "boards_graduating",
+   "url": "https://advanced-indexer.pump.fun/boards/graduating?offset=0&limit=50",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:06+00:00",
+   "observed_at_brt": "05:51:06",
+   "err": null,
+   "bytes": 43553,
+   "ratelimit": {}
+  },
+  {
+   "n": 10,
+   "name": "coins_complete_p1",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=70&sort=created_timestamp&order=DESC&includeNsfw=false&complete=true",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:07+00:00",
+   "observed_at_brt": "05:51:07",
+   "err": null,
+   "bytes": 140780,
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 11,
+   "name": "coins_complete_p2",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=70&limit=70&sort=created_timestamp&order=DESC&includeNsfw=false&complete=true",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:08+00:00",
+   "observed_at_brt": "05:51:08",
+   "err": null,
+   "bytes": 137658,
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 12,
+   "name": "imc_01_DOGUE",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/2mnc3MJz7Jj7WCYMUinQofgb2H14aV3eEsZ81hktpump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:10+00:00",
+   "observed_at_brt": "05:51:10",
+   "err": null,
+   "bytes": 1749,
+   "ratelimit": {}
+  },
+  {
+   "n": 13,
+   "name": "imc_02_revolve_",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/J8X5ygWHY5uHFch7m3MisSC7eDAWpAkgi1pyqfT5pump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:11+00:00",
+   "observed_at_brt": "05:51:11",
+   "err": null,
+   "bytes": 1780,
+   "ratelimit": {}
+  },
+  {
+   "n": 14,
+   "name": "imc_03_DIVIDEND",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/5y4P3R4FTmx5Ni3MYLrM73z4utnzsKHURWs7xjBVSTNK",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:12+00:00",
+   "observed_at_brt": "05:51:12",
+   "err": null,
+   "bytes": 1791,
+   "ratelimit": {}
+  },
+  {
+   "n": 15,
+   "name": "imc_04_GROK",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/GKeUT73KRsvWVYNfQPdghxdHTKKGUAESf3t8BZmfXvih",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:13+00:00",
+   "observed_at_brt": "05:51:13",
+   "err": null,
+   "bytes": 1759,
+   "ratelimit": {}
+  },
+  {
+   "n": 16,
+   "name": "imc_05_MEOW_",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/CzGMhTQN6rWu5a9X8KpW5krvtVd2YfALav7xpfPvpump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T08:51:14+00:00",
+   "observed_at_brt": "05:51:14",
+   "err": null,
+   "bytes": 1704,
+   "ratelimit": {}
+  }
+ ]
+}
