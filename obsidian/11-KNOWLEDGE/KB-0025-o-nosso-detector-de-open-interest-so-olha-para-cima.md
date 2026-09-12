@@ -145,3 +145,9 @@ Divergência: nenhuma.
 [[KB-0017-liquidacoes-o-fluxo-forcado-que-observamos-por-amostragem]] ·
 [[KB-0023-funding-extremo-como-contrarian-a-afirmacao-mais-repetida]] ·
 [[Anomalies]] · [[Open Bugs]] · [[Risk Engine]] · [[Strategy Backlog]]
+
+## Adendo 2026-09-12 (Astra)
+
+- **O lado do detector se refere ao desvio do OI, independentemente da direção do preço:** `OPEN_INTEREST_SPIKE` lê `open_interest_change_1h` com `DetectorSide.UP`, e a normalização usa `(current − median) / mad` e retém o desvio positivo para `UP` (procedência: `packages/indicators/hunter_indicators/anomalies/detectors.py:177`, `packages/indicators/hunter_indicators/anomalies/severity.py:107` e `packages/indicators/hunter_indicators/anomalies/severity.py:122`; `.claude/state/astra-review-plantao-20260910-1608.md`, "MUST-FIX" 5).
+- **OI subindo enquanto o preço cai não demonstra o lado ausente:** o lado já existente poderia reconhecer um desvio positivo do OI, mas o crescimento de três horas citado no plantão não comprova disparo da feature de uma hora sem sua baseline e severidade; justificar um detector bilateral apenas pela queda do preço confundiria as duas variáveis (procedência: `.claude/state/plantao/2026-09-10-1608-lane2.md`, item 3; `.claude/state/astra-review-plantao-20260910-1608.md`, "MUST-FIX" 5).
+- **Funding pequeno num snapshot não prova custo realizado pequeno nem pouca alavancagem:** o diagnóstico de posicionamento permanece descritivo, e o custo de cada posição exige os settlements atravessados e normalização pelo risco inicial, sem presumir diferença líquido–ex-funding próxima de zero (procedência: `.claude/state/astra-review-plantao-20260910-1608.md`, "MUST-FIX" 5).
