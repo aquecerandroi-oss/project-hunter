@@ -1,0 +1,285 @@
+{
+ "mint": "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump",
+ "user": "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd",
+ "curve": {
+  "slot": 446378552,
+  "virtual_sol": 36903292683,
+  "virtual_token": 872279913273338,
+  "real_sol": 6903292683,
+  "real_token": 592379913273338,
+  "complete": false,
+  "creator": "B4tp4tfJU9kWBdYdMmW6yAxgHfYNPjfchaT4abCpkyJZ",
+  "is_mayhem_mode": false
+ },
+ "buy_quote": {
+  "token_amount": 1000000,
+  "sol_amount": 43,
+  "protocol_fee": 1,
+  "creator_fee": 1,
+  "total_cost": 45,
+  "max_sol_cost": 46
+ },
+ "sell_quote": {
+  "token_amount": 1000000,
+  "sol_amount": 42,
+  "protocol_fee": 1,
+  "creator_fee": 1,
+  "net_proceeds": 40,
+  "min_sol_output": 39
+ },
+ "simulations": {
+  "buy_full": {
+   "ok": true,
+   "err": null,
+   "units_consumed": 65345,
+   "slot": 446378553,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Buy",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 362887 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: TransferChecked",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2562 of 356027 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program data: vdt/007mYe5FGOg/gIJKBhmogKXgZTQFJ6qBd84PI/+pF/IAleJZfysAAAAAAAAAQEIPAAAAAAABkqPQTwqNevkb8sVz4Do8H12E4MQIqw4mRJNaEGrKpq5eBqVqAAAAADaPm5cIAAAAutVQflUZAwA243ebAQAAALo9PjLEGgIASsL40N1cvJfjKJwZfLUGKlTz2Va5zm5RFfllZ6pcs+ZfAAAAAAAAAAEAAAAAAAAAlZQx9NXoKArXkViIF4nfbvgFjXsGvMSYCuF7EBI1JmIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAGJ1eQAeAAAAAAAAAAEAAAAAAAAAiBMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACsAAAAAAAAANo+blwgAAAA243ebAQAAAA==",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [2]",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 2146 of 338784 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 65045 of 399700 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"
+   ],
+   "accounts": [
+    "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+    "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+    "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump",
+    "ChDRd2ZZ1NTFZ2sx6PAWH9iaL7wv3jSdnCFMzSBxNCaS",
+    "FkqtrypdaSbVttRMBhSQMKENNPSEpQzcFoFE6Mg1WpCm",
+    "4FCLJd2BCLvGeeumeojwyE2LSKjE1Yzb89Q8sk4WoNRL",
+    "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd",
+    "11111111111111111111111111111111",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "EbEQsXX4jzggNbYWva4zxX2MWHxiavtTm5NqjLGcUpWu",
+    "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "Hq2wp8uJ9jCPsYgNHex8RtqdvMPfVGoYwjvF1ATiwn2Y",
+    "2WuCgEtv55K5U76bkGN24CEYmpzYn1CL6UGvGGWuPK29",
+    "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+    "4CLQeN5wrddJ9adY3GJGSTyu1AEKD4Ta14RffSy5aHud",
+    "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD"
+   ],
+   "data_hex": "66063d1201daebea40420f00000000002e00000000000000",
+   "captured_at": "2026-09-12T07:59:27.164512+00:00"
+  },
+  "buy_without_undocumented_account": {
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6062
+     }
+    ]
+   },
+   "units_consumed": 35717,
+   "slot": 446378553,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Buy",
+    "Program log: AnchorError thrown in programs/pump/src/sell.rs:145. Error Code: BuybackFeeRecipientMissing. Error Number: 6062. Error Message: BuybackFeeRecipientMissing.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 35417 of 399700 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x17ae"
+   ],
+   "accounts": [
+    "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+    "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+    "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump",
+    "ChDRd2ZZ1NTFZ2sx6PAWH9iaL7wv3jSdnCFMzSBxNCaS",
+    "FkqtrypdaSbVttRMBhSQMKENNPSEpQzcFoFE6Mg1WpCm",
+    "4FCLJd2BCLvGeeumeojwyE2LSKjE1Yzb89Q8sk4WoNRL",
+    "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd",
+    "11111111111111111111111111111111",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "EbEQsXX4jzggNbYWva4zxX2MWHxiavtTm5NqjLGcUpWu",
+    "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "Hq2wp8uJ9jCPsYgNHex8RtqdvMPfVGoYwjvF1ATiwn2Y",
+    "2WuCgEtv55K5U76bkGN24CEYmpzYn1CL6UGvGGWuPK29",
+    "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+    "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD"
+   ],
+   "data_hex": "66063d1201daebea40420f00000000002e00000000000000",
+   "captured_at": "2026-09-12T07:59:27.310889+00:00"
+  },
+  "buy_idl_only_16_accounts": {
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6062
+     }
+    ]
+   },
+   "units_consumed": 35461,
+   "slot": 446378554,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Buy",
+    "Program log: AnchorError thrown in programs/pump/src/sell.rs:145. Error Code: BuybackFeeRecipientMissing. Error Number: 6062. Error Message: BuybackFeeRecipientMissing.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 35161 of 399700 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x17ae"
+   ],
+   "accounts": [
+    "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+    "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+    "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump",
+    "ChDRd2ZZ1NTFZ2sx6PAWH9iaL7wv3jSdnCFMzSBxNCaS",
+    "FkqtrypdaSbVttRMBhSQMKENNPSEpQzcFoFE6Mg1WpCm",
+    "4FCLJd2BCLvGeeumeojwyE2LSKjE1Yzb89Q8sk4WoNRL",
+    "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd",
+    "11111111111111111111111111111111",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "EbEQsXX4jzggNbYWva4zxX2MWHxiavtTm5NqjLGcUpWu",
+    "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "Hq2wp8uJ9jCPsYgNHex8RtqdvMPfVGoYwjvF1ATiwn2Y",
+    "2WuCgEtv55K5U76bkGN24CEYmpzYn1CL6UGvGGWuPK29",
+    "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"
+   ],
+   "data_hex": "66063d1201daebea40420f00000000002e00000000000000",
+   "captured_at": "2026-09-12T07:59:27.440855+00:00"
+  },
+  "sell_full": {
+   "ok": true,
+   "err": null,
+   "units_consumed": 55284,
+   "slot": 446378554,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 370980 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: TransferChecked",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2562 of 364160 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program data: vdt/007mYe5FGOg/gIJKBhmogKXgZTQFJ6qBd84PI/+pF/IAleJZfyoAAAAAAAAAQEIPAAAAAAAAkqPQTwqNevkb8sVz4Do8H12E4MQIqw4mRJNaEGrKpq5eBqVqAAAAAOGOm5cIAAAAOlpvflUZAwDh4nebAQAAADrCXDLEGgIASsL40N1cvJfjKJwZfLUGKlTz2Va5zm5RFfllZ6pcs+ZfAAAAAAAAAAEAAAAAAAAAlZQx9NXoKArXkViIF4nfbvgFjXsGvMSYCuF7EBI1JmIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAHNlbGwAHgAAAAAAAAABAAAAAAAAAIgTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqAAAAAAAAAOGOm5cIAAAA4eJ3mwEAAAA=",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [2]",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 2146 of 348112 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 54984 of 399700 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"
+   ],
+   "accounts": [
+    "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+    "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+    "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump",
+    "ChDRd2ZZ1NTFZ2sx6PAWH9iaL7wv3jSdnCFMzSBxNCaS",
+    "FkqtrypdaSbVttRMBhSQMKENNPSEpQzcFoFE6Mg1WpCm",
+    "4FCLJd2BCLvGeeumeojwyE2LSKjE1Yzb89Q8sk4WoNRL",
+    "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd",
+    "11111111111111111111111111111111",
+    "EbEQsXX4jzggNbYWva4zxX2MWHxiavtTm5NqjLGcUpWu",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+    "2WuCgEtv55K5U76bkGN24CEYmpzYn1CL6UGvGGWuPK29",
+    "4CLQeN5wrddJ9adY3GJGSTyu1AEKD4Ta14RffSy5aHud",
+    "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD"
+   ],
+   "data_hex": "33e685a4017f83ad40420f00000000002700000000000000",
+   "captured_at": "2026-09-12T07:59:27.588149+00:00"
+  },
+  "buy_max_sol_cost_one_lamport_short": {
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6002
+     }
+    ]
+   },
+   "units_consumed": 44658,
+   "slot": 446378555,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Buy",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 362887 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:513. Error Code: TooMuchSolRequired. Error Number: 6002. Error Message: slippage: Too much SOL required to buy the given amount of tokens..",
+    "Program log: Left: 44",
+    "Program log: Right: 45",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 44358 of 399700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1772"
+   ],
+   "accounts": [
+    "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+    "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+    "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump",
+    "ChDRd2ZZ1NTFZ2sx6PAWH9iaL7wv3jSdnCFMzSBxNCaS",
+    "FkqtrypdaSbVttRMBhSQMKENNPSEpQzcFoFE6Mg1WpCm",
+    "4FCLJd2BCLvGeeumeojwyE2LSKjE1Yzb89Q8sk4WoNRL",
+    "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd",
+    "11111111111111111111111111111111",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "EbEQsXX4jzggNbYWva4zxX2MWHxiavtTm5NqjLGcUpWu",
+    "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "Hq2wp8uJ9jCPsYgNHex8RtqdvMPfVGoYwjvF1ATiwn2Y",
+    "2WuCgEtv55K5U76bkGN24CEYmpzYn1CL6UGvGGWuPK29",
+    "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+    "4CLQeN5wrddJ9adY3GJGSTyu1AEKD4Ta14RffSy5aHud",
+    "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD"
+   ],
+   "data_hex": "66063d1201daebea40420f00000000002c00000000000000",
+   "captured_at": "2026-09-12T07:59:27.721512+00:00"
+  }
+ },
+ "rpc_url": "https://api.mainnet-beta.solana.com",
+ "sig_verify": false,
+ "sent": false
+}

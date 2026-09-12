@@ -86,6 +86,7 @@ markers = [
   "unit: fast, no IO",
   "integration: needs Postgres/Redis via testcontainers",
   "live: hits a real exchange API; never in CI",
+  "live_devnet: T4.8 — simulates (mainnet, sigVerify=false) or sends on Solana devnet; never mainnet, never in CI",
 ]
 addopts = "-ra --strict-markers"
 # Each workspace member has its own `tests` package; resolve them as namespace packages

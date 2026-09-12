@@ -409,6 +409,22 @@ assume:
 
 ## 9. Caminho de execução e modelo de confiança
 
+> **Implementado em (T4.8, 2026-09-12, inerte por construção — a doutrina abaixo não mudou):**
+> opção **B** (instruções próprias pela IDL) em
+> `packages/exchange-adapters/hunter_exchanges/pumpfun/{solana_codec,global_state,tx,quote,trade_event,verify,tx_rpc}.py`
+> e `packages/core/hunter_core/execution/meme/{gates,signer,journal,submit}.py`.
+> Paridade byte a byte provada contra um `buy` real do roteador do site e um `sell` real de um bot
+> (`tests/fixtures/pumpfun/rpc_tx_{buy,probe}_raw.json`); prova de execução por
+> `simulateTransaction` na mainnet com `sigVerify=false` (nunca enviada —
+> `simulation_proof_mainnet_raw.json`). §9.1 → `verify.py` (teste adversarial em
+> `test_pumpfun_verify.py`); §9.2 → `submit.py` + `tx_rpc.py` (`skipPreflight=false`, `allow_send`
+> inerte por default); §9.3 → parâmetro `SubmitPolicy.jito_bundle=False` + `jito_tip_transfer`
+> verificado contra o teto; §9.4 → `journal.py` (uma linha por proposta, assinaturas listadas,
+> trava de assinatura) e `MemeSubmitter.reconcile/on_stream_event`; §9.5 → `expires_at` checado
+> antes de tudo; §9.6 → `trade_event.py` (fill = `TradeEvent` decodificado; taxas do evento).
+> VM1–VM3/VM7 continuam pendentes do pacote de risco da §13 (`infra/scripts/meme_vm.py` diz isso
+> em vez de fingir verde).
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |

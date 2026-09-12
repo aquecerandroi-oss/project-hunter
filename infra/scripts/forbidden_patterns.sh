@@ -144,6 +144,17 @@ scan_file() {
   # T4.4 finding: also the meme flag and the YAML form (`KEY: "true"`) that
   # docker-compose uses -- the shell form alone let both through.
   report "$f" "ENABLE_LIVE_TRADING=true" 'ENABLE_(MEME_)?LIVE_TRADING[[:space:]]*[=:][[:space:]]*"?true' -i
+
+  # T4.8 (docs/RISK_ENGINE_MEME.md section 3.3 / section 13 finding 3): a Solana
+  # secret key has two export shapes, and neither may ever be *assigned* in a
+  # tracked file. (1) base58 of the 64-byte keypair is 87-88 characters; the
+  # pattern keys off an assignment/JSON separator so a bare 88-char string in a
+  # list (a transaction signature, also 64 bytes) is not reported, but
+  # `signature = "..."` is -- for a human reviewer to judge, like json.dump.
+  # (2) the JSON-array export is exactly 64 integers on one line. A key split
+  # over several lines is not caught by a line grep: documented limitation.
+  report "$f" "solana secret key (base58 keypair)" '[=:][[:space:]]*[^[:alnum:][:space:]]?[1-9A-HJ-NP-Za-km-z]{87,88}([^1-9A-HJ-NP-Za-km-z]|$)'
+  report "$f" "solana secret key (64-int array)" '\[[[:space:]]*([0-9]{1,3}[[:space:]]*,[[:space:]]*){63}[0-9]{1,3}[[:space:]]*\]'
 }
 
 # ---------------------------------------------------------------------------
@@ -233,6 +244,22 @@ run_self_test() {
   assert_hit "meme_flags.py" "ENABLE_LIVE_TRADING=true"
   printf 'environment:\n  ENABLE_LIVE_TRADING: "true"\n' > compose.yml
   assert_hit "compose.yml" "ENABLE_LIVE_TRADING=true"
+
+  # T4.8: Solana secret-key shapes. The fixtures are synthetic (a repeated
+  # pattern, an ascending integer sequence) -- never a real key.
+  fake_b58_88="$(printf '3xk9%.0s' 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22)"
+  printf 'SOLANA_WALLET_SECRET_KEY=%s\n' "$fake_b58_88" > wallet_env.py
+  assert_hit "wallet_env.py" "solana secret key (base58 keypair)"
+  printf 'secret_key: "%s"\n' "${fake_b58_88%?}" > wallet.yaml     # 87 chars, quoted YAML form
+  assert_hit "wallet.yaml" "solana secret key (base58 keypair)"
+  printf 'KEY = [%s]\n' "$(seq -s, 1 64)" > wallet_array.py
+  assert_hit "wallet_array.py" "solana secret key (64-int array)"
+  printf 'PUBKEY = "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf"\n' > pubkey_only.py
+  assert_no_hit "pubkey_only.py"                # a 44-char public key is not a keypair
+  printf 'DISC = [%s]\n' "$(seq -s, 1 32)" > disc_array.py
+  assert_no_hit "disc_array.py"                 # 32 ints: a discriminator/seed list, not a keypair
+  printf 'SIGS = ["%s"]\n' "$fake_b58_88" > sig_list.py
+  assert_no_hit "sig_list.py"                   # bare list element, no assignment separator before it
 
   printf 'def add(a, b):\n    return a + b\n' > clean.py
   assert_no_hit "clean.py"

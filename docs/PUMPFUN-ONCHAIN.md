@@ -648,6 +648,50 @@ chaves fora do escopo desta pesquisa).
 
 ---
 
+## 6b. O que o construtor de instruções faz hoje (T4.8, 2026-09-12)
+
+`packages/exchange-adapters/hunter_exchanges/pumpfun/tx.py` monta `buy` (disc `66063d1201daebea`)
+e `sell` (disc `33e685a4017f83ad`) — as instruções legadas só-SOL, que são as que o próprio site
+usa hoje (o `swap-build` do site devolve uma transação v0 que roteia por `6Vo3245…` e faz CPI
+em `buy`, capturado em `tests/fixtures/pumpfun/rpc_tx_buy_raw.json`). Tudo puro; toda conta é
+derivada ou lida de estado:
+
+| Conta | De onde vem |
+|---|---|
+| `global`, `event_authority`, `global_volume_accumulator` | PDAs do programa Pump (`solana_codec.find_program_address`, com a checagem ed25519 que a §1.4b dizia faltar) |
+| `fee_config` | PDA `["fee_config", pump_program_id]` **sob o programa Pump Fees** = `8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt` (conferido na cadeia) |
+| `bonding_curve`, `associated_bonding_curve`, `associated_user`, `creator_vault`, `user_volume_accumulator` | PDAs/ATAs de `mint`, `creator` (da conta `BondingCurve`) e `user`; o **token program vem do owner do mint** (a moeda da fixture é Token-2022) |
+| `fee_recipient` | um dos 8 de `Global` — normais para moeda comum, **reservados** (`reserved_fee_recipient(s)`) quando `BondingCurve.is_mayhem_mode` (é isto o "vault Mayhem" da execução); qualquer outro endereço é recusado pelo construtor e pelo verificador |
+| `buyback_fee_recipient` | um dos 8 `Global.buyback_fee_recipients` |
+
+**Duas coisas que a IDL não diz (confirmadas em duas transações reais e por simulação):**
+
+1. **Remaining accounts.** O programa exige, depois das contas da IDL, `[<conta não documentada>,
+   buyback_fee_recipient]` no `buy` e `[user_volume_accumulator, <conta não documentada>,
+   buyback_fee_recipient]` no `sell`. A conta não documentada é sempre
+   `4CLQeN5wrddJ9adY3GJGSTyu1AEKD4Ta14RffSy5aHud` (read-only, **não existe** na cadeia —
+   `rpc_account_4CLQ_raw.json`; não é PDA derivável sob os quatro programas nem ATA de nada
+   envolvido; nem a IDL `main` do GitHub nem a IDL on-chain a nomeiam). Sem ela o programa falha
+   com `BuybackFeeRecipientMissing` (6062) — o slot é posicional. Guardada literalmente em
+   `tx.UNDOCUMENTED_REMAINING_ACCOUNT`, com esse aviso.
+2. **`track_volume: OptionBool` vai ausente** (dados de 24 bytes) nas duas transações reais; só é
+   anexado quando o chamador passa `True`/`False` explicitamente.
+
+**Taxas, medidas na cadeia (não na doc):** `GetFeesWithQuoteMint` devolveu `lp 0 / protocolo 95 /
+criador 30` bps nas duas fixtures. Cada componente é arredondado **para cima** sobre `sol_amount`;
+em moeda *cashback* os 30 bps viram `cashback` (creator_fee = 0 no evento) mas **saem igualmente da
+carteira** — reconciliado lamport a lamport: delta do vendedor = `sol_amount − fee − cashback −
+taxa de rede − tip`. `buy`: `sol_amount = ⌊a·vsol/(vtok−a)⌋ + 1`; `sell`: `⌊a·vsol/(vtok+a)⌋`;
+`max_sol_cost` é comparado com o custo **com taxas** (simulação: `total_cost − 1` → `TooMuchSolRequired`).
+Cotação local em `quote.py`; contra o `swap-build` do site (0,01 SOL exact-in) a diferença foi
+`−9,8 × 10⁻⁶` em tokens (`test_pumpfun_quote.py`).
+
+**Prova de execução:** `simulateTransaction` na mainnet, `sigVerify=false`, pagador sem assinatura
+(nunca enviada): `buy` 18 contas OK (65.345 CU), `sell` 17 contas OK (55.284 CU) —
+`simulation_proof_mainnet_raw.json`. O programa e o `Global` existem na **devnet** (atividade às
+08:01 UTC de 2026-09-12), mas o faucet público recusou o airdrop (`-32603`), por isso não houve envio
+em rede nenhuma nesta tarefa.
+
 ## 7. Resumo acionável para T4.1/Astra
 
 1. `decode.py` (layout de `BondingCurve`) está **correto e bate byte a byte com o IDL oficial** —

@@ -31,6 +31,10 @@ dependencies = [
   "starlette>=0.41",
   "uvicorn[standard]>=0.32",
   "httpx>=0.28",
+  # T4.8: Ed25519 signing for the meme wallet (hunter_core.execution.meme.signer).
+  # Already in the lock transitively via pyjwt; declared so the signer never
+  # depends on a dependency someone else may drop.
+  "cryptography>=43",
 ]
 
 [tool.hatch.build.targets.wheel]

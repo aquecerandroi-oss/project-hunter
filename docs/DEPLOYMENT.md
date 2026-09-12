@@ -589,6 +589,34 @@ A terceira consulta é a que importa: um minuto com `cobertos = 0` **não** é u
 buraco silencioso — é uma linha por mint com `curve_reason` preenchido mais uma
 linha em `meme_ingest_gaps`. Nenhum minuto deve faltar sem uma das duas coisas.
 
+**O Lab meme (T4.6) roda dentro do mesmo processo**, como quinta cadência do `TaskGroup`
+(`lab.py`, um tick por minuto), atrás de `MEME_LAB_ENABLED` — **padrão ligado sempre que o radar
+coleta**: o laço só lê o que o coletor já escreveu e fala com um endpoint a mais
+(`frontend-api-v3.pump.fun/sol-price`, grupo próprio de rate limit, no máximo uma vez por minuto),
+então um segundo interruptor desligado por padrão só produziria um radar que parece vivo e não
+propõe nada. `MEME_LAB_ENABLED=false` é para quem quer o coletor sem o laço, e o readiness diz
+`lab: "disabled (MEME_LAB_ENABLED=false)"`. Ligado, o detalhe `lab` mostra `Ns since last tick` e
+`(stalled)` acima de 3 × 60 s — detalhe, nunca veredito: um portão quieto não pode derrubar o
+`/ready`. Toda aposta é papel (`meme_paper_bets.mode` é `CHECK (mode = 'paper')`); nenhuma chave e
+nenhuma flag ao vivo existem neste processo.
+
+**Verificar o Lab depois de subir:**
+
+```bash
+docker exec hunter-redis-1 redis-cli HGETALL hb:meme:radar | grep -A1 '^lab_'   # lab_last_tick_at, lab_gate_refusals, lab_bets_open
+curl -s localhost:8001/ready | jq .lab                                          # "12s since last tick"
+docker exec hunter-postgres-1 psql -U hunter -d hunter -c \
+  "SELECT name, version, kind, status FROM meme_rule_sets; \
+   SELECT status, refusal, count(*) FROM meme_proposals GROUP BY 1, 2 ORDER BY 1, 2; \
+   SELECT status, exit ->> 'reason' AS reason, count(*), sum(pnl_sol) FROM meme_paper_bets GROUP BY 1, 2;"
+./compose.sh run --rm ops python infra/scripts/meme_diary.py --dry-run          # o diário do dia, sem gravar
+```
+
+Com as fontes grátis de hoje `lab_gate_refusals` mostra `creator_net_seller_unknown` e
+`curve_volume_1m_unknown` em toda linha: é o portão congelado da EXP-M1 recusando por insumo
+ausente, não o laço parado — o laço parado é `lab_last_tick_at` velho com `ts` fresco
+(`GET /api/v1/orgs/{org}/meme/lab` → `sources.lab_status = "stalled"`).
+
 **Retenção e partições:** `MEME_RETENTION_DAYS` (padrão 90) governa as duas
 metades — `infra/scripts/prune_partitions.py` derruba o mês inteiro das três
 tabelas particionadas e o próprio worker poda `meme_tokens` linha a linha, em
@@ -939,8 +967,9 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | Variável | Obrigatória em prod? | Default | Propósito |
 |---|---|---|---|
 | `ENABLE_LIVE_TRADING` | não | `false` | live trading; `LiveExecutionAdapter` levanta `LiveTradingDisabled` enquanto for `false` (sempre, até a Fase 4) |
-| `ENABLE_MEME_LIVE_TRADING` | **proposta (T4.4) — nenhum processo lê hoje** | `false` | execução real na bonding curve do pump.fun (Solana). Contrato: `docs/RISK_ENGINE_MEME.md` §3.4. Só o Everton liga, no `.env` da VPS, e só depois dos três portões da §12 daquele documento; o adaptador levantará `MemeLiveTradingDisabled` enquanto for `false`. **Atenção:** o padrão de `infra/scripts/forbidden_patterns.sh:144` cobre apenas `ENABLE_LIVE_TRADING=true` — este nome precisa do seu próprio padrão antes de a variável existir |
-| `SOLANA_WALLET_SECRET_KEY` | **proposta (T4.4) — nenhum processo lê hoje** | vazio | chave da carteira Solana dedicada ao Hunter. Vive **só** no `.env` da VPS, digitada pelo Everton; lida por **um** processo (`services/meme-executor/`, proposto); nunca em log, métrica, heartbeat, resposta de API ou commit (`docs/RISK_ENGINE_MEME.md` §3.3) |
+| `ENABLE_MEME_LIVE_TRADING` | não (**lida por `hunter_core.execution.meme.gates.load_execution_mode`** — T4.8; nenhum serviço a compõe ainda) | `false` | execução real na bonding curve do pump.fun (Solana). Contrato: `docs/RISK_ENGINE_MEME.md` §3.4. Só o Everton liga, no `.env` da VPS. Com `true`, o boot exige `MEME_GATES_FILE` válido (§12) ou **recusa subir** (`MemeLiveTradingRefused`, motivo nomeado); com `false`, `MemeSubmitter` levanta `MemeLiveTradingDisabled` antes de assinar. `forbidden_patterns.sh` cobre os dois nomes e as formas `=`/`:` |
+| `MEME_GATES_FILE` | só com a flag acima em `true` (T4.8) | vazio | caminho do `meme_gates.json` (`hunter.meme_gates/v1`: portões A/B/C com data e evidência, `signed_by`, `signed_at`, `valid_until`), escrito à mão pelo operador. Ausente, inválido, vencido ou com portão vermelho ⇒ recusa de boot **antes** de a chave ser lida |
+| `SOLANA_WALLET_SECRET_KEY` | não (**lida uma única vez por `hunter_core.execution.meme.signer.MemeSigner.from_environment`**, que a remove do ambiente ao ler — T4.8) | vazio | chave da carteira Solana dedicada ao Hunter (base58 de 64 bytes ou array JSON de 64 inteiros). Vive **só** no `.env` da VPS, digitada pelo Everton; um processo só; nunca em log, métrica, heartbeat, `repr`, exceção, pickle ou commit (`docs/RISK_ENGINE_MEME.md` §3.3; teste de não-vazamento `test_meme_signer.py`; `forbidden_patterns.sh` recusa as duas formas de chave em arquivo rastreado) |
 | `MEME_WALLET_MAX_SOL`, `MEME_MAX_SOL_PER_TRADE`, `MEME_DAILY_LOSS_CAP_SOL` | **propostas (T4.4) — valores pendentes do Everton** | — | tetos de capital da carteira meme: saldo máximo, teto por compra e perda do dia que trava a carteira (latched, retomada só por OWNER). Tabela completa em `docs/RISK_ENGINE_MEME.md` §3.1 |
 | `ENABLE_SOCIAL_INTELLIGENCE` | não | `false` | Fase 2 |
 | `ENABLE_ONCHAIN` | não | `false` | Fase 3 |
@@ -970,6 +999,7 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | `MEME_TRACKED_MINTS_MAX` | não | `120` | teto do conjunto rastreado. O orçamento REST é 60 req/60 s, então 120 mints é uma volta completa a cada dois minutos; qualquer número maior é uma promessa que o orçamento não cumpre |
 | `MEME_TRACK_WINDOW_MINUTES` | não | `1440` | quanto tempo um mint fica rastreado depois de criado (24 h — a vida do próprio agente Mayhem). Um agente `active`/`paused` mantém o mint mesmo depois disso |
 | `MEME_RPC_TOP_K` | não | `20` | quantos mints, por market cap, são reconciliados contra a cadeia a cada ciclo |
+| `MEME_LAB_ENABLED` | não | `true` | se o Lab meme (T4.6) roda dentro do meme-worker quando `MEME_ENABLED` está ligado: o laço por minuto que propõe, preenche na fotografia seguinte, marca e fecha apostas de **papel** (§3.6). Desligado, o readiness diz `lab: disabled` e o heartbeat grava `lab_enabled=false`. Sem efeito com `MEME_ENABLED=false` |
 
 ## 8. Comandos locais reais
 
