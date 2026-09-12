@@ -186,6 +186,20 @@ _FEATURE_COLUMNS = (
     "tape_reason",
     "creator_net_seller",
     "creator_net_seller_reason",
+    # 0026 — the lines and the hype (T4.10, ``features_lines.py``).
+    "mcap_slope_5m",
+    "mcap_slope_15m",
+    "high_15m_sol",
+    "low_15m_sol",
+    "breakout_15m",
+    "support_line_sol",
+    "support_line_slope",
+    "higher_lows",
+    "distance_to_support_pct",
+    "line_points",
+    "line_reason",
+    "hype_score",
+    "hype_reason",
 )
 
 _INSERT_FEATURES = text(

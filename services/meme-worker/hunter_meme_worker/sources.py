@@ -165,6 +165,22 @@ class SourcesState:
     mayhem_refused_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
     """The Mayhem loop (``mayhem.py``): tracked Mayhem mints still without a
     denominator, denominators written in the last minute, refusals in the hour."""
+    chain_cycle_s: float | None = None
+    chain_tracked_mints: int | None = None
+    chain_read_mints: int | None = None
+    chain_calls_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    chain_refused_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
+    chain_block_time_missing_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    """The chain loop (T4.2f, ``chain.py``): the last cycle's duration, how many
+    mints it asked for and read, RPC calls in the minute, refusals in the hour,
+    readings whose slot had no block time (``observed_at = received_at``)."""
+    swap_api_effective_budget_60s: int | None = None
+    swap_api_measured_60s: int | None = None
+    swap_api_429_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
+    swap_api_blocked_until: datetime | None = None
+    """The tape budget as the edge enforces it (T4.2f, ``tape_budget.py``): the
+    effective budget, the successes counted before the last real 429, real 429s
+    in the hour, and until when the IP is blocked."""
     _sampled: dict[str, int] = field(default_factory=dict[str, int])
 
     def __getitem__(self, name: str) -> SourceStats:
@@ -195,6 +211,38 @@ class SourcesState:
         self.tape_covered_mints = covered
         self.tape_never_pulled = never_pulled
         self.tape_deferred_60s.add(at, deferred)
+
+    def record_chain_cycle(
+        self,
+        at: datetime,
+        *,
+        duration_s: float,
+        tracked: int,
+        read: int,
+        calls: int,
+        refused: int,
+        block_time_missing: int,
+    ) -> None:
+        self.chain_cycle_s = duration_s
+        self.chain_tracked_mints = tracked
+        self.chain_read_mints = read
+        self.chain_calls_60s.add(at, calls)
+        self.chain_refused_1h.add(at, refused)
+        self.chain_block_time_missing_60s.add(at, block_time_missing)
+
+    def record_tape_budget(
+        self,
+        at: datetime,
+        *,
+        effective: int,
+        measured: int | None,
+        refused_429: int,
+        blocked_until: datetime | None,
+    ) -> None:
+        self.swap_api_effective_budget_60s = effective
+        self.swap_api_measured_60s = measured
+        self.swap_api_429_1h.add(at, refused_429)
+        self.swap_api_blocked_until = blocked_until
 
     def record_new_listing(self, at: datetime, *, in_scope: bool) -> None:
         """One first sighting on the ``new`` board; ``in_scope`` = program ``pump``."""
@@ -266,6 +314,17 @@ class SourcesState:
             "mayhem_pending": self.mayhem_pending,
             "mayhem_written_60s": self.mayhem_written_60s.total(now),
             "mayhem_refused_1h": self.mayhem_refused_1h.total(now),
+            # T4.2f: the chain loop and the tape budget as the edge enforces it.
+            "chain_cycle_s": self.chain_cycle_s,
+            "chain_tracked_mints": self.chain_tracked_mints,
+            "chain_read_mints": self.chain_read_mints,
+            "chain_calls_60s": self.chain_calls_60s.total(now),
+            "chain_refused_1h": self.chain_refused_1h.total(now),
+            "chain_block_time_missing_60s": self.chain_block_time_missing_60s.total(now),
+            "swap_api_effective_budget_60s": self.swap_api_effective_budget_60s,
+            "swap_api_measured_60s": self.swap_api_measured_60s,
+            "swap_api_429_1h": self.swap_api_429_1h.total(now),
+            "swap_api_blocked_until": _iso(self.swap_api_blocked_until),
             "sources_at": now.isoformat(),
             "sources": json.dumps(
                 {name: stats.as_fields(now) for name, stats in self.sources.items()},

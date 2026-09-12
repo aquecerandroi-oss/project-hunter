@@ -44,6 +44,7 @@ from hunter_exchanges.pumpfun.rest import PumpFunRestClient
 from hunter_exchanges.pumpfun.rpc import SolanaRpcClient
 from hunter_exchanges.pumpfun.ws import PumpPortalWsClient
 from hunter_exchanges.rate_limit import TokenBucketRateLimiter
+from hunter_meme_worker.chain import chain_once
 from hunter_meme_worker.collect import fold_once, forever, poll_once, prune_once, reconcile_once
 from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState
@@ -248,6 +249,8 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         lab=lab is not None,
         trenches=sorted(boards),
         swap_api=ctx.trades is not None,
+        swap_api_budget_60s=config.swap_api_budget_60s,
+        chain_curves=config.chain_curves_enabled,
         risk=ctx.risk is not None,
     )
 
@@ -264,10 +267,17 @@ async def run_meme(runtime: WorkerRuntime) -> None:
             group.create_task(
                 forever("poll", config.poll_cycle_s, poll_once, ctx), name="meme-poll"
             )
-            group.create_task(
-                forever("reconcile", config.reconcile_cycle_s, reconcile_once, ctx),
-                name="meme-reconcile",
-            )
+            if config.chain_curves_enabled:
+                # T4.2f: every tracked curve from the chain, once a minute; the
+                # top-K reconciliation is a subset of it and does not run.
+                group.create_task(
+                    forever("chain", config.chain_cycle_s, chain_once, ctx), name="meme-chain"
+                )
+            else:
+                group.create_task(
+                    forever("reconcile", config.reconcile_cycle_s, reconcile_once, ctx),
+                    name="meme-reconcile",
+                )
             group.create_task(
                 forever("mayhem", config.mayhem_cycle_s, mayhem_once, ctx), name="meme-mayhem"
             )

@@ -26,10 +26,12 @@ from hunter_core.db.session import role_session
 from hunter_core.logging import get_logger
 from hunter_meme_worker.config import FEATURES_STREAM
 from hunter_meme_worker.features import NOT_POLLED, FeatureRow, MinuteInputs, build_row
+from hunter_meme_worker.features_lines import board_standing
 from hunter_meme_worker.features_tape import HoldersObservation, TapeTrade, holders_for, tape_for
 from hunter_meme_worker.metrics import meme_features_rows_total, meme_gaps_total
 from hunter_meme_worker.repo import GapRow, insert_features, record_gap
 from hunter_meme_worker.repo_boards import insert_board_minutes
+from hunter_meme_worker.repo_lines import load_line_points
 from hunter_meme_worker.repo_tape import load_tape
 
 if TYPE_CHECKING:
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from hunter_indicators.meme.lines import LinePoint
     from hunter_meme_worker.context import RadarContext
     from hunter_meme_worker.tracker import TrackedMint
 
@@ -67,7 +70,7 @@ def _tape_inputs(
         creator=tracked.creator,
         covered_since=ctx.trades.coverage_for(tracked.mint, boundary),
     )
-    return minute, ctx.trades.absence_reason(tracked.mint)
+    return minute, ctx.trades.absence_reason(tracked.mint, at=boundary)
 
 
 async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]:
@@ -83,9 +86,14 @@ async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]
         and since <= boundary
     ]
     tape: dict[str, list[TapeTrade]] = {}
-    if covered:
-        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+    points: dict[str, list[LinePoint]] = {}
+    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+        if covered:
             tape = await load_tape(session, mints=covered, end_time=boundary)
+        # T4.10: the photos the lines may read — received by the close, like the tape.
+        points = await load_line_points(
+            session, mints=[t.mint for t in tracked_set], end_time=boundary
+        )
     rows: list[FeatureRow] = []
     for tracked in tracked_set:
         minute, absence = _tape_inputs(ctx, tracked, boundary, tape)
@@ -101,6 +109,8 @@ async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]
                     holders=holders_for(_readings(ctx, tracked.mint), end_time=boundary),
                     tape=minute,  # type: ignore[arg-type]
                     tape_absence_reason=absence,
+                    line_points=points.get(tracked.mint, []),
+                    board=board_standing(board_rows, mint=tracked.mint, end_time=boundary),
                 ),
                 features_version=ctx.config.features_version,
             )

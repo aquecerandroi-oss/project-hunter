@@ -4,10 +4,24 @@ cursor (``docs/PUMPFUN.md`` §2 route 5).
 Measured live on 2026-09-12: ``limit ≤ 100``, newest first, ``pagination
 {nextCursor, hasMore, limit}`` with ``nextCursor = "<slotIndexId>-<epoch ms>"``
 pointing at the page *before* (older) the one returned; the host answers with
-``x-ratelimit-limit: 1000`` per 60 s. This client spends a **900 / 60 s**
-bucket (``rl:pumpfun_swap_api:requests``) — the measured limit minus 10 % of
-slack, the brief's number — and a ``429`` is :class:`RateLimited`, never a
-silent retry.
+``x-ratelimit-limit: 1000`` per 60 s.
+
+**The real limit is not that header (T4.2f, 12/09 13:36–13:48 UTC, four probes,
+115 requests, five 429s —** ``tests/fixtures/pumpfun/t42f_swap_api_ratelimit_probes.json``**).**
+Every 429 came from Cloudflare (error 1015, ``server: cloudflare``, ``retry-after:
+60``, no ``x-ratelimit-*`` at all) while the backend's own header still said
+``remaining ≈ 900``. The rule counts **per IP, about 20 requests per 60 s**,
+whatever the mint: cut at the 20th, 20th, 23rd and 24th request of a window at
+0,85–6 req/s (only 8 of the 22 fell in the last 10 s, so the window is not 10 s),
+at the 28th in a 16 req/s burst (distributed counters), and with 40 distinct
+mints at 1,2 req/s at the 24th. A breach costs a **60 s block of every request
+from the IP**. So this client spends a :data:`REQUEST_CAPACITY` = **16 / 60 s**
+bucket (``rl:pumpfun_swap_api:requests``): the measured 20 minus four of margin
+for the edge's approximate counting; :data:`MEASURED_LIMIT` is the ceiling the
+constructor refuses to exceed, and a ``429`` is :class:`HttpRateLimited` with
+the headers it came with — never a silent retry. T4.2c/T4.2e spent a 900/60 s
+bucket eight requests at a time, which is exactly what tripped the rule every
+cycle and produced the ``rate_limited`` rows they measured.
 
 What a row does and does not say, and what this client does about it:
 
@@ -52,8 +66,13 @@ logger = get_logger(__name__)
 EXCHANGE = "pumpfun_swap_api"
 BASE_URL = "https://swap-api.pump.fun"
 REQUEST_BUCKET = "requests"
-MEASURED_CAPACITY = 1000
-REQUEST_CAPACITY = 900
+HEADER_LIMIT = 1000
+"""What ``x-ratelimit-limit`` says: the backend's window, never the one that refuses."""
+MEASURED_LIMIT = 20
+"""Cloudflare's rule, measured (module docstring): ~20 requests per 60 s per IP."""
+MEASURED_BLOCK_S = 60.0
+"""``retry-after`` of every 429 seen — the cost of one breach."""
+REQUEST_CAPACITY = 16
 REQUEST_PERIOD_S = 60.0
 MAX_PAGE = 100
 CURVE_PROGRAM = "pump"
@@ -84,8 +103,8 @@ class SwapApiClient:
         max_retries: int = 2,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
-        if not 1 <= capacity <= MEASURED_CAPACITY:
-            raise ValueError(f"capacity must be 1..{MEASURED_CAPACITY} (the measured limit)")
+        if not 1 <= capacity <= MEASURED_LIMIT:
+            raise ValueError(f"capacity must be 1..{MEASURED_LIMIT} (the measured limit)")
         self._owns_client = http_client is None
         self._client = http_client or httpx.AsyncClient(
             base_url=base_url,
@@ -231,8 +250,10 @@ def parse_trades_page(mint: str, raw: Any, *, received_at: datetime) -> TradesPa
 __all__ = [
     "BASE_URL",
     "CURVE_PROGRAM",
+    "HEADER_LIMIT",
     "MAX_PAGE",
-    "MEASURED_CAPACITY",
+    "MEASURED_BLOCK_S",
+    "MEASURED_LIMIT",
     "REQUEST_CAPACITY",
     "SwapApiClient",
     "TradesPage",

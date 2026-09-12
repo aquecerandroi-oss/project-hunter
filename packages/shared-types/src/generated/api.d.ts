@@ -1427,7 +1427,7 @@ export interface components {
             /** Exit At */
             exit_at: string | null;
             /** Exit Reason */
-            exit_reason: ("target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot") | string | null;
+            exit_reason: ("target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot" | "max_loss" | "line_broken") | string | null;
             /** Fee Sol */
             fee_sol: string | null;
             /** High Water X */
@@ -1441,6 +1441,11 @@ export interface components {
             id: string;
             /** Initial Risk Sol */
             initial_risk_sol: string;
+            /**
+             * Leg
+             * @default single
+             */
+            leg: ("probe" | "scale" | "single") | string;
             /** Mark At */
             mark_at: string | null;
             /** Mark Sol */
@@ -1448,6 +1453,8 @@ export interface components {
             /** Mode */
             mode: string;
             params: components["schemas"]["DeskParamsOut"];
+            /** Parent Bet Id */
+            parent_bet_id?: string | null;
             /** Pnl Sol */
             pnl_sol: string | null;
             /** R Multiple */
@@ -2889,6 +2896,8 @@ export interface components {
         MemeFeaturePointOut: {
             /** Age Minutes */
             age_minutes: number | null;
+            /** Breakout 15M */
+            breakout_15m?: boolean | null;
             /** Buy Sell Ratio */
             buy_sell_ratio: string | null;
             /** Buy Sell Ratio Reason */
@@ -2903,6 +2912,8 @@ export interface components {
             curve_progress_pct: string | null;
             /** Curve Reason */
             curve_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            /** Distance To Support Pct */
+            distance_to_support_pct?: string | null;
             /**
              * End Time
              * Format: date-time
@@ -2910,10 +2921,32 @@ export interface components {
             end_time: string;
             /** Features Version */
             features_version: string;
+            /** High 15M Sol */
+            high_15m_sol?: string | null;
+            /** Higher Lows */
+            higher_lows?: boolean | null;
+            /** Hype Reason */
+            hype_reason?: ("no_tape_no_board" | "partial") | null;
+            /** Hype Score */
+            hype_score?: string | null;
+            /** Line Points */
+            line_points?: number | null;
+            /** Line Reason */
+            line_reason?: ("too_few_points" | "no_snapshot" | "flat" | "out_of_range") | null;
+            /** Low 15M Sol */
+            low_15m_sol?: string | null;
+            /** Mcap Slope 15M */
+            mcap_slope_15m?: string | null;
+            /** Mcap Slope 5M */
+            mcap_slope_5m?: string | null;
             /** Mcap Sol */
             mcap_sol: string | null;
             /** Progress Reason */
             progress_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            /** Support Line Slope */
+            support_line_slope?: string | null;
+            /** Support Line Sol */
+            support_line_sol?: string | null;
             /** Top10 Share */
             top10_share: string | null;
             /** Top10 Share Reason */
@@ -3113,9 +3146,19 @@ export interface components {
             budget_60s: number | null;
             /** Budget Used 60S */
             budget_used_60s: number | null;
+            /** Chain Calls 60S */
+            chain_calls_60s?: number | null;
+            /** Chain Cycle S */
+            chain_cycle_s?: number | null;
+            /** Chain Read Mints */
+            chain_read_mints?: number | null;
+            /** Chain Refused 1H */
+            chain_refused_1h?: number | null;
+            /** Chain Tracked Mints */
+            chain_tracked_mints?: number | null;
             /**
              * Coverage Explanation
-             * @default cobertura do último minuto dobrado: linhas com progresso ÷ linhas e linhas com fita ÷ linhas; uma linha sem fita diz o motivo em tape_reason (no_trade_feed = nunca puxada, not_polled = o orçamento da fita não a alcançou no ciclo, rate_limited = a fonte recusou); uma linha sem progresso diz progress_reason (denominator_unknown = Mayhem ainda sem a leitura on-chain de MayhemState, mayhem_pending conta quantas)
+             * @default cobertura do último minuto dobrado: linhas com progresso ÷ linhas e linhas com fita ÷ linhas; uma linha sem fita diz o motivo em tape_reason (no_trade_feed = nunca puxada, not_polled = o orçamento da fita não a alcançou no ciclo, rate_limited = a fonte recusou); uma linha sem progresso diz progress_reason (denominator_unknown = Mayhem ainda sem a leitura on-chain de MayhemState, mayhem_pending conta quantas); desde a T4.2f a curva de todos os rastreados vem da cadeia uma vez por minuto (chain_read_mints ÷ chain_tracked_mints) e a fita é limitada pela regra do Cloudflare do swap-api (~20 req/60 s por IP, medida — swap_api_effective_budget_60s é o orçamento em vigor), não pelo x-ratelimit-limit de 1000
              */
             coverage_explanation: string;
             /**
@@ -3169,8 +3212,16 @@ export interface components {
             sources_at: string | null;
             /** Stalled After S */
             stalled_after_s: number;
+            /** Swap Api 429 1H */
+            swap_api_429_1h?: number | null;
+            /** Swap Api Blocked Until */
+            swap_api_blocked_until?: string | null;
             /** Swap Api Budget 60S */
             swap_api_budget_60s: number | null;
+            /** Swap Api Effective Budget 60S */
+            swap_api_effective_budget_60s?: number | null;
+            /** Swap Api Measured 60S */
+            swap_api_measured_60s?: number | null;
             /** Swap Api Used 60S */
             swap_api_used_60s: number | null;
             /** Tape Coverage Pct */

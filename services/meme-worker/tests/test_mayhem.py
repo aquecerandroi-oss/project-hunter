@@ -147,6 +147,9 @@ class FakeChain:
     async def get_curve_state(self, mint: str, bonding_curve: str) -> Any:
         raise AssertionError("the Mayhem loop never reads one account at a time")
 
+    async def get_curve_states(self, mints: Any, *, with_block_time: bool = True) -> Any:
+        raise AssertionError("the Mayhem loop never reads the curve batch (T4.2f, chain.py)")
+
     async def get_mayhem_flows(self, mints: Any) -> MayhemFlowBatch:
         self.calls.append(list(mints))
         if self.fail:

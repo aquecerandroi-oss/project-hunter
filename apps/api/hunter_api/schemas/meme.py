@@ -80,6 +80,17 @@ NullReason = Literal[
 """The contract's frozen vocabulary (§4): "a T4.3 renderiza estes, e só
 estes" -- shared by all six ``*_reason`` columns on ``meme_features_1m``."""
 
+LineReason = Literal["too_few_points", "no_snapshot", "flat", "out_of_range"]
+"""``meme_features_1m.line_reason`` (``0026``, T4.10): why the support line
+could not be drawn this minute — fewer than five photos in the 15-minute
+window, no photo of the minute itself, no two local lows, or a value the
+column cannot hold. The brief's vocabulary, exactly."""
+
+HypeReason = Literal["no_tape_no_board", "partial"]
+"""``meme_features_1m.hype_reason`` (``0026``): ``no_tape_no_board`` sits next
+to a ``NULL`` score (neither source spoke); ``partial`` sits next to a **number**
+computed from one of the two sources, with the other's components at zero."""
+
 MemeTokenSort = Literal["mcap", "age", "progress"]
 
 
@@ -257,6 +268,28 @@ class MemeFeaturePointOut(BaseModel):
     coverage: DecimalStr
     """Fraction of the minute actually observed (0..1) — never null."""
     features_version: str
+    # ``0026`` (T4.10, ``meme_features_v3``): the drawn lines and the hype.
+    # Every field defaults to ``None`` so a minute folded before the lines
+    # existed renders as "linha: sem leitura", never as a zero.
+    mcap_slope_5m: DecimalStr | None = None
+    mcap_slope_15m: DecimalStr | None = None
+    """OLS slope of ``ln(mcap_sol)`` per minute over the last 5 / 15 minutes."""
+    high_15m_sol: DecimalStr | None = None
+    low_15m_sol: DecimalStr | None = None
+    breakout_15m: bool | None = None
+    """``mcap_sol >= high`` of the **previous** 15-minute window (the minute
+    being folded is never its own reference)."""
+    support_line_sol: DecimalStr | None = None
+    support_line_slope: DecimalStr | None = None
+    higher_lows: bool | None = None
+    distance_to_support_pct: DecimalStr | None = None
+    """The line through the last two local lows, evaluated at ``end_time``;
+    its slope in SOL/min; whether the lows rise; ``(mcap − support)/support``.
+    ``None`` together, with ``line_reason``."""
+    line_points: int | None = None
+    line_reason: LineReason | None = None
+    hype_score: DecimalStr | None = None
+    hype_reason: HypeReason | None = None
 
 
 class MemeTokenDetailOut(BaseModel):
@@ -295,6 +328,8 @@ __all__ = [
     "DecimalStr",
     "GraduationMatrixOut",
     "GraduationsOut",
+    "HypeReason",
+    "LineReason",
     "MemeFeaturePointOut",
     "MemeGapListOut",
     "MemeGapOut",

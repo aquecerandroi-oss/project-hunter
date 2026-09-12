@@ -37,8 +37,24 @@ RuleSetKind = Literal["research_only", "operator"]
 BetStatus = Literal["open", "closed"]
 CommandKind = Literal["sell_now", "cancel"]
 ExitReason = Literal[
-    "target", "trailing", "time_stop", "migrated", "creator_dump", "sell_now", "rug_no_snapshot"
+    "target",
+    "trailing",
+    "time_stop",
+    "migrated",
+    "creator_dump",
+    "sell_now",
+    "rug_no_snapshot",
+    "max_loss",
+    "line_broken",
 ]
+"""The contract's seven, plus ``max_loss`` (the loop has written it since T4.6,
+Emendas 1) and ``line_broken`` (``0026``, T4.10: the market cap closed below the
+support line for two snapshots in a row — EXP-M2's own invalidation)."""
+
+BetLeg = Literal["probe", "scale", "single"]
+"""``meme_paper_bets.leg`` (``0026``, T4.10 — the brief's contract): ``probe``
+is the desk's "semi-comprado (sonda)", ``scale`` its "escalado (perna 2)" (a
+separate bet that names its ``parent_bet_id``), ``single`` every other bet."""
 
 
 class DeskParamsIn(StrictModel):
@@ -152,6 +168,12 @@ class BetOut(BaseModel):
     sol_received: DecimalStr | None
     sol_usd_at_entry: DecimalStr | None
     sol_usd_at_exit: DecimalStr | None
+    leg: BetLeg | str = "single"
+    """``0026``: the desk shows ``probe`` as "semi-comprado (sonda)" and
+    ``scale`` as "escalado (perna 2)"; a row written before the column existed
+    is ``single``, which is what it was."""
+    parent_bet_id: uuid.UUID | None = None
+    """The probe a ``scale`` leg rides on; ``None`` for every other leg."""
 
 
 class DeskRowOut(BaseModel):
@@ -238,6 +260,7 @@ class ProposalOut(BaseModel):
 __all__ = [
     "MEME_DESK_LABEL",
     "ApproveProposalIn",
+    "BetLeg",
     "BetOut",
     "BetStatus",
     "CommandKind",

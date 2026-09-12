@@ -257,6 +257,19 @@ class MemeRepository:
                 creator_sold_reason=r.creator_sold_reason,
                 coverage=r.coverage,
                 features_version=r.features_version,
+                mcap_slope_5m=r.mcap_slope_5m,
+                mcap_slope_15m=r.mcap_slope_15m,
+                high_15m_sol=r.high_15m_sol,
+                low_15m_sol=r.low_15m_sol,
+                breakout_15m=r.breakout_15m,
+                support_line_sol=r.support_line_sol,
+                support_line_slope=r.support_line_slope,
+                higher_lows=r.higher_lows,
+                distance_to_support_pct=r.distance_to_support_pct,
+                line_points=r.line_points,
+                line_reason=r.line_reason,
+                hype_score=r.hype_score,
+                hype_reason=r.hype_reason,
             )
             for r in rows
         ]

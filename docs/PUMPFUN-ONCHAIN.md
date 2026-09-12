@@ -668,6 +668,45 @@ sob demanda (que é o que este próprio documento fez, ≤5 chamadas RPC no tota
 
 ---
 
+### 5.5 Leitura em lote da curva de todos os rastreados — `getMultipleAccounts` (T4.2f, 12/09/2026)
+
+**O que foi medido** (10:07 e 10:36 BRT; 6 chamadas RPC públicas de 10 permitidas, sem chave; fixtures
+`t42f_rpc_curves_batch{1,2}_{raw,addresses}.json`, `t42f_rpc_block_time_raw.json`, `t42f_capture_http_log.json`):
+os 140 mints mais novos de `/coins` (2 páginas de 70), com a PDA `["bonding-curve", mint]` derivada localmente
+(`tx.bonding_curve_address`) **igual ao `bonding_curve` da REST em 140/140** — o laço lê qualquer rastreado sem
+depender do frame do PumpPortal; `getMultipleAccounts` de 100 contas em **467 ms / 34,6 KB** (slot 446436963) e de
+41 em 187 ms (slot 446436965); `getBlockTime` dos dois slots = 13:07:47Z e 13:07:48Z, **~11 s antes** do
+`received_at` (13:07:58Z) — a finalidade, e por isso `observed_at` é o blockTime. Na cadeia: **115 curvas em SOL**
+(79 + 36); **23 com quote ≠ SOL** (6 USDC `EPjFWdd5…`, 6 `pumpCmXq…`, 11 `Xs…`/`DoGE…`/`RDDT…`) — 16 % das moedas
+novas, invisíveis ao adaptador só-SOL por construção (`unsupported_quote`, nomeado, o mint sai do conjunto);
+**2 esvaziadas** (`complete = true` e todas as reservas zero: é o que `migrate` deixa na conta; a REST mantém os
+números pré-migração — o sinal de migração da própria cadeia, `curve_emptied`); 1 endereço-sonda que não é curva
+(`owner = System`, 0 bytes, 1,4 SOL de lamports → `curve_not_found`). Tamanhos de conta: 124 bytes (55) e 151
+(45) — `extend_account` já correu à frente; o decodificador lê os 115 mínimos. **Nenhuma** das 79 curvas SOL do
+lote 1 estava virgem (`real_sol_reserves = 0`): toda moeda nasce com a compra do criador, logo `observed_virgin`
+é a exceção e `global_params` a regra do denominador. REST e cadeia coincidiram exatamente em 113/140 (leituras
+30 s distantes, não atômicas).
+
+**Cabeçalhos do próprio RPC público** (na resposta, não na doc): `x-ratelimit-tier: free`,
+`x-ratelimit-rps-limit: 250`, **`x-ratelimit-method-limit: 10`** (`remaining` 9 → 8 em duas chamadas do mesmo
+método), `x-ratelimit-conn-limit: 40`, `x-ratelimit-connrate-limit: 40`, `x-ratelimit-pubsub-limit: 10`. O teto
+por método é **10**, não os 40/10 s da §5.1 (a página de `solana.com`); o cliente espaça uma chamada por segundo
+por método (`rpc.METHOD_SPACING_S`). O RPC recusou com 403 as duas primeiras chamadas feitas com `Origin`/
+`User-Agent` do site — sem esses cabeçalhos, 200.
+
+**O laço** (`services/meme-worker/hunter_meme_worker/chain.py`, `MEME_CHAIN_CURVES_ENABLED`): uma vez por minuto,
+todos os rastreados (≈ 130 → 2 `getMultipleAccounts` + 1–2 `getBlockTime` ≈ 4 chamadas/min contra `rps 250` e
+`method 10`), decodificados pela IDL (`decode.py`), gravados em `meme_curve_snapshots` com `source = 'solana_rpc'`,
+`slot`, `commitment = 'finalized'` e `observed_at` = blockTime (senão `received_at`, contado em
+`chain_block_time_missing_60s`), pelo **mesmo caminho da T4.2d** (`persist_reading`: denominador
+`global_params`/`observed_virgin`, sinais de conclusão, tracker, fold). O poll REST (60/min) fica só para o que
+o espelho ensina sozinho (`tracker.needs_rest`: `mayhem_state` de mint nunca lido, agente `active`/`paused` a
+cada `MEME_REST_MAYHEM_REFRESH_S`, leitura final, apostas abertas) e volta ao plano cheio se o laço falhar por
+dois ciclos; a reconciliação top-K não roda com o laço ligado. Heartbeat: `chain_cycle_s`,
+`chain_tracked_mints`, `chain_read_mints`, `chain_calls_60s`, `chain_refused_1h`, `chain_block_time_missing_60s`.
+
+---
+
 ## 6. O que a execução vai precisar depois (descrição, sem código de assinatura)
 
 **Compra/venda na curva (`buy_v2`/`sell_v2`):** transação com, no mínimo, as 26-27 contas listadas

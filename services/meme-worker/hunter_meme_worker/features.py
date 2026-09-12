@@ -27,10 +27,13 @@ is a lie that looks like a graduation.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_EVEN, Decimal
 
+from hunter_indicators.meme.lines import LinePoint
+from hunter_meme_worker.features_lines import BoardStanding, hype_columns, line_columns
 from hunter_meme_worker.features_tape import (
     NO_SELLS,
     HoldersObservation,
@@ -39,17 +42,19 @@ from hunter_meme_worker.features_tape import (
     fraction,
 )
 
-FEATURES_VERSION = "meme_features_v2"
+FEATURES_VERSION = "meme_features_v3"
 """Frozen protocol name. A different formula is a different version — a different
 row by the primary key — never an edit of a minute already cut by a hypothesis.
 ``0023`` added columns to ``meme_features_v1``: a NULL with a reason in an old
 row and a number in a new one is the same protocol with more sources, not a new
-formula for a number that already existed. **``meme_features_v2`` (T4.2d) is a
-new formula for a number that already existed**: ``curve_progress_pct`` may now
-be computed over a denominator taken from the ``/global-params`` record
-(``progress_denominator_source = global_params``) instead of only from a virgin
-photo. The ``v1`` rows are not rewritten; the series breaks at the deploy and
-the Lab reads the version its config names (``lab_repo.load_gate_rows``)."""
+formula for a number that already existed. ``meme_features_v2`` (T4.2d) was a
+new formula for a number that already existed (``curve_progress_pct`` over the
+``/global-params`` denominator). **``meme_features_v3`` (T4.10, ``0026``) adds
+the lines and the hype** — nine line columns with ``line_points``/``line_reason``
+and ``hype_score``/``hype_reason`` (``features_lines.py``): the brief names the
+version, and a gate that reads a line must know the row was folded by a fold
+that draws one. The ``v2`` rows are not rewritten; the series breaks at the
+deploy and the Lab reads the version its config names (``lab_repo.load_gate_rows``)."""
 
 NO_TRADE_FEED = "no_trade_feed"
 NO_HOLDERS_READER = "no_holders_reader"
@@ -121,6 +126,12 @@ class MinuteInputs:
     tape_absence_reason: str = NO_TRADE_FEED
     """Why there is no tape when there is none: ``no_trade_feed`` (never pulled),
     ``rate_limited`` (the pull was refused) or ``unsupported_quote``."""
+    line_points: Sequence[LinePoint] = ()
+    """The curve photos of the last 16 minutes received by ``end_time``
+    (``repo_lines.load_line_points``); the lines are drawn over them."""
+    board: BoardStanding | None = None
+    """The mint's standing on the site's boards this minute
+    (``features_lines.board_standing``), or ``None`` when no board row names it."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +173,20 @@ class FeatureRow:
     tape_reason: str | None = NO_TRADE_FEED
     creator_net_seller: bool | None = None
     creator_net_seller_reason: str | None = NO_TRADE_FEED
+    # 0026 (T4.10) — the lines and the hype, ``features_lines.py``.
+    mcap_slope_5m: Decimal | None = None
+    mcap_slope_15m: Decimal | None = None
+    high_15m_sol: Decimal | None = None
+    low_15m_sol: Decimal | None = None
+    breakout_15m: bool | None = None
+    support_line_sol: Decimal | None = None
+    support_line_slope: Decimal | None = None
+    higher_lows: bool | None = None
+    distance_to_support_pct: Decimal | None = None
+    line_points: int | None = None
+    line_reason: str | None = None
+    hype_score: Decimal | None = None
+    hype_reason: str | None = None
 
 
 def curve_progress_pct(
@@ -302,6 +327,16 @@ def build_row(inputs: MinuteInputs, *, features_version: str = FEATURES_VERSION)
         **curve,
         **_holders_columns(inputs.holders),
         **_tape_columns(inputs.tape, inputs.tape_absence_reason),
+        **line_columns(
+            inputs.line_points,
+            end_time=inputs.end_time,
+            mcap_now=curve["mcap_sol"],  # type: ignore[arg-type]
+        ),
+        **hype_columns(
+            tape=inputs.tape,
+            board=inputs.board,
+            snipers=None if inputs.holders is None else inputs.holders.snipers,
+        ),
     }
     return FeatureRow(
         mint=inputs.mint,

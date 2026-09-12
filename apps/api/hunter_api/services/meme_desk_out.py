@@ -270,6 +270,8 @@ def _bet_out(bet: BetRow) -> BetOut:
         sol_received=decimal_or_none(exit_data.get("sol_received")),
         sol_usd_at_entry=bet.sol_usd_at_entry,
         sol_usd_at_exit=bet.sol_usd_at_exit,
+        leg=bet.leg,
+        parent_bet_id=bet.parent_bet_id,
     )
 
 

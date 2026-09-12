@@ -6328,3 +6328,90 @@ vocabulário: o orçamento da fita não alcançou o mint no ciclo).
 | `GET /api/v1/orgs/{org}/meme/tokens[/{mint}]` | `progress_denominator_source` ∈ {`observed_virgin`, `global_params`, `mayhem_state`, `unknown`} |
 | `GET /api/v1/orgs/{org}/meme/sources` | `progress_coverage_pct`, `tape_coverage_pct`, `fold_minute`, `fold_rows`, `tape_cycle_s`, `tape_*`, `mayhem_pending`, `mayhem_denominators_60s`, `coverage_explanation` |
 | `apps/web` | **pendente**: `labels.ts` tipa `Record<MemeDenominatorSource, string>` exaustivo — precisa do rótulo `mayhem_state` e de `pnpm gen:types` (fora do escopo da T4.2e) |
+
+## 38. As linhas traçadas e a sonda de hype viram schema — M4 (`0026_meme_lines`)
+
+Vigésima sexta revisão. **Treze colunas** em `meme_features_1m` com oito CHECKs, **duas colunas** em
+`meme_paper_bets` com uma chave estrangeira para a própria tabela, dois CHECKs e um índice parcial, e uma
+**semente de dois conjuntos de regras**. Nenhuma tabela, vista, enum, política ou grant novo (as colunas
+herdam os grants das tabelas); nada tocado na `0022`–`0025`. Entrega a T4.10 (Parte A) sobre a diretiva do
+Everton de 12/09/2026: toda moeda analisada tem as **linhas traçadas como feature**, e a que é jovem demais
+para ter linha entra **semi-comprada** por hype. Contrato: `.claude/state/brief-T4.10-tracado-de-linhas-e-sonda-de-hype.md`.
+
+### 38.1 As linhas — `meme_features_v3`
+
+Sobre `mcap_sol` das fotografias da curva dos últimos 15 minutos **recebidas até `end_time`**
+(`received_at <= end_time`, a mesma regra da fita e dos boards; `services/meme-worker/hunter_meme_worker/repo_lines.py`),
+o fold (`features_lines.py` → `hunter_indicators.meme.lines`) escreve:
+
+| coluna | tipo | definição |
+|---|---|---|
+| `mcap_slope_5m`, `mcap_slope_15m` | `numeric(12,6)` | inclinação OLS de ln(mcap) × minutos (fração por minuto) |
+| `high_15m_sol`, `low_15m_sol` | `numeric(28,10)` | extremos da janela `(end_time − 15 min, end_time]` |
+| `breakout_15m` | `boolean` | mcap do minuto ≥ máxima da janela **anterior** `(end_time − 16 min, end_time − 1 min]` — o minuto nunca é a própria referência; NULL quando a janela anterior não tem fotografia |
+| `support_line_sol` | `numeric(28,10)` | valor em `end_time` da reta pelos **dois últimos fundos locais** (ponto estritamente abaixo dos dois vizinhos) |
+| `support_line_slope` | `numeric(12,6)` | inclinação dessa reta, SOL/min |
+| `higher_lows` | `boolean` | o segundo fundo está acima do primeiro |
+| `distance_to_support_pct` | `numeric(9,6)` | (mcap − suporte)/suporte |
+| `line_points` | `smallint` | fotografias usadas na janela — e a **marca** de uma linha dobrada por um fold que traça linhas |
+| `line_reason` | `text` | `too_few_points` (< 5) · `no_snapshot` · `flat` (sem dois fundos) · `out_of_range` (valor que a coluna não guarda) |
+| `hype_score` | `numeric(9,6)` | média ponderada documentada (`hunter_indicators.meme.hype`: compras 0,35, compradores únicos 0,25, posição em `movers`/`new` 0,20, social 0,10, snipers ≤ 2 0,10) |
+| `hype_reason` | `text` | `no_tape_no_board` (score NULL) · `partial` (uma das duas fontes; **convive com um número**) |
+
+**Os CHECKs são escopados a `line_points IS NOT NULL`.** Uma linha de `meme_features_v1`/`v2` não tem
+`line_points`, não tem linha, não tem hype e **não recebe motivo inventado**: o vocabulário nomeia o que um
+fold viu, e nenhum fold viu aqueles minutos (a `0023` pôde preencher `no_holders_reader` porque era verdade;
+aqui nenhuma das quatro palavras seria). Nas linhas de `v3`: `(support_line_sol IS NULL) = (line_reason IS
+NOT NULL)`; suporte, inclinação, `higher_lows` e distância nulos juntos; `line_reason`/`hype_reason` no
+vocabulário; `(high IS NULL) = (low IS NULL)`; `line_points >= 0`; `hype_score` em [0, 1]; e
+`(hype_score IS NULL) = coalesce(hype_reason = 'no_tape_no_board', false)` — o bicondicional é contra a
+**única** palavra que significa "sem score", porque `partial` fica ao lado de um número por regra do brief.
+`too_few_points`/`no_snapshot` anulam todas as colunas de linha; `flat`/`out_of_range` só o grupo do
+suporte (os extremos e as inclinações da janela continuam fatos).
+
+### 38.2 As pernas — `meme_paper_bets.leg` e `parent_bet_id`
+
+`leg text NOT NULL DEFAULT 'single'` ∈ {`probe`, `scale`, `single`} e `parent_bet_id uuid NULL` com
+`fk_meme_paper_bets_parent_bet_id_meme_paper_bets`; `ck_meme_paper_bets_a_scale_leg_names_its_probe`:
+`(leg = 'scale') = (parent_bet_id IS NOT NULL)` — só uma perna 2 nomeia uma sonda, e toda perna 2 nomeia.
+Índice parcial `ix_meme_paper_bets_parent_bet_id … WHERE parent_bet_id IS NOT NULL`. Toda aposta de hoje
+vira `single`, que é o que era. A mesa mostra `probe` como "semi-comprado (sonda)" e `scale` como
+"escalado (perna 2)" (Parte B). O teto `max_open_positions` conta pernas ≠ `scale` (a perna 2 monta na
+vaga da sonda — o brief fixa "máximo 5 sondas abertas"); a exposição por mint conta as duas.
+
+### 38.3 A semente
+
+Dois conjuntos `research_only` com ids fixos (o argumento de `seed_reference.py`), parâmetros congelados no
+brief e nas páginas `EXP-M2-a-linha-manda.md`/`EXP-M3-sonda-de-hype.md`:
+
+- **`trendline_v0/1`** (`…0003`, EXP-M2): idade 300–600 s, progresso 2–50 %, participação ≤ 1 %, criador
+  não vendedor líquido, `require_higher_lows`, `require_breakout_15m`, distância 0–0,25; 0,05 SOL; 2× /
+  trailing 30 % / 900 s / `exit_on_line_break` (2 fotografias) / migração / dump; carteira 2,0, dia 0,20,
+  3 posições, 0,05 por mint.
+- **`hype_probe_v0/1`** (`…0004`, EXP-M3): idade 30–300 s, `require_progress = false`, `min_hype_score
+  0,6`, `max_dev_share 0,10` com `dev_share_unknown_allowed`, `max_snipers 2`, criador, participação ≤ 1 %;
+  sonda 0,01 SOL, 3× / 40 % / 600 s; `scale_size_sol 0,04`, `scale_gate = trendline_v0/1`; carteira 2,0,
+  dia 0,20, `max_open_positions 5`, 0,05 por mint, `max_sol_per_bet 0,04`.
+
+Suposições numéricas declaradas (o brief não as fixa): `max_loss_pct = 50` nos dois (o piso da EXP-M1);
+`max_age_s = 600` na linha; progresso fora da porta da sonda; `max_exposure_per_mint_sol = 0,05` na sonda
+(= sonda + perna 2). A perna 2 leva `leg`/`parent_bet_id` no `suggested`/`decision` da proposta (nenhuma
+coluna nova em `meme_proposals`); o fill grava as duas colunas na aposta e recusa por nome
+`scale_without_parent`/`unknown_leg`. `line_broken` entra no vocabulário de `exit.reason`.
+
+### 38.4 Guardas, trava, vistas
+
+**Sem guarda de subida — asserção:** colunas nulas ou com default, CHECKs escopados, semente `ON CONFLICT
+DO NOTHING`. **A descida recusa** (§17.7) enquanto uma aposta tiver `leg <> 'single'` ou `parent_bet_id`,
+enquanto uma linha de features tiver `line_points` (uma linha que um fold traçou é evidência), ou enquanto
+uma proposta/aposta referenciar os dois conjuntos semeados; a semente sozinha reverte. `ADD COLUMN` sem
+default volátil é só catálogo; os CHECKs de `meme_features_1m` entram `NOT VALID` + `VALIDATE` (`SHARE
+UPDATE EXCLUSIVE`, o fold continua inserindo). `meme_desk_v1` e `meme_lab_scoreboard_v1` **não mudam**: a
+API da mesa lê as tabelas base (Emendas da T4.7) e agora devolve `leg`/`parent_bet_id` na `BetOut`.
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-worker/**` | `FEATURES_VERSION = meme_features_v3`; `features_lines.py`, `repo_lines.py` (fold); `proposals_scale.py`, `lab_repo_lines.py`, `lines_exit.py`, `paper_fill.py` (laço); `lab_repo_bets` grava/lê `leg`/`parent_bet_id` |
+| `GET /api/v1/orgs/{org}/meme/tokens/{mint}` | `features[*]` ganha as 13 colunas (`line_reason`/`hype_reason` nos vocabulários acima); ausentes numa linha `v2` → `null` |
+| `GET /api/v1/orgs/{org}/meme/desk` | `bet.leg` (`probe` \| `scale` \| `single`), `bet.parent_bet_id`; `exit_reason` ganha `max_loss` e `line_broken` |
+| `apps/web` | Parte B (paralela): desenho das linhas em `/meme/{mint}`, colunas na tabela de minutos, rótulos `leg` em `labels.ts` |

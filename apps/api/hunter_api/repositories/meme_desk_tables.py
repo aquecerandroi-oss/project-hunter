@@ -101,4 +101,7 @@ meme_paper_bets = Table(
     Column("high_water_x", Numeric()),
     Column("sol_usd_at_entry", Numeric()),
     Column("sol_usd_at_exit", Numeric()),
+    # 0026 (T4.10) — probe and scale legs.
+    Column("parent_bet_id", UUID(as_uuid=True)),
+    Column("leg", Text, nullable=False),
 )

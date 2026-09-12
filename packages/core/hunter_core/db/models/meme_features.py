@@ -24,13 +24,17 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Index, Integer, Numeric, Text, func
+from sqlalchemy import CheckConstraint, Index, Integer, Numeric, SmallInteger, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hunter_core.db.base import Base
 from hunter_core.db.models._common import PERCENT
 
 RATIO = Numeric(18, 8)
+SLOPE = Numeric(12, 6)
+"""A slope — a growth fraction per minute or SOL per minute (``0026``): six
+decimals like a fraction, six integer digits because a market cap in SOL can
+move whole units per minute."""
 """A ratio is neither money (``NUMERIC(28,10)``) nor a presentation fraction
 (``NUMERIC(9,6)``) — the same slot ``market_betas.beta`` occupies (§18.6). A
 buy/sell ratio with no sells is not representable as a number, so it is NULL with
@@ -139,6 +143,44 @@ class MemeFeatures1m(Base):
         CheckConstraint(
             "curve_volume_1m_sol IS NULL OR curve_volume_1m_sol >= 0",
             name="curve_volume_is_not_negative",
+        ),
+        # 0026 — the lines and the hype (T4.10). Every CHECK is scoped to
+        # ``line_points IS NOT NULL``: a row folded before the lines existed
+        # carries no count, no line, no hype and no invented reason.
+        CheckConstraint(
+            "line_points IS NULL OR (support_line_sol IS NULL) = (line_reason IS NOT NULL)",
+            name="support_line_is_null_with_a_reason",
+        ),
+        CheckConstraint(
+            "line_points IS NULL OR ((support_line_sol IS NULL) = (support_line_slope IS NULL) "
+            "AND (support_line_sol IS NULL) = (higher_lows IS NULL) "
+            "AND (support_line_sol IS NULL) = (distance_to_support_pct IS NULL))",
+            name="support_group_is_absent_together",
+        ),
+        CheckConstraint(
+            "line_reason IS NULL OR line_reason IN "
+            "('too_few_points', 'no_snapshot', 'flat', 'out_of_range')",
+            name="line_reason_is_a_known_label",
+        ),
+        CheckConstraint(
+            "(high_15m_sol IS NULL) = (low_15m_sol IS NULL)",
+            name="window_extremes_are_absent_together",
+        ),
+        CheckConstraint(
+            "line_points IS NULL OR line_points >= 0", name="line_points_are_not_negative"
+        ),
+        CheckConstraint(
+            "line_points IS NULL OR (hype_score IS NULL) = "
+            "coalesce(hype_reason = 'no_tape_no_board', false)",
+            name="hype_is_null_without_both_sources",
+        ),
+        CheckConstraint(
+            "hype_reason IS NULL OR hype_reason IN ('no_tape_no_board', 'partial')",
+            name="hype_reason_is_a_known_label",
+        ),
+        CheckConstraint(
+            "hype_score IS NULL OR (hype_score >= 0 AND hype_score <= 1)",
+            name="hype_score_is_a_fraction",
         ),
         {"postgresql_partition_by": "RANGE (end_time)"},
     )
@@ -255,5 +297,40 @@ class MemeFeatures1m(Base):
     the EXP-M1 gate (``hunter_indicators.meme.rules``). Distinct from
     ``creator_sold``: a creator who sold once and bought back more has sold and
     is not a net seller. ``NULL`` when the creator is unknown or the tape is."""
+
+    # --- 0026: the lines and the hype (T4.10, ``meme_features_v3``) ------------
+    mcap_slope_5m: Mapped[Decimal | None] = mapped_column(SLOPE)
+    mcap_slope_15m: Mapped[Decimal | None] = mapped_column(SLOPE)
+    """OLS slope of ``ln(mcap_sol)`` against minutes (a growth fraction per
+    minute) over the last 5 / 15 minutes of curve photos received by ``end_time``."""
+
+    high_15m_sol: Mapped[Decimal | None]
+    low_15m_sol: Mapped[Decimal | None]
+    breakout_15m: Mapped[bool | None]
+    """``mcap_sol >= high`` of the **previous** window ``(end_time − 16 min,
+    end_time − 1 min]`` — the minute being folded is never its own reference."""
+
+    support_line_sol: Mapped[Decimal | None]
+    support_line_slope: Mapped[Decimal | None] = mapped_column(SLOPE)
+    higher_lows: Mapped[bool | None]
+    distance_to_support_pct: Mapped[Decimal | None] = mapped_column(PERCENT)
+    """The line through the last two local lows of the window, evaluated at
+    ``end_time``; its slope in SOL/min; whether the second low is above the
+    first; ``(mcap − support) / support``. ``NULL`` together, with ``line_reason``."""
+
+    line_points: Mapped[int | None] = mapped_column(SmallInteger)
+    """Photos used in the window — and the mark of a row a lines-aware fold
+    wrote: ``NULL`` exactly on rows folded before ``0026``."""
+
+    line_reason: Mapped[str | None] = mapped_column(Text)
+    """``too_few_points`` (< 5 photos) | ``no_snapshot`` | ``flat`` (no two
+    local lows) | ``out_of_range`` (a value the column cannot hold)."""
+
+    hype_score: Mapped[Decimal | None] = mapped_column(PERCENT)
+    hype_reason: Mapped[str | None] = mapped_column(Text)
+    """The documented weighted average of ``hunter_indicators.meme.hype``
+    (buys, unique buyers, board standing, social, low snipers). ``NULL`` with
+    ``no_tape_no_board`` when neither source spoke; ``partial`` sits next to a
+    number when exactly one did."""
 
     computed_at: Mapped[datetime] = mapped_column(server_default=func.now())

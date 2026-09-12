@@ -14,8 +14,11 @@ import httpx
 import pytest
 
 from hunter_exchanges.base import ExchangeError, MalformedMessage, RateLimited
+from hunter_exchanges.pumpfun.rate_shared import HttpRateLimited
 from hunter_exchanges.pumpfun.swap_api import (
-    MEASURED_CAPACITY,
+    HEADER_LIMIT,
+    MEASURED_BLOCK_S,
+    MEASURED_LIMIT,
     REQUEST_CAPACITY,
     SwapApiClient,
     parse_trade,
@@ -111,9 +114,9 @@ async def test_the_client_sends_limit_and_cursor_and_spends_the_declared_budget(
         older = await client.get_trades("RAYMINT", cursor=page.next_cursor)
     assert seen[0].path == "/v2/coins/RAYMINT/trades" and seen[0].params["limit"] == "100"
     assert seen[1].params["cursor"] == page.next_cursor and older.has_more
-    assert REQUEST_CAPACITY == 900 and MEASURED_CAPACITY == 1000
+    assert REQUEST_CAPACITY == 16 and MEASURED_LIMIT == 20 and HEADER_LIMIT == 1000
     with pytest.raises(ValueError):
-        SwapApiClient(http_client=http, capacity=1001)
+        SwapApiClient(http_client=http, capacity=MEASURED_LIMIT + 1)
     with pytest.raises(ValueError):
         await client.get_trades("RAYMINT", limit=101)
 
@@ -135,6 +138,9 @@ async def test_errors_are_named_and_a_429_is_never_retried_silently(status: int)
             await client.get_trades("MINT")
     if status == 429:
         assert calls == 1 and error.value.retry_after_s == 7  # type: ignore[attr-defined]
+        assert isinstance(error.value, HttpRateLimited)
+        assert error.value.status_code == 429 and error.value.headers == {"retry-after": "7"}
+        assert not error.value.edge, "no server header: not the edge's rule"
     elif status == 404:
         assert calls == 1
     else:
@@ -143,3 +149,42 @@ async def test_errors_are_named_and_a_429_is_never_retried_silently(status: int)
 
 async def _no_sleep(_: float) -> None:
     return None
+
+
+def test_the_measured_limit_is_cloudflares_rule_not_the_backends_window() -> None:
+    """T4.2f, four live probes (12/09 13:36–13:48 UTC): every first 429 is
+    Cloudflare error 1015 with ``retry-after: 60`` and no ``x-ratelimit-*``; the
+    backend's header said 1000 and ~900 remaining on the request before. The
+    rule counts ~20 requests per 60 s per IP — 19–27 successes fit before the
+    cut, at 0,85 req/s as at 16 req/s and with 40 distinct mints alike."""
+    probes = _raw("t42f_swap_api_ratelimit_probes.json")
+    phases = {p["name"]: p for p in probes["phases"]}
+    assert set(phases) >= {
+        "A_burst",
+        "B_paced_4ps",
+        "C_paced_8ps",
+        "D_paced_0.7ps",
+        "F_distinct_mints",
+    }
+    for name, phase in phases.items():
+        first = phase["first_429"]
+        assert first is not None and first["status"] == 429, name
+        refused = HttpRateLimited(
+            "swap-api 429",
+            exchange="pumpfun_swap_api",
+            retry_after_s=60,
+            status_code=429,
+            headers=first["headers"],
+        )
+        assert refused.edge and refused.headers["retry-after"] == str(int(MEASURED_BLOCK_S)), name
+        assert "x-ratelimit-limit" not in refused.headers, name
+        assert "Error 1015" in first["body"], name
+        ok_before = sum(1 for e in phase["log"] if e.get("status") == 200)
+        assert 19 <= ok_before <= 27, (name, ok_before)
+        last_ok = [e for e in phase["log"] if e.get("status") == 200][-1]["headers"]
+        assert last_ok["x-ratelimit-limit"] == str(HEADER_LIMIT)
+        assert int(last_ok["x-ratelimit-remaining"]) > 800, "the backend's window never binds"
+        assert phase["recovery"]["status"] == 200, "60 s later the IP answers again"
+    paced = phases["D_paced_0.7ps"]
+    assert paced["ok_in_10s_before_429"] <= 8 < MEASURED_LIMIT, "the window is not 10 s"
+    assert REQUEST_CAPACITY <= MEASURED_LIMIT - 4, "four requests of margin under the edge's count"

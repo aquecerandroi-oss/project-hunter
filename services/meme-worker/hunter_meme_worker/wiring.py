@@ -15,13 +15,14 @@ cadences like the poller's.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.indexer_rest import AdvancedIndexerClient
-from hunter_exchanges.pumpfun.swap_api import MEASURED_CAPACITY, SwapApiClient
+from hunter_exchanges.pumpfun.swap_api import MEASURED_LIMIT, SwapApiClient
 from hunter_exchanges.pumpfun.trenches import TrenchesWsClient
 from hunter_meme_worker.boards import BoardCollector
 from hunter_meme_worker.config import TRENCHES_STREAM
@@ -29,10 +30,18 @@ from hunter_meme_worker.metrics import meme_gaps_total, meme_rows_total, meme_so
 from hunter_meme_worker.repo import GapRow, record_gap, upsert_token
 from hunter_meme_worker.risk import RiskReader
 from hunter_meme_worker.sources import INDEXER_RISK, SWAP_API, TRENCHES_WS, SourcesState
-from hunter_meme_worker.tracker import TIER_GRADUATING, TIER_NEW, TIER_OPEN_BET, TIER_REST
+from hunter_meme_worker.tracker import (
+    TIER_GRADUATING,
+    TIER_NEW,
+    TIER_OPEN_BET,
+    TIER_REST,
+    TIER_YOUNG,
+)
 from hunter_meme_worker.trades import TradesPuller, pull_once
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from hunter_meme_worker.config import MemeConfig
     from hunter_meme_worker.context import RadarContext
     from hunter_meme_worker.tracker import MintTracker
@@ -49,7 +58,7 @@ def build_sources(config: MemeConfig) -> SourcesState:
     sources[TRENCHES_WS].enabled = config.trenches_enabled
     sources[TRENCHES_WS].connected = False if config.trenches_enabled else None
     sources[SWAP_API].enabled = config.swap_api_enabled
-    sources[SWAP_API].budget_60s = min(config.swap_api_budget_60s, MEASURED_CAPACITY)
+    sources[SWAP_API].budget_60s = min(config.swap_api_budget_60s, MEASURED_LIMIT)
     sources[INDEXER_RISK].enabled = config.risk_enabled
     sources[INDEXER_RISK].budget_60s = 60
     return sources
@@ -67,7 +76,7 @@ def build_boards(
 def build_trades(config: MemeConfig, sources: SourcesState) -> TradesPuller | None:
     if not config.swap_api_enabled:
         return None
-    capacity = min(max(1, config.swap_api_budget_60s), MEASURED_CAPACITY)
+    capacity = min(max(1, config.swap_api_budget_60s), MEASURED_LIMIT)
     return TradesPuller(
         SwapApiClient(capacity=capacity),
         budget_60s=capacity,
@@ -143,13 +152,16 @@ async def _record_board_gap(ctx: RadarContext, client: TrenchesWsClient, session
         ctx.sources.gaps_60s.add(end)
 
 
-def tape_tiers(ctx: RadarContext) -> dict[str, int]:
-    """Every mint the tape should cover, with its tier (``tracker.py``'s order)."""
+def tape_tiers(ctx: RadarContext, now: datetime | None = None) -> dict[str, int]:
+    """Every mint the tape should cover, with its tier (``tracker.py``'s order:
+    open bet, ``graduating``, ``new``, young, rest)."""
+    at = now or utcnow()
+    young = timedelta(minutes=ctx.config.young_minutes)
     tiers: dict[str, int] = {}
     for tracked in ctx.tracker.snapshot():
         if tracked.quote_unsupported:
             continue
-        tier = TIER_REST
+        tier = TIER_YOUNG if at - tracked.age_anchor <= young else TIER_REST
         if tracked.board == "graduating":
             tier = TIER_GRADUATING
         elif tracked.board == "new":
@@ -162,8 +174,8 @@ def tape_tiers(ctx: RadarContext) -> dict[str, int]:
 
 async def trades_once(ctx: RadarContext) -> None:
     assert ctx.trades is not None
-    tiers = tape_tiers(ctx)
     now = utcnow()
+    tiers = tape_tiers(ctx, now)
     report = await pull_once(ctx.trades, ctx.session_factory, tiers=tiers, now=now, clock=utcnow)
     meme_rows_total.labels(table="meme_trades").inc(report.rows)
     meme_source_messages_total.labels(source=SWAP_API).inc(report.pages)
@@ -177,6 +189,14 @@ async def trades_once(ctx: RadarContext) -> None:
             tracked=stats.tracked,
             covered=stats.covered,
             never_pulled=stats.never_pulled,
+        )
+        budget = ctx.trades.budget
+        ctx.sources.record_tape_budget(
+            now,
+            effective=budget.effective,
+            measured=budget.measured,
+            refused_429=report.refused_429,
+            blocked_until=budget.blocked_until,
         )
 
 

@@ -201,5 +201,17 @@ def build_meme_sources(
         tape_deferred_60s=parse_heartbeat_int(fields.get("tape_deferred_60s")),
         mayhem_pending=parse_heartbeat_int(fields.get("mayhem_pending")),
         mayhem_denominators_60s=parse_heartbeat_int(fields.get("mayhem_written_60s")),
+        # T4.2f: the chain loop and the tape budget as the edge enforces it.
+        chain_cycle_s=_float(fields.get("chain_cycle_s") or None),
+        chain_tracked_mints=parse_heartbeat_int(fields.get("chain_tracked_mints")),
+        chain_read_mints=parse_heartbeat_int(fields.get("chain_read_mints")),
+        chain_calls_60s=parse_heartbeat_int(fields.get("chain_calls_60s")),
+        chain_refused_1h=parse_heartbeat_int(fields.get("chain_refused_1h")),
+        swap_api_effective_budget_60s=parse_heartbeat_int(
+            fields.get("swap_api_effective_budget_60s")
+        ),
+        swap_api_measured_60s=parse_heartbeat_int(fields.get("swap_api_measured_60s")),
+        swap_api_429_1h=parse_heartbeat_int(fields.get("swap_api_429_1h")),
+        swap_api_blocked_until=parse_heartbeat_datetime(fields.get("swap_api_blocked_until")),
         sources=[_source_out(name, blocks.get(name), latest.get(name)) for name in names],
     )

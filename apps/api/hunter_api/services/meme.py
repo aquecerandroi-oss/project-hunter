@@ -151,6 +151,20 @@ def build_feature_out(row: MemeFeatureRow) -> MemeFeaturePointOut:
         creator_sold_reason=row.creator_sold_reason,  # type: ignore[arg-type]
         coverage=row.coverage,
         features_version=row.features_version,
+        # 0026 (T4.10): the lines and the hype, ``None`` with their reasons.
+        mcap_slope_5m=row.mcap_slope_5m,
+        mcap_slope_15m=row.mcap_slope_15m,
+        high_15m_sol=row.high_15m_sol,
+        low_15m_sol=row.low_15m_sol,
+        breakout_15m=row.breakout_15m,
+        support_line_sol=row.support_line_sol,
+        support_line_slope=row.support_line_slope,
+        higher_lows=row.higher_lows,
+        distance_to_support_pct=row.distance_to_support_pct,
+        line_points=row.line_points,
+        line_reason=row.line_reason,  # type: ignore[arg-type]
+        hype_score=row.hype_score,
+        hype_reason=row.hype_reason,  # type: ignore[arg-type]
     )
 
 

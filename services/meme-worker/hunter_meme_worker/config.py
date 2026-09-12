@@ -10,10 +10,16 @@ sources, not preferences:
   a **ceiling shared by IP**, so a second process on the same host halves it —
   declared here because the adapter's token bucket is per instance unless Redis
   backs it (T4.1's own stated limitation);
-- ``rpc_top_k = 20`` against a public RPC that allows ~10 req/s *and* 40 calls per
-  method/10 s: reconciling the whole tracked set against the chain is not available
-  at this price, so the largest market caps are reconciled and the rest carries the
-  REST mirror's word, labelled by ``meme_curve_snapshots.source``.
+- ``rpc_top_k = 20`` against a public RPC that allows ~10 req/s *and* 10 calls per
+  method per window (its own header, T4.2f): until T4.2f only the largest market
+  caps were reconciled. Now ``chain.py`` reads **every** tracked curve once a
+  minute in one ``getMultipleAccounts`` per 100 mints (plus one ``getBlockTime``
+  per slot) — about six calls a minute — and the top-K reconciliation is
+  redundant while that loop runs (``main.py`` starts one or the other);
+- ``swap_api_budget_60s = 16`` is the ``swap-api`` ceiling **as measured on
+  12/09** (``hunter_exchanges.pumpfun.swap_api``): Cloudflare cuts the IP at
+  ~20 requests per 60 s and blocks it for 60 s, whatever ``x-ratelimit-limit``
+  says. Sixteen leaves four of margin for the edge's approximate counting.
 """
 
 from __future__ import annotations
@@ -121,24 +127,43 @@ class MemeConfig:
     swap_api_enabled: bool = True
     """The ``swap-api`` tape (T4.2c), ``MEME_SWAP_API_ENABLED``, default on."""
 
-    swap_api_budget_60s: int = 900
-    """``MEME_SWAP_API_BUDGET_60S``: the measured 1000/60 s minus 10 % of slack;
-    the adapter refuses anything above the measured limit."""
+    swap_api_budget_60s: int = 16
+    """``MEME_SWAP_API_BUDGET_60S`` (T4.2f): requests per 60 s the tape may spend.
+    Default 16 = the measured Cloudflare ceiling (~20/60 s per IP, 60 s block on
+    a breach) minus four of margin; the adapter refuses anything above 20. A
+    real 429 shrinks the effective budget to 80 % of what succeeded in the
+    minute before it and holds that for 15 min (``tape_budget.py``)."""
 
     trades_cycle_s: float = 10.0
-    """The tape puller wakes every 10 s and spends a sixth of the minute's budget:
-    the mints the Lab is deciding on are read every cycle, the rest once a
-    minute (``trades.MIN_INTERVAL_S``)."""
+    """The tape puller wakes every 10 s and spends a sixth of the minute's budget
+    — with 16 a minute that is two or three pulls a cycle, carried exactly
+    (``tape_budget.TapeBudget.per_cycle``), never a burst the edge would count."""
 
     trades_max_pages: int = 3
+    """Pages per pull for the mints with an **open paper bet** only (T4.2f): every
+    other mint gets one page — the 100 newest trades are the minute."""
 
-    trades_concurrency: int = 8
-    """``MEME_TRADES_CONCURRENCY`` (T4.2e): tape pulls in flight at once, behind
-    the adapter's 900/60 s bucket, which is what paces them. Sequential pulls
-    made a 250-mint round take ~90 s (250–450 ms a request), so the "10 s"
-    tiers were read every ~90 s and ``swap_api_used_60s`` sat at ~170 of 900
-    while 109 of 250 gate rows had no tape (08:35 BRT, 12/09). Eight in flight
-    bring the round to ~10 s; ``1`` reproduces the old behaviour."""
+    trades_concurrency: int = 2
+    """``MEME_TRADES_CONCURRENCY``: tape pulls in flight at once. T4.2e raised it
+    to 8 behind a 900/60 s bucket, which is exactly what tripped Cloudflare's
+    ~20/60 s rule every cycle (T4.2f). The cycle's share of the budget is what
+    paces now; two in flight is enough for it."""
+
+    chain_curves_enabled: bool = True
+    """``MEME_CHAIN_CURVES_ENABLED`` (T4.2f): the curve of every tracked mint from
+    the chain once a minute (``chain.py``), ``source = 'solana_rpc'``, stamped
+    with the slot's block time. On, the REST poll keeps only the identity reads
+    (``tracker.needs_rest``) and the top-K reconciliation does not run. Off
+    reproduces T4.2e: the 60 REST requests carry the curve."""
+
+    chain_cycle_s: float = 60.0
+    chain_batch: int = 100
+    """``getMultipleAccounts`` takes 100 addresses; one curve account per mint."""
+
+    rest_mayhem_refresh_s: int = 300
+    """``MEME_REST_MAYHEM_REFRESH_S``: with the chain carrying the curve, how often
+    the mirror is asked again for the agent state of an ``active``/``paused``
+    Mayhem coin (the chain has the flag, not the state)."""
 
     tape_stale_s: float = 180.0
     """A minute's tape is usable only if the mint's newest successful pull at
@@ -210,9 +235,11 @@ def load_config(settings: Settings) -> MemeConfig:
         lab_enabled=_bool_env("MEME_LAB_ENABLED", default=True),
         trenches_enabled=_bool_env("MEME_TRENCHES_ENABLED", default=True),
         swap_api_enabled=_bool_env("MEME_SWAP_API_ENABLED", default=True),
-        swap_api_budget_60s=_int_env("MEME_SWAP_API_BUDGET_60S", 900),
-        trades_concurrency=max(1, _int_env("MEME_TRADES_CONCURRENCY", 8)),
+        swap_api_budget_60s=_int_env("MEME_SWAP_API_BUDGET_60S", 16),
+        trades_concurrency=max(1, _int_env("MEME_TRADES_CONCURRENCY", 2)),
         risk_enabled=_bool_env("MEME_RISK_ENABLED", default=True),
+        chain_curves_enabled=_bool_env("MEME_CHAIN_CURVES_ENABLED", default=True),
+        rest_mayhem_refresh_s=max(60, _int_env("MEME_REST_MAYHEM_REFRESH_S", 300)),
     )
 
 

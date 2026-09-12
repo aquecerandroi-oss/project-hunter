@@ -561,6 +561,97 @@ cai em `SectionUnavailable` sem derrubar o resto da página. Mobile 375: chips q
 medidores empilham; dark/light pelos tokens `-soft` dos badges. Playwright/checagem visual com dado real
 fica para a sessão logada (o navegador embutido não abre localhost/Clerk).
 
+### T4.2f — cobertura total: a curva de todos os rastreados pela cadeia e o limite real do swap-api (entregue 12/09/2026)
+
+**Fatos que a motivaram** (VPS `8478eef`, 10:00 BRT, depois da T4.2e): `progress_coverage_pct` 43,3 e
+`tape_coverage_pct` 38,8; progresso ausente por `not_polled` em 1 267 linhas/15 min (60 req/min de REST não
+fotografam 130 curvas por minuto); fita ausente por `rate_limited` em 1 069 linhas/15 min.
+
+**A curva pela cadeia** (`docs/PUMPFUN-ONCHAIN.md` §5.5): `SolanaRpcClient.get_curve_states` (`rpc_curves.py`)
+lê 100 PDAs `["bonding-curve", mint]` por `getMultipleAccounts` (467 ms ao vivo; a PDA derivada bateu com a REST
+em 140/140) e carimba `observed_at` com o `getBlockTime` do slot (~11 s antes da chegada — a finalidade). O laço
+`chain.py` fotografa **todos** os rastreados uma vez por minuto (~4 chamadas RPC/min; o RPC público declara nos
+cabeçalhos `rps 250` e `method 10`) e persiste pelo caminho da T4.2d; o poll REST fica só para identidade/
+mayhem/fallback (`tracker.needs_rest`); a reconciliação top-K não roda com o laço ligado. Da captura: **16 % das
+moedas novas têm quote ≠ SOL** (USDC, `pumpCmXq…`, `Xs…`) — `unsupported_quote`, nomeado; 2 curvas esvaziadas
+pelo `migrate` (reservas zero na cadeia; a REST mantém o valor antigo) — `curve_emptied`, o sinal de migração da
+própria cadeia; 0 de 79 virgens (toda moeda nasce com a compra do criador). Meta `progress_coverage_pct ≥ 90`:
+o que faltar é `unsupported_quote` (≈ 16 % até o mint sair do conjunto), `denominator_unknown` Mayhem (até o laço
+da T4.2e escrever) e `insufficient_coverage` (curva ainda não finalizada no primeiro minuto).
+
+**O limite real do swap-api** (medido, `docs/PUMPFUN.md` §2): não é o `x-ratelimit-limit: 1000` — é uma regra do
+Cloudflare (erro 1015): **~20 requisições por 60 s por IP**, bloqueio de 60 s, qualquer rota (4 sondas, 115
+requisições, 5 × 429). Era isso que os 8 pulls concorrentes da T4.2e disparavam a cada ciclo. Agora:
+`MEME_SWAP_API_BUDGET_60S` = 16 (o adaptador recusa > 20), cota exata por ciclo com resto carregado (2, 3, 3, 2,
+3, 3), **1 página por mint por minuto** (paginação só para apostas abertas), prioridade aposta aberta >
+`graduating` > `new` > jovem > resto, 429 real (`HttpRateLimited` com os cabeçalhos — nunca o bucket próprio) →
+mede o que passou no minuto, encolhe para 80 % por 15 min e bloqueia o `retry-after`; `tape_reason`:
+`rate_limited` só com 429 real ou dentro do bloqueio, `not_polled` quando o orçamento não alcançou (mesmo se já
+coberto antes). **A meta `tape_coverage_pct ≥ 80` não é alcançável por este endpoint a partir de um IP:**
+16 pulls/min × 180 s de frescor ÷ 130 ≈ 40 % (a T4.2e mediu 38,8 % — o teto, não um bug); o que muda é zero
+apagões de 60 s e a razão honesta em cada linha. Saídas, para decisão: um segundo IP/proxy para a fita, ou
+`POST /v1/coins/market-activity/batch` (N mints por requisição, janelas 5m/1h, USD — outra feature, outra versão).
+
+Heartbeat: `chain_cycle_s`, `chain_tracked_mints`, `chain_read_mints`, `chain_calls_60s`, `chain_refused_1h`,
+`chain_block_time_missing_60s`, `swap_api_effective_budget_60s`, `swap_api_measured_60s`, `swap_api_429_1h`,
+`swap_api_blocked_until`; `GET /meme/sources` expõe todos. Prova: `infra/scripts/sql/research/2026-09-12-t42f-cobertura.sql`
+(§7–§10 novos: fotografias por fonte, origem da fotografia dobrada, lacunas com `chain_covered`, fita por minuto).
+Env: `MEME_CHAIN_CURVES_ENABLED`, `MEME_REST_MAYHEM_REFRESH_S` (novas); `MEME_SWAP_API_BUDGET_60S` 900 → 16;
+`MEME_TRADES_CONCURRENCY` 8 → 2.
+
+### T4.10 — traçado de linhas obrigatório e a sonda de hype (Parte A entregue 12/09/2026)
+
+**Diretiva** (Everton, 12/09 10:5x BRT): "você é obrigado a usar traçamento de linha, e os que não tiver
+você vai deixar já semi-comprado por causa do hype". Contrato entre as duas partes:
+`.claude/state/brief-T4.10-tracado-de-linhas-e-sonda-de-hype.md`.
+
+**As linhas viram feature, não desenho** (`hunter_indicators.meme.lines`, puro, registrado com
+`FeatureDefinition` v1 por coluna): sobre as fotografias da curva dos últimos 15 minutos **recebidas até
+o fecho do minuto** — suporte pela reta dos **dois últimos fundos locais** (ponto abaixo dos dois
+vizinhos), sua inclinação em SOL/min, `higher_lows`, distância (mcap − suporte)/suporte, extremos da
+janela, `breakout_15m` contra a máxima da janela **anterior** (o minuto nunca é a própria referência),
+inclinações OLS de ln(mcap) a 5 e 15 min. Nulos nomeados: `too_few_points` (< 5 fotografias),
+`no_snapshot`, `flat`, `out_of_range`. `meme_features_v3` (`0026`): 13 colunas com CHECKs escopados a
+`line_points IS NOT NULL` — uma linha `v2` não ganha motivo inventado. Provas: `test_meme_lines.py`
+(dois fundos 36 → 41 ⇒ suporte 48, distância 0,166667; série exponencial ⇒ inclinação 0,02/min exata;
+a fotografia do próprio minuto não é referência do rompimento; uma fotografia recebida 1 s depois do
+fecho não muda nada), `test_features_lines.py` (o mesmo dentro do `build_row`, e um board recebido
+depois do fecho não é a posição do minuto), `test_lab_lines.py` (contra Postgres: `load_line_points`
+recusa `received_at > end_time`).
+
+**O score de hype** (`hunter_indicators.meme.hype`, `hype_score` v1): compras do minuto (min/30 × 0,35),
+compradores únicos (min/20 × 0,25), melhor posição em `movers`/`new` (top-10 = 1, top-50 = 0,5 × 0,20),
+`has_social` (0,10), snipers ≤ 2 (0,10); decomposição raw/normalizado/peso/contribuição acompanha o
+número; `no_tape_no_board` (NULL) e `partial` (ao lado de um número). 15 compras, 10 compradores, posição
+3, social, 1 sniper = **0,700000** (`test_meme_hype.py`).
+
+**Dois conjuntos semeados na `0026`, ambos `research_only`, parâmetros congelados no brief:**
+`trendline_v0/1` (EXP-M2, [[EXP-M2-a-linha-manda]]: a porta da EXP-M1 com idade ≥ 5 min **e** fundos
+ascendentes **e** rompimento **e** distância 0–0,25; 0,05 SOL; saídas 2× / 30 % / 900 s / **linha
+rompida** = 2 fotografias seguidas abaixo da reta projetada ao instante da fotografia, `line_broken` na
+precedência depois do piso e antes do alvo) e `hype_probe_v0/1` (EXP-M3, [[EXP-M3-sonda-de-hype]]: 30 s
+a 5 min, `hype_score ≥ 0,6`, `dev_share ≤ 0,10` ou desconhecido **com motivo**, snipers ≤ 2, criador,
+participação ≤ 1 %; **sonda** de 0,01 SOL, 3× / 40 % / 600 s; **escala** para a perna 2 de 0,04 SOL —
+aposta separada com `parent_bet_id`, `leg = scale` — só enquanto a sonda está aberta e a porta de
+`trendline_v0/1` é satisfeita para o mesmo mint, uma vez por sonda, com a participação julgada com 0,04;
+teto de 5 sondas abertas — a perna 2 monta na vaga da sonda). Previsão registrada nas duas páginas:
+**`descartar`**; o Lab decide. Suposições declaradas: `max_loss_pct = 50` (o piso da EXP-M1) nos dois,
+progresso fora da porta da sonda, `max_exposure_per_mint_sol = 0,05` na sonda.
+
+**O laço** (`proposals_scale.py`, `lab._scale_step`, `paper_fill.py`, `lines_exit.py`): a proposta da
+perna 2 nasce aprovada por `rules` com `leg`/`parent_bet_id` no `suggested`; o fill grava as duas colunas
+e recusa `scale_without_parent`/`unknown_leg`; a saída `line_broken` reconstrói a sequência de fechos
+abaixo da linha a partir da fotografia da última marca (uma para trás — nunca dispara cedo numa
+reinicialização). Prova contra Postgres (`test_lab_lines.py`, um container): sonda aberta aos 2 min de
+vida (0,01 SOL, sem vigiar linha) → linha nasce aos 6 min (suporte 30,4, `higher_lows`, rompimento) →
+perna 2 de 0,04 SOL com `parent_bet_id` = a sonda, vigiando a linha → dois fechos abaixo (29,6 e 28,5
+contra 30,9/31,1) → venda `line_broken` na fotografia seguinte; a sonda continua aberta; uma única
+proposta de escala jamais escrita.
+
+**API:** `MemeFeaturePointOut` ganha as 13 colunas (`LineReason`/`HypeReason`), `BetOut` ganha `leg` e
+`parent_bet_id`, `ExitReason` ganha `max_loss` (já escrito pelo laço desde a T4.6) e `line_broken`.
+`apps/web` é a Parte B (paralela). Schema: `docs/DATABASE.md` §38. Notas: `.claude/state/notes-T4.10a.md`.
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

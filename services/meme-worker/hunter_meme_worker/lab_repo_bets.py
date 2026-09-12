@@ -62,9 +62,12 @@ _WALLET = text(
     "       coalesce(sum(pnl_sol) FILTER (WHERE status = 'closed' "
     "                AND exit_at >= :day_start AND exit_at < :day_end), 0) AS realized_today, "
     "       coalesce(sum(initial_risk_sol) FILTER (WHERE status = 'open'), 0) AS open_exposure, "
-    "       count(*) FILTER (WHERE status = 'open') AS open_positions "
+    "       count(*) FILTER (WHERE status = 'open' AND leg <> 'scale') AS open_positions "
     "FROM meme_paper_bets WHERE rule_set_id = :rule_set_id"
 )
+"""``open_positions`` counts the legs that take a slot of ``max_open_positions``
+(``probe`` and ``single``): a ``scale`` leg rides on its probe's slot (T4.10 —
+the brief's ceiling is "máximo 5 sondas abertas"). Exposure counts every leg."""
 _EXPOSURE = text(
     "SELECT mint, sum(initial_risk_sol) AS exposure FROM meme_paper_bets "
     "WHERE rule_set_id = :rule_set_id AND status = 'open' GROUP BY mint"
@@ -72,10 +75,11 @@ _EXPOSURE = text(
 
 _INSERT_BET = text(
     "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, mode, status, entry_at, "
-    "  entry, initial_risk_sol, params, mark_sol, mark_at, high_water_x, sol_usd_at_entry) "
+    "  entry, initial_risk_sol, params, mark_sol, mark_at, high_water_x, sol_usd_at_entry, "
+    "  leg, parent_bet_id) "
     "VALUES (:id, :proposal_id, :rule_set_id, :mint, 'paper', 'open', :entry_at, "
     "  CAST(:entry AS jsonb), :initial_risk_sol, CAST(:params AS jsonb), :mark_sol, :entry_at, "
-    "  :high_water_x, :sol_usd_at_entry)"
+    "  :high_water_x, :sol_usd_at_entry, :leg, CAST(:parent_bet_id AS uuid))"
 )
 _FILL_PROPOSAL = text(
     "UPDATE meme_proposals SET status = 'filled', bet_id = :bet_id "
@@ -89,6 +93,7 @@ _UNFILL_PROPOSAL = text(
 _OPEN_BETS = text(
     "SELECT b.id, b.proposal_id, b.rule_set_id, b.mint, b.entry_at, b.entry, b.initial_risk_sol, "
     "       b.params, b.high_water_x, b.mark_sol, b.mark_at, b.exit_intent, "
+    "       b.leg, b.parent_bet_id, "
     "       t.migrated_at, t.completed_at, "
     "       (SELECT f.creator_sold FROM meme_features_1m f WHERE f.mint = b.mint "
     "          AND f.creator_sold IS NOT NULL ORDER BY f.end_time DESC LIMIT 1) AS creator_sold "
@@ -165,6 +170,8 @@ async def mark_filled(session: AsyncSession, proposal: ApprovedProposal, entry: 
             "mark_sol": entry.mark_sol,
             "high_water_x": entry.high_water_x,
             "sol_usd_at_entry": entry.sol_usd_at_entry,
+            "leg": entry.leg,
+            "parent_bet_id": entry.parent_bet_id,
         },
     )
     await session.execute(_FILL_PROPOSAL, {"id": proposal.id, "bet_id": bet_id})
@@ -195,6 +202,8 @@ async def load_open_bets(session: AsyncSession) -> list[OpenBet]:
             exit_intent=r["exit_intent"],
             fee_pct=decimal_of(entry["fee_pct"]),
             priority_fee_sol=decimal_of(entry["priority_fee_sol"]),
+            leg=str(r["leg"]),
+            parent_bet_id=None if r["parent_bet_id"] is None else str(r["parent_bet_id"]),
         )
         out.append(
             OpenBet(

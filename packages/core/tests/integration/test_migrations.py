@@ -15,6 +15,7 @@ import re
 import uuid
 from collections.abc import AsyncIterator, Iterator, Mapping
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import cast
 
 import pytest
@@ -38,7 +39,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0025_meme_mayhem_denominator"
+HEAD_REVISION = "0026_meme_lines"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -71,6 +72,9 @@ that the day ``0024_meme_graduation`` landed."""
 MEME_GRADUATION_REVISION = "0024_meme_graduation"
 """And again: the ``0024`` tests reverse **0024**, and ``"-1"`` stopped meaning
 that the day ``0025_meme_mayhem_denominator`` landed."""
+MEME_MAYHEM_REVISION = "0025_meme_mayhem_denominator"
+"""And again: the ``0025`` tests reverse **0025**, and ``"-1"`` stopped meaning
+that the day ``0026_meme_lines`` landed."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
 reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
 top of it. They now stage the database at this revision first, exactly as every
@@ -4229,12 +4233,15 @@ _A_BET = (
 def test_0022_seeds_the_two_rule_sets_the_contract_names(upgraded: str) -> None:
     """The seed is part of the revision: a Lab with no rule set would be a loop
     that runs and proposes nothing while looking alive."""
+    # By id: ``0026`` seeds two more active sets on top (``trendline_v0``,
+    # ``hype_probe_v0``); this test is about the two ``0022`` planted.
+    seeds = {"a": _RESEARCH_RULE_SET, "b": "01994d00-6c1a-7000-8000-000000000002"}
     rows = asyncio.run(
         _scalars(
             upgraded,
             "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') "
-            "FROM meme_rule_sets WHERE status = 'active' ORDER BY name",
-            {},
+            "FROM meme_rule_sets WHERE status = 'active' AND id IN (:a, :b) ORDER BY name",
+            dict(seeds),
         )
     )
     assert rows == ["meme_paper_v0/1:research_only:EXP-M1", "operator/1:operator:-"]
@@ -4242,8 +4249,9 @@ def test_0022_seeds_the_two_rule_sets_the_contract_names(upgraded: str) -> None:
         _scalars(
             upgraded,
             "SELECT (params ->> 'max_sol_per_bet') || '/' || (params ->> 'wallet_max_sol') || '/' "
-            "|| (params ->> 'daily_loss_cap_sol') FROM meme_rule_sets ORDER BY name",
-            {},
+            "|| (params ->> 'daily_loss_cap_sol') FROM meme_rule_sets WHERE id IN (:a, :b) "
+            "ORDER BY name",
+            dict(seeds),
         )
     )
     assert sizes == ["0.05/2.0/0.20", "0.05/2.0/0.20"]
@@ -4370,9 +4378,10 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     for relation in (*MEME_LAB_TABLES, *MEME_LAB_VIEWS):
         assert asyncio.run(_relation_exists(upgraded, relation)), relation
+    # ``0022``'s two plus ``0026``'s two, all re-seeded on the way back up.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["2"]
+    ) == ["4"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",
@@ -4919,11 +4928,19 @@ def test_0025_refuses_a_downgrade_that_would_lose_a_mayhem_denominator(upgraded:
         )
     )
     try:
+        # Stage at 0025 first: ``0026`` sits on top and its own guard counts
+        # only legs, lines and its seeds' references, so this step passes;
+        # ``"-1"`` is then 0025.
+        command.downgrade(config, MEME_MAYHEM_REVISION)
         with pytest.raises(DBAPIError, match="mayhem_state"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == MEME_MAYHEM_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
         asyncio.run(_write(upgraded, list(_CLEAN_TOKENS_0025)))
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     command.check(config)
 
 
@@ -4931,7 +4948,7 @@ def test_0025_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     """The operator's rollback: at ``0024`` the label is refused again; the
     upgrade accepts it once more."""
     config = alembic_config(upgraded)
-    command.downgrade(config, "-1")
+    command.downgrade(config, MEME_GRADUATION_REVISION)  # through 0026, then 0025
     try:
         assert asyncio.run(_revision(upgraded)) == MEME_GRADUATION_REVISION
         asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "G25_BACK"})]))
@@ -4946,4 +4963,222 @@ def test_0025_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
         asyncio.run(_write(upgraded, [(_A_MAYHEM_DENOMINATOR, {"mint": "G25_BACK"})]))
     finally:
         asyncio.run(_write(upgraded, list(_CLEAN_TOKENS_0025)))
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0026_meme_lines — the drawn lines and the hype as columns, probe and scale legs (T4.10)
+# ---------------------------------------------------------------------------
+
+_TRENDLINE_RULE_SET = "01994d00-6c1a-7000-8000-000000000003"
+_HYPE_PROBE_RULE_SET = "01994d00-6c1a-7000-8000-000000000004"
+_REASON_COLUMNS = (
+    "progress_reason, curve_reason, unique_buyers_reason, buy_sell_ratio_reason, "
+    "top10_share_reason, creator_sold_reason, holders_reason, dev_share_reason, "
+    "snipers_reason, tape_reason, creator_net_seller_reason"
+)
+_REASON_VALUES = (
+    "'not_polled', 'not_polled', 'no_trade_feed', 'no_trade_feed', 'no_holders_reader', "
+    "'no_trade_feed', 'no_holders_reader', 'no_holders_reader', 'no_holders_reader', "
+    "'no_trade_feed', 'no_trade_feed'"
+)
+_A_V3_ROW = (
+    "INSERT INTO meme_features_1m (end_time, mint, features_version, coverage, "  # noqa: S608
+    f"  {_REASON_COLUMNS}, line_points, line_reason, support_line_sol, support_line_slope, "
+    "  higher_lows, distance_to_support_pct, high_15m_sol, low_15m_sol, hype_score, hype_reason) "
+    f"VALUES ('2026-10-05T12:00:00Z', :mint, 'meme_features_v3', 1, {_REASON_VALUES}, "
+    "  :points, :line_reason, :support, :slope, :higher, :distance, :high, :low, :hype, "
+    "  :hype_reason)"
+)
+_A_V2_ROW = (
+    "INSERT INTO meme_features_1m (end_time, mint, features_version, coverage, "  # noqa: S608
+    f"  {_REASON_COLUMNS}) VALUES ('2026-10-05T12:00:00Z', :mint, 'meme_features_v2', 1, "
+    f"  {_REASON_VALUES})"
+)
+_A_LEGGED_BET = (
+    "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, mode, entry_at, entry, "
+    "  initial_risk_sol, params, leg, parent_bet_id) VALUES (:id, :proposal, :rule_set, "
+    "  'GUARD_MINT', 'paper', now(), '{}'::jsonb, 0.01, '{}'::jsonb, :leg, "
+    "  CAST(:parent AS uuid))"
+)
+_CLEAN_0026: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_paper_bets WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_proposals WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_features_1m WHERE mint LIKE 'L26_%'", {}),
+)
+_NO_SUPPORT: dict[str, object] = {
+    "support": None,
+    "slope": None,
+    "higher": None,
+    "distance": None,
+}
+
+
+def _a_v3_row(mint: str, **overrides: object) -> tuple[str, dict[str, object]]:
+    params: dict[str, object] = {
+        "mint": mint,
+        "points": 15,
+        "line_reason": None,
+        "support": Decimal("48"),
+        "slope": Decimal("1"),
+        "higher": True,
+        "distance": Decimal("0.166667"),
+        "high": Decimal("56"),
+        "low": Decimal("36"),
+        "hype": Decimal("0.7"),
+        "hype_reason": None,
+    }
+    params.update(overrides)
+    return _A_V3_ROW, params
+
+
+def _a_legged_bet(
+    ordinal: int, rule_set: str, leg: str, parent: str | None
+) -> list[tuple[str, dict[str, object]]]:
+    proposal = f"00000000-0000-4000-8000-0000000002{ordinal:02d}"
+    bet = f"00000000-0000-4000-8000-0000000003{ordinal:02d}"
+    return [
+        (_A_PROPOSAL, {"id": proposal, "rule_set": rule_set}),
+        (
+            _A_LEGGED_BET,
+            {"id": bet, "proposal": proposal, "rule_set": rule_set, "leg": leg, "parent": parent},
+        ),
+    ]
+
+
+def test_0026_adds_the_columns_their_checks_and_seeds_the_two_arms(upgraded: str) -> None:
+    """Thirteen columns on the minute, two on the bet, eight plus two CHECKs, and
+    the two pre-registered rule sets with the brief's frozen parameters. A row
+    folded before the lines (no ``line_points``) is still a legal row."""
+    lines = migration_ddl("meme_lines")
+    features = cast("tuple[str, ...]", lines.FEATURE_COLUMNS_0026)
+    bets = cast("tuple[str, ...]", lines.BET_COLUMNS_0026)
+    for table, frozen in (("meme_features_1m", features), ("meme_paper_bets", bets)):
+        names = ", ".join(f"'{column}'" for column in frozen)
+        present = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT column_name FROM information_schema.columns "  # noqa: S608
+                f"WHERE table_name = '{table}' AND column_name IN ({names})",
+                {},
+            )
+        )
+        assert set(present) == set(frozen), table
+    seeds = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || exp_ref || ':' || status "
+            "|| ':' || (params ->> 'size_sol') || ':' || coalesce(params ->> 'scale_size_sol', '-') "
+            "|| ':' || coalesce(params ->> 'scale_gate', '-') || ':' "
+            "|| coalesce(params ->> 'min_hype_score', '-') || ':' "
+            "|| coalesce(params ->> 'exit_on_line_break', '-') || ':' "
+            "|| (params ->> 'max_open_positions') "
+            "FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name",
+            {"a": _TRENDLINE_RULE_SET, "b": _HYPE_PROBE_RULE_SET},
+        )
+    )
+    assert seeds == [
+        "hype_probe_v0/1:research_only:EXP-M3:active:0.01:0.04:trendline_v0/1:0.6:-:5",
+        "trendline_v0/1:research_only:EXP-M2:active:0.05:-:-:-:true:3",
+    ]
+    asyncio.run(_write(upgraded, [_a_v3_row("L26_OK")]))
+    asyncio.run(_write(upgraded, [_a_v3_row("L26_FLAT", line_reason="flat", **_NO_SUPPORT)]))
+    asyncio.run(_write(upgraded, [_a_v3_row("L26_PARTIAL", hype_reason="partial")]))
+    asyncio.run(_write(upgraded, [(_A_V2_ROW, {"mint": "L26_OLD"})]))
+    try:
+        refused: list[tuple[dict[str, object], str]] = [
+            (dict(_NO_SUPPORT), "support_line_is_null_with_a_reason"),
+            ({"slope": None}, "support_group_is_absent_together"),
+            ({"line_reason": "blog", **_NO_SUPPORT}, "line_reason_is_a_known_label"),
+            ({"low": None}, "window_extremes_are_absent_together"),
+            ({"hype": None}, "hype_is_null_without_both_sources"),
+            ({"hype": None, "hype_reason": "partial"}, "hype_is_null_without_both_sources"),
+            ({"hype_reason": "blog"}, "hype_reason_is_a_known_label"),
+            ({"hype": Decimal("1.5")}, "hype_score_is_a_fraction"),
+        ]
+        for overrides, constraint in refused:
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(_write(upgraded, [_a_v3_row("L26_BAD", **overrides)]))
+        asyncio.run(_write(upgraded, _a_legged_bet(1, _HYPE_PROBE_RULE_SET, "probe", None)))
+        probe = "00000000-0000-4000-8000-000000000301"
+        for leg, parent, constraint in (
+            ("scale", None, "a_scale_leg_names_its_probe"),
+            ("probe", probe, "a_scale_leg_names_its_probe"),
+            ("hedge", None, "leg_is_a_known_label"),
+        ):
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(_write(upgraded, _a_legged_bet(2, _HYPE_PROBE_RULE_SET, leg, parent)))
+        asyncio.run(_write(upgraded, _a_legged_bet(3, _HYPE_PROBE_RULE_SET, "scale", probe)))
+        legs = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT leg || ':' || coalesce(parent_bet_id::text, '-') FROM meme_paper_bets "
+                "WHERE mint = 'GUARD_MINT' ORDER BY leg",
+                {},
+            )
+        )
+        assert legs == ["probe:-", f"scale:{probe}"]
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0026)))
+
+
+def test_0026_refuses_a_downgrade_that_would_lose_a_leg_or_a_line(upgraded: str) -> None:
+    """§17.7: a probe and the lines a fold drew are evidence — count, name, stop."""
+    config = alembic_config(upgraded)
+    asyncio.run(_write(upgraded, _a_legged_bet(4, _RESEARCH_RULE_SET, "probe", None)))
+    try:
+        with pytest.raises(DBAPIError, match="carry a leg"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0026)))
+    asyncio.run(_write(upgraded, [_a_v3_row("L26_GUARD")]))
+    try:
+        with pytest.raises(DBAPIError, match="carry the lines"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0026)))
+    command.check(config)
+
+
+def test_0026_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: the columns and the seed go, the ``0025`` schema
+    is exactly what it was, and the upgrade restores both."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_MAYHEM_REVISION
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM information_schema.columns "
+                "WHERE (table_name = 'meme_features_1m' "
+                "       AND column_name IN ('support_line_sol', 'hype_score', 'line_points')) "
+                "OR (table_name = 'meme_paper_bets' AND column_name IN ('leg', 'parent_bet_id'))",
+                {},
+            )
+        ) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id IN (:a, :b)",
+                {"a": _TRENDLINE_RULE_SET, "b": _HYPE_PROBE_RULE_SET},
+            )
+        ) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT count(*)::text FROM meme_rule_sets WHERE id IN (:a, :b) AND status = 'active'",
+            {"a": _TRENDLINE_RULE_SET, "b": _HYPE_PROBE_RULE_SET},
+        )
+    ) == ["2"]
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+    }
     command.check(config)

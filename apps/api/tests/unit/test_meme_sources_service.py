@@ -203,6 +203,39 @@ def test_the_coverage_of_the_last_fold_and_the_tape_cycle_are_the_workers_number
     assert older.tape_coverage_pct is None and older.mayhem_pending is None
 
 
+def test_the_chain_loop_and_the_edges_budget_are_the_workers_numbers() -> None:
+    """T4.2f: the chain loop's last cycle and the tape budget the edge enforces
+    come from the heartbeat as written; a worker before T4.2f yields ``None``."""
+    blocked = AS_OF + timedelta(seconds=40)
+    out = build_meme_sources(
+        _heartbeat(
+            chain_cycle_s="1.284",
+            chain_tracked_mints="141",
+            chain_read_mints="115",
+            chain_calls_60s="4",
+            chain_refused_1h="26",
+            swap_api_effective_budget_60s="12",
+            swap_api_measured_60s="16",
+            swap_api_429_1h="1",
+            swap_api_blocked_until=blocked.isoformat(),
+        ),
+        _latest(),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    assert out.chain_cycle_s == pytest.approx(1.284)
+    assert (out.chain_tracked_mints, out.chain_read_mints) == (141, 115)
+    assert (out.chain_calls_60s, out.chain_refused_1h) == (4, 26)
+    assert out.swap_api_effective_budget_60s == 12 and out.swap_api_measured_60s == 16
+    assert out.swap_api_429_1h == 1 and out.swap_api_blocked_until == blocked
+    assert (
+        "Cloudflare" in out.coverage_explanation and "chain_read_mints" in out.coverage_explanation
+    )
+    older = build_meme_sources(_heartbeat(), _latest(), as_of=AS_OF, heartbeat_key=KEY)
+    assert older.chain_read_mints is None and older.swap_api_effective_budget_60s is None
+    assert older.swap_api_blocked_until is None
+
+
 def test_source_status_reads_the_workers_word_and_never_infers_health() -> None:
     assert source_status("swap_api", None) == ("unknown", "heartbeat_missing")
     assert source_status("swap_api", {"enabled": False}) == ("disabled", "disabled")

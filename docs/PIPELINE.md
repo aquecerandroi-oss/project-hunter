@@ -210,6 +210,19 @@ zero. Heartbeat `hb:meme:radar`: `tape_coverage_pct`, `progress_coverage_pct` (l
 dobrado com fita/progresso ÷ linhas), `tape_cycle_s`, `mayhem_pending`… — `GET /meme/sources` os
 expõe. Schema: `docs/DATABASE.md` §37; plano §T4.2e.
 
+**T4.2f — a curva pela cadeia e o limite real da fita.** Um laço `chain` (uma vez por minuto) lê a curva de
+**todos** os rastreados em `getMultipleAccounts` de 100 PDAs `["bonding-curve", mint]` (2 chamadas para 130,
+467 ms ao vivo) mais `getBlockTime` do slot, e grava `meme_curve_snapshots` com `source = 'solana_rpc'`, `slot`,
+`commitment = 'finalized'` e `observed_at` = blockTime (~11 s antes da chegada) pelo mesmo caminho da T4.2d —
+o poll REST (60/min) fica só para identidade (`mayhem_state`, leitura final, apostas abertas) e volta ao plano
+cheio se a cadeia falhar. A fita: o limite real do `swap-api` é a regra do Cloudflare (~20 req/60 s por IP,
+bloqueio de 60 s; erro 1015), não o `x-ratelimit-limit: 1000` — `MEME_SWAP_API_BUDGET_60S` = 16 em cota exata
+por ciclo, 1 página por mint por minuto (paginação só para apostas abertas), 429 real encolhe o orçamento e
+bloqueia o `retry-after`; `tape_reason = rate_limited` só com 429 real, `not_polled` quando o orçamento não
+alcançou. Teto aritmético da fita com 130 rastreados e frescor de 180 s: ≈ 40 %. Heartbeat: `chain_*`,
+`swap_api_effective_budget_60s`, `swap_api_429_1h`, `swap_api_blocked_until`. Plano §T4.2f;
+`docs/PUMPFUN-ONCHAIN.md` §5.5; `docs/PUMPFUN.md` §2.
+
 ## 2. Feature Engine
 
 **Onde:** `scanner-worker`. **Gatilho:** `market.ticks` (tick-features, throttle 1 s por símbolo) e `market.candles.closed` (bar-features).

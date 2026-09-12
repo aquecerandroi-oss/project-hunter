@@ -102,6 +102,9 @@ class BetRow:
     high_water_x: Decimal | None
     sol_usd_at_entry: Decimal | None
     sol_usd_at_exit: Decimal | None
+    leg: str = "single"
+    parent_bet_id: uuid.UUID | None = None
+    """``0026`` (T4.10): defaults so a row mapped without the columns is ``single``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,6 +281,8 @@ def bet_from_mapping(r: RowMapping) -> BetRow:
         high_water_x=r["high_water_x"],
         sol_usd_at_entry=r["sol_usd_at_entry"],
         sol_usd_at_exit=r["sol_usd_at_exit"],
+        leg=str(r.get("leg") or "single"),
+        parent_bet_id=r.get("parent_bet_id"),
     )
 
 

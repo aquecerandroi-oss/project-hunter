@@ -1,0 +1,248 @@
+{
+ "rpc": [
+  {
+   "name": "rpc_curves_batch1",
+   "url": "rpc:getMultipleAccounts",
+   "status": 200,
+   "bytes": 34591,
+   "ms": 467,
+   "at": "2026-09-12T13:07:58+00:00",
+   "reused_from_console": true,
+   "ratelimit": {
+    "x-ratelimit-tier": "free",
+    "x-ratelimit-method-limit": "50",
+    "x-ratelimit-rps-limit": "250",
+    "x-ratelimit-conn-limit": "40",
+    "x-ratelimit-connrate-limit": "40",
+    "x-ratelimit-endpoint-limit": "unlimited",
+    "x-ratelimit-pubsub-limit": "10"
+   }
+  },
+  {
+   "name": "rpc_curves_batch2",
+   "url": "rpc:getMultipleAccounts",
+   "status": 200,
+   "bytes": 14072,
+   "ms": 187,
+   "at": "2026-09-12T13:07:59+00:00",
+   "reused_from_console": true,
+   "ratelimit": {
+    "x-ratelimit-tier": "free",
+    "x-ratelimit-method-limit": "50",
+    "x-ratelimit-rps-limit": "250",
+    "x-ratelimit-conn-limit": "40",
+    "x-ratelimit-connrate-limit": "40",
+    "x-ratelimit-endpoint-limit": "unlimited",
+    "x-ratelimit-pubsub-limit": "10"
+   }
+  },
+  {
+   "name": "rpc_block_time_batch1",
+   "url": "rpc:getBlockTime",
+   "status": 200,
+   "bytes": 45,
+   "ms": 437,
+   "at": "2026-09-12T13:36:42.526672+00:00",
+   "ratelimit": {
+    "x-ratelimit-tier": "free",
+    "x-ratelimit-method-limit": "10",
+    "x-ratelimit-method-remaining": "9",
+    "x-ratelimit-rps-limit": "250",
+    "x-ratelimit-rps-remaining": "249",
+    "x-ratelimit-endpoint-limit": "unlimited",
+    "x-ratelimit-endpoint-remaining": "-5063",
+    "x-ratelimit-conn-limit": "40",
+    "x-ratelimit-conn-remaining": "39",
+    "x-ratelimit-connrate-limit": "40",
+    "x-ratelimit-connrate-remaining": "39",
+    "x-ratelimit-pubsub-limit": "10",
+    "x-ratelimit-pubsub-remaining": "10"
+   }
+  },
+  {
+   "name": "rpc_block_time_batch2",
+   "url": "rpc:getBlockTime",
+   "status": 200,
+   "bytes": 45,
+   "ms": 140,
+   "at": "2026-09-12T13:36:42.664157+00:00",
+   "ratelimit": {
+    "x-ratelimit-tier": "free",
+    "x-ratelimit-method-limit": "10",
+    "x-ratelimit-method-remaining": "8",
+    "x-ratelimit-rps-limit": "250",
+    "x-ratelimit-rps-remaining": "248",
+    "x-ratelimit-endpoint-limit": "unlimited",
+    "x-ratelimit-endpoint-remaining": "-5045",
+    "x-ratelimit-conn-limit": "40",
+    "x-ratelimit-conn-remaining": "39",
+    "x-ratelimit-connrate-limit": "40",
+    "x-ratelimit-connrate-remaining": "39",
+    "x-ratelimit-pubsub-limit": "10",
+    "x-ratelimit-pubsub-remaining": "10"
+   }
+  }
+ ],
+ "swap_api": [
+  {
+   "name": "swap_api_probe_A_burst",
+   "requests": 28,
+   "ok": 27,
+   "elapsed_s": 1.74,
+   "first_429_index": 28,
+   "first_429_at": "2026-09-12T13:37:49.616187+00:00",
+   "first_429_headers": {
+    "retry-after": "60",
+    "cf-ray": "a39f4f1d3c7c501a-GRU",
+    "server": "cloudflare",
+    "content-type": "application/json; charset=utf-8",
+    "date": "Sat, 12 Sep 2026 13:37:49 GMT"
+   },
+   "ok_in_60s_before_429": 27,
+   "recovery": {
+    "at": "2026-09-12T13:38:50.112868+00:00",
+    "status": 200,
+    "ms": 461,
+    "headers": {
+     "x-ratelimit-limit": "1000",
+     "x-ratelimit-remaining": "891",
+     "x-ratelimit-reset": "35",
+     "cf-ray": "a39f5095ca8628b1-GRU",
+     "cf-cache-status": "DYNAMIC",
+     "server": "cloudflare",
+     "content-type": "application/json; charset=utf-8",
+     "date": "Sat, 12 Sep 2026 13:38:50 GMT"
+    },
+    "slept_s": 60.0
+   }
+  },
+  {
+   "name": "swap_api_probe_B_paced_4ps",
+   "requests": 20,
+   "ok": 19,
+   "elapsed_s": 5.76,
+   "first_429_index": 20,
+   "first_429_at": "2026-09-12T13:39:00.609885+00:00",
+   "first_429_headers": {
+    "retry-after": "60",
+    "cf-ray": "a39f50d8ea918138-GRU",
+    "server": "cloudflare",
+    "content-type": "application/json; charset=utf-8",
+    "date": "Sat, 12 Sep 2026 13:39:00 GMT"
+   },
+   "ok_in_60s_before_429": 19,
+   "recovery": {
+    "at": "2026-09-12T13:40:02.043558+00:00",
+    "status": 200,
+    "ms": 1151,
+    "headers": {
+     "x-ratelimit-limit": "1000",
+     "x-ratelimit-remaining": "894",
+     "x-ratelimit-reset": "14",
+     "cf-ray": "a39f5257ebfa4f2b-GRU",
+     "cf-cache-status": "DYNAMIC",
+     "server": "cloudflare",
+     "content-type": "application/json; charset=utf-8",
+     "date": "Sat, 12 Sep 2026 13:40:02 GMT"
+    },
+    "slept_s": 60.0
+   }
+  },
+  {
+   "name": "swap_api_probe_C_paced_8ps",
+   "requests": 20,
+   "ok": 19,
+   "elapsed_s": 3.33,
+   "first_429_index": 20,
+   "first_429_at": "2026-09-12T13:40:04.925365+00:00",
+   "first_429_headers": {
+    "retry-after": "60",
+    "cf-ray": "a39f526aece24f2b-GRU",
+    "server": "cloudflare",
+    "content-type": "application/json; charset=utf-8",
+    "date": "Sat, 12 Sep 2026 13:40:04 GMT"
+   },
+   "ok_in_60s_before_429": 19,
+   "recovery": {
+    "at": "2026-09-12T13:41:05.865226+00:00",
+    "status": 200,
+    "ms": 488,
+    "headers": {
+     "x-ratelimit-limit": "1000",
+     "x-ratelimit-remaining": "958",
+     "x-ratelimit-reset": "6",
+     "cf-ray": "a39f53e6bb5d74c3-GRU",
+     "cf-cache-status": "DYNAMIC",
+     "server": "cloudflare",
+     "content-type": "application/json; charset=utf-8",
+     "date": "Sat, 12 Sep 2026 13:41:05 GMT"
+    },
+    "slept_s": 60.0
+   }
+  },
+  {
+   "name": "swap_api_probe_D_paced_0.7ps",
+   "requests": 23,
+   "ok": 22,
+   "elapsed_s": 27.12,
+   "first_429_index": 23,
+   "first_429_at": "2026-09-12T13:44:03.082058+00:00",
+   "first_429_headers": {
+    "retry-after": "60",
+    "cf-ray": "a39f583b98d01446-GRU",
+    "server": "cloudflare",
+    "content-type": "application/json; charset=utf-8",
+    "date": "Sat, 12 Sep 2026 13:44:03 GMT"
+   },
+   "ok_in_60s_before_429": 22,
+   "recovery": {
+    "at": "2026-09-12T13:45:03.340937+00:00",
+    "status": 200,
+    "ms": 196,
+    "headers": {
+     "x-ratelimit-limit": "1000",
+     "x-ratelimit-remaining": "922",
+     "x-ratelimit-reset": "59",
+     "cf-ray": "a39f59b2f99d8d97-GRU",
+     "cf-cache-status": "DYNAMIC",
+     "server": "cloudflare",
+     "content-type": "application/json; charset=utf-8",
+     "date": "Sat, 12 Sep 2026 13:45:03 GMT"
+    },
+    "slept_s": 60.0
+   }
+  },
+  {
+   "name": "swap_api_probe_F_distinct_mints",
+   "requests": 24,
+   "ok": null,
+   "elapsed_s": null,
+   "first_429_index": 24,
+   "first_429_at": "2026-09-12T13:47:08.909633+00:00",
+   "first_429_headers": {
+    "retry-after": "60",
+    "cf-ray": "a39f5cc4cf5bd94e-GRU",
+    "server": "cloudflare",
+    "content-type": "application/json; charset=utf-8",
+    "date": "Sat, 12 Sep 2026 13:47:08 GMT"
+   },
+   "ok_in_60s_before_429": null,
+   "recovery": {
+    "at": "2026-09-12T13:48:09.145982+00:00",
+    "status": 200,
+    "ms": 205,
+    "headers": {
+     "x-ratelimit-limit": "1000",
+     "x-ratelimit-remaining": "930",
+     "x-ratelimit-reset": "5",
+     "cf-ray": "a39f5e3c4b5ba10e-GRU",
+     "cf-cache-status": "DYNAMIC",
+     "server": "cloudflare",
+     "content-type": "application/json; charset=utf-8",
+     "date": "Sat, 12 Sep 2026 13:48:09 GMT"
+    },
+    "slept_s": 60.0
+   }
+  }
+ ]
+}

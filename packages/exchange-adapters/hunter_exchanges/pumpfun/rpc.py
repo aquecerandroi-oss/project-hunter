@@ -1,10 +1,19 @@
 """Read-only finalized Solana account snapshots; endpoint injection never loads dotenv.
 
-The caller supplies the mint's bonding-curve address for a curve read; the Mayhem
-flow read derives its four accounts from the mint by the IDL's seeds
-(``mayhem_state.py``) and batches 25 mints per ``getMultipleAccounts`` (T4.2e).
-No transaction method is exposed. HTTP/RPC errors never include the injected
-URL (it may carry a key).
+The caller supplies the mint's bonding-curve address for a single curve read; the
+Mayhem flow read derives its four accounts from the mint by the IDL's seeds
+(``mayhem_state.py``) and batches 25 mints per ``getMultipleAccounts`` (T4.2e);
+the curve batch (``rpc_curves.py``, T4.2f) derives the curve PDA of every mint
+and reads 100 per call, stamped with the slot's block time. No transaction method
+is exposed. HTTP/RPC errors never include the injected URL (it may carry a key).
+
+**Measured limits of the public endpoint** (12/09 13:36 UTC, the RPC's own
+response headers, ``tests/fixtures/pumpfun/t42f_capture_http_log.json``):
+``x-ratelimit-rps-limit: 250``, ``x-ratelimit-method-limit: 10`` (per method;
+``remaining`` fell 9 → 8 across two calls in a window), ``x-ratelimit-conn-limit:
+40``. The per-method ceiling is tighter than the 40/10 s ``solana.com`` documents,
+so the method spacing below is one call per second — the radar's loops need
+about six calls a minute in total.
 """
 
 from __future__ import annotations
@@ -12,6 +21,7 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import httpx
@@ -31,10 +41,19 @@ from hunter_exchanges.pumpfun.mayhem_state import (
 )
 from hunter_exchanges.pumpfun.models import NormalizedCurveState
 from hunter_exchanges.pumpfun.normalize import curve_state_from_rpc_account
+from hunter_exchanges.pumpfun.rpc_curves import (
+    ACCOUNTS_PER_CALL,
+    CurveBatch,
+    curve_addresses,
+    decode_curve_batch,
+)
 from hunter_exchanges.rate_limit import TokenBucketRateLimiter
 
 PUBLIC_RPC_URL = "https://api.mainnet-beta.solana.com"
 _FINALIZED = {"encoding": "base64", "commitment": "finalized"}
+METHOD_SPACING_S = 1.0
+"""One call per second per method on the public endpoint: its own header says
+``x-ratelimit-method-limit: 10`` (module docstring)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,12 +86,12 @@ class SolanaRpcClient:
         self._limiter = rate_limiter or TokenBucketRateLimiter(
             "solana_rpc", capacity=10, refill_period_s=1
         )
-        # Public RPC also limits each method to 40/10s. Pace conservatively
-        # (no 40-request burst followed by a second burst inside that window).
+        # The public RPC also limits each method (its header: 10 per window).
+        # Pace one call per second per method — no burst, ever.
         self._method_limiter = method_limiter
         if self._method_limiter is None and self._url.rstrip("/") == PUBLIC_RPC_URL:
             self._method_limiter = TokenBucketRateLimiter(
-                "solana_rpc_method", capacity=1, refill_period_s=0.26
+                "solana_rpc_method", capacity=1, refill_period_s=METHOD_SPACING_S
             )
 
     async def aclose(self) -> None:
@@ -127,6 +146,67 @@ class SolanaRpcClient:
             raise MalformedMessage("invalid Solana account response", exchange="pumpfun") from None
         state = curve_state_from_rpc_account(mint, decoded)
         return state.model_copy(update={"slot": slot, "commitment": "finalized"})
+
+    async def get_block_time(self, slot: int) -> datetime | None:
+        """The block time of ``slot`` (UTC), or ``None`` when the node has none."""
+        result = await self._call("getBlockTime", [int(slot)])
+        if result is None:
+            return None
+        if type(result) is not int or result <= 0:
+            raise MalformedMessage("invalid getBlockTime result", exchange="pumpfun")
+        return datetime.fromtimestamp(result, tz=UTC)
+
+    async def get_curve_states(
+        self, mints: Sequence[str], *, with_block_time: bool = True
+    ) -> CurveBatch:
+        """The curve of every mint, 100 per ``getMultipleAccounts`` (T4.2f,
+        ``rpc_curves.py``). ``observed_at`` is the slot's block time; a slot
+        without one keeps ``received_at`` and is counted. A refusal is by name,
+        never a number; a failed call raises and the caller counts it."""
+        states: dict[str, NormalizedCurveState] = {}
+        refused: dict[str, str] = {}
+        slots: list[int] = []
+        block_times: dict[int, datetime | None] = {}
+        calls = missing = 0
+        for start in range(0, len(mints), ACCOUNTS_PER_CALL):
+            pairs = curve_addresses(mints[start : start + ACCOUNTS_PER_CALL])
+            result = await self._call(
+                "getMultipleAccounts", [[address for _, address in pairs], _FINALIZED]
+            )
+            calls += 1
+            received_at = utcnow()
+            try:
+                slot = _slot(result)
+            except (KeyError, TypeError, ValueError):
+                raise MalformedMessage(
+                    "invalid getMultipleAccounts response", exchange="pumpfun"
+                ) from None
+            block_time: datetime | None = None
+            if with_block_time:
+                if slot not in block_times:
+                    calls += 1
+                    try:
+                        block_times[slot] = await self.get_block_time(slot)
+                    except RateLimited:
+                        raise
+                    except ExchangeError:
+                        block_times[slot] = None
+                block_time = block_times[slot]
+            chunk_states, chunk_refused, _ = decode_curve_batch(
+                [mint for mint, _ in pairs], result, block_time=block_time, received_at=received_at
+            )
+            if with_block_time and block_time is None:
+                missing += len(chunk_states)
+            states.update(chunk_states)
+            refused.update(chunk_refused)
+            slots.append(slot)
+        return CurveBatch(
+            states=states,
+            refused=refused,
+            slots=tuple(slots),
+            calls=calls,
+            block_time_missing=missing,
+        )
 
     async def get_mayhem_flows(self, mints: Sequence[str]) -> MayhemFlowBatch:
         """The agent's net flow for each Mayhem mint, four accounts per mint in
@@ -212,4 +292,4 @@ def _flow(mint: str, accounts: list[Any], *, slot: int, now: Any) -> NormalizedM
     )
 
 
-__all__ = ["PUBLIC_RPC_URL", "MayhemFlowBatch", "SolanaRpcClient"]
+__all__ = ["METHOD_SPACING_S", "PUBLIC_RPC_URL", "CurveBatch", "MayhemFlowBatch", "SolanaRpcClient"]

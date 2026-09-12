@@ -35,6 +35,16 @@ then the young tier (``young_minutes``) and the rest; inside each tier the
 genuinely skipped — and the collector writes that as a ``meme_ingest_gaps`` row
 instead of leaving a silent hole, which is the whole difference between a gap
 and a lie.
+
+**Since T4.2f the chain photographs every tracked curve once a minute**
+(``chain.py``, one ``getMultipleAccounts`` per 100 mints), so the 60 REST
+requests are no longer the curve's budget: :meth:`MintTracker.plan` with
+``chain_covered=True`` selects only what the REST mirror alone can teach
+(:meth:`MintTracker.needs_rest`) — the site's agent state of a mint never read
+by REST, its transitions while the agent is ``active``/``paused`` (one read per
+``mayhem_refresh``), the REST word of a finished curve, and a fresher photo of
+the mints the Lab is marking. Everything else is the chain's, and a mint the
+budget still leaves out is ``skipped`` only when it was a candidate.
 """
 
 from __future__ import annotations
@@ -56,6 +66,11 @@ TIER_NEW = 3
 TIER_YOUNG = 4
 TIER_REST = 5
 
+REST_SOURCE = "pumpfun_rest"
+MAYHEM_REFRESH = timedelta(minutes=5)
+"""How often an ``active``/``paused`` agent's state is re-read from the mirror
+when the chain carries the curve (``MEME_REST_MAYHEM_REFRESH_S``)."""
+
 
 @dataclass(frozen=True, slots=True)
 class TrackedMint:
@@ -69,6 +84,10 @@ class TrackedMint:
     mayhem_state: str | None = None
     initial_real_token_reserves: Decimal | None = None
     last_polled_at: datetime | None = None
+    last_rest_polled_at: datetime | None = None
+    """The last successful ``pumpfun_rest`` read (T4.2f): with the chain
+    photographing the curve every minute, this is what says whether the mirror
+    has ever told us the site's agent state of this mint, and when."""
     mcap_sol: Decimal | None = None
     complete: bool = False
     migrated: bool = False
@@ -173,19 +192,29 @@ class MintTracker:
             quote_unsupported=existing.quote_unsupported or candidate.quote_unsupported,
             mcap_sol=candidate.mcap_sol if candidate.mcap_sol is not None else existing.mcap_sol,
             last_polled_at=candidate.last_polled_at or existing.last_polled_at,
+            last_rest_polled_at=candidate.last_rest_polled_at or existing.last_rest_polled_at,
             board=candidate.board or existing.board,
         )
         self._mints[candidate.mint] = merged
         return merged
 
-    def mark_polled(self, mint: str, at: datetime, *, mcap_sol: Decimal | None = None) -> None:
-        """A successful read. On a finished curve it *is* the final read."""
+    def mark_polled(
+        self,
+        mint: str,
+        at: datetime,
+        *,
+        mcap_sol: Decimal | None = None,
+        source: str = REST_SOURCE,
+    ) -> None:
+        """A successful read from ``source``. On a finished curve it *is* the
+        final read, whichever source made it."""
         current = self._mints.get(mint)
         if current is None:
             return
         self._mints[mint] = dataclasses.replace(
             current,
             last_polled_at=at,
+            last_rest_polled_at=at if source == REST_SOURCE else current.last_rest_polled_at,
             mcap_sol=mcap_sol if mcap_sol is not None else current.mcap_sol,
             final_read_pending=False,
         )
@@ -236,22 +265,58 @@ class MintTracker:
             return TIER_NEW
         return TIER_YOUNG if now - tracked.age_anchor <= self._young else TIER_REST
 
+    def needs_rest(
+        self,
+        tracked: TrackedMint,
+        now: datetime,
+        boosted: Mapping[str, int],
+        mayhem_refresh: timedelta = MAYHEM_REFRESH,
+    ) -> bool:
+        """With the chain carrying the curve (T4.2f), what the mirror alone still
+        teaches about this mint — and therefore what a REST request buys."""
+        if boosted.get(tracked.mint) == TIER_OPEN_BET:
+            return True
+        if tracked.finished and tracked.final_read_pending:
+            return True
+        if tracked.last_rest_polled_at is None:
+            return True
+        if tracked.mayhem_state in ACTIVE_MAYHEM_STATES:
+            return now - tracked.last_rest_polled_at >= mayhem_refresh
+        return False
+
     def plan(
-        self, now: datetime, budget: int, *, boosted: Mapping[str, int] | None = None
+        self,
+        now: datetime,
+        budget: int,
+        *,
+        boosted: Mapping[str, int] | None = None,
+        chain_covered: bool = False,
+        mayhem_refresh: timedelta = MAYHEM_REFRESH,
     ) -> PollPlan:
         """Pick up to ``budget`` mints: by tier, least recently polled first inside
         each. ``boosted`` names mints whose tier comes from outside the tracker —
         an open paper bet (``TIER_OPEN_BET``) or a board listing the tracker has
-        not seen itself."""
-        if budget <= 0:
-            return PollPlan(selected=(), skipped=tuple(sorted(self._mints)))
+        not seen itself. With ``chain_covered`` only the mints :meth:`needs_rest`
+        names are candidates, ordered by their last **REST** read; the rest is
+        the chain's and is not ``skipped``."""
         boost = boosted or {}
+        candidates = [
+            m
+            for m in self._mints.values()
+            if not chain_covered or self.needs_rest(m, now, boost, mayhem_refresh)
+        ]
+        if budget <= 0:
+            return PollPlan(selected=(), skipped=tuple(sorted(m.mint for m in candidates)))
+
+        def stamp(m: TrackedMint) -> datetime | None:
+            return m.last_rest_polled_at if chain_covered else m.last_polled_at
+
         ordered = sorted(
-            self._mints.values(),
+            candidates,
             key=lambda m: (
                 self.tier(m, now, boost),
-                m.last_polled_at is not None,
-                m.last_polled_at or datetime.min.replace(tzinfo=m.first_seen_at.tzinfo),
+                stamp(m) is not None,
+                stamp(m) or datetime.min.replace(tzinfo=m.first_seen_at.tzinfo),
                 m.mint,
             ),
         )

@@ -1,37 +1,29 @@
-"""The entry gate and the exit rules of a curve position, as pure functions.
+"""The entry gate of a curve position, as a pure function — and the home of the
+exit rules' names (:mod:`hunter_indicators.meme.exits`, re-exported here so
+``hunter_indicators.meme.rules:evaluate_entry+evaluate_exit`` stays the
+``code_ref`` of every seeded rule set).
 
 Registered the way a feature is (``key``, ``version``, ``parameters``,
 ``description``, ``inputs``): changing a threshold is a **new version**, never an
 edit, because a rule set that changed meaning silently would make two runs of
-EXP-M1 incomparable.
+an EXP-M* incomparable.
 
 The entry gate answers one question — *may we buy this mint now?* — over a row of
-features, and every "no" has a name. Three of those names are about our own
+features, and every "no" has a name. Several of those names are about our own
 instrument rather than the market: ``progress_unknown``,
-``creator_net_seller_unknown`` and ``curve_volume_1m_unknown`` fire when the free
-sources have not produced the input yet (T4.2 leaves exactly these columns null
-with a reason). Refusing while blind is the decision; reading a missing input as
-"nobody sold" or "nobody traded" is the mistake Astra's review calls the gravest
-of the original design.
+``creator_net_seller_unknown``, ``curve_volume_1m_unknown``, ``hype_unknown``,
+``snipers_unknown``, ``line_*`` fire when the free sources have not produced the
+input yet. Refusing while blind is the decision; reading a missing input as
+"nobody sold", "nobody traded" or "the line is fine" is the mistake Astra's
+review calls the gravest of the original design.
 
-The exit side is a declared precedence, evaluated in this order:
-
-1. ``rug_signal`` — placeholder: no detector exists, so ``rug_suspected`` is
-   ``None`` in production today and the decision says ``rug_signal_unknown``
-   out loud instead of behaving as if a rug had been ruled out;
-2. ``creator_dump`` — the creator turned net seller (``docs/RISK_ENGINE_MEME.md``
-   §6). Unknown is ``creator_dump_unknown``, never "the dev did not sell";
-3. ``migrated`` / ``curve_complete`` — the curve stops being the venue;
-4. ``max_loss`` — the floor against the cost basis. It is an exit rule, **not**
-   the risk of the position: on a curve the risk is everything we paid
-   (``docs/RISK_ENGINE_MEME.md`` §5), because the sell may not find a buyer;
-5. ``target_multiple`` — the ROI Everton asked for;
-6. ``trailing_from_peak`` — drawdown from the highest mark-to-curve seen;
-7. ``time_stop`` — the horizon.
-
-Marks are always the honest mark-to-curve (what a full sell would net now, fees
-included), so ``target_multiple = 2`` means "a full exit would double what we
-paid", not "the marginal price doubled".
+T4.10 adds the criteria of EXP-M2 (the line: ``higher_lows``, ``breakout_15m``,
+``distance_to_support_pct`` in a band) and EXP-M3 (the hype probe:
+``hype_score`` floor, ``dev_share`` ceiling — with the brief's one declared
+exception, an unknown ``dev_share`` **with a reason** may pass — and a
+``snipers`` ceiling). Every new criterion is **off by default**: a gate that does
+not ask a question does not refuse over it, so EXP-M1's frozen gate reads
+exactly as it did.
 """
 
 from __future__ import annotations
@@ -42,8 +34,23 @@ from decimal import Decimal, localcontext
 from typing import Final
 
 from hunter_core.strategies.numeric import CONTEXT
+from hunter_indicators.meme.exits import (
+    EXIT_INPUTS,
+    ExitDecision,
+    ExitRules,
+    ExitState,
+    evaluate_exit,
+    hit_curve_event,
+    hit_line_break,
+    hit_max_loss,
+    hit_target,
+    hit_time_stop,
+    hit_trailing,
+)
 
 __all__ = [
+    "EXIT_INPUTS",
+    "GATE_INPUTS",
     "EntryFeatures",
     "EntryGate",
     "ExitDecision",
@@ -53,6 +60,7 @@ __all__ = [
     "evaluate_entry",
     "evaluate_exit",
     "hit_curve_event",
+    "hit_line_break",
     "hit_max_loss",
     "hit_target",
     "hit_time_stop",
@@ -66,13 +74,12 @@ GATE_INPUTS: Final = (
     "meme_curve_snapshots.real_token_reserves",
     "meme_features_1m.creator_sold",
     "meme_features_1m.curve_volume_1m_sol",
-)
-EXIT_INPUTS: Final = (
-    "paper_wallet.mark_to_curve",
-    "paper_wallet.position.peak_mark_sol",
-    "meme_tokens.completed_at",
-    "meme_tokens.migrated_at",
-    "meme_features_1m.creator_sold",
+    "meme_features_1m.higher_lows",
+    "meme_features_1m.breakout_15m",
+    "meme_features_1m.distance_to_support_pct",
+    "meme_features_1m.hype_score",
+    "meme_features_1m.dev_share",
+    "meme_features_1m.snipers",
 )
 
 
@@ -89,6 +96,21 @@ class EntryGate:
     max_progress_pct: Decimal
     max_participation_pct: Decimal
     require_creator_not_net_seller: bool = True
+    require_progress: bool = True
+    """Off: the progress window is not a criterion and an unknown progress is
+    not a refusal (EXP-M3 buys before the denominator of a 30-second-old curve
+    is known). On (the default): the window applies and unknown refuses."""
+    require_higher_lows: bool = False
+    require_breakout_15m: bool = False
+    min_distance_to_support_pct: Decimal | None = None
+    max_distance_to_support_pct: Decimal | None = None
+    """A band on ``(mcap − support) / support``; either bound alone is legal."""
+    min_hype_score: Decimal | None = None
+    max_dev_share: Decimal | None = None
+    dev_share_unknown_allowed: bool = False
+    """The brief's one exception to "unknown refuses": ``dev_share ≤ 0,10 ou
+    NULL com motivo``. Only meaningful with ``max_dev_share`` set."""
+    max_snipers: int | None = None
     inputs: tuple[str, ...] = GATE_INPUTS
 
     def __post_init__(self) -> None:
@@ -100,10 +122,23 @@ class EntryGate:
             raise ValueError("progress window must satisfy 0 <= min <= max <= 100")
         if not 0 < self.max_participation_pct <= HUNDRED:
             raise ValueError("max_participation_pct must be in (0, 100]")
+        low, high = self.min_distance_to_support_pct, self.max_distance_to_support_pct
+        if low is not None and high is not None and low > high:
+            raise ValueError("distance band must satisfy min <= max")
+        if self.min_hype_score is not None and not 0 <= self.min_hype_score <= 1:
+            raise ValueError("min_hype_score must be in [0, 1]")
+        if self.max_dev_share is not None and not 0 <= self.max_dev_share <= 1:
+            raise ValueError("max_dev_share must be in [0, 1]")
+        if self.max_snipers is not None and self.max_snipers < 0:
+            raise ValueError("max_snipers cannot be negative")
 
     def as_parameters(self) -> Mapping[str, str]:
-        """Every threshold as a string — what a persisted decomposition stores."""
-        return {
+        """Every threshold as a string — what a persisted decomposition stores.
+
+        A criterion the gate does not ask is not listed: EXP-M1's registered
+        parameters must read today exactly as they did the day they were frozen.
+        """
+        parameters = {
             "min_age_s": str(self.min_age_s),
             "max_age_s": str(self.max_age_s),
             "min_progress_pct": str(self.min_progress_pct),
@@ -111,6 +146,19 @@ class EntryGate:
             "max_participation_pct": str(self.max_participation_pct),
             "require_creator_not_net_seller": str(self.require_creator_not_net_seller),
         }
+        optional: dict[str, object] = {
+            "require_progress": None if self.require_progress else False,
+            "require_higher_lows": self.require_higher_lows or None,
+            "require_breakout_15m": self.require_breakout_15m or None,
+            "min_distance_to_support_pct": self.min_distance_to_support_pct,
+            "max_distance_to_support_pct": self.max_distance_to_support_pct,
+            "min_hype_score": self.min_hype_score,
+            "max_dev_share": self.max_dev_share,
+            "dev_share_unknown_allowed": self.dev_share_unknown_allowed or None,
+            "max_snipers": self.max_snipers,
+        }
+        parameters.update({k: str(v) for k, v in optional.items() if v is not None})
+        return parameters
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +173,17 @@ class EntryFeatures:
     intended_size_sol: Decimal
     curve_complete: bool = False
     migrated: bool = False
+    higher_lows: bool | None = None
+    breakout_15m: bool | None = None
+    distance_to_support_pct: Decimal | None = None
+    line_reason: str | None = None
+    """Why the line columns are ``None`` (``lines.LINE_REASONS``); named in the
+    refusal so the heartbeat counts blindness apart from a line that said no."""
+    hype_score: Decimal | None = None
+    hype_reason: str | None = None
+    dev_share: Decimal | None = None
+    dev_share_reason: str | None = None
+    snipers: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,72 +192,6 @@ class GateDecision:
 
     allowed: bool
     refusals: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ExitRules:
-    """One registered exit rule set, thresholds and the two event switches."""
-
-    key: str
-    version: int
-    description: str
-    target_multiple: Decimal
-    trailing_drawdown_pct: Decimal
-    time_stop_s: int
-    max_loss_pct: Decimal
-    exit_on_curve_complete: bool = True
-    exit_on_migration: bool = True
-    exit_on_creator_dump: bool = True
-    inputs: tuple[str, ...] = EXIT_INPUTS
-
-    def __post_init__(self) -> None:
-        if self.version < 1:
-            raise ValueError("version starts at 1")
-        if self.target_multiple <= 1:
-            raise ValueError("target_multiple must be greater than 1")
-        if not 0 < self.trailing_drawdown_pct < HUNDRED:
-            raise ValueError("trailing_drawdown_pct must be in (0, 100)")
-        if not 0 < self.max_loss_pct <= HUNDRED:
-            raise ValueError("max_loss_pct must be in (0, 100]")
-        if self.time_stop_s < 1:
-            raise ValueError("time_stop_s must be at least 1 second")
-
-    def as_parameters(self) -> Mapping[str, str]:
-        return {
-            "target_multiple": str(self.target_multiple),
-            "trailing_drawdown_pct": str(self.trailing_drawdown_pct),
-            "time_stop_s": str(self.time_stop_s),
-            "max_loss_pct": str(self.max_loss_pct),
-            "exit_on_curve_complete": str(self.exit_on_curve_complete),
-            "exit_on_migration": str(self.exit_on_migration),
-            "exit_on_creator_dump": str(self.exit_on_creator_dump),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class ExitState:
-    """What the exit rules read: honest marks, the peak, the clock, the events."""
-
-    mark_sol: Decimal
-    """Mark-to-curve: SOL a full sell would net **now**, fees included."""
-    cost_basis_sol: Decimal
-    peak_mark_sol: Decimal
-    held_s: int
-    curve_complete: bool = False
-    migrated: bool = False
-    rug_suspected: bool | None = None
-    """``None`` = no detector has looked. Named in the decision, never assumed."""
-    creator_net_seller: bool | None = None
-    """The creator dump of ``RISK_ENGINE_MEME`` §6; ``None`` = no trade feed."""
-
-
-@dataclass(frozen=True, slots=True)
-class ExitDecision:
-    """Exit or not, the winning reason, and what the rules could not know."""
-
-    should_exit: bool
-    reason: str | None
-    unknown: tuple[str, ...]
 
 
 def participation_pct(size_sol: Decimal, curve_volume_1m_sol: Decimal | None) -> Decimal | None:
@@ -224,6 +217,8 @@ def _age_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
 
 
 def _progress_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    if not gate.require_progress:
+        return []
     if features.progress_pct is None:
         return ["progress_unknown"]
     if features.progress_pct < gate.min_progress_pct:
@@ -258,6 +253,57 @@ def _participation_refusals(features: EntryFeatures, gate: EntryGate) -> list[st
     return []
 
 
+def _line_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    """EXP-M2: the line must exist, its lows must rise, the previous window's
+    high must be taken out and the price must sit in the band above support."""
+    asks_line = (
+        gate.require_higher_lows
+        or gate.require_breakout_15m
+        or gate.min_distance_to_support_pct is not None
+        or gate.max_distance_to_support_pct is not None
+    )
+    if not asks_line:
+        return []
+    if features.higher_lows is None or features.distance_to_support_pct is None:
+        return [f"line_{features.line_reason or 'unknown'}"]
+    refusals: list[str] = []
+    if gate.require_higher_lows and not features.higher_lows:
+        refusals.append("no_higher_lows")
+    if gate.require_breakout_15m:
+        if features.breakout_15m is None:
+            refusals.append("breakout_unknown")
+        elif not features.breakout_15m:
+            refusals.append("no_breakout")
+    low, high = gate.min_distance_to_support_pct, gate.max_distance_to_support_pct
+    if low is not None and features.distance_to_support_pct < low:
+        refusals.append("distance_below_min")
+    if high is not None and features.distance_to_support_pct > high:
+        refusals.append("distance_above_max")
+    return refusals
+
+
+def _hype_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    """EXP-M3: the documented score floor, the dev's share and the snipers."""
+    refusals: list[str] = []
+    if gate.min_hype_score is not None:
+        if features.hype_score is None:
+            refusals.append(f"hype_{features.hype_reason or 'unknown'}")
+        elif features.hype_score < gate.min_hype_score:
+            refusals.append("hype_below_min")
+    if gate.max_dev_share is not None:
+        if features.dev_share is None:
+            if not (gate.dev_share_unknown_allowed and features.dev_share_reason):
+                refusals.append("dev_share_unknown")
+        elif features.dev_share > gate.max_dev_share:
+            refusals.append("dev_share_above_max")
+    if gate.max_snipers is not None:
+        if features.snipers is None:
+            refusals.append("snipers_unknown")
+        elif features.snipers > gate.max_snipers:
+            refusals.append("snipers_above_max")
+    return refusals
+
+
 def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
     """May we buy this mint now? Pure function of one features row and one gate."""
     refusals: list[str] = []
@@ -271,63 +317,6 @@ def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
     refusals.extend(_progress_refusals(features, gate))
     refusals.extend(_creator_refusals(features, gate))
     refusals.extend(_participation_refusals(features, gate))
+    refusals.extend(_line_refusals(features, gate))
+    refusals.extend(_hype_refusals(features, gate))
     return GateDecision(allowed=not refusals, refusals=tuple(refusals))
-
-
-def hit_curve_event(state: ExitState, rules: ExitRules) -> str | None:
-    """``migrated`` or ``curve_complete`` when the rule set watches for them."""
-    if rules.exit_on_migration and state.migrated:
-        return "migrated"
-    if rules.exit_on_curve_complete and state.curve_complete:
-        return "curve_complete"
-    return None
-
-
-def hit_max_loss(state: ExitState, rules: ExitRules) -> bool:
-    """Mark at or below the declared floor against the cost basis."""
-    with localcontext(CONTEXT):
-        floor = state.cost_basis_sol * (HUNDRED - rules.max_loss_pct) / HUNDRED
-        return state.mark_sol <= floor
-
-
-def hit_target(state: ExitState, rules: ExitRules) -> bool:
-    """Mark at or above ``target_multiple`` times everything we paid."""
-    with localcontext(CONTEXT):
-        return state.mark_sol >= state.cost_basis_sol * rules.target_multiple
-
-
-def hit_trailing(state: ExitState, rules: ExitRules) -> bool:
-    """Mark fell ``trailing_drawdown_pct`` from the highest mark seen since entry."""
-    with localcontext(CONTEXT):
-        trigger = state.peak_mark_sol * (HUNDRED - rules.trailing_drawdown_pct) / HUNDRED
-        return state.mark_sol <= trigger
-
-
-def hit_time_stop(state: ExitState, rules: ExitRules) -> bool:
-    """Held for at least the declared horizon."""
-    return state.held_s >= rules.time_stop_s
-
-
-def evaluate_exit(state: ExitState, rules: ExitRules) -> ExitDecision:
-    """Should we sell now? The precedence is the module docstring's list."""
-    unknown: tuple[str, ...] = ()
-    if state.rug_suspected is None:
-        unknown += ("rug_signal_unknown",)
-    if rules.exit_on_creator_dump and state.creator_net_seller is None:
-        unknown += ("creator_dump_unknown",)
-    reason: str | None = None
-    if state.rug_suspected:
-        reason = "rug_signal"
-    elif rules.exit_on_creator_dump and state.creator_net_seller:
-        reason = "creator_dump"
-    elif (event := hit_curve_event(state, rules)) is not None:
-        reason = event
-    elif hit_max_loss(state, rules):
-        reason = "max_loss"
-    elif hit_target(state, rules):
-        reason = "target_multiple"
-    elif hit_trailing(state, rules):
-        reason = "trailing_from_peak"
-    elif hit_time_stop(state, rules):
-        reason = "time_stop"
-    return ExitDecision(should_exit=reason is not None, reason=reason, unknown=unknown)

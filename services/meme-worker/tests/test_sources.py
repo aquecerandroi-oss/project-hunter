@@ -131,6 +131,31 @@ def test_the_heartbeat_reports_the_folds_coverage_and_the_tape_cycle_never_a_sil
     )
 
 
+def test_the_heartbeat_carries_the_chain_loop_and_the_budget_the_edge_enforces() -> None:
+    """T4.2f: the chain loop's last cycle and the tape budget as measured —
+    unknown until the loops ran (``""``), never a zero that reads as health."""
+    sources = SourcesState()
+    empty = sources.heartbeat_fields(NOW, tracked=0)
+    assert empty["chain_read_mints"] == "" and empty["chain_cycle_s"] == ""
+    assert empty["swap_api_effective_budget_60s"] == "" and empty["swap_api_blocked_until"] == ""
+    assert empty["chain_calls_60s"] == "0" and empty["swap_api_429_1h"] == "0"
+    sources.record_chain_cycle(
+        NOW, duration_s=1.284, tracked=141, read=115, calls=4, refused=26, block_time_missing=0
+    )
+    sources.record_tape_budget(
+        NOW, effective=12, measured=16, refused_429=1, blocked_until=NOW + timedelta(seconds=60)
+    )
+    fields = sources.heartbeat_fields(NOW, tracked=141)
+    assert fields["chain_cycle_s"] == "1.284" and fields["chain_tracked_mints"] == "141"
+    assert fields["chain_read_mints"] == "115" and fields["chain_calls_60s"] == "4"
+    assert fields["chain_refused_1h"] == "26" and fields["chain_block_time_missing_60s"] == "0"
+    assert fields["swap_api_effective_budget_60s"] == "12"
+    assert fields["swap_api_measured_60s"] == "16" and fields["swap_api_429_1h"] == "1"
+    assert fields["swap_api_blocked_until"] == (NOW + timedelta(seconds=60)).isoformat()
+    later = sources.heartbeat_fields(NOW + timedelta(seconds=61), tracked=141)
+    assert later["chain_calls_60s"] == "0" and later["swap_api_429_1h"] == "1"
+
+
 def test_a_connected_trenches_says_true_and_a_dropped_one_false() -> None:
     sources = SourcesState()
     sources[TRENCHES_WS].connected = True

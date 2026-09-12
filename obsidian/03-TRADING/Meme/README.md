@@ -53,6 +53,8 @@ por isso `result: nao-iniciado` com 0 avaliáveis e 0 dias.
 | Conjunto | Pré-registro | Status | Último veredito |
 |---|---|---|---|
 | `comprar_cedo_na_curva v1` + `alvo_2x_trailing_30_tempo_15m v1` — perfil `meme_paper_v0` (idade 30–600 s, progresso 2–50 %, participação ≤ 1 %; 2× / trailing 30 % / time stop 15 min / piso 50 % / dump do criador) | [[EXP-M1-comprar-cedo-na-curva]] | **pré-registrado** — carteira paper, sem chave, sem ordem real | — (nenhuma corrida; portão de desenho C1–C8 = `REVISE`, veredito **previsto** `descartar`) |
+| `a_linha_manda v1` + `alvo_2x_trailing_30_tempo_15m_linha v1` — conjunto `trendline_v0/1` (T4.10, `0026`: EXP-M1 com idade ≥ 5 min **e** fundos ascendentes **e** rompimento da janela anterior **e** banda 0–25 % sobre o suporte; saída com **linha rompida**) | [[EXP-M2-a-linha-manda]] | **pré-registrado** — paper, sem chave, sem ordem real | — (nenhuma corrida; portão = `REVISE`, veredito **previsto** `descartar`) |
+| `sonda_de_hype v1` + `alvo_3x_trailing_40_tempo_10m v1` + escala pela porta de `trendline_v0/1` — conjunto `hype_probe_v0/1` (T4.10, `0026`: 30 s–5 min, `hype_score ≥ 0,6`, sonda 0,01 SOL → perna 2 de 0,04 SOL com `parent_bet_id`) | [[EXP-M3-sonda-de-hype]] | **pré-registrado** — paper, sem chave, sem ordem real | — (nenhuma corrida; portão = `REVISE`, veredito **previsto** `descartar`) |
 
 Uma linha por `EXP-M<n>`, no mesmo espírito da página de família de `03-TRADING/Estrategias/**`
 (`docs/OBSIDIAN.md` §1). Status e veredito são copiados da página do experimento, nunca decididos

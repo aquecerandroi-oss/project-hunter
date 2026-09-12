@@ -84,7 +84,7 @@ describe("readLineFields: tolerant to the columns not existing yet", () => {
   });
 
   it("a null support with line_reason is present-but-untraceable; a numeric decimal is tolerated as text", () => {
-    const fields = readLineFields(feature({ support_line_sol: null, support_line_slope: null, line_reason: "flat", high_15m_sol: 12.5 }));
+    const fields = readLineFields(feature({ support_line_sol: null, support_line_slope: null, line_reason: "flat", high_15m_sol: "12.5" }));
     expect(fields.present).toBe(true);
     expect(fields.supportLineSol).toBeNull();
     expect(fields.lineReason).toBe("flat");

@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 from hunter_core.db.session import role_session
 from hunter_core.logging import get_logger
-from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot, money_str
+from hunter_meme_worker.lab_models import BetState, RuleSetSpec, Snapshot, money_str
 from hunter_meme_worker.lab_repo import apply_command, load_approved_proposals, pending_commands
 from hunter_meme_worker.lab_repo_bets import (
     close_bet_row,
@@ -38,6 +38,8 @@ from hunter_meme_worker.lab_repo_bets import (
     update_mark,
     wallet_state,
 )
+from hunter_meme_worker.lab_repo_lines import snapshot_at, support_lines_for
+from hunter_meme_worker.lines_exit import SupportLine, below_support, next_streak, support_at
 from hunter_meme_worker.paper_engine import (
     close_bet,
     close_without_snapshot,
@@ -187,8 +189,12 @@ async def _process_one(
         intent = _sell_now_intent(command)
     after = state.mark_at or state.entry_at
     snapshots = await snapshots_after(session, mint=state.mint, after=after)
+    lines, streak = await _line_state(ctx, session, state, after=after, now=now)
     last: tuple[Snapshot, Any] | None = None
     for snapshot in snapshots:
+        if state.params.exit_on_line_break:
+            below = below_support(snapshot.mcap_sol, support_at(lines, snapshot.observed_at))
+            streak = next_streak(streak, below)
         if intent is not None and snapshot.observed_at > _parse(intent["decided_at"]):
             sol_usd = await ctx.sol_usd(now)
             trigger_at = intent.get("snapshot_observed_at")
@@ -221,6 +227,7 @@ async def _process_one(
                 migrated=bet.migrated_at is not None and snapshot.observed_at >= bet.migrated_at,
                 creator_net_seller=bet.creator_net_seller,
                 sell_now=False,
+                below_support_streak=streak,
             )
             if reason is not None:
                 intent = {
@@ -268,6 +275,30 @@ async def _process_one(
         pending_reason=pending_reason,
     )
     return "closed"
+
+
+async def _line_state(
+    ctx: LabContext,
+    session: AsyncSession,
+    state: BetState,
+    *,
+    after: datetime,
+    now: datetime,
+) -> tuple[list[SupportLine], int | None]:
+    """T4.10: the support lines a bet that watches the line may read (folded at
+    or before ``now``; ``support_at`` further refuses any folded after the
+    snapshot being judged) and the streak rebuilt from the snapshot the last
+    mark was written on — one back, which is all a two-snapshot rule needs and
+    never lets a restart fire it early."""
+    if not state.params.exit_on_line_break:
+        return [], None
+    lines = await support_lines_for(
+        session, mint=state.mint, features_version=ctx.config.features_version, until=now
+    )
+    seed = await snapshot_at(session, mint=state.mint, at=after)
+    if seed is None:
+        return lines, None
+    return lines, next_streak(None, below_support(seed.mcap_sol, support_at(lines, after)))
 
 
 async def _settle_command(

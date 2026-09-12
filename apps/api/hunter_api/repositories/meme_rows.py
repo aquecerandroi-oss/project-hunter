@@ -106,6 +106,20 @@ class MemeFeatureRow:
     creator_sold_reason: str | None
     coverage: Decimal
     features_version: str
+    # 0026 (T4.10): defaults so a row read before the columns existed is still a row.
+    mcap_slope_5m: Decimal | None = None
+    mcap_slope_15m: Decimal | None = None
+    high_15m_sol: Decimal | None = None
+    low_15m_sol: Decimal | None = None
+    breakout_15m: bool | None = None
+    support_line_sol: Decimal | None = None
+    support_line_slope: Decimal | None = None
+    higher_lows: bool | None = None
+    distance_to_support_pct: Decimal | None = None
+    line_points: int | None = None
+    line_reason: str | None = None
+    hype_score: Decimal | None = None
+    hype_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

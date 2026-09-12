@@ -136,6 +136,23 @@ porque o inteiro excede 2^53 em JS.
 Não chamados: `GET /v1/fee-sharing/account/{addr}/shares?limit&cursor`, `GET /v2/fee-sharing/account/{addr}/coins`,
 `POST /v2/creators/unified-charts`, `POST /v1/coins/ath/batch`, `/coins/{mint}/ath?…&program=`.
 
+**Limite real medido (T4.2f, 12/09/2026 10:36–10:48 BRT; 4 sondas, 115 requisições, 5 × 429 — fixture
+`packages/exchange-adapters/tests/fixtures/pumpfun/t42f_swap_api_ratelimit_probes.json`):** a coluna RL = 1000
+acima é o `x-ratelimit-limit` do backend (janela de 60 s; `remaining` ≈ 900 em toda resposta 200) e **não é o que
+recusa**. Quem recusa é uma regra de rate limiting do **Cloudflare** (erro 1015: `server: cloudflare`,
+`retry-after: 60`, sem nenhum `x-ratelimit-*` na 429, corpo JSON `"title": "Error 1015: You are being rate
+limited"`, `"retry_after": 30`): **~20 requisições por 60 s por IP, qualquer rota** — cortes na 20.ª, 20.ª, 23.ª e
+24.ª requisição da janela a 0,85–6 req/s, na 28.ª numa rajada de 16 req/s (contadores distribuídos do CF) e, com
+40 mints distintos a 1,2 req/s, na 24.ª; a 0,85 req/s só 8 das 22 aceitas caíram nos 10 s anteriores, logo a
+janela não é de 10 s. Uma violação bloqueia **todas** as requisições do IP por 60 s (recuperação com 200 após 60 s
+nas 5 vezes). Era isso que os 8 pulls concorrentes da T4.2c/T4.2e disparavam a cada ciclo. O adaptador
+(`hunter_exchanges/pumpfun/swap_api.py`) gasta **16/60 s** (`MEME_SWAP_API_BUDGET_60S`; recusa capacidade
+acima de 20) em cota exata por ciclo, e uma 429 real (`HttpRateLimited`, com os cabeçalhos) encolhe o orçamento
+para 80 % do que passou no minuto anterior e bloqueia o `retry-after`. Aritmética honesta: 16 pulls/min × 180 s
+de frescor ÷ ~130 rastreados ≈ **40 % de cobertura da fita por minuto** — o teto deste endpoint a partir de um
+IP só (a T4.2e mediu 38,8 %). `POST /v1/coins/market-activity/batch` (rota 4: N mints numa requisição, janelas
+5m/1h/6h/24h, USD) é a saída para uma feature de janela maior, não para a fita do minuto.
+
 ## 3. Superfícies em tempo real
 
 ### 3.1 WS do site: `wss://advanced-indexer.pump.fun/ws/trenches` (boards do screener)

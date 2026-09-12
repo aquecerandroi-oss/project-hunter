@@ -113,6 +113,20 @@ meme_features_1m = Table(
     Column("snapshot_observed_at", DateTime(timezone=True)),
     Column("snapshot_source", Text),
     Column("computed_at", DateTime(timezone=True), nullable=False),
+    # 0026 (T4.10) — the drawn lines and the hype.
+    Column("mcap_slope_5m", Numeric()),
+    Column("mcap_slope_15m", Numeric()),
+    Column("high_15m_sol", Numeric()),
+    Column("low_15m_sol", Numeric()),
+    Column("breakout_15m", Boolean),
+    Column("support_line_sol", Numeric()),
+    Column("support_line_slope", Numeric()),
+    Column("higher_lows", Boolean),
+    Column("distance_to_support_pct", Numeric()),
+    Column("line_points", Integer),
+    Column("line_reason", Text),
+    Column("hype_score", Numeric()),
+    Column("hype_reason", Text),
 )
 
 meme_ingest_gaps = Table(

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from hunter_exchanges.pumpfun.models import NormalizedCurveState
-    from hunter_exchanges.pumpfun.rpc import MayhemFlowBatch
+    from hunter_exchanges.pumpfun.rpc import CurveBatch, MayhemFlowBatch
     from hunter_exchanges.pumpfun.ws import ConnectionState, MemeEvent
     from hunter_meme_worker.boards import BoardCollector
     from hunter_meme_worker.config import MemeConfig
@@ -61,6 +61,13 @@ class ChainSource(Protocol):
         """Four accounts per Mayhem mint, 25 mints per call (T4.2e, ``mayhem.py``)."""
         ...
 
+    async def get_curve_states(
+        self, mints: Sequence[str], *, with_block_time: bool = True
+    ) -> CurveBatch:
+        """The curve of every mint, 100 per call, stamped with the slot's block
+        time (T4.2f, ``chain.py``)."""
+        ...
+
 
 @dataclass
 class RadarState:
@@ -91,6 +98,15 @@ class RadarState:
     open_bets: frozenset[str] = frozenset()
     """Mints with an open paper bet, re-read from ``meme_paper_bets`` by the
     poller every cycle — the top of every priority list (poll, tape, risk)."""
+
+    chain_ok_at: datetime | None = None
+    """When the chain loop (T4.2f, ``chain.py``) last photographed the whole
+    tracked set. While this is fresh the REST poll narrows to what only the
+    mirror can teach (``tracker.needs_rest``); when it goes stale — the RPC is
+    down, or the loop never ran — the poll falls back to the full plan."""
+
+    def chain_covers(self, now: datetime, *, within_s: float) -> bool:
+        return self.chain_ok_at is not None and (now - self.chain_ok_at).total_seconds() <= within_s
 
     def observe(self, mint: str, observation: CurveObservation) -> None:
         current = self.observations.get(mint)

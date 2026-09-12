@@ -47,13 +47,16 @@ from hunter_meme_worker.lab_repo import (
     open_mints_for,
     pending_commands,
 )
+from hunter_meme_worker.lab_repo_lines import open_probes_for, scaled_parent_ids
 from hunter_meme_worker.proposals import evaluate_gate
+from hunter_meme_worker.proposals_scale import REFUSAL_SCALE_GATE_INACTIVE, evaluate_scale
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from hunter_exchanges.pumpfun.models import NormalizedSolPrice
     from hunter_meme_worker.config import MemeConfig
+    from hunter_meme_worker.proposals import GateRow
 
 logger = get_logger(__name__)
 
@@ -192,9 +195,47 @@ async def _gate_step(
                 refusals[spec.name].update(outcome.refusals)
                 rows_total += outcome.evaluated
                 proposals_total += await insert_proposals(session, outcome.drafts)
+            proposals_total += await _scale_step(ctx, session, specs, rows, refusals, now=now)
         ctx.state.last_gate_minute = minute
     ctx.state.refusals = {name: dict(counter) for name, counter in refusals.items()}
     return rows_total, proposals_total
+
+
+async def _scale_step(
+    ctx: LabContext,
+    session: AsyncSession,
+    specs: list[RuleSetSpec],
+    rows: list[GateRow],
+    refusals: dict[str, Counter[str]],
+    *,
+    now: datetime,
+) -> int:
+    """T4.10: for every set that scales, the open probes not yet scaled are
+    judged by the line set's gate on this minute's rows (``proposals_scale``)."""
+    by_label = {spec.label: spec for spec in specs}
+    inserted = 0
+    for spec in specs:
+        if not spec.scales or spec.scale_gate is None:
+            continue
+        trend = by_label.get(spec.scale_gate)
+        if trend is None:
+            refusals[spec.name][REFUSAL_SCALE_GATE_INACTIVE] += 1
+            continue
+        probes = await open_probes_for(session, spec.id)
+        if not probes:
+            continue
+        outcome = evaluate_scale(
+            spec,
+            trend,
+            rows,
+            open_probes=probes,
+            already_scaled=await scaled_parent_ids(session, spec.id),
+            now=now,
+            ttl_s=ctx.config.lab_proposal_ttl_s,
+        )
+        refusals[spec.name].update(outcome.refusals)
+        inserted += await insert_proposals(session, outcome.drafts)
+    return inserted
 
 
 async def lab_tick(ctx: LabContext, *, now: datetime | None = None) -> TickReport:

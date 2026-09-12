@@ -166,6 +166,57 @@ def test_inside_a_tier_the_least_recently_polled_still_goes_first() -> None:
     assert tracker.plan(NOW, budget=3).selected == ("c", "b", "a")
 
 
+def test_with_the_chain_covering_the_rest_plan_keeps_only_identity_reads() -> None:
+    """T4.2f: the chain photographs every curve each minute, so a REST request
+    buys only what the mirror alone teaches — the agent state of a mint never
+    read, a stale active agent, the final read, a fresher photo of a bet. The
+    rest is the chain's and is not skipped."""
+    tracker = MintTracker(window_minutes=1440, cap=20)
+    read = NOW - timedelta(minutes=2)
+    tracker.observe(_tracked("never"))
+    tracker.observe(_tracked("done", last_rest_polled_at=read))
+    tracker.observe(_tracked("agent_fresh", mayhem_state="active", last_rest_polled_at=read))
+    tracker.observe(
+        _tracked(
+            "agent_stale", mayhem_state="paused", last_rest_polled_at=NOW - timedelta(minutes=6)
+        )
+    )
+    tracker.observe(
+        _tracked("final", migrated=True, final_read_pending=True, last_rest_polled_at=read)
+    )
+    tracker.observe(_tracked("bet", last_rest_polled_at=read))
+    tracker.observe(_tracked("chain_only", last_rest_polled_at=read, polled_minutes_ago=0))
+    boosted = {"bet": TIER_OPEN_BET}
+    plan = tracker.plan(NOW, budget=60, boosted=boosted, chain_covered=True)
+    assert plan.selected == ("bet", "final", "never", "agent_stale"), (
+        "inside a tier the mint never read by the mirror goes first"
+    )
+    assert plan.skipped == ()
+    short = tracker.plan(NOW, budget=2, boosted=boosted, chain_covered=True)
+    assert short.selected == ("bet", "final") and short.skipped == ("agent_stale", "never"), (
+        "skipped names only the candidates the budget left out"
+    )
+    assert tracker.plan(NOW, budget=0, chain_covered=True).skipped == (
+        "agent_stale",
+        "final",
+        "never",
+    ), "without the boost the bet is the chain's; the final read is still a candidate"
+    full = tracker.plan(NOW, budget=60, boosted=boosted)
+    assert set(full.selected) == {t.mint for t in tracker.snapshot()}, "no chain: everything"
+    tracker.mark_polled("never", NOW, source="solana_rpc")
+    assert "never" in tracker.plan(NOW, budget=60, chain_covered=True).selected, (
+        "a chain read is not an identity read"
+    )
+    tracker.mark_polled("never", NOW)
+    assert "never" not in tracker.plan(NOW, budget=60, chain_covered=True).selected
+    assert (
+        "agent_stale"
+        not in tracker.plan(
+            NOW, budget=60, chain_covered=True, mayhem_refresh=timedelta(minutes=10)
+        ).selected
+    )
+
+
 def test_a_board_hint_and_a_creator_merge_like_state_and_identity() -> None:
     tracker = MintTracker(window_minutes=1440, cap=10)
     tracker.observe(_tracked("m", creator="X"))

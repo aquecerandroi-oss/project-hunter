@@ -41,9 +41,12 @@ COVERAGE_EXPLANATION = (
     "linhas; uma linha sem fita diz o motivo em tape_reason (no_trade_feed = nunca puxada, "
     "not_polled = o orçamento da fita não a alcançou no ciclo, rate_limited = a fonte recusou); "
     "uma linha sem progresso diz progress_reason (denominator_unknown = Mayhem ainda sem a "
-    "leitura on-chain de MayhemState, mayhem_pending conta quantas)"
+    "leitura on-chain de MayhemState, mayhem_pending conta quantas); desde a T4.2f a curva de "
+    "todos os rastreados vem da cadeia uma vez por minuto (chain_read_mints ÷ chain_tracked_mints) "
+    "e a fita é limitada pela regra do Cloudflare do swap-api (~20 req/60 s por IP, medida — "
+    "swap_api_effective_budget_60s é o orçamento em vigor), não pelo x-ratelimit-limit de 1000"
 )
-"""T4.2e: what the two coverage numbers are and where the missing rows explain themselves."""
+"""T4.2e/T4.2f: what the coverage numbers are and where the missing rows explain themselves."""
 
 RadarStatus = Literal["alive", "stale", "never", "heartbeat_missing", "redis_unavailable"]
 """The worker's own heartbeat fields: ``alive`` when ``sources_at`` is fresh,
@@ -132,5 +135,21 @@ class MemeSourcesOut(BaseModel):
     mayhem_pending: int | None = None
     """Tracked Mayhem mints still without a denominator (the loop reads 25 a minute)."""
     mayhem_denominators_60s: int | None = None
+    chain_cycle_s: float | None = None
+    """T4.2f: the chain loop's last cycle — every tracked curve from the chain
+    once a minute (``getMultipleAccounts``, 100 per call). ``None`` before the
+    first cycle or from a worker that predates T4.2f."""
+    chain_tracked_mints: int | None = None
+    chain_read_mints: int | None = None
+    """How many of the tracked mints the last cycle photographed; the rest are
+    refused by name (``chain_refused_1h``: not SOL-quoted, emptied, not found)."""
+    chain_calls_60s: int | None = None
+    chain_refused_1h: int | None = None
+    swap_api_effective_budget_60s: int | None = None
+    """The tape budget in force: the configured value, or 80 % of what
+    succeeded before the last real 429 (Cloudflare's ~20/60 s per IP)."""
+    swap_api_measured_60s: int | None = None
+    swap_api_429_1h: int | None = None
+    swap_api_blocked_until: datetime | None = None
     coverage_explanation: str = COVERAGE_EXPLANATION
     sources: list[MemeSourceOut]

@@ -49,6 +49,8 @@ _GATE_ROWS = text(
     "SELECT f.mint, f.end_time, f.curve_progress_pct, f.progress_reason, f.mcap_sol, "
     "       f.creator_net_seller, f.curve_volume_1m_sol, "
     "       f.snapshot_observed_at, f.snapshot_source, "
+    "       f.higher_lows, f.breakout_15m, f.distance_to_support_pct, f.line_reason, "
+    "       f.hype_score, f.hype_reason, f.dev_share, f.dev_share_reason, f.snipers, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
     "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol "
@@ -154,6 +156,17 @@ async def load_gate_rows(
                 completed_at=r["completed_at"],
                 migrated_at=r["migrated_at"],
                 snapshot=snapshot,
+                # T4.10 (``0026``): the line and the hype of the minute, each
+                # ``None`` with its reason; the gate refuses by that reason.
+                higher_lows=r["higher_lows"],
+                breakout_15m=r["breakout_15m"],
+                distance_to_support_pct=r["distance_to_support_pct"],
+                line_reason=r["line_reason"],
+                hype_score=r["hype_score"],
+                hype_reason=r["hype_reason"],
+                dev_share=r["dev_share"],
+                dev_share_reason=r["dev_share_reason"],
+                snipers=r["snipers"],
             )
         )
     return out

@@ -44,6 +44,9 @@ function bet(overrides: Partial<MemeDeskBet> = {}): MemeDeskBet {
     sol_received: null,
     sol_usd_at_entry: "180",
     sol_usd_at_exit: null,
+    // T4.10a: `leg` and `parent_bet_id` are required in the generated type.
+    leg: "single",
+    parent_bet_id: null,
     ...overrides,
   };
 }

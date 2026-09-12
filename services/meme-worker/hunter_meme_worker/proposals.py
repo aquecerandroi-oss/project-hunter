@@ -38,7 +38,16 @@ from hunter_indicators.meme.curve import marginal_price_sol, quote_buy
 from hunter_indicators.meme.rules import EntryFeatures, evaluate_entry, participation_pct
 from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot, money_str, optional_money_str
 
-__all__ = ["GateOutcome", "GateRow", "ProposalDraft", "evaluate_gate"]
+__all__ = [
+    "GateOutcome",
+    "GateRow",
+    "ProposalDraft",
+    "draft_proposal",
+    "entry_features_of",
+    "evaluate_gate",
+    "gate_reasons",
+    "quote_for",
+]
 
 HUNDRED = Decimal(100)
 REFUSAL_ALREADY_OPEN = "already_open"
@@ -64,6 +73,17 @@ class GateRow:
     migrated_at: datetime | None
     snapshot: Snapshot | None
     """The snapshot the minute was folded from (``snapshot_observed_at``)."""
+    higher_lows: bool | None = None
+    breakout_15m: bool | None = None
+    distance_to_support_pct: Decimal | None = None
+    line_reason: str | None = None
+    hype_score: Decimal | None = None
+    hype_reason: str | None = None
+    dev_share: Decimal | None = None
+    dev_share_reason: str | None = None
+    snipers: int | None = None
+    """T4.10 (``0026``): the line and the hype of the minute — read by the
+    EXP-M2/EXP-M3 gates, ignored by a gate that does not ask."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,20 +128,34 @@ def _progress_pct(fraction: Decimal | None) -> Decimal | None:
         return fraction * HUNDRED
 
 
-def _entry_features(row: GateRow, spec: RuleSetSpec) -> EntryFeatures:
+def entry_features_of(
+    row: GateRow, spec: RuleSetSpec, *, size_sol: Decimal | None = None
+) -> EntryFeatures:
+    """The row as ``spec``'s gate reads it, sized ``size_sol`` (default: the set's)."""
     return EntryFeatures(
         mint=row.mint,
         age_s=_age_s(row),
         progress_pct=_progress_pct(row.curve_progress_pct),
         creator_net_seller=row.creator_sold,
         curve_volume_1m_sol=row.curve_volume_1m_sol,
-        intended_size_sol=spec.size_sol,
+        intended_size_sol=spec.size_sol if size_sol is None else size_sol,
         curve_complete=row.completed_at is not None,
         migrated=row.migrated_at is not None,
+        higher_lows=row.higher_lows,
+        breakout_15m=row.breakout_15m,
+        distance_to_support_pct=row.distance_to_support_pct,
+        line_reason=row.line_reason,
+        hype_score=row.hype_score,
+        hype_reason=row.hype_reason,
+        dev_share=row.dev_share,
+        dev_share_reason=row.dev_share_reason,
+        snipers=row.snipers,
     )
 
 
-def _quote(row: GateRow, snapshot: Snapshot, spec: RuleSetSpec) -> dict[str, Any]:
+def quote_for(
+    row: GateRow, snapshot: Snapshot, spec: RuleSetSpec, *, size_sol: Decimal | None = None
+) -> dict[str, Any]:
     """The snapshot the desk sees, and what ``size_sol`` would cost **with** the fee.
 
     The keys are the ones the desk reads (contract, Emendas of T4.7):
@@ -129,14 +163,15 @@ def _quote(row: GateRow, snapshot: Snapshot, spec: RuleSetSpec) -> dict[str, Any
     ``price_sol_per_token``, ``size_sol``, ``fee_pct``, ``fee_sol``, ``cost_sol``,
     ``tokens``, ``reason`` — plus the reserves, so the number can be re-derived.
     """
-    cost = quote_buy(snapshot.reserves, spec.size_sol, spec.fee_pct)
+    size = spec.size_sol if size_sol is None else size_sol
+    cost = quote_buy(snapshot.reserves, size, spec.fee_pct)
     progress = _progress_pct(row.curve_progress_pct)
     return {
         **snapshot.as_json(),
         "mcap_sol": optional_money_str(row.mcap_sol),
         "curve_progress_pct": optional_money_str(progress),
         "price_sol_per_token": money_str(marginal_price_sol(snapshot.reserves)),
-        "size_sol": money_str(spec.size_sol),
+        "size_sol": money_str(size),
         "fee_pct": money_str(spec.fee_pct),
         "curve_cost_sol": money_str(cost.curve_cost_sol),
         "fee_sol": money_str(cost.fee_sol),
@@ -146,12 +181,16 @@ def _quote(row: GateRow, snapshot: Snapshot, spec: RuleSetSpec) -> dict[str, Any
     }
 
 
-def _reasons(features: EntryFeatures, spec: RuleSetSpec) -> list[dict[str, Any]]:
-    """Which rule fired and the value of every feature it read — the decomposition."""
+def gate_reasons(features: EntryFeatures, spec: RuleSetSpec) -> list[dict[str, Any]]:
+    """Which rule fired and the value of every feature it read — the decomposition.
+
+    The T4.10 features are listed only when the gate asked for them, so an
+    EXP-M1 proposal's ``reasons`` read exactly as they did before.
+    """
     gate = spec.gate
     share = participation_pct(features.intended_size_sol, features.curve_volume_1m_sol)
     progress = features.progress_pct
-    return [
+    reasons: list[dict[str, Any]] = [
         {"rule": f"{gate.key}/{gate.version}"},
         {"feature": "age_s", "value": features.age_s, "window": [gate.min_age_s, gate.max_age_s]},
         {
@@ -166,6 +205,33 @@ def _reasons(features: EntryFeatures, spec: RuleSetSpec) -> list[dict[str, Any]]
             "cap": money_str(gate.max_participation_pct),
         },
     ]
+    if gate.require_higher_lows or gate.require_breakout_15m or gate.max_distance_to_support_pct:
+        reasons.append(
+            {
+                "feature": "line",
+                "higher_lows": features.higher_lows,
+                "breakout_15m": features.breakout_15m,
+                "distance_to_support_pct": optional_money_str(features.distance_to_support_pct),
+                "line_reason": features.line_reason,
+                "band": [
+                    optional_money_str(gate.min_distance_to_support_pct),
+                    optional_money_str(gate.max_distance_to_support_pct),
+                ],
+            }
+        )
+    if gate.min_hype_score is not None:
+        reasons.append(
+            {
+                "feature": "hype_score",
+                "value": optional_money_str(features.hype_score),
+                "hype_reason": features.hype_reason,
+                "min": money_str(gate.min_hype_score),
+                "dev_share": optional_money_str(features.dev_share),
+                "dev_share_reason": features.dev_share_reason,
+                "snipers": features.snipers,
+            }
+        )
+    return reasons
 
 
 def evaluate_gate(
@@ -185,7 +251,7 @@ def evaluate_gate(
         if row.mint in already_open:
             refusals[REFUSAL_ALREADY_OPEN] += 1
             continue
-        features = _entry_features(row, spec)
+        features = entry_features_of(row, spec)
         decision = evaluate_entry(features, spec.gate)
         if not decision.allowed:
             refusals.update(decision.refusals)
@@ -193,24 +259,46 @@ def evaluate_gate(
         if row.snapshot is None:
             refusals[REFUSAL_NO_SNAPSHOT_FOR_QUOTE] += 1
             continue
-        research = spec.kind == "research_only"
-        suggested = spec.suggested()
         drafts.append(
-            ProposalDraft(
-                id=str(uuid7()),
-                mint=row.mint,
-                rule_set_id=spec.id,
-                origin="rules",
-                status="approved" if research else "proposed",
-                proposed_at=now,
-                expires_at=now + timedelta(seconds=ttl_s),
-                features_end_time=row.end_time,
-                quote=_quote(row, row.snapshot, spec),
-                reasons=_reasons(features, spec),
-                suggested=suggested,
-                decision=dict(suggested) if research else None,
-                decided_by="rules" if research else None,
-                decided_at=now if research else None,
+            draft_proposal(
+                row,
+                spec,
+                quote=quote_for(row, row.snapshot, spec),
+                reasons=gate_reasons(features, spec),
+                suggested=spec.suggested(),
+                now=now,
+                ttl_s=ttl_s,
             )
         )
     return GateOutcome(drafts=drafts, refusals=refusals, evaluated=evaluated)
+
+
+def draft_proposal(
+    row: GateRow,
+    spec: RuleSetSpec,
+    *,
+    quote: dict[str, Any],
+    reasons: list[dict[str, Any]],
+    suggested: dict[str, Any],
+    now: datetime,
+    ttl_s: int,
+) -> ProposalDraft:
+    """A ``research_only`` proposal is born approved by ``rules``; an
+    ``operator`` one is born ``proposed`` and waits for the desk."""
+    research = spec.kind == "research_only"
+    return ProposalDraft(
+        id=str(uuid7()),
+        mint=row.mint,
+        rule_set_id=spec.id,
+        origin="rules",
+        status="approved" if research else "proposed",
+        proposed_at=now,
+        expires_at=now + timedelta(seconds=ttl_s),
+        features_end_time=row.end_time,
+        quote=quote,
+        reasons=reasons,
+        suggested=suggested,
+        decision=dict(suggested) if research else None,
+        decided_by="rules" if research else None,
+        decided_at=now if research else None,
+    )

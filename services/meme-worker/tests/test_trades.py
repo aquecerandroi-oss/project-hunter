@@ -1,5 +1,8 @@
 """The tape puller: priority and intervals, the per-cycle budget, the cursor
-walk to the high-water mark, dedupe rows, and what a refusal leaves behind.
+walk to the high-water mark, dedupe rows, and what a refusal leaves behind —
+since T4.2f the budget the edge enforces (~20/60 s, measured): the exact share
+per cycle, one page per mint unless an open bet, a real 429 that measures,
+shrinks and blocks, and ``rate_limited``/``not_polled`` meaning what they say.
 No socket: a fake ``TradeSource`` serves the live captures."""
 
 from __future__ import annotations
@@ -14,10 +17,12 @@ from typing import Any
 import pytest
 from hunter_meme_worker.repo_tape import trade_rows
 from hunter_meme_worker.sources import SWAP_API, SourcesState
+from hunter_meme_worker.tape_budget import BUDGET_REFUSED, TapeBudget
 from hunter_meme_worker.tracker import TIER_GRADUATING, TIER_NEW, TIER_OPEN_BET, TIER_REST
 from hunter_meme_worker.trades import TapeCoverage, TradesPuller, pull_once
 
 from hunter_exchanges.base import RateLimited
+from hunter_exchanges.pumpfun.rate_shared import HttpRateLimited
 from hunter_exchanges.pumpfun.swap_api import TradesPage, parse_trades_page
 
 pytestmark = pytest.mark.unit
@@ -44,13 +49,22 @@ class FakeSwapApi:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str | None]] = []
         self.refuse = False
+        self.bucket_refuse = False
 
     async def get_trades(
         self, mint: str, *, limit: int = 100, cursor: str | None = None
     ) -> TradesPage:
         self.calls.append((mint, cursor))
-        if self.refuse:
-            raise RateLimited("429", exchange="pumpfun_swap_api", retry_after_s=12)
+        if self.refuse:  # the edge's 429 as captured live: Cloudflare, retry-after, no window
+            raise HttpRateLimited(
+                "429",
+                exchange="pumpfun_swap_api",
+                retry_after_s=12,
+                status_code=429,
+                headers={"retry-after": "12", "server": "cloudflare"},
+            )
+        if self.bucket_refuse:  # our own token bucket saying no
+            raise RateLimited("bucket", exchange="pumpfun_swap_api", retry_after_s=3)
         if mint == "PUMP":  # the curve capture is one page: nothing older to walk to
             page = _page("swap_api_trades_5ejA_raw.json", mint)
             return dataclasses.replace(page, has_more=False, next_cursor=None)
@@ -118,10 +132,19 @@ def test_the_plan_orders_by_tier_respects_intervals_and_caps_the_cycle() -> None
     for mint in tiers:
         puller.coverage[mint] = TapeCoverage(last_pull_at=NOW)
     soon = NOW + timedelta(seconds=15)
-    assert puller.plan(tiers, soon) == ["bet", "grad"], "10 s tiers are due, 20 s and 60 s are not"
+    assert puller.plan(tiers, soon) == [], "T4.2f: every tier is due once a minute"
     assert puller.plan(tiers, NOW + timedelta(seconds=61)) == ["bet", "grad", "new", "rest"]
     small = TradesPuller(FakeSwapApi(), budget_60s=12, cycle_s=10)
     assert small.plan(tiers, NOW) == ["bet", "grad"], "budget_60s × cycle_s / 60 = 2 per cycle"
+
+
+def test_the_cycles_share_is_carried_exactly_and_never_burst() -> None:
+    """16 a minute over 10 s cycles is 2,67 a cycle: 2, 3, 3, 2, 3, 3 — sixteen in
+    the minute, never seventeen, never a burst the edge would count."""
+    budget = TapeBudget(budget_60s=16, cycle_s=10)
+    shares = [budget.per_cycle(NOW + timedelta(seconds=10 * i)) for i in range(12)]
+    assert shares[:6] == [2, 3, 3, 2, 3, 3] and sum(shares[:6]) == 16 == sum(shares[6:])
+    assert budget.per_cycle_nominal == 2
 
 
 async def test_a_pull_walks_the_cursor_to_the_cap_then_stops_at_the_high_water_mark(
@@ -160,21 +183,108 @@ async def test_curve_trades_are_written_once_per_cycle_and_a_refusal_is_named(
     assert log and log[0][0].startswith("INSERT INTO meme_trades")
     assert puller.covered_since("PUMP") == NOW and puller.absence_reason("PUMP") == "no_trade_feed"
     api.refuse = True
-    later = NOW + timedelta(seconds=10)
+    later = NOW + timedelta(seconds=61)
     report = await pull_once(
         puller, _factory(log), tiers={"PUMP": TIER_OPEN_BET, "NEW": TIER_NEW}, now=later
     )  # type: ignore[arg-type]
-    assert report.errors == 2 and report.pulled == 0
-    assert puller.absence_reason("NEW") == "rate_limited", (
-        "never covered and refused: the minute says so"
+    assert report.errors == 2 and report.pulled == 0 and report.refused_429 == 2
+    assert puller.absence_reason("NEW", at=later) == "rate_limited", (
+        "never covered and refused by the server: the minute says so"
     )
     assert puller.coverage_for("PUMP", later) == NOW, "covered before: the tape exists"
-    assert puller.absence_reason("PUMP") == "rate_limited", (
+    assert puller.absence_reason("PUMP", at=later) == "rate_limited", (
         "asked only when the tape is unusable — and then the refusal is the reason"
     )
     assert sources[SWAP_API].errors_1h.total(later) == 2
     last_error = sources[SWAP_API].last_error
     assert last_error is not None and last_error.startswith("rate_limited")
+    # The block: nothing is planned until retry-after passed, and the minute
+    # that closes inside it says ``rate_limited`` for everyone.
+    assert puller.budget.blocked_until == later + timedelta(seconds=12)
+    assert puller.plan({"X": TIER_REST}, later + timedelta(seconds=5)) == []
+    assert puller.absence_reason("X", at=later + timedelta(seconds=5)) == "rate_limited"
+    assert puller.absence_reason("X", at=later + timedelta(seconds=13)) == "not_polled"
+    assert puller.budget.measured == 0 and puller.budget.effective == 4, (
+        "no success in the 60 s before the 429: the floor, not a guess"
+    )
+
+
+async def test_a_real_429_measures_the_ceiling_shrinks_the_budget_and_restores_it_later(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sixteen successes in the minute, then Cloudflare says 429: the measured
+    ceiling is 16, the effective budget becomes 12 (80 %), the cycle inside the
+    block plans nothing, and the configured 16 returns after the hold."""
+    api = FakeSwapApi()
+    puller = TradesPuller(api, budget_60s=16, cycle_s=10, adapt_hold_s=900)
+    log: list[Any] = []
+    monkeypatch.setattr("hunter_meme_worker.trades.role_session", _no_role)
+    tiers = {f"M{i}": TIER_REST for i in range(40)}
+    pulled: list[int] = []
+    for cycle in range(6):
+        at = NOW + timedelta(seconds=10 * cycle)
+        report = await pull_once(puller, _factory(log), tiers=tiers, now=at)  # type: ignore[arg-type]
+        pulled.append(report.pulled)
+    assert (
+        pulled == [2, 3, 3, 2, 3, 3]
+        and puller.budget.ok_60s.total(NOW + timedelta(seconds=59)) == 16
+    )
+    api.refuse = True
+    at = NOW + timedelta(seconds=60)
+    report = await pull_once(puller, _factory(log), tiers=tiers, now=at)  # type: ignore[arg-type]
+    assert report.refused_429 >= 1 and report.pulled == 0
+    assert puller.budget.measured == 16 and puller.budget.effective == 12
+    assert puller.budget.blocked_until == at + timedelta(seconds=12)
+    api.refuse = False
+    blocked = await pull_once(puller, _factory(log), tiers=tiers, now=at + timedelta(seconds=10))  # type: ignore[arg-type]
+    assert blocked.planned == 0 and blocked.deferred >= 20, "inside the block: every due mint waits"
+    after = at + timedelta(seconds=20)
+    shares = [puller.budget.per_cycle(after + timedelta(seconds=10 * i)) for i in range(6)]
+    assert sum(shares) == 12, "the shrunk budget paces the next minute"
+    assert puller.budget.per_cycle(at + timedelta(seconds=900)) >= 2
+    assert puller.budget.effective == 16, "the configured budget is tried again after the hold"
+
+
+async def test_our_own_bucket_refusal_is_not_polled_never_rate_limited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = FakeSwapApi()
+    api.bucket_refuse = True
+    sources = SourcesState()
+    puller = TradesPuller(api, budget_60s=16, cycle_s=10, sources=sources)
+    log: list[Any] = []
+    monkeypatch.setattr("hunter_meme_worker.trades.role_session", _no_role)
+    report = await pull_once(puller, _factory(log), tiers={"PUMP": TIER_REST}, now=NOW)  # type: ignore[arg-type]
+    assert report.errors == 1 and report.refused_429 == 0
+    assert puller.absence_reason("PUMP", at=NOW) == "not_polled"
+    assert puller.coverage["PUMP"].last_error == BUDGET_REFUSED
+    assert puller.budget.blocked_until is None and puller.budget.effective == 16
+    assert sources[SWAP_API].last_error == BUDGET_REFUSED
+
+
+async def test_one_page_per_mint_and_the_walk_only_for_an_open_bet(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = FakeSwapApi()
+    puller = TradesPuller(api, budget_60s=16, cycle_s=60, max_pages=3)
+    log: list[Any] = []
+    monkeypatch.setattr("hunter_meme_worker.trades.role_session", _no_role)
+    report = await pull_once(
+        puller, _factory(log), tiers={"RAY": TIER_GRADUATING, "BET": TIER_OPEN_BET}, now=NOW
+    )  # type: ignore[arg-type]
+    assert report.pulled == 2 and report.pages == 4
+    assert [c for c in api.calls if c[0] == "RAY"] == [("RAY", None)], "one page is the minute"
+    assert len([c for c in api.calls if c[0] == "BET"]) == 3, "an open bet walks to the cap"
+
+
+def test_a_deferred_mint_that_was_covered_before_still_says_not_polled() -> None:
+    puller = TradesPuller(FakeSwapApi(), budget_60s=6, cycle_s=10)
+    puller.coverage["old"] = TapeCoverage(covered_since=NOW - timedelta(minutes=10))
+    tiers = {"old": TIER_REST, "bet": TIER_OPEN_BET}
+    assert puller.plan(tiers, NOW) == ["bet"]
+    assert puller.absence_reason("old", at=NOW) == "not_polled", (
+        "covered once, left out by the budget now: the budget is the reason"
+    )
 
 
 def test_a_mint_the_cap_left_out_is_remembered_as_not_polled() -> None:

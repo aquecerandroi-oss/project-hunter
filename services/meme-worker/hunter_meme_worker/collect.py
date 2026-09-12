@@ -8,12 +8,16 @@
   cycle naming the count, not one per mint, because a hundred rows saying the
   same thing is noise, not evidence. A curve quoted in something other than SOL
   is dropped from the set on the first refusal (T4.2c: it cost 2–4 requests a
-  minute for a reading the adapter will never produce);
+  minute for a reading the adapter will never produce). **Since T4.2f the chain
+  loop (``chain.py``) photographs every tracked curve once a minute**, so while
+  it is healthy the poll narrows to the identity reads only
+  (``tracker.needs_rest``) and the mints it leaves to the chain are not gaps;
 - **reconcile** reads the top-K tracked mints by market cap from the chain. The
   REST mirror is undocumented and best effort (T4-MEME-RADAR.md §2: never a single
   source of truth), so the mints where being wrong costs most are checked against
   the RPC — and both readings are kept, distinguished by
-  ``meme_curve_snapshots.source``, rather than one overwriting the other;
+  ``meme_curve_snapshots.source``, rather than one overwriting the other. It
+  runs only when the chain loop is off (``main.py``): the loop supersedes it;
 - **fold** writes one ``meme_features_1m`` row per tracked mint per closed minute
   (``fold.py``, since T4.2c with the boards and the tape), with a NULL and a
   reason wherever a source cannot answer;
@@ -72,6 +76,7 @@ WORKER_ROLE = "hunter_worker"
 BUDGET_REASON = "budget_exhausted"
 
 __all__ = [
+    "chain_covered",
     "fold_once",
     "forever",
     "minute_end",
@@ -107,7 +112,9 @@ async def persist_reading(
         await insert_snapshot(session, snapshot_row(state))
         await upsert_token(session, token_row_from_curve(state, params=params))
     ctx.tracker.observe(tracked_from_curve(state, tracked, params))
-    ctx.tracker.mark_polled(state.mint, state.observed_at, mcap_sol=state.market_cap_sol)
+    ctx.tracker.mark_polled(
+        state.mint, state.observed_at, mcap_sol=state.market_cap_sol, source=state.source
+    )
     ctx.state.observe(
         state.mint,
         CurveObservation(
@@ -134,6 +141,14 @@ async def refresh_open_bets(ctx: RadarContext) -> frozenset[str]:
     return ctx.state.open_bets
 
 
+def chain_covered(ctx: RadarContext, now: datetime) -> bool:
+    """The chain loop photographed the set within the last two of its cycles:
+    the REST poll may narrow to identity reads. Off, stale or failed → full plan."""
+    return ctx.config.chain_curves_enabled and ctx.state.chain_covers(
+        now, within_s=2 * ctx.config.chain_cycle_s
+    )
+
+
 async def poll_once(ctx: RadarContext) -> int:
     """One pass of the REST budget. Returns how many curves were read."""
     now = utcnow()
@@ -144,6 +159,8 @@ async def poll_once(ctx: RadarContext) -> int:
         now,
         ctx.config.rest_budget_per_minute,
         boosted={mint: TIER_OPEN_BET for mint in open_bets},
+        chain_covered=chain_covered(ctx, now),
+        mayhem_refresh=timedelta(seconds=ctx.config.rest_mayhem_refresh_s),
     )
     read = 0
     for mint in plan.selected:
@@ -197,6 +214,7 @@ async def _record_budget_gap(
                     "aged_out": aged_out,
                     "tracked": len(ctx.tracker),
                     "budget": ctx.config.rest_budget_per_minute,
+                    "chain_covered": chain_covered(ctx, now),
                 },
             ),
         )

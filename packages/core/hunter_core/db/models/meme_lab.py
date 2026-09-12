@@ -50,10 +50,18 @@ BET_EXIT_REASONS = (
     "sell_now",
     "rug_no_snapshot",
     "max_loss",
+    "line_broken",
 )
 """The contract's seven plus ``max_loss`` (Emendas 1): EXP-M1 pre-registered a
 50 % loss floor as an exit rule, and a floor that closed a bet under another name
-would be a lie in the diary."""
+would be a lie in the diary. Plus ``line_broken`` (``0026``, T4.10): the market
+cap closed below the support line for two snapshots in a row — EXP-M2's own
+invalidation, named as such."""
+
+BET_LEGS = ("probe", "scale", "single")
+"""``meme_paper_bets.leg`` (``0026``): the hype probe ("semi-comprado (sonda)"),
+the second leg that scales it ("escalado (perna 2)", which names its
+``parent_bet_id``) and the one-leg bet of every other rule set."""
 
 OPERATOR_COMMANDS = ("sell_now", "cancel")
 
@@ -190,6 +198,16 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
         CheckConstraint("(mark_sol IS NULL) = (mark_at IS NULL)", name="a_mark_says_when"),
         CheckConstraint("initial_risk_sol > 0", name="the_risk_is_what_was_spent"),
         CheckConstraint("char_length(mint) > 0", name="mint_is_not_empty"),
+        # 0026 — probe and scale legs (T4.10).
+        Index(
+            "ix_meme_paper_bets_parent_bet_id",
+            "parent_bet_id",
+            postgresql_where=text("parent_bet_id IS NOT NULL"),
+        ),
+        CheckConstraint("leg IN ('probe', 'scale', 'single')", name="leg_is_a_known_label"),
+        CheckConstraint(
+            "(leg = 'scale') = (parent_bet_id IS NOT NULL)", name="a_scale_leg_names_its_probe"
+        ),
     )
 
     proposal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meme_proposals.id"))
@@ -219,6 +237,14 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
     high_water_x: Mapped[Decimal | None]
     sol_usd_at_entry: Mapped[Decimal | None]
     sol_usd_at_exit: Mapped[Decimal | None]
+
+    # --- 0026: probe and scale legs (T4.10) -------------------------------------
+    parent_bet_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("meme_paper_bets.id"))
+    """The probe a ``scale`` leg rides on — set exactly when ``leg = 'scale'``."""
+
+    leg: Mapped[str] = mapped_column(Text, server_default=text("'single'"))
+    """``probe`` | ``scale`` | ``single`` (:data:`BET_LEGS`); every bet written
+    before ``0026`` is ``single`` by default, which is what it was."""
 
 
 class MemeOperatorCommand(Base, UUIDPrimaryKeyMixin):
