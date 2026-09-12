@@ -33,10 +33,9 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from hunter_core.db.session import create_session_factory, role_session
+from hunter_core.db.session import create_session_factory
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_core.redis import keys
@@ -53,10 +52,9 @@ from hunter_meme_worker.fast_lane import fast_once
 from hunter_meme_worker.graduation import GlobalParamsStore
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
 from hunter_meme_worker.mayhem import mayhem_once
-from hunter_meme_worker.metrics import meme_tracked_mints
-from hunter_meme_worker.repo import load_tracked
 from hunter_meme_worker.tracker import MintTracker
 from hunter_meme_worker.wallets import build_wallets, wallets_once
+from hunter_meme_worker.warmup import warm_tracked_set
 from hunter_meme_worker.wiring import (
     build_boards,
     build_risk,
@@ -74,7 +72,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-WORKER_ROLE = "hunter_worker"
 STALE_EVENT_AFTER_S = 600
 """No new token for ten minutes is *suspicious*, not fatal: pump.fun genuinely has
 quiet stretches, and T4.1's acceptance criterion separates "the socket is alive"
@@ -130,9 +127,11 @@ def _heartbeat_writer(runtime: WorkerRuntime) -> Callable[[dict[str, str]], Awai
     return write_fields
 
 
-def build_lab_context(runtime: WorkerRuntime, config: MemeConfig) -> LabContext:
+def build_lab_context(runtime: WorkerRuntime, config: MemeConfig, ctx: RadarContext) -> LabContext:
     """The Lab's own view: the same session factory, a quote client of its own,
-    and a writer onto this worker's heartbeat hash."""
+    a writer onto this worker's heartbeat hash, and — since T4.16b — the
+    radar's own tracker and chain client, so the Lab can reload the pinned set
+    every tick and attempt one point read before an indeterminate close."""
     return LabContext(
         config=config,
         session_factory=create_session_factory(runtime.engine),
@@ -143,24 +142,9 @@ def build_lab_context(runtime: WorkerRuntime, config: MemeConfig) -> LabContext:
             )
         ),
         heartbeat=_heartbeat_writer(runtime),
+        tracker=ctx.tracker,
+        chain=ctx.chain,
     )
-
-
-async def warm_tracked_set(ctx: RadarContext) -> int:
-    """Rebuild the tracked set from the database before any loop starts.
-
-    A restart is not a reset: without this the radar would watch only what the
-    socket happens to push next, and every mint discovered before the restart
-    would silently stop being polled while its rows kept implying it was watched.
-    This is the durable checkpoint half of Astra's MUST-FIX 3.
-    """
-    cutoff = utcnow() - timedelta(minutes=ctx.config.track_window_minutes)
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        tracked = await load_tracked(session, cutoff=cutoff, cap=ctx.config.tracked_max)
-    for mint in tracked:
-        ctx.tracker.observe(mint)
-    meme_tracked_mints.set(len(ctx.tracker))
-    return len(tracked)
 
 
 def _register_health(
@@ -239,7 +223,7 @@ async def run_meme(runtime: WorkerRuntime) -> None:
 
     ctx, boards = build_context(runtime, config)
     _register_health(runtime, ctx, boards)
-    lab = build_lab_context(runtime, config) if config.lab_enabled else None
+    lab = build_lab_context(runtime, config, ctx) if config.lab_enabled else None
     _register_lab_health(runtime, lab)
     write = _heartbeat_writer(runtime)
     if lab is None:

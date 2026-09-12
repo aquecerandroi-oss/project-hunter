@@ -601,6 +601,14 @@ Nada de "preenchido ao último preço visto".
    o mercado não falou. A reclassificação de linhas antigas é ato auditado
    (`infra/scripts/meme_reclassify_indeterminate.py --apply --reason`), nunca edição à mão.
 
+8. **O rastreador não solta uma moeda com aposta aberta (T4.16b).** A regra do item 7 supunha que a fotografia
+   faltava porque o mercado parou; em 12/09 faltou porque o **rastreador** expulsou a moeda pelo teto de 120 (cinco
+   apostas, última fotografia 13 min antes do `time_stop`). Agora mints com aposta de papel aberta, posição real aberta
+   ou proposta pendente são **fixados** (relidos das linhas a cada tique; nunca caem pelo teto nem pela janela), o teto
+   vale só sobre as não fixadas (`cap − |fixadas|`, nunca < 20), e antes de fechar `indeterminate` o laço pede **uma**
+   leitura pontual da curva pela cadeia e fecha por ela quando ela vem (`meme_lab_bet_closed_by_point_read`).
+   Só sem resposta o desfecho fica indeterminado.
+
 ## 11. VM1–VM9 — as nove verificações do motor meme
 
 Equivalente das V1–V9 da T3.9 (`.claude/state/spec-T3.9-verificacoes.md`,

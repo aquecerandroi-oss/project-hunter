@@ -94,7 +94,7 @@ def test_the_root_cause_a_curve_that_migrates_before_its_first_poll_was_never_re
     tracked = tracker.get("instant")
     assert tracked is not None and tracked.migrated and tracked.final_read_pending
     assert tracked.creator == "CREATOR", "the creator is what the tape's creator columns need"
-    aged_out, _ = tracker.prune(NOW)
+    aged_out, _, _ = tracker.prune(NOW)
     assert aged_out == (), "the finished curve was evicted before its final read"
     plan = tracker.plan(NOW, budget=1)
     assert plan.selected == ("instant",)
@@ -103,7 +103,7 @@ def test_the_root_cause_a_curve_that_migrates_before_its_first_poll_was_never_re
     tracker.mark_polled("instant", NOW)
     read = tracker.get("instant")
     assert read is not None and not read.final_read_pending
-    aged_out, _ = tracker.prune(NOW)
+    aged_out, _, _ = tracker.prune(NOW)
     assert aged_out == ("instant",)
 
 

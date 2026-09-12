@@ -2,17 +2,25 @@
 
 Order of one tick, and why that order:
 
-1. **rule sets** — read fresh every tick, so retiring one in the database
+1. **the pinned set** (T4.16b) — reloaded from the durable rows every tick
+   and handed to the tracker wholesale, before anything else runs: an open
+   paper bet, an open live position or a pending proposal must keep being
+   photographed by the chain loop even when the tracker's cap would
+   otherwise have evicted the mint minutes ago;
+2. **rule sets** — read fresh every tick, so retiring one in the database
    stops it without a restart;
-2. **expiry** — ``proposed`` past ``expires_at`` becomes ``expired`` before
+3. **expiry** — ``proposed`` past ``expires_at`` becomes ``expired`` before
    anything else looks at it;
-3. **cancel commands** — the operator's ``cancel`` on a proposal that has not
+4. **cancel commands** — the operator's ``cancel`` on a proposal that has not
    filled, applied before the fill step can fill it;
-4. **the gate** — every rule set over every closed minute not yet evaluated
+5. **the gate** — every rule set over every closed minute not yet evaluated
    (``end_time <= now − 1 min``, at most ``lab_gate_backlog_minutes`` back);
-5. **fills** — ``approved`` proposals against the first later snapshot;
-6. **bets** — marks, exits, ``sell_now``, sales on the next snapshot;
-7. **heartbeat** — ``lab_*`` fields on the worker's own ``hb:meme:radar``
+6. **fills** — ``approved`` proposals against the first later snapshot;
+7. **bets** — marks, exits, ``sell_now``, sales on the next snapshot; a
+   pending exit whose last snapshot is stale gets one point read straight
+   from the chain before it is written off as ``indeterminate`` (T4.16b,
+   ``lab_point_read.py``);
+8. **heartbeat** — ``lab_*`` fields on the worker's own ``hb:meme:radar``
    hash, so a loop that stopped is visible as a stale ``lab_last_tick_at``
    rather than as silence (§Semântica 5).
 
@@ -38,6 +46,7 @@ from hunter_meme_worker.lab_bets import BetsReport, FillReport, fill_approved, p
 from hunter_meme_worker.lab_fast import fast_gate_step
 from hunter_meme_worker.lab_heartbeat import HEARTBEAT_PREFIX, heartbeat_fields, write_lab_heartbeat
 from hunter_meme_worker.lab_models import RuleSetSpec, SolUsd
+from hunter_meme_worker.lab_pins import reload_pinned_mints
 from hunter_meme_worker.lab_repo import (
     apply_command,
     cancel_proposal,
@@ -73,7 +82,9 @@ if TYPE_CHECKING:
 
     from hunter_exchanges.pumpfun.models import NormalizedSolPrice
     from hunter_meme_worker.config import MemeConfig
+    from hunter_meme_worker.context import ChainSource
     from hunter_meme_worker.proposals import GateRow
+    from hunter_meme_worker.tracker import MintTracker
 
 logger = get_logger(__name__)
 
@@ -130,6 +141,16 @@ class LabContext:
     state: LabState
     quotes: SolUsdSource | None
     heartbeat: HeartbeatWriter | None
+    tracker: MintTracker | None = None
+    """The radar's own tracker (T4.16b): reloaded with the pinned set every
+    tick (``lab_pins.reload_pinned_mints``). ``None`` in every test of this
+    package and in the throwaway context ``main.py`` writes a heartbeat with
+    while the Lab is disabled — the reload is then a no-op, not a crash."""
+    chain: ChainSource | None = None
+    """The same chain client the minute loop reads (T4.16b, ``chain.py``): one
+    point read of a mint's own curve before a pending exit is written off as
+    ``indeterminate`` (``lab_point_read.py``) — the same budget accounting,
+    because it is the same client instance."""
 
     async def sol_usd(self, now: datetime) -> SolUsd | None:
         """The observed quote, at most ``lab_sol_usd_max_age_s`` old; ``None`` and
@@ -275,8 +296,9 @@ async def _scale_step(
 
 
 async def lab_tick(ctx: LabContext, *, now: datetime | None = None) -> TickReport:
-    """One pass of the seven steps. Raises on failure: the TaskGroup decides."""
+    """One pass of the eight steps. Raises on failure: the TaskGroup decides."""
     now = now or utcnow()
+    await reload_pinned_mints(ctx, now=now)
     day_start, day_end = brasilia_day_bounds(now)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         specs = await load_active_rule_sets(session)

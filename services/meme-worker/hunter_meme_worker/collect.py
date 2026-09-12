@@ -11,7 +11,11 @@
   minute for a reading the adapter will never produce). **Since T4.2f the chain
   loop (``chain.py``) photographs every tracked curve once a minute**, so while
   it is healthy the poll narrows to the identity reads only
-  (``tracker.needs_rest``) and the mints it leaves to the chain are not gaps;
+  (``tracker.needs_rest``) and the mints it leaves to the chain are not gaps.
+  ``ctx.tracker.prune`` runs here first (T4.16b): the pinned set (an open paper
+  bet, an open live position, a pending proposal) is never among the aged-out
+  or the capped, and the two counts land on the heartbeat as ``tracked_pinned``
+  and ``tracked_capped_60s`` (``sources.py``);
 - **reconcile** reads the top-K tracked mints by market cap from the chain. The
   REST mirror is undocumented and best effort (T4-MEME-RADAR.md §2: never a single
   source of truth), so the mints where being wrong costs most are checked against
@@ -152,8 +156,10 @@ def chain_covered(ctx: RadarContext, now: datetime) -> bool:
 async def poll_once(ctx: RadarContext) -> int:
     """One pass of the REST budget. Returns how many curves were read."""
     now = utcnow()
-    aged_out, capped = ctx.tracker.prune(now)
+    aged_out, capped, pinned_kept = ctx.tracker.prune(now)
     meme_tracked_mints.set(len(ctx.tracker))
+    if ctx.sources is not None:
+        ctx.sources.record_tracker_prune(now, pinned=len(pinned_kept), capped=len(capped))
     open_bets = await refresh_open_bets(ctx)
     plan = ctx.tracker.plan(
         now,

@@ -962,6 +962,36 @@ p50/p95"; `refusal` `creator_serial` → "criador em série", `symbol_clone` →
 "poucos compradores", `sells_ratio_above_max` → "giro (vendas/compras)", `holders_not_rising` → "holders
 não sobem", `progress_not_rising` → "progresso não sobe".
 
+### T4.16b — o rastreador não solta uma moeda com aposta aberta (entregue 12/09/2026)
+
+**Fato medido (banco da VPS, 15:5x BRT):** cinco apostas `hype_probe_v0/1` fecharam `rug_no_snapshot` entre 15:01 e
+15:45 BRT com `pending_reason = time_stop` e a última fotografia **13 min antes** da saída; nenhuma moeda tinha morrido.
+Causa no código: `MintTracker.prune()` cortava o conjunto em `MEME_TRACKED_MINTS_MAX` (120) pelas mais novas — com
+~31 moedas novas por minuto (medido às 17:0x), uma moeda com aposta aberta era expulsa em ~13 min e o laço `meme-chain`
+(que lê `chain_mints(tracker)`) parava de fotografá-la. Uma posição **real** (T4.14) ficaria sem marca do mesmo jeito.
+
+**O que mudou:**
+1. **Conjunto fixado** (`tracker_pins.py`, `tracker.py`): mints com aposta de papel aberta (`meme_paper_bets.status =
+   'open'`), posição real aberta (`meme_live_positions.status = 'open'`, só leitura) ou proposta `proposed` não expirada
+   nunca caem pelo teto nem pela janela. O conjunto é **relido das linhas a cada tique do laço** (`lab_pins.py`, uma
+   consulta) e na partida (`warmup.py`, `repo.load_tracked_by_mint` traz as fixadas que o `cutoff`/`cap` deixariam de
+   fora) — nunca um diff mantido em memória; um reinício reconstrói o mesmo conjunto.
+2. **Teto sobre as não fixadas:** `cap − |fixadas|`, nunca abaixo de `MIN_EFFECTIVE_CAP = 20` (o radar continua com
+   espaço para descobrir). Heartbeat: `tracked_pinned` e `tracked_capped_60s` (`sources.py`, `GET /meme/sources`).
+3. **Leitura pontual antes de `indeterminate`** (`lab_point_read.py`, chamado por `lab_bets.py`): uma saída pendente
+   (`time_stop` ou qualquer outra) com a última fotografia > 3 min pede **uma** leitura da curva daquele mint pela
+   cadeia (`getMultipleAccounts` de uma PDA, o mesmo cliente e o mesmo orçamento do laço de minuto) e fecha pela
+   leitura se ela vier (`mark_source = 'curve'`, `mark_stale_s` real, evento `meme_lab_bet_closed_by_point_read`);
+   só sem resposta o desfecho vira `indeterminate`, exatamente como antes.
+4. As cinco apostas da tarde foram reclassificadas pelo script auditado com a razão `tracker_evicted_open_bet` (ids no
+   diário de 12/09), junto com as cinco do artefato da manhã.
+
+**Provas:** `test_tracker.py` (fixadas sobrevivem ao teto e à janela; teto reduzido; `unpin` ao fechar),
+`test_lab_persistence.py` (aposta aberta continua fotografada depois de 200 moedas novas; leitura pontual fecha pela
+cadeia) — 38 verdes com Postgres; worker unit 205; ruff/format/pyright 0; `check_file_size` 0 acima (`tracker_types.py`,
+`source_stats.py`, `warmup.py`, `lab_pins.py` nasceram do teto de 350). A agente foi cortada pelo limite semanal no
+passo do pyright; o orquestrador fechou os três erros de tipo restantes (`RowMapping`, `iso_or_none`) e commitou.
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

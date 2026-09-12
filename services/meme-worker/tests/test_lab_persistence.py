@@ -27,7 +27,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 
 from hunter_core.db.session import role_session
-from hunter_exchanges.pumpfun.models import NormalizedSolPrice
+from hunter_exchanges.pumpfun.models import NormalizedCurveState, NormalizedSolPrice
+from hunter_exchanges.pumpfun.rpc import CurveBatch
 from hunter_meme_worker.config import MemeConfig
 from hunter_meme_worker.features import CurveObservation, MinuteInputs, build_row
 from hunter_meme_worker.lab import LabContext, LabState, closed_minutes, lab_tick
@@ -732,3 +733,124 @@ async def test_the_scoreboard_and_the_desk_report_the_day_and_the_roles_hold_the
             await session.execute(
                 text("UPDATE meme_paper_bets SET mode = 'live' WHERE id = :b"), {"b": bet["id"]}
             )
+
+
+# ---- T4.16b: the point-read rescue before an indeterminate close ----------------------
+
+
+class _FakeChainOneRead:
+    """Answers one fresh curve reading for whichever single mint the point
+    read asks for — a bonding-curve address is never derived, so the mint's
+    identity does not have to be a real base58 pubkey."""
+
+    def __init__(self, *, sol: str, tokens: str, at: datetime) -> None:
+        self.sol, self.tokens, self.at = Decimal(sol), Decimal(tokens), at
+        self.calls: list[list[str]] = []
+
+    async def get_curve_state(self, mint: str, bonding_curve: str) -> Any:
+        raise AssertionError("the point read is always a get_curve_states batch of one")
+
+    async def get_mayhem_flows(self, mints: Any) -> Any:
+        raise AssertionError("not the Mayhem loop")
+
+    async def get_curve_states(self, mints: Any, *, with_block_time: bool = True) -> CurveBatch:
+        self.calls.append(list(mints))
+        assert len(mints) == 1, "T4.16b's own rule: one point read, one mint"
+        mint = mints[0]
+        state = NormalizedCurveState(
+            mint=mint,
+            virtual_sol_reserves=self.sol,
+            virtual_token_reserves=self.tokens,
+            real_sol_reserves=self.sol - Decimal(30),
+            real_token_reserves=self.tokens - Decimal("279900000"),
+            total_supply=Decimal(1_000_000_000),
+            complete=False,
+            market_cap_sol=Decimal("1"),
+            source="solana_rpc",
+            slot=1,
+            commitment="finalized",
+            observed_at=self.at,
+            received_at=self.at,
+        )
+        return CurveBatch(states={mint: state}, refused={}, slots=(1,), calls=2)
+
+
+async def test_a_pending_close_is_rescued_by_one_point_read_from_the_chain(
+    db_session_factory: async_sessionmaker[AsyncSession],
+    db_engine: AsyncEngine,
+) -> None:
+    """The exact shape of the 12/09 artefact — a ``target`` fires and the curve
+    then goes silent for the whole 3-minute window — except this time the
+    chain still has something to say, and the close is ``measured``, not
+    ``indeterminate``."""
+    chain = _FakeChainOneRead(sol="68", tokens="470000000", at=NOW)  # ``.at`` reset once known
+    ctx = LabContext(
+        config=MemeConfig(enabled=True, lab_enabled=True),
+        session_factory=db_session_factory,
+        state=LabState(),
+        quotes=FakeQuotes(),
+        heartbeat=Heartbeats(),
+        chain=chain,
+    )
+    mint, proposal, entry_at = await _open_bet(ctx, db_session_factory, db_engine, "rescue")
+    trigger = entry_at + timedelta(seconds=60)
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        await insert_snapshot(session, _snapshot(mint, trigger, "70", "460000000"))  # target fires
+    await lab_tick(ctx, now=trigger + timedelta(seconds=5))
+    pending = await _bet_of(db_session_factory, proposal)
+    assert pending["status"] == "open" and pending["exit_intent"]["reason"] == "target"
+    # No later snapshot arrives; without T4.16b this would close indeterminate
+    # at trigger + 181s exactly like test_an_exit_that_finds_no_later_snapshot_is_a_rug_at_zero.
+    rescue_at = trigger + timedelta(seconds=181)
+    chain.at = rescue_at
+    await lab_tick(ctx, now=rescue_at)
+    closed = await _bet_of(db_session_factory, proposal)
+    assert chain.calls == [[mint]], "one point read, this mint alone"
+    assert closed["status"] == "closed"
+    assert closed["exit"]["reason"] == "target", "the rescue closes by the reason that was pending"
+    assert closed["outcome_quality"] == "measured", "priced by a real read: never indeterminate"
+    assert closed["outcome_quality_reason"] is None and closed["outcome_quality_at"] is None
+    assert closed["mark_source"] == "curve"
+    assert closed["mark_stale_s"] == 0, "the read was taken at the very instant it priced the close"
+    assert closed["exit_at"] == rescue_at
+    assert closed["pnl_sol"] != 0
+
+
+class _FakeChainRefuses:
+    """The chain answered, but has nothing sellable for this mint — the only
+    case that still falls back to ``indeterminate`` (T4.16b: "só sem resposta
+    vira indeterminate")."""
+
+    async def get_curve_state(self, mint: str, bonding_curve: str) -> Any:
+        raise AssertionError("the point read is always a get_curve_states batch of one")
+
+    async def get_mayhem_flows(self, mints: Any) -> Any:
+        raise AssertionError("not the Mayhem loop")
+
+    async def get_curve_states(self, mints: Any, *, with_block_time: bool = True) -> CurveBatch:
+        return CurveBatch(states={}, refused={mints[0]: "curve_not_found"}, slots=(1,), calls=2)
+
+
+async def test_a_chain_refusal_still_falls_back_to_indeterminate(
+    db_session_factory: async_sessionmaker[AsyncSession],
+    db_engine: AsyncEngine,
+) -> None:
+    ctx = LabContext(
+        config=MemeConfig(enabled=True, lab_enabled=True),
+        session_factory=db_session_factory,
+        state=LabState(),
+        quotes=FakeQuotes(),
+        heartbeat=Heartbeats(),
+        chain=_FakeChainRefuses(),
+    )
+    mint, proposal, entry_at = await _open_bet(ctx, db_session_factory, db_engine, "refuse")
+    trigger = entry_at + timedelta(seconds=60)
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        await insert_snapshot(session, _snapshot(mint, trigger, "70", "460000000"))
+    await lab_tick(ctx, now=trigger + timedelta(seconds=5))
+    await lab_tick(ctx, now=trigger + timedelta(seconds=181))
+    closed = await _bet_of(db_session_factory, proposal)
+    assert closed["status"] == "closed"
+    assert closed["exit"]["reason"] == "rug_no_snapshot"
+    assert closed["outcome_quality"] == "indeterminate"
+    assert closed["outcome_quality_reason"] == "no_snapshot_in_window"

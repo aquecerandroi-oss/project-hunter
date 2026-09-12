@@ -121,7 +121,7 @@ _UPDATE_MARK = text(
 _CLOSE_BET = text(
     "UPDATE meme_paper_bets SET status = 'closed', exit_at = :exit_at, exit = CAST(:exit AS jsonb), "
     "  pnl_sol = :pnl_sol, r_multiple = :r_multiple, sol_usd_at_exit = :sol_usd_at_exit, "
-    "  mark_sol = :mark_sol, mark_at = :exit_at, mark_stale_s = NULL, "
+    "  mark_sol = :mark_sol, mark_at = :exit_at, mark_stale_s = :mark_stale_s, "
     "  mark_source = coalesce(:mark_source, mark_source), "
     "  exit_intent = coalesce(CAST(:exit_intent AS jsonb), exit_intent), "
     "  outcome_quality = :outcome_quality, outcome_quality_reason = :outcome_quality_reason, "
@@ -130,7 +130,11 @@ _CLOSE_BET = text(
 )
 """``outcome_quality_at`` is bound on its own (the close's instant, or ``NULL``
 for a measured close): a ``CASE … THEN :exit_at END`` would make asyncpg
-deduce ``text`` for the parameter it shares with ``exit_at``."""
+deduce ``text`` for the parameter it shares with ``exit_at``. ``mark_stale_s``
+is ``NULL`` on every ordinary close (staleness of an open position is
+meaningless once it is shut) **except** the T4.16b rescue: a pending exit
+priced by one point read straight from the chain carries the honest age of
+that read, never a fabricated zero."""
 
 
 async def first_snapshot_after(
@@ -271,10 +275,13 @@ async def close_bet_row(
     *,
     exit_intent: dict[str, Any] | None = None,
     mark_source: str | None = None,
+    mark_stale_s: int | None = None,
 ) -> None:
     """Close the bet; the rule that fired stays on the row even when the trigger
     and the sale landed in the same tick and no mark was written between.
-    ``mark_source`` names what priced the sale when it was not the curve."""
+    ``mark_source`` names what priced the sale when it was not the curve;
+    ``mark_stale_s`` is the honest age of that price — ``None`` on every
+    ordinary close, a real number only for the T4.16b point-read rescue."""
     await session.execute(
         _CLOSE_BET,
         {
@@ -287,6 +294,7 @@ async def close_bet_row(
             "sol_usd_at_exit": closed.sol_usd_at_exit,
             "mark_sol": Decimal(closed.exit.get("sol_received", "0")),
             "mark_source": mark_source,
+            "mark_stale_s": mark_stale_s,
             "outcome_quality": closed.outcome_quality,
             "outcome_quality_reason": closed.outcome_quality_reason,
             "outcome_quality_at": (

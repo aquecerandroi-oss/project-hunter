@@ -28,11 +28,13 @@ The row shapes live in ``repo_rows.py`` and are re-exported here.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import text
+from sqlalchemy.engine import RowMapping
 
 from hunter_core.domain.types import uuid7
 from hunter_meme_worker.features import FeatureRow
@@ -50,6 +52,7 @@ __all__ = [
     "insert_features",
     "insert_snapshot",
     "load_tracked",
+    "load_tracked_by_mint",
     "prune_tokens",
     "record_gap",
     "upsert_token",
@@ -232,6 +235,16 @@ pool) without that photo comes back with ``final_read_pending``: one poll to
 record the REST word for the matrix, the T4.2c fix for the hour with zero
 ``complete = true`` snapshots, widened in T4.2d to every finish signal."""
 
+_LOAD_TRACKED_BY_MINT = text(
+    "SELECT mint, first_seen_at, created_at, creator, bonding_curve, mayhem_state, "
+    "       initial_real_token_reserves, completed_at, migrated_at "
+    "FROM meme_tokens WHERE mint = ANY(:mints)"
+)
+"""T4.16b: the pinned mints (``tracker_pins.pinned_mints``) ``_LOAD_TRACKED``'s
+cutoff/cap may leave out at boot — a real position or a paper bet older than
+``track_window_minutes``, or simply not among the youngest ``tracked_max``, is
+loaded anyway, because a pinned mint is never optional inventory."""
+
 _PRUNE_TOKENS = text(
     "WITH doomed AS ("
     "  SELECT mint FROM meme_tokens "
@@ -271,27 +284,35 @@ async def record_gap(session: AsyncSession, gap: GapRow) -> None:
     await session.execute(_INSERT_GAP, payload)
 
 
+def _tracked_from_row(row: RowMapping) -> TrackedMint:
+    finished_elsewhere = row["migrated_at"] is not None or row["completed_at"] is not None
+    return TrackedMint(
+        mint=str(row["mint"]),
+        first_seen_at=row["first_seen_at"],
+        created_at=row["created_at"],
+        creator=row["creator"],
+        bonding_curve=row["bonding_curve"],
+        mayhem_state=row["mayhem_state"],
+        initial_real_token_reserves=row["initial_real_token_reserves"],
+        complete=False,
+        migrated=row["migrated_at"] is not None,
+        final_read_pending=finished_elsewhere,
+    )
+
+
 async def load_tracked(session: AsyncSession, *, cutoff: datetime, cap: int) -> list[TrackedMint]:
     """Rebuild the tracked set from the durable rows (a restart is not a reset)."""
     result = await session.execute(_LOAD_TRACKED, {"cutoff": cutoff, "cap": cap})
-    tracked: list[TrackedMint] = []
-    for row in result.mappings():
-        finished_elsewhere = row["migrated_at"] is not None or row["completed_at"] is not None
-        tracked.append(
-            TrackedMint(
-                mint=str(row["mint"]),
-                first_seen_at=row["first_seen_at"],
-                created_at=row["created_at"],
-                creator=row["creator"],
-                bonding_curve=row["bonding_curve"],
-                mayhem_state=row["mayhem_state"],
-                initial_real_token_reserves=row["initial_real_token_reserves"],
-                complete=False,
-                migrated=row["migrated_at"] is not None,
-                final_read_pending=finished_elsewhere,
-            )
-        )
-    return tracked
+    return [_tracked_from_row(row) for row in result.mappings()]
+
+
+async def load_tracked_by_mint(session: AsyncSession, *, mints: Sequence[str]) -> list[TrackedMint]:
+    """The pinned mints ``load_tracked``'s cutoff/cap left out — by identity,
+    not by recency (T4.16b)."""
+    if not mints:
+        return []
+    result = await session.execute(_LOAD_TRACKED_BY_MINT, {"mints": list(mints)})
+    return [_tracked_from_row(row) for row in result.mappings()]
 
 
 async def prune_tokens(session: AsyncSession, *, cutoff: datetime, batch: int) -> int:

@@ -45,19 +45,48 @@ by REST, its transitions while the agent is ``active``/``paused`` (one read per
 ``mayhem_refresh``), the REST word of a finished curve, and a fresher photo of
 the mints the Lab is marking. Everything else is the chain's, and a mint the
 budget still leaves out is ``skipped`` only when it was a candidate.
+
+**Pinned, since T4.16b, is a membership fact stronger than any of the above.**
+Five ``hype_probe_v0`` paper bets closed ``rug_no_snapshot`` on 12/09 with a
+last photo 13 minutes before the exit and no coin actually dead: at roughly
+one discovery every few seconds, ``prune``'s cap (``MEME_TRACKED_MINTS_MAX``,
+120 by default) evicted a mint with an open bet in 10–15 minutes, and the
+chain loop (which reads ``chain_mints(tracker)``) stopped photographing it the
+instant it left the set. :meth:`MintTracker.pin`/:meth:`unpin` name a set of
+mints — an open paper bet, an open live position (T4.14) or a proposal still
+waiting on a decision — that :meth:`prune` never drops for aging out of the
+window *or* for the cap: the cap itself narrows to ``cap − |pinned|`` (never
+below :data:`MIN_EFFECTIVE_CAP`) so a pinned mint spends none of the room the
+rest of discovery competes for. Pinning changes nothing about *priority*
+(``tier``/``needs_rest``/``plan`` are untouched — an open bet is already
+boosted to :data:`TIER_OPEN_BET` there); it only changes whether the mint can
+be evicted at all.
 """
 
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-ACTIVE_MAYHEM_STATES = frozenset({"active", "paused"})
-"""``paused`` means liquidity is insufficient right now, not that the agent is
-done (A4.1b §2) — so it keeps the mint in the set."""
+from hunter_meme_worker.tracker_types import ACTIVE_MAYHEM_STATES, PollPlan, TrackedMint
+
+__all__ = [
+    "ACTIVE_MAYHEM_STATES",
+    "MAYHEM_REFRESH",
+    "MIN_EFFECTIVE_CAP",
+    "REST_SOURCE",
+    "TIER_FINAL_READ",
+    "TIER_GRADUATING",
+    "TIER_NEW",
+    "TIER_OPEN_BET",
+    "TIER_REST",
+    "TIER_YOUNG",
+    "MintTracker",
+    "PollPlan",
+    "TrackedMint",
+]
 
 TIER_OPEN_BET = 0
 TIER_FINAL_READ = 1
@@ -71,69 +100,9 @@ MAYHEM_REFRESH = timedelta(minutes=5)
 """How often an ``active``/``paused`` agent's state is re-read from the mirror
 when the chain carries the curve (``MEME_REST_MAYHEM_REFRESH_S``)."""
 
-
-@dataclass(frozen=True, slots=True)
-class TrackedMint:
-    """One mint the collector is watching, with everything the poller needs."""
-
-    mint: str
-    first_seen_at: datetime
-    created_at: datetime | None = None
-    creator: str | None = None
-    bonding_curve: str | None = None
-    mayhem_state: str | None = None
-    initial_real_token_reserves: Decimal | None = None
-    last_polled_at: datetime | None = None
-    last_rest_polled_at: datetime | None = None
-    """The last successful ``pumpfun_rest`` read (T4.2f): with the chain
-    photographing the curve every minute, this is what says whether the mirror
-    has ever told us the site's agent state of this mint, and when."""
-    mcap_sol: Decimal | None = None
-    complete: bool = False
-    migrated: bool = False
-    final_read_pending: bool = False
-    """The curve finished (or left for PumpSwap) and no reading of the finished
-    state has been persisted yet: one more poll, then eviction."""
-    quote_unsupported: bool = False
-    board: str | None = None
-    """The site board that last listed the mint (``new`` / ``graduating``), a
-    priority hint — never a claim about the curve."""
-
-    @property
-    def age_anchor(self) -> datetime:
-        """``created_at`` when we know it, else when we first saw the mint.
-
-        Never a fabricated creation time: a mint discovered by its *migration*
-        genuinely has no creation time (the PumpPortal migration frame carries
-        none), and ranking it by ``first_seen_at`` says "as old as our knowledge
-        of it" instead of claiming it was born when we noticed it.
-        """
-        return self.created_at or self.first_seen_at
-
-    @property
-    def finished(self) -> bool:
-        return self.complete or self.migrated
-
-    def is_trackable(self, now: datetime, window: timedelta) -> bool:
-        if self.quote_unsupported:
-            return False
-        if self.finished:
-            return self.final_read_pending
-        if self.mayhem_state in ACTIVE_MAYHEM_STATES:
-            return True
-        return now - self.age_anchor <= window
-
-
-@dataclass(frozen=True, slots=True)
-class PollPlan:
-    """What this cycle polls, and what it could not reach."""
-
-    selected: tuple[str, ...]
-    skipped: tuple[str, ...]
-
-    @property
-    def skipped_count(self) -> int:
-        return len(self.skipped)
+MIN_EFFECTIVE_CAP = 20
+"""``prune``'s cap over the *un*-pinned mints never drops below this, however
+many are pinned (T4.16b's brief): the radar still needs room to discover."""
 
 
 class MintTracker:
@@ -144,12 +113,35 @@ class MintTracker:
         self._cap = cap
         self._young = timedelta(minutes=young_minutes)
         self._mints: dict[str, TrackedMint] = {}
+        self._pinned: set[str] = set()
 
     def __len__(self) -> int:
         return len(self._mints)
 
     def __contains__(self, mint: str) -> bool:
         return mint in self._mints
+
+    @property
+    def pinned(self) -> frozenset[str]:
+        return frozenset(self._pinned)
+
+    def pin(self, mints: Iterable[str]) -> None:
+        """Never evicted by :meth:`prune`'s cap or window while pinned (T4.16b):
+        an open paper bet, an open live position or a proposal still waiting on
+        a decision — the tracker's cap must never be the reason a real position
+        or a bet the Lab is marking stops being photographed."""
+        self._pinned.update(mints)
+
+    def unpin(self, mints: Iterable[str]) -> None:
+        self._pinned.difference_update(mints)
+
+    def set_pinned(self, mints: Iterable[str]) -> None:
+        """Replace the pinned set wholesale — a reload, not a diff the caller
+        would have to track itself. The Lab re-reads the durable rows every
+        tick (``lab.py``) and this is what it hands the tracker back."""
+        wanted = frozenset(mints)
+        self.unpin(self._pinned - wanted)
+        self.pin(wanted)
 
     def snapshot(self) -> tuple[TrackedMint, ...]:
         """Every tracked mint, newest first — the order the radar reads in."""
@@ -224,32 +216,43 @@ class MintTracker:
         if current is not None:
             self._mints[mint] = dataclasses.replace(current, quote_unsupported=True)
 
-    def prune(self, now: datetime) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        """Drop what left the window, then cap. Returns ``(aged_out, capped)``.
+    def prune(self, now: datetime) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+        """Drop what left the window, then cap the rest. Returns ``(aged_out,
+        capped, pinned_kept)``.
 
-        Two return values, not one, because they are two different operator
-        facts: a mint that aged out was watched for its whole eligible life, and a
-        mint dropped by the cap **was not** — the second is the one that belongs in
-        the gap ledger.
+        Three return values, not two, because they are three different
+        operator facts: a mint that aged out was watched for its whole
+        eligible life, a mint dropped by the cap **was not**, and a pinned
+        mint survived both by construction — an open paper bet, an open live
+        position or a proposal still waiting on a decision (T4.16b) is never
+        optional inventory, however old or however far past the cap it sits.
+        The cap itself narrows to the *un*-pinned mints (``cap − |pinned|``,
+        never below :data:`MIN_EFFECTIVE_CAP`): a pinned mint spends none of
+        the room the rest of the discovery competes for.
         """
         aged_out = tuple(
             sorted(
                 mint
                 for mint, tracked in self._mints.items()
-                if not tracked.is_trackable(now, self._window)
+                if mint not in self._pinned and not tracked.is_trackable(now, self._window)
             )
         )
         for mint in aged_out:
             del self._mints[mint]
 
+        pinned_kept = tuple(sorted(mint for mint in self._mints if mint in self._pinned))
+        # ``min(cap, …)`` matters exactly when ``cap`` itself is small (every
+        # test in this module, and nobody pinned): the floor must never *grow*
+        # a deliberately small cap back past the ceiling the caller configured.
+        effective_cap = min(self._cap, max(MIN_EFFECTIVE_CAP, self._cap - len(pinned_kept)))
         capped: tuple[str, ...] = ()
-        if len(self._mints) > self._cap:
-            ordered = self.snapshot()
-            evicted = ordered[self._cap :]
+        unpinned = [m for m in self.snapshot() if m.mint not in self._pinned]
+        if len(unpinned) > effective_cap:
+            evicted = unpinned[effective_cap:]
             capped = tuple(sorted(m.mint for m in evicted))
             for mint in capped:
                 del self._mints[mint]
-        return aged_out, capped
+        return aged_out, capped, pinned_kept
 
     def tier(self, tracked: TrackedMint, now: datetime, boosted: Mapping[str, int]) -> int:
         """The declared priority of one mint (lower polls first)."""

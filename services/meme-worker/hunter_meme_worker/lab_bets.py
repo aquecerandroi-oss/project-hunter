@@ -15,7 +15,10 @@ snapshot and are recorded as ``exit_intent``; the sale is priced on the **next**
 snapshot; no next snapshot inside the window is ``rug_no_snapshot``. A curve
 nobody has observed for the whole horizon plus the window is closed the same
 way with ``pending_reason = "time_stop"``: an open bet that can never be priced
-is not a position, it is a hole in the ledger.
+is not a position, it is a hole in the ledger. Before either becomes an
+``indeterminate`` close, one point read straight from the chain gets a last
+chance to price it (T4.16b, ``lab_point_read.py``) — the tracker may have
+evicted the mint minutes ago, but the chain does not need the tracker.
 """
 
 from __future__ import annotations
@@ -31,7 +34,8 @@ from hunter_meme_worker.lab_bets_pool import (
     process_pool_bet,
     settle_command,
 )
-from hunter_meme_worker.lab_models import BetState, RuleSetSpec, Snapshot, money_str
+from hunter_meme_worker.lab_models import MARK_CURVE, BetState, RuleSetSpec, Snapshot, money_str
+from hunter_meme_worker.lab_point_read import point_read_rescue
 from hunter_meme_worker.lab_repo import apply_command, load_approved_proposals, pending_commands
 from hunter_meme_worker.lab_repo_bets import (
     close_bet_row,
@@ -278,6 +282,26 @@ async def _process_one(
             pending_reason = "time_stop"
     if pending_reason is None:
         return "marked" if last is not None else "unchanged"
+    rescue = await point_read_rescue(ctx, session, state, intent, pending_reason, now=now)
+    if rescue is not None:
+        rescued_exit, mark_stale_s = rescue
+        await close_bet_row(
+            session,
+            state.id,
+            rescued_exit,
+            exit_intent=intent,
+            mark_source=MARK_CURVE,
+            mark_stale_s=mark_stale_s,
+        )
+        await settle_command(session, command, intent, rescued_exit.exit["reason"], now=now)
+        logger.info(
+            "meme_lab_bet_closed_by_point_read",
+            bet_id=state.id,
+            mint=state.mint,
+            reason=rescued_exit.exit["reason"],
+            mark_stale_s=mark_stale_s,
+        )
+        return "closed"
     exit_ = close_without_snapshot(state, now=now, pending_reason=pending_reason)
     await close_bet_row(session, state.id, exit_, exit_intent=intent)
     await settle_command(session, command, intent, "rug_no_snapshot", now=now)

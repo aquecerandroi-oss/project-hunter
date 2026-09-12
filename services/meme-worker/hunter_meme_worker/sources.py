@@ -8,14 +8,21 @@ requests did a budget spend in the last 60 s, how many frames were malformed, ho
 many errors in the last hour, how far behind the source's clock is ours. A source
 that is switched off says ``enabled = false``; a source that never spoke says
 ``last_observed_at = null`` — never a zero that looks like health.
+
+``RollingCounter``/``SourceStats`` moved to ``source_stats.py`` in T4.16b (the
+350-line budget) and are re-exported here so nothing that imported them from
+this module has to move.
 """
 
 from __future__ import annotations
 
 import json
-from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
+
+from hunter_meme_worker.source_stats import RollingCounter, SourceStats, iso_or_none
+
+__all__ = ["RollingCounter", "SourceStats", "SourcesState"]
 
 PUMPPORTAL_WS = "pumpportal_ws"
 PUMPFUN_REST = "pumpfun_rest"
@@ -31,91 +38,6 @@ SOURCE_NAMES: tuple[str, ...] = (
     SWAP_API,
     INDEXER_RISK,
 )
-
-
-class RollingCounter:
-    """Events inside the last ``window_s`` seconds; older ones fall off on read."""
-
-    def __init__(self, window_s: float) -> None:
-        self._window = timedelta(seconds=window_s)
-        self._events: deque[tuple[datetime, int]] = deque()
-
-    def add(self, at: datetime, count: int = 1) -> None:
-        if count > 0:
-            self._events.append((at, count))
-
-    def total(self, now: datetime) -> int:
-        cutoff = now - self._window
-        while self._events and self._events[0][0] < cutoff:
-            self._events.popleft()
-        return sum(count for _, count in self._events)
-
-
-@dataclass
-class SourceStats:
-    """One source. ``connected`` is ``None`` for a request/response source."""
-
-    name: str
-    enabled: bool = True
-    budget_60s: int | None = None
-    connected: bool | None = None
-    last_observed_at: datetime | None = None
-    last_received_at: datetime | None = None
-    last_error: str | None = None
-    last_error_at: datetime | None = None
-    reason: str | None = None
-    """Why the source has nothing to say (``disabled``, ``never_connected``…)."""
-    used_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
-    errors_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
-
-    def record_ok(self, *, observed_at: datetime, received_at: datetime, count: int = 1) -> None:
-        self.used_60s.add(received_at, count)
-        if self.last_observed_at is None or observed_at >= self.last_observed_at:
-            self.last_observed_at = observed_at
-        if self.last_received_at is None or received_at >= self.last_received_at:
-            self.last_received_at = received_at
-        self.reason = None
-
-    def record_spent(self, at: datetime, count: int = 1) -> None:
-        """A request that cost budget but produced no observation (an error)."""
-        self.used_60s.add(at, count)
-
-    def record_error(self, at: datetime, error: str) -> None:
-        self.errors_1h.add(at)
-        self.last_error = error
-        self.last_error_at = at
-
-    def lag_s(self, now: datetime) -> float | None:
-        if self.last_observed_at is None or self.last_received_at is None:
-            return None
-        return round((self.last_received_at - self.last_observed_at).total_seconds(), 3)
-
-    def as_fields(self, now: datetime) -> dict[str, object]:
-        reason = self.reason
-        if not self.enabled:
-            reason = "disabled"
-        elif self.last_observed_at is None:
-            reason = reason or "never_observed"
-        return {
-            "enabled": self.enabled,
-            "connected": self.connected,
-            "last_observed_at": _iso(self.last_observed_at),
-            "last_received_at": _iso(self.last_received_at),
-            "lag_s": self.lag_s(now),
-            "age_s": None
-            if self.last_received_at is None
-            else round((now - self.last_received_at).total_seconds(), 1),
-            "used_60s": self.used_60s.total(now),
-            "budget_60s": self.budget_60s,
-            "errors_1h": self.errors_1h.total(now),
-            "last_error": self.last_error,
-            "last_error_at": _iso(self.last_error_at),
-            "reason": reason,
-        }
-
-
-def _iso(value: datetime | None) -> str | None:
-    return None if value is None else value.isoformat()
 
 
 def _pct(part: int | None, whole: int | None) -> float | None:
@@ -185,6 +107,12 @@ class SourcesState:
     fast_lane_cycle_s: float | None = None
     fast_lane_reads_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     fast_lane_calls_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    tracked_pinned: int | None = None
+    tracked_capped_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    """T4.16b: how many of the tracked set are pinned right now (an open paper
+    bet, an open live position or a pending proposal — never evicted by the
+    cap or the window, ``tracker.py``), and how many *un*-pinned mints the cap
+    dropped in the last minute (``tracker.prune``'s ``capped``)."""
     _sampled: dict[str, int] = field(default_factory=dict[str, int])
 
     def __getitem__(self, name: str) -> SourceStats:
@@ -256,6 +184,13 @@ class SourcesState:
         self.fast_lane_reads_60s.add(at, read)
         self.fast_lane_calls_60s.add(at, calls)
 
+    def record_tracker_prune(self, at: datetime, *, pinned: int, capped: int) -> None:
+        """T4.16b: the poll loop's own ``tracker.prune`` — a gauge (how many
+        pinned mints the tracker holds right now) beside a rolling count (how
+        many un-pinned mints the cap dropped in the last minute)."""
+        self.tracked_pinned = pinned
+        self.tracked_capped_60s.add(at, capped)
+
     def record_new_listing(self, at: datetime, *, in_scope: bool) -> None:
         """One first sighting on the ``new`` board; ``in_scope`` = program ``pump``."""
         self.new_board_entries_1h.add(at)
@@ -301,7 +236,7 @@ class SourcesState:
             "budget_60s": self.sources[PUMPFUN_REST].budget_60s,
             "gaps_60s": self.gaps_60s.total(now),
             "ws_malformed_60s": self.ws_malformed_60s.total(now),
-            "last_snapshot_observed_at": _iso(self.last_snapshot_observed_at),
+            "last_snapshot_observed_at": iso_or_none(self.last_snapshot_observed_at),
             "lag_s": lag,
             "trenches_connected": "disabled"
             if not trenches.enabled
@@ -315,7 +250,7 @@ class SourcesState:
             # T4.2e: the coverage of the last folded minute and the tape cycle.
             "progress_coverage_pct": _pct(self.fold_rows_with_progress, self.fold_rows),
             "tape_coverage_pct": _pct(self.fold_rows_with_tape, self.fold_rows),
-            "fold_minute": _iso(self.fold_minute),
+            "fold_minute": iso_or_none(self.fold_minute),
             "fold_rows": self.fold_rows,
             "tape_cycle_s": self.tape_cycle_s,
             "tape_planned": self.tape_planned,
@@ -336,11 +271,14 @@ class SourcesState:
             "swap_api_effective_budget_60s": self.swap_api_effective_budget_60s,
             "swap_api_measured_60s": self.swap_api_measured_60s,
             "swap_api_429_1h": self.swap_api_429_1h.total(now),
-            "swap_api_blocked_until": _iso(self.swap_api_blocked_until),
+            "swap_api_blocked_until": iso_or_none(self.swap_api_blocked_until),
             "fast_lane_mints": self.fast_lane_mints,
             "fast_lane_cycle_s": self.fast_lane_cycle_s,
             "fast_lane_reads_60s": self.fast_lane_reads_60s.total(now),
             "fast_lane_calls_60s": self.fast_lane_calls_60s.total(now),
+            # T4.16b: the pinned set the tracker's cap and window may not touch.
+            "tracked_pinned": self.tracked_pinned,
+            "tracked_capped_60s": self.tracked_capped_60s.total(now),
             "sources_at": now.isoformat(),
             "sources": json.dumps(
                 {name: stats.as_fields(now) for name, stats in self.sources.items()},

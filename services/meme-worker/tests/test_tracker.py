@@ -112,9 +112,10 @@ def test_a_migrated_or_complete_curve_leaves_the_set_and_keeps_nothing_else() ->
     tracker.observe(_tracked("young", minutes_old=1))
     tracker.observe(_tracked("migrated", minutes_old=1, migrated=True))
     tracker.observe(_tracked("complete", minutes_old=1, complete=True))
-    aged_out, capped = tracker.prune(NOW)
+    aged_out, capped, pinned_kept = tracker.prune(NOW)
     assert aged_out == ("complete", "migrated"), "a static curve kept costing budget"
     assert capped == ()
+    assert pinned_kept == ()
     assert [m.mint for m in tracker.snapshot()] == ["young"]
 
 
@@ -124,7 +125,7 @@ def test_an_old_mint_leaves_unless_its_mayhem_agent_is_still_running() -> None:
     tracker.observe(_tracked("stale", minutes_old=120))
     tracker.observe(_tracked("paused_agent", minutes_old=120, mayhem_state="paused"))
     tracker.observe(_tracked("ended_agent", minutes_old=120, mayhem_state="completed"))
-    aged_out, _ = tracker.prune(NOW)
+    aged_out, _, _ = tracker.prune(NOW)
     assert aged_out == ("ended_agent", "stale")
     assert [m.mint for m in tracker.snapshot()] == ["paused_agent"]
 
@@ -134,9 +135,10 @@ def test_the_cap_evicts_the_oldest_and_says_so_separately_from_ageing_out() -> N
     tracker = MintTracker(window_minutes=1440, cap=2)
     for age in (1, 2, 3, 4):
         tracker.observe(_tracked(f"m{age}", minutes_old=age))
-    aged_out, capped = tracker.prune(NOW)
+    aged_out, capped, pinned_kept = tracker.prune(NOW)
     assert aged_out == ()
     assert capped == ("m3", "m4"), "the cap did not keep the youngest"
+    assert pinned_kept == ()
     assert [m.mint for m in tracker.snapshot()] == ["m1", "m2"]
 
 
@@ -195,3 +197,68 @@ def test_the_age_anchor_falls_back_to_first_seen_and_never_invents_a_birth() -> 
     tracked = TrackedMint(mint="m", first_seen_at=seen)
     assert tracked.age_anchor == seen
     assert tracked.created_at is None
+
+
+# T4.16b: a mint with an open paper bet, an open live position or a pending
+# proposal is never evicted by the window or by the cap.
+
+
+def test_a_pinned_mint_survives_the_window_it_would_otherwise_have_aged_out_of() -> None:
+    tracker = MintTracker(window_minutes=60, cap=10)
+    tracker.observe(_tracked("old_bet", minutes_old=120))
+    tracker.observe(_tracked("old_nothing", minutes_old=120))
+    tracker.pin(["old_bet"])
+    aged_out, capped, pinned_kept = tracker.prune(NOW)
+    assert aged_out == ("old_nothing",), "only the un-pinned mint aged out of the window"
+    assert capped == ()
+    assert pinned_kept == ("old_bet",)
+    assert [m.mint for m in tracker.snapshot()] == ["old_bet"]
+
+
+def test_a_pinned_mint_survives_the_cap_and_the_cap_shrinks_for_the_rest() -> None:
+    """``effective_cap = min(cap, max(floor, cap - |pinned|))``: with a cap of
+    25 and 3 pinned mints (below the floor's reach), the 25 free mints compete
+    for 22 slots, not 25 — the three oldest go."""
+    tracker = MintTracker(window_minutes=1440, cap=25)
+    for age in range(1, 26):
+        tracker.observe(_tracked(f"free{age}", minutes_old=age))
+    tracker.observe(_tracked("bet1", minutes_old=100))
+    tracker.observe(_tracked("bet2", minutes_old=200))
+    tracker.observe(_tracked("bet3", minutes_old=300))
+    tracker.pin(["bet1", "bet2", "bet3"])
+    aged_out, capped, pinned_kept = tracker.prune(NOW)
+    assert aged_out == ()
+    assert pinned_kept == ("bet1", "bet2", "bet3")
+    assert capped == ("free23", "free24", "free25"), "25 - 3 = 22 slots: the three oldest go"
+    assert len(tracker) == 25, "22 free plus the 3 pinned — the pinned spent none of the 25"
+
+
+def test_the_effective_cap_never_drops_below_the_floor_however_many_are_pinned() -> None:
+    tracker = MintTracker(window_minutes=1440, cap=25)
+    pinned = [f"bet{i}" for i in range(10)]
+    for mint in pinned:
+        tracker.observe(_tracked(mint, minutes_old=1))
+    for age in range(30):
+        tracker.observe(_tracked(f"free{age}", minutes_old=age + 1))
+    tracker.pin(pinned)
+    _, capped, pinned_kept = tracker.prune(NOW)
+    assert len(pinned_kept) == 10
+    # cap(25) - pinned(10) = 15, above the floor(20)? no: max(20, 15) = 20.
+    assert len(tracker) - len(pinned_kept) == 20, "the floor of 20 won over 25 - 10"
+    assert len(capped) == 30 - 20
+
+
+def test_unpin_returns_a_mint_to_the_ordinary_window_and_cap() -> None:
+    tracker = MintTracker(window_minutes=60, cap=10)
+    tracker.observe(_tracked("m", minutes_old=120))
+    tracker.pin(["m"])
+    assert tracker.prune(NOW)[0] == (), "pinned: the window does not evict it"
+    tracker.unpin(["m"])
+    assert tracker.prune(NOW)[0] == ("m",), "unpinned: the ordinary rule applies again"
+
+
+def test_set_pinned_replaces_the_whole_set_in_one_call() -> None:
+    tracker = MintTracker(window_minutes=1440, cap=10)
+    tracker.pin(["a", "b"])
+    tracker.set_pinned(["b", "c"])
+    assert tracker.pinned == frozenset({"b", "c"}), "a's pin did not survive the reload"
