@@ -27,6 +27,15 @@ export type MemeGap = components["schemas"]["MemeGapOut"];
 export type MemeGapStream = MemeGap["stream"];
 export type MemeGapList = components["schemas"]["MemeGapListOut"];
 
+// T4.3b: `GET /meme/sources` (`schemas/meme_sources.py`) -- the worker's
+// heartbeat per source plus the last folded minute's coverage. `name` is a
+// plain string there (the worker may report a source the screen does not
+// know yet), so only the two status unions are enums the labels must cover.
+export type MemeSources = components["schemas"]["MemeSourcesOut"];
+export type MemeSourceOut = components["schemas"]["MemeSourceOut"];
+export type MemeRadarStatus = MemeSources["radar_status"];
+export type MemeSourceStatus = MemeSourceOut["status"];
+
 export type MemeTokenSort = "mcap" | "age" | "progress";
 export const MEME_TOKEN_SORTS: readonly MemeTokenSort[] = ["mcap", "age", "progress"];
 

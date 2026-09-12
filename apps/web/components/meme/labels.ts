@@ -7,7 +7,7 @@
  * value arrays for a second, explicit exhaustiveness check (the convention
  * `components/system/latency-labels.ts` already established).
  */
-import type { MemeGapStream, MemeNullReason, MemeSource, MemeToken, MemeTokenState } from "@/lib/api/meme-types";
+import type { MemeGapStream, MemeNullReason, MemeRadarStatus, MemeSource, MemeSourceStatus, MemeToken, MemeTokenState } from "@/lib/api/meme-types";
 
 export const MEME_TOKEN_STATES: readonly MemeTokenState[] = ["curve", "completed", "migrated"];
 
@@ -40,6 +40,54 @@ const SOURCE_LABEL: Record<MemeSource, string> = {
 
 export function memeSourceLabel(source: MemeSource): string {
   return SOURCE_LABEL[source];
+}
+
+// T4.3b: the six feeds the worker's heartbeat reports (`services/meme_sources.py`
+// `SOURCE_NAMES`). `name` is a plain string in the contract -- a feed added
+// upstream before this map learns it still gets a readable name (underscores
+// to spaces) instead of throwing or hiding the source.
+export const MEME_FEED_SOURCES: readonly string[] = ["pumpportal_ws", "pumpfun_rest", "solana_rpc", "trenches_ws", "swap_api", "indexer_risk"];
+
+const FEED_SOURCE_LABEL: Record<string, string> = {
+  pumpportal_ws: "PumpPortal (WS)",
+  pumpfun_rest: "pump.fun (REST)",
+  solana_rpc: "Solana RPC",
+  trenches_ws: "boards do site (WS)",
+  swap_api: "fita do site (swap-api)",
+  indexer_risk: "risco do site (indexer)",
+};
+
+export function memeFeedSourceLabel(name: string): string {
+  return FEED_SOURCE_LABEL[name] ?? name.replace(/_/g, " ");
+}
+
+export const MEME_RADAR_STATUSES: readonly MemeRadarStatus[] = ["alive", "stale", "never", "heartbeat_missing", "redis_unavailable"];
+
+const RADAR_STATUS_LABEL: Record<MemeRadarStatus, string> = {
+  alive: "radar vivo",
+  stale: "radar parado",
+  never: "o worker subiu, mas o radar nunca escreveu seus campos",
+  heartbeat_missing: "sem heartbeat do worker",
+  redis_unavailable: "Redis indisponível",
+};
+
+export function memeRadarStatusLabel(status: MemeRadarStatus): string {
+  return RADAR_STATUS_LABEL[status];
+}
+
+export const MEME_SOURCE_STATUSES: readonly MemeSourceStatus[] = ["connected", "disconnected", "ok", "erroring", "disabled", "unknown"];
+
+const SOURCE_STATUS_LABEL: Record<MemeSourceStatus, string> = {
+  connected: "conectada",
+  disconnected: "desconectada",
+  ok: "em dia",
+  erroring: "com erro",
+  disabled: "desligada",
+  unknown: "sem leitura",
+};
+
+export function memeSourceStatusLabel(status: MemeSourceStatus): string {
+  return SOURCE_STATUS_LABEL[status];
 }
 
 export const MEME_GAP_STREAMS: readonly MemeGapStream[] = ["pumpportal_ws", "curve_poll", "features_1m"];

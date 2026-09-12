@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MEME_FEED_SOURCES,
   MEME_GAP_STREAMS,
   MEME_NULL_REASONS,
+  MEME_RADAR_STATUSES,
+  MEME_SOURCE_STATUSES,
   MEME_SOURCES,
   MEME_TOKEN_STATES,
+  memeFeedSourceLabel,
   memeGapStreamLabel,
   memeNullReasonLabel,
   memeNullReasonText,
+  memeRadarStatusLabel,
   memeSourceLabel,
+  memeSourceStatusLabel,
   memeTokenStateLabel,
 } from "@/components/meme/labels";
 
@@ -45,6 +51,27 @@ describe("Meme Radar labels: exhaustive over every enum value the API can send",
     for (const reason of MEME_NULL_REASONS) {
       expect(memeNullReasonLabel(reason)).not.toBe(reason);
     }
+  });
+
+  // T4.3b: `GET /meme/sources` -- the radar's heartbeat state and each source's status.
+  it("labels every radar status and every source status, never raw", () => {
+    for (const status of MEME_RADAR_STATUSES) {
+      expect(memeRadarStatusLabel(status)).toMatch(/\S/);
+      expect(memeRadarStatusLabel(status)).not.toBe(status);
+    }
+    for (const status of MEME_SOURCE_STATUSES) {
+      expect(memeSourceStatusLabel(status)).toMatch(/\S/);
+      expect(memeSourceStatusLabel(status)).not.toBe(status);
+    }
+  });
+
+  it("labels the six feed sources the worker reports, and humanizes one it does not know yet instead of throwing", () => {
+    expect(MEME_FEED_SOURCES).toEqual(["pumpportal_ws", "pumpfun_rest", "solana_rpc", "trenches_ws", "swap_api", "indexer_risk"]);
+    for (const name of MEME_FEED_SOURCES) {
+      expect(memeFeedSourceLabel(name)).toMatch(/\S/);
+      expect(memeFeedSourceLabel(name)).not.toBe(name);
+    }
+    expect(memeFeedSourceLabel("some_new_feed")).toBe("some new feed");
   });
 });
 

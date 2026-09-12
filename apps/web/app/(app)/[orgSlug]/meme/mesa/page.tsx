@@ -8,8 +8,10 @@ import { partitionDesk } from "@/components/meme-desk/meme-desk-format";
 import { OpenBetsSection } from "@/components/meme-desk/open-bets-section";
 import { PaperLabel } from "@/components/meme-desk/paper-label";
 import { ProposalsSection } from "@/components/meme-desk/proposals-section";
+import { MemeSourcesPanel } from "@/components/meme/meme-sources-panel";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
 import { isApiError } from "@/lib/api-error";
+import { loadMemeSources } from "@/lib/api/meme";
 import { getMemeDesk, getMemeLoopState } from "@/lib/api/meme-desk";
 import type { MemeDesk } from "@/lib/api/meme-desk-types";
 import { resolveOrgContext, roleAtLeast } from "@/lib/api/org-context";
@@ -49,7 +51,9 @@ export default async function MemeDeskPage({ params }: MemeDeskPageProps) {
 
   const orgId = membership.organization.id;
   const canOperate = roleAtLeast(membership.role, "TRADER");
-  const [desk, loop] = await Promise.all([loadDesk(orgId), getMemeLoopState(orgId)]);
+  // T4.3b: the sources line rides the same 5 s refresh; it renders on its own
+  // so a desk failure still leaves the operator seeing what the radar reads.
+  const [desk, loop, sources] = await Promise.all([loadDesk(orgId), getMemeLoopState(orgId), loadMemeSources(orgId)]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,6 +65,12 @@ export default async function MemeDeskPage({ params }: MemeDeskPageProps) {
         </div>
         <PaperLabel />
       </div>
+
+      {sources.ok ? (
+        <MemeSourcesPanel sources={sources.data} variant="line" />
+      ) : (
+        <SectionUnavailable title="Fontes" reason={`falha ao carregar (${sources.reason})`} compact />
+      )}
 
       {!desk.ok ? (
         <SectionUnavailable title="Mesa" reason={`falha ao carregar (${desk.reason})`} />

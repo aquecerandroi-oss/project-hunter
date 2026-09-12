@@ -7,7 +7,7 @@ vi.mock("server-only", () => ({}));
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
 vi.mock("@/lib/server/api", () => ({ apiFetch: apiFetchMock }));
 
-import { getMemeOverview, getMemeToken, listMemeGaps, listMemeTokens } from "@/lib/api/meme";
+import { getMemeOverview, getMemeSources, getMemeToken, listMemeGaps, listMemeTokens, loadMemeSources } from "@/lib/api/meme";
 
 beforeEach(() => {
   apiFetchMock.mockReset().mockResolvedValue({ items: [] });
@@ -66,5 +66,22 @@ describe("listMemeGaps: cursor pagination, no state/sort", () => {
     const query = new URLSearchParams(path.split("?")[1]);
     expect(query.get("limit")).toBe("20");
     expect(query.get("cursor")).toBe("xyz");
+  });
+});
+
+describe("getMemeSources / loadMemeSources: GET /meme/sources (T4.3b), the loader never throws", () => {
+  it("calls the sources endpoint under the org path", async () => {
+    await getMemeSources("org-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/api/v1/orgs/org-1/meme/sources");
+  });
+
+  it("loadMemeSources wraps the payload as ok", async () => {
+    apiFetchMock.mockResolvedValueOnce({ as_of: "2026-09-12T13:00:00Z", sources: [] });
+    expect(await loadMemeSources("org-1")).toEqual({ ok: true, data: { as_of: "2026-09-12T13:00:00Z", sources: [] } });
+  });
+
+  it("loadMemeSources turns a failure into a named reason instead of throwing", async () => {
+    apiFetchMock.mockRejectedValueOnce(new Error("boom"));
+    expect(await loadMemeSources("org-1")).toEqual({ ok: false, reason: "boom" });
   });
 });

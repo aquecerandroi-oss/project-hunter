@@ -1,8 +1,10 @@
 import "server-only";
 
+import { isApiError } from "@/lib/api-error";
 import { apiFetch } from "@/lib/server/api";
+import { logger } from "@/lib/logger";
 
-import type { MemeGapList, MemeOverview, MemeTokenDetail, MemeTokenList, MemeTokenSort, MemeTokenState } from "./meme-types";
+import type { MemeGapList, MemeOverview, MemeSources, MemeTokenDetail, MemeTokenList, MemeTokenSort, MemeTokenState } from "./meme-types";
 
 /**
  * `GET /api/v1/orgs/{org_id}/meme/**` (T4.3, `routers/meme.py`) -- read-only
@@ -76,4 +78,27 @@ function gapsQuery(params: ListMemeGapsParams): string {
 /** Ingestion gaps -- declared, never silenced (WS reconnects, REST rate limits). */
 export async function listMemeGaps(orgId: string, params: ListMemeGapsParams = {}): Promise<MemeGapList> {
   return apiFetch<MemeGapList>(`${memeBase(orgId)}/gaps${gapsQuery(params)}`);
+}
+
+/** The radar's sources (T4.2c/T4.3b, `routers/meme_sources.py`): heartbeat per source, coverage of the last folded minute, declared discovery blindness. */
+export async function getMemeSources(orgId: string): Promise<MemeSources> {
+  return apiFetch<MemeSources>(`${memeBase(orgId)}/sources`);
+}
+
+export type MemeSourcesLoad = { ok: true; data: MemeSources } | { ok: false; reason: string };
+
+/**
+ * `getMemeSources` that never throws -- shared by `/meme` and `/meme/mesa`
+ * (brief T4.3b): the panel is one section of a page whose other sections
+ * must still render when this read fails, so the failure comes back named
+ * and the page hands it to `SectionUnavailable`.
+ */
+export async function loadMemeSources(orgId: string): Promise<MemeSourcesLoad> {
+  try {
+    return { ok: true, data: await getMemeSources(orgId) };
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : error instanceof Error ? error.message : "erro desconhecido";
+    logger.error("meme_sources_load_failed", { error: reason });
+    return { ok: false, reason };
+  }
 }

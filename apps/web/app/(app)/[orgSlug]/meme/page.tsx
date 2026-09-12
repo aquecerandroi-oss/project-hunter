@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MemeFilterBar } from "@/components/meme/meme-filter-bar";
 import { MemeOverviewStrip } from "@/components/meme/meme-overview-strip";
+import { MemeSourcesPanel } from "@/components/meme/meme-sources-panel";
 import { MemeTokensTable } from "@/components/meme/meme-tokens-table";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
 import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { isApiError } from "@/lib/api-error";
-import { getMemeOverview, listMemeTokens, type ListMemeTokensParams } from "@/lib/api/meme";
+import { getMemeOverview, listMemeTokens, type ListMemeTokensParams, loadMemeSources } from "@/lib/api/meme";
+import { getMemeLoopState } from "@/lib/api/meme-desk";
 import { MEME_TOKEN_SORTS, type MemeOverview, type MemeTokenList, type MemeTokenSort, type MemeTokenState } from "@/lib/api/meme-types";
 import { resolveOrgContext } from "@/lib/api/org-context";
 import { logger } from "@/lib/logger";
@@ -70,7 +72,15 @@ export default async function MemePage({ params, searchParams }: MemePageProps) 
 
   const tokensParams: ListMemeTokensParams = { sort, limit: PAGE_LIMIT, ...(state ? { state } : {}) };
 
-  const [overviewResult, tokensResult] = await Promise.all([loadOverview(orgId), loadTokens(orgId, tokensParams)]);
+  // T4.3b: the sources panel and the loop's tick are read in the same server
+  // render, so the page's own `AutoRefresh` is their polling too; each read
+  // fails on its own (`loadMemeSources`/`getMemeLoopState` never throw).
+  const [overviewResult, tokensResult, sourcesResult, loop] = await Promise.all([
+    loadOverview(orgId),
+    loadTokens(orgId, tokensParams),
+    loadMemeSources(orgId),
+    getMemeLoopState(orgId),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -84,6 +94,12 @@ export default async function MemePage({ params, searchParams }: MemePageProps) 
         <MemeOverviewStrip overview={overviewResult.data} />
       ) : (
         <SectionUnavailable title="Visão geral" reason={`falha ao carregar (${overviewResult.reason})`} />
+      )}
+
+      {sourcesResult.ok ? (
+        <MemeSourcesPanel sources={sourcesResult.data} loop={loop} />
+      ) : (
+        <SectionUnavailable title="Fontes" reason={`falha ao carregar (${sourcesResult.reason})`} />
       )}
 
       <section className="flex flex-col gap-3">

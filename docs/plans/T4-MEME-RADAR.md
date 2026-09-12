@@ -520,6 +520,47 @@ primeira página (um pull que cruza o fecho do minuto cobre o minuto seguinte). 
 `tape_deferred_60s`, `mayhem_pending`, `mayhem_written_60s`; `GET /meme/sources` expõe todos.
 Prova em produção: `infra/scripts/sql/research/2026-09-12-t42e-cobertura.sql` (antes × depois).
 
+### T4.3b — o painel de fontes na tela: `/meme` e `/meme/mesa` (entregue 12/09/2026)
+
+**Por quê:** desde a T4.2c/T4.2e a API expõe `GET /meme/sources`, mas nada disso aparecia na tela — o
+Everton perguntava "operável?" sem ter como ver que 43 % das linhas têm progresso e 39 % têm fita.
+
+**O que aparece (brief `.claude/state/brief-T4.3b-painel-de-fontes.md`):** uma faixa "Fontes"
+(`components/meme/meme-sources-panel.tsx`; regras puras em `meme-sources-format.ts`, testadas em
+`tests/meme-sources-format.test.ts` e `tests/meme-sources-panel.test.tsx`):
+
+- **Um chip por fonte** (as seis do heartbeat: PumpPortal WS, pump.fun REST, Solana RPC, boards do site,
+  fita do `swap-api`, risco do indexer; uma fonte nova que o worker relate antes de a tela conhecê-la ganha
+  nome legível em vez de sumir). Cor por regra, na ordem: cinza "desligada"/"sem leitura: motivo"
+  (`never_observed`, `never_connected`, `heartbeat_missing` em português, nunca o slug); vermelho
+  "desconectada"/"com erro · N na hora"/"N erro(s) na hora" (erro na hora vence tudo); âmbar "atrasada há
+  N s|min|h" quando `age_s` passa do `stalled_after_s` do próprio radar, ou "orçamento N%" a partir de
+  90 % do limite; verde "conectada"/"em dia". Cada chip traz "atraso N.N s · usado/limite req/min" (ou
+  "N/min (sem limite declarado)", ou "sem leitura") e o `last_observed_at` em Brasília; o `title` guarda o
+  último erro e a testemunha do banco.
+- **Três medidores honestos:** *progresso coberto* e *fita coberta* (o `progress_coverage_pct` e o
+  `tape_coverage_pct` do último minuto dobrado, com o `fold_minute` como `observed_at`, mais
+  "N linha(s) no minuto · N Mayhem sem denominador" e "N de M mints com fita · ciclo N.N s ·
+  N adiado(s)/min · N nunca puxado(s)"), e *cegueira da descoberta* (`discovery_blind_share_1h`, com
+  "N de M entradas do board new na hora", o `sources_at` como `observed_at` e a frase fixa "moedas de
+  outros launchpads que o radar não vê por construção"). Sem número → "sem leitura: motivo", com quatro
+  motivos distintos: radar sem heartbeat/parado, nenhum minuto dobrado ainda, minuto dobrado vazio,
+  board `new` sem listagem na hora — e, para um worker anterior à T4.2d/T4.2e que não manda o campo,
+  "o worker não informou este número". Nunca um 0 %.
+- **Estado do radar e do laço:** "radar vivo · heartbeat há N s" ≠ "radar parado desde dd/mm hh:mm"
+  (Brasília) ≠ "radar: sem leitura (sem heartbeat do worker | Redis indisponível | o worker subiu, mas o
+  radar nunca escreveu seus campos)"; o laço reaproveita o `loopStateLabel` da mesa, medido contra o
+  `as_of` da própria API. "N mints rastreados" (ou "rastreados: sem leitura"), gaps e mensagens
+  malformadas do último minuto só quando houve alguma, e "consultado em" com o `as_of`.
+
+**Montagem:** `/meme` lê `/meme/sources` e `/meme/lab` no mesmo render que o overview e a lista (mesmo
+`AutoRefresh`), painel completo abaixo da faixa de visão geral; `/meme/mesa` lê `/meme/sources` junto com
+a mesa (5 s) e mostra a versão de uma linha acima da faixa de PnL e das propostas (o laço já está na faixa
+da mesa, por isso a linha não o repete). Cada leitura falha sozinha (`loadMemeSources` nunca lança) e
+cai em `SectionUnavailable` sem derrubar o resto da página. Mobile 375: chips quebram em duas colunas,
+medidores empilham; dark/light pelos tokens `-soft` dos badges. Playwright/checagem visual com dado real
+fica para a sessão logada (o navegador embutido não abre localhost/Clerk).
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets
