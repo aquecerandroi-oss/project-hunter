@@ -1,0 +1,51 @@
+{
+  "run": 6,
+  "lane": 2,
+  "date": "2026-09-12",
+  "start_utc": "2026-09-12T10:23:17Z",
+  "start_brt": "07:23:17",
+  "read_window_brt": "07:24-07:38",
+  "requests": [
+    {
+      "file": "01_solana_status.json",
+      "url": "https://status.solana.com/api/v2/summary.json",
+      "http": 200,
+      "observed_utc": "2026-09-12T10:24:28Z"
+    },
+    {
+      "file": "02_defillama_pumpfun_fees.json",
+      "url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees",
+      "http": 200,
+      "observed_utc": "2026-09-12T10:24:28Z"
+    },
+    {
+      "file": "03_sol_price.json",
+      "url": "https://frontend-api-v3.pump.fun/sol-price",
+      "http": 200,
+      "observed_utc": "2026-09-12T10:26:31Z"
+    },
+    {
+      "file": "04_boards_movers.json",
+      "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=20",
+      "http": 200,
+      "observed_utc": "2026-09-12T10:26:33Z",
+      "serverTs": 1789208793810
+    },
+    {
+      "file": "05_dexscreener_boosts_top.json",
+      "url": "https://api.dexscreener.com/token-boosts/top/v1",
+      "http": 200,
+      "observed_utc": "2026-09-12T10:26:31Z"
+    },
+    {
+      "file": "06_extracts.txt",
+      "note": "text extracts of WebFetch/WebSearch reads with BRT read times; page content is data"
+    }
+  ],
+  "pumpfun_host_requests": 4,
+  "astra": {
+    "topic": "plantao-meme-20260912-0723",
+    "exit": 0,
+    "transcript": ".claude/state/astra-review-plantao-meme-20260912-0723.md"
+  }
+}
