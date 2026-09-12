@@ -81,6 +81,33 @@ class MemeConfig:
     """RPC reconciliation of the top-K. Five minutes, not every cycle: the chain is
     the truth but the public RPC is the scarcest budget of the three."""
 
+    lab_enabled: bool = True
+    """The continuous paper Lab (T4.6). ``MEME_LAB_ENABLED`` defaults to **true**
+    whenever the radar collects: the Lab reads only what the collector already
+    wrote and speaks to one more endpoint (``/sol-price``, at most once a
+    minute), so a second switch defaulting to off would only produce a radar
+    that looks alive and proposes nothing. Off is for an operator who wants the
+    collector without the loop, and the readiness body says so."""
+
+    lab_cycle_s: float = 60.0
+    """One tick per minute — the cadence of the closed minute it reads."""
+
+    lab_proposal_ttl_s: int = 120
+    """``expires_at = proposed_at + 120 s`` (contract): memes move fast."""
+
+    lab_fill_window_s: int = 180
+    """No snapshot strictly after the decision within 3 min → ``unfilled`` with
+    ``no_later_snapshot`` (contract §Semântica 2). The same window bounds a
+    sale: an exit that finds no later snapshot is ``rug_no_snapshot``."""
+
+    lab_gate_backlog_minutes: int = 3
+    """After a restart the gate re-reads at most this many closed minutes: a
+    proposal for an older minute would expire before anyone could act on it."""
+
+    lab_sol_usd_max_age_s: int = 60
+    """The SOL/USD quote is re-read at most once a minute (its own upstream
+    rate-limit group, 50/60 s), and only when a fill or a sale needs it."""
+
 
 def _int_env(name: str, default: int) -> int:
     """An integer knob of this worker, or its default. A malformed value is the
@@ -116,9 +143,17 @@ def load_config(settings: Settings) -> MemeConfig:
     belong there.
     """
     return MemeConfig(
-        enabled=os.environ.get("MEME_ENABLED", "").strip().lower() in {"1", "true", "yes"},
+        enabled=_bool_env("MEME_ENABLED", default=False),
         tracked_max=_int_env("MEME_TRACKED_MINTS_MAX", 120),
         track_window_minutes=_int_env("MEME_TRACK_WINDOW_MINUTES", 1440),
         rpc_top_k=_int_env("MEME_RPC_TOP_K", 20),
         retention_days=settings.meme_retention_days,
+        lab_enabled=_bool_env("MEME_LAB_ENABLED", default=True),
     )
+
+
+def _bool_env(name: str, *, default: bool) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes"}

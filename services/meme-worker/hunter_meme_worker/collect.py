@@ -304,11 +304,11 @@ async def prune_once(ctx: RadarContext) -> int:
     return total
 
 
-async def forever(
+async def forever[ContextT](
     name: str,
     interval_s: float,
-    step: Callable[[RadarContext], Awaitable[object]],
-    ctx: RadarContext,
+    step: Callable[[ContextT], Awaitable[object]],
+    ctx: ContextT,
 ) -> None:
     """Run one step on a fixed cadence until cancelled.
 
