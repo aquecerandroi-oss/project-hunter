@@ -220,7 +220,11 @@ case "$cmd" in
     # Build, then run the migration ALONE, then bring the services up: a
     # migration that fails now fails with the previous release still running,
     # and `set -e` stops here before anything is recreated.
-    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" build
+    # Only `api` and `web` have a build context; every other service reuses
+    # `hunter-api:$GIT_SHA`. A bare `build` also tries to *pull* that tag for
+    # them first and logs "pull access denied" six times (deploy eeb566c) --
+    # harmless, but noise that looks like a failure in the log.
+    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" build api web
     "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" run --rm migrate
     "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" up -d --remove-orphans
     "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" ps
