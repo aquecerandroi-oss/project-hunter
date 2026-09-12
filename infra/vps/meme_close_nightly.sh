@@ -10,7 +10,7 @@
 # raiz do repositório) que o orquestrador puxa de manhã, aplica e commita.
 #
 # Uso: meme_close_nightly.sh [YYYY-MM-DD]   (sem dia: ontem, no relógio de Brasília)
-# Cron (docs/DEPLOYMENT.md §3.6b): 10 3 * * * (03:10 UTC = 00:10 BRT).
+# Cron (docs/DEPLOYMENT.md §3.6b): 10 5 * * * na hora local do host (Europe/Berlin): 00:10 BRT no CEST, 01:10 BRT no CET.
 set -euo pipefail
 
 ROOT=/opt/project-hunter

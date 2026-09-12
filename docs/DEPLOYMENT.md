@@ -696,10 +696,13 @@ cd /opt/project-hunter && GIT_SHA="$(git rev-parse --short HEAD)" docker compose
   ops python infra/scripts/meme_close_day.py --day 2026-09-12 --dry-run
 ```
 
-Agendamento (instalar uma vez, à mão, no padrão de `/etc/cron.d/hunter-partitions` —
-`infra/vps/README.md`; supondo a máquina em UTC, confirmar com `timedatectl`: 00:10 BRT = 03:10
-UTC; o `--day` é calculado no relógio de Brasília para nunca depender do fuso do host). O cron
-**não** chama o `docker compose` diretamente: chama `infra/vps/meme_close_nightly.sh`, que copia
+Agendamento (instalado em 12/09/2026, no padrão de `/etc/cron.d/hunter-partitions` —
+`infra/vps/README.md`). **A VPS não está em UTC:** `timedatectl` mostra `Europe/Berlin`, e o
+`cron 3.0pl1` do Ubuntu não entende `CRON_TZ`, então a hora do cron é a hora local do host:
+`10 5 * * *` = 05:10 CEST = 03:10 UTC = **00:10 BRT** no horário de verão europeu e 05:10 CET =
+**01:10 BRT** no inverno (a partir de 25/10/2026) — sempre depois da meia-noite de Brasília, que é
+o que importa; o `--day` é calculado no relógio de Brasília para nunca depender do fuso do host. O
+cron **não** chama o `docker compose` diretamente: chama `infra/vps/meme_close_nightly.sh`, que copia
 `obsidian/` e `.claude/state/` para `/opt/hunter-close/` (`rsync --delete`), roda o job com a
 **cópia** montada e deixa `/opt/hunter-close/patch-<UTC>.diff` (`diff -ruN`, caminhos relativos à
 raiz) e `run-<UTC>.log`. A árvore de `/opt/project-hunter` fica limpa; o `git pull` do
@@ -709,7 +712,7 @@ raiz) e `run-<UTC>.log`. A árvore de `/opt/project-hunter` fica limpa; o `git p
 printf '%s\n' \
   'SHELL=/bin/bash' \
   'PATH=/usr/local/bin:/usr/bin:/bin' \
-  '10 3 * * * hunter /opt/project-hunter/infra/vps/meme_close_nightly.sh >> /opt/hunter-close/cron.log 2>&1' \
+  '10 5 * * * hunter /opt/project-hunter/infra/vps/meme_close_nightly.sh >> /opt/hunter-close/cron.log 2>&1' \
   | sudo tee /etc/cron.d/hunter-meme-close >/dev/null
 sudo chmod 644 /etc/cron.d/hunter-meme-close
 ```
