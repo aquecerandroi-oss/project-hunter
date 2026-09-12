@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from sqlalchemy.exc import IntegrityError
+
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
@@ -48,6 +50,19 @@ WORKER_ROLE = "hunter_worker"
 RECONNECT_REASON = "ws_disconnected"
 
 
+def _identity(value: str | None) -> str | None:
+    """An empty identity string is "not observed", not an identity.
+
+    The adapter lets ``name``/``symbol``/``uri`` be ``""`` (PumpPortal does emit
+    creates with an empty ``uri``; one arrived at 08:52:32Z on 12/09 and killed the
+    discovery TaskGroup), and ``meme_tokens`` refuses an empty string by CHECK
+    (``ck_meme_tokens_an_observed_identity_is_not_empty``). ``NULL`` is the value
+    the schema reserves for "still unknown", so that is what an empty string maps
+    to — and a later REST read may still fill it once.
+    """
+    return value if value else None
+
+
 def token_row_from_event(event: MemeEvent) -> TokenRow:
     """One normalized frame -> one upsert. Unknown fields stay ``None``."""
     if isinstance(event, NormalizedMemeTokenCreated):
@@ -56,10 +71,10 @@ def token_row_from_event(event: MemeEvent) -> TokenRow:
             first_seen_source=event.source,
             first_seen_at=event.observed_at,
             last_seen_at=event.observed_at,
-            name=event.name,
-            symbol=event.symbol,
-            uri=event.uri,
-            creator=event.creator,
+            name=_identity(event.name),
+            symbol=_identity(event.symbol),
+            uri=_identity(event.uri),
+            creator=_identity(event.creator),
             created_at=event.created_at,
             bonding_curve=event.bonding_curve,
             initial_virtual_sol_reserves=event.initial_virtual_sol_reserves,
@@ -102,10 +117,24 @@ async def _handle(ctx: RadarContext, event: MemeEvent) -> None:
     kind = "migration" if isinstance(event, NormalizedMemeMigration) else "created"
     row = token_row_from_event(event)
     generation = ctx.events.state.reconnects
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await upsert_token(session, row)
-        if generation > ctx.state.ws_generation:
-            await _record_reconnect_gap(ctx, session, generation, event_at=row.last_seen_at)
+    try:
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            await upsert_token(session, row)
+            if generation > ctx.state.ws_generation:
+                await _record_reconnect_gap(ctx, session, generation, event_at=row.last_seen_at)
+    except IntegrityError as exc:
+        # One frame the schema refuses must cost one row, not the whole loop:
+        # an unhandled error here propagates through the TaskGroup and restarts
+        # the process (seen in production at 08:52:33Z on 12/09), which drops the
+        # tracked set and every in-flight poll. Named, counted, skipped.
+        logger.warning(
+            "meme_token_upsert_rejected",
+            mint=row.mint,
+            kind=kind,
+            error=str(exc.orig)[:200] if exc.orig is not None else str(exc)[:200],
+        )
+        meme_events_total.labels(kind="rejected").inc()
+        return
     ctx.tracker.observe(_tracked_from_row(row))
     ctx.state.last_event_at = row.last_seen_at
     meme_events_total.labels(kind=kind).inc()
