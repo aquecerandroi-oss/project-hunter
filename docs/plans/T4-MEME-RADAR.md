@@ -652,6 +652,53 @@ proposta de escala jamais escrita.
 `parent_bet_id`, `ExitReason` ganha `max_loss` (já escrito pelo laço desde a T4.6) e `line_broken`.
 `apps/web` é a Parte B (paralela). Schema: `docs/DATABASE.md` §38. Notas: `.claude/state/notes-T4.10a.md`.
 
+### T4.13 — o registro completo de cada teste na mesa (entregue 12/09/2026)
+
+**Diretiva** (Everton, 12/09 11:3x BRT): "deixa pronto os testes na mesa colocando tempo de entrada, valor de
+entrada, tempo de saída e tudo; vou começar a testar com grana verdadeira". Brief:
+`.claude/state/brief-T4.13-registro-de-testes-na-mesa.md`.
+
+**API** (`routers/meme_tests.py`, VIEWER+, só leitura): `GET /api/v1/orgs/{org}/meme/tests?day=&rule_set=&cursor=&limit=`
+— uma linha por aposta de papel **do dia Brasília de `entry_at`** (a régua da `meme_lab_scoreboard_v1`), fechada
+**e** aberta (aberta com `mark_sol`/`mark_at` como saída provisória, `exit.provisional = true`), com tudo já
+derivado no servidor em `Decimal`: entrada (hora, preço marginal antes, preço médio, mcap da fotografia, SOL gasto,
+tokens, taxa, atraso decisão→fill), saída (hora, preço marginal após, mcap, SOL recebido, taxa, motivo no vocabulário
+fechado `ExitReason` **e** o rótulo em português `EXIT_REASON_PT`, gatilho, regra pendente no rug), duração, PnL SOL,
+**PnL US$ = `pnl_sol × sol_usd_at_exit`** (a fórmula da vista do placar; aberta → provisório pela cotação da entrada,
+`pnl_usd_basis`; sem cotação → `null` com `pnl_usd_reason`), R, conjunto/perna/`parent_bet_id`, origem/decisor, e
+`lab_context` lido de `meme_features_1m` no `(mint, features_end_time)` da proposta preferindo `meme_features_v3`
+(linha traçável?, suporte, distância, fundos ascendentes, rompimento, `hype_score`/motivo, criador vendeu?, progresso,
+idade, compradores, gatilhos; manual → `manual_no_minute`, minuto sem linha → `no_features_row`). Totais do dia em
+SQL sobre o filtro inteiro (apostas, fechadas/abertas, acertos/perdas, PnL SOL realizado e provisório, PnL US$ +
+`unpriced_usd`, R somado). `GET .../tests.csv?day=&rule_set=`: UTF-8 com BOM, `;`, CRLF, decimais com vírgula,
+datas `dd/mm/aaaa HH:MM:SS` Brasília, `sim`/`não`, 39 colunas (`CSV_COLUMNS`), teto 5 000 linhas.
+`GET .../tests/{bet_id}`: a mesma linha + a curva de `entry_at − 5 min` a `saída + 5 min` (≤ 600 fotografias).
+**REAL (T4.12, paralela)**: `meme_wallet_positions` lida por `to_regclass` + `SELECT *` sob SAVEPOINT, colunas do
+brief lidas com tolerância (`services/meme_tests_real.py`, `kind = real_observed`, conjunto `wallet:<8>`); tabela
+ausente → `sources.wallets = "não observada"`, erro de leitura → `"leitura indisponível"`; as linhas reais vêm em
+`real_items` (fora do keyset das apostas de papel) e a tela/CSV as intercalam por hora de entrada.
+
+**Web**: aba **"Testes"** em `/meme/mesa` (`?tab=testes`, guias `<Link>` "Mesa · Testes") e rota própria
+`/meme/testes?day=&set=&cursor=` — mesma `MemeTestsSection` (`components/meme-tests/*`): rótulo da API, filtro por
+dia (input nativo + Hoje/Ontem/←/→ pelo relógio do servidor) e por conjunto (pills), totais, linha de fontes
+("Reais: sem carteira observada ainda · contexto do Lab lido de meme_features_v3 · Consultado em …"), tabela densa
+13 px com três colunas fixas à esquerda (▸ · hora entrada · moeda) e as demais (conjunto · entrada SOL · saída SOL ·
+PnL SOL · PnL US$ · R · motivo · duração) rolando, linha expansível com entrada/saída/cotação/**o que o Lab dizia**;
+selo "REAL — observado na cadeia"; `*` em saída/US$ provisórios; 375 px em cartões com `<details>`; ≤ 200 linhas por
+página (link "Próxima página" + aviso "exporte o CSV para o dia inteiro"); botão **Exportar CSV** → route handler
+`/meme/testes/export?day=` (passa pelo `clerkMiddleware`, pede o token e repassa os bytes/cabeçalhos da API; o caminho
+não termina em `.csv` porque o matcher do middleware ignora essa extensão). Ficha `/meme/mesa/aposta/{id}`: stats,
+`MemeCurveChart` reaproveitado (aceita `{observed_at, mcap_sol}`) com as marcas "entrada" e "saída"/"marca atual",
+ficha completa. `MEME_EXIT_REASONS` do web ganhou `max_loss`/`line_broken` com rótulos (o build de produção quebrou
+três vezes por rótulo faltante).
+
+**Provas**: API unit 18 (`test_meme_tests_service.py`: vocabulário exaustivo por `get_args(ExitReason)`, limites
+Brasília, fechada/aberta/rug, US$ pela fórmula do placar, contexto do Lab, linhas REAL tolerantes, CSV byte a byte);
+integração 13 em testcontainer contra o Alembic head (`test_meme_tests_api.py`: uma fechada **por motivo**, aberta,
+manual, sonda+escala, ontem excluído, minuto v3, curva do detalhe, keyset, filtro, 404, CSV byte a byte); web Vitest
+44 novos (formatação Brasília com segundos, motivos, totais, link do CSV, tabela/cartões com REAL e expansão).
+Notas: `.claude/state/notes-T4.13.md`.
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

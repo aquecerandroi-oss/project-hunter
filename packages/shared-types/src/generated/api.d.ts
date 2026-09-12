@@ -609,6 +609,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/meme/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every test of a Brasília day: entry, exit, PnL, R, leg and what the Lab said */
+        get: operations["list_tests_api_v1_orgs__org_id__meme_tests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/tests.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The same record as a CSV for Excel in pt-BR (UTF-8 with BOM, ';', Brasília) */
+        get: operations["export_tests_csv_api_v1_orgs__org_id__meme_tests_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/tests/{bet_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One bet's record with the curve between its entry and its exit */
+        get: operations["get_test_api_v1_orgs__org_id__meme_tests__bet_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/meme/tokens": {
         parameters: {
             query?: never;
@@ -2379,6 +2430,51 @@ export interface components {
             daily_loss_pct: string;
             /** Drawdown Pct */
             drawdown_pct: string;
+        };
+        /**
+         * LabContextOut
+         * @description What the gate read in the minute that motivated the proposal
+         *     (``meme_features_1m`` at ``features_end_time``).
+         */
+        LabContextOut: {
+            /** Age Minutes */
+            age_minutes: number | null;
+            /** Breakout 15M */
+            breakout_15m: boolean | null;
+            /** Creator Sold */
+            creator_sold: boolean | null;
+            /** Creator Sold Reason */
+            creator_sold_reason: string | null;
+            /** Curve Progress Pct */
+            curve_progress_pct: string | null;
+            /** Distance To Support Pct */
+            distance_to_support_pct: string | null;
+            /** Features End Time */
+            features_end_time: string | null;
+            /** Features Version */
+            features_version: string | null;
+            /** Gate Reasons */
+            gate_reasons: unknown[];
+            /** Higher Lows */
+            higher_lows: boolean | null;
+            /** Hype Reason */
+            hype_reason: string | null;
+            /** Hype Score */
+            hype_score: string | null;
+            /** Line Drawn */
+            line_drawn: boolean | null;
+            /** Line Reason */
+            line_reason: string | null;
+            /** Mcap Sol */
+            mcap_sol: string | null;
+            /** Progress Reason */
+            progress_reason: string | null;
+            /** Reason */
+            reason: ("manual_no_minute" | "no_features_row") | null;
+            /** Support Line Sol */
+            support_line_sol: string | null;
+            /** Unique Buyers */
+            unique_buyers: number | null;
         };
         /** LatencyHopOut */
         LatencyHopOut: {
@@ -5418,6 +5514,252 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** TestCurvePointOut */
+        TestCurvePointOut: {
+            /** Complete */
+            complete: boolean;
+            /** Mcap Sol */
+            mcap_sol: string | null;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Source */
+            source: string;
+        };
+        /** TestDetailOut */
+        TestDetailOut: {
+            /** Curve */
+            curve: components["schemas"]["TestCurvePointOut"][];
+            /**
+             * Curve From
+             * Format: date-time
+             */
+            curve_from: string;
+            /**
+             * Curve To
+             * Format: date-time
+             */
+            curve_to: string;
+            /**
+             * Label
+             * @default Registro de testes — papel e REAL observado lado a lado; nada aqui executa
+             */
+            label: string;
+            row: components["schemas"]["TestRowOut"];
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
+        };
+        /**
+         * TestEntryOut
+         * @description The fill photograph (``meme_paper_bets.entry``): every ``None`` is a key
+         *     the loop did not write.
+         */
+        TestEntryOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Average Price Sol */
+            average_price_sol: string | null;
+            /** Fee Pct */
+            fee_pct: string | null;
+            /** Fee Sol */
+            fee_sol: string | null;
+            /** Fill Delay S */
+            fill_delay_s: number | null;
+            /** Fill Delay Snapshots */
+            fill_delay_snapshots: number | null;
+            /** Mcap Sol */
+            mcap_sol: string | null;
+            /** Price Sol Per Token */
+            price_sol_per_token: string | null;
+            /** Sol Spent */
+            sol_spent: string | null;
+            /** Source */
+            source: string | null;
+            /** Tokens */
+            tokens: string | null;
+        };
+        /**
+         * TestExitOut
+         * @description The sale photograph, or — while the bet is open — the last mark standing
+         *     in as a provisional exit (``provisional = True``).
+         */
+        TestExitOut: {
+            /** At */
+            at: string | null;
+            /** Fee Sol */
+            fee_sol: string | null;
+            /** Mcap Sol */
+            mcap_sol: string | null;
+            /** Pending Reason */
+            pending_reason: string | null;
+            /** Price Sol Per Token */
+            price_sol_per_token: string | null;
+            /** Provisional */
+            provisional: boolean;
+            /** Reason */
+            reason: ("target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot" | "max_loss" | "line_broken") | string | null;
+            /** Reason Label */
+            reason_label: string;
+            /** Sol Received */
+            sol_received: string | null;
+            /** Trigger */
+            trigger: string | null;
+        };
+        /** TestRowOut */
+        TestRowOut: {
+            /** Bet Id */
+            bet_id: string | null;
+            /** Decided By */
+            decided_by: string | null;
+            /** Duration S */
+            duration_s: number | null;
+            entry: components["schemas"]["TestEntryOut"];
+            exit: components["schemas"]["TestExitOut"];
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "paper" | "real_observed";
+            /** Kind Label */
+            kind_label: string;
+            lab_context: components["schemas"]["LabContextOut"];
+            /** Leg */
+            leg: ("probe" | "scale" | "single") | string;
+            /** Mark Source */
+            mark_source: string | null;
+            /** Mint */
+            mint: string;
+            /** Origin */
+            origin: string | null;
+            /** Parent Bet Id */
+            parent_bet_id: string | null;
+            /** Pnl Sol */
+            pnl_sol: string | null;
+            /** Pnl Usd */
+            pnl_usd: string | null;
+            /** Pnl Usd Basis */
+            pnl_usd_basis: ("exit_quote" | "entry_quote_provisional") | null;
+            /** Pnl Usd Reason */
+            pnl_usd_reason: ("no_exit_quote" | "no_entry_quote" | "no_pnl") | null;
+            /** Proposal Id */
+            proposal_id: string | null;
+            /** R Multiple */
+            r_multiple: string | null;
+            rule_set: components["schemas"]["TestRuleSetOut"];
+            /** Sol Usd At Entry */
+            sol_usd_at_entry: string | null;
+            /** Sol Usd At Exit */
+            sol_usd_at_exit: string | null;
+            /** Sol Usd Source */
+            sol_usd_source: string | null;
+            /** Status */
+            status: ("open" | "closed") | string;
+            /** Token Name */
+            token_name: string | null;
+            /** Token Symbol */
+            token_symbol: string | null;
+            /** Wallet */
+            wallet: string | null;
+        };
+        /** TestRuleSetOut */
+        TestRuleSetOut: {
+            /** Kind */
+            kind: string | null;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string | null;
+            /** Version */
+            version: string | null;
+        };
+        /** TestsListOut */
+        TestsListOut: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Day End
+             * Format: date-time
+             */
+            day_end: string;
+            /**
+             * Day Start
+             * Format: date-time
+             */
+            day_start: string;
+            /** Items */
+            items: components["schemas"]["TestRowOut"][];
+            /**
+             * Label
+             * @default Registro de testes — papel e REAL observado lado a lado; nada aqui executa
+             */
+            label: string;
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Real Items */
+            real_items: components["schemas"]["TestRowOut"][];
+            /** Rule Set */
+            rule_set: string | null;
+            /** Rule Sets */
+            rule_sets: string[];
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
+            sources: components["schemas"]["TestsSourcesOut"];
+            totals: components["schemas"]["TestsTotalsOut"];
+        };
+        /** TestsSourcesOut */
+        TestsSourcesOut: {
+            /** Features Version */
+            features_version: string;
+            /**
+             * Wallets
+             * @enum {string}
+             */
+            wallets: "observada" | "não observada" | "leitura indisponível";
+        };
+        /**
+         * TestsTotalsOut
+         * @description The day's totals over **every** row of the filter, not only the page.
+         */
+        TestsTotalsOut: {
+            /** Bets */
+            bets: number;
+            /** Closed */
+            closed: number;
+            /** Losses */
+            losses: number;
+            /** Open */
+            open: number;
+            /** Pnl Sol */
+            pnl_sol: string;
+            /** Pnl Usd */
+            pnl_usd: string | null;
+            /** Provisional Pnl Sol */
+            provisional_pnl_sol: string;
+            /** R Sum */
+            r_sum: string;
+            /** Real Rows */
+            real_rows: number;
+            /** Unpriced Usd */
+            unpriced_usd: number;
+            /** Wins */
+            wins: number;
+        };
         /**
          * Timeframe
          * @description ``candle_timeframe`` — DATABASE.md §4 (candles.timeframe).
@@ -7045,6 +7387,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemeSourcesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tests_api_v1_orgs__org_id__meme_tests_get: {
+        parameters: {
+            query?: {
+                day?: string | null;
+                rule_set?: string | null;
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestsListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_tests_csv_api_v1_orgs__org_id__meme_tests_csv_get: {
+        parameters: {
+            query?: {
+                day?: string | null;
+                rule_set?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv; charset=utf-8": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_test_api_v1_orgs__org_id__meme_tests__bet_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bet_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestDetailOut"];
                 };
             };
             /** @description Validation Error */

@@ -77,8 +77,11 @@ export function markY(geometry: Pick<CurveChartGeometry, "min" | "max">, y: numb
   return HEIGHT - ((y - geometry.min) / (geometry.max - geometry.min)) * HEIGHT;
 }
 
+/** T4.13: the chart reads only the instant and the mcap, so a bet's curve slice (`TestCurvePointOut`) draws on the same component as the token detail. */
+export type CurveSnapshotLike = Pick<MemeSnapshotPoint, "observed_at" | "mcap_sol">;
+
 export interface MemeCurveChartProps {
-  snapshots: MemeSnapshotPoint[];
+  snapshots: CurveSnapshotLike[];
   marks?: SignalMark[];
   /** T4.10b: the feature series (any order); the lines come from its latest two minutes. Omitted = curve only, no line caption. */
   features?: MemeFeaturePoint[];
@@ -86,7 +89,7 @@ export interface MemeCurveChartProps {
 
 /** Newest-last order expected (chronological, left to right) -- callers pass `[...snapshots].reverse()` when the API returned newest-first (it does, `GET .../tokens/{mint}`). */
 export function MemeCurveChart({ snapshots, marks = [], features }: MemeCurveChartProps) {
-  const withValue = snapshots.filter((s): s is MemeSnapshotPoint & { mcap_sol: string } => s.mcap_sol !== null);
+  const withValue = snapshots.filter((s): s is CurveSnapshotLike & { mcap_sol: string } => s.mcap_sol !== null);
   const omitted = snapshots.length - withValue.length;
   const points: CurvePoint[] = withValue.map((s) => ({ x: new Date(s.observed_at).getTime(), y: Number(s.mcap_sol) }));
   const geometry = curveChartGeometry(points);

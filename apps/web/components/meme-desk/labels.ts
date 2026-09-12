@@ -30,6 +30,9 @@ const EXIT_REASON_LABEL: Record<MemeExitReason, string> = {
   creator_dump: "criador vendeu",
   sell_now: "vender agora (operador)",
   rug_no_snapshot: "rug — sem fotografia",
+  // T4.13: the same words `hunter_api.schemas.meme_tests.EXIT_REASON_PT` writes to the CSV.
+  max_loss: "perda máxima (piso)",
+  line_broken: "linha rompida",
 };
 
 export function exitReasonLabel(reason: string | null | undefined): string {

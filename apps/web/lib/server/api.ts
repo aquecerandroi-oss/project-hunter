@@ -4,10 +4,10 @@ import { ApiError, type ApiErrorBody } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 import { getServerSession } from "@/lib/server/auth";
 
-async function buildHeaders(init: RequestInit): Promise<Headers> {
+async function buildHeaders(init: RequestInit, accept = "application/json"): Promise<Headers> {
   const session = await getServerSession();
   const headers = new Headers(init.headers);
-  headers.set("Accept", "application/json");
+  headers.set("Accept", accept);
   if (session?.token) headers.set("Authorization", `Bearer ${session.token}`);
   headers.set("X-Request-ID", crypto.randomUUID());
   if (init.body !== undefined && !headers.has("Content-Type")) {
@@ -53,4 +53,27 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 
   return payload as T;
+}
+
+/**
+ * The raw `Response` of a non-JSON read (a file the API renders, e.g. the
+ * tests CSV of `routers/meme_tests.py`), with the same bearer token and
+ * request id as `apiFetch`. A non-2xx answer is still turned into an
+ * `ApiError` (its body read as problem+json when it is one), so a route
+ * handler streaming the body never forwards an error page as a download.
+ */
+export async function apiFetchResponse(path: string, accept: string, init: RequestInit = {}): Promise<Response> {
+  const baseUrl = process.env.API_URL;
+  if (!baseUrl) throw new Error("API_URL is not configured");
+
+  const headers = await buildHeaders(init, accept);
+  const response = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  if (!response.ok) {
+    const isJson = (response.headers.get("content-type") ?? "").includes("json");
+    const payload: unknown = isJson ? await response.json() : await response.text();
+    const body = await readErrorBody(response, isJson, payload);
+    logger.error("api_request_failed", { path, status: response.status, type: body.type });
+    throw new ApiError(body);
+  }
+  return response;
 }

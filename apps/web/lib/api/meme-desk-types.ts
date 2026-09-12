@@ -29,8 +29,11 @@ export type MemeDeskManualBody = components["schemas"]["ManualProposalIn"];
 export type MemeProposalStatus = "proposed" | "approved" | "rejected" | "expired" | "filled" | "unfilled";
 export const MEME_PROPOSAL_STATUSES: readonly MemeProposalStatus[] = ["proposed", "approved", "rejected", "expired", "filled", "unfilled"];
 
-export type MemeExitReason = "target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot";
-export const MEME_EXIT_REASONS: readonly MemeExitReason[] = ["target", "trailing", "time_stop", "migrated", "creator_dump", "sell_now", "rug_no_snapshot"];
+// T4.13: `max_loss` (the loop's loss floor, written since T4.6) and
+// `line_broken` (0026, T4.10) joined the API's `ExitReason`; a label missing
+// here is exactly what broke three production builds on 2026-09-12.
+export type MemeExitReason = "target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot" | "max_loss" | "line_broken";
+export const MEME_EXIT_REASONS: readonly MemeExitReason[] = ["target", "trailing", "time_stop", "migrated", "creator_dump", "sell_now", "rug_no_snapshot", "max_loss", "line_broken"];
 
 export function isMemeProposalStatus(value: string): value is MemeProposalStatus {
   return (MEME_PROPOSAL_STATUSES as readonly string[]).includes(value);
