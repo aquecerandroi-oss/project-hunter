@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { formatMemePct, formatSol } from "@/components/meme/meme-format";
+import { formatSol } from "@/components/meme/meme-format";
 import { BrasiliaShort } from "@/components/time/brasilia-instant";
 import { Button } from "@/components/ui/button";
 import type { MemeDeskRow } from "@/lib/api/meme-desk-types";
@@ -18,7 +18,7 @@ function QuoteLine({ row }: { row: MemeDeskRow }) {
   return (
     <p className="text-[11px] text-fg-muted">
       {q.mcap_sol ? `mcap ${formatSol(q.mcap_sol, 2)}` : "mcap sem dado"}
-      {q.curve_progress_pct ? ` · curva ${formatMemePct(q.curve_progress_pct)}` : ""}
+      {q.curve_progress_pct ? ` · curva ${formatQuoteProgress(q.curve_progress_pct)}` : ""}
       {q.cost_sol ? ` · custo ${formatSol(q.cost_sol)}` : ""}
       {q.fee_sol ? ` (taxa ${formatSol(q.fee_sol)})` : ""}
       {q.observed_at ? (
@@ -57,10 +57,31 @@ function Header({ orgSlug, row, countdown, expired }: { orgSlug: string; row: Me
   );
 }
 
+/** The loop writes `curve_progress_pct` into the quote already as a percent ("25.8459"); `formatMemePct` expects a fraction, which printed "2,584.59 %" on the desk (12/09 12:17 BRT). */
+function formatQuoteProgress(value: string): string {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${n.toFixed(2)}%` : value;
+}
+
+/** T4.10a proposals carry structured reasons (`{feature, value, window?, cap?}` or `{rule}`); `String(obj)` printed "[object Object]". */
+function reasonText(reason: unknown): string {
+  if (typeof reason === "string") return reason;
+  if (reason && typeof reason === "object") {
+    const r = reason as Record<string, unknown>;
+    if (typeof r.rule === "string") return `regra ${r.rule}`;
+    const feature = typeof r.feature === "string" ? r.feature : "?";
+    const value = r.value === undefined || r.value === null ? "" : String(r.value);
+    const window = Array.isArray(r.window) ? ` (janela ${r.window.map(String).join("–")})` : "";
+    const cap = r.cap === undefined || r.cap === null ? "" : ` (teto ${String(r.cap)})`;
+    return `${feature} = ${value}${window}${cap}`;
+  }
+  return String(reason);
+}
+
 function ReasonsLine({ row }: { row: MemeDeskRow }) {
   return (
     <p className="text-[11px] text-fg-muted">
-      {originLabel(row.origin)} · motivo: {row.reasons.length ? row.reasons.map(String).join(", ") : "não informado"}
+      {originLabel(row.origin)} · motivo: {row.reasons.length ? row.reasons.map(reasonText).join(" · ") : "não informado"}
       {row.rule_set ? ` · conjunto ${row.rule_set.name} v${row.rule_set.version}` : ""}
     </p>
   );
