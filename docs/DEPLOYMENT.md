@@ -134,6 +134,16 @@ STRATEGY_SHARDS=4 docker compose -f infra/docker/docker-compose.yml \
 VPS: `STRATEGY_SHARDS=4 bash infra/vps/compose.sh update` (mesmo padrão de
 `MARKET_SHARDS`, perfil ativado automaticamente pelo script).
 
+**Ordem interna do `update` (T4.9, 12/09/2026):** `build` → `run --rm migrate`
+**sozinho** → `up -d --remove-orphans`. Antes era `up -d --build`, que recriava todos
+os serviços e só então esperava o `migrate`: quando a migração 0023 falhou nas linhas
+de produção (07:33 BRT), a versão anterior já tinha sido removida e a pilha inteira
+ficou em `Created` por 14 minutos (as velas foram recuperadas pelo `market-worker`,
+mas o Lab e a API ficaram fora). Agora uma migração que falha para o script com a
+versão anterior ainda no ar. Regra que acompanha: migração que adiciona `CHECK`/`NOT
+NULL` a tabela com dados precisa de backfill no mesmo `upgrade` **e** de teste com
+linhas pré-existentes, não só em banco vazio.
+
 ### 3.2 `execution-worker` (T3.5/T3.13)
 
 O que é: `HUNTER_ROLE=execution` (`services/execution-worker/`), o motor da

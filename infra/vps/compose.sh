@@ -213,7 +213,16 @@ case "$cmd" in
     git -C "$ROOT" pull --ff-only
     GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)"
     export GIT_SHA
-    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" up -d --build --remove-orphans
+    # T4.9 (12/09/2026 07:33-07:47 BRT): `up -d --build` recreates every
+    # service and only THEN waits for `migrate`; when migration 0023 failed on
+    # production rows, the old containers were already gone and the whole
+    # stack sat in `Created` for 14 minutes (200 markets without candles).
+    # Build, then run the migration ALONE, then bring the services up: a
+    # migration that fails now fails with the previous release still running,
+    # and `set -e` stops here before anything is recreated.
+    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" build
+    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" run --rm migrate
+    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" up -d --remove-orphans
     "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" ps
     check_up_status
     ;;
