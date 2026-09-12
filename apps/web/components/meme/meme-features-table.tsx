@@ -6,11 +6,16 @@
  * a `0`/`false` standing in for "not measured" (docs/DESIGN.md, T4.3
  * acceptance criteria). `coverage` (fraction of the minute actually
  * observed) is never null, so it always renders a real percentage.
+ *
+ * T4.10b: the trend-line columns (support + distance, higher lows, breakout)
+ * and `hype_score` of `meme_features_v3` (`meme-features-line-cells.tsx`),
+ * read tolerantly -- a row from an older version says "linha: sem leitura".
  */
 import { BrasiliaShort } from "@/components/time/brasilia-instant";
 import type { MemeFeaturePoint, MemeNullReason } from "@/lib/api/meme-types";
 
 import { memeNullReasonText } from "./labels";
+import { HypeCell, LineCells } from "./meme-features-line-cells";
 import { formatMemePct, formatRatio, formatSol } from "./meme-format";
 
 function Reasoned({
@@ -47,6 +52,10 @@ export function MemeFeaturesTable({ features }: MemeFeaturesTableProps) {
             <th className="hidden px-3 py-2 text-right md:table-cell">Compra/venda</th>
             <th className="hidden px-3 py-2 text-right md:table-cell">Top 10 holders</th>
             <th className="hidden px-3 py-2 text-right md:table-cell">Dev vendeu</th>
+            <th className="hidden px-3 py-2 text-right md:table-cell">Suporte (SOL)</th>
+            <th className="hidden px-3 py-2 text-right md:table-cell">Fundos ascendentes</th>
+            <th className="hidden px-3 py-2 text-right md:table-cell">Rompimento 15 min</th>
+            <th className="px-3 py-2 text-right">Hype</th>
             <th className="px-3 py-2 text-right">Cobertura</th>
           </tr>
         </thead>
@@ -82,6 +91,8 @@ export function MemeFeaturesTable({ features }: MemeFeaturesTableProps) {
                   <span>{row.creator_sold ? "Sim" : "Não"}</span>
                 )}
               </td>
+              <LineCells row={row} />
+              <HypeCell row={row} />
               <td className="px-3 py-2 text-right tabular-nums">{formatMemePct(row.coverage, 0)}</td>
             </tr>
           ))}

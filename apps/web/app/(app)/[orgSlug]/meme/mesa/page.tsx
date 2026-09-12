@@ -93,6 +93,8 @@ interface DeskBodyProps {
 function DeskBody({ orgId, orgSlug, desk, loopLastTickAt, loopReason, canOperate }: DeskBodyProps) {
   const loop = { lastTickAt: loopLastTickAt, reason: loopReason };
   const sections = partitionDesk(desk.items, desk.server_now);
+  // T4.10b: a scale leg links to its probe's card only when that card is on this page.
+  const knownBetIds = desk.items.flatMap((row) => (row.bet ? [row.bet.id] : []));
   return (
     <>
       <DeskOverviewStrip summary={desk.summary} loop={loop} serverNow={desk.server_now} />
@@ -110,9 +112,9 @@ function DeskBody({ orgId, orgSlug, desk, loopLastTickAt, loopReason, canOperate
         <h2 className="text-sm font-medium text-fg">Comprar manual</h2>
         <ManualBuyDialog orgId={orgId} canOperate={canOperate} />
       </div>
-      <OpenBetsSection orgId={orgId} orgSlug={orgSlug} rows={sections.open} serverNow={desk.server_now} canOperate={canOperate} />
-      <ClosedTodaySection orgSlug={orgSlug} rows={sections.closedToday} />
-      <RecentDecisionsSection orgSlug={orgSlug} rows={sections.recent} />
+      <OpenBetsSection orgId={orgId} orgSlug={orgSlug} rows={sections.open} serverNow={desk.server_now} canOperate={canOperate} knownBetIds={knownBetIds} />
+      <ClosedTodaySection orgSlug={orgSlug} rows={sections.closedToday} knownBetIds={knownBetIds} />
+      <RecentDecisionsSection orgSlug={orgSlug} rows={sections.recent} knownBetIds={knownBetIds} />
     </>
   );
 }

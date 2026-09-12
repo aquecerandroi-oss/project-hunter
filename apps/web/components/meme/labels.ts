@@ -187,3 +187,59 @@ const DENOMINATOR_SOURCE_LABEL: Record<MemeDenominatorSource, string> = {
 export function memeDenominatorSourceLabel(source: MemeDenominatorSource): string {
   return DENOMINATOR_SOURCE_LABEL[source];
 }
+
+// T4.10b: the trend-line columns of `meme_features_v3` (brief T4.10
+// §Contrato). The vocabularies are typed here, not off the generated
+// contract, because the screen is built against the brief while the backend
+// lands in parallel; `Record<Enum, string>` still makes the compiler check the
+// map, and the label functions accept any string so a value the vocabulary
+// does not know yet renders as readable text instead of crashing the build
+// or the page (three deploys broke on 2026-09-12 for a missing label).
+export type MemeLineReason = "too_few_points" | "no_snapshot" | "flat" | "out_of_range";
+
+export const MEME_LINE_REASONS: readonly MemeLineReason[] = ["too_few_points", "no_snapshot", "flat", "out_of_range"];
+
+const LINE_REASON_LABEL: Record<MemeLineReason, string> = {
+  too_few_points: "menos de 5 fotografias na janela",
+  no_snapshot: "sem fotografia da curva na janela",
+  flat: "sem dois fundos distintos (curva plana)",
+  out_of_range: "valor fora da faixa possível (não gravado)",
+};
+
+function unknownReason(reason: string): string {
+  return `motivo não previsto (${reason.replace(/_/g, " ")})`;
+}
+
+export function memeLineReasonLabel(reason: string): string {
+  return (LINE_REASON_LABEL as Record<string, string>)[reason] ?? unknownReason(reason);
+}
+
+/** The columns exist but are absent from the payload -- an older `features_version`, never a "no line" verdict. */
+export const MEME_LINE_NO_READING = "linha: sem leitura";
+
+/** "linha ainda não traçável: <motivo>" -- the exact phrasing the brief asks for when `line_reason` is present. */
+export function memeLineUntraceableText(reason: string | null | undefined): string {
+  if (!reason) return "linha ainda não traçável: motivo não informado";
+  return `linha ainda não traçável: ${memeLineReasonLabel(reason)}`;
+}
+
+export type MemeHypeReason = "no_tape_no_board" | "partial";
+
+export const MEME_HYPE_REASONS: readonly MemeHypeReason[] = ["no_tape_no_board", "partial"];
+
+const HYPE_REASON_LABEL: Record<MemeHypeReason, string> = {
+  no_tape_no_board: "sem fita e sem board no minuto",
+  // `partial` rides beside a score computed from one of the two sources.
+  partial: "só uma das duas fontes (fita ou board)",
+};
+
+export function memeHypeReasonLabel(reason: string): string {
+  return (HYPE_REASON_LABEL as Record<string, string>)[reason] ?? unknownReason(reason);
+}
+
+export const MEME_HYPE_NO_READING = "hype: sem leitura";
+
+export function memeHypeMissingText(reason: string | null | undefined): string {
+  if (!reason) return "sem hype: motivo não informado";
+  return `sem hype: ${memeHypeReasonLabel(reason)}`;
+}

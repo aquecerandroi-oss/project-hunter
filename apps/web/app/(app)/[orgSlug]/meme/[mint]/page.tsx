@@ -100,7 +100,7 @@ function TokenDetailBody({ data, mint }: { data: MemeTokenDetail; mint: string }
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium text-fg">Mcap ao longo do tempo</h2>
-        <MemeCurveChart snapshots={chronological} marks={signalMarks(completionSignals(token))} />
+        <MemeCurveChart snapshots={chronological} marks={signalMarks(completionSignals(token))} features={features} />
       </section>
 
       <section className="flex flex-col gap-2">

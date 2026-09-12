@@ -17,10 +17,19 @@
  * drawn as vertical lines at their instants -- only inside the drawn span;
  * a signal outside it (a `gd` before the first snapshot) is listed beside
  * the chart, never squeezed onto its edge.
+ *
+ * T4.10b: `features` (the per-minute series) draws the trend lines the
+ * backend computed -- support through the last two lows projected to now,
+ * the previous window's 15-minute high, the breakout mark
+ * (`meme-lines.ts` + `meme-curve-lines.tsx`) -- on the same time/value scale
+ * as the curve, and says "linha ainda não traçável: <motivo>" or "linha: sem
+ * leitura" when there is nothing to draw.
  */
-import type { MemeSnapshotPoint } from "@/lib/api/meme-types";
+import type { MemeFeaturePoint, MemeSnapshotPoint } from "@/lib/api/meme-types";
 
+import { CurveLinesCaption, CurveLinesLayer } from "./meme-curve-lines";
 import type { SignalMark } from "./meme-graduation-signals";
+import { lineOverlay } from "./meme-lines";
 
 export interface CurvePoint {
   x: number;
@@ -62,20 +71,34 @@ export function markX(geometry: Pick<CurveChartGeometry, "minX" | "maxX">, x: nu
   return ((x - geometry.minX) / spanX) * WIDTH;
 }
 
+/** The drawn y of a value, by the same value scale as the line (a value outside the series' range lands outside the box and is clipped, never rescales the curve). */
+export function markY(geometry: Pick<CurveChartGeometry, "min" | "max">, y: number): number {
+  if (geometry.max === geometry.min) return HEIGHT / 2;
+  return HEIGHT - ((y - geometry.min) / (geometry.max - geometry.min)) * HEIGHT;
+}
+
 export interface MemeCurveChartProps {
   snapshots: MemeSnapshotPoint[];
   marks?: SignalMark[];
+  /** T4.10b: the feature series (any order); the lines come from its latest two minutes. Omitted = curve only, no line caption. */
+  features?: MemeFeaturePoint[];
 }
 
 /** Newest-last order expected (chronological, left to right) -- callers pass `[...snapshots].reverse()` when the API returned newest-first (it does, `GET .../tokens/{mint}`). */
-export function MemeCurveChart({ snapshots, marks = [] }: MemeCurveChartProps) {
+export function MemeCurveChart({ snapshots, marks = [], features }: MemeCurveChartProps) {
   const withValue = snapshots.filter((s): s is MemeSnapshotPoint & { mcap_sol: string } => s.mcap_sol !== null);
   const omitted = snapshots.length - withValue.length;
   const points: CurvePoint[] = withValue.map((s) => ({ x: new Date(s.observed_at).getTime(), y: Number(s.mcap_sol) }));
   const geometry = curveChartGeometry(points);
+  const overlay = features ? lineOverlay(features, geometry) : null;
 
   if (!geometry) {
-    return <p className="text-xs text-fg-muted">Sem histórico suficiente para o gráfico de mcap.</p>;
+    return (
+      <div>
+        <p className="text-xs text-fg-muted">Sem histórico suficiente para o gráfico de mcap.</p>
+        {overlay && <CurveLinesCaption overlay={overlay} />}
+      </div>
+    );
   }
 
   const drawn = marks.map((mark) => ({ ...mark, x: markX(geometry, mark.x) })).filter((mark): mark is SignalMark => mark.x !== null);
@@ -88,8 +111,9 @@ export function MemeCurveChart({ snapshots, marks = [] }: MemeCurveChartProps) {
         height={HEIGHT}
         role="img"
         aria-label={`Mcap teórico em SOL ao longo do tempo, de ${geometry.min.toFixed(2)} a ${geometry.max.toFixed(2)} SOL`}
-        className="text-fg-muted"
+        className="overflow-hidden text-fg-muted"
       >
+        {overlay && <CurveLinesLayer overlay={overlay} toX={(x) => markX(geometry, x)} toY={(y) => markY(geometry, y)} />}
         <polyline points={geometry.linePoints} fill="none" stroke="currentColor" strokeWidth={1.5} />
         {drawn.map((mark) => (
           <line key={`${mark.label}-${mark.x}`} x1={mark.x} x2={mark.x} y1={0} y2={HEIGHT} className="text-warning" stroke="currentColor" strokeWidth={1} strokeDasharray="2 2">
@@ -103,6 +127,7 @@ export function MemeCurveChart({ snapshots, marks = [] }: MemeCurveChartProps) {
         {drawn.length > 0 ? ` · marcas: ${drawn.map((m) => m.label).join(", ")}` : ""}
         {outside > 0 ? ` · ${outside} sinal(is) fora da janela do gráfico` : ""}
       </figcaption>
+      {overlay && <CurveLinesCaption overlay={overlay} />}
     </figure>
   );
 }

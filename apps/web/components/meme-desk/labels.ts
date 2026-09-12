@@ -7,7 +7,7 @@
  */
 import type { Problem } from "@hunter/shared-types";
 
-import { isMemeExitReason, isMemeProposalStatus, type MemeExitReason, type MemeProposalStatus } from "@/lib/api/meme-desk-types";
+import { isMemeBetLeg, isMemeExitReason, isMemeProposalStatus, type MemeBetLeg, type MemeExitReason, type MemeProposalStatus } from "@/lib/api/meme-desk-types";
 
 const PROPOSAL_STATUS_LABEL: Record<MemeProposalStatus, string> = {
   proposed: "Aguardando aval",
@@ -35,6 +35,17 @@ const EXIT_REASON_LABEL: Record<MemeExitReason, string> = {
 export function exitReasonLabel(reason: string | null | undefined): string {
   if (!reason) return "saída sem motivo registrado";
   return isMemeExitReason(reason) ? EXIT_REASON_LABEL[reason] : "motivo não previsto";
+}
+
+// T4.10b: the exact words brief T4.10 asks the desk to show for each leg.
+const BET_LEG_LABEL: Record<MemeBetLeg, string> = {
+  probe: "semi-comprado (sonda)",
+  scale: "escalado (perna 2)",
+  single: "aposta única",
+};
+
+export function betLegLabel(leg: string): string {
+  return isMemeBetLeg(leg) ? BET_LEG_LABEL[leg] : "perna não prevista";
 }
 
 /** `meme_proposals.refusal` (contract §Tabelas) -- named by the loop when a proposal ends `unfilled`. */

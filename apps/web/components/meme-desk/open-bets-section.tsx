@@ -11,6 +11,7 @@ import { computeAgeMs, formatAge, useAgeTicker } from "@/hooks/useAgeTicker";
 import { sellNowAction } from "@/lib/api/meme-desk-actions";
 import type { MemeDeskBet, MemeDeskRow } from "@/lib/api/meme-desk-types";
 
+import { BetLegBadge, betAnchorId } from "./bet-leg";
 import { memeDeskProblemMessage } from "./labels";
 import { formatMultiple, formatR, formatSolSigned, remainingHoldLabel, signClass } from "./meme-desk-format";
 
@@ -49,12 +50,15 @@ function SellNowConfirm({ bet, busy, onConfirm, onBack }: SellNowConfirmProps) {
   );
 }
 
-function BetHeader({ orgSlug, row, bet }: { orgSlug: string; row: MemeDeskRow; bet: MemeDeskBet }) {
+function BetHeader({ orgSlug, row, bet, knownBetIds }: { orgSlug: string; row: MemeDeskRow; bet: MemeDeskBet; knownBetIds: readonly string[] }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <Link href={`/${orgSlug}/meme/${row.mint}`} className="text-sm font-medium text-fg hover:underline">
-        {row.token?.name ?? "(nome desconhecido)"}
-      </Link>
+      <span className="flex flex-wrap items-baseline gap-2">
+        <Link href={`/${orgSlug}/meme/${row.mint}`} className="text-sm font-medium text-fg hover:underline">
+          {row.token?.name ?? "(nome desconhecido)"}
+        </Link>
+        <BetLegBadge bet={bet} knownBetIds={knownBetIds} />
+      </span>
       <span className="text-[11px] text-fg-subtle">
         entrada <BrasiliaShort iso={bet.entry_at} /> · {bet.sol_spent ? formatSol(bet.sol_spent) : "gasto não informado"}
         {row.rule_set ? ` · ${row.rule_set.name} v${row.rule_set.version}` : ""}
@@ -95,10 +99,10 @@ function BetMetrics({ bet, nowMs }: { bet: MemeDeskBet; nowMs: number }) {
   );
 }
 
-function BetCard({ orgSlug, row, bet, nowMs, canOperate, confirming, busy, onSell, onConfirm, onBack }: { orgSlug: string; row: MemeDeskRow; bet: MemeDeskBet; nowMs: number; canOperate: boolean; confirming: boolean; busy: boolean; onSell: () => void; onConfirm: () => void; onBack: () => void }) {
+function BetCard({ orgSlug, row, bet, knownBetIds, nowMs, canOperate, confirming, busy, onSell, onConfirm, onBack }: { orgSlug: string; row: MemeDeskRow; bet: MemeDeskBet; knownBetIds: readonly string[]; nowMs: number; canOperate: boolean; confirming: boolean; busy: boolean; onSell: () => void; onConfirm: () => void; onBack: () => void }) {
   return (
-    <li className="flex flex-col gap-2 rounded-md border border-border p-3">
-      <BetHeader orgSlug={orgSlug} row={row} bet={bet} />
+    <li id={betAnchorId(bet.id)} className="flex flex-col gap-2 rounded-md border border-border p-3">
+      <BetHeader orgSlug={orgSlug} row={row} bet={bet} knownBetIds={knownBetIds} />
       <BetMetrics bet={bet} nowMs={nowMs} />
       {confirming ? (
         <SellNowConfirm bet={bet} busy={busy} onConfirm={onConfirm} onBack={onBack} />
@@ -120,10 +124,12 @@ export interface OpenBetsSectionProps {
   rows: MemeDeskRow[];
   serverNow: string;
   canOperate: boolean;
+  /** T4.10b: ids of every bet on the page, so a scale leg links to its probe only when the probe's card exists. */
+  knownBetIds?: string[];
 }
 
 /** "Abertas" (contract §Tela): live mark, PnL, R, remaining hold, and "Vender agora" with a one-tap confirmation. */
-export function OpenBetsSection({ orgId, orgSlug, rows, serverNow, canOperate }: OpenBetsSectionProps) {
+export function OpenBetsSection({ orgId, orgSlug, rows, serverNow, canOperate, knownBetIds = [] }: OpenBetsSectionProps) {
   const router = useRouter();
   const { now } = useAgeTicker(serverNow);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -173,6 +179,7 @@ export function OpenBetsSection({ orgId, orgSlug, rows, serverNow, canOperate }:
                 orgSlug={orgSlug}
                 row={row}
                 bet={row.bet}
+                knownBetIds={knownBetIds}
                 nowMs={now}
                 canOperate={canOperate}
                 confirming={confirmingId === row.bet.id}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { exitReasonLabel, memeDeskProblemMessage, proposalStatusLabel, quoteReasonLabel, refusalLabel } from "@/components/meme-desk/labels";
-import { MEME_EXIT_REASONS, MEME_PROPOSAL_STATUSES } from "@/lib/api/meme-desk-types";
+import { betLegLabel, exitReasonLabel, memeDeskProblemMessage, proposalStatusLabel, quoteReasonLabel, refusalLabel } from "@/components/meme-desk/labels";
+import { MEME_BET_LEGS, MEME_EXIT_REASONS, MEME_PROPOSAL_STATUSES, isMemeBetLeg, readBetLeg } from "@/lib/api/meme-desk-types";
 
 describe("meme-desk labels are exhaustive and never leak a raw enum", () => {
   it("every proposal status has a Portuguese label", () => {
@@ -29,6 +29,28 @@ describe("meme-desk labels are exhaustive and never leak a raw enum", () => {
   it("quote reasons", () => {
     expect(quoteReasonLabel("no_snapshot_yet")).toContain("sem fotografia");
     expect(quoteReasonLabel(null)).toBe("sem cotação registrada");
+  });
+
+  // T4.10b: `meme_paper_bets.leg` (brief T4.10 §Conjuntos de regras) -- the
+  // hype probe and its second leg get the exact words the brief asks for.
+  it("every bet leg has a label; the probe and the scale say what the brief says", () => {
+    expect(MEME_BET_LEGS).toEqual(["probe", "scale", "single"]);
+    for (const leg of MEME_BET_LEGS) {
+      expect(betLegLabel(leg)).not.toBe(leg);
+      expect(betLegLabel(leg).length).toBeGreaterThan(3);
+    }
+    expect(betLegLabel("probe")).toBe("semi-comprado (sonda)");
+    expect(betLegLabel("scale")).toBe("escalado (perna 2)");
+    expect(betLegLabel("something_new")).toBe("perna não prevista");
+    expect(isMemeBetLeg("probe")).toBe(true);
+    expect(isMemeBetLeg("nope")).toBe(false);
+  });
+
+  it("readBetLeg tolerates a payload from before the column existed", () => {
+    expect(readBetLeg({ id: "bet-1" })).toEqual({ leg: null, parentBetId: null });
+    expect(readBetLeg({ id: "bet-2", leg: "scale", parent_bet_id: "bet-1" })).toEqual({ leg: "scale", parentBetId: "bet-1" });
+    // A leg the screen does not know is reported as null, never rendered raw.
+    expect(readBetLeg({ id: "bet-3", leg: "weird", parent_bet_id: null })).toEqual({ leg: null, parentBetId: null });
   });
 });
 

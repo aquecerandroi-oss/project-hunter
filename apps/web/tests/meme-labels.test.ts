@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   MEME_FEED_SOURCES,
   MEME_GAP_STREAMS,
+  MEME_HYPE_NO_READING,
+  MEME_HYPE_REASONS,
+  MEME_LINE_NO_READING,
+  MEME_LINE_REASONS,
   MEME_NULL_REASONS,
   MEME_RADAR_STATUSES,
   MEME_SOURCE_STATUSES,
@@ -10,6 +14,10 @@ import {
   MEME_TOKEN_STATES,
   memeFeedSourceLabel,
   memeGapStreamLabel,
+  memeHypeMissingText,
+  memeHypeReasonLabel,
+  memeLineReasonLabel,
+  memeLineUntraceableText,
   memeNullReasonLabel,
   memeNullReasonText,
   memeRadarStatusLabel,
@@ -72,6 +80,43 @@ describe("Meme Radar labels: exhaustive over every enum value the API can send",
       expect(memeFeedSourceLabel(name)).not.toBe(name);
     }
     expect(memeFeedSourceLabel("some_new_feed")).toBe("some new feed");
+  });
+});
+
+// T4.10b: the trend-line and hype vocabularies of `meme_features_v3` (brief
+// T4.10 §Contrato). Three deploys broke on 2026-09-12 for a missing label, so
+// besides the exhaustive walk every label function also degrades to readable
+// text on a value it does not know instead of throwing at render time.
+describe("Meme lines/hype labels: exhaustive over the contract's vocabularies", () => {
+  it("labels every line_reason of the contract, never raw", () => {
+    expect(MEME_LINE_REASONS).toEqual(["too_few_points", "no_snapshot", "flat", "out_of_range"]);
+    for (const reason of MEME_LINE_REASONS) {
+      expect(memeLineReasonLabel(reason)).toMatch(/\S/);
+      expect(memeLineReasonLabel(reason)).not.toBe(reason);
+    }
+  });
+
+  it("labels every hype_reason of the contract, never raw", () => {
+    expect(MEME_HYPE_REASONS).toEqual(["no_tape_no_board", "partial"]);
+    for (const reason of MEME_HYPE_REASONS) {
+      expect(memeHypeReasonLabel(reason)).toMatch(/\S/);
+      expect(memeHypeReasonLabel(reason)).not.toBe(reason);
+    }
+  });
+
+  it("humanizes a reason the vocabulary does not know yet instead of throwing", () => {
+    expect(memeLineReasonLabel("brand_new_reason")).toBe("motivo não previsto (brand new reason)");
+    expect(memeHypeReasonLabel("brand_new_reason")).toBe("motivo não previsto (brand new reason)");
+  });
+
+  it("composes the exact sentences the brief asks for", () => {
+    expect(MEME_LINE_NO_READING).toBe("linha: sem leitura");
+    expect(memeLineUntraceableText("too_few_points")).toBe("linha ainda não traçável: menos de 5 fotografias na janela");
+    expect(memeLineUntraceableText(null)).toBe("linha ainda não traçável: motivo não informado");
+    expect(memeLineUntraceableText(undefined)).toBe("linha ainda não traçável: motivo não informado");
+    expect(MEME_HYPE_NO_READING).toBe("hype: sem leitura");
+    expect(memeHypeMissingText("no_tape_no_board")).toBe("sem hype: sem fita e sem board no minuto");
+    expect(memeHypeMissingText(null)).toBe("sem hype: motivo não informado");
   });
 });
 

@@ -40,6 +40,29 @@ export function isMemeExitReason(value: string): value is MemeExitReason {
   return (MEME_EXIT_REASONS as readonly string[]).includes(value);
 }
 
+// T4.10b: `meme_paper_bets.leg` / `parent_bet_id` (brief T4.10 §Conjuntos de
+// regras -- the hype probe and its second leg). Read tolerantly off the bet
+// object: the backend lands these columns in parallel, so a payload from
+// before them yields `null`, never a crash and never a raw value on screen.
+export type MemeBetLeg = "probe" | "scale" | "single";
+export const MEME_BET_LEGS: readonly MemeBetLeg[] = ["probe", "scale", "single"];
+
+export function isMemeBetLeg(value: string): value is MemeBetLeg {
+  return (MEME_BET_LEGS as readonly string[]).includes(value);
+}
+
+export interface MemeBetLegReading {
+  leg: MemeBetLeg | null;
+  parentBetId: string | null;
+}
+
+export function readBetLeg(bet: object): MemeBetLegReading {
+  const record = bet as Record<string, unknown>;
+  const leg = typeof record.leg === "string" && isMemeBetLeg(record.leg) ? record.leg : null;
+  const parent = record.parent_bet_id;
+  return { leg, parentBetId: typeof parent === "string" && parent.length > 0 ? parent : null };
+}
+
 /** Mirrors `hunter_api.schemas.meme_desk.MEME_DESK_LABEL` -- the permanent label (contract §Tela). */
 export const MEME_DESK_LABEL = "PAPEL — nenhuma transação real; a chave e a flag ao vivo não existem neste processo";
 
