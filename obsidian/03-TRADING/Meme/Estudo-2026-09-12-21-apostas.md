@@ -53,6 +53,16 @@ líquido (desconhecido recusa); participação ≤ 1 %. Saídas: alvo 3×, trail
 *Na amostra:* teria excluído 18 das 20 perdedoras pelos critérios de holders/snipers/criador/clone (mantendo a
 vencedora e duas perdedoras: 100k or Rug? e Roblox) — dentro da amostra, sem valor confirmatório.
 
+*Medido depois da fita por lote (deploy 6fc3a43, 18:3x–19:0x BRT, série de 15 s, 30 min):* 13 moedas passaram a base de
+fluxo (idade 30–300 s, fluxo líquido > 0, ≥ 10 compradores, vendas/compras ≤ 0,6), 12 com progresso ≥ 5 %. Delas,
+`snipers ≤ 2` → **0**; ≤ 10 → 5; ≤ 25 → 9; holders subindo entre duas leituras → 3, não caindo com ≥ 20 → 6; dev ≤ 10 %
+→ 12; criador não vendedor → 5, desconhecido → 7. Com tudo junto (snipers ≤ 10, holders não caindo ≥ 20, dev ≤ 10 %,
+criador não vendeu, progresso ≥ 5 % subindo ou mcap subindo) → **1 moeda em 30 min**; com snipers ≤ 25 e criador
+desconhecido admitido → 2. A E1 como pré-registrada não propõe nada (0 desde 18:44) — um portão sem saída não se mede;
+o braço 2 (T4.21: snipers ≤ 10, holders não caindo ≥ 20, criador desconhecido só com dev medido ≤ 10 %) é pré-registrado
+como `descartar` e corre ao lado do braço 1, que continua ativo para comparação. SQL:
+`infra/scripts/sql/research/2026-09-12-t421-funil-e1.sql`.
+
 ### E2 — "Exclusões de pedigree" (filtro transversal, EXP-M6)
 Recusa nomeada em **qualquer** conjunto quando: `creator_prior_mints_1h ≥ 2` (M-P26), `symbol_dup_24h ≥ 3` (M-P3),
 `post_sibling_rank_at_create > 1` (M-P33: não é a primeira moeda daquele post), `twitter` ausente **e** `desc` vazia
