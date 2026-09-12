@@ -72,3 +72,5 @@ dado real** e que o mesmo código executa de verdade quando a chave e a flag exi
 - Meta e Lab contínuo: [[2026-09-12-meta-7m-e-lab-meme]]; alvo: [[README-meme]].
 - Diário meme do dia: gerado por `infra/scripts/meme_diary.py` quando houver a primeira aposta fechada
   (hoje nenhuma; a pasta `09-OPERATIONS/Diario-Meme/` continua só com o formato).
+
+Continuação (17:2x BRT, autorização escrita do Everton): [[06-DECISIONS/2026-09-12-teste-pequeno-meme-real|dinheiro real — escopo do teste pequeno e tetos]].

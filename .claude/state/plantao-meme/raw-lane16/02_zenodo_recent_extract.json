@@ -1,0 +1,171 @@
+{
+ "query": "https://zenodo.org/api/records?q=%22pump.fun%22 OR pumpfun OR (memecoin AND solana)&sort=mostrecent&size=15",
+ "total": 20,
+ "rows": [
+  {
+   "id": 22286914,
+   "pub": "2026-09-06",
+   "updated": "2026-09-07T02:04:25",
+   "title": "RED-PUMP-2026-v1: A public benchmark of 860,213 pump.fun token launches with collector-generated terminal labels (May–June 2026 regime)",
+   "version": "v1.5",
+   "creators": [
+    "Kamat, Arati"
+   ],
+   "doi": "10.5281/zenodo.22286914"
+  },
+  {
+   "id": 22116163,
+   "pub": "2026-08-26",
+   "updated": "2026-08-26T18:36:36",
+   "title": "Silent Killer v1.3: Dev-Wallet Silence Is Not a Solana Pump.fun Rug Predictor: Corrected Release",
+   "version": "1.3",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.22116163"
+  },
+  {
+   "id": 21780222,
+   "pub": "2026-08-03",
+   "updated": "2026-08-03T20:24:48",
+   "title": "Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading on Solana DEXs: Evidence, Theory, and Design Lessons from a 15-Day Deployment",
+   "version": "v4",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21780222"
+  },
+  {
+   "id": 21780072,
+   "pub": "2026-08-03",
+   "updated": "2026-08-03T20:15:51",
+   "title": "Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading: Companion Dataset + Manuscript Bundle",
+   "version": "v1.2",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21780072"
+  },
+  {
+   "id": 21765387,
+   "pub": "2026-08-03",
+   "updated": "2026-08-03T01:03:20",
+   "title": "RED-COHORT-2026-v1: A Catalogue of 1,012 Persistent Wallet Cohorts Detected on the Solana Pump.fun Bonding-Curve Marketplace (June 11-25, 2026)",
+   "version": "1.1.1",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21765387"
+  },
+  {
+   "id": 21402477,
+   "pub": "2026-07-17",
+   "updated": "2026-07-16T23:16:58",
+   "title": "RED-REJECT-2026-v1: A 96-Day Public Corpus of Algorithmic Filter Rejections with Post-Rejection Follow-up Samples on the Solana pump.fun Ecosystem",
+   "version": "v1",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21402477"
+  },
+  {
+   "id": 21399919,
+   "pub": "2026-07-16",
+   "updated": "2026-07-16T17:40:56",
+   "title": "LIFECYCLE-SEPARATION-2026-v1: Sniper Cohort and Algorithmic Rejection Datasets for Two-Window Lifecycle-Stage Separation Analysis in Solana Memecoin Markets",
+   "version": "v1",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21399919"
+  },
+  {
+   "id": 21350314,
+   "pub": "2026-07-14",
+   "updated": "2026-07-14T06:50:54",
+   "title": "$ARG FAN TOKEN - Ingeniería Financiera, Detección de Manipulación y Riesgo de Fraude Global _  V2",
+   "version": null,
+   "creators": [
+    "Avila Nicolau, Fabiana Mirta"
+   ],
+   "doi": "10.5281/zenodo.21350314"
+  },
+  {
+   "id": 21149176,
+   "pub": "2026-07-03",
+   "updated": "2026-07-03T02:08:13",
+   "title": "REJECTION-ABLATION-2026-v1: A Post-Rejection Follow-up Sampling (PRFS) Corpus and Per-Filter Counterfactual Ablation for Solana Memecoin Trading (June 2026)",
+   "version": null,
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21149176"
+  },
+  {
+   "id": 17336387,
+   "pub": "2025-10-13",
+   "updated": "2025-10-13T01:54:01",
+   "title": "The Q-Phase Papers: Where Spectral Geometry and Cryptography Collide",
+   "version": null,
+   "creators": [
+    "Tibedo, Charles"
+   ],
+   "doi": "10.5281/zenodo.17336387"
+  },
+  {
+   "id": 17136447,
+   "pub": "2025-09-16",
+   "updated": "2025-09-16T16:29:16",
+   "title": "Can We Build a Memecoin Index? Building a Financial Index for Internet Jokes with a 10000x ROI",
+   "version": null,
+   "creators": [
+    "N, Divyasshree"
+   ],
+   "doi": "10.5281/zenodo.17136447"
+  },
+  {
+   "id": 15851137,
+   "pub": "2025-07-01",
+   "updated": "2025-07-09T20:30:10",
+   "title": "PUMP.FUN AND MEME-COINS: A CASE STUDY IN THE LEGAL COMMODIFICATION OF PONZI-LIKE TOKENOMICS",
+   "version": null,
+   "creators": [
+    "Dan Valeriu VOINEA"
+   ],
+   "doi": "10.5281/zenodo.15851137"
+  },
+  {
+   "id": 22708412,
+   "pub": "2026-09-11",
+   "updated": "2026-09-11T12:23:37",
+   "title": "PumpSwap Historic Data",
+   "version": null,
+   "creators": [
+    "Data Store"
+   ],
+   "doi": "10.5281/zenodo.22708412"
+  },
+  {
+   "id": 22306254,
+   "pub": "2026-09-04",
+   "updated": "2026-09-05T20:27:28",
+   "title": "pump.fun On-Chain Trading Dataset for Pump-and-Dump Detection (April–May 2026)",
+   "version": null,
+   "creators": [
+    "van de Wouw, Niek"
+   ],
+   "doi": "10.5281/zenodo.22306254"
+  },
+  {
+   "id": 22110674,
+   "pub": "2026-08-26",
+   "updated": "2026-08-26T11:42:12",
+   "title": "Alpha Without Access: Execution Constraints in a Bonding-Curve Market",
+   "version": "v1.0",
+   "creators": [
+    "Lindsey, Brad M."
+   ],
+   "doi": "10.5281/zenodo.22110674"
+  }
+ ]
+}

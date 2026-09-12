@@ -1,0 +1,238 @@
+SOURCE: https://zenodo.org/records/22110674/files/Alpha_Without_Access_Lindsey_2026.pdf (baixado 2026-09-12 16:48 BRT; extrato de texto por pypdf; PDF apagado)
+Alpha Without Access:
+Execution Constraints in a Bonding-Curve Market
+BradM.Lindsey
+August2026
+Abstract
+Wereportamarketinwhichapositivereturnisvisibleinpricesyetcannotberealizedbyafixedtrading
+policy, and we measure why. On a frozen set of 1,220 tokens approaching the pump.fun graduation
+boundary (C1), a counterfactual buy that ignores the execution race shows a median gross return of
++8.5%to+17.45%(C6).Accesstothatreturn,however,disappearswithinafewseconds:69.0%ofthe
+tokens are already unreachable at the earliest state our data can resolve, and 89.7% by eight seconds
+(C5), a collapse we reconstruct exactly from graduation timing (C3, C13). We then bound the return
+thepolicycouldactuallyobtain.Grantingitzerocostandentry-statepricing—mechanicallythemost
+favorable price whenever the curve does not retrace below its entry state before arrival, a path we can
+checkonlydirectionally(forwardin98.3%ofcases,C12)—theresultingconditionaloptimisticupper
+boundonexpectedgrossreturnpertokenisnegativeateverylatencywecanobserve,fromtheearliest
+resolvablestatethrougheightseconds(C9,C11),anditsupper95%confidencelimitstaysbelowzeroat
+everystepunderabootstrapthatresampleshour-clusters(C15).Thenegativesigndoesnotcomefrom
+latency alone: the bound is more negative at lower latency, because reaching more of the population
+fillsmoreofasubsetwhoserealizedeconomicsareworse—anadversecompositionweobserverather
+thanaselectionmechanismwedemonstrate(C10).Observed,accessible,andrealizablereturnsarethus
+threedistinctquantitieshere,andthismarketletsusmeasureallthreeatonce.Wedonotidentifywho
+obtained the favorable tokens, we make no priority claim, and we make no claim beyond the single
+policy,window,andvenuestudied.
+Disclosure.Language-modeltoolsassistedwithprosedraftingandanalysis-codegenerationunderauthor-definedestimands,poli-
+cies, and reporting constraints. The author reviewed and takes responsibility for all analyses and claims; reproducibility artifacts
+andhashesaccompanythearchivalpackage.
+1. Introduction
+Whetheranobservedreturncanactuallybeearnedisastandardmicrostructurequestion,andthetwoare
+oftentreatedasone.Wekeepthemapart,alongwithathirdquantitythatmediatesbetweenthem:thereturn
+presentinprices,theprobabilityandtermsonwhichagivenpolicycantransact,andwhatthepolicynets
+after both. The paper reports a case in which the first is positive while the third has a negative conditional
+optimisticbound,anditmeasurestheaccessandcompositioneffectsthatseparatethem.
+ThesettingisatokenlaunchonSolana.Apump.funtokentradesagainstanissuancecurveuntilafixed
+amountofreserveaccumulates,atwhichpointit graduatestoastandingautomatedmarketmaker;westudy
+the last part of that curve, just before graduation. The setting is convenient for one reason: the transition
+is deterministic in the curve state and timestamped on-chain, so the apparent return and the access to it
+can be measured on the same tokens. The claim is narrow. We study one fixed policy on one frozen set of
+tokensoveronewindow,andweshowthatthepolicy’sexpectedgrossreturnontheobservedopportunity
+is non-positive throughout the observable latency domain, even under assumptions chosen to favor it. We
+do not argue that no policy can, that participants cannot profit generally, that latency alone is responsible,
+orthatanyresulthereisnew.
+2. Setting, data, and identification
+A pump.fun token trades on a bonding curve — a deterministic pricing schedule in the token’s own
+reserves—untilafixedreservethresholdisreached,atwhichpointitgraduatestoaPumpSwapconstant-
+product pool. We study the terminal region of the curve, the last SOL before graduation, where both the
+apparentreturnandtheaccessconstraintappear.
+All results come from one frozen decoded-event pull (DUNE_R1_ROWS.json, sha256 3deb540e…,
+9,360landmarkcrossings),reconstructedfromthedecodedtradeevent,whichrecordsexactper-tradecurve
+reserves. The analysis is the original project code (dune/r1_analysis.py, dune/pumpswap_e0.py;
+hashes in the code manifest); run on the frozen data it returns every value below — counts to the unit,
+returnstothereportedprecision.Reproducibilityisahash-anchoredpropertyratherthanarecollection.
+Eligibility is set by a model-free landmark: the first time a token’s remaining curve reserve falls to≤
+1 SOL, restricted to genuine near-graduation tokens (real SOL raised at entry≥ 78 SOL, which drops
+degenerate near-zero-liquidity curves). This gives 1,220 tokens (C1), 99.6% of which graduate (C2). The
+set is fixed for every latency and never shrinks with L; every unconditional expectation below is taken
+over all 1,220 tokens, with unreached tokens contributing zero, and the fill-conditioned mean is reported
+separatelyandneversubstitutedforit.
+The policy is fixed in advance (C14): buy q = 0.10 SOL on the curve at arrival time τ + L; if the token
+migrateswithinafive-minutehold,sellintoPumpSwapattheobservedpost-graduationreserves,otherwise
+liquidateonthecurveatthefive-minutestate;exact-integerconstant-productaccountingonbothlegs.
+Whetheracurvebuyarrivingatτ+Lfillsisexact.Foreachtokenweknowthelandmarktimeτandthe
+graduation time, and their difference is the completion time T_complete (C3); a token that has graduated
+byτ+Lreturnsnothingtoacurvebuy.Thisaccesslegisreconstructibletothebaseunit.
+The return leg is not exact. The data record curve reserves at the entry state τ and at the exit state (+5
+min),butnotatthearrivalstateτ+L,soareachedtoken’sfillpricecanonlybebounded,notreconstructed.
+We therefore separate two support classes per token and latency (C13): the no-fill outcome is exact (class
+A), a reached fill’s return is bounded (class B), and across the population at every latency A + B = 100%
+withtheunsupportedclassempty.Thefrontierbelowisestimatedasaboundedobjectonthatbasis.
+Wepriceareachedbuyattheentrystateτ,whichisoptimisticforthetraderunderastatedpathcondition
+rather than unconditionally. On the constant-product curve the tokens received for a fixed q arek·net /
+(vsol·(vsol+net)), which decreases in vsol; a buy at a lower vsol — an earlier, less-progressed state
+— yields at least as many tokens, and this holds with zero exceptions across all 1,220 tokens (C12). The
+curve is exactly constant-product in the data (the invariant is preserved in every same-token comparison,
+median drift zero) and moves forward (vsol at the later state≥ vsol at entry in 98.3% of cases). Entry-
+state pricing is therefore mechanically optimistic whenever the curve does not move backward below its
+entry state within [τ, τ + L]; the tape cannot observe that entire interval, and the +5-minute state serves
+onlyasadirectionaldiagnostic(forwardmovementin98.3%ofcases).Weaccordinglytreatthereturnleg
+as a conditional optimistic bound rather than an unconditional proof. Zero cost, entry-state pricing, and a
+grantedcounterfactualfilleachfurtherfavorthepolicy,sotheboundisone-sidedbyconstruction.
+3. Results
+Grantingthefilltoeveryeligibletokenattheentrystate—acounterfactualthatcreditsthetraderwith
+access it does not have — the median gross return is +8.50%, +10.25%, and +17.45% across genuine-
+token floors of 70, 78, and 82 SOL (C6). The mean is dominated by a few thin post-graduation pools and
+2
+isuninformative,sowereportthemedian.Apositivereturnispresentinprices.
+Accesstoitdisappearswithinseconds.ThecompletiontimeT_completehasmedian0,75thpercentile
+1, and 90th percentile 8 seconds (C3). As a fill constraint, 69.0% of the tokens are already unreachable at
+the earliest state the integer-second data resolves, and this rises monotonically to 89.7% at eight seconds
+(C5,C4).Theaccesslegisexact(Figure1).
+Thetokensthatremainreachablereturnnegatively.Ofthe1,220,the126slowenoughforabuyatτ+8
+storeachreturn,conditionalonfilling,ameanof − 12.29%andamedianof − 11.27%,with29%positive
+(C7);PumpSwap-exitfillsaverage − 11.21%(n=108)andcurve-liquidationexits − 18.77%(n=18).The
+unconditional expectation per token, counting unreached tokens as zero, is− 1.27% (C8). These are two
+distinct quantities — a mean over 126 filled tokens and an expectation over all 1,220 — and we do not
+mergethem.
+Combining the exact access leg with the conditional optimistic pricing of reached fills, the bound on
+the policy’s expected gross return per token (over all 1,220 at every latency) is U(0) =− 5.30%, U(1) =
+− 3.94%, U(2) =− 2.90%, U(4) =− 2.34%, and U(8) =− 1.27% (C9) (Figure 3). The break-even latency
+L*0 isthereforeatorbelowtheearliestobservablestate:theboundisnegativeatL=0andateveryslower
+step (C11). Because the data are integer-second, L = 0 is the earliestresolvable state rather than literal
+zero latency or first-in-queue execution, so, under the stated no-retracement path condition, no profitable
+region appears anywhere in the observable latency range, and any profitable access would have to lie in
+the unresolved sub-second interval or under a different policy. For the fixed set U(L) is known exactly; to
+quantifyinferentialuncertaintyundertheobservedtokenandhour-clusterstructureweresample.Underan
+hour-clusterbootstrap—appropriatefortemporaldependence,andhereslightlywiderthanani.i.d.token
+bootstrapreportedalongside—theupper95%confidencelimitofU(L)isbelowzeroateverystep(C15),
+theeight-secondstepbeingtheclosest( − 0.24%).Thisinferenceisconditionalontheobservedregimeand
+doesnotestablishtemporalorcross-regimegeneralization.
+The negative sign is not a latency effect alone. The bound is more negative at lower latency (Figures 2
+and3):atlowerlatencymoreofthepopulationisreached,andthereachedsubsetreturnsbetween − 17.11%
+(L = 0) and− 12.29% (L = 8 s) even under optimistic pricing (C10). We call this an adverse composition
+of the reached set — an observed association between reachability and worse realized economics, not a
+demonstratedselectionmechanism.Thedistancebetweentheapparent+10.25%andthenegativeper-token
+bound reflects both the access collapse and the worse economics of what remains reachable, and it is not
+explainedbyexecutionspeedbyitself.
+4. Limitations
+Several boundaries carry weight. Completion times are integer-second, so sub-second ordering within
+the L = 0 state is unresolved and the frontier’s earliest step is read accordingly. In particular, sub-second
+executionandorderingmechanisms—suchasJitobundlesandotherslot-levelMEVorderingonSolana—
+operatewithinthisunresolvedL<1sdomain,sotheclaimisrestrictedtotheobservablelatencyrangeand
+makesnostatementaboutsub-secondpriority.Thereturnlegisaone-sidedoptimisticboundconditionalon
+nonetbackwardmovementwithin[τ,τ+L],notanexactreconstruction,becausearrival-statereservesare
+notrecorded;forwardmovementisobservedin98.3%ofcasesasadirectionalproxy(C12),thehour-cluster
+bootstrapplacestheupper95%limitbelowzeroateveryrung(C15),andanexact-statereconstructionthat
+would close the path condition is left to future work. We study one policy (q = 0.10 SOL curve buy, five-
+minute exit) on one ~two-day window at one venue, and do not establish generalization across policies,
+regimes,orvenues.Weshowthepolicy’sexpectedgrossreturnis non-positivethroughoutthe observable
+latencydomain;wedonotidentifywhoobtainedthefavorabletokens,anattributionfurtherlimitedbyan
+unmeasurable off-chain leg and left outside this paper. Costs are set to zero to keep the bound optimistic,
+3
+sotheiromissiononlylowersthefrontierandisconservativefortheconclusion.Anarrowprior-artsearch
+(Section5)foundnoequivalentdecompositioninthissetting,butweclaimonlythatabsence,notpriority.
+5. Related work
+That execution access shapes realized outcomes and adverse selection is established in equities market
+microstructure, where differential access to venues affects execution outcomes (Brugler and Comerton-
+Forde, 2025); we neither claim nor rely on the novelty of that general point. Related automated-market-
+makertheoryformalizesadverse-selectioncoststhroughloss-versus-rebalancing,showinghowstaleAMM
+prices can transfer value to better-informed arbitrageurs (Milionis et al., 2022); this general mechanism is
+established prior art we invoke, not our contribution. On-chain, the latency race at token launch is widely
+known, and adjacent empirical work characterizes coordinated sniper cohorts (Kamat, 2026a, whose es-
+timated SOL-inflow lift is not distinguishable from zero — consistent with our refusal of any capture or
+causalclaim),filterperformanceonrejectedtokens(Kamat,2026b),andgraduationdynamics(Marinoet
+al.,2026;Kamat,2026c). Eachaddressesone component—accesseffects, adverseselection,or bonding-
+curve behavior — in an adjacent setting; we did not find a study that joins them into a single realizability
+decomposition. Our contribution is that join — price-space opportunity, access probability, reached-set
+composition,andarealizable-returnbound—measuredwheretheaccesslegisexactandthereturnlega
+conditional optimistic bound. We are not aware of prior empirical work documenting this decomposition
+inabonding-curvegraduationmarket,andweclaimnomore.
+6. Discussion
+Thepointisnarrowand,wethink,transferable.Inamarketwherethetransitionisobservable,areturn
+present in prices can coexist with a negative conditional optimistic bound on what a fixed policy realizes,
+andthegapisspannedbyaccessandbythecompositionofwhatremainsreachableratherthanbyexecution
+speedassuch.Thesameseparationbetweenareturnthatcanbepredictedandareturnthatcanbeexecuted
+operatesinlessobservablemarkets;heretheon-chain,timestampedtransitionsimplymakesitmeasurable.
+What we leave open — whether the separation holds across regimes and venues, whether an exact arrival-
+statereconstructionwouldtightentheboundedleg,andwhotransactsontheunreachableside—doesnot
+bearontheclaimmade.NoquantityappearsherethatisnotalreadyintheResultsandtheevidenceledger.
+References
+Brugler, J., & Comerton-Forde, C. (2025). Differential access to dark markets and execution outcomes.Journal of
+Financial Economics,171,104086. https://doi.org/10.1016/j.jfineco.2025.104086
+Kamat, A. U. (2026a). Coordinated Sniper Cohorts on Pump.fun: Detection of 1,012 Persistent Wallet Rings and
+aContamination-AdjustedEstimateofCoordination-SpecificFirst-HourBuyer-FlowLift.arXiv:2607.02795[q-
+fin.TR]. https://arxiv.org/abs/2607.02795
+Kamat,A.U.(2026b).Hour-AwareAdaptiveRiskManagementforAutonomousMemecoinTradingonSolanaDEXs:
+Evidence, Theory, and Design Lessons from a 15-Day Deployment. arXiv:2606.08232 [q-fin.TR].https://
+arxiv.org/abs/2606.08232
+Kamat, A. U. (2026c). Pump.fun Graduation Regime Windows: Survival Analysis of 832,941 Token Launches and
+theSocial-PresenceEffect.arXiv:2607.02823[q-fin.TR]. https://arxiv.org/abs/2607.02823
+Marino,G.,Naviglio,M.,Tarantelli,F.,&Lillo,F.(2026).Predictingthesuccessofnewcrypto-tokens:ThePump.fun
+case.arXiv:2602.14860[q-fin.ST]. https://arxiv.org/abs/2602.14860
+Milionis,J.,Moallemi,C.C.,Roughgarden,T.,&Zhang,A.L.(2022).AutomatedMarketMakingandLoss-Versus-
+4
+Rebalancing.arXiv:2208.06046[q-fin.MF]. https://arxiv.org/abs/2208.06046
+5
+Figures
+Each figure re-presents values already stated in the Results and the evidence ledger; discrete observa-
+tions only, no smoothing or interpolation.
+0 1 2 4 8
+arrival latency after landmark  (seconds)
+60%
+65%
+70%
+75%
+80%
+85%
+90%
+95%no-fill fraction
+p50 p75 p90
+0
+4
+8
+completion time  (s)
+Figure 1. Access collapse (exact). Main panel:theno-fillfractionagainstarrivallatency {0,1,2,4,8}s(C5),recon-
+structible to the base unit from graduation timing (C3, C5, C13); the latency axis is equal-spacedby category.Inset:
+thecompletion-timedistribution Tcomplete (C3),withmedian0s,75thpercentile1s,and90thpercentile8s.
+6
+apparent
+(all eligible,
+granted fill)
+reachable fill
+(conditional,
+n = 126)
+per-eligible
+expectation
+(N = 1,220)
+-15%
+-10%
+-5%
+0%
+5%
+10%
+gross return
+Figure 2. Three distinct return quantities. Thecounterfactualreturngrantedafilltoeveryeligibletoken(median
++10.25%, C6); the fill-conditioned reached return (mean− 12.29%, median− 11.27%; n = 126, C7); and the per-
+eligibleexpectationoverall N = 1,220tokens,countingunreachedtokensaszero( − 1.27%,C8).Thethreequantities
+arelabelleddistinctlyandnevermerged.
+7
+0 1 2 4 8
+arrival latency  (seconds, equal-spaced by category)
+-20%
+-15%
+-10%
+-5%
+0%
+gross return per eligible event
+U(L): conditional optimistic bound  (bars: 95% CI)
+reachable-only mean
+Figure 3. The conditional optimistic frontierU (L). U (L)at {0,1,2,4,8}s(C9),pointsjoinedbystraightsegments
+only (not a fit). The return leg is aconditional optimistic upper bound (zero cost, entry-state pricing, granted fill;
+optimistic whenever the curve does not retrace below its entry state within [τ,τ+L], a path observed forward in
+98.3% of cases), so the policy’s expected return per eligible event lies in the shaded region at or below the plotted
+bound;thereachable-onlymean(C10)isoverlaid.Errorbarsarethehour-clusterbootstrap95%confidenceintervals
+(C15); the upper limit is below zero at every rung, closest at eight seconds (− 0.24%). The bound is non-positive at
+every observable latency, so the break-even latency satisfiesL∗
+0 ≤ L=0, whereL=0 is the earliestresolvablestate
+ratherthanliteralzero.
+8
