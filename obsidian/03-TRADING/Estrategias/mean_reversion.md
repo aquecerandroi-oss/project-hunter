@@ -1,7 +1,7 @@
 ---
 tags: ["estrategia", "catalogo", "mean_reversion", "familia"]
 strategy: mean_reversion
-updated: 2026-09-11
+updated: 2026-09-12
 ---
 # mean_reversion
 
@@ -37,6 +37,7 @@ updated: 2026-09-11
 - Eixo "portão de regime" (v6→v11): [[EXP-0020-regime-gate]]
 - Replicação de 90 dias (v1/v2/v10): [[EXP-0025-mean-reversion-90-dias]]
 - Eixo "portão de amplitude" (v10→v18/v19): [[EXP-0027-amplitude]]
+- Eixo "portão de dispersão BTC × alts" (v10→v20/v21, **não derivadas** — `inviavel-populacao` em 2026-09-12): [[EXP-0029-dispersao-btc-alts]]
 - Irmã de 1 h (módulo novo, código pronto, replay pendente): [[mean_reversion_h1]]
 - Irmã de 5 min (módulo novo, ativada e **aposentada** em 2026-09-11: `descartar`, ex-funding −0,1940 R em 373 desfechos — e **o custo não foi a causa**, 89,8 % da piora é a vantagem bruta caindo de +0,1270 para +0,0346 R): [[mean_reversion_m5]] — [[EXP-0028-mean-reversion-5-min]]
 <!-- generated:end -->
@@ -154,3 +155,18 @@ separação **igual ou maior** nos dois braços (+0,0017 ≥ −0,0184 em A; +0,
 horário do BTC, já descartado como estratégia pela [[EXP-0026-regime-como-estrategia]]. Ambos
 aposentados no mesmo dia: `v18` às 2026-09-12T01:15:24Z, `v19` às 01:16:02Z (22:15/22:16 BRT de
 2026-09-11), `successor=none`.
+
+**Acréscimo de 2026-09-12 (T3.91, quant-engineer) — o portão de dispersão BTC × alts não chegou a
+ser derivado: a célula pré-registrada quase não existe na história.** [[EXP-0029-dispersao-btc-alts]]
+pré-registrou dois braços de `v10` sobre a série nova `dispersion_24h_v1` (mediana do retorno de 24 h
+das 16 alts menos o do BTC, por minuto): A = discordância `[−0,10; −0,03)` (`v20`) e B = falseamento
+`[0; 0,10)` (`v21`), com uma checagem de população **antes** de derivar (A entre 10 % e 30 % das
+barras de 15 min, B entre 20 % e 40 %). O backfill de 88 dias (06-16 → 09-11, 126 720 linhas, 16/16 em
+todo minuto) foi lido às 04:40 BRT: **A cobre 1,48 % das 8 352 barras (124 barras em 9 dias, 55 delas
+o próprio 10/09, zero em 07-16 → 08-15) e B cobre 44,85 %** — os dois fora da faixa. A série é
+estreita (mediana −0,0013, desvio 0,0132, p05 −0,0210): o corte −0,03, tirado das duas leituras que
+motivaram H-P18, é percentil ~1,5, não um estado. **Nenhuma versão foi derivada, nenhum replay rodou,
+nada foi aposentado** — `v19` continua a última da família. Leitura descritiva no pai (não move a
+régua): a pior célula é a queda conjunta `[−0,03; 0)` (342 decisões, −0,0721 R), B é +0,0203 R (414
+decisões), tercis não monótonos (+0,1502 / −0,0468 / +0,1016). Se H-P18 voltar, é EXP nova com faixas
+calibradas nos quantis da série.

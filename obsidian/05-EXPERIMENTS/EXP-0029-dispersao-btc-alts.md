@@ -1,12 +1,12 @@
 ---
 tags: [experimento, dispersao, btc, alts, elegibilidade, populacao, mean-reversion, pre-registro]
 updated: 2026-09-12
-status: pre-registrado
+status: inviavel-populacao
 owner: quant-engineer
 exp: EXP-0029
 strategy: "mean_reversion v10 (pai sem portão) + dois braços com portão"
-version: "a derivar (v20 braço A, v21 braço B — v19 era a última em 11/09)"
-result: nao-iniciado
+version: "nenhuma derivada (v20 braço A e v21 braço B previstas; a checagem de população §2 falhou nos dois — v19 continua a última)"
+result: inconclusivo
 evaluable: 0
 days: 0
 last_eval: "2026-09-12"
@@ -143,42 +143,60 @@ filha é reportada como número próprio. K5: a cobertura de `R_net` da coorte d
 **37,59 %** (300 de 798), então o eixo primário é **`r_ex_funding`** (798 de 798) e **toda tabela
 declara o eixo**.
 
-## Distribuição de `dispersion_24h_v1` — `‹backfill›`
+## Distribuição de `dispersion_24h_v1` — medida em 2026-09-12 às 04:40–04:41 BRT (07:40–07:41 UTC), antes de derivar
 
 Preencher **antes** de derivar, com SQL somente-leitura sobre a série já populada
 (`infra/scripts/sql/research/2026-09-12-t390-*.sql`), e com a hora BRT da leitura:
 
+> **Preenchido em 2026-09-12 às 04:40–04:41 BRT (T3.91, quant-engineer).** Os `t390-*.sql` previstos
+> acima não chegaram a existir; a leitura é a de
+> `infra/scripts/sql/research/2026-09-12-t391-q01-dispersao-distribuicao.sql` (série),
+> `-q02-dispersao-nas-barras-de-15m.sql` (barras de 15 min) e `-q03-celulas-do-pai.sql` (pai),
+> todas `repeatable read read only`; saída verbatim em `.claude/state/notes-T3.91.md`. A série
+> **começa em 2026-06-16 00:00Z** (o backfill `--days 90` de 04:33 BRT dobrou 88 dias, 06-16 → 09-11;
+> a faixa viva grava desde 2026-09-12 00:00Z), e nenhuma faixa desta página foi tocada.
+
 | campo | valor |
 |---|---|
-| linhas na série / usáveis | `‹backfill›` |
-| janela coberta (`min(end_time)` → `max(end_time)`) | `‹backfill›` |
-| dias com cobertura ≥ 80 % (de 90) | `‹backfill›` |
-| linhas `insufficient_coverage` / `btc_missing` | `‹backfill›` |
-| mínimo / p05 / p10 / p25 | `‹backfill›` |
-| **p50** | `‹backfill›` |
-| p75 / p90 / p95 / máximo | `‹backfill›` |
-| média | `‹backfill›` |
+| linhas na série / usáveis | **126 911 / 126 911** (126 720 do backfill = 88 dias × 1 440, mais 191 da faixa viva de 12/09; **zero** inutilizáveis) |
+| janela coberta (`min(end_time)` → `max(end_time)`) | **2026-06-16 00:00Z → 2026-09-12 07:40Z** (a faixa viva continua) |
+| dias com cobertura ≥ 80 % (de 90) | **88 de 88 dias completos** (06-16 → 09-11), cobertura mínima **1,0000** (16 de 16) em **todos** os 126 911 minutos; o 89.º dia (12/09) é o dia vivo parcial, também 16/16 |
+| linhas `insufficient_coverage` / `btc_missing` | **0 / 0** |
+| mínimo / p05 / p10 / p25 | **−0,083542 / −0,021014 / −0,016014 / −0,008182** |
+| **p50** | **−0,001284** |
+| p75 / p90 / p95 / máximo | **+0,005167 / +0,012107 / +0,018892 / +0,131334** |
+| média | **−0,001125** (desvio-padrão 0,013216; histograma em degraus de 0,01: `[−0,01; 0)` 35,33 %, `[0; 0,01)` 31,52 %, `[−0,02; −0,01)` 14,20 %, `[0,01; 0,02)` 8,54 %, `[−0,03; −0,02)` 4,39 % — unimodal, estreita, centrada perto de zero) |
 
 **Share de barras elegíveis por braço** — o denominador honesto são os **fechamentos de 15 min** da
 janela de replay (a grade de decisão da `v10`), não todos os minutos:
 
 | célula | barras de 15 min | share |
 |---|---|---|
-| **A** `[−0,10; −0,03)` | `‹backfill›` | `‹backfill›` |
-| **B** `[0,00; +0,10)` | `‹backfill›` | `‹backfill›` |
-| sem braço `[−0,03; 0,00)` (queda conjunta) | `‹backfill›` | `‹backfill›` |
-| sem braço `< −0,10` (discordância extrema) | `‹backfill›` | `‹backfill›` |
-| sem braço `>= +0,10` | `‹backfill›` | `‹backfill›` |
-| sem linha usável | `‹backfill›` | `‹backfill›` |
+| **A** `[−0,10; −0,03)` | **124** | **1,48 %** |
+| **B** `[0,00; +0,10)` | **3 746** | **44,85 %** |
+| sem braço `[−0,03; 0,00)` (queda conjunta) | 4 475 | 53,58 % |
+| sem braço `< −0,10` (discordância extrema) | 0 | 0,00 % |
+| sem braço `>= +0,10` | 7 | 0,08 % |
+| sem linha usável | 0 | 0,00 % |
 
-Por janela de 30 dias (a régua exige as três): A `‹backfill›` · B `‹backfill›`.
+Denominador: **8 352 fechamentos de 15 min** em (2026-06-16 00:00Z; 2026-09-11 00:00Z] — 87 dias × 96,
+a janela de replay que o protocolo abaixo fixa (medido às 04:40 BRT). Dias distintos com **ao menos
+uma** barra de 15 min na célula: **A = 9 de 88** (06-23: 4 barras · 08-20: 1 · 08-21: 4 · 08-23: 7 ·
+08-24: 28 · 08-25: 9 · 08-26: 14 · 09-09: 2 · **09-10: 55** — o dia que motivou a hipótese é 44 % do
+braço), **B = 75 de 88**. As 7 barras `>= +0,10` são todas de 08-22.
+
+Por janela de 30 dias (a régua exige as três; J1 06-16→07-16, J2 07-16→08-15, J3 08-15→09-11 com
+27 d): A **0,14 % / 0,00 % / 4,63 %** (4 / 0 / 120 barras) · B **41,28 % / 42,67 % / 51,23 %**
+(1 189 / 1 229 / 1 328 barras). **O braço A não tem uma barra sequer em J2** e 120 das suas 124
+barras estão em J3.
 
 **Tercis congelados (só para a leitura descritiva).** Calibrados sobre as linhas **usáveis** de
-**2026-06-13 → 2026-07-31**, todos os minutos, e **nunca recalculados**: `t1 = ‹backfill›` e
-`t2 = ‹backfill›` (n = `‹backfill›`). A janela de calibração é **descartada** da leitura descritiva,
+**2026-06-13 → 2026-07-31**, todos os minutos, e **nunca recalculados**: `t1 = −0,005913` e
+`t2 = +0,001660` (n = **66 240**). A janela de calibração é **descartada** da leitura descritiva,
 que é medida sobre as decisões de 2026-08-01 em diante. Se a série começar depois de 06-13 (como a
 `breadth_v2` começou em 06-14), a calibração efetiva é o que existir e **fica escrito aqui**, com o
-n exato.
+n exato: **a série começa em 2026-06-16 00:00Z, então a calibração efetiva é 2026-06-16 00:00Z →
+2026-07-31 23:59Z, 46 dias × 1 440 = os 66 240 exatos** (medido às 04:40 BRT).
 
 ## Previsões numéricas registradas antes da primeira derivação
 
@@ -200,7 +218,7 @@ Elas podem estar erradas e é para isso que estão aqui.
 5. **`dispersion_unavailable`** abaixo de **1 %** das barras da janela de replay, se o backfill
    cobrir os 89 dias dobráveis. Acima disso, a leitura é sobre cobertura e não sobre a hipótese.
 
-## Leitura descritiva por célula — `‹backfill›`, medida sobre as decisões do PAI antes do replay
+## Leitura descritiva por célula — medida em 2026-09-12 às 04:41 BRT (07:41 UTC), sobre as decisões do PAI antes do replay
 
 Juntando cada uma das 798 decisões de `replay:c7d138eb…` à linha de `dispersion_24h_v1` do seu
 `source_bar_close`. **Não é o resultado do experimento** — a população dos braços difere pela
@@ -208,15 +226,24 @@ divergência de máquina de estados do slot (`docs/PIPELINE.md` §4b item 11) �
 
 | célula | n | dias | `r_ex_funding` médio | soma R |
 |---|---|---|---|---|
-| **A** `[−0,10; −0,03)` | `‹backfill›` | `‹backfill›` | `‹backfill›` | `‹backfill›` |
-| **B** `[0,00; +0,10)` | `‹backfill›` | `‹backfill›` | `‹backfill›` | `‹backfill›` |
-| `[−0,03; 0,00)` (sem braço) | `‹backfill›` | `‹backfill›` | `‹backfill›` | `‹backfill›` |
-| `< −0,10` (sem braço) | `‹backfill›` | `‹backfill›` | `‹backfill›` | `‹backfill›` |
-| `>= +0,10` (sem braço) | `‹backfill›` | `‹backfill›` | `‹backfill›` | `‹backfill›` |
-| sem linha usável | `‹backfill›` | `‹backfill›` | `‹backfill›` | `‹backfill›` |
+| **A** `[−0,10; −0,03)` | **7** | **2** (08-24 e 08-25) | −0,0261 | −0,1826 |
+| **B** `[0,00; +0,10)` | **414** | 61 | **+0,0203** | +8,4233 |
+| `[−0,03; 0,00)` (sem braço) | 342 | 69 | **−0,0721** | −24,6663 |
+| `< −0,10` (sem braço) | 0 | 0 | — | — |
+| `>= +0,10` (sem braço) | 1 | 1 (08-22 04:45Z) | −1,0203 | −1,0203 |
+| sem linha usável | 34 | 4 (06-12 → 06-15, antes do início da série) | −0,1737 | −5,9057 |
 
-Tercis congelados, decisões de 2026-08-01 em diante: T1 `‹backfill›` · T2 `‹backfill›` · T3
-`‹backfill›`. **Monotonicidade é evidência sobre o eixo, não sobre os braços** — foi assim que a
+O pai cortado no início da série (`emitted_at >= 2026-06-16`, o controle que o protocolo abaixo
+declara) fica com **764 decisões em 85 dias, −0,0228 R, soma −17,4459 R**. Eixo `r_ex_funding`
+(764 de 764). K4 do pai, lido do recibo original de 90 d: **0,9259 %** (1 280 de 138 240 barras).
+
+Tercis congelados, decisões de 2026-08-01 em diante: **T1 baixo `[−1; −0,005913)` +0,1502 R
+(n = 77, 23 dias) · T2 meio `[−0,005913; +0,001660)` −0,0468 R (n = 60, 21 dias) · T3 alto
+`[+0,001660; +1]` +0,1016 R (n = 213, 29 dias)**. **Não é monótono** — o meio é a pior célula, e as
+duas pontas são positivas — logo a leitura descritiva **não** dá evidência de um gradiente ao longo
+do eixo. (T3 concentra 213 das 350 decisões de agosto–setembro porque a calibração de junho–julho
+tem média −0,0018 e agosto–setembro tem média +0,0005: o eixo derivou para cima entre as duas
+janelas.) **Monotonicidade é evidência sobre o eixo, não sobre os braços** — foi assim que a
 EXP-0027 descobriu que a ponta boa da amplitude estava fora das duas faixas pré-registradas.
 
 ## Não-antecipação (o que está provado e o que custa)
@@ -268,9 +295,10 @@ permanentes — `0020` não dá `UPDATE`/`DELETE` a ninguém.
 - **Universo elegível:** os 16 mercados com ≥ 90 d de velas de 1 min (ARB BNB BTC DASH DOGE ETH LINK
   NEAR PROM SAHARA SOL SUI TAO UNI XRP ZEC), `markets.is_monitored` de hoje — a limitação declarada
   do método (`docs/PIPELINE.md` §6c: não há histórico de pertencimento por barra)
-- **Janela:** `‹backfill›` (o início da série `dispersion_24h_v1`) → 2026-09-11, **com a população
-  do pai cortada no mesmo início**, como a EXP-0027 fez, e a diferença de calendário declarada antes
-  da corrida
+- **Janela:** **2026-06-16** (o início da série `dispersion_24h_v1`, preenchido em 2026-09-12 às
+  04:40 BRT) → 2026-09-11, **com a população do pai cortada no mesmo início**, como a EXP-0027 fez, e
+  a diferença de calendário declarada antes da corrida (o pai tem 34 decisões em 06-12 → 06-15 que
+  saem das duas leituras: 798 → 764)
 - **Data de início:** 2026-09-12
 
 ## Avaliações (acrescentadas, nunca reescritas)
@@ -286,17 +314,87 @@ esta página foi escrita (a `0020` não estava aplicada em lugar nenhum: o códi
 então derivar `v20`/`v21` com `--dry-run` primeiro, ativar como `research_only`, replayar por braço
 e aplicar a régua acima — o que falhar é aposentado no mesmo dia.
 
+### Avaliação de 2026-09-12 — `as_of = 2026-09-12T07:41:13Z` (04:41 BRT): checagem de população §2 — inviável nos dois braços, nenhuma variante derivada
+
+**Corridas:** nenhuma. Nenhuma derivação, nenhum replay, nenhum estresse: `mean_reversion v20`/`v21`
+**não existem** (a última versão da família continua `v19`, `deprecated`; `strategy_versions` lida
+às 04:38 BRT). Tudo nesta seção é leitura somente-leitura da série e da coorte do pai (q01/q02/q03,
+04:40–04:41 BRT), feita **antes** de derivar — a ordem que o brief T3.91 fixa: "se A ou B ficar fora
+da sua faixa, PARE depois de escrever o resultado na EXP e não derive". Comandos e saídas verbatim em
+`.claude/state/notes-T3.91.md`.
+
+**A checagem de população, contra a previsão 2 (congelada antes do backfill):**
+
+| braço | faixa | previsto (share das barras de 15 min) | medido (8 352 barras, 06-16 → 09-11) | dias com barra | veredito |
+|---|---|---|---|---|---|
+| **A** (discordância) | `[−0,10; −0,03)` | entre 10 % e 30 % | **1,48 %** (124 barras) | **9 de 88** | **fora da faixa** — 6,7× abaixo do piso |
+| **B** (falseamento) | `[0,00; +0,10)` | entre 20 % e 40 % | **44,85 %** (3 746 barras) | 75 de 88 | **fora da faixa** — acima do teto |
+
+Por janela de 30 d: A **0,14 % / 0,00 % / 4,63 %** — o braço A não tem **uma barra sequer** em J2
+(07-16 → 08-15) e 120 das 124 estão em J3; B 41,28 % / 42,67 % / 51,23 %.
+
+**Projeção de n, dos dois lados.** Pelo share: 764 decisões do pai cortado × 1,48 % ≈ **11**
+desfechos; medido diretamente na coorte do pai, a célula A tem **7 decisões em 2 dias**. Mesmo no
+limite absurdo em que toda barra A decidisse em todos os 16 mercados (124 × 16 = 1 984 slots), a
+condição 2 exige **≥ 30 dias distintos** e a célula só existe em **9** — o braço A é
+**`descartar por população`** antes de nascer, exatamente o caso que a régua já nomeava ("um braço
+mudo é descartar por população, nunca negativo"). O braço B cobre quase metade das barras e **54,2 %
+das decisões do pai** (414 de 764 — o pai decide mais quando as alts estão acima do BTC do que o
+share de barras diz): "concordância" não é um estado dentro desta série, é o padrão dela; o braço
+de falseamento pré-registrado não falseia nada porque quase tudo cabe nele.
+
+**Result:** **`inviavel-populacao`**. Nenhum Δ, nenhum IC, nenhuma cláusula de identidade — nada a
+medir e **nada a aposentar**, porque nada foi derivado. A hipótese H-P18 **como foi pré-registrada**
+(célula A = `[−0,10; −0,03)`) não é testável nesta história: **não foi refutada nem confirmada**
+(`result: inconclusivo`, o vocabulário da base).
+
+**As previsões numéricas, pontuadas:**
+
+1. **Distribuição — forma certa, cauda errada por uma ordem de grandeza.** Unimodal, estreita,
+   mediana **−0,001284** (dentro do previsto [−0,01; +0,01]); mas "menos de 15 % dos minutos
+   abaixo de −0,03" foi **1,45 %**. O desvio-padrão da série é **0,0132** e o p05 é **−0,0210**: o
+   corte −0,03 fica perto do **percentil 1,5**. A faixa A foi fixada a partir de duas leituras
+   (−0,033 em 10/09, −0,0255 em 11/09 — a série as reproduz: **−0,035624** às 19:10Z de 10/09 e
+   **−0,026937** às 11:11Z de 11/09, ambas 16/16), e o próprio pré-registro avisou que era "uma
+   hipótese sobre dois dias". A checagem de população existia para isto, e disparou: **55 das 124
+   barras de A (44 %) são o próprio 10/09**.
+2. **População — falsificada nos dois braços** (tabela acima).
+3. **Direção** e 4. **cláusula de identidade** — **não mensuráveis**, sem corrida.
+5. **`dispersion_unavailable` < 1 %** — **0,00 %**: nenhuma das 8 352 barras de 15 min fica sem
+   linha usável; cobertura 16/16 em todos os 126 911 minutos; `insufficient_coverage` e
+   `btc_missing` são zero. O instrumento entregou; a faixa é que não existe.
+
+**O que a leitura descritiva diz (evidência sobre o eixo, não veredito, e não move a régua):** os
+tercis **não são monótonos** (T1 +0,1502 · T2 −0,0468 · T3 +0,1016, n = 77/60/213, decisões de
+08-01 em diante); por célula, a **pior** célula do pai é a queda conjunta `[−0,03; 0,00)` (342
+decisões, 69 dias, **−0,0721 R**, soma −24,67 R) e a célula B `[0; 0,10)` é **+0,0203 R** (414
+decisões). É a mesma assinatura da EXP-0027 (a célula "de dentro" pior que a de falseamento) lida
+sem replay, e vale o que valeu lá: **uma faixa que ninguém pré-registrou não ganha braço.**
+
+**Conclusion:** `inviavel-populacao` nos dois braços; `v20`/`v21` não derivadas; nada aposentado;
+H-P18 marcada `testada` na INBOX com este veredito. Custo da corrida: **zero replays** — a checagem
+de população poupou 24 fatias.
+
+**Next Action:** nenhuma sobre estas faixas. Se H-P18 for perseguida, é uma **EXP nova** com
+pré-registro próprio, faixas calibradas nos quantis da série (tercis `t1`/`t2` acima, ou p10/p90)
+e o prior escrito de que a célula `[−0,03; 0,00)` é a pior do pai (−0,0721 R) enquanto `[0; 0,10)`
+é a melhor (+0,0203 R) — a cláusula de identidade contra `regime_hourly_v1` continua por medir. E um
+aviso para o plantão: a célula original de H-P18 ("mediana < −3 % **e** BTC > −2 %") **não é** a
+mesma coisa que `dispersion < −0,03` — a dispersão é uma diferença, e a leitura de 10/09 (mediana
+−5,08 %, BTC −1,52 %) cabe nas duas definições por coincidência, não por construção.
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde ficou registrada |
 |---|---|---|---|
-| — | — | nenhuma derivada ainda; a série precisa existir primeiro | — |
+| `v20` (A, `dispersion=-0.10--0.03`) / `v21` (B, `dispersion=0.00-0.10`) | 2026-09-12 | **não derivadas** — a checagem de população §2 falhou nos dois braços (A 1,48 %, B 44,85 % das barras de 15 min; A com 9 dias) | esta página, avaliação de 2026-09-12 (04:41 BRT) |
 
 ## Relacionadas
 
 [[Experiments Index]] · [[Strategies]] · [[Strategy Performance]] · [[Dialogos/SHADOW]] ·
 [[EXP-0025-mean-reversion-90-dias]] · [[EXP-0026-regime-como-estrategia]] ·
-[[EXP-0027-amplitude]] · [[KB-0083-uma-hora-de-34-r-deriva-e-impulso]]
+[[EXP-0027-amplitude]] · [[KB-0083-uma-hora-de-34-r-deriva-e-impulso]] · [[Diario/2026-09-12]] (a
+madrugada em que a checagem de população parou esta EXP)
 
 ## Fontes
 
@@ -309,3 +407,6 @@ e aplicar a régua acima — o que falhar é aposentado no mesmo dia.
   `infra/migrations/versions/0020_market_dispersion.py`
 - régua: [[EXP-0027-amplitude]] (a mesma, congelada), bootstrap
   `.claude/state/exp-drafts/t362b/blocos90.py`
+- leitura de 2026-09-12 (T3.91): brief `.claude/state/brief-T3.91-exp-0029-dispersao.md`; notas
+  `.claude/state/notes-T3.91.md`; SQL `infra/scripts/sql/research/2026-09-12-t391-q01-dispersao-distribuicao.sql`,
+  `-q02-dispersao-nas-barras-de-15m.sql`, `-q03-celulas-do-pai.sql`
