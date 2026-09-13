@@ -48,6 +48,7 @@ from hunter_meme_worker.chain import chain_once
 from hunter_meme_worker.collect import fold_once, forever, poll_once, prune_once, reconcile_once
 from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState
+from hunter_meme_worker.creator_watch import spawn_creator_watch
 from hunter_meme_worker.discovery import run_discovery
 from hunter_meme_worker.fast_lane import fast_once
 from hunter_meme_worker.graduation import GlobalParamsStore
@@ -297,6 +298,8 @@ async def run_meme(runtime: WorkerRuntime) -> None:
             group.create_task(
                 forever("fold", config.features_cycle_s, fold_once, ctx), name="meme-fold"
             )
+            if config.creator_watch_enabled:
+                spawn_creator_watch(group, config, ctx)
             group.create_task(
                 forever("retention", config.retention_cycle_s, prune_once, ctx),
                 name="meme-retention",

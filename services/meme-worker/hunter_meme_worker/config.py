@@ -109,6 +109,11 @@ class MemeConfig:
     yet evaluated by this process: a proposal on an older instant would be
     priced against a curve that already moved twice."""
 
+    creator_watch_enabled: bool = True
+    """``MEME_CREATOR_WATCH_ENABLED`` (T4.2h): the creator's token accounts read
+    from the chain every ``creator_watch_cycle_s`` for the mints with an open
+    paper bet (``creator_watch.py``)."""
+    creator_watch_cycle_s: float = 15.0
     fast_lane_enabled: bool = True
     """``MEME_FAST_LANE_ENABLED`` (T4.16): the 15-second chain clock for the
     mints younger than ``fast_lane_max_age_s`` (``fast_lane.py``). Needs the
@@ -304,6 +309,8 @@ def load_config(settings: Settings) -> MemeConfig:
         activity_lead_s=float(max(0, min(30, _int_env("MEME_ACTIVITY_LEAD_S", 3)))),
         chain_curves_enabled=_bool_env("MEME_CHAIN_CURVES_ENABLED", default=True),
         fast_lane_enabled=_bool_env("MEME_FAST_LANE_ENABLED", default=True),
+        creator_watch_enabled=_bool_env("MEME_CREATOR_WATCH_ENABLED", default=True),
+        creator_watch_cycle_s=float(max(5, _int_env("MEME_CREATOR_WATCH_CYCLE_S", 15))),
         rest_mayhem_refresh_s=max(60, _int_env("MEME_REST_MAYHEM_REFRESH_S", 300)),
         watch_wallets=_wallets_env("MEME_WATCH_WALLETS"),
     )

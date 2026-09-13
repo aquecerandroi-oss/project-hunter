@@ -6990,3 +6990,20 @@ Parâmetro novo do portão: `max_top10_share` (`rules.py`; lê `meme_features_1m
 carregados pelo `lab_repo.py` do minuto; a série de 15 s não o tem → `top10_unknown`). Downgrade recusa com proposta ou
 aposta referenciando o conjunto (§17.7). Testes: `test_0035_*` (2); o `test_0034_refuses_a_downgrade…` passa a estagiar
 em `E1_ARM2_REVISION`.
+
+## 48. A venda do criador vista na cadeia — M4 (`0036_meme_creator_watch`)
+
+**Por quê (12/09/2026):** `creator_dump` foi a saída de 22 das 35 apostas medidas (−6,2 R), em média 14 min depois da
+entrada; a fita por lote (§44) não traz vendas por carteira e a fita por mint cobre poucas moedas — o laço só sabia da
+venda do dev quando o preço já tinha caído; uma posição real (§40) teria o mesmo atraso.
+
+**Colunas em `meme_paper_bets`:** `creator_sold_seen_at timestamptz` (o instante da leitura que viu o saldo do criador
+cair), `creator_sold_fraction numeric(9,6)` (vendido ÷ saldo anterior, fração em (0, 1]) e `creator_balance_reason text`
+(`creator_ata_missing` = o criador não tem conta de tokens: **não medido**, nunca "não vendeu"). CHECKs: a fração é
+fração; instante e fração andam juntos; o motivo é rótulo conhecido. Quem escreve: `hunter_worker`
+(`services/meme-worker/hunter_meme_worker/creator_watch.py`, a cada 15 s, um `getMultipleAccounts` `jsonParsed` das
+ATAs do criador — Token clássico e Token-2022 — dos mints com aposta aberta; o primeiro **decréscimo** entre duas
+leituras marca as apostas abertas do mint). Quem lê: `lab_repo_bets._OPEN_BETS` (`creator_sold = true` quando
+`creator_sold_seen_at` existe, senão a fita do minuto) → a saída `creator_dump` do motor de papel dispara na fotografia
+seguinte. A latência venda → saída fica medível: `exit_at − creator_sold_seen_at`. O downgrade recusa enquanto uma
+aposta carregar uma venda vista (§17.7). Ainda **não** cobre `meme_live_positions` (executor real) — declarado.

@@ -34,7 +34,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hunter_core.db.base import Base, UUIDPrimaryKeyMixin
-from hunter_core.db.models._common import JSONB_EMPTY, JSONB_EMPTY_LIST
+from hunter_core.db.models._common import JSONB_EMPTY, JSONB_EMPTY_LIST, PERCENT
 from hunter_core.db.models.meme_lab_commands import MemeOperatorCommand
 
 RULE_SET_KINDS = ("research_only", "operator")
@@ -263,6 +263,15 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
             "AND (outcome_quality = 'indeterminate') = (outcome_quality_at IS NOT NULL)",
             name="an_indeterminate_outcome_names_its_reason",
         ),
+        # T4.2h (0036); the reason's label CHECK lives in ddl/meme_creator_watch.py only.
+        CheckConstraint(
+            "creator_sold_fraction IS NULL OR (creator_sold_fraction > 0 AND creator_sold_fraction <= 1)",
+            name="creator_sold_fraction_is_a_fraction",
+        ),
+        CheckConstraint(
+            "(creator_sold_seen_at IS NULL) = (creator_sold_fraction IS NULL)",
+            name="a_creator_sale_has_its_fraction",
+        ),
     )
 
     proposal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meme_proposals.id"))
@@ -319,6 +328,10 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
 
     outcome_quality_reason: Mapped[str | None] = mapped_column(Text)
     outcome_quality_at: Mapped[datetime | None]
+    creator_sold_seen_at: Mapped[datetime | None]
+    creator_sold_fraction: Mapped[Decimal | None] = mapped_column(PERCENT)
+    creator_balance_reason: Mapped[str | None] = mapped_column(Text)
+    """T4.2h (``0036``): the creator's sale seen on the chain, or why the watch could not measure."""
 
 
 __all__ = [

@@ -632,6 +632,11 @@ Nada de "preenchido ao último preço visto".
     ≤ 10 %, criador não vendedor, E2 — e **segura pela migração** (`exit_on_migration = false`, marca pela pool; alvo 5×,
     trailing 40 % após 2×, 60 min, piso 50 %). Pré-registrado como `descartar`; nada real depende dele.
 
+12. **A venda do criador vista na cadeia (T4.2h).** O motivo de saída que mais custou em 12/09 (`creator_dump`, 22 de 35)
+    chegava 14 min depois pela fita. Agora o laço lê a conta de tokens do criador pela cadeia a cada 15 s para os mints
+    com aposta aberta e o primeiro decréscimo entre duas leituras vira `creator_sold_seen_at`; o motor sai na fotografia
+    seguinte. Conta ausente é `creator_ata_missing` — não medido, nunca "o dev não vendeu". Só papel por enquanto.
+
 ## 11. VM1–VM9 — as nove verificações do motor meme
 
 Equivalente das V1–V9 da T3.9 (`.claude/state/spec-T3.9-verificacoes.md`,

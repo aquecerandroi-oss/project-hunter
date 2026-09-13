@@ -40,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0035_meme_organic_e3"
+HEAD_REVISION = "0036_meme_creator_watch"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran.
 ``0033`` (T4.19) sits on ``0032_meme_activity`` (T4.2g), which sits on
@@ -100,6 +100,7 @@ stage first, because ``"-1"`` stopped meaning 0031 the day 0032 landed."""
 MEME_ACTIVITY_REVISION = "0032_meme_activity"
 OPERATOR_3_REVISION = "0033_meme_operator_3"
 E1_ARM2_REVISION = "0034_meme_gate_e1_arm2"
+ORGANIC_REVISION = "0035_meme_organic_e3"
 """``0033``: where the ``0033`` tests stage now that ``0034`` sits on top (T4.21)."""
 
 
@@ -6960,7 +6961,25 @@ def test_0035_seeds_the_organic_arm_on_the_minute_clock_and_retires_nothing(upgr
 
 
 def test_0035_reverses_on_a_clean_database_and_refuses_under_a_bet(upgraded: str) -> None:
+    with _staged_at(upgraded, ORGANIC_REVISION) as config:
+        _refusal_of_0035(upgraded, config)
     config = alembic_config(upgraded)
+    command.downgrade(config, E1_ARM2_REVISION)
+    try:
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id = :id",
+                {"id": _ORGANIC_RULE_SET},
+            )
+        ) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+def _refusal_of_0035(upgraded: str, config: Config) -> None:
     proposal = "00000000-0000-4000-8000-000000000d01"
     bet = "00000000-0000-4000-8000-000000000d02"
     asyncio.run(
@@ -6983,7 +7002,7 @@ def test_0035_reverses_on_a_clean_database_and_refuses_under_a_bet(upgraded: str
     try:
         with pytest.raises(DBAPIError, match="bets reference the seeded organic_v0/1"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == ORGANIC_REVISION, "the downgrade must not commit"
     finally:
         asyncio.run(_write(upgraded, list(_CLEAN_0034)))
     command.downgrade(config, E1_ARM2_REVISION)
@@ -6995,6 +7014,59 @@ def test_0035_reverses_on_a_clean_database_and_refuses_under_a_bet(upgraded: str
                 {"id": _ORGANIC_RULE_SET},
             )
         ) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0036_meme_creator_watch — the creator's sale seen on the chain (T4.2h)
+# ---------------------------------------------------------------------------
+
+_CREATOR_WATCH_COLUMNS = ("creator_sold_seen_at", "creator_sold_fraction", "creator_balance_reason")
+
+
+def test_0036_adds_the_creator_watch_columns_reverses_and_refuses_under_a_seen_sale(
+    upgraded: str,
+) -> None:
+    config = alembic_config(upgraded)
+    for column in _CREATOR_WATCH_COLUMNS:
+        assert asyncio.run(_column_exists(upgraded, "meme_paper_bets", column)), column
+    proposal = "00000000-0000-4000-8000-000000000e01"
+    bet = "00000000-0000-4000-8000-000000000e02"
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
+                (
+                    _A_BET,
+                    {
+                        "id": bet,
+                        "proposal": proposal,
+                        "rule_set": _RESEARCH_RULE_SET,
+                        "mode": "paper",
+                    },
+                ),
+                (
+                    "UPDATE meme_paper_bets SET creator_sold_seen_at = now(), "
+                    "creator_sold_fraction = 0.6 WHERE id = :id",
+                    {"id": bet},
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="carry a creator sale seen on the chain"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0034)))
+    command.downgrade(config, ORGANIC_REVISION)
+    try:
+        for column in _CREATOR_WATCH_COLUMNS:
+            assert not asyncio.run(_column_exists(upgraded, "meme_paper_bets", column)), column
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION

@@ -107,8 +107,9 @@ _OPEN_BETS = text(
     "       b.params, b.high_water_x, b.mark_sol, b.mark_at, b.exit_intent, "
     "       b.leg, b.parent_bet_id, b.mark_source, b.mark_stale_s, "
     "       t.migrated_at, t.completed_at, t.total_supply, t.creator, "
-    "       (SELECT f.creator_sold FROM meme_features_1m f WHERE f.mint = b.mint "
-    "          AND f.creator_sold IS NOT NULL ORDER BY f.end_time DESC LIMIT 1) AS creator_sold "
+    "       CASE WHEN b.creator_sold_seen_at IS NOT NULL THEN true ELSE "
+    "         (SELECT f.creator_sold FROM meme_features_1m f WHERE f.mint = b.mint "
+    "            AND f.creator_sold IS NOT NULL ORDER BY f.end_time DESC LIMIT 1) END AS creator_sold "
     "FROM meme_paper_bets b LEFT JOIN meme_tokens t ON t.mint = b.mint "
     "WHERE b.status = 'open' ORDER BY b.entry_at"
 )

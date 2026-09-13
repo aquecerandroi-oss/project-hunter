@@ -1113,6 +1113,22 @@ série de minuto (`lab_repo.py`), `lab_models.py` lê o parâmetro; migração `
 página EXP-M7 pré-registrada. **Provas:** indicators `-k meme` 227, worker unit 221, `test_migrations -k "0034 or 0035"`
 verde (Postgres), ruff/format/pyright 0, `check_file_size` 0 acima. Feito pelo orquestrador (agentes no limite semanal).
 
+### T4.2h — a vigilância da conta do criador pela cadeia: `creator_dump` em 15 s (entregue 13/09/2026)
+
+**Por quê:** 22 das 35 apostas medidas de 12/09 saíram por `creator_dump`, em média 14 min depois da entrada — a fita
+avisa tarde. **Entregue:** laço `meme-creator-watch` (`creator_watch.py`, 15 s, `MEME_CREATOR_WATCH_ENABLED`/`_CYCLE_S`):
+para cada aposta de papel aberta com criador conhecido, deriva as ATAs do criador (Token clássico e Token-2022,
+`associated_token_address`), lê todas num `getMultipleAccounts` `jsonParsed` (≤ 100 contas/chamada, mesmo cliente e
+orçamento do laço chain; um `ChainSource` sem `call` faz o laço dizer isso uma vez e não fazer nada), guarda o último
+saldo por mint em memória e trata o primeiro **decréscimo** entre duas leituras como venda: `creator_sold_seen_at` +
+`creator_sold_fraction` nas apostas abertas do mint (migração `0036`, §48 do `DATABASE.md`); conta ausente →
+`creator_balance_reason = creator_ata_missing` (não medido). `lab_repo_bets` lê a marca como `creator_net_seller = true`
+e o motor sai na fotografia seguinte. **Provas:** `test_creator_watch.py` 5 (ATAs, parse, soma por mint, só o
+decréscimo é venda), worker unit 226, core unit 1 332, `test_migrations -k "0035 or 0036"` 6 (Postgres),
+`test_lab_persistence` + `test_lab_operator_3` 16 (Postgres), ruff/format/pyright 0, `check_file_size` 0 acima.
+**Fora (declarado):** posições reais (`meme_live_positions`), heartbeat/rótulos `creator_watch_*`, teste de persistência
+do laço (a marca é SQL simples coberta pela migração). Feito pelo orquestrador (agentes no limite semanal).
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets
