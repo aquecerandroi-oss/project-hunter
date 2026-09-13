@@ -51,6 +51,7 @@ _GATE_ROWS = text(
     "       f.snapshot_observed_at, f.snapshot_source, "
     "       f.higher_lows, f.breakout_15m, f.distance_to_support_pct, f.line_reason, "
     "       f.hype_score, f.hype_reason, f.dev_share, f.dev_share_reason, f.snipers, "
+    "       f.top10_share, f.top10_share_reason, "
     "       f.net_sol_flow_1m, f.buys_1m, f.sells_1m, f.unique_buyers, f.tape_reason, "
     "       f.holders, f.holders_reason, prev.holders AS holders_prev, "
     "       prev.curve_progress_pct AS progress_prev, "
@@ -178,6 +179,8 @@ async def load_gate_rows(
                 dev_share=r["dev_share"],
                 dev_share_reason=r["dev_share_reason"],
                 snipers=r["snipers"],
+                top10_share=r["top10_share"],
+                top10_reason=r["top10_share_reason"],
                 # T4.16: the flow of the minute and the two trends against the
                 # minute before — ``None`` with its reason, refused by name.
                 net_sol_flow_1m=r["net_sol_flow_1m"],

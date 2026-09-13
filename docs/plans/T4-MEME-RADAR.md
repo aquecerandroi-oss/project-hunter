@@ -1100,6 +1100,19 @@ arquiva as compras manuais sob `operator/4`. **Provas:** indicators `-k meme` 22
 `test_migrations -k "0033 or 0034"` 11, `test_lab_operator_3` + moonshot + persistência 19 (Postgres); ruff/format/pyright
 0; `check_file_size` 0 acima. A agente foi cortada pelo limite semanal depois das regras; o orquestrador fechou o resto.
 
+### T4.22 — `organic_v0/1`: a orgânica lenta (E3) — entrar depois do pump dos bots e segurar pela migração (entregue 13/09/2026)
+
+**Por quê:** 12/09 fechou 35 apostas medidas a −9,4 R, `high_water_x ≤ 1,0` em 31 de 35, `creator_dump` em 22; a lição
+medida do fechamento (M-L2) diz que entrar com < 5 % da curva custa −0,36 R (IC fora de zero); todos os conjuntos vivos
+compram 30–300 s depois da criação. Pedido do Everton (13/09 01:0x BRT): "então aprimore essa parte".
+
+**Entregue:** `max_top10_share` no portão (`rules.py`/`rules_criteria.py`: recusa `top10_above_max`, desconhecido
+`top10_<motivo>`; desligado por padrão; 4 testes), `top10_share`/`top10_reason` em `GateRow`/`EntryFeatures` lidos da
+série de minuto (`lab_repo.py`), `lab_models.py` lê o parâmetro; migração `0035_meme_organic_e3` (§47 do
+`DATABASE.md`) semeando `organic_v0/1` (EXP-M7, previsão `descartar`, relógio de minuto, `exit_on_migration = false`);
+página EXP-M7 pré-registrada. **Provas:** indicators `-k meme` 227, worker unit 221, `test_migrations -k "0034 or 0035"`
+verde (Postgres), ruff/format/pyright 0, `check_file_size` 0 acima. Feito pelo orquestrador (agentes no limite semanal).
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

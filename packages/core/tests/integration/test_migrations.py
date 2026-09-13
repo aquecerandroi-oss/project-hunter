@@ -40,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0034_meme_gate_e1_arm2"
+HEAD_REVISION = "0035_meme_organic_e3"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran.
 ``0033`` (T4.19) sits on ``0032_meme_activity`` (T4.2g), which sits on
@@ -99,6 +99,7 @@ MEME_LAB_TICKS_REVISION = "0031_meme_lab_ticks"
 stage first, because ``"-1"`` stopped meaning 0031 the day 0032 landed."""
 MEME_ACTIVITY_REVISION = "0032_meme_activity"
 OPERATOR_3_REVISION = "0033_meme_operator_3"
+E1_ARM2_REVISION = "0034_meme_gate_e1_arm2"
 """``0033``: where the ``0033`` tests stage now that ``0034`` sits on top (T4.21)."""
 
 
@@ -6823,8 +6824,12 @@ def test_0034_refuses_a_downgrade_while_a_proposal_or_a_bet_references_arm_2(
     upgraded: str,
 ) -> None:
     """§17.7: a proposal under ``operator/4`` or a bet under ``flow_v2/2`` is
-    evidence — count, name, stop. ``0034`` is the head: no staging."""
-    config = alembic_config(upgraded)
+    evidence — count, name, stop. Staged at ``0034`` since ``0035`` sits on top."""
+    with _staged_at(upgraded, E1_ARM2_REVISION) as config:
+        _refusal_of_0034(upgraded, config)
+
+
+def _refusal_of_0034(upgraded: str, config: Config) -> None:
     proposal = "00000000-0000-4000-8000-000000000b01"
     bet = "00000000-0000-4000-8000-000000000b02"
     guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
@@ -6853,12 +6858,11 @@ def test_0034_refuses_a_downgrade_while_a_proposal_or_a_bet_references_arm_2(
         try:
             with pytest.raises(DBAPIError, match=message):
                 command.downgrade(config, "-1")
-            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
+            assert asyncio.run(_revision(upgraded)) == E1_ARM2_REVISION, (
                 "the downgrade must not commit"
             )
         finally:
             asyncio.run(_write(upgraded, list(_CLEAN_0034)))
-    command.check(config)
 
 
 def test_0034_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
@@ -6918,3 +6922,80 @@ def test_0034_refuses_to_upgrade_a_desk_that_already_has_another_active_operator
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"]
+
+
+# ---------------------------------------------------------------------------
+# 0035_meme_organic_e3 — the slow-organic arm (T4.22, EXP-M7)
+# ---------------------------------------------------------------------------
+
+_ORGANIC_RULE_SET = "01994d00-6c1a-7000-8000-00000000000d"
+
+
+def test_0035_seeds_the_organic_arm_on_the_minute_clock_and_retires_nothing(upgraded: str) -> None:
+    """E3 as the study wrote it: 3–30 min old, 10–30 % of the curve and rising,
+    ≥ 20 holders rising, top-10 ≤ 30 %, snipers ≤ 2, held through migration;
+    the desk and every other set untouched."""
+    seed = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+            "|| status || ':' || (params ->> 'gate_key') || '/' || (params ->> 'gate_version') "
+            "|| ':' || (params ->> 'clock') || ':' || (params ->> 'min_age_s') || '-' "
+            "|| (params ->> 'max_age_s') || ':' || (params ->> 'min_progress_pct') || '-' "
+            "|| (params ->> 'max_progress_pct') || ':' || (params ->> 'min_holders') || ':' "
+            "|| (params ->> 'max_top10_share') || ':' || (params ->> 'max_snipers') || ':' "
+            "|| (params ->> 'target_x') || ':' || (params ->> 'trailing_pct') || ':' "
+            "|| (params ->> 'trailing_arm_x') || ':' || (params ->> 'max_hold_s') || ':' "
+            "|| (params ->> 'exit_on_migration') "
+            "FROM meme_rule_sets WHERE id = :id",
+            {"id": _ORGANIC_RULE_SET},
+        )
+    )
+    assert seed == [
+        "organic_v0/1:research_only:EXP-M7:active:organica_lenta/1:1m:180-1800:10-30:20:0.30:2"
+        ":5:40:2:3600:false"
+    ]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"]
+    command.check(alembic_config(upgraded))
+
+
+def test_0035_reverses_on_a_clean_database_and_refuses_under_a_bet(upgraded: str) -> None:
+    config = alembic_config(upgraded)
+    proposal = "00000000-0000-4000-8000-000000000d01"
+    bet = "00000000-0000-4000-8000-000000000d02"
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
+                (
+                    _A_BET,
+                    {
+                        "id": bet,
+                        "proposal": proposal,
+                        "rule_set": _ORGANIC_RULE_SET,
+                        "mode": "paper",
+                    },
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="bets reference the seeded organic_v0/1"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0034)))
+    command.downgrade(config, E1_ARM2_REVISION)
+    try:
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id = :id",
+                {"id": _ORGANIC_RULE_SET},
+            )
+        ) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)

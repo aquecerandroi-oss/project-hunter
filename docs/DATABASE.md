@@ -6975,3 +6975,18 @@ ativo"; `flow_v2/1` **continua ativo** (o braço 1 segue sendo medido ao lado). 
 `lab_models.py` e avaliados em `hunter_indicators.meme.rules_criteria` — desligados por padrão, o braço 1 lê exatamente
 como foi congelado. O downgrade recusa enquanto uma proposta ou aposta referenciar os dois conjuntos (§17.7) e revive o
 `operator/3`. Testes: `test_0034_*` (4) e os `test_0033_*` agora estagiados em `OPERATOR_3_REVISION`.
+
+## 47. A orgânica lenta — M4 (`0035_meme_organic_e3`)
+
+**Por quê (12/09/2026):** 35 apostas medidas a −9,4 R; em 31 de 35 a moeda nunca valeu mais do que na compra
+(`high_water_x ≤ 1,0`); o criador despejou em 22. Todos os conjuntos vivos compram 30–300 s depois da criação. A E3 do
+estudo das 21 apostas entra **tarde** e segura pela migração.
+
+**O que a migração faz (`ddl/meme_organic_e3.py`):** semeia `organic_v0/1` (`…000d`, `research_only`, EXP-M7, relógio
+de **minuto**) = `FLOW_V2_PARAMS || {organica_lenta/1: idade 180–1 800 s, progresso 10–30 % e subindo, fluxo > 0, ≥ 5
+compradores, vendas/compras ≤ 0,8, holders ≥ 20 subindo, top-10 ≤ 30 %, snipers ≤ 2, dev ≤ 10 %, criador não vendedor,
+E2; saída alvo 5×/trailing 40 % após 2×/3 600 s/piso 50 %, exit_on_migration false, 3 abertas}`; nada é aposentado.
+Parâmetro novo do portão: `max_top10_share` (`rules.py`; lê `meme_features_1m.top10_share`/`top10_share_reason`, agora
+carregados pelo `lab_repo.py` do minuto; a série de 15 s não o tem → `top10_unknown`). Downgrade recusa com proposta ou
+aposta referenciando o conjunto (§17.7). Testes: `test_0035_*` (2); o `test_0034_refuses_a_downgrade…` passa a estagiar
+em `E1_ARM2_REVISION`.

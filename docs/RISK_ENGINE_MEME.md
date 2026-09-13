@@ -627,6 +627,11 @@ Nada de "preenchido ao último preço visto".
     progresso **ou** mcap subindo), pré-registrado como `descartar` na EXP-M5; o braço 1 (`flow_v2/1`) continua ativo e
     medido ao lado. Nenhuma outra régua muda: 0,05 SOL, 180 s, alvo 3×, trailing 35 % após 1,5×, 30 min, dev, pedigree.
 
+11. **A orgânica lenta (T4.22, EXP-M7).** O primeiro conjunto que **não** compra recém-nascidas: entra na série de
+    minuto entre 3 e 30 min, com a curva em 10–30 % e subindo, ≥ 20 holders subindo, top-10 ≤ 30 %, snipers ≤ 2, dev
+    ≤ 10 %, criador não vendedor, E2 — e **segura pela migração** (`exit_on_migration = false`, marca pela pool; alvo 5×,
+    trailing 40 % após 2×, 60 min, piso 50 %). Pré-registrado como `descartar`; nada real depende dele.
+
 ## 11. VM1–VM9 — as nove verificações do motor meme
 
 Equivalente das V1–V9 da T3.9 (`.claude/state/spec-T3.9-verificacoes.md`,

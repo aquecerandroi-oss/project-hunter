@@ -102,6 +102,7 @@ GATE_INPUTS: Final = (
     "meme_features_1m.hype_score",
     "meme_features_1m.dev_share",
     "meme_features_1m.snipers",
+    "meme_features_1m.top10_share",
     "meme_features_1m.net_sol_flow_1m",
     "meme_features_1m.unique_buyers",
     "meme_features_1m.buys_1m",
@@ -143,6 +144,8 @@ class EntryGate:
     """The brief's one exception to "unknown refuses": ``dev_share ≤ 0,10 ou
     NULL com motivo``. Only meaningful with ``max_dev_share`` set."""
     max_snipers: int | None = None
+    max_top10_share: Decimal | None = None
+    """T4.22 (EXP-M7): ceiling on the top-10 holders' share (fraction); unknown refuses by reason."""
     require_positive_flow: bool = False
     """T4.16 (EXP-M5): ``net_sol_flow_1m > 0`` — or, when the tape is absent
     and the 15-second series speaks, ``mcap_delta_60s > 0``; unknown refuses."""
@@ -181,6 +184,8 @@ class EntryGate:
             raise ValueError("max_dev_share must be in [0, 1]")
         if self.max_snipers is not None and self.max_snipers < 0:
             raise ValueError("max_snipers cannot be negative")
+        if self.max_top10_share is not None and not 0 <= self.max_top10_share <= 1:
+            raise ValueError("max_top10_share must be in [0, 1]")
         if self.min_unique_buyers is not None and self.min_unique_buyers < 0:
             raise ValueError("min_unique_buyers cannot be negative")
         if self.max_sells_to_buys is not None and self.max_sells_to_buys < 0:
@@ -212,6 +217,7 @@ class EntryGate:
             "max_dev_share": self.max_dev_share,
             "dev_share_unknown_allowed": self.dev_share_unknown_allowed or None,
             "max_snipers": self.max_snipers,
+            "max_top10_share": self.max_top10_share,
             "require_positive_flow": self.require_positive_flow or None,
             "min_unique_buyers": self.min_unique_buyers,
             "max_sells_to_buys": self.max_sells_to_buys,
@@ -251,6 +257,8 @@ class EntryFeatures:
     dev_share: Decimal | None = None
     dev_share_reason: str | None = None
     snipers: int | None = None
+    top10_share: Decimal | None = None
+    top10_reason: str | None = None
     net_sol_flow_1m: Decimal | None = None
     mcap_delta_60s: Decimal | None = None
     """T4.16: the minute's net SOL flow from the tape, and — on the 15-second
@@ -266,8 +274,7 @@ class EntryFeatures:
     progress_rising: bool | None = None
     holders: int | None = None
     holders_prev: int | None = None
-    """T4.21: the two holders readings behind ``holders_rising`` — the floor
-    reads the newest, "not falling" compares the two."""
+    """T4.21: the two holders readings behind ``holders_rising`` (floor, "not falling")."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -102,6 +102,8 @@ class GateRow:
     progress_rising: bool | None = None
     holders: int | None = None
     holders_prev: int | None = None
+    top10_share: Decimal | None = None
+    top10_reason: str | None = None
     """T4.21: the two holders readings behind ``holders_rising`` (arm 2's floor and 'not falling')."""
     """T4.16: the flow of the minute (or of the last 60 s on the 15-second
     series) and the two trends — read by the EXP-M5 gate."""
@@ -188,6 +190,8 @@ def entry_features_of(
         progress_rising=row.progress_rising,
         holders=row.holders,
         holders_prev=row.holders_prev,
+        top10_share=row.top10_share,
+        top10_reason=row.top10_reason,
     )
 
 

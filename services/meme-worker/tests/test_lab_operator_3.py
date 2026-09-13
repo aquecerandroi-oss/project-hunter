@@ -98,9 +98,9 @@ async def test_the_seed_hands_the_desk_to_operator_4_on_the_flow_gate_arm_2(
     assert operator.trailing_arm_x == flow.trailing_arm_x == Decimal("1.5")
     assert (operator.max_hold_s, operator.max_loss_pct) == (1800, Decimal(50))
     assert operator.exit_on_line_break and flow.ttl_s is None
-    assert [s.label for s in specs.values() if s.kind == "operator"] == ["operator/4"], (
-        "exactly one active operator set"
-    )
+    assert [s.label for s in specs.values() if s.kind == "operator" and s.name == "operator"] == [
+        "operator/4"
+    ], "exactly one seeded operator set (test_lab_persistence plants throwaway operator-kind sets)"
 
 
 async def test_operator_4_proposes_the_same_coin_as_flow_v2_2_waits_180_s_and_fills_once_approved(

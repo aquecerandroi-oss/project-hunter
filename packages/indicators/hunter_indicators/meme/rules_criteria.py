@@ -108,6 +108,11 @@ def hype_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
             refusals.append("snipers_unknown")
         elif features.snipers > gate.max_snipers:
             refusals.append("snipers_above_max")
+    if gate.max_top10_share is not None:
+        if features.top10_share is None:
+            refusals.append(f"top10_{features.top10_reason or 'unknown'}")
+        elif features.top10_share > gate.max_top10_share:
+            refusals.append("top10_above_max")
     return refusals
 
 
