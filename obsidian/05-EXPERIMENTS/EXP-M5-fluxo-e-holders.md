@@ -147,6 +147,15 @@ script auditado (`infra/scripts/meme_rule_set.py --deprecate`) no mesmo dia; a p
 
 *Nenhuma.* A página nasce em 2026-09-12 com `result: nao-iniciado`, `evaluable: 0`, `days: 0`.
 
+### Avaliação de 2026-09-12 — fechamento diário (T4.15)
+
+Escrita por `infra/scripts/meme_close_day.py --day 2026-09-12` em 2026-09-13 00:10 BRT (`meme_paper_bets`, conjunto `flow_v2/1`, coorte prospectiva). Nada acima desta linha foi editado.
+
+- **Hoje (2026-09-12)**: n = 1, R somado -0.2569; saídas: `line_broken` 1.
+- **Acumulado até 2026-09-12 23:59 BRT**: n = 1, dias distintos = 1, R médio -0.2569, IC 95 % por blocos de dia — (< 2 dias), alvo em 0 % das saídas, `dead`/`time_stop` em 0 %, leave-top-out (R somado sem a melhor) 0.
+- **A previsão congelada dizia:** «P4 — expectância do braço 1: entre −0,40 e +0,10 R (ponto −0,15 R); ≤ 15 % das entradas atingem 3×. Veredito previsto: `descartar` (H0), com a ressalva de população: < 100 apostas em 30 dias é o»
+- **Veredito:** régua não atingida (n 1/100, dias 1/30) — `result` da frontmatter não muda; quem escreve `validada`/`reprovada` é o orquestrador, com a régua completa (2 de 3 janelas, controle, censura).
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde |

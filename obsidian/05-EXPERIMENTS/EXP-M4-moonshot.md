@@ -148,6 +148,15 @@ retirado no mesmo dia; a página fica.
 
 *Nenhuma.* A página nasce em 2026-09-12 com `result: nao-iniciado`, `evaluable: 0`, `days: 0`.
 
+### Avaliação de 2026-09-12 — fechamento diário (T4.15)
+
+Escrita por `infra/scripts/meme_close_day.py --day 2026-09-12` em 2026-09-13 00:10 BRT (`meme_paper_bets`, conjunto `moonshot_v0/1`, coorte prospectiva). Nada acima desta linha foi editado.
+
+- **Hoje (2026-09-12)**: n = 4, R somado -1.5676; saídas: `creator_dump` 3, `time_stop` 1.
+- **Acumulado até 2026-09-12 23:59 BRT**: n = 4, dias distintos = 1, R médio -0.3919, IC 95 % por blocos de dia — (< 2 dias), alvo em 0 % das saídas, `dead`/`time_stop` em 25 %, leave-top-out (R somado sem a melhor) -1.7371.
+- **A previsão congelada dizia:** «P3 — expectância: braço 1 entre −0,90 e −0,30 R (ponto −0,60 R); braço 2 pior que o braço 1 em ≥ 0,10 R. Veredito previsto: `descartar` (H0).»
+- **Veredito:** régua não atingida (n 4/100, dias 1/30) — `result` da frontmatter não muda; quem escreve `validada`/`reprovada` é o orquestrador, com a régua completa (2 de 3 janelas, controle, censura).
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde |

@@ -63,3 +63,7 @@ número aqui é paper (`ENABLE_MEME_LIVE_TRADING=false` até segunda ordem do Ev
 [[09-OPERATIONS/Diario/2026-09-11|Diário (geral)]] · [[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme]] ·
 [[03-TRADING/Meme/README|Meme (Trading)]] · [[02-MARKET/Meme/README|Meme (Mercado)]] ·
 [[11-KNOWLEDGE/README-meme|Meme (Conhecimento)]] · `docs/plans/T4-MEME-RADAR-UI.md`
+
+## Diários gerados
+
+- [[09-OPERATIONS/Diario-Meme/2026-09-12|2026-09-12]] — 47 apostas fechadas, R somado -21.3594
