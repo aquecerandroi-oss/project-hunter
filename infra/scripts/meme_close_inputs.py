@@ -80,6 +80,9 @@ class CloseInputs:
     all_time: Sequence[ExpAllTime]
     predictions: Mapping[str, str | None]
     """``exp_ref -> the frozen prediction quoted from its page`` (``None`` = not found)."""
+    indeterminate: int = 0
+    """T4.15b: closes of the day with ``outcome_quality = indeterminate`` — outside
+    every sum above, counted here so the day says how often the instrument blinked."""
 
 
 def brt(at: datetime | None, pattern: str = "%H:%M:%S") -> str:

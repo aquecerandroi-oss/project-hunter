@@ -55,7 +55,16 @@ _CLOSED_BETS = text(
     "    AND f.end_time > b.entry_at - interval '10 minutes' "
     "  ORDER BY f.end_time DESC, f.features_version DESC LIMIT 1) f ON true "
     "WHERE b.status = 'closed' AND b.entry_at >= :day_start AND b.entry_at < :day_end "
+    "  AND coalesce(b.outcome_quality, 'measured') = 'measured' "
     "ORDER BY b.entry_at, b.id"
+)
+"""T4.15b: only **measured** closes feed the lessons — an ``indeterminate`` close
+(``rug_no_snapshot`` with no photo, T4.16) keeps its −1 R on the row but says
+nothing about the market; it is counted apart (``_INDETERMINATE``)."""
+_INDETERMINATE = text(
+    "SELECT count(*) AS n FROM meme_paper_bets b "
+    "WHERE b.status = 'closed' AND b.outcome_quality = 'indeterminate' "
+    "  AND b.entry_at >= :day_start AND b.entry_at < :day_end"
 )
 _ACTIVE_SETS = text(
     "SELECT name || '/' || version AS rule_set, exp_ref, kind FROM meme_rule_sets "
@@ -67,6 +76,7 @@ _ALL_TIME = text(
     "       (b.entry_at AT TIME ZONE 'America/Sao_Paulo')::date AS day_brt "
     "FROM meme_paper_bets b JOIN meme_rule_sets r ON r.id = b.rule_set_id "
     "WHERE r.status = 'active' AND b.status = 'closed' AND b.entry_at < :day_end "
+    "  AND coalesce(b.outcome_quality, 'measured') = 'measured' "
     "ORDER BY b.entry_at, b.id"
 )
 _COVERAGE = text(
@@ -86,7 +96,7 @@ _TICKS = text(
 _OPERATOR = text(
     "SELECT p.status, p.origin, p.proposed_at, p.decided_at, b.r_multiple, b.status AS bet_status "
     "FROM meme_proposals p JOIN meme_rule_sets r ON r.id = p.rule_set_id "
-    "LEFT JOIN meme_paper_bets b ON b.id = p.bet_id "
+    "LEFT JOIN meme_paper_bets b ON b.id = p.bet_id AND coalesce(b.outcome_quality, 'measured') = 'measured' "
     "WHERE r.kind = 'operator' AND p.proposed_at >= :day_start AND p.proposed_at < :day_end "
     "ORDER BY p.proposed_at"
 )
@@ -254,6 +264,9 @@ async def gather_close(
             coverage_row = (await session.execute(_COVERAGE, window)).mappings().one()
             ticks = await _rows(session, _TICKS, window)
             operator = _operator(await _rows(session, _OPERATOR, window))
+            indeterminate = int(
+                (await session.execute(_INDETERMINATE, window)).mappings().one()["n"]
+            )
     finally:
         await engine.dispose()
     return CloseInputs(
@@ -267,4 +280,5 @@ async def gather_close(
         reals=real_observed,
         all_time=all_time,
         predictions=predictions,
+        indeterminate=indeterminate,
     )

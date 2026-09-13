@@ -60,6 +60,8 @@ class BetLine:
     sol_usd_source: str | None
     sol_usd_observed_at: str | None
     initial_risk_sol: Decimal
+    outcome_quality: str | None = None
+    """T4.15b: ``indeterminate`` closes print as such instead of their −1 R."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,7 +175,8 @@ def _bets(inputs: DiaryInputs) -> list[str]:
         rule = f"`{b.rule_set}`" + (f" ({b.exp_ref})" if b.exp_ref else "")
         lines.append(
             f"| `{b.mint}` | {rule} | {_brt(b.entry_at)} | {_brt(b.exit_at)} | "
-            f"{b.exit_reason or 'aberta'} | {_n(b.r_multiple, places=4, reason='aberta')} | "
+            f"{b.exit_reason or 'aberta'} | "
+            f"{'indeterminada' if b.outcome_quality == 'indeterminate' else _n(b.r_multiple, places=4, reason='aberta')} | "
             f"{_n(b.pnl_sol, reason='aberta')} | {_n(b.pnl_usd, places=2, reason='sem cotação')} | {quote} |"
         )
     return lines
@@ -213,7 +216,7 @@ def _real_observed(inputs: DiaryInputs) -> list[str]:
 def _r_section(inputs: DiaryInputs) -> list[str]:
     lines = ["## 3. R em SOL do dia e acumulado", ""]
     lines += [
-        "| conjunto | apostas | fechadas | acertos | R do dia | R acumulado | drawdown do dia (SOL) | drawdown acumulado (SOL) | rugs |",
+        "| conjunto | apostas | fechadas | acertos | R do dia | R acumulado | drawdown do dia (SOL) | drawdown acumulado (SOL) | indeterminadas |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for r in inputs.rule_sets:
@@ -272,10 +275,11 @@ def _goal(inputs: DiaryInputs) -> list[str]:
 
 def _incidents(inputs: DiaryInputs) -> list[str]:
     lines = ["## 5. Incidentes", ""]
-    rugs = [b for b in inputs.bets if b.exit_reason == "rug_no_snapshot"]
+    rugs = [b for b in inputs.bets if b.outcome_quality == "indeterminate"]
     if rugs:
         lines.append(
-            f"- Rug sem fotografia durante aposta aberta: {len(rugs)} ({', '.join('`' + b.mint + '`' for b in rugs)})"
+            f"- Indeterminadas (sem fotografia; fora de todas as somas — T4.16): {len(rugs)} "
+            f"({', '.join('`' + b.mint + '`' for b in rugs)})"
         )
     for refusal, count in sorted(inputs.unfilled_by_refusal.items()):
         lines.append(f"- Propostas não preenchidas — `{refusal}`: {count}")

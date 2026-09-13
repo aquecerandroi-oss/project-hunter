@@ -56,7 +56,8 @@ _RULE_SETS = text(
     "ORDER BY status, name, version"
 )
 _WALLET_AT = text(
-    "SELECT coalesce(sum(pnl_sol) FILTER (WHERE status = 'closed' AND exit_at < :at), 0) AS realized, "
+    "SELECT coalesce(sum(pnl_sol) FILTER (WHERE status = 'closed' AND exit_at < :at "
+    "         AND coalesce(outcome_quality, 'measured') = 'measured'), 0) AS realized, "
     "       coalesce(sum(initial_risk_sol) FILTER (WHERE entry_at < :at "
     "                AND (exit_at IS NULL OR exit_at >= :at)), 0) AS exposure "
     "FROM meme_paper_bets WHERE rule_set_id = :rule_set_id"
@@ -67,24 +68,31 @@ _OPEN_AT = text(
     "ORDER BY entry_at"
 )
 _DAY_STATS = text(
-    "SELECT count(*) AS bets, count(*) FILTER (WHERE status = 'closed') AS closed, "
-    "       count(*) FILTER (WHERE status = 'closed' AND pnl_sol > 0) AS wins, "
-    "       count(*) FILTER (WHERE exit ->> 'reason' = 'rug_no_snapshot') AS rugs, "
-    "       sum(r_multiple) FILTER (WHERE status = 'closed') AS r_day "
+    "SELECT count(*) AS bets, "
+    "       count(*) FILTER (WHERE status = 'closed' "
+    "         AND coalesce(outcome_quality, 'measured') = 'measured') AS closed, "
+    "       count(*) FILTER (WHERE status = 'closed' AND pnl_sol > 0 "
+    "         AND coalesce(outcome_quality, 'measured') = 'measured') AS wins, "
+    "       count(*) FILTER (WHERE status = 'closed' AND outcome_quality = 'indeterminate') AS rugs, "
+    "       sum(r_multiple) FILTER (WHERE status = 'closed' "
+    "         AND coalesce(outcome_quality, 'measured') = 'measured') AS r_day "
     "FROM meme_paper_bets WHERE rule_set_id = :rule_set_id "
     "  AND entry_at >= :day_start AND entry_at < :day_end"
 )
 _R_TOTAL = text(
     "SELECT sum(r_multiple) AS r_total FROM meme_paper_bets "
-    "WHERE rule_set_id = :rule_set_id AND status = 'closed' AND exit_at < :day_end"
+    "WHERE rule_set_id = :rule_set_id AND status = 'closed' AND exit_at < :day_end "
+    "  AND coalesce(outcome_quality, 'measured') = 'measured'"
 )
 _CLOSED_SERIES = text(
     "SELECT pnl_sol FROM meme_paper_bets WHERE rule_set_id = :rule_set_id AND status = 'closed' "
+    "  AND coalesce(outcome_quality, 'measured') = 'measured' "
     "  AND exit_at >= :since AND exit_at < :day_end ORDER BY exit_at, id"
 )
 _BETS = text(
     "SELECT b.mint, r.name || '/' || r.version AS rule_set, r.exp_ref, b.entry_at, b.exit_at, "
     "       b.exit ->> 'reason' AS exit_reason, b.r_multiple, b.pnl_sol, b.initial_risk_sol, "
+    "       b.outcome_quality, "
     "       b.sol_usd_at_exit, b.exit -> 'sol_usd' ->> 'source' AS sol_usd_source, "
     "       b.exit -> 'sol_usd' ->> 'observed_at' AS sol_usd_observed_at "
     "FROM meme_paper_bets b JOIN meme_rule_sets r ON r.id = b.rule_set_id "
@@ -244,6 +252,7 @@ async def gather(day: date) -> DiaryInputs:
                     exit_reason=b["exit_reason"],
                     r_multiple=b["r_multiple"],
                     pnl_sol=b["pnl_sol"],
+                    outcome_quality=b["outcome_quality"],
                     pnl_usd=None
                     if b["pnl_sol"] is None or b["sol_usd_at_exit"] is None
                     else Decimal(b["pnl_sol"]) * Decimal(b["sol_usd_at_exit"]),

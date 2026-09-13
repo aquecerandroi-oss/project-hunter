@@ -96,7 +96,9 @@ def render_lessons_section(inputs: CloseInputs) -> str:
         "Régua: cada lição traz n, IC 95 % por blocos de hora (bootstrap por blocos, semente 20260912, "
         "2 000 reamostragens); n < 30 = insuficiente; uma lição só vira linha `M-L` na fila quando o "
         "contraste passa a régua (n ≥ 30, ≥ 3 blocos, células ≥ 10, IC fora de zero); nenhuma vira "
-        f"regra viva sem pré-registro (KB-0092). Apostas fechadas do dia: n = {len(inputs.bets)}.",
+        f"regra viva sem pré-registro (KB-0092). Apostas fechadas do dia: n = {len(inputs.bets)} "
+        f"medidas; indeterminadas (sem fotografia, fora de todas as somas — T4.16): "
+        f"{inputs.indeterminate}.",
         "",
     ]
     for index, lesson in enumerate(inputs.lessons, start=1):
