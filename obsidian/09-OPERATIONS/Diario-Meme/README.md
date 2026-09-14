@@ -67,3 +67,4 @@ número aqui é paper (`ENABLE_MEME_LIVE_TRADING=false` até segunda ordem do Ev
 ## Diários gerados
 
 - [[09-OPERATIONS/Diario-Meme/2026-09-12|2026-09-12]] — 47 apostas fechadas, R somado -21.3594
+- [[09-OPERATIONS/Diario-Meme/2026-09-13|2026-09-13]] — 66 apostas fechadas, R somado -9.4972
