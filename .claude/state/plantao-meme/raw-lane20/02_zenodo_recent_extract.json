@@ -1,0 +1,541 @@
+{
+ "query": "\"pump.fun\" OR pumpfun OR (memecoin AND solana) OR (\"meme coin\" AND solana); sort=mostrecent; size=20; read 2026-09-15 16:55:54-58 BRT",
+ "total": 27,
+ "hits": [
+  {
+   "id": 22679925,
+   "created": "2026-09-09T16:43:28.717201+00:00",
+   "updated": "2026-09-09T16:43:29.388154+00:00",
+   "publication_date": "2026-09-09",
+   "title": "PREreview of \"Resisting Manipulative Bots in Meme Coin Copy Trading: A Multi-Agent Approach with Chain-of-Thought Reasoning\"",
+   "creators": [
+    "Arati Kamat"
+   ],
+   "doi": "10.5281/zenodo.22679925",
+   "version": null,
+   "files": [
+    [
+     "review.html",
+     11777
+    ]
+   ],
+   "description": "<p><strong>This Zenodo record is a permanently preserved version of a PREreview. You can view the complete PREreview at <a href=\"https://prereview.org/reviews/22679925\">https://prereview.org/reviews/22679925</a>.</strong></p>\n\n<p><b>SUMMARY</b></p>\n\n<p>This paper examines bot-driven manipulation of copy trading in Solana meme coin markets, particularly <a href=\"http://pump.fun\">pump.fun</a> and GMGN. The paper makes four main contributions. First, it develops a taxonomy of bundle, sniper, bump, and comment bots and proposes detection algorithms for these categories. Second, it analyzes approximately 6,000 meme coins and finds that position-manipulation bots tend to redistribute project retur"
+  },
+  {
+   "id": 22286914,
+   "created": "2026-09-07T02:04:25.065866+00:00",
+   "updated": "2026-09-07T02:04:25.324547+00:00",
+   "publication_date": "2026-09-06",
+   "title": "RED-PUMP-2026-v1: A public benchmark of 860,213 pump.fun token launches with collector-generated terminal labels (May–June 2026 regime)",
+   "creators": [
+    "Kamat, Arati"
+   ],
+   "doi": "10.5281/zenodo.22286914",
+   "version": "v1.5",
+   "files": [
+    [
+     "RED-PUMP-2026-v1_v1.5_reproducibility_FINAL.zip",
+     348525405
+    ]
+   ],
+   "description": "<p>RED-PUMP-2026-v1 is a reproducibility package for a pre-registered fintech-microstructure study of 860,213 pump.fun token launches recorded by an off-chain V3 collector between 2026-05-08 and 2026-06-10 (regime data-collection window). The primary analytical cohort is 749,816 unique mints in the V3 primary window (1,597 GRADUATED, 748,219 TIMEOUT).</p>\n<p>Two pre-registered analyses are conducted: (i) a measurement audit of the collector's terminal classifier (documented at 04_frozen_inputs/OUTCOME_ASCERTAINMENT_MECHANISM.md); and (ii) a locked temporal-holdout evaluation of a pre-registered logistic association model (15-day development split followed by a 14-day validation split). Devel"
+  },
+  {
+   "id": 22116163,
+   "created": "2026-08-26T18:36:36.129974+00:00",
+   "updated": "2026-08-26T18:36:36.295979+00:00",
+   "publication_date": "2026-08-26",
+   "title": "Silent Killer v1.3: Dev-Wallet Silence Is Not a Solana Pump.fun Rug Predictor: Corrected Release",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.22116163",
+   "version": "1.3",
+   "files": [
+    [
+     "P12_Silent_Killer_v1_3_FINAL.zip",
+     58729
+    ]
+   ],
+   "description": "<p>SILENT-KILLER-2026-v1.3 is a corrected reproducibility bundle for the<br>paper \"Dev-Wallet Silence Is Not a Rug Predictor on Solana Pump.fun:<br>Empirical Evidence from a Positive-Class and Control-Panel Study, with<br>a Corrected RPC-Validated Analysis\" (Kamat, 2026).</p>\n<p>The bundle supports a null-result empirical finding: dev-wallet<br>transaction silence (&gt;= 6 hours) in the 24-hour window before a rug<br>does NOT distinguish rug tokens from non-rug tokens on Solana Pump.fun.<br>Under the corrected retrieval protocol (v3), positive class contains<br>27 operationally classified rug events (26 unique dev wallets, gone-state<br>window 2026-06-29 to 2026-07-06). Control class contain"
+  },
+  {
+   "id": 21780222,
+   "created": "2026-08-03T20:24:48.383531+00:00",
+   "updated": "2026-08-03T20:24:48.597632+00:00",
+   "publication_date": "2026-08-03",
+   "title": "Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading on Solana DEXs: Evidence, Theory, and Design Lessons from a 15-Day Deployment",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21780222",
+   "version": "v4",
+   "files": [
+    [
+     "Kamat_HourAware_2026_v4.pdf",
+     404117
+    ]
+   ],
+   "description": "<p>Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading on Solana DEXs: Evidence, Theory, and Design Lessons from a 15-Day Deployment</p>\n<p>Version v4 (2026-08-03).</p>\n<p>Kamat, Arati Uday. Independent Researcher. ORCID 0009-0000-4781-312X.</p>\n<p>This record deposits the v4 manuscript PDF. Substantive revisions from v3:</p>\n<p>1. Added Section III \"Theoretical Framework\" (~700 words) &mdash; states three predictions from Kyle (1985), Precup-Sutton-Singh (2000), and Bailey-Lopez de Prado (2014).<br>2. Added Section VII \"Generalisable Design Lessons\" (~600 words) and a Significance for the Field paragraph in Section I + expanded Section VIII.B.<br>3. Expanded Section II Relat"
+  },
+  {
+   "id": 21780072,
+   "created": "2026-08-03T20:15:51.142392+00:00",
+   "updated": "2026-08-03T20:15:51.276142+00:00",
+   "publication_date": "2026-08-03",
+   "title": "Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading: Companion Dataset + Manuscript Bundle",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21780072",
+   "version": "v1.2",
+   "files": [
+    [
+     "Kamat_HourAware_2026_ZenodoBundle_v1.2.zip",
+     597066
+    ]
+   ],
+   "description": "<p>Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading: Companion Dataset + Manuscript Bundle (v1.2)</p>\n<p>Kamat, Arati Uday. Independent Researcher. ORCID 0009-0000-4781-312X.</p>\n<p>Companion deposit for Kamat (2026), a 15-day paper-traded deployment of an autonomous memecoin trading system on Solana decentralised exchanges. The v1.2 bundle contains the exact data underlying the paper's headline results (190 closed paper-trades and 4,874 post-rejection price samples), four supporting figures (SVG), and the v4 manuscript (Markdown source + PDF) prepared in response to Ledger #632 editorial pre-review feedback (invitation to resubmit received 2026-07-27).</p>\n<p>v1.2 (2026-0"
+  },
+  {
+   "id": 21765387,
+   "created": "2026-08-03T01:03:20.801239+00:00",
+   "updated": "2026-08-03T01:03:20.941573+00:00",
+   "publication_date": "2026-08-03",
+   "title": "RED-COHORT-2026-v1: A Catalogue of 1,012 Persistent Wallet Cohorts Detected on the Solana Pump.fun Bonding-Curve Marketplace (June 11-25, 2026)",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21765387",
+   "version": "1.1.1",
+   "files": [
+    [
+     "RED-COHORT-2026-v1_1_1.zip",
+     8769673
+    ]
+   ],
+   "description": "<p>RED-COHORT-2026-v1 is a public, reproducibility-grade dataset of 1,012 persistent sniper-cohort detections on the Solana pump.fun bonding-curve marketplace, derived from 1,578,333 buyer events across 166,098 token launches observed between 2026-06-11 21:43 UTC and 2026-06-25 06:52 UTC (13.38 days elapsed).</p>\n<p>The release accompanies a working paper:</p>\n<p>&nbsp; Kamat, A. U. (2026). \"Coordinated Sniper Cohorts on Pump.fun: Detection of 1,012 Persistent Wallet Rings and a Contamination-Adjusted Estimate of Coordination-Specific First-Hour Buyer-Flow Lift.\" Working paper.</p>\n<p>Contents (27 files -- see README.md for the full annotated inventory): the 1,012-cohort catalogue (sniper_co"
+  },
+  {
+   "id": 21402477,
+   "created": "2026-07-16T23:16:57.913767+00:00",
+   "updated": "2026-07-16T23:16:58.075577+00:00",
+   "publication_date": "2026-07-17",
+   "title": "RED-REJECT-2026-v1: A 96-Day Public Corpus of Algorithmic Filter Rejections with Post-Rejection Follow-up Samples on the Solana pump.fun Ecosystem",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21402477",
+   "version": "v1",
+   "files": [
+    [
+     "RED-REJECT-2026-v1.zip",
+     73299873
+    ]
+   ],
+   "description": "<p>RED-REJECT-2026-v1 is a public benchmark corpus of algorithmic filter rejections with post-rejection follow-up samples, collected from a single blockchain observer on the Solana pump.fun ecosystem between 2026-04-11 and 2026-07-16 (96 days continuous, 13.7 weeks).<br>Corpus size: 716,762 post-rejection sample records across 4,635 unique SPL token addresses. Every row represents a scheduled follow-up observation of a token that was rejected by one of eight algorithmic trading filter families (downtrend_24h 56.11 percent, marketcap_out_of_range 21.37 percent, multi_tf_fade 11.98 percent, timeSlot_not_strong 5.17 percent, hour_blacklist 2.35 percent, ultra_fast_reject_exit 1.64 percent, utc_"
+  },
+  {
+   "id": 21399919,
+   "created": "2026-07-16T17:40:56.826702+00:00",
+   "updated": "2026-07-16T17:40:56.948129+00:00",
+   "publication_date": "2026-07-16",
+   "title": "LIFECYCLE-SEPARATION-2026-v1: Sniper Cohort and Algorithmic Rejection Datasets for Two-Window Lifecycle-Stage Separation Analysis in Solana Memecoin Markets",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21399919",
+   "version": "v1",
+   "files": [
+    [
+     "LIFECYCLE-SEPARATION-2026-v1.zip",
+     31645335
+    ]
+   ],
+   "description": "<p>LIFECYCLE-SEPARATION-2026-v1 is a reproducibility bundle for the paper \"Sniper Cohorts and Algorithmic Filter Rejections in Solana Memecoin Markets: Two-Window Replication of Lifecycle-Stage Population Separation\" (Kamat, 2026). The bundle contains three data files, eight analysis-output reports, seven analysis scripts, LICENSE, README, SCHEMA, and SHA256SUMS.</p>\n<p>The datasets support the empirical claim that two independent algorithmic detection streams applied to the same Solana memecoin market during the same observation windows produce nearly disjoint token-set outputs. In the June 2026 window, 2 of 20,162 sniper-cohort-detected mints (0.010 percent) appear in the algorithmic rejec"
+  },
+  {
+   "id": 21350314,
+   "created": "2026-07-14T06:50:50.095351+00:00",
+   "updated": "2026-07-14T06:50:54.972921+00:00",
+   "publication_date": "2026-07-14",
+   "title": "$ARG FAN TOKEN - Ingeniería Financiera, Detección de Manipulación y Riesgo de Fraude Global _  V2",
+   "creators": [
+    "Avila Nicolau, Fabiana Mirta"
+   ],
+   "doi": "10.5281/zenodo.21350314",
+   "version": null,
+   "files": [
+    [
+     "guerra_v3_definitivo-4.html",
+     83060
+    ],
+    [
+     "informe_palantir.pdf",
+     42912
+    ],
+    [
+     "guerra_v3_definitivo.html",
+     66923
+    ],
+    [
+     "el_juego_de_la_guerra.html",
+     88478
+    ],
+    [
+     "guerra_v3_definitivo-3.html",
+     83060
+    ],
+    [
+     "el_juego_definitivo.html",
+     79268
+    ],
+    [
+     "El Juego de la Guerra _ Argentina _ (Markor) (1).pdf",
+     1615833
+    ],
+    [
+     "informe2_palantir.pdf",
+     52644
+    ],
+    [
+     "el_juego_definitivo-1.html",
+     79268
+    ],
+    [
+     "fraude_trump.html",
+     1773799
+    ],
+    [
+     "guerra_v3_definitivo-2.html",
+     83060
+    ],
+    [
+     "fraude_trump_mercados.pdf",
+     361010
+    ]
+   ],
+   "description": "<p>ARG TOKEN &mdash; ACTUALIZACI&Oacute;N CR&Iacute;TICA Y CORRECCIONES _ VERIFICACI&Oacute;N DE FUENTES _&nbsp; AN&Aacute;LISIS DE MECANISMOS DE FRAUDE<br>Versi&oacute;n 2.0 &middot;&nbsp;<br>---</p>\n<p>&nbsp;</p>\n<p># VERIFICACI&Oacute;N DE FUENTES + AN&Aacute;LISIS DE MECANISMOS DE FRAUDE<br>## Protocolo de Verificaci&oacute;n Acad&eacute;mica &middot; 14 de julio de 2026</p>\n<p>&gt; *\"La Pluma, La Verdad y El Viento Del Sur.\"*</p>\n<p>---</p>\n<p>## PARTE I: VERIFICACI&Oacute;N DE FUENTES Y CORRECCIONES</p>\n<p>### I.A &mdash; QU&Eacute; EST&Aacute; VERIFICADO (fuente primaria confirmada)</p>\n<p>---</p>\n<p>**1. RESULTADO QF: Argentina 3-1 Suiza (tiempo extra, 11.07.2026)**</p>\n<p>Verificado"
+  },
+  {
+   "id": 21149176,
+   "created": "2026-07-03T02:08:12.568443+00:00",
+   "updated": "2026-07-03T02:08:13.479685+00:00",
+   "publication_date": "2026-07-03",
+   "title": "REJECTION-ABLATION-2026-v1: A Post-Rejection Follow-up Sampling (PRFS) Corpus and Per-Filter Counterfactual Ablation for Solana Memecoin Trading (June 2026)",
+   "creators": [
+    "Kamat, Arati Uday"
+   ],
+   "doi": "10.5281/zenodo.21149176",
+   "version": null,
+   "files": [
+    [
+     "fig1_naive_vs_corrected.png",
+     85087
+    ],
+    [
+     "fig3_survival_by_filter.svg",
+     2380
+    ],
+    [
+     "README.md",
+     8529
+    ],
+    [
+     "appendix_c_survivorship_bounds.csv",
+     484
+    ],
+    [
+     "fig2_per_filter_ablation.png",
+     70917
+    ],
+    [
+     "LICENSE",
+     3007
+    ],
+    [
+     "appendix_a_naive_vs_corrected.csv",
+     573
+    ],
+    [
+     "appendix_b_horizon_1h_check.csv",
+     534
+    ],
+    [
+     "fig1_naive_vs_corrected.svg",
+     4968
+    ],
+    [
+     "fig3_survival_by_filter.png",
+     95978
+    ],
+    [
+     "rejection_ablation.js",
+     4243
+    ],
+    [
+     "rejection_ablation_table.csv",
+     634
+    ]
+   ],
+   "description": "<p>REJECTION-ABLATION-2026-v1 is a public, reproducibility-grade Post-Rejection Follow-up Sampling (PRFS) corpus and the per-filter counterfactual ablation derived from it. The corpus contains 496,848 post-rejection price-follow-up samples covering 3,125 unique rejected tokens across 8 rejection filters, collected from a live paper-trading system on the Solana / pump.fun bonding-curve marketplace.</p>\n<p>PRFS instruments a trading system so that every rejected candidate is followed up and its subsequent price path is sampled, making the counterfactual (\"what would have happened had we entered?\") observable. This release applies PRFS to per-filter ablation: for each rejection filter, the real"
+  },
+  {
+   "id": 18246856,
+   "created": "2026-01-14T16:50:18.938135+00:00",
+   "updated": "2026-01-15T16:32:57.736457+00:00",
+   "publication_date": "2026-01-14",
+   "title": "MemeChain: A Multimodal Cross-Chain Dataset for Meme Coin Forensics and Risk Analysis",
+   "creators": [
+    "Mongardini, Alberto Maria",
+    "Mei, Alessandro"
+   ],
+   "doi": "10.5281/zenodo.18246856",
+   "version": null,
+   "files": [
+    [
+     "README.md",
+     3494
+    ],
+    [
+     "data.zip",
+     709648302
+    ]
+   ],
+   "description": "<div>This repository contains the dataset presented in the paper \"<strong>MemeChain: A Multimodal Cross-Chain Dataset for Meme Coin Forensics and Risk Analysis</strong>\".</div>\n<p>&nbsp;</p>\n<div>MemeChain provides a comprehensive, multimodal snapshot of&nbsp;<strong>34,988 meme coins</strong> spanning four major blockchains (Ethereum, BSC, Base, and Solana). MemeChain is designed to support research in financial forensics, scam detection (including rug pulls and honeypots), and heterogeneous graph mining.</div>\n<p>&nbsp;</p>\n<h2>Dataset Organization</h2>\n<p>&nbsp;</p>\n<div>The dataset is strictly organized in the <code>`data/`</code> directory to ensure&nbsp;<strong>Interoperability</strong"
+  },
+  {
+   "id": 17830944,
+   "created": "2025-12-05T15:22:04.784857+00:00",
+   "updated": "2025-12-05T15:22:04.997782+00:00",
+   "publication_date": "2025-12-05",
+   "title": "Code and Dataset for \"A Midsummer Meme's Dream: Investigating Market Manipulations in the Meme Coin Ecosystem\"",
+   "creators": [
+    "Mongardini, Alberto Maria",
+    "Mei, Alessandro"
+   ],
+   "doi": "10.5281/zenodo.17830944",
+   "version": null,
+   "files": [
+    [
+     "meme_coin-main.zip",
+     26446048
+    ]
+   ],
+   "description": "<div>\n<p>This repository contains the data and code used for the paper, &ldquo;A Midsummer Meme&rsquo;s Dream: Investigating Market Manipulations in the Meme Coin Ecosystem.&rdquo;</p>\n<p>&nbsp;</p>\n</div>\n<div>\n<h3>Abstract</h3>\n</div>\n<div>\n<p>From viral jokes to a billion-dollar phenomenon, meme coins have become one of the most popular segments in cryptocurrency markets. Unlike utility-focused crypto assets like Bitcoin or Ethereum, meme coins derive value primarily from community sentiment, making them vulnerable to manipulation. This study presents a cross-chain analysis of the meme coin ecosystem, examining 34,988 tokens across Ethereum, BNB Smart Chain, Solana, and Base. We character"
+  },
+  {
+   "id": 17336387,
+   "created": "2025-10-13T01:51:58.486345+00:00",
+   "updated": "2025-10-13T01:54:01.369572+00:00",
+   "publication_date": "2025-10-13",
+   "title": "The Q-Phase Papers: Where Spectral Geometry and Cryptography Collide",
+   "creators": [
+    "Tibedo, Charles"
+   ],
+   "doi": "10.5281/zenodo.17336387",
+   "version": null,
+   "files": [
+    [
+     "The Q-Phase Papers_Where Spectral Geometry and Cryptography Collide.pdf",
+     2287792
+    ]
+   ],
+   "description": "<div>\n<p><strong>The Q-Phase Papers: Where Spectral Geometry and Cryptography Collide</strong></p>\n<h2>Abstract</h2>\n<p>This comprehensive mathematical work presents a revolutionary framework unifying spectral geometry, hypercomplex analysis, and cryptographic security through the discovery of fundamental vulnerabilities in elliptic curve discrete logarithm problems and RSA factorization. The research introduces Q-Phase operators&mdash;algebraic constructs that systematically reduce exponential cryptographic hardness to polynomial-time solutions via four-adic torsion extraction, cyclotomic field extensions, and golden ratio eigenvalue dynamics.</p>\n<h2>Key Mathematical Contributions</h2>\n<p>"
+  },
+  {
+   "id": 17136447,
+   "created": "2025-09-16T16:29:16.139962+00:00",
+   "updated": "2025-09-16T16:29:16.350817+00:00",
+   "publication_date": "2025-09-16",
+   "title": "Can We Build a Memecoin Index? Building a Financial Index for Internet Jokes with a 10000x ROI",
+   "creators": [
+    "N, Divyasshree"
+   ],
+   "doi": "10.5281/zenodo.17136447",
+   "version": null,
+   "files": [
+    [
+     "memecoin_index.pdf",
+     390806
+    ]
+   ],
+   "description": "<p>This paper presents a comprehensive analysis of constructing and commercializing a memecoin index, examining two distinct methodologies: volume-weighted and volatility-weighted approaches. Using real trading data from the Solana blockchain via Bitquery API, I analyze 100 memecoins across multiple timeframes (2-week to 1-year) to assess the commercial viability of listing such an index.</p>\n<p>Critically, the Return on Investment (ROI) analysis reveals fundamental limitations of historical performance metrics in memecoin markets: only 16-25% of tokens achieve positive returns while 75-84% experience complete loss (-100% ROI). Volume-weighted ROI calculations reveal negative returns (-84.59"
+  },
+  {
+   "id": 15851137,
+   "created": "2025-07-09T20:30:10.070996+00:00",
+   "updated": "2025-07-09T20:30:10.265619+00:00",
+   "publication_date": "2025-07-01",
+   "title": "PUMP.FUN AND MEME-COINS: A CASE STUDY IN THE LEGAL COMMODIFICATION OF PONZI-LIKE TOKENOMICS",
+   "creators": [
+    "Dan Valeriu VOINEA"
+   ],
+   "doi": "10.5281/zenodo.15851137",
+   "version": null,
+   "files": [
+    [
+     "aucjcm-11-15-38.pdf",
+     468162
+    ]
+   ],
+   "description": "Launched in 2024, Pump.fun enabled the instant minting and trading of millions of tokens, generating hundreds of millions in fee revenue by capitalizing on speculative frenzy. While positioned as a form of participatory culture and financial democratization, the platform's ecosystem exhibited characteristics analogous to Ponzi schemes: value derived from continuous new investment rather than fundamentals, enriching early insiders while over 99% of tokens collapsed, leading to widespread retail losses. Our analysis explores the regulatory gray area these meme-coins occupy, often evading securities classification while attracting scrutiny from bodies like the UK's FCA and prompting class-actio"
+  },
+  {
+   "id": 15697524,
+   "created": "2025-06-24T09:35:29.468430+00:00",
+   "updated": "2025-06-24T09:35:29.839796+00:00",
+   "publication_date": "2025",
+   "title": "A Midsummer Meme's Dream: Investigating Market Manipulations in the Meme Coin Ecosystem",
+   "creators": [
+    "Mongardini, Alberto Maria",
+    "Mei, Alessandro"
+   ],
+   "doi": "10.5281/zenodo.15697524",
+   "version": null,
+   "files": [
+    [
+     "preprint.pdf",
+     846454
+    ]
+   ],
+   "description": "<p>From viral jokes to a billion-dollar phenomenon, meme coins have become one of the most popular segments in cryptocurrency markets. Unlike utility-focused crypto assets like Bitcoin or Ethereum, meme coins derive value primarily from community sentiment, making them vulnerable to manipulation.<br>This study presents a cross-chain analysis of the meme coin ecosystem, examining 34,988 tokens across Ethereum, BNB Smart Chain, Solana, and Base. We characterize the tokenomics of meme coins and track their growth in a three-month longitudinal analysis.&nbsp;<br>We discover that among high-return tokens (&gt;100%), an alarming 82.6% show evidence of extensive use of artificial growth strategies "
+  },
+  {
+   "id": 22708412,
+   "created": "2026-09-11T12:23:35.314244+00:00",
+   "updated": "2026-09-11T12:23:37.058078+00:00",
+   "publication_date": "2026-09-11",
+   "title": "PumpSwap Historic Data",
+   "creators": [
+    "Data Store"
+   ],
+   "doi": "10.5281/zenodo.22708412",
+   "version": null,
+   "files": [
+    [
+     "pump_fun_toggle_cashback_enabled.csv",
+     4080
+    ],
+    [
+     "pump_fun_extend_account_event.csv",
+     253165
+    ],
+    [
+     "pump_fun_update_global_authority.csv",
+     866
+    ],
+    [
+     "pump_fun_create_event.csv",
+     546111
+    ],
+    [
+     "pump_fun_set_params.csv",
+     378
+    ],
+    [
+     "pump_fun_close_user_volume_accumulator.csv",
+     332541
+    ],
+    [
+     "pump_fun_init_user_volume_accumulator_event.csv",
+     244661
+    ],
+    [
+     "pump_fun_set_params_event.csv",
+     372
+    ],
+    [
+     "pump_fun_claim_cashback_event.csv",
+     222368
+    ],
+    [
+     "pump_fun_set_metaplex_creator_event.csv",
+     99
+    ],
+    [
+     "pump_fun_set_creator.csv",
+     12207
+    ],
+    [
+     "pump_fun_trade_event.csv",
+     455567
+    ]
+   ],
+   "description": "<p>This dataset has 6,000 rows of decoded PumpSwap data from Solana, the AMM that Pump.fun tokens trade on after they leave the bonding curve. It covers buy and sell instructions, the trade events each one emitted, and the raw event log, all from slots 425,520,001 to 425,520,072 on 10 June 2026 (09:38:33 to 09:39:01 UTC). Every trade includes the pool, trader, mints, amounts, the LP, protocol and creator fee split, and pool reserves after the trade.</p>"
+  },
+  {
+   "id": 22306254,
+   "created": "2026-09-05T20:27:28.205796+00:00",
+   "updated": "2026-09-05T20:27:28.479417+00:00",
+   "publication_date": "2026-09-04",
+   "title": "pump.fun On-Chain Trading Dataset for Pump-and-Dump Detection (April–May 2026)",
+   "creators": [
+    "van de Wouw, Niek"
+   ],
+   "doi": "10.5281/zenodo.22306254",
+   "version": null,
+   "files": [
+    [
+     "pumpfun_database.db",
+     23971725312
+    ]
+   ],
+   "description": "<p>This dataset contains on-chain trading data collected from the pump.fun bonding-curve token launchpad on the Solana blockchain, covering the period 28 April 2026 to 29 May 2026. It was collected to support a supervised machine learning study on early detection of pump-and-dump (P&amp;D) schemes.</p>\n<p>The dataset comprisesA SQL database of pump.fun tokens with&nbsp; three components: (1) token-level metadata for 110,469 tokens observed during the collection period; (2) 20,731,091 individual on-chain trade records; and (3) pre-computed checkpoint feature vectors for 60,890 in-scope tokens across seven vSOL checkpoint levels (40, 45, 50, 55, 60, 65, 70 vSOL), including binary P&amp;D label"
+  },
+  {
+   "id": 22110674,
+   "created": "2026-08-26T11:42:12.183471+00:00",
+   "updated": "2026-08-26T11:42:12.672621+00:00",
+   "publication_date": "2026-08-26",
+   "title": "Alpha Without Access: Execution Constraints in a Bonding-Curve Market",
+   "creators": [
+    "Lindsey, Brad M."
+   ],
+   "doi": "10.5281/zenodo.22110674",
+   "version": "v1.0",
+   "files": [
+    [
+     "Alpha_Without_Access_Lindsey_2026.pdf",
+     105703
+    ],
+    [
+     "reproduction_packet.zip",
+     1067707
+    ]
+   ],
+   "description": "<p>We report a market in which a positive return is visible in prices yet cannot be realized by a fixed trading policy, and we measure why. On a frozen set of 1,220 tokens approaching the pump.fun graduation boundary, a counterfactual buy that ignores the execution race shows a median gross return of +8.5% to +17.45%. Access to that return disappears within seconds: 69.0% of tokens are unreachable at the earliest resolvable state and 89.7% by eight seconds, a collapse reconstructed exactly from graduation timing. Granting the policy zero cost and entry-state pricing &mdash; a conditional optimistic bound, favorable whenever the curve does not retrace below its entry state within the unobserv"
+  },
+  {
+   "id": 21983722,
+   "created": "2026-08-17T18:13:45.141155+00:00",
+   "updated": "2026-08-17T18:13:45.603949+00:00",
+   "publication_date": "2026-08-17",
+   "title": "SmugCalls: 4,356 Solana memecoin calls with entry market cap, post-call peak and exact timestamps (losers included)",
+   "creators": [
+    "Pronin, Artem"
+   ],
+   "doi": "10.5281/zenodo.21983722",
+   "version": "2026-08-17",
+   "files": [
+    [
+     "calls-b.ots",
+     205
+    ],
+    [
+     "attest.json",
+     388
+    ],
+    [
+     "calls-a.ots",
+     207
+    ],
+    [
+     "calls.jsonl",
+     701574
+    ]
+   ],
+   "description": "<p>A complete, unfiltered record of automated memecoin calls published by the SmugCalls Telegram channel between 2026-06-30 and 2026-08-17.</p>\n<p>Every call the system made is included. Losing calls are not removed, which is what separates this file from the screenshots that circulate in the space: the median call reaches 1.64x its entry market cap, 38.8% of mature calls double, and 61.2% do not.</p>\n<p>One JSON object per line, 4,356 records:</p>\n<p>mint &mdash; SPL token mint address on Solana<br>sym &mdash; token symbol at call time<br>t &mdash; Unix timestamp of the call<br>utc &mdash; the same moment in ISO-8601<br>mc &mdash; market capitalisation in USD at the exact second the call wa"
+  }
+ ]
+}

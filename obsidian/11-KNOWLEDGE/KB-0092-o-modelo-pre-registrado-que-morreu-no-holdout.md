@@ -69,3 +69,7 @@ Parecer `.claude/state/astra-review-plantao-meme-20260912-0509.md`: **limitar a 
 — um modelo logístico falhar num holdout de 14 dias não demonstra que features sociais falham universalmente; M-P21 é a primeira
 hipótese que ela testaria entre as novas, com a ressalva de separar refutação estatística (IC acima de 0,55) de relevância operacional
 (0,60) e de esperar os rótulos de 24 h maturarem antes de ajustar. `astra: pendente` até o parecer específico sobre esta nota.
+
+## Adendo — 15/09/2026 (plantão run 20, lane 4): a própria fonte retratou
+
+Kamat, arXiv 2607.02823 **v4** (submetida 10/09/2026; invisível às buscas anteriores porque a API ordena pela v1) retrata as afirmações das v1–v3 que este vault cita (Telegram 1,485 % vs 0,166 %, HR 5,40/4,51, "3,18×") e audita o rótulo do coletor: 42 das 43 graduadas "invisíveis" estavam no rank ≥ 45 do feed; o modelo travado caiu de AUROC 0,859 para **0,464** na coorte seguinte e passou em 2 dos 9 portões. É exatamente o padrão desta KB — modelo bom na amostra, morto no holdout — agora na fonte primária. **O que muda:** nenhuma citação de Kamat v1–v3 vale como taxa-base; as regras de saída continuam não divulgadas. Detalhe em `.claude/state/plantao-meme/2026-09-15-1654-lane4.md` e [[02-MARKET/Meme/2026-09-15]].

@@ -76,6 +76,11 @@ pool ([[05-EXPERIMENTS/EXP-M4-moonshot|T4.11]]). Tamanho 0,05 SOL; 3 abertas. Pl
 - **P4** R médio entre −0,30 e +0,10 (ponto −0,10) → `descartar` (H0); só ≥ +0,20 R com leave-top-out ≥ 0 muda a previsão.
 - **P5** ≥ 1 aposta atravessará a migração e será marcada pela pool nos 7 primeiros dias.
 
+## Adendo — 15/09/2026 17:3x BRT (plantão run 20; não altera o protocolo)
+- **Unidade do progresso:** `curve_progress_pct` é a **fração de tokens vendidos** da curva, não a fração de SOL levantado; a janela 10–30 % desta regra corresponde a ≈ **2,39–8,55 SOL** levantados (parecer da Astra), não 8,5–25,5 SOL como uma leitura ingênua sugeriria. A regra não muda; a interpretação sim.
+- **Taxas-base externas para comparar (referências, não teto — M-P40):** SmugCalls por evento on-chain: graduação 2,62 % de todas as moedas, 4,15 % das que passam de 1 SOL, 6,71 % das que passam de 10 SOL, 12,40 % das que passam de 25 SOL; mediana criação→graduação 5 min entre as graduadas. MELT: 73 % das migradas caem abaixo de 40 % do topo em 20 min.
+- **As lições de 13/09 (snipers > 2, top-10 médio) não replicaram em 14/09** (M-D14) — os braços 3 e 4 seguem como pré-registrados (`descartar`) e serão julgados só pela régua.
+
 ## O que NÃO fazer
 Ajustar os limiares olhando os primeiros dias (KB-0092); ligar dinheiro real nisto antes da régua.
 

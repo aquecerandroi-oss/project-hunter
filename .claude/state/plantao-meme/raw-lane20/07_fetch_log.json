@@ -1,0 +1,31 @@
+{
+ "run": 20, "lane": 4, "date": "2026-09-15", "clock": "Git Bash date -u; BRT = UTC-3",
+ "start_utc": "2026-09-15T19:54:54Z", "start_brt": "16:54:54",
+ "pumpfun_host_requests": 0,
+ "raw_policy": "JSON/XML/text extracts only; Zenodo listing (1.24 MB) reduced to 02_ and deleted; SmugCalls calls.jsonl (701,574 B, sha256 882fc61b...e704 = deposit hash) computed into 06_ and deleted",
+ "requests": [
+  {"n": 1, "url": "https://export.arxiv.org/api/query?search_query=abs:memecoin OR abs:\"pump.fun\" OR abs:\"meme coin\" OR abs:\"bonding curve\" OR abs:launchpad OR abs:\"rug pull\" OR abs:sniper OR abs:memecoins&sortBy=submittedDate&max_results=40", "utc": "19:55:47Z", "brt": "16:55:47", "http": 200, "bytes": 101457, "file": "01_arxiv_7d_q.xml"},
+  {"n": 2, "url": "https://zenodo.org/api/records?q=\"pump.fun\" OR pumpfun OR (memecoin AND solana) OR (\"meme coin\" AND solana)&sort=mostrecent&size=20", "utc": "19:55:54Z", "brt": "16:55:54", "http": 200, "bytes": 1243131, "file": "02_zenodo_recent_extract.json (extract; full deleted)"},
+  {"n": 3, "url": "https://api.semanticscholar.org/graph/v1/paper/search?query=pump.fun memecoin&year=2026", "utc": "19:57:37Z", "brt": "16:57:37", "http": 429, "bytes": 174, "file": "03_s2_pumpfun_2026.json"},
+  {"n": 4, "url": "https://arxiv.org/abs/2607.02823v4", "utc": "~19:57Z", "brt": "~16:57", "http": 200, "reader": "WebFetch"},
+  {"n": 5, "url": "https://arxiv.org/abs/2607.02795v3", "utc": "~19:57Z", "brt": "~16:57", "http": 200, "reader": "WebFetch"},
+  {"n": 6, "url": "https://arxiv.org/html/2608.20271v1", "utc": "~19:57Z", "brt": "~16:57", "http": 200, "reader": "WebFetch"},
+  {"n": 7, "url": "https://arxiv.org/abs/2512.00377", "utc": "~19:57Z", "brt": "~16:57", "http": 200, "reader": "WebFetch"},
+  {"n": 8, "url": "https://arxiv.org/html/2602.13480v2", "utc": "~19:58Z", "brt": "~16:58", "http": 200, "reader": "WebFetch"},
+  {"n": 9, "url": "https://www.bitget.com/news/detail/12560604161427", "utc": "~19:58Z", "brt": "~16:58", "http": 200, "reader": "WebFetch", "note": "Foresight News 19/08/2024 — old, secondary"},
+  {"n": 10, "url": "https://www.dextools.io/news/pump-fun-graduation-collapse-solana-fees-2026", "utc": "~19:58Z", "brt": "~16:58", "http": 404},
+  {"n": 11, "url": "https://yellow.com/research/pump-fun-700m-fees-memecoin-launchpad-economics-2026", "utc": "~19:58Z", "brt": "~16:58", "http": 200, "reader": "WebFetch", "note": "cites 'Hirniak, Univ. Warsaw, SSRN late 2024' — not found on SSRN"},
+  {"n": 12, "url": "https://zenodo.org/api/records/21983722", "utc": "20:00:04Z", "brt": "17:00:04", "http": 200, "bytes": 7152, "file": "04_zenodo_21983722_smugcalls.json"},
+  {"n": 13, "url": "https://zenodo.org/api/records/22679925", "utc": "20:00:05Z", "brt": "17:00:05", "http": 200, "bytes": 17464, "file": "05_zenodo_22679925_prereview.json"},
+  {"n": 14, "url": "https://arxiv.org/html/2607.02823v4", "utc": "~20:00Z", "brt": "~17:00", "http": 200, "reader": "WebFetch"},
+  {"n": 15, "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5239105", "utc": "~20:00Z", "brt": "~17:00", "http": 403},
+  {"n": 16, "url": "https://stepdata.substack.com/p/pumpfun-livestream-tokens-hype-risk", "utc": "~20:00Z", "brt": "~17:00", "http": 200, "reader": "WebFetch", "note": "19/09/2025; no creator-sell data"},
+  {"n": 17, "url": "https://zenodo.org/records/21983722/files/calls.jsonl?download=1", "utc": "20:02:41Z", "brt": "17:02:41", "http": 200, "bytes": 701574, "file": "06_smugcalls_summary_computed.json (computed; raw deleted)"},
+  {"n": 18, "url": "https://smugcalls.com/data.html", "utc": "~20:03Z", "brt": "~17:03", "http": 200, "reader": "WebFetch"},
+  {"n": 19, "url": "https://smugcalls.com/pumpfun-graduation-rate.html", "utc": "~20:03Z", "brt": "~17:03", "http": 200, "reader": "WebFetch"},
+  {"n": 20, "url": "https://www.coingecko.com/research/publications/average-lifespan-of-pumpfun-tokens", "utc": "~20:03Z", "brt": "~17:03", "http": 200, "reader": "WebFetch"},
+  {"n": 21, "url": "https://www.kucoin.com/news/flash/pump-fun-holder-rewards-generate-over-4m-in-two-days", "utc": "~20:03Z", "brt": "~17:03", "http": 200, "reader": "WebFetch"}
+ ],
+ "web_searches": 16,
+ "not_opened": ["dune.com dashboards (401 sem chave no run 19; não tentado)", "medium.com (403 histórico; não tentado)", "SSRN 6915560 (versão antiga do 2607.02823 — substituída pela v4 do arXiv)"]
+}
