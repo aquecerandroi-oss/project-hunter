@@ -5,7 +5,7 @@ owner: sexta-feira
 updated: 2026-09-15
 ---
 
-# baha.com/news — a fonte fixa de notícias (pedido do Everton, 15/09/2026 21:1x BRT)
+# baha.com/news — a fonte fixa de notícias (pedido do Everton, 15/09/2026 17:5x BRT)
 
 **O que é:** o feed "baha breaking news" da baha GmbH (ex-TeleTrader, Viena) — notícias curtas 24/7 de mercados, economia,
 política, guerra, tecnologia e cripto, com carimbo relativo ("1h ago"), categoria e fonte (TeleTrader). Página inicial
@@ -25,7 +25,7 @@ SEC/CFTC), BTC/ETH com movimento ≥ 3 % no dia, Solana, memecoins, lançamentos
 10 anos, petróleo, guerra; (3) tecnologia só quando toca cripto/IA de negociação. Política doméstica dos EUA, esportes e
 o resto **não entram**. Cada item: uma linha, com hora BRT e o que muda para nós (uma frase) — opinião é rotulada opinião.
 
-**Cadência do feed medida (15/09, 21:1x BRT):** página inicial com ~50 itens nas últimas 7 h (≈ 7/h; predominam
+**Cadência do feed medida (15/09, 17:5x BRT):** página inicial com ~50 itens nas últimas 7 h (≈ 7/h; predominam
 política e guerra); a categoria Crypto tem **10 itens em 20 dias** (≈ 1 a cada 2 dias) — para cripto ele é lento e
 institucional (regulação, BTC/ETH, bancos); o pump.fun em si não aparece. Serve como **termômetro macro e regulatório**,
 não como sinal de moeda.
