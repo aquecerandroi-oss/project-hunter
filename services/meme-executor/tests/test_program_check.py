@@ -1,6 +1,9 @@
-"""T4.8b — the program-identity check: at boot, ``program_upgraded`` is a named refusal
+"""The program-identity check: at boot, ``program_upgraded`` is a named refusal
 in live mode and a logged, heartbeat-visible state in inert mode; at runtime the
-deploy slot alone flips the state. No signer is involved in any branch."""
+deploy slot alone flips the state. No signer is involved in any branch.
+
+Fixtures refreshed to T4.8c (2026-09-15, the program's second deploy that week,
+slot 447228373) — ``EXPECTED_PUMP_PROGRAM`` moved from T4.8b's values."""
 
 from __future__ import annotations
 
@@ -43,9 +46,9 @@ class FakeRpc:
         if self.down:
             raise RuntimeError("rpc down")
         if params[0] == pump_idl_account_address():
-            return _fixture("t48b_rpc_idl_account_raw.json")["result"]
+            return _fixture("t48c_rpc_idl_account_raw.json")["result"]
         if params[0] == pump_programdata_address():
-            result = _fixture("t48b_rpc_programdata_raw.json")["result"]
+            result = _fixture("t48c_rpc_programdata_raw.json")["result"]
             header = struct.pack("<IQ", 3, self.deploy_slot) + b"\x01" + b"\x00" * 32
             value = {**result["value"], "data": [base64.b64encode(header).decode(), "base64"]}
             return {**result, "value": value}

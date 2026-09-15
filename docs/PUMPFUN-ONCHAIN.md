@@ -898,10 +898,72 @@ a cada tique do kill switch relê o slot e, se mudou, toda entrada é recusada `
 (as saídas continuam guardadas pela simulação §9.2). Heartbeat: `program_idl_hash`,
 `program_last_deploy_slot`, `program_divergence`.
 
+## 6d. Segundo deploy de 15/09/2026 — `is_holder_reward` na cadeia e o que mudou de novo (T4.8c)
+
+Captura só-leitura no RPC público, 19:53–20:21 UTC (16:53–17:21 BRT), fixtures `t48c_*` em
+`packages/exchange-adapters/tests/fixtures/pumpfun/`; comandos e saídas em
+`.claude/state/notes-T4.8c.md`. Achado do plantão (run 19, lane 3, `KB-0096`) que motivou a tarefa:
+o programa foi reimplantado de novo horas antes (07:34:32 BRT) e `is_holder_reward` apareceu pela
+primeira vez na REST/boards. Nenhum `sendTransaction`.
+
+**Quando.** `ProgramData.slot` (mesma PDA da §6c) agora diz **447228373**; `getBlockTime` = 2026-09-15
+10:34:32 UTC = **07:34:32 BRT** — lido de forma independente e batendo com o que o plantão já tinha
+(`KB-0096`). A autoridade de upgrade (`6348fb82…`) **não mudou** desde a §6c.
+
+**Desta vez a conta da IDL on-chain *foi* republicada** (diferente da §6c, onde ficou intocada):
+`fd48d989…` → **`c7ca9566…`**, 40 → **47 instruções**, `TradeEvent` 32 → **34 campos nomeados** — o
+on-chain simplesmente alcançou o que a IDL `main` do GitHub já mostrava para a T4.14. Consequência
+prática: o hash da IDL *e* o slot do `ProgramData` agora concordam sobre este upgrade (na §6c só o
+slot detectava); `hunter_exchanges.pumpfun.program_identity.EXPECTED_PUMP_PROGRAM` aponta para os
+dois valores novos, e `PREVIOUS_PUMP_PROGRAM`/`PUMP_PROGRAM_HISTORY` guardam os da §6c.
+
+**`buy`/`sell` legados e o `TradeEvent`: byte a byte iguais, de novo.** Um `sell` direto (`65GR4vo5…`,
+slot 447334468, sem CPI de bot, reconciliação exata sem sobra) e um `buy` legado real via o mesmo bot
+da §6c (`FLASHX8…`, `4ffo79zY…`) — achado na *primeira* transação de sinal do programa que esta tarefa
+tentou (a §6c nunca achou um `buy` legado real e usou só simulação). `TradeEvent` continua com 375
+bytes (`layout = "2026-09-12/holder_rewards"`); `holder_rewards`/`holder_rewards_bps` continuam **0**
+nos dois fills reais de hoje. Taxas iguais ao lamport: 95 bps protocolo / 30 bps criador, o mesmo tier
+da §6c (`test_pumpfun_tx_parity.py`).
+
+**O que é novo de verdade: uma instrução `sell_v2`** (`5df6823ce7e940b2`, mesmo formato de contas do
+já conhecido `buy_exact_quote_in_v2`) — o roteador do site a usou para pelo menos uma venda real
+capturada hoje. O construtor deste pacote continua só com `buy`/`sell` legados (provados acima); não
+constrói `sell_v2` (documentado, sem paridade reivindicada).
+
+**`is_holder_reward` é um byte na própria `BondingCurve` — e não é novo.** Layout confirmado direto
+da cadeia (`decode.py`, `LAYOUT_WITH_HOLDER_REWARD`): depois de `quote_mint` (offset 115), mais
+`creator_fee_bps: u64` (override por moeda da taxa do criador; `0` em toda moeda lida exceto uma,
+`t42f`, `= 10`), `can_edit_creator_fee: bool` e **`is_holder_reward: bool`** (offset 124) — confirmado
+`true` numa moeda que a REST também reporta `is_holder_reward: true` (`7qSzmCMq…pump`, "COFFEE SHOP")
+e `false` numa moeda de controle da mesma listagem (`Czv4odPi…pump`). **O achado que corrige a leitura
+do plantão:** isto não nasceu com nenhum dos dois upgrades de 2026-09 — a captura do T4.2f de
+**2026-09-12** já tinha 45/100 contas amostradas no layout estendido (151 bytes), uma delas com
+`creator_fee_bps = 10`; relendo hoje as próprias moedas de referência da §6b/§6c (paradas desde 12/09)
+elas também já estão em 151 bytes. `decode_bonding_curve_account` simplesmente nunca lia além do byte
+115 antes desta tarefa — o que mudou recentemente foi a **REST/indexer passar a expor o valor**
+(`KB-0096`), não o byte on-chain crescer. O mecanismo exato (alocação na criação vs. realloc
+posterior) não foi determinado dentro do orçamento de RPC desta tarefa.
+
+**Simulação mainnet pelo caminho do executor** (`ChainReader → build_buy`/`build_sell` → verificador
+§9.1 → `simulateTransaction`, `sigVerify=false`, sem envio; `t48c_simulation_proof_mainnet_raw.json`):
+
+| moeda | `buy` | `sell` |
+|---|---|---|
+| clássica (`Czv4odPi…`, sem HR, sem Mayhem) | **ok, 103 096 CU** | **ok, 62 037 CU** |
+| `is_holder_reward = true` (`7qSzmCMq…`) | **ok, 104 600 CU** | não obtida (ver Concerns) |
+| Mayhem (`F6pQRW2L…`) | **ok, 87 286 CU** | **ok, 49 556 CU** |
+
+Vendas usaram um detentor real (o próprio `creator` quando tinha ATA; senão um comprador real achado
+pelas assinaturas da curva) como `user` sem assinatura — nunca a carteira descartável vazia (essa
+prova, herdada da §6c/6b, já existe: `AccountNotFound`).
+
 ## 7. Resumo acionável para T4.1/Astra
 
-1. `decode.py` (layout de `BondingCurve`) está **correto e bate byte a byte com o IDL oficial** —
-   nenhuma mudança necessária.
+1. `decode.py` (layout de `BondingCurve`) bate byte a byte com o IDL oficial nos campos que já
+   decodificava — mas **três campos a mais existem depois de `quote_mint`** desde antes de qualquer
+   upgrade de 2026-09 (`creator_fee_bps`, `can_edit_creator_fee`, `is_holder_reward`; T4.8c §6d). O
+   pacote agora os lê (com fallback para o layout curto, sem eles). Quem cita este item deve saber
+   que "correto e bate byte a byte" valia só para os campos lidos, não para o comprimento da conta.
 2. `curve.py.CURVE_TRADE_FEE_PCT=1.25%` bate com a linha "Bonding curve" da tabela de tiers hoje,
    mas é melhor documentá-la como "tier atual, não uma taxa fixa do protocolo" e apontar quem for
    calcular fills a ler `fee_basis_points`/`creator_fee_basis_points` direto do `TradeEvent`

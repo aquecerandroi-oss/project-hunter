@@ -24,6 +24,7 @@ from hunter_core.execution.meme.gates import MemeLiveTradingRefused
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.program_identity import (
     EXPECTED_PUMP_PROGRAM,
+    UPGRADE_MESSAGE,
     program_divergence,
     read_last_deploy_slot,
     read_program_identity,
@@ -74,7 +75,7 @@ async def program_check_once(ctx: ExecutorContext) -> None:
         return
     detail = (
         f"last_deploy_slot {slot} != {EXPECTED_PUMP_PROGRAM.last_deploy_slot} "
-        f"(programa mudou: regravar T4.8b; fixtures {EXPECTED_PUMP_PROGRAM.task} "
+        f"({UPGRADE_MESSAGE}; fixtures {EXPECTED_PUMP_PROGRAM.task} "
         f"{EXPECTED_PUMP_PROGRAM.captured_at})"
     )
     if ctx.state.program_divergence != detail:

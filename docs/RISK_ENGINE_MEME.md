@@ -468,6 +468,21 @@ assume:
 > (sha256 da IDL on-chain + slot do último deploy, capturados junto com as fixtures) e, no executor,
 > `program_check.py`: divergência no boot ⇒ `program_upgraded` (live: o processo não sobe; nada
 > assinado), em tempo de execução ⇒ toda entrada recusada por esse nome até T4.8b ser refeita.
+>
+> **T4.8c (15/09/2026, `docs/PUMPFUN-ONCHAIN.md` §6d):** segundo deploy da semana (slot 447228373,
+> 07:34:32 BRT) — desta vez a conta da IDL on-chain *foi* republicada (40→47 instruções); `buy`/`sell`
+> legados e `TradeEvent` continuam byte a byte iguais (paridade provada com um `buy` e um `sell` reais
+> de hoje, `t48c_rpc_tx_{buy_legacy,sell}_raw.json`); taxas no mesmo tier (95/30 bps). Uma instrução
+> nova (`sell_v2`) apareceu no roteador do site — não construída por este pacote (documentada, sem
+> paridade reivindicada). `EXPECTED_PUMP_PROGRAM` (`program_identity.py`) aponta para os valores de
+> hoje; os de T4.8b ficam em `PREVIOUS_PUMP_PROGRAM`/`PUMP_PROGRAM_HISTORY`. Achado à parte, não deste
+> upgrade: `BondingCurve.is_holder_reward` (M-P34/`KB-0096`) é um byte que já existia desde pelo menos
+> 12/09 (`decode.py` simplesmente não olhava além do byte 115) — `decode.py` agora o lê. Simulação
+> mainnet pelo caminho do executor: `buy` ok numa moeda clássica (103 096 CU), numa `is_holder_reward
+> = true` (104 600 CU) e numa Mayhem (87 286 CU); `sell` ok na clássica (62 037 CU) e na Mayhem
+> (49 556 CU) — o `sell` de uma moeda HR não foi obtido nesta tarefa (a única com atividade real era
+> cotada num token custom, recusada por nome antes de simular; a mais barata ainda não tinha comprador
+> real na cadeia — `t48c_simulation_proof_mainnet_raw.json`).
 
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 

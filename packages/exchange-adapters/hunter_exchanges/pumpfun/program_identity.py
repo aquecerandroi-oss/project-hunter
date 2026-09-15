@@ -19,6 +19,16 @@ touched: its hash that evening equals the morning's. So the deploy slot is the
 detector that moves on every upgrade, and the IDL hash the one that names *what*
 changed when it is updated. Both are compared with the values captured next to
 the fixtures this code was proven against; either differing is a divergence.
+
+Lesson of 2026-09-15 (T4.8c, ``docs/PUMPFUN-ONCHAIN.md`` §6d): a **second**
+deploy that same week (slot 447228373, 07:34:32 BRT) — and this time the IDL
+account *was* republished (47 instructions vs. 40, ``TradeEvent`` 34 fields vs.
+32 named — the on-chain copy simply caught up to what the GitHub "main" IDL had
+already shown T4.14). ``buy``/``sell`` and ``TradeEvent`` themselves were, once
+again, unchanged byte for byte (``test_pumpfun_tx_parity.py``); what changed is
+one more instruction (``sell_v2``) our builder does not construct. Both fields
+of :data:`EXPECTED_PUMP_PROGRAM` moved this time; :data:`PREVIOUS_PUMP_PROGRAM`
+keeps T4.8b's values so the history is not lost.
 """
 
 from __future__ import annotations
@@ -41,6 +51,8 @@ from hunter_exchanges.pumpfun.tx_rpc import SolanaTxRpcClient
 __all__ = [
     "BPF_UPGRADEABLE_LOADER_ID",
     "EXPECTED_PUMP_PROGRAM",
+    "PREVIOUS_PUMP_PROGRAM",
+    "PUMP_PROGRAM_HISTORY",
     "DecodedIdlAccount",
     "ProgramExpectation",
     "ProgramIdentity",
@@ -61,12 +73,13 @@ _IDL_ACCOUNT_DISCRIMINATOR = bytes.fromhex("184662bf3a907b9e")
 the same 8 bytes head the pump program's IDL account on chain (``t48b_rpc_idl_account_raw``)."""
 _PROGRAMDATA_TAG = 3
 _PROGRAMDATA_HEADER_LEN = 45
-UPGRADE_MESSAGE = "programa mudou: regravar T4.8b"
+UPGRADE_MESSAGE = "programa mudou: regravar T4.8d"
 
 
 @dataclass(frozen=True, slots=True)
 class ProgramExpectation:
-    """What the fixtures were captured against — bump only by re-running T4.8b."""
+    """What the fixtures were captured against — bump only by re-running the task
+    :data:`UPGRADE_MESSAGE` names."""
 
     idl_sha256: str
     last_deploy_slot: int
@@ -74,15 +87,37 @@ class ProgramExpectation:
     task: str
 
 
-EXPECTED_PUMP_PROGRAM = ProgramExpectation(
+PREVIOUS_PUMP_PROGRAM = ProgramExpectation(
     idl_sha256="fd48d9891733c30d167691b08ca5e5996e3723db58801db889b5a253f8d3e969",
     last_deploy_slot=446462760,
     captured_at="2026-09-12T17:52:36Z",
     task="T4.8b",
 )
 """``t48b_idl_pump_onchain_raw.json`` (40 instructions, ``TradeEvent`` 32 fields —
-the IDL account still predates the upgrade) and ``t48b_rpc_programdata_raw.json``
-(deploy slot 446462760 = 2026-09-12 15:24:04 UTC, ``t48b_rpc_deploy_block_time_raw``)."""
+the IDL account still predated *that* upgrade) and ``t48b_rpc_programdata_raw.json``
+(deploy slot 446462760 = 2026-09-12 15:24:04 UTC, ``t48b_rpc_deploy_block_time_raw``).
+Kept for history — :func:`program_divergence` only compares against the current
+:data:`EXPECTED_PUMP_PROGRAM`."""
+
+EXPECTED_PUMP_PROGRAM = ProgramExpectation(
+    idl_sha256="c7ca9566370b9351df9472adb7667dcc77695c49d0b1cc21b953f77567e2dc12",
+    last_deploy_slot=447228373,
+    captured_at="2026-09-15T19:53:52Z",
+    task="T4.8c",
+)
+"""``t48c_idl_pump_onchain_raw.json`` (47 instructions, ``TradeEvent`` 34 fields —
+the IDL account *was* republished this time, matching the count T4.14 read from
+GitHub's "main") and ``t48c_rpc_programdata_raw.json`` (deploy slot 447228373 =
+2026-09-15 10:34:32 UTC / 07:34:32 BRT, ``t48c_rpc_deploy_block_time_raw`` — also
+the value the plantão's run 19 read independently, KB-0096). The upgrade
+authority (``6348fb82…``) did not change from :data:`PREVIOUS_PUMP_PROGRAM`."""
+
+PUMP_PROGRAM_HISTORY: tuple[ProgramExpectation, ...] = (
+    PREVIOUS_PUMP_PROGRAM,
+    EXPECTED_PUMP_PROGRAM,
+)
+"""Every deploy this package has been proven against, oldest first — for docs
+and tests that want to show the program has moved more than once."""
 
 
 @dataclass(frozen=True, slots=True)

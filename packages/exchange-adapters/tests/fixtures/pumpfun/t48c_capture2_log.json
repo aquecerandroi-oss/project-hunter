@@ -1,0 +1,47 @@
+{
+ "started_at": "2026-09-15T19:57:02.001737+00:00",
+ "buy_exact_quote_v2": {
+  "signature": "4D9kossyzD8Dw9GgR44fKszH2kz5tYKDfbaCoRyRRreoxQH6izmC1vG7h9MYfeKs4baztcpx3jaZK1LZ2pBNjUpv",
+  "slot": 447334468,
+  "blockTime": 1789502041
+ },
+ "buy_legacy": {
+  "signature": "4ffo79zYcwY4MZbwD9La1CbeCPACBt4ZciG2CmbJzDHT1Dn7p4kun1RGAmJ19kN8tRB5wZmW7jhwZUssF4xQn17R",
+  "slot": 447334468,
+  "blockTime": 1789502041,
+  "info": {
+   "side": "buy",
+   "mint": "3f6ACaSW2wAYno61Y5KdyhccfmGq2y1Ud4AfpFAwpump",
+   "user": "3VY5oXS6psas76wQTSW9gRVYjLSntyQts4pzKpFpNxWg",
+   "remaining": [
+    {
+     "index": 0,
+     "address": "4h99zXxm9CFSpJgViBb1JMsPfrDRT3kke5ikxeYu7uCh",
+     "writable": false,
+     "tag": "PDA [\"bonding-curve-v2\", mint]"
+    },
+    {
+     "index": 1,
+     "address": "9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7",
+     "writable": true,
+     "tag": "Global.buyback_fee_recipients[1]"
+    }
+   ]
+  }
+ },
+ "calls": [
+  {
+   "n": 1,
+   "method": "getTransaction",
+   "label": "tx_buy_exact_quote_v2",
+   "at": "2026-09-15T19:57:02.001737+00:00"
+  },
+  {
+   "n": 2,
+   "method": "getTransaction",
+   "label": "tx_pump_more",
+   "at": "2026-09-15T19:57:04.147862+00:00"
+  }
+ ],
+ "finished_at": "2026-09-15T19:57:04.487687+00:00"
+}

@@ -70,5 +70,38 @@ Parecer do run 19 (`.claude/state/astra-review-plantao-meme-20260915-1616.md`, 1
 nota é. Ordem: M-D8 → validar HR (M-D9 ampliada; M-D13 como adenda) → Mayhem em M-D11; coleta bruta de HR em paralelo. Must-fixes 1, 2, 4, 5 aplicados aqui; 3, 6, 7 nas linhas e na nota do dia [[02-MARKET/Meme/2026-09-15]] (seção "Run 19"). Pede adendos em KB-0094 (nova fronteira, sem presumir conteúdo)
 e KB-0095 (`buy_zero_amount`; ausência do objeto `mayhem` por endpoint) — fora dos caminhos desta lane, ficam para o orquestrador.
 
+## Adendo — T4.8c (15/09/2026, engenharia de integração): a cadeia lida, o conteúdo do upgrade e a leitura do byte on-chain
+
+Captura só-leitura no RPC público, 16:53–17:21 BRT, fixtures `t48c_*` em
+`packages/exchange-adapters/tests/fixtures/pumpfun/`; comandos em `.claude/state/notes-T4.8c.md`;
+detalhe em `docs/PUMPFUN-ONCHAIN.md` §6d. Nenhum `sendTransaction`.
+
+- **Conteúdo do upgrade, agora lido:** desta vez a conta da IDL on-chain *foi* republicada (o deploy de
+  12/09 tinha deixado ela intocada) — 40 → 47 instruções, `TradeEvent` 32 → 34 campos nomeados; o
+  on-chain só alcançou o que a IDL `main` do GitHub já mostrava. `buy`/`sell` legados e o `TradeEvent`
+  continuam byte a byte iguais (paridade provada com um `buy` e um `sell` reais de hoje); taxas no
+  mesmo tier (95/30 bps). Uma instrução nova (`sell_v2`) apareceu no roteador do site.
+- **`is_holder_reward` tem byte confirmado na `BondingCurve` — e não é estado novo.** Depois de
+  `quote_mint`: `creator_fee_bps: u64`, `can_edit_creator_fee: bool`, `is_holder_reward: bool` (offset
+  124). Confirmado `true` na cadeia para `7qSzmCMq…pump` ("COFFEE SHOP", a mesma moeda que a REST
+  reporta `is_holder_reward: true` na listagem lida por esta tarefa) e `false` numa moeda de controle
+  da mesma listagem. **Isto corrige a moldura do achado original:** o byte **já existia desde pelo
+  menos 12/09** (a captura do T4.2f daquele dia já tinha 45/100 contas no layout estendido, uma com
+  `creator_fee_bps` não-zero) — inclusive nas próprias moedas de referência da T4.8/T4.8b, paradas
+  desde 12/09, que já estão nesse layout ao serem relidas hoje. O decodificador deste pacote
+  simplesmente nunca olhava além do byte 115. **O que mudou de fato foi a REST/indexer passarem a
+  expor o valor** (o próprio achado desta KB) — não o byte on-chain nascer agora. O mecanismo exato
+  (alocação na criação vs. realloc posterior) não foi determinado dentro do orçamento de RPC da tarefa.
+- **Simulação mainnet pelo caminho do executor** (`sigVerify=false`, nunca enviada): `buy` ok numa
+  moeda clássica (103 096 CU), numa `is_holder_reward = true` (104 600 CU) e numa Mayhem (87 286 CU);
+  `sell` ok na clássica (62 037 CU) e na Mayhem (49 556 CU). **Venda de moeda HR não obtida:** a
+  candidata mais barata ainda não tinha comprador real na cadeia (só *snipers* falhos); a segunda
+  candidata (maior *market cap*) é cotada num token custom — `build.py` a recusou por nome
+  (`unsupported_quote`) antes de simular, o mesmo guarda que a T4.8b já tinha para moedas USDC.
+- **Continua não estabelecido:** um `holder_rewards`/`holder_rewards_bps` não-zero no `TradeEvent` —
+  os dois fills reais de hoje (nenhum numa moeda HR) leram 0, como todos os de 12/09. A validação
+  prospectiva do flag contra o byte (M-D9/M-D13) segue pendente, agora com a leitura on-chain provada
+  e disponível como referência.
+
 ## Ligações
 [[02-MARKET/Meme/2026-09-15]] · [[00-INBOX/Hipoteses-do-plantao]] · [[KB-0094-pump-fun-upgrade-de-12-09-2026-holder-rewards-e-bonding-curve-v2]] · [[KB-0095-pump-fun-rotulos-observados-do-site-da-rest-e-os-limites-on-chain]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[KB-0093-dex-paid-e-boost-o-que-custam-e-o-que-medem]] · [[README-meme]]

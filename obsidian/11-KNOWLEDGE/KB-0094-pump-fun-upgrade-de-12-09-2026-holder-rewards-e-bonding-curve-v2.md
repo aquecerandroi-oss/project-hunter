@@ -101,5 +101,27 @@ Parecer do run 14 (`.claude/state/astra-review-plantao-meme-20260912-1447.md`) r
   US$ 452,66 M — não reconciliado). Onde o anúncio **não** foi encontrado: `pump_tech_updates` (parado em 20/07), Telegram `@pumpfun` (só memes; identidade não verificada),
   `pump.fun/docs` e `/blog` (casca). Fila: M-D12, M-P38.
 
+## Adendo — T4.8c (15/09/2026, engenharia de integração): segundo deploy datado; `is_holder_reward` é byte pré-existente, não novo estado
+
+- **Nova fronteira confirmada por engenharia, não só pelo plantão:** `ProgramData.slot` = **447 228 373**,
+  `getBlockTime` = 2026-09-15 10:34:32 UTC (**07:34:32 BRT**) — lido de forma independente e batendo com a
+  leitura do plantão (run 19, `KB-0096`). A autoridade de upgrade não mudou desde 12/09.
+- **Desta vez a conta da IDL on-chain foi republicada** (diferente do deploy de 12/09, que a deixou intocada):
+  40 → 47 instruções, `TradeEvent` 32 → 34 campos nomeados — o on-chain simplesmente alcançou o que a IDL
+  `main` do GitHub já mostrava. `buy`/`sell` legados e o `TradeEvent` continuam **byte a byte iguais** (paridade
+  provada com um `buy` e um `sell` reais de hoje); taxas no mesmo tier (95/30 bps). Uma instrução nova
+  (`sell_v2`) apareceu no roteador do site — fora do escopo do construtor atual (documentada).
+- **Achado que corrige a leitura do plantão sobre `is_holder_reward`:** o byte que a carrega na `BondingCurve`
+  (depois de `quote_mint`: `creator_fee_bps` u64, `can_edit_creator_fee` bool, `is_holder_reward` bool) **já
+  existia desde pelo menos 12/09** — a captura do T4.2f daquele dia já tinha 45/100 contas amostradas no
+  layout estendido (151 bytes), uma com `creator_fee_bps = 10` não-zero; as próprias moedas de referência da
+  T4.8/T4.8b (paradas desde 12/09) já estão em 151 bytes ao serem relidas hoje. `decode_bonding_curve_account`
+  simplesmente nunca lia além do byte 115 antes desta tarefa. **O que mudou de fato foi a REST/indexer passar
+  a expor o valor** (o achado do plantão, `KB-0096`), não o byte on-chain aparecer agora. Confirmado `true` numa
+  moeda que a REST também reporta `is_holder_reward: true` e `false` numa moeda de controle da mesma listagem.
+  Detalhe byte a byte, simulação (`buy`/`sell` ok em moeda clássica/HR/Mayhem, CUs) e o que ficou pendente
+  (venda de moeda HR não obtida — a única com atividade real era cotada em token custom) em
+  `docs/PUMPFUN-ONCHAIN.md` §6d e `.claude/state/notes-T4.8c.md`.
+
 ## Ligações
-[[02-MARKET/Meme/2026-09-12]] · [[00-INBOX/Hipoteses-do-plantao]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[KB-0093-dex-paid-e-boost-o-que-custam-e-o-que-medem]] · [[KB-0095-pump-fun-rotulos-observados-do-site-da-rest-e-os-limites-on-chain]] · [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas]] · [[README-meme]]
+[[02-MARKET/Meme/2026-09-12]] · [[00-INBOX/Hipoteses-do-plantao]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[KB-0093-dex-paid-e-boost-o-que-custam-e-o-que-medem]] · [[KB-0095-pump-fun-rotulos-observados-do-site-da-rest-e-os-limites-on-chain]] · [[KB-0096-pump-fun-is-holder-reward-na-rest-e-o-segundo-deploy-de-15-09-2026]] · [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas]] · [[README-meme]]

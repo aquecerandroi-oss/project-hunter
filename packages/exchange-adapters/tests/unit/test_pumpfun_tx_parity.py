@@ -18,6 +18,20 @@ T4.8b fixtures (all read-only ``getTransaction``/``getAccountInfo`` on the publi
 - ``rpc_tx_buy_raw.json`` / ``rpc_tx_probe_raw.json`` — T4.8's pre-upgrade trades on
   a cashback coin: still reproduced byte for byte, which is how the "undocumented"
   account turned out to be the derived PDA (see the third test).
+
+T4.8c fixtures (2026-09-15, after the program's *second* deploy that week — slot
+447228373 / 07:34:32 BRT, ``docs/PUMPFUN-ONCHAIN.md`` §6d) confirm the legacy
+``buy``/``sell`` byte parity holds again, unchanged, even though the on-chain IDL
+account itself was republished this time (unlike T4.8b's silent upgrade) and the
+router now also carries a brand-new ``sell_v2`` instruction our builder does not
+construct:
+
+- ``t48c_rpc_tx_sell_raw.json`` — a direct (non-CPI) ``sell``, signature
+  ``65GR4vo5…`` (slot 447334468): full lamport reconciliation, no bot skimming.
+- ``t48c_rpc_tx_buy_legacy_raw.json`` — a real legacy ``buy``, CPI'd by the same
+  bot as T4.8b's (``FLASHX8…``), signature ``4ffo79zY…``: found on the *first*
+  new program signature this task tried (unlike T4.8b, which never found one and
+  fell back to simulation-only proof for the buy side).
 """
 
 from __future__ import annotations
@@ -59,6 +73,12 @@ def _fixture(name: str) -> dict[str, Any]:
 @pytest.fixture(scope="module")
 def global_account() -> GlobalAccount:
     value = _fixture("t48b_rpc_global_account_raw.json")["result"]["value"]
+    return decode_global_account(value["data"][0], owner=value["owner"])
+
+
+@pytest.fixture(scope="module")
+def global_account_t48c() -> GlobalAccount:
+    value = _fixture("t48c_rpc_global_account_raw.json")["result"]["value"]
     return decode_global_account(value["data"][0], owner=value["owner"])
 
 
@@ -357,3 +377,121 @@ def test_recipients_must_come_from_global(global_account: GlobalAccount) -> None
         global_account,
     )
     assert ok.accounts[1].pubkey == global_account.reserved_fee_recipient
+
+
+def test_sell_matches_a_real_sell_of_2026_09_15_second_deploy_byte_for_byte(
+    global_account_t48c: GlobalAccount,
+) -> None:
+    """The program's second deploy that week (slot 447228373, 07:34:32 BRT) did
+    not touch the legacy ``sell`` — same 16 accounts, same remaining pair, same
+    24-byte data. This particular sell is a direct call (no bot CPI wrapper):
+    the lamport reconciliation is exact, no ``unexplained_lamports``."""
+    tx = _fixture("t48c_rpc_tx_sell_raw.json")["result"]
+    assert tx["slot"] == 447334468 and tx["blockTime"] == 1789502041
+    accounts, flags, data = _pump_instruction(tx, inner=False)
+    (event,) = trade_events_from_transaction(tx, program_id=PUMP_PROGRAM_ID)
+    assert not event.is_buy and event.layout == LAYOUT_HOLDER_REWARDS
+    assert not event.mayhem_mode
+    intent = TradeIntent(
+        side="sell",
+        mint=event.mint,
+        user=event.user,
+        creator=event.creator,
+        token_program=accounts[9],
+        token_amount=int.from_bytes(data[8:16], "little"),
+        sol_limit=int.from_bytes(data[16:24], "little"),
+        fee_recipient=event.fee_recipient,
+        buyback_fee_recipient=accounts[15],
+        is_mayhem_mode=event.mayhem_mode,
+        is_cashback_coin=event.cashback_fee_basis_points > 0,
+    )
+    assert not intent.is_cashback_coin
+    ours = build_sell_instruction(intent, global_account_t48c)
+    assert ours.data == data
+    assert [a.pubkey for a in ours.accounts] == accounts
+    for index, (meta, flag) in enumerate(zip(ours.accounts, flags, strict=True)):
+        assert meta.is_writable == flag, f"writable flag differs at account {index}"
+    assert len(ours.accounts) == len(SELL_ACCOUNT_NAMES) == 16
+    assert ours.accounts[14].pubkey == bonding_curve_v2_address(event.mint)
+    assert not ours.accounts[14].is_writable
+    assert ours.accounts[15].pubkey in global_account_t48c.buyback_fee_recipients
+    decoded = decode_trade_instruction(ours)
+    assert decoded.token_amount == event.token_amount == 1490367545732
+    assert decoded.sol_limit == 52056176 and decoded.track_volume is None
+    # fees, from the event, same tier as T4.8b (95 / 30 bps)
+    assert event.sol_amount == 197080811 and event.fee == 1872268 and event.fee_basis_points == 95
+    assert event.creator_fee == 591243 and event.creator_fee_basis_points == 30
+    assert event.holder_rewards == 0 and event.holder_rewards_basis_points == 0
+    assert event.sell_net_proceeds == 194617300
+    # exact reconciliation: no bot wrapper skimming this one (unlike T4.8b's fixture)
+    keys = tx["transaction"]["message"]["accountKeys"]
+    delta = tx["meta"]["postBalances"][0] - tx["meta"]["preBalances"][0]
+    assert keys[0] == event.user
+    assert delta == event.sell_net_proceeds - tx["meta"]["fee"] == 194609300
+
+
+def test_buy_matches_a_real_legacy_buy_of_2026_09_15_second_deploy_byte_for_byte(
+    global_account_t48c: GlobalAccount,
+) -> None:
+    """Unlike T4.8b (no legacy ``buy`` landed in its sampled windows — the buy
+    parity there was simulation-only), this task found a real one on the first
+    new program signature it tried: the same bot as T4.8b's (``FLASHX8…``)."""
+    tx = _fixture("t48c_rpc_tx_buy_legacy_raw.json")["result"]
+    assert tx["slot"] == 447334468 and tx["blockTime"] == 1789502041
+    accounts, flags, data = _pump_instruction(tx, inner=True)
+    (event,) = trade_events_from_transaction(tx, program_id=PUMP_PROGRAM_ID)
+    assert event.is_buy and event.layout == LAYOUT_HOLDER_REWARDS
+    assert not event.mayhem_mode and event.cashback_fee_basis_points == 0
+    intent = TradeIntent(
+        side="buy",
+        mint=event.mint,
+        user=event.user,
+        creator=event.creator,
+        token_program=accounts[8],
+        token_amount=event.token_amount,
+        sol_limit=int.from_bytes(data[16:24], "little"),
+        fee_recipient=event.fee_recipient,
+        buyback_fee_recipient=accounts[17],
+        is_mayhem_mode=event.mayhem_mode,
+        is_cashback_coin=False,
+    )
+    ours = build_buy_instruction(intent, global_account_t48c)
+    assert ours.data == data
+    assert [a.pubkey for a in ours.accounts] == accounts
+    for index, (meta, flag) in enumerate(zip(ours.accounts, flags, strict=True)):
+        assert meta.is_writable == flag, f"writable flag differs at account {index}"
+    assert len(ours.accounts) == len(BUY_ACCOUNT_NAMES) == 18
+    assert ours.accounts[16].pubkey == bonding_curve_v2_address(event.mint)
+    assert not ours.accounts[16].is_writable and ours.accounts[17].is_writable
+    decoded = decode_trade_instruction(ours)
+    assert decoded.token_amount == event.token_amount == 26397686981
+    assert decoded.sol_limit == 4880845 and decoded.track_volume is None
+    assert event.sol_amount == 4820586 and event.fee == 45796 and event.fee_basis_points == 95
+    assert event.creator_fee == 14462 and event.creator_fee_basis_points == 30
+    assert event.holder_rewards == 0 and event.holder_rewards_basis_points == 0
+    assert event.buy_total_cost == 4880844
+    # the bot's own transfers (rent/tip), not the pump program's — same shape as
+    # T4.8b's sell fixture: the ledger names the gap, never invents its parts.
+    delta = tx["meta"]["postBalances"][0] - tx["meta"]["preBalances"][0]
+    assert accounts[6] == event.user
+    unexplained = -delta - (event.buy_total_cost + tx["meta"]["fee"])
+    assert unexplained == 1_563_141
+
+
+def test_the_program_gained_sell_v2_this_deploy_our_builder_never_constructs_it() -> None:
+    """``sell_v2`` (disc ``5df6823ce7e940b2``) is new in the on-chain IDL account
+    as of T4.8c (absent from T4.8b's, which was never republished) — the site's
+    router now uses it for at least some sells. Our builder still only speaks
+    the legacy ``buy``/``sell`` (proven above); this is a documentation test,
+    not a parity claim."""
+    tx = _fixture("t48c_rpc_tx_sell_v2_raw.json")["result"]
+    keys, _ = _keys_and_flags(tx)
+    found = [
+        b58decode(ix["data"])[:8].hex()
+        for inner in tx["meta"]["innerInstructions"]
+        for ix in inner["instructions"]
+        if keys[ix["programIdIndex"]] == PUMP_PROGRAM_ID
+    ]
+    assert "5df6823ce7e940b2" in found
+    (event,) = trade_events_from_transaction(tx, program_id=PUMP_PROGRAM_ID)
+    assert not event.is_buy  # this particular sell_v2 call was a sell, not a buy
