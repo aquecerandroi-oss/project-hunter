@@ -1,0 +1,8 @@
+{
+ "read_brt": "16:25:03",
+ "context_slot": 447328953,
+ "programdata_slot": 447228373,
+ "has_upgrade_authority": true,
+ "bytes_read": 45,
+ "_note": "getAccountInfo base64 dataSlice(0,45): u32 enum + u64 slot LE + option authority; jsonParsed de 13,98 MB descartado"
+}

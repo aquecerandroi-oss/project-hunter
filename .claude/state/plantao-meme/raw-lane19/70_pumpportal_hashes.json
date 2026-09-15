@@ -1,0 +1,92 @@
+{
+ "/": {
+  "http": 200,
+  "sha1_norm": "1105d0046545",
+  "len": 1013,
+  "key_phrases": {
+   "Effective May 1, 2026": false,
+   "0.5% fee": false,
+   "1% fee": false,
+   "0.01 SOL": false,
+   "one WebSocket": false,
+   "priority fee on the first tx is used for jito tip": false,
+   "up to 5 transactions": false,
+   "holder": false,
+   "Holder Rewards": false,
+   "cashback": false
+  },
+  "read_brt": "16:21:59"
+ },
+ "/fees/": {
+  "http": 200,
+  "sha1_norm": "94c4b4456f58",
+  "len": 1247,
+  "key_phrases": {
+   "Effective May 1, 2026": true,
+   "0.5% fee": true,
+   "1% fee": true,
+   "0.01 SOL": true,
+   "one WebSocket": false,
+   "priority fee on the first tx is used for jito tip": false,
+   "up to 5 transactions": false,
+   "holder": false,
+   "Holder Rewards": false,
+   "cashback": false
+  },
+  "read_brt": "16:22:01"
+ },
+ "/data-api/real-time/": {
+  "http": 200,
+  "sha1_norm": "1522c15c99be",
+  "len": 5400,
+  "key_phrases": {
+   "Effective May 1, 2026": false,
+   "0.5% fee": false,
+   "1% fee": false,
+   "0.01 SOL": true,
+   "one WebSocket": false,
+   "priority fee on the first tx is used for jito tip": false,
+   "up to 5 transactions": false,
+   "holder": false,
+   "Holder Rewards": false,
+   "cashback": false
+  },
+  "read_brt": "16:22:02"
+ },
+ "/local-trading-api/trading-api/": {
+  "http": 200,
+  "sha1_norm": "400c301fd11a",
+  "len": 5332,
+  "key_phrases": {
+   "Effective May 1, 2026": false,
+   "0.5% fee": false,
+   "1% fee": false,
+   "0.01 SOL": false,
+   "one WebSocket": false,
+   "priority fee on the first tx is used for jito tip": false,
+   "up to 5 transactions": false,
+   "holder": false,
+   "Holder Rewards": false,
+   "cashback": false
+  },
+  "read_brt": "16:22:03"
+ },
+ "/local-trading-api/jito-bundles/": {
+  "http": 200,
+  "sha1_norm": "9ee04c0d72da",
+  "len": 6208,
+  "key_phrases": {
+   "Effective May 1, 2026": false,
+   "0.5% fee": false,
+   "1% fee": false,
+   "0.01 SOL": false,
+   "one WebSocket": false,
+   "priority fee on the first tx is used for jito tip": true,
+   "up to 5 transactions": true,
+   "holder": false,
+   "Holder Rewards": false,
+   "cashback": false
+  },
+  "read_brt": "16:22:05"
+ }
+}

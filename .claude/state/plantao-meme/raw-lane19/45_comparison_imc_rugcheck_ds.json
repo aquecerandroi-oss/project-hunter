@@ -1,0 +1,821 @@
+[
+ {
+  "sym": "DOOM",
+  "mint": "GE2j19..doom",
+  "imc": {
+   "ticker": "DOOM",
+   "program": "pump",
+   "platform": "",
+   "progress": 100,
+   "top10HoldersPercent": 16.7173,
+   "devHoldingsPercent": 0,
+   "numHolders": 2553,
+   "bundlerOwnedPercentageV2": 4.5969,
+   "snipersOwnedPercent": 4.5965,
+   "sniperCount": 78,
+   "numKolsTraded": 20,
+   "isMayhemMode": false,
+   "mayhemState": null,
+   "isCashbackEnabled": false,
+   "marketCapUsd": 249693.45052492473,
+   "athMarketCapUsd": 939514.3809400178,
+   "txCount": 39449,
+   "quote": "111111",
+   "created": "15/09 15:49:40",
+   "gd": "15/09 15:49:50",
+   "prio_per_tx": 374209,
+   "builderTipV2_per_tx": 398362
+  },
+  "rc": {
+   "top10_ex_pool": 19.33,
+   "top1": 3.55,
+   "creator_pct_in_top": null,
+   "creatorBalance": 0,
+   "totalHolders": 6924,
+   "insiders": 36,
+   "insiderNetworks": 3,
+   "risks": [],
+   "score_norm": 1,
+   "liq": 58657,
+   "lp": [
+    [
+     "pump_fun_amm",
+     100,
+     44957
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ]
+   ],
+   "detectedAt": "2026-09-15T18:49:41.859484536Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 0.00024362266341083433,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [
+   {
+    "dex": "pumpswap",
+    "pairCreatedAt": "15/09 15:49:50",
+    "liq": 45500,
+    "mcap": 249324,
+    "fdv": 249324,
+    "info": true,
+    "boosts": null,
+    "h24": {
+     "buys": 20227,
+     "sells": 19257
+    },
+    "vol24": 3195683,
+    "chg24": 539,
+    "quote": "SOL",
+    "labels": null
+   }
+  ],
+  "orders": {
+   "orders": [
+    {
+     "chainId": "solana",
+     "tokenAddress": "GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom",
+     "type": "tokenProfile",
+     "status": "approved",
+     "paymentTimestamp": 1789498395651
+    }
+   ],
+   "boosts": []
+  }
+ },
+ {
+  "sym": "pill",
+  "mint": "DvdmEn..pump",
+  "imc": {
+   "ticker": "pill",
+   "program": "pump",
+   "platform": "",
+   "progress": 99.84,
+   "top10HoldersPercent": 28.9386,
+   "devHoldingsPercent": 0,
+   "numHolders": 1915,
+   "bundlerOwnedPercentageV2": 2.6491,
+   "snipersOwnedPercent": 0.2351,
+   "sniperCount": 43,
+   "numKolsTraded": 20,
+   "isMayhemMode": false,
+   "mayhemState": null,
+   "isCashbackEnabled": false,
+   "marketCapUsd": 911846.8019431517,
+   "athMarketCapUsd": 1414601.8131453358,
+   "txCount": 29939,
+   "quote": "pumpCm",
+   "created": "13/09 20:22:09",
+   "gd": "13/09 20:31:12",
+   "prio_per_tx": 330676,
+   "builderTipV2_per_tx": 218621
+  },
+  "rc": {
+   "top10_ex_pool": 26.82,
+   "top1": 5.4,
+   "creator_pct_in_top": null,
+   "creatorBalance": 0,
+   "totalHolders": 4243,
+   "insiders": 4,
+   "insiderNetworks": 1,
+   "risks": [],
+   "score_norm": 1,
+   "liq": 106758,
+   "lp": [
+    [
+     "pump_fun_amm",
+     100,
+     90688
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ],
+    [
+     "orca",
+     0,
+     0
+    ]
+   ],
+   "detectedAt": "2026-09-13T23:22:10.671758723Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 0.0008761790539381277,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [
+   {
+    "dex": "pumpswap",
+    "pairCreatedAt": "13/09 20:31:49",
+    "liq": 85650,
+    "mcap": 733079,
+    "fdv": 733079,
+    "info": true,
+    "boosts": null,
+    "h24": {
+     "buys": 4337,
+     "sells": 3407
+    },
+    "vol24": 908865,
+    "chg24": 3805,
+    "quote": "PUMP",
+    "labels": null
+   }
+  ],
+  "orders": {
+   "orders": [
+    {
+     "chainId": "solana",
+     "tokenAddress": "DvdmEnztCmXwBnAbedD48XVGZJSxq31zNvnyftXdpump",
+     "type": "tokenProfile",
+     "status": "approved",
+     "paymentTimestamp": 1789341791947
+    }
+   ],
+   "boosts": [
+    {
+     "chainId": "solana",
+     "tokenAddress": "DvdmEnztCmXwBnAbedD48XVGZJSxq31zNvnyftXdpump",
+     "id": "kbthVM3EZpg3GaOiRZBw",
+     "amount": 30,
+     "paymentTimestamp": 1789343496944
+    }
+   ]
+  }
+ },
+ {
+  "sym": "biketyson",
+  "mint": "CbyTNf..pump",
+  "imc": {
+   "ticker": "biketyson",
+   "program": "pump",
+   "platform": "",
+   "progress": 100,
+   "top10HoldersPercent": 13.3739,
+   "devHoldingsPercent": 0.9509,
+   "numHolders": 12950,
+   "bundlerOwnedPercentageV2": 0,
+   "snipersOwnedPercent": 0,
+   "sniperCount": 34,
+   "numKolsTraded": 111,
+   "isMayhemMode": false,
+   "mayhemState": null,
+   "isCashbackEnabled": false,
+   "marketCapUsd": 4361494.665153839,
+   "athMarketCapUsd": 12076801.023098418,
+   "txCount": 249694,
+   "quote": "111111",
+   "created": "03/09 08:08:06",
+   "gd": "03/09 13:16:19",
+   "prio_per_tx": 340543,
+   "builderTipV2_per_tx": 281013
+  },
+  "rc": {
+   "top10_ex_pool": 17.62,
+   "top1": 2.8,
+   "creator_pct_in_top": null,
+   "creatorBalance": 442968416,
+   "totalHolders": 42381,
+   "insiders": 4,
+   "insiderNetworks": 1,
+   "risks": [],
+   "score_norm": 1,
+   "liq": 731629,
+   "lp": [
+    [
+     "pump_fun_amm",
+     100.0,
+     240339
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ]
+   ],
+   "detectedAt": "2026-09-03T11:08:07.731475763Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Raydium",
+   "deployPlatform": "unknown",
+   "price": 0.0040975628908306826,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [
+   {
+    "dex": "pumpswap",
+    "pairCreatedAt": "03/09 13:16:10",
+    "liq": 249973,
+    "mcap": 4168393,
+    "fdv": 4168393,
+    "info": true,
+    "boosts": null,
+    "h24": {
+     "buys": 33586,
+     "sells": 32675
+    },
+    "vol24": 6704908,
+    "chg24": -27.21,
+    "quote": "SOL",
+    "labels": null
+   }
+  ],
+  "orders": {
+   "orders": [
+    {
+     "chainId": "solana",
+     "tokenAddress": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+     "type": "tokenAd",
+     "status": "approved",
+     "paymentTimestamp": 1788614846905
+    },
+    {
+     "chainId": "solana",
+     "tokenAddress": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+     "type": "communityTakeover",
+     "status": "approved",
+     "paymentTimestamp": 1788493327560
+    },
+    {
+     "chainId": "solana",
+     "tokenAddress": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+     "type": "tokenProfile",
+     "status": "approved",
+     "paymentTimestamp": 1788461727862
+    }
+   ],
+   "boosts": [
+    {
+     "chainId": "solana",
+     "tokenAddress": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+     "id": "vCooLRFh5FmVSzHipxUV",
+     "amount": 10,
+     "paymentTimestamp": 1788552008573
+    }
+   ]
+  }
+ },
+ {
+  "sym": "HUHCAT",
+  "mint": "A9AHYe..KRdH",
+  "imc": {
+   "ticker": "HUHCAT",
+   "program": "pump",
+   "platform": "",
+   "progress": 100,
+   "top10HoldersPercent": 14.7528,
+   "devHoldingsPercent": 0,
+   "numHolders": 5224,
+   "bundlerOwnedPercentageV2": 4.4637,
+   "snipersOwnedPercent": 0,
+   "sniperCount": 19,
+   "numKolsTraded": 17,
+   "isMayhemMode": false,
+   "mayhemState": null,
+   "isCashbackEnabled": false,
+   "marketCapUsd": 1097092.651795341,
+   "athMarketCapUsd": 1727921.873204444,
+   "txCount": 76058,
+   "quote": "111111",
+   "created": "14/09 22:08:15",
+   "gd": "14/09 23:12:56",
+   "prio_per_tx": 424509,
+   "builderTipV2_per_tx": 182545
+  },
+  "rc": {
+   "top10_ex_pool": 15.33,
+   "top1": 1.72,
+   "creator_pct_in_top": null,
+   "creatorBalance": 0,
+   "totalHolders": 12299,
+   "insiders": 29,
+   "insiderNetworks": 5,
+   "risks": [],
+   "score_norm": 1,
+   "liq": 190121,
+   "lp": [
+    [
+     "pump_fun_amm",
+     100,
+     106015
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ]
+   ],
+   "detectedAt": "2026-09-15T02:12:58.268168983Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 0.0012119171818895428,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [
+   {
+    "dex": "pumpswap",
+    "pairCreatedAt": "14/09 23:12:55",
+    "liq": 100165,
+    "mcap": 1037868,
+    "fdv": 1037868,
+    "info": true,
+    "boosts": null,
+    "h24": {
+     "buys": 43605,
+     "sells": 34409
+    },
+    "vol24": 6593129,
+    "chg24": 2510,
+    "quote": "SOL",
+    "labels": null
+   }
+  ],
+  "orders": {
+   "orders": [
+    {
+     "chainId": "solana",
+     "tokenAddress": "A9AHYeqb7nQk7LZUraw7rBCzYRjy2DRvE6NqWfFHKRdH",
+     "type": "tokenProfile",
+     "status": "approved",
+     "paymentTimestamp": 1789443802237
+    }
+   ],
+   "boosts": []
+  }
+ },
+ {
+  "sym": "STAMPY",
+  "mint": "stammh..288D",
+  "imc": {
+   "ticker": "STAMPY",
+   "program": "pump",
+   "platform": "",
+   "progress": 99.48,
+   "top10HoldersPercent": 22.5107,
+   "devHoldingsPercent": 0.1836,
+   "numHolders": 1329,
+   "bundlerOwnedPercentageV2": 3.4437,
+   "snipersOwnedPercent": 2.9795,
+   "sniperCount": 117,
+   "numKolsTraded": 15,
+   "isMayhemMode": false,
+   "mayhemState": null,
+   "isCashbackEnabled": false,
+   "marketCapUsd": 171273.10942949977,
+   "athMarketCapUsd": 253200.65091853723,
+   "txCount": 28847,
+   "quote": "111111",
+   "created": "15/09 11:52:53",
+   "gd": "15/09 11:54:54",
+   "prio_per_tx": 292870,
+   "builderTipV2_per_tx": 506534
+  },
+  "rc": {
+   "top10_ex_pool": 22.02,
+   "top1": 3.3,
+   "creator_pct_in_top": null,
+   "creatorBalance": 1835781006764,
+   "totalHolders": 4436,
+   "insiders": 0,
+   "insiderNetworks": 0,
+   "risks": [
+    [
+     "Creator history of rugged tokens",
+     "danger",
+     69600
+    ]
+   ],
+   "score_norm": 75,
+   "liq": 30520,
+   "lp": [
+    [
+     "pump_fun_amm",
+     100,
+     30483
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ],
+    [
+     "meteoraDlmm",
+     0,
+     0
+    ]
+   ],
+   "detectedAt": "2026-09-15T14:52:54.717172583Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 0.00012401785174886084,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [
+   {
+    "dex": "pumpswap",
+    "pairCreatedAt": "15/09 11:54:59",
+    "liq": 35621,
+    "mcap": 161504,
+    "fdv": 161504,
+    "info": true,
+    "boosts": null,
+    "h24": {
+     "buys": 15367,
+     "sells": 12331
+    },
+    "vol24": 1385919,
+    "chg24": 374,
+    "quote": "SOL",
+    "labels": null
+   }
+  ],
+  "orders": {
+   "orders": [
+    {
+     "chainId": "solana",
+     "tokenAddress": "stammhomWdwpZtncMzJbMn2ykF5h8TcnigxDZxp288D",
+     "type": "tokenProfile",
+     "status": "approved",
+     "paymentTimestamp": 1789484105966
+    }
+   ],
+   "boosts": []
+  }
+ },
+ {
+  "sym": "LAB1",
+  "mint": "CuG7Yy..pump",
+  "imc": "HTTP 404",
+  "rc": {
+   "top10_ex_pool": 0.52,
+   "top1": 0.13,
+   "creator_pct_in_top": null,
+   "creatorBalance": 0,
+   "totalHolders": 151,
+   "insiders": 10,
+   "insiderNetworks": 2,
+   "risks": [
+    [
+     "Low Liquidity",
+     "danger",
+     2984
+    ]
+   ],
+   "score_norm": 34,
+   "liq": 2302,
+   "lp": [
+    [
+     "pump_fun",
+     100,
+     2302
+    ],
+    [
+     "meteora_damm_v2",
+     0,
+     0
+    ]
+   ],
+   "detectedAt": "2026-09-13T12:47:18.540458793Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 2.903247090278947e-06,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [
+   {
+    "dex": "pumpfun",
+    "pairCreatedAt": "13/09 09:47:17",
+    "liq": 0,
+    "mcap": 2899.69,
+    "fdv": 2899.69,
+    "info": false,
+    "boosts": null,
+    "h24": {
+     "buys": 0,
+     "sells": 2
+    },
+    "vol24": 1,
+    "chg24": -1.08,
+    "quote": "SOL",
+    "labels": null
+   }
+  ],
+  "orders": {
+   "orders": [],
+   "boosts": []
+  }
+ },
+ {
+  "sym": "LAB2",
+  "mint": "9vUgBL..pump",
+  "imc": {
+   "ticker": "Smolingor",
+   "program": "pump",
+   "platform": "",
+   "progress": 100,
+   "top10HoldersPercent": 0,
+   "devHoldingsPercent": 0,
+   "numHolders": 0,
+   "bundlerOwnedPercentageV2": 0,
+   "snipersOwnedPercent": 0,
+   "sniperCount": 3,
+   "numKolsTraded": 5,
+   "isMayhemMode": false,
+   "mayhemState": null,
+   "isCashbackEnabled": false,
+   "marketCapUsd": 2086.425720174974,
+   "athMarketCapUsd": 45297.31295493914,
+   "txCount": 4954,
+   "quote": "111111",
+   "created": "13/09 14:46:56",
+   "gd": "13/09 14:53:34",
+   "prio_per_tx": 377159,
+   "builderTipV2_per_tx": 290999
+  },
+  "rc": {
+   "top10_ex_pool": 0.59,
+   "top1": 0.14,
+   "creator_pct_in_top": null,
+   "creatorBalance": 0,
+   "totalHolders": 622,
+   "insiders": 0,
+   "insiderNetworks": 0,
+   "risks": [
+    [
+     "Low Liquidity",
+     "danger",
+     2851
+    ]
+   ],
+   "score_norm": 33,
+   "liq": 2057,
+   "lp": [
+    [
+     "pump_fun_amm",
+     100,
+     2057
+    ]
+   ],
+   "detectedAt": "2026-09-13T17:46:57.721181808Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 2.0619703047768277e-06,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [
+   {
+    "dex": "pumpswap",
+    "pairCreatedAt": "13/09 14:53:33",
+    "liq": 2061,
+    "mcap": 1929,
+    "fdv": 1929,
+    "info": false,
+    "boosts": null,
+    "h24": {
+     "buys": 0,
+     "sells": 6
+    },
+    "vol24": 3,
+    "chg24": -3.38,
+    "quote": "SOL",
+    "labels": null
+   }
+  ],
+  "orders": {
+   "orders": [],
+   "boosts": []
+  }
+ },
+ {
+  "sym": "LAB3",
+  "mint": "2vNP5Y..pump",
+  "imc": "HTTP 404",
+  "rc": {
+   "top10_ex_pool": 0.26,
+   "top1": 0.26,
+   "creator_pct_in_top": null,
+   "creatorBalance": 0,
+   "totalHolders": 8,
+   "insiders": 0,
+   "insiderNetworks": 0,
+   "risks": [
+    [
+     "Low Liquidity",
+     "danger",
+     2999
+    ]
+   ],
+   "score_norm": 34,
+   "liq": 1,
+   "lp": [
+    [
+     "pump_fun_amm",
+     100,
+     1
+    ]
+   ],
+   "detectedAt": "2026-09-13T04:54:02.917433276Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 3.5930929606661314e-10,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [],
+  "orders": {
+   "orders": [],
+   "boosts": []
+  }
+ },
+ {
+  "sym": "LAB4",
+  "mint": "8Urn3E..pump",
+  "imc": "HTTP 404",
+  "rc": {
+   "top10_ex_pool": 18.14,
+   "top1": 10.71,
+   "creator_pct_in_top": 0,
+   "creatorBalance": 0,
+   "totalHolders": 15,
+   "insiders": 0,
+   "insiderNetworks": 0,
+   "risks": [
+    [
+     "Low Liquidity",
+     "danger",
+     2997
+    ]
+   ],
+   "score_norm": 34,
+   "liq": 5,
+   "lp": [
+    [
+     "pump_fun_amm",
+     100,
+     5
+    ]
+   ],
+   "detectedAt": "2026-09-13T09:11:13.958462157Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 1.6368262685137167e-09,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [],
+  "orders": {
+   "orders": [],
+   "boosts": []
+  }
+ },
+ {
+  "sym": "LAB5",
+  "mint": "3bK5st..pump",
+  "imc": "HTTP 404",
+  "rc": {
+   "top10_ex_pool": 6.67,
+   "top1": 6.67,
+   "creator_pct_in_top": null,
+   "creatorBalance": 0,
+   "totalHolders": 4,
+   "insiders": 0,
+   "insiderNetworks": 0,
+   "risks": [],
+   "score_norm": 1,
+   "liq": 8,
+   "lp": [
+    [
+     "pump_fun",
+     100,
+     8
+    ]
+   ],
+   "detectedAt": "2026-09-13T13:41:38.165356184Z",
+   "rugged": false,
+   "mintAuth": null,
+   "freezeAuth": null,
+   "launchpad": "Pump.Fun",
+   "deployPlatform": "unknown",
+   "price": 6.071622702898089e-09,
+   "events": [],
+   "tokenType": "",
+   "keys_reward": [],
+   "reward_mentions": 0
+  },
+  "ds": [],
+  "orders": {
+   "orders": [],
+   "boosts": []
+  }
+ }
+]

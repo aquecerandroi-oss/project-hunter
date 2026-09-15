@@ -1,0 +1,7 @@
+AVISO: a Astra alterou a árvore de trabalho num modo que não permite alterações:
+6a7
+>  M apps/web/tests/meme-sources-format.test.ts
+27a29
+> ?? .claude/state/_t423_out2.txt
+32a35
+> ?? .claude/state/astra-review-plantao-meme-20260915-1616.md

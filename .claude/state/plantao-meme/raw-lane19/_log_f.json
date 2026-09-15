@@ -1,0 +1,77 @@
+{
+ "script": "F",
+ "requests": [
+  {
+   "url": "https://api.dexscreener.com/tokens/v1/solana/CeUDkrhiue8t2akd5jsPZNnPYXVMKvm26FQxmTKWpump,6ZDPWccfTmVNzsVR4Rbsy9w2g1nbJukCaYYAi5Nopump,CEv5D6GLhfqFEXwpksdd5XbaahA3eiYEn3YGVEup3N16,AcqxANtuQ5FQ3pTpdZYR7sTe8dQtjYPBKEFbAKxzYBeY,FqMc1JorN93wiiqSUckpEYFHcK1Ki1NU8McLacggpump,GHrzjLaSDPszhJBbQL1YPyGBACXNrqXZ9Td4ZVHRz6w,BtzTJkmJivjHy8gsXysgPGXHR2VmNZQUVWtE9JKDniaG,8dmRsXrBciJt5HdVDZvTcE1LcLrywNESt7QhsRrzpump,ABbjtYZjvk59QmUcvnMFSsUyScNddPqwXrCZMYyApump,GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom,AJEocehCZhqH2qB1p5Txjmma2LeezXEt94XEJytSpump,69fmNNTkyAfWSTG5Fs86cULWC3bBxLxkY4mM88Ptpump,7UD6E8kPbkPgbToygBpeSqFycKQdv2KxLYFTFyFmpump,TbyvXnoaRvenymghrddqWDge91PbjjwjezvNTcJpump,2A1Qu9FcQPvQeXTY6WvvL27v7hqWRdPg6yP2iwJMpump,6pei4VZghASa2zCq64UEknBE7r3asoPLFNvsDRWhR358,gDbLj4bN1rYs2g9QTh2d7V8UWM2UoKztaGPxo8Apump,Ej3dwnKLYsYFSAHXw4k3s9EQM1KGJkYSHtDrunCjQjru,Cizasdp25SJbC5xTefBhJ27GvouQw2NySuKpQox2pump,9tfuoEF9jXbrvz5Ey3aS5UAZubVL2F5zu1m1qyrpump,5QvYDMPQJfJdqTa6nN5R9F65TiFsMrddeQWZ3Vq5pump,9jmDC6hjfsXTs72xj8muCmP6ZJDkfsyUF6KvZRrvTLR1,9DVtSJrSRupJwLd5FNkuoDgCriQ5cVdbQ6GoyNezDwW2,H7Y3TzFyyfPBnn5Dpwa5m79NdgDQnFS8TcAtQe2Tpump,B4qSoFfob1CgctNzXxD5cCSgSnMogas2R9XrjNw4pump,7PNsPVqaRMggKwHjgpry7jz7hEupu21B8vrL79h4pump,vGzwmsLRnNboTXDdE2x1izVt867V7EbP1fASSx2pump,9CacTHqLYfQf6TD1z86A13RdgEfoiDDfKRAbjwMHGNAU,9MBetPjhp7uZ4odThXNm44GTVaffoYBcmGpdda9rpump,9KJtRgekHsCoum2nHt4ePf6xf88gFtDSM6RvKif8uray",
+   "http": 200,
+   "bytes": 31083,
+   "request_started_utc": "2026-09-15T19:29:25.503+00:00",
+   "read_brt": "16:29:25",
+   "file": "46_dexscreener_graduated50_batch1.json"
+  },
+  {
+   "url": "https://api.dexscreener.com/tokens/v1/solana/CcJS4ddNoyBxafpfUabY2S564ULXXyKj9anC7Pmgpump,6GSgc4n9rvSx5ndxf6fJ7sKtixDUdLLHFbPJHzgppump,6jeLZNBcF2AbcH4XhmPxwndqk6KaHV1S7tFE6YY6pump,9wNFRWac9zBcVs81ezkVmfY7Y6on7QqKxwwLTfuKpump,VteFppzaTe3kYjoriGooCGRs3Xz4Qj2ECqVDDKASTNK,C11KeXxUJkcF4Mj5Knj7DKJ4L4N6uchAx61DDnYmpump,C8pvSBY8JBhP6zjAXAmbzNTAsqCsKiVoapCpCF5pump,FUxKqGVGzSchuXVaQHy7svs5EBX3MEEU9nVjSQKjpump,ErU4GojuJ5X7pCicoebfSzBPPb88yjCQwiUmgoqfpump,EHrb1j276rh8B72yB9zraZBb7aFxhMFM143Xefa3pump,Jx2s7Whgc6DbcyViw3awc3fH2zjs4PAAaiZghZ1pump,A45uJvqs554GEjH3nS9eU9fpeX9H82ZeEkk57iPqpump,7sMQaGNAXAjqLVQ7Gx7Vnd4oAnc9on3ytS6kMpqBpump,U6ranLPd7HAM2kPQHhWK2QtoAZC6xMM1QyfSKCDpump,5kxCLgbUMfYHKwHXnDZDuZz8s1x31yhKrPdjeJF1pump,FRXMTen6kpHuuuQopSptX63zJ9Br1G8UCa9z87EZpump,mAHVpz3Vhk53K4W8WqCijVTcUCdaUFfdoyaQU8Apump,qnMs8C51c8J7mn4x9VhCZpb43oKZSyEaF71EibWpump,GsPd4mGfiSvz8mUhAjYC142yhB2bMvgLi1ayNXHJpump,7MbDwZr4pmxBykGJtkQPzktjkzybmh3aoMeAQURnpump",
+   "http": 200,
+   "bytes": 18247,
+   "request_started_utc": "2026-09-15T19:29:26.930+00:00",
+   "read_brt": "16:29:27",
+   "file": "46_dexscreener_graduated50_batch2.json"
+  },
+  {
+   "url": "https://api.dexscreener.com/orders/v1/solana/9jmDC6hjfsXTs72xj8muCmP6ZJDkfsyUF6KvZRrvTLR1",
+   "http": 200,
+   "bytes": 504,
+   "request_started_utc": "2026-09-15T19:29:28.265+00:00",
+   "read_brt": "16:29:28",
+   "file": null
+  },
+  {
+   "url": "https://api.dexscreener.com/orders/v1/solana/6jeLZNBcF2AbcH4XhmPxwndqk6KaHV1S7tFE6YY6pump",
+   "http": 200,
+   "bytes": 182,
+   "request_started_utc": "2026-09-15T19:29:29.541+00:00",
+   "read_brt": "16:29:29",
+   "file": null
+  },
+  {
+   "url": "https://api.dexscreener.com/orders/v1/solana/BtzTJkmJivjHy8gsXysgPGXHR2VmNZQUVWtE9JKDniaG",
+   "http": 200,
+   "bytes": 25,
+   "request_started_utc": "2026-09-15T19:29:30.827+00:00",
+   "read_brt": "16:29:31",
+   "file": null
+  },
+  {
+   "url": "https://api.dexscreener.com/orders/v1/solana/69fmNNTkyAfWSTG5Fs86cULWC3bBxLxkY4mM88Ptpump",
+   "http": 200,
+   "bytes": 182,
+   "request_started_utc": "2026-09-15T19:29:32.109+00:00",
+   "read_brt": "16:29:32",
+   "file": null
+  },
+  {
+   "url": "https://api.dexscreener.com/orders/v1/solana/6pei4VZghASa2zCq64UEknBE7r3asoPLFNvsDRWhR358",
+   "http": 200,
+   "bytes": 25,
+   "request_started_utc": "2026-09-15T19:29:33.391+00:00",
+   "read_brt": "16:29:33",
+   "file": null
+  },
+  {
+   "url": "https://api.rugcheck.xyz/v1/tokens/C11KeXxUJkcF4Mj5Knj7DKJ4L4N6uchAx61DDnYmpump/report",
+   "http": 200,
+   "bytes": 14384,
+   "request_started_utc": "2026-09-15T19:29:34.673+00:00",
+   "read_brt": "16:29:35",
+   "file": "31_rugcheck_hr_GIGADOG.json"
+  },
+  {
+   "url": "https://api.rugcheck.xyz/v1/tokens/9wNFRWac9zBcVs81ezkVmfY7Y6on7QqKxwwLTfuKpump/report",
+   "http": 200,
+   "bytes": 15267,
+   "request_started_utc": "2026-09-15T19:29:36.613+00:00",
+   "read_brt": "16:29:36",
+   "file": "31_rugcheck_hr_CHINESE.json"
+  }
+ ]
+}

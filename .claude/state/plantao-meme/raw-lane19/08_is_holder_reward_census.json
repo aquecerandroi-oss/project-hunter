@@ -1,0 +1,80 @@
+{
+ "newest70": {
+  "false": 63,
+  "true": 7
+ },
+ "newest70_true": [
+  [
+   " ",
+   "7GBR4kzP",
+   "15/09 16:18:04",
+   null,
+   "111111",
+   "29yFze",
+   3529
+  ],
+  [
+   "BARRON",
+   "DsNPXYoZ",
+   "15/09 16:17:56",
+   null,
+   "6p6xgH",
+   "FFdBLY",
+   3782
+  ],
+  [
+   "BARRON",
+   "GvC7cNda",
+   "15/09 16:17:47",
+   null,
+   "6p6xgH",
+   "E4BUi1",
+   3790
+  ],
+  [
+   "BARRON",
+   "7AmjdJyZ",
+   "15/09 16:17:40",
+   null,
+   "6p6xgH",
+   "EBx24u",
+   3783
+  ],
+  [
+   "BARRON",
+   "EAF5EBaa",
+   "15/09 16:17:34",
+   null,
+   "DJTu7v",
+   "FCUPh2",
+   5097
+  ],
+  [
+   "Slingoor",
+   "sM4Vfzju",
+   "15/09 16:17:31",
+   null,
+   "111111",
+   "7pANNk",
+   2787
+  ],
+  [
+   "BARRON",
+   "8ur3NuCR",
+   "15/09 16:17:29",
+   null,
+   "DJTu7v",
+   "bwamJz",
+   3935
+  ]
+ ],
+ "mayhem_mode60": {
+  "false": 60
+ },
+ "mayhem_mode60_true": [],
+ "details10": {
+  "false": 10
+ },
+ "details10_true": [],
+ "read_brt": "16:19:37-16:20:06"
+}

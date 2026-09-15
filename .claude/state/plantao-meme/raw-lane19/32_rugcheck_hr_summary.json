@@ -1,0 +1,36 @@
+{
+ "GIGADOG": {
+  "mint": "C11KeXxUJkcF4Mj5Knj7DKJ4L4N6uchAx61DDnYmpump",
+  "risks": [],
+  "score_norm": 1,
+  "totalHolders": 883,
+  "insiders": 0,
+  "liq": 45255,
+  "creatorBalance": 0,
+  "creator": "JB3AXXbb",
+  "detectedAt": "2026-09-15T17:58:36.913939685Z",
+  "reward_mentions": 0,
+  "keys": 36,
+  "tokenMeta_name": "Tsumugi",
+  "topHolders_n": 20,
+  "top10_incl_pool": 31.61,
+  "creator_in_top": []
+ },
+ "CHINESE": {
+  "mint": "9wNFRWac9zBcVs81ezkVmfY7Y6on7QqKxwwLTfuKpump",
+  "risks": [],
+  "score_norm": 1,
+  "totalHolders": 961,
+  "insiders": 0,
+  "liq": 15515,
+  "creatorBalance": 0,
+  "creator": "2AMX9KA7",
+  "detectedAt": "2026-09-15T17:50:00.691394541Z",
+  "reward_mentions": 0,
+  "keys": 36,
+  "tokenMeta_name": "You met me at a very chinese...",
+  "topHolders_n": 20,
+  "top10_incl_pool": 54.48,
+  "creator_in_top": []
+ }
+}

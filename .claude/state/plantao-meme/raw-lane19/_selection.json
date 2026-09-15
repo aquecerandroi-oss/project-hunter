@@ -1,0 +1,139 @@
+{
+ "movers_top5": [
+  [
+   "DOOM",
+   "GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom",
+   "pump",
+   "",
+   1789498190000,
+   1792
+  ],
+  [
+   "pill",
+   "DvdmEnztCmXwBnAbedD48XVGZJSxq31zNvnyftXdpump",
+   "pump",
+   "",
+   1789342272000,
+   158243
+  ],
+  [
+   "biketyson",
+   "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+   "pump",
+   "",
+   1788452179000,
+   1066286
+  ],
+  [
+   "HUHCAT",
+   "A9AHYeqb7nQk7LZUraw7rBCzYRjy2DRvE6NqWfFHKRdH",
+   "pump",
+   "",
+   1789438376000,
+   65477
+  ],
+  [
+   "STAMPY",
+   "stammhomWdwpZtncMzJbMn2ykF5h8TcnigxDZxp288D",
+   "pump",
+   "",
+   1789484094000,
+   15999
+  ]
+ ],
+ "lab_13_09": [
+  [
+   "CuG7YyQog8UUxXCUPfhBFMyA7cmtYhyJhxTeKaXvpump",
+   "flow_v2/2 +1.0213 R line_broken 09:48-09:51"
+  ],
+  [
+   "9vUgBLZtNZd58xN5ZyWzM4ETt3HRFXKXnYd3DDJHpump",
+   "flow_v2/2 +3.7574 R (melhor do dia, leave-top-out)"
+  ],
+  [
+   "2vNP5YC7SFsuVaMHXgZvRSceYnk36pYoqE7h97kapump",
+   "moonshot_v0 -0.9491 R creator_dump 01:56-01:58"
+  ],
+  [
+   "8Urn3EVEFofHwxp1D4nct4ZqeBogDMkf5c5u7R4jpump",
+   "moonshot_v0 -1 R dead 06:13-06:55"
+  ],
+  [
+   "3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump",
+   "moonshot_v0 -0.7284 R time_stop 10:44-12:44"
+  ]
+ ],
+ "fresh_mayhem": [
+  {
+   "mint": "HWCsYhpYYvdBreG8ivE7svPmGqUvXp7WpUCdeyGEpump",
+   "symbol": "FAK U",
+   "created_timestamp": 1789499965000,
+   "mayhem_state_in_list": "active",
+   "src": "newest70"
+  },
+  {
+   "mint": "4gtepPZSCfMc98fPGE84TUiuqVqpFnT6KG2Cpk5Gpump",
+   "symbol": "NABU",
+   "created_timestamp": 1789499962000,
+   "mayhem_state_in_list": "completed",
+   "src": "newest70"
+  },
+  {
+   "mint": "DUWWjiZnqaNv96b4M8XVepR1Bm96P5XUrrqGauVHpump",
+   "symbol": "BUYCAT",
+   "created_timestamp": 1789499961000,
+   "mayhem_state_in_list": "active",
+   "src": "newest70"
+  },
+  {
+   "mint": "CpN6S3GQ3vmdzFABb85A9TPnidyPtwQwo7ALFn61pump",
+   "symbol": "DUMBASS",
+   "created_timestamp": 1789499957000,
+   "mayhem_state_in_list": "active",
+   "src": "newest70"
+  },
+  {
+   "mint": "FjeZHwipfgUo1ETCcDiXFbHztachuUksh1NzxNoopump",
+   "symbol": "Usdtd",
+   "created_timestamp": 1789499956000,
+   "mayhem_state_in_list": "active",
+   "src": "newest70"
+  },
+  {
+   "mint": "6E2hecBUCQ2TgsqiEfUdxfYYsJuT3HgLEQhXUNmApump",
+   "symbol": "Pussy",
+   "created_timestamp": 1789499948000,
+   "mayhem_state_in_list": "active",
+   "src": "newest70"
+  },
+  {
+   "mint": "6gr3HWVEz3iVofs28ZRMqCsWwDb9MZ3pByCR2xCRpump",
+   "symbol": "$CAT",
+   "created_timestamp": 1789499943000,
+   "mayhem_state_in_list": "paused",
+   "src": "newest70"
+  },
+  {
+   "mint": "DX1yDwtuP8c592z5MSynNyXmy8AwtXJyUYAvWhWcpump",
+   "symbol": "Fak U",
+   "created_timestamp": 1789499901000,
+   "mayhem_state_in_list": "paused",
+   "src": "newest70"
+  },
+  {
+   "mint": "DdNgqamcS79mpAKHeSFD5YvsS5UbT7toYbipLm19pump",
+   "symbol": "wind",
+   "created_timestamp": 1789499894000,
+   "mayhem_state_in_list": "paused",
+   "src": "newest70"
+  },
+  {
+   "mint": "55724hp93eoztnGTVE4P7eDARnf7MgHh1HZ7xp2Tpump",
+   "symbol": "BARRON",
+   "created_timestamp": 1789499885000,
+   "mayhem_state_in_list": "paused",
+   "src": "newest70"
+  }
+ ],
+ "movers_serverTs": 1789499972562
+}

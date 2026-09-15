@@ -1,0 +1,766 @@
+{
+ "run": 19,
+ "lane": 3,
+ "script": "A",
+ "start_utc": "2026-09-15T19:19:28.882273+00:00",
+ "pumpfun_host_requests": 27,
+ "requests": [
+  {
+   "file": "01_sol_price.json",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "request_started_utc": "2026-09-15T19:19:29.224+00:00",
+   "http": 200,
+   "bytes": 74,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "50",
+    "x-ratelimit-remaining": "49",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fbb889cf8300-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:29.508+00:00",
+   "read_brt": "16:19:29"
+  },
+  {
+   "file": "02_mayhem_overview.json",
+   "url": "https://frontend-api-v3.pump.fun/mayhem/overview",
+   "request_started_utc": "2026-09-15T19:19:30.660+00:00",
+   "http": 200,
+   "bytes": 278,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fbc0e9cc8300-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:30.867+00:00",
+   "read_brt": "16:19:30"
+  },
+  {
+   "file": "03_boards_movers.json",
+   "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=50",
+   "request_started_utc": "2026-09-15T19:19:32.018+00:00",
+   "http": 200,
+   "bytes": 46124,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fbca1de19321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:32.794+00:00",
+   "read_brt": "16:19:32"
+  },
+  {
+   "file": "04_boards_graduating.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduating?offset=0&limit=50",
+   "request_started_utc": "2026-09-15T19:19:33.945+00:00",
+   "http": 200,
+   "bytes": 45290,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fbd8ab399321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:34.635+00:00",
+   "read_brt": "16:19:34"
+  },
+  {
+   "file": "05_boards_graduated.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=0&limit=50",
+   "request_started_utc": "2026-09-15T19:19:35.786+00:00",
+   "http": 200,
+   "bytes": 45608,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fbe0eedc9321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:35.962+00:00",
+   "read_brt": "16:19:35"
+  },
+  {
+   "file": "06_coins_newest70.json",
+   "url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true",
+   "request_started_utc": "2026-09-15T19:19:37.113+00:00",
+   "http": 200,
+   "bytes": 131506,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fbe99c2ce10f-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:37.504+00:00",
+   "read_brt": "16:19:37"
+  },
+  {
+   "file": "07_coins_mayhem_mode60.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/mayhem-mode?limit=60",
+   "request_started_utc": "2026-09-15T19:19:38.655+00:00",
+   "http": 200,
+   "bytes": 117943,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fbf2dd62e10f-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:38.994+00:00",
+   "read_brt": "16:19:38"
+  },
+  {
+   "file": "10_imc_01_DOOM.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom",
+   "request_started_utc": "2026-09-15T19:19:40.145+00:00",
+   "http": 200,
+   "bytes": 1732,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fbfc4c369321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:40.317+00:00",
+   "read_brt": "16:19:40"
+  },
+  {
+   "file": "10_imc_02_pill.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/DvdmEnztCmXwBnAbedD48XVGZJSxq31zNvnyftXdpump",
+   "request_started_utc": "2026-09-15T19:19:41.468+00:00",
+   "http": 200,
+   "bytes": 1763,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc046fc79321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:41.625+00:00",
+   "read_brt": "16:19:41"
+  },
+  {
+   "file": "10_imc_03_biketyson.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+   "request_started_utc": "2026-09-15T19:19:42.776+00:00",
+   "http": 200,
+   "bytes": 1727,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc0c888a9321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:42.956+00:00",
+   "read_brt": "16:19:42"
+  },
+  {
+   "file": "10_imc_04_HUHCAT.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/A9AHYeqb7nQk7LZUraw7rBCzYRjy2DRvE6NqWfFHKRdH",
+   "request_started_utc": "2026-09-15T19:19:44.107+00:00",
+   "http": 200,
+   "bytes": 1793,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc153b9d9321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:44.326+00:00",
+   "read_brt": "16:19:44"
+  },
+  {
+   "file": "10_imc_05_STAMPY.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/stammhomWdwpZtncMzJbMn2ykF5h8TcnigxDZxp288D",
+   "request_started_utc": "2026-09-15T19:19:45.477+00:00",
+   "http": 200,
+   "bytes": 1714,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc1d7ee69321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:45.646+00:00",
+   "read_brt": "16:19:45"
+  },
+  {
+   "file": "10_imc_06_LAB1.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/CuG7YyQog8UUxXCUPfhBFMyA7cmtYhyJhxTeKaXvpump",
+   "request_started_utc": "2026-09-15T19:19:46.797+00:00",
+   "http": 404,
+   "bytes": 161,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc25a95b9321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:46.954+00:00",
+   "read_brt": "16:19:46"
+  },
+  {
+   "file": "10_imc_07_LAB2.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/9vUgBLZtNZd58xN5ZyWzM4ETt3HRFXKXnYd3DDJHpump",
+   "request_started_utc": "2026-09-15T19:19:48.105+00:00",
+   "http": 200,
+   "bytes": 1714,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc2ddb829321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:48.265+00:00",
+   "read_brt": "16:19:48"
+  },
+  {
+   "file": "10_imc_08_LAB3.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/2vNP5YC7SFsuVaMHXgZvRSceYnk36pYoqE7h97kapump",
+   "request_started_utc": "2026-09-15T19:19:49.416+00:00",
+   "http": 404,
+   "bytes": 161,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc3609da9321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:49.574+00:00",
+   "read_brt": "16:19:49"
+  },
+  {
+   "file": "10_imc_09_LAB4.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/8Urn3EVEFofHwxp1D4nct4ZqeBogDMkf5c5u7R4jpump",
+   "request_started_utc": "2026-09-15T19:19:50.726+00:00",
+   "http": 404,
+   "bytes": 161,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc3e4ebc9321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:50.943+00:00",
+   "read_brt": "16:19:50"
+  },
+  {
+   "file": "10_imc_10_LAB5.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump",
+   "request_started_utc": "2026-09-15T19:19:52.095+00:00",
+   "http": 404,
+   "bytes": 161,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc476c529321-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:52.342+00:00",
+   "read_brt": "16:19:52"
+  },
+  {
+   "file": "20_coin_01_HWCsYh.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/HWCsYhpYYvdBreG8ivE7svPmGqUvXp7WpUCdeyGEpump",
+   "request_started_utc": "2026-09-15T19:19:53.492+00:00",
+   "http": 200,
+   "bytes": 2224,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc5128326d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:53.925+00:00",
+   "read_brt": "16:19:53"
+  },
+  {
+   "file": "20_coin_02_4gtepP.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/4gtepPZSCfMc98fPGE84TUiuqVqpFnT6KG2Cpk5Gpump",
+   "request_started_utc": "2026-09-15T19:19:55.075+00:00",
+   "http": 200,
+   "bytes": 1984,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc59ea1b6d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:55.312+00:00",
+   "read_brt": "16:19:55"
+  },
+  {
+   "file": "20_coin_03_DUWWji.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/DUWWjiZnqaNv96b4M8XVepR1Bm96P5XUrrqGauVHpump",
+   "request_started_utc": "2026-09-15T19:19:56.462+00:00",
+   "http": 200,
+   "bytes": 1953,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc621b016d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:56.671+00:00",
+   "read_brt": "16:19:56"
+  },
+  {
+   "file": "20_coin_04_CpN6S3.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/CpN6S3GQ3vmdzFABb85A9TPnidyPtwQwo7ALFn61pump",
+   "request_started_utc": "2026-09-15T19:19:57.821+00:00",
+   "http": 200,
+   "bytes": 2069,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc6a9bc16d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:58.023+00:00",
+   "read_brt": "16:19:58"
+  },
+  {
+   "file": "20_coin_05_FjeZHw.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/FjeZHwipfgUo1ETCcDiXFbHztachuUksh1NzxNoopump",
+   "request_started_utc": "2026-09-15T19:19:59.174+00:00",
+   "http": 200,
+   "bytes": 1975,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc730cfa6d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:19:59.339+00:00",
+   "read_brt": "16:19:59"
+  },
+  {
+   "file": "20_coin_06_6E2hec.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/6E2hecBUCQ2TgsqiEfUdxfYYsJuT3HgLEQhXUNmApump",
+   "request_started_utc": "2026-09-15T19:20:00.490+00:00",
+   "http": 200,
+   "bytes": 1954,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc7b9f896d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:00.707+00:00",
+   "read_brt": "16:20:00"
+  },
+  {
+   "file": "20_coin_07_6gr3HW.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/6gr3HWVEz3iVofs28ZRMqCsWwDb9MZ3pByCR2xCRpump",
+   "request_started_utc": "2026-09-15T19:20:01.858+00:00",
+   "http": 200,
+   "bytes": 1963,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc842fe76d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:02.104+00:00",
+   "read_brt": "16:20:02"
+  },
+  {
+   "file": "20_coin_08_DX1yDw.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/DX1yDwtuP8c592z5MSynNyXmy8AwtXJyUYAvWhWcpump",
+   "request_started_utc": "2026-09-15T19:20:03.254+00:00",
+   "http": 200,
+   "bytes": 2254,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc8cc8c66d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:03.473+00:00",
+   "read_brt": "16:20:03"
+  },
+  {
+   "file": "20_coin_09_DdNgqa.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/DdNgqamcS79mpAKHeSFD5YvsS5UbT7toYbipLm19pump",
+   "request_started_utc": "2026-09-15T19:20:04.623+00:00",
+   "http": 200,
+   "bytes": 1957,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc95598b6d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:04.843+00:00",
+   "read_brt": "16:20:04"
+  },
+  {
+   "file": "20_coin_10_55724h.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/55724hp93eoztnGTVE4P7eDARnf7MgHh1HZ7xp2Tpump",
+   "request_started_utc": "2026-09-15T19:20:05.994+00:00",
+   "http": 200,
+   "bytes": 2070,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fc9da9d76d78-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:06.174+00:00",
+   "read_brt": "16:20:06"
+  },
+  {
+   "file": "30_rugcheck_01_DOOM.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom/report",
+   "request_started_utc": "2026-09-15T19:20:07.225+00:00",
+   "http": 200,
+   "bytes": 20377,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:07.995+00:00",
+   "read_brt": "16:20:07"
+  },
+  {
+   "file": "30_rugcheck_02_pill.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/DvdmEnztCmXwBnAbedD48XVGZJSxq31zNvnyftXdpump/report",
+   "request_started_utc": "2026-09-15T19:20:09.047+00:00",
+   "http": 200,
+   "bytes": 24961,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:09.290+00:00",
+   "read_brt": "16:20:09"
+  },
+  {
+   "file": "30_rugcheck_03_biketyson.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump/report",
+   "request_started_utc": "2026-09-15T19:20:10.340+00:00",
+   "http": 200,
+   "bytes": 203183,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:10.837+00:00",
+   "read_brt": "16:20:10"
+  },
+  {
+   "file": "30_rugcheck_04_HUHCAT.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/A9AHYeqb7nQk7LZUraw7rBCzYRjy2DRvE6NqWfFHKRdH/report",
+   "request_started_utc": "2026-09-15T19:20:11.887+00:00",
+   "http": 200,
+   "bytes": 26666,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:12.125+00:00",
+   "read_brt": "16:20:12"
+  },
+  {
+   "file": "30_rugcheck_05_STAMPY.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/stammhomWdwpZtncMzJbMn2ykF5h8TcnigxDZxp288D/report",
+   "request_started_utc": "2026-09-15T19:20:13.176+00:00",
+   "http": 200,
+   "bytes": 24000,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:13.472+00:00",
+   "read_brt": "16:20:13"
+  },
+  {
+   "file": "30_rugcheck_06_LAB1.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/CuG7YyQog8UUxXCUPfhBFMyA7cmtYhyJhxTeKaXvpump/report",
+   "request_started_utc": "2026-09-15T19:20:14.523+00:00",
+   "http": 200,
+   "bytes": 11382,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:14.969+00:00",
+   "read_brt": "16:20:14"
+  },
+  {
+   "file": "30_rugcheck_07_LAB2.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/9vUgBLZtNZd58xN5ZyWzM4ETt3HRFXKXnYd3DDJHpump/report",
+   "request_started_utc": "2026-09-15T19:20:16.020+00:00",
+   "http": 200,
+   "bytes": 9665,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:16.776+00:00",
+   "read_brt": "16:20:16"
+  },
+  {
+   "file": "30_rugcheck_08_LAB3.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/2vNP5YC7SFsuVaMHXgZvRSceYnk36pYoqE7h97kapump/report",
+   "request_started_utc": "2026-09-15T19:20:17.827+00:00",
+   "http": 200,
+   "bytes": 6365,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:18.539+00:00",
+   "read_brt": "16:20:18"
+  },
+  {
+   "file": "30_rugcheck_09_LAB4.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/8Urn3EVEFofHwxp1D4nct4ZqeBogDMkf5c5u7R4jpump/report",
+   "request_started_utc": "2026-09-15T19:20:19.590+00:00",
+   "http": 200,
+   "bytes": 8050,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:20.041+00:00",
+   "read_brt": "16:20:20"
+  },
+  {
+   "file": "30_rugcheck_10_LAB5.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump/report",
+   "request_started_utc": "2026-09-15T19:20:21.091+00:00",
+   "http": 200,
+   "bytes": 5096,
+   "headers": {
+    "server": "nginx",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "response_received_utc": "2026-09-15T19:20:21.480+00:00",
+   "read_brt": "16:20:21"
+  },
+  {
+   "file": "40_dexscreener_tokens_batch.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom,DvdmEnztCmXwBnAbedD48XVGZJSxq31zNvnyftXdpump,CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump,A9AHYeqb7nQk7LZUraw7rBCzYRjy2DRvE6NqWfFHKRdH,stammhomWdwpZtncMzJbMn2ykF5h8TcnigxDZxp288D,CuG7YyQog8UUxXCUPfhBFMyA7cmtYhyJhxTeKaXvpump,9vUgBLZtNZd58xN5ZyWzM4ETt3HRFXKXnYd3DDJHpump,2vNP5YC7SFsuVaMHXgZvRSceYnk36pYoqE7h97kapump,8Urn3EVEFofHwxp1D4nct4ZqeBogDMkf5c5u7R4jpump,3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump,HWCsYhpYYvdBreG8ivE7svPmGqUvXp7WpUCdeyGEpump,4gtepPZSCfMc98fPGE84TUiuqVqpFnT6KG2Cpk5Gpump,DUWWjiZnqaNv96b4M8XVepR1Bm96P5XUrrqGauVHpump,CpN6S3GQ3vmdzFABb85A9TPnidyPtwQwo7ALFn61pump,FjeZHwipfgUo1ETCcDiXFbHztachuUksh1NzxNoopump,6E2hecBUCQ2TgsqiEfUdxfYYsJuT3HgLEQhXUNmApump,6gr3HWVEz3iVofs28ZRMqCsWwDb9MZ3pByCR2xCRpump,DX1yDwtuP8c592z5MSynNyXmy8AwtXJyUYAvWhWcpump,DdNgqamcS79mpAKHeSFD5YvsS5UbT7toYbipLm19pump,55724hp93eoztnGTVE4P7eDARnf7MgHh1HZ7xp2Tpump",
+   "request_started_utc": "2026-09-15T19:20:22.531+00:00",
+   "http": 200,
+   "bytes": 15778,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd069bf7a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:23.018+00:00",
+   "read_brt": "16:20:23"
+  },
+  {
+   "file": "41_dexscreener_boosts_latest.json",
+   "url": "https://api.dexscreener.com/token-boosts/latest/v1",
+   "request_started_utc": "2026-09-15T19:20:24.069+00:00",
+   "http": 200,
+   "bytes": 20869,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "age": "22",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd0ead33a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:24.153+00:00",
+   "read_brt": "16:20:24"
+  },
+  {
+   "file": "42_dexscreener_boosts_top.json",
+   "url": "https://api.dexscreener.com/token-boosts/top/v1",
+   "request_started_utc": "2026-09-15T19:20:25.205+00:00",
+   "http": 200,
+   "bytes": 23060,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "age": "27",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd15cccfa4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:25.261+00:00",
+   "read_brt": "16:20:25"
+  },
+  {
+   "file": "43_dexscreener_profiles_latest.json",
+   "url": "https://api.dexscreener.com/token-profiles/latest/v1",
+   "request_started_utc": "2026-09-15T19:20:26.312+00:00",
+   "http": 200,
+   "bytes": 24378,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "age": "32",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd1cbac8a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:26.388+00:00",
+   "read_brt": "16:20:26"
+  },
+  {
+   "file": "44_dexscreener_orders_GE2j19bL.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom",
+   "request_started_utc": "2026-09-15T19:20:27.439+00:00",
+   "http": 200,
+   "bytes": 182,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd23d916a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:27.710+00:00",
+   "read_brt": "16:20:27"
+  },
+  {
+   "file": "44_dexscreener_orders_DvdmEnzt.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/DvdmEnztCmXwBnAbedD48XVGZJSxq31zNvnyftXdpump",
+   "request_started_utc": "2026-09-15T19:20:28.761+00:00",
+   "http": 200,
+   "bytes": 337,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd2bf99aa4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:28.955+00:00",
+   "read_brt": "16:20:28"
+  },
+  {
+   "file": "44_dexscreener_orders_CbyTNf7U.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+   "request_started_utc": "2026-09-15T19:20:30.006+00:00",
+   "http": 200,
+   "bytes": 653,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd33b8f9a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:30.207+00:00",
+   "read_brt": "16:20:30"
+  },
+  {
+   "file": "44_dexscreener_orders_A9AHYeqb.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/A9AHYeqb7nQk7LZUraw7rBCzYRjy2DRvE6NqWfFHKRdH",
+   "request_started_utc": "2026-09-15T19:20:31.258+00:00",
+   "http": 200,
+   "bytes": 182,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd3c79f7a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:31.826+00:00",
+   "read_brt": "16:20:31"
+  },
+  {
+   "file": "44_dexscreener_orders_stammhom.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/stammhomWdwpZtncMzJbMn2ykF5h8TcnigxDZxp288D",
+   "request_started_utc": "2026-09-15T19:20:32.877+00:00",
+   "http": 200,
+   "bytes": 181,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd45ce5fa4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:33.072+00:00",
+   "read_brt": "16:20:33"
+  },
+  {
+   "file": "44_dexscreener_orders_CuG7YyQo.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/CuG7YyQog8UUxXCUPfhBFMyA7cmtYhyJhxTeKaXvpump",
+   "request_started_utc": "2026-09-15T19:20:34.124+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "REVALIDATED",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd4f9a1ea4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:34.707+00:00",
+   "read_brt": "16:20:34"
+  },
+  {
+   "file": "44_dexscreener_orders_9vUgBLZt.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/9vUgBLZtNZd58xN5ZyWzM4ETt3HRFXKXnYd3DDJHpump",
+   "request_started_utc": "2026-09-15T19:20:35.757+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "REVALIDATED",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd57d944a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:36.010+00:00",
+   "read_brt": "16:20:36"
+  },
+  {
+   "file": "44_dexscreener_orders_2vNP5YC7.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/2vNP5YC7SFsuVaMHXgZvRSceYnk36pYoqE7h97kapump",
+   "request_started_utc": "2026-09-15T19:20:37.061+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "REVALIDATED",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd6008f3a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:37.328+00:00",
+   "read_brt": "16:20:37"
+  },
+  {
+   "file": "44_dexscreener_orders_8Urn3EVE.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/8Urn3EVEFofHwxp1D4nct4ZqeBogDMkf5c5u7R4jpump",
+   "request_started_utc": "2026-09-15T19:20:38.378+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "REVALIDATED",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd681b98a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:38.624+00:00",
+   "read_brt": "16:20:38"
+  },
+  {
+   "file": "44_dexscreener_orders_3bK5stEW.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump",
+   "request_started_utc": "2026-09-15T19:20:39.674+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare",
+    "cf-ray": "a3b9fd703c35a4fd-GIG"
+   },
+   "response_received_utc": "2026-09-15T19:20:39.903+00:00",
+   "read_brt": "16:20:39"
+  }
+ ],
+ "end_utc": "2026-09-15T19:20:39.906397+00:00"
+}

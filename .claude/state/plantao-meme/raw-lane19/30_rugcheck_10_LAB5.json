@@ -1,0 +1,226 @@
+{
+ "mint": "3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump",
+ "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+ "creator": "8kDsCHuvBBBZrURsF5ifoSZXnGqH8oU9UN7LhEBzMmq2",
+ "creatorBalance": 0,
+ "token": {
+  "mintAuthority": null,
+  "supply": 1640876772815102,
+  "decimals": 6,
+  "isInitialized": true,
+  "freezeAuthority": null
+ },
+ "token_extensions": {
+  "nonTransferable": false,
+  "transferFeeConfig": null,
+  "defaultAccountState": null,
+  "permanentDelegate": null,
+  "metadataPointer": {
+   "authority": null,
+   "metadataAddress": "3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump"
+  },
+  "groupPointer": null,
+  "groupMemberPointer": null,
+  "tokenMetadata": {
+   "authority": null,
+   "mint": "3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump",
+   "name": "bullc2",
+   "symbol": "bullc2",
+   "uri": "https://ipfs.io/ipfs/QmRdz4o7w3T7TzPeMc9YCmdwNQvVUt1WDjQYUE8L1LPwTa",
+   "additionalMetadata": {}
+  },
+  "mintCloseAuthority": null,
+  "confidentialTransferMint": null,
+  "interestBearingConfig": null,
+  "transferHook": null,
+  "confidentialTransferFeeConfig": null,
+  "tokenGroup": null,
+  "tokenGroupMember": null,
+  "scaledUiAmountConfig": null,
+  "pausableConfig": null
+ },
+ "tokenMeta": {
+  "name": "bullc2",
+  "symbol": "bullc2",
+  "uri": "https://ipfs.io/ipfs/QmRdz4o7w3T7TzPeMc9YCmdwNQvVUt1WDjQYUE8L1LPwTa",
+  "mutable": false,
+  "updateAuthority": "11111111111111111111111111111111"
+ },
+ "topHolders": [
+  {
+   "address": "3Y7kaVzmoEp81PRkuDgAyzLQ2Q8Q4WmBm6gVoWMZEmdz",
+   "amount": 1531451399578919,
+   "decimals": 6,
+   "pct": 93.33128635562,
+   "uiAmount": 1531451399.578919,
+   "uiAmountString": "1531451399.578919",
+   "owner": "GnY9jcBPpnGr21NAvHTLbY56L7hjat77KMthhbV5TcAd",
+   "insider": false
+  },
+  {
+   "address": "CuYtmFXwK8qFk9L6QAXbKvDc8HWjkicuRBrWR1EWxUwx",
+   "amount": 109425373236183,
+   "decimals": 6,
+   "pct": 6.668713644380005,
+   "uiAmount": 109425373.236183,
+   "uiAmountString": "109425373.236183",
+   "owner": "GZQcJfoRoVRGE6BSNJr2nM8rG6VTyS1kUpKGAru6VhA2",
+   "insider": false
+  },
+  {
+   "address": "22YEKk4X25yjtaEFNarjGheNJDihvmJbDY2F11jGhV7Y",
+   "amount": 0,
+   "decimals": 6,
+   "pct": 0,
+   "uiAmount": 0,
+   "uiAmountString": "0.000000",
+   "owner": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+   "insider": false
+  },
+  {
+   "address": "DC4QC9DLKapFMGkedkRmnEAExh6hXy7eDvHYAE7stoGB",
+   "amount": 0,
+   "decimals": 6,
+   "pct": 0,
+   "uiAmount": 0,
+   "uiAmountString": "0.000000",
+   "owner": "Bd8Nqy2c28HnJJdifqg6Ea7gCAdPkg5H7f4HXzFdSpTF",
+   "insider": false
+  }
+ ],
+ "freezeAuthority": null,
+ "mintAuthority": null,
+ "risks": [],
+ "score": 1,
+ "score_normalised": 1,
+ "fileMeta": {
+  "description": "",
+  "name": "bullc2",
+  "symbol": "bullc2",
+  "image": ""
+ },
+ "lockerOwners": {},
+ "lockers": {},
+ "lockerScanStatus": "none",
+ "markets": [
+  {
+   "pubkey": "GnY9jcBPpnGr21NAvHTLbY56L7hjat77KMthhbV5TcAd",
+   "marketType": "pump_fun",
+   "mintA": "3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump",
+   "mintB": "So11111111111111111111111111111111111111112",
+   "mintLP": "11111111111111111111111111111111",
+   "liquidityA": "7mfm4erXJtCuFJeNudoVKZexpHGooPHuiWu8EtsWro79",
+   "liquidityB": "GnY9jcBPpnGr21NAvHTLbY56L7hjat77KMthhbV5TcAd",
+   "mintAAccount": {
+    "mintAuthority": null,
+    "supply": 1640876772815102,
+    "decimals": 6,
+    "isInitialized": true,
+    "freezeAuthority": null
+   },
+   "mintBAccount": {
+    "mintAuthority": null,
+    "supply": 0,
+    "decimals": 9,
+    "isInitialized": false,
+    "freezeAuthority": null
+   },
+   "mintLPAccount": {
+    "mintAuthority": null,
+    "supply": 0,
+    "decimals": 0,
+    "isInitialized": false,
+    "freezeAuthority": null
+   },
+   "liquidityAAccount": {
+    "mint": "3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump",
+    "owner": "GnY9jcBPpnGr21NAvHTLbY56L7hjat77KMthhbV5TcAd",
+    "amount": 1324551399578919,
+    "delegate": null,
+    "state": 0,
+    "delegatedAmount": 0,
+    "closeAuthority": null
+   },
+   "liquidityBAccount": {
+    "mint": "So11111111111111111111111111111111111111112",
+    "owner": "GnY9jcBPpnGr21NAvHTLbY56L7hjat77KMthhbV5TcAd",
+    "amount": 1330549,
+    "delegate": null,
+    "state": 0,
+    "delegatedAmount": 0,
+    "closeAuthority": null
+   },
+   "lp": {
+    "baseMint": "3bK5stEWLh9283XBTuiNcg6wu5VPrkJbeQvncKLZpump",
+    "quoteMint": "So11111111111111111111111111111111111111112",
+    "lpMint": "11111111111111111111111111111111",
+    "quotePrice": 98.17165906962384,
+    "basePrice": 6.071622702898089e-09,
+    "base": 1324551399.578919,
+    "quote": 0.001330549,
+    "reserveSupply": 1330549,
+    "currentSupply": 0,
+    "quoteUSD": 0.13062220280342896,
+    "baseUSD": 8.042176348838803,
+    "pctReserve": 0,
+    "pctSupply": 0,
+    "holders": null,
+    "totalTokensUnlocked": 0,
+    "tokenSupply": 0,
+    "lpLocked": 1330549,
+    "lpUnlocked": 0,
+    "lpLockedPct": 100,
+    "lpLockedUSD": 8.17279855164223,
+    "lpMaxSupply": 0,
+    "lpCurrentSupply": 0,
+    "lpTotalSupply": 1330549
+   }
+  }
+ ],
+ "totalMarketLiquidity": 8.17279855164223,
+ "totalStableLiquidity": 0.13062220280342896,
+ "totalLPProviders": 0,
+ "totalHolders": 4,
+ "price": 6.071622702898089e-09,
+ "rugged": false,
+ "tokenType": "",
+ "transferFee": {
+  "pct": 0,
+  "maxAmount": 0,
+  "authority": "11111111111111111111111111111111"
+ },
+ "knownAccounts": {
+  "7mfm4erXJtCuFJeNudoVKZexpHGooPHuiWu8EtsWro79": {
+   "name": "Pump Fun",
+   "type": "AMM"
+  },
+  "8kDsCHuvBBBZrURsF5ifoSZXnGqH8oU9UN7LhEBzMmq2": {
+   "name": "Creator",
+   "type": "CREATOR"
+  },
+  "DwAb3fXzjLLfkGLrUWJRT87ED2hNhkmu5c6Rbhjmabox": {
+   "name": "Printr Stake Pool",
+   "type": "LOCKER"
+  },
+  "GnY9jcBPpnGr21NAvHTLbY56L7hjat77KMthhbV5TcAd": {
+   "name": "Pump Fun",
+   "type": "AMM"
+  }
+ },
+ "events": [],
+ "verification": null,
+ "validation": {
+  "validated": false
+ },
+ "graphInsidersDetected": 0,
+ "insiderNetworks": null,
+ "detectedAt": "2026-09-13T13:41:38.165356184Z",
+ "creatorTokens": null,
+ "launchpad": {
+  "name": "Pump.Fun",
+  "logo": "https://api.rugcheck.xyz/public/logos/pump_fun.png",
+  "url": "https://x.com/pumpfun",
+  "platform": "pump_fun"
+ },
+ "deployPlatform": "unknown"
+}

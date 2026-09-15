@@ -1,0 +1,51 @@
+{
+ "run": 19,
+ "lane": 3,
+ "script": "B+B2",
+ "_note": "B abortou por contador de orcamento que casava 'pump.fun' nas URLs da DefiLlama; log de B reconstruido do console; B2 = 2 paginas",
+ "pumpfun_host_requests_B": 1,
+ "pumpfun_host_requests_B2": 2,
+ "pumpfun_host_requests_total_run": 30,
+ "console_B": [
+  "[16:21:37] 200 354B 50_jito_tip_floor.json <- https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+  "[16:21:39] 200 6376B 51_rpc_prioritization_fees_pump_program.json <- https://api.mainnet-beta.solana.com getRecentPrioritizationFees([6EF8...])",
+  "[16:21:41] 200 601B 52_rpc_perf_samples.json <- https://api.mainnet-beta.solana.com getRecentPerformanceSamples(5)",
+  "[16:21:44] 200 13981402B 53_rpc_programdata.json (reduzido a 53_rpc_programdata_trim.json) <- https://api.mainnet-beta.solana.com getAccountInfo(ProgramData B5Mv..., jsonParsed)",
+  "[16:21:46] 200 2973B 54_status_solana_summary.json <- https://status.solana.com/api/v2/summary.json",
+  "[16:21:51] 200 64509B 60_defillama_pumpfun_fees_trim.json <- https://api.llama.fi/summary/fees/pump.fun",
+  "[16:21:54] 200 40750B 61_defillama_pumpswap_dex_trim.json <- https://api.llama.fi/summary/dexs/pumpswap",
+  "[16:21:57] 200 61877B 62_defillama_pumpfun_dex_trim.json <- https://api.llama.fi/summary/dexs/pump.fun",
+  "[16:21:59] 200 12653B 70_pumpportal_hashes.json <- https://pumpportal.fun/",
+  "[16:22:01] 200 12438B 70_pumpportal_hashes.json <- https://pumpportal.fun/fees/",
+  "[16:22:02] 200 67764B 70_pumpportal_hashes.json <- https://pumpportal.fun/data-api/real-time/",
+  "[16:22:03] 200 53645B 70_pumpportal_hashes.json <- https://pumpportal.fun/local-trading-api/trading-api/",
+  "[16:22:05] 200 88509B 70_pumpportal_hashes.json <- https://pumpportal.fun/local-trading-api/jito-bundles/",
+  "[16:22:06] 403 5617B 71_probes <- https://photon-sol.tinyastro.io/en/discover",
+  "[16:22:07] 403 4903B 71_probes <- https://gmgn.ai/defi/quotation/v1/rank/sol/pump/1h?orderby=progress&direction=desc&new_creation=true",
+  "[16:22:09] 403 4903B 71_probes <- https://gmgn.ai/?chain=sol",
+  "[16:22:11] 401 27B 71_probes <- https://api.dune.com/api/v1/query/3308123/results",
+  "[16:22:13] 404 56386B 71_probes <- https://dune.com/api/echo/v1/dashboards/adam_tehc/pumpfun",
+  "[16:22:15] 302 0B 71_probes <- https://graphql.bitquery.io/",
+  "[16:22:18] 200 2052017B coinpage (texto perdido no abort; refeita em B2) <- https://pump.fun/coin/GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom"
+ ],
+ "requests_B2": [
+  {
+   "file": "80_pumpfun_coinpages_text.json",
+   "url": "https://pump.fun/coin/GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom",
+   "request_started_utc": "2026-09-15T19:23:12.312+00:00",
+   "http": 200,
+   "bytes": 2051056,
+   "read_brt": "16:23:13",
+   "html_saved": false
+  },
+  {
+   "file": "80_pumpfun_coinpages_text.json",
+   "url": "https://pump.fun/coin/HWCsYhpYYvdBreG8ivE7svPmGqUvXp7WpUCdeyGEpump",
+   "request_started_utc": "2026-09-15T19:23:15.008+00:00",
+   "http": 200,
+   "bytes": 2064129,
+   "read_brt": "16:23:16",
+   "html_saved": false
+  }
+ ]
+}

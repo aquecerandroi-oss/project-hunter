@@ -1,0 +1,583 @@
+[
+ {
+  "url": "https://dexscreener.com/solana/bpumvngpahaeccub2ki44mmztsptgn6g9bzqgugwpump",
+  "chainId": "solana",
+  "tokenAddress": "BPuMvNGpahAeccUB2Ki44mmztSptgn6G9bZQguGwpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/Tbz0zh1U_x_2RU9l?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/4SYE6dEVAL_7Fjta?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BPuMvNGpahAeccUB2Ki44mmztSptgn6G9bZQguGwpump?timestamp=1789500000000",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/CyborgDeployed/status/2099939214087614920"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x75dcab346281d4cea4e1e7eb2d6a46f764669e5b",
+  "chainId": "robinhood",
+  "tokenAddress": "0x75dcab346281d4cea4e1e7eb2d6a46f764669e5b",
+  "icon": "https://cdn.dexscreener.com/cms/images/s0yffm4KfT-YEb10?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/oVSVjVpVaXAp0r7Y?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x75dcab346281d4cea4e1e7eb2d6a46f764669e5b?timestamp=1789500000000",
+  "description": "Coin from the creator of RobinHood Chain",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/onlyreatz/status/2099937239434182958"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/hvtbjugf5rky1hznfh7gcp4zncgt257e5n4hvq8jpump",
+  "chainId": "solana",
+  "tokenAddress": "HvTbJugf5rkY1HzNfH7GcP4zNcgT257E5N4HVQ8jpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/8vWCTS3UipB9CoTw?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/W12lfKTsJxCiXNRW?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/HvTbJugf5rkY1HzNfH7GcP4zNcgT257E5N4HVQ8jpump?timestamp=1789500000000",
+  "description": "Pumpfun just made holding rewarding and the hottest aninal meta on CT has paws. 💎🐾\nPAWS turns diamond hands into Diamond Paws: hold longer, stay diamond, get rewarded.",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/PAWSTOKENN/status/2099939448167301625?s=20"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/inourbagera"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/el7tvcecsmdlxmzuvygkln7mtbk11dtwmpnfrxusoy5y",
+  "chainId": "solana",
+  "tokenAddress": "EL7tVceCSMDLxMzUVyGKLN7MTBk11dTWmpNfrXUSoY5y",
+  "icon": "https://cdn.dexscreener.com/cms/images/tB-gKOqKTUlkiCjn?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/THLFyx-z3tiIhp4a?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/EL7tVceCSMDLxMzUVyGKLN7MTBk11dTWmpNfrXUSoY5y?timestamp=1789500000000",
+  "description": "",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/RealDesertDoge/status/2099937704477622677"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x3a65d0894169b81b2cfecc37765766410d1e738f",
+  "chainId": "robinhood",
+  "tokenAddress": "0x3a65d0894169b81b2CFECC37765766410d1e738f",
+  "icon": "https://cdn.dexscreener.com/cms/images/LRR1qCzpSLNsnqeI?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/6aIfw9IzC38sNV8E?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x3a65d0894169b81b2cfecc37765766410d1e738f?timestamp=1789500000000",
+  "description": "You came to flip\nShe made you hold",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://milfstocks.org/"
+   },
+   {
+    "label": "Treasury",
+    "url": "https://indices.theindex.finance/coin/0x597718f07a3ad3b645b989fc8ceaa6098460bf43"
+   },
+   {
+    "label": "PONS",
+    "url": "https://www.ponsfamily.com/launchpad/0x3a65d0894169b81b2cfecc37765766410d1e738f"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/milfstocks"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/milfstocks"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/be4wdwmrx5kwz4uk9wdqhol2zvuacwdztdwsvsudc5kf",
+  "chainId": "solana",
+  "tokenAddress": "BE4WDWMRx5kwz4uk9wdQHoL2ZvUacwdZtDWSVSudc5Kf",
+  "icon": "https://cdn.dexscreener.com/cms/images/_TQ3cjoOeHYNx-fC?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/1ikf5BisqiBZZK6d?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BE4WDWMRx5kwz4uk9wdQHoL2ZvUacwdZtDWSVSudc5Kf?timestamp=1789500000000",
+  "description": "",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://clawpump.tech/tokens/BE4WDWMRx5kwz4uk9wdQHoL2ZvUacwdZtDWSVSudc5Kf"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Clawinusol"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x9b5e3be3d1c2b5b056aa86dda4d7813b6d64ef16",
+  "chainId": "robinhood",
+  "tokenAddress": "0x9b5e3be3d1c2b5b056aa86dda4d7813b6d64ef16",
+  "icon": "https://cdn.dexscreener.com/cms/images/Mu69inQsrATr6Pud?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/kSAX4VIEU5vzI9wL?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x9b5e3be3d1c2b5b056aa86dda4d7813b6d64ef16?timestamp=1789500000000",
+  "description": "complete work. submit proof. get paid.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://questpad.fun/"
+   },
+   {
+    "label": "Docs",
+    "url": "https://questpad.fun/docs"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/_questpad"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xb7ea878bdf4193f20dcd118c350ac422318b88de",
+  "chainId": "robinhood",
+  "tokenAddress": "0xb7ea878bdf4193f20dcd118c350ac422318b88de",
+  "icon": "https://cdn.dexscreener.com/cms/images/z9xRIMeakqtf9v2y?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/8RY3Clk1F704Xg_s?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xb7ea878bdf4193f20dcd118c350ac422318b88de?timestamp=1789500000000",
+  "description": "First Audio Coin on RH",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://robinhoodchain.blockscout.com/token/0x6c856C7990F202c6d7dA9dD6694B195Eb415B861?tab=contract"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/playtime4PF/status/2099937421995753618?s=20"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/69fmnntkyafwstg5fs86culwc3bbxlxky4mm88ptpump",
+  "chainId": "solana",
+  "tokenAddress": "69fmNNTkyAfWSTG5Fs86cULWC3bBxLxkY4mM88Ptpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/xZ6vKKJ2PxjQT7Od?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/rNyrNsHt9x4mhTQo?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/69fmNNTkyAfWSTG5Fs86cULWC3bBxLxkY4mM88Ptpump?timestamp=1789500000000",
+  "description": "",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://x.com/GaryCardone/status/2099836961171161112"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/thedevrrrrrrr/status/2099933020358946976"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xf8af0d49b1c3f7448b1fa1cab9aa240597e6a775",
+  "chainId": "robinhood",
+  "tokenAddress": "0xf8af0d49b1c3f7448b1fa1cab9aa240597e6a775",
+  "icon": "https://cdn.dexscreener.com/cms/images/xyqJw5lW5h9EaCk9?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/OwLWFYIXWxhC6I4q?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xf8af0d49b1c3f7448b1fa1cab9aa240597e6a775?timestamp=1789500000000",
+  "description": "WTF is plop",
+  "links": [
+   {
+    "label": "Website",
+    "url": "http://www.plop.wtf"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/plopwtf"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xc6494fc80d40dcf96bcb4677e262abd99e45b78d",
+  "chainId": "robinhood",
+  "tokenAddress": "0xc6494fc80d40dcf96bcb4677e262abd99e45b78d",
+  "icon": "https://cdn.dexscreener.com/cms/images/uC3dIlY--aKhtnpn?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/mygoclD246j0ycNx?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xc6494fc80d40dcf96bcb4677e262abd99e45b78d?timestamp=1789500000000",
+  "description": "A Launchpad for Tokens Backed by Real GPUs and Paired with Any RWA",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://cudapad.com/"
+   },
+   {
+    "label": "Docs",
+    "url": "https://cudapad.com/docs"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/cudapad"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xf0fd79b056e5ee52fd178eb086fe232545bfb0e5",
+  "chainId": "robinhood",
+  "tokenAddress": "0xf0fd79b056e5ee52fd178eb086fe232545bfb0e5",
+  "icon": "https://cdn.dexscreener.com/cms/images/vgZ8ivTO7bxukbI6?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/FWUYzIFB6hxurAum?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xf0fd79b056e5ee52fd178eb086fe232545bfb0e5?timestamp=1789500000000",
+  "description": "Subreddits become pairs now",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://redditpad.family/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/redditpad"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/redditpad"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/bag4nvwzqcj1bgt1s8chhnjxszuhy2g4aagbiuopump",
+  "chainId": "solana",
+  "tokenAddress": "BaG4NVWZQCj1bGT1s8ChhnjxSZuhY2g4AAGBiUopump",
+  "icon": "https://cdn.dexscreener.com/cms/images/Eam4cN8cBcPg0uEk?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/sMibdZLEHjM1L9IS?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BaG4NVWZQCj1bGT1s8ChhnjxSZuhY2g4AAGBiUopump?timestamp=1789500000000",
+  "description": "WORTHLESS COIN",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.google.com/search?q=clarity+act&oq=clarity+act+++&gs_lcrp=EgZjaHJvbWUqBggAEEUYOzIGCAAQRRg7MgYIARBFGDsyBggCEEUYPTIGCAMQRRg8MgYIBBBFGD3SAQgyMDMzajBqNKgCALACAQ&sourceid=chrome&source=chrome.ob&ie=UTF-8"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/NikolaiHauckx/status/2099939179161407780?s=20"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/ethereum/0x45b98868e7d53191eb6ffe1cc3116cd0a6e9dfa6",
+  "chainId": "ethereum",
+  "tokenAddress": "0x45b98868E7D53191eB6ffe1cc3116Cd0A6e9dFa6",
+  "icon": "https://cdn.dexscreener.com/cms/images/bffeHIWbxVmH1OWu?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/FA07XAsH4pY4AFok?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/ethereum/0x45b98868e7d53191eb6ffe1cc3116cd0a6e9dfa6?timestamp=1789500000000",
+  "description": "launch tokens fluid family with your favorite memecoins, coins or stocks on Ethereum chain",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://fluid.family"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Fluiddotfamily"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/4seyzqnf8fa762qxblzm1xpbwezmmvsaqkdkzetugall",
+  "chainId": "solana",
+  "tokenAddress": "4SEYzqnf8Fa762QxBLZM1XPBwEzmMVSAqKDKZETuGALL",
+  "icon": "https://cdn.dexscreener.com/cms/images/bHo8F_j2gGJqyy8v?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/u8Z4ubu1-d79OHfd?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/4SEYzqnf8Fa762QxBLZM1XPBwEzmMVSAqKDKZETuGALL?timestamp=1789500000000",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.allonsol.fun/"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/ge2j19blpf4hkhwhfp4vxs5x86aht5pnkdwmudrvdoom",
+  "chainId": "solana",
+  "tokenAddress": "GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom",
+  "icon": "https://cdn.dexscreener.com/cms/images/iONQZm_K9KM_3iEK?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/HDT_Qwn4aeuYQbeR?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom?timestamp=1789500000000",
+  "description": "DOOM's game fully inscribed onto the solana blockchain forever.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://doomonchain.fun/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/doomonchain/status/2099933622929080705"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xf086c53f2780e601f0d005fabb3ee5a220336062",
+  "chainId": "robinhood",
+  "tokenAddress": "0xf086C53f2780E601F0d005fABB3Ee5a220336062",
+  "icon": "https://cdn.dexscreener.com/cms/images/plo-1soN36m6Z4qD?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/DQk3FI7aqNa7GHt1?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xf086c53f2780e601f0d005fabb3ee5a220336062?timestamp=1789500000000",
+  "description": "Buy COUPONS and receive rewards in PONS tokens.",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/coupons_eth?s=11"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/4ahxnyedcujty32rqhqriugewrq44krphan1mnjepump",
+  "chainId": "solana",
+  "tokenAddress": "4aHxnyEDcUjTy32rQHqRiugEWrq44kRPhaN1mNJepump",
+  "icon": "https://cdn.dexscreener.com/cms/images/i-WbmXVoo2g-KUcv?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/qkOZds4RVsnATsqr?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/4aHxnyEDcUjTy32rQHqRiugEWrq44kRPhaN1mNJepump?timestamp=1789500000000",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/i/communities/2038653966062407908"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x8aa55fb0e7c0f0ff5039d023095efb30ec9dd548",
+  "chainId": "robinhood",
+  "tokenAddress": "0x8aa55FB0E7C0f0Ff5039d023095efb30eC9dD548",
+  "icon": "https://cdn.dexscreener.com/cms/images/eFUqiuge10fF2avh?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/oxEr91eomR7Mgfgs?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x8aa55fb0e7c0f0ff5039d023095efb30ec9dd548?timestamp=1789500000000",
+  "description": "Introducing freeLLM v1.0 - the FREE AI models directory",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/HOP_RH"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/acyug6d4cqbsps1w91iltbqvzcmoehaalh7hrttsepv",
+  "chainId": "solana",
+  "tokenAddress": "ACyug6D4cQBsps1w91iLtBQVzCMoeHAALH7hRTTsEPV",
+  "icon": "https://cdn.dexscreener.com/cms/images/SEf7zwR25Z1waHw-?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/frwe_SnijPnsxsza?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/ACyug6D4cQBsps1w91iLtBQVzCMoeHAALH7hRTTsEPV?timestamp=1789500000000",
+  "description": "Obscure cat",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/thenormiecalvin/status/2099932544527405296?s=20"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/7ud6e8kpbkpgbtoygbpesqfyckqdv2kxlyftfyfmpump",
+  "chainId": "solana",
+  "tokenAddress": "7UD6E8kPbkPgbToygBpeSqFycKQdv2KxLYFTFyFmpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/7d5GCrvxvqZilQlQ?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/XcKZCZin6IUfGOJH?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/7UD6E8kPbkPgbToygBpeSqFycKQdv2KxLYFTFyFmpump?timestamp=1789500000000",
+  "description": "Every message is a transaction.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://v1be.network"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/v1bebook"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xb51343ce13e7d44677fc44faf917fcf9c218d924",
+  "chainId": "robinhood",
+  "tokenAddress": "0xb51343Ce13E7D44677FC44faF917fCf9C218D924",
+  "icon": "https://cdn.dexscreener.com/cms/images/BRsddvQMjQuIlxJt?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/JLbkBb9E7FZuCV5n?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xb51343ce13e7d44677fc44faf917fcf9c218d924?timestamp=1789500000000",
+  "description": "QUOSTR turns creator fees into Quotrons, buybacks, burns, and ecosystem growth. 50% acquires + hardwires Quotrons, 25% buys back and burns $QUOSTR, 15% supports the Quotron ecosystem on Ink, and 10% funds operations. Supported Quotron rewards fuel additional buybacks.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://quostr.com/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/QuoStr_"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/eglgzakuspycgfgvqnwbqgnjfudotvhsj3t1qbyfszpu",
+  "chainId": "solana",
+  "tokenAddress": "EgLGzAKuSPyCgfGVQNwBQgnJFudoTvhSj3t1qbYFsZPu",
+  "icon": "https://cdn.dexscreener.com/cms/images/BEedyhsK9g-AzQ4z?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/z7caCThjpKqUPwX7?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/EgLGzAKuSPyCgfGVQNwBQgnJFudoTvhSj3t1qbYFsZPu?timestamp=1789500000000",
+  "description": "fart sound paired with fartcoin",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.stampy.fun/token/EgLGzAKuSPyCgfGVQNwBQgnJFudoTvhSj3t1qbYFsZPu"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/trenchguerilla/status/2099917842447495554"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/vpyxc73fkuxucp2bpxactgrysvsu5ugfc7yvrrhpump",
+  "chainId": "solana",
+  "tokenAddress": "vPyxc73FKuXUCP2BPXActgRySvsu5UGFC7yvrRhpump",
+  "icon": "https://cdn.dexscreener.com/cms/images/Rjzku86OETqoPxy9?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/TuSLbJB36EpjX_CD?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/vPyxc73FKuXUCP2BPXActgRySvsu5UGFC7yvrRhpump?timestamp=1789500000000",
+  "description": "Enjoy any Uber Eats order for 40% off using Bite Plug's website and pay in Solana.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://biteplug.xyz"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/i/communities/1940824513597317622"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x843401f5df15bf73d50d0f73e929630388fa832c",
+  "chainId": "robinhood",
+  "tokenAddress": "0x843401f5df15bf73d50d0f73e929630388fa832c",
+  "icon": "https://cdn.dexscreener.com/cms/images/PQH8WSxrUbN44UNF?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/talD6nfG08r4T_t4?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x843401f5df15bf73d50d0f73e929630388fa832c?timestamp=1789500000000",
+  "description": "FLARE is a market game on Robinhood Chain where players predict the short-term price movement of major U.S. stocks. Choose NVIDIA, Apple, Tesla, Amazon, or Microsoft and predict Up or Down for 1, 5, or 15 minutes. Bets are made in FLARE, while winning bets are paid in tokenized stocks.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://flare.family/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/flaretaptrade"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xca7107ca810e7dd0ba08a514c7e9a0813a69253a",
+  "chainId": "robinhood",
+  "tokenAddress": "0xca7107ca810e7dd0ba08a514c7e9a0813a69253a",
+  "icon": "https://cdn.dexscreener.com/cms/images/5Ne7bSSdmEYIEeIz?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/V5ET6D5gZjcd4-HU?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xca7107ca810e7dd0ba08a514c7e9a0813a69253a?timestamp=1789500000000",
+  "description": "Jons lets anyone build, backtest, and run automated Polymarket strategies 24/7.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://tryjons.xyz/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/usejons"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xcfb0d53fbde4510508ad43cbf892407188c93e54",
+  "chainId": "robinhood",
+  "tokenAddress": "0xcfb0d53fbde4510508ad43cbf892407188c93e54",
+  "icon": "https://cdn.dexscreener.com/cms/images/FBzFFm0t24974dO8?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/1Z-qAD-jEhW6fegD?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xcfb0d53fbde4510508ad43cbf892407188c93e54?timestamp=1789500000000",
+  "description": "Launch coins backed by perps, stocks, and RWAs. Creator fees build the position, profits flow back through buybacks and burns.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://hypurps.org/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/hypurpsliquid"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/gdblj4bn1rys2g9qth2d7v8uwm2uokztagpxo8apump",
+  "chainId": "solana",
+  "tokenAddress": "gDbLj4bN1rYs2g9QTh2d7V8UWM2UoKztaGPxo8Apump",
+  "icon": "https://cdn.dexscreener.com/cms/images/WrViJyPE1L-2SFdY?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/GNNdTIOYKXA6siho?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/gDbLj4bN1rYs2g9QTh2d7V8UWM2UoKztaGPxo8Apump?timestamp=1789500000000",
+  "description": "$RENTOPOLY turns Monopoly into live on-chain rent, where every deed buys a Bank share 🎩\nSix districts, real payouts every 30 seconds, and open-book balances make buying the block feel playable 🏘️",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://www.rentopoly.fun"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xaf6bd6c1cb14bf4eec104e9110557134c1cdfec9",
+  "chainId": "robinhood",
+  "tokenAddress": "0xaF6BD6c1CB14Bf4EEC104e9110557134c1cdfEc9",
+  "icon": "https://cdn.dexscreener.com/cms/images/jywrjKhrveB_oHkY?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/DoaxQNR6c5U9UyHF?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xaf6bd6c1cb14bf4eec104e9110557134c1cdfec9?timestamp=1789500000000",
+  "description": "Get a job, keep the job, get paid in stocks on Robinhood Chain\n3,333 desks and they're filling up.",
+  "links": [
+   {
+    "label": "Website",
+    "url": "https://headhunt.fun/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/headhuntgame"
+   }
+  ],
+  "cto": false
+ },
+ {
+  "url": "https://dexscreener.com/solana/6mmpe862msecdgwmwh3y4pe1afbfsjtd8lfvdkixhcvj",
+  "chainId": "solana",
+  "tokenAddress": "6Mmpe862mSEcDgWMwh3Y4pE1afBFsJtD8LFVDkixHCVJ",
+  "icon": "https://cdn.dexscreener.com/cms/images/Dx24qA_pvjAZxL_J?width=64&height=64&fit=crop&quality=95&format=auto",
+  "header": "https://cdn.dexscreener.com/cms/images/YRQW1wX-9mfnx9ho?width=600&height=200&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/6Mmpe862mSEcDgWMwh3Y4pE1afBFsJtD8LFVDkixHCVJ?timestamp=1789500000000",
+  "description": "09/15/2026 - uniPCs:\n\ni was the loudest $BONK bull last cycle\n\ni was screaming about it from the $20m lows, when no one was talking about it, to $4 BILLION+ ATHs while almost everyone on Crypto Twitter ridiculed me\n\ni mean i literally became known as 'Bonk Guy' due to my viral BONK trade where i turned $16k to $20m+ at peak\n\ni think $USELESS is going to go far higher than BONK's $4 billion+ ATH\n\nimagine the headlines when USELESS coin is in top 50 and trading above $1b\n\nthen above $2b\n\nthen above $3b\n\nliterally NO OTHER MEMECOIN has this advantage\n\nnone\n\nevery mainstream media will talk about it and the cult of believers who think it's going to flip doge\n\nthey'll talk about me being the biggest fomo trader and it being my most bullish bag after being up bajillions — IF GOD WILLS IT\n\nthey're going to keep using it as the prime of example of exactly WHY CRYPTO IS USELESS\n\nand it'll kind of become a sort of mainstream joke, 'BTC? idk, you might just as well buy USELESS coin! have you seen USELESS coin? yeh, it's a real thing and at $2 BILLION market cap. 2 BILLION?!!! IMAGINE!!!'\n\nlike USELESS is that memecoin that has only two options:\n\nDIE or go AGGRESSIVELY MAINSTREAM & TO INSANE VALUATIONS\n\nthere is literally no in-between\n\nand it is clear now that it is not dying\n\nso we might as well relax and wait for the insane valuations",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/search?q=%24uniPCs%20OR%20solana%3A6Mmpe862mSEcDgWMwh3Y4pE1afBFsJtD8LFVDkixHCVJ&src=typeahead_click"
+   }
+  ],
+  "cto": false
+ }
+]

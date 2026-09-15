@@ -1,0 +1,77 @@
+{
+ "photon_discover": {
+  "http": 403,
+  "len_norm": 58,
+  "excerpt": "Just a moment... Enable JavaScript and cookies to continue",
+  "headers": {
+   "date": "Tue, 15 Sep 2026 19:22:06 GMT",
+   "content-type": "text/html; charset=UTF-8",
+   "server": "cloudflare",
+   "cf-ray": "a3b9ff8efcd6ccfb-GRU"
+  },
+  "read_brt": "16:22:06",
+  "error": null
+ },
+ "gmgn_pump_rank_api": {
+  "http": 403,
+  "len_norm": 764,
+  "excerpt": "Attention Required! | Cloudflare Please enable cookies. Sorry, you have been blocked You are unable to access gmgn.ai Why have I been blocked? This website is using a security service to protect itself from online attacks. The action you just performed triggered the security solution. There are seve",
+  "headers": {
+   "date": "Tue, 15 Sep 2026 19:22:07 GMT",
+   "content-type": "text/html; charset=UTF-8",
+   "server": "cloudflare",
+   "cf-ray": "a3b9ff977a04f239-GRU"
+  },
+  "read_brt": "16:22:07",
+  "error": null
+ },
+ "gmgn_home": {
+  "http": 403,
+  "len_norm": 764,
+  "excerpt": "Attention Required! | Cloudflare Please enable cookies. Sorry, you have been blocked You are unable to access gmgn.ai Why have I been blocked? This website is using a security service to protect itself from online attacks. The action you just performed triggered the security solution. There are seve",
+  "headers": {
+   "date": "Tue, 15 Sep 2026 19:22:09 GMT",
+   "content-type": "text/html; charset=UTF-8",
+   "server": "cloudflare",
+   "cf-ray": "a3b9ff9ef92bf239-GRU"
+  },
+  "read_brt": "16:22:09",
+  "error": null
+ },
+ "dune_api_no_key": {
+  "http": 401,
+  "len_norm": 27,
+  "excerpt": "{\"error\":\"invalid API Key\"}",
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "date": "Tue, 15 Sep 2026 19:22:11 GMT"
+  },
+  "read_brt": "16:22:11",
+  "error": null
+ },
+ "dune_echo": {
+  "http": 404,
+  "len_norm": 432,
+  "excerpt": "404 Page Not Found | Dune Skip to content Dune Search Catalog Library Queries Dashboards Favorites Folders Data uploads Materialized views Contracts Monitor Activity Schedules Alerts Connect Dune APIs MCP &amp; CLI API keys Connectors Docs Upgrade plan Dune 404 - Page not found The page you&#x27;re ",
+  "headers": {
+   "date": "Tue, 15 Sep 2026 19:22:13 GMT",
+   "content-type": "text/html; charset=utf-8",
+   "age": "0",
+   "server": "cloudflare",
+   "cf-cache-status": "DYNAMIC",
+   "cf-ray": "a3b9ffb7485da18e-GRU"
+  },
+  "read_brt": "16:22:13",
+  "error": null
+ },
+ "bitquery_graphql_get": {
+  "http": 302,
+  "len_norm": 0,
+  "excerpt": "",
+  "headers": {
+   "location": "https://ide.bitquery.io"
+  },
+  "read_brt": "16:22:15",
+  "error": null
+ }
+}
