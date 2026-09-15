@@ -48,12 +48,22 @@ class OpenPosition:
     sell_requested_at: datetime | None
     sell_requested_by: str | None
     migrated: bool
+    creator_sold_seen_at: datetime | None = None
+    """T4.2h-b (``0038``): the instant the radar's creator watch saw this mint's
+    creator sell on the chain. Read on the exit loop's own 5 s tick, so a real
+    position stops waiting for the minute tape to notice."""
+
+    def creator_dump_seen(self, tape_creator_sold: bool | None) -> bool:
+        """``creator_dump`` for this position: the sale **seen on the chain** or
+        the tape's own flag — either is enough, and neither is inferred from
+        silence (a tape that says ``None`` has not measured anything)."""
+        return self.creator_sold_seen_at is not None or tape_creator_sold is True
 
 
 _OPEN_POSITIONS = text(
     "SELECT id, proposal_id, mint, entry_at, tokens, sol_spent_lamports, initial_risk_sol, "
     "       params, mark_sol, high_water_sol, exit_intent, sell_requested_at, "
-    "       sell_requested_by, migrated "
+    "       sell_requested_by, migrated, creator_sold_seen_at "
     "FROM meme_live_positions WHERE status = 'open' ORDER BY entry_at"
 )
 _INSERT_POSITION = text(
@@ -105,6 +115,7 @@ async def open_positions(session: AsyncSession) -> list[OpenPosition]:
             sell_requested_at=r["sell_requested_at"],
             sell_requested_by=r["sell_requested_by"],
             migrated=bool(r["migrated"]),
+            creator_sold_seen_at=r["creator_sold_seen_at"],
         )
         for r in (await session.execute(_OPEN_POSITIONS)).mappings()
     ]

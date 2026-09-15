@@ -164,6 +164,25 @@ class MemeSourcesOut(BaseModel):
     fast_lane_reads_60s: int | None = None
     fast_lane_calls_60s: int | None = None
     fast_lane_cycle_s: float | None = None
+    creator_watch_mints: int | None = None
+    """T4.2h-b: mints the creator watch is reading right now — every mint with an
+    open paper bet or an open **real** position whose creator is known. ``None``
+    from a worker that predates T4.2h-b; a real ``0`` means it holds nothing."""
+    creator_watch_live_mints: int | None = None
+    """How many of those carry an open real position (money, not paper)."""
+    creator_watch_calls_60s: int | None = None
+    creator_watch_drops_1h: int | None = None
+    """Creator sales **seen on the chain** in the last hour (one per mint)."""
+    creator_watch_missing: int | None = None
+    """Mints whose creator holds no token account at all (``creator_ata_missing``):
+    unmeasured by this watch — never "the dev did not sell"."""
+    creator_watch_cycle_s: float | None = None
+    creator_watch_sale_to_exit_s_p50: int | None = None
+    """The **measured** seen-sale → exit latency (seconds) over the newest closes
+    that carry a seen sale, paper and live together; ``None`` before the first
+    such close — an unmeasured latency is not a fast one."""
+    creator_watch_sale_to_exit_s_p95: int | None = None
+    creator_watch_sale_to_exit_n: int | None = None
     lab_decision_to_fill_s_p50: int | None = None
     """T4.16: the **measured** decision → fill latency (seconds) over the last
     fills the Lab made — nearest-rank median; ``None`` before the first fill."""

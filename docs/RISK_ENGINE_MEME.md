@@ -632,10 +632,36 @@ Nada de "preenchido ao último preço visto".
     ≤ 10 %, criador não vendedor, E2 — e **segura pela migração** (`exit_on_migration = false`, marca pela pool; alvo 5×,
     trailing 40 % após 2×, 60 min, piso 50 %). Pré-registrado como `descartar`; nada real depende dele.
 
-12. **A venda do criador vista na cadeia (T4.2h).** O motivo de saída que mais custou em 12/09 (`creator_dump`, 22 de 35)
-    chegava 14 min depois pela fita. Agora o laço lê a conta de tokens do criador pela cadeia a cada 15 s para os mints
-    com aposta aberta e o primeiro decréscimo entre duas leituras vira `creator_sold_seen_at`; o motor sai na fotografia
-    seguinte. Conta ausente é `creator_ata_missing` — não medido, nunca "o dev não vendeu". Só papel por enquanto.
+12. **A venda do criador vista na cadeia (T4.2h), na posição real e com a latência medida (T4.2h-b).** O motivo de
+    saída que mais custou em 12/09 (`creator_dump`, 22 de 35) chegava 14 min depois pela fita. O laço lê a conta de
+    tokens do criador pela cadeia a cada 15 s e o primeiro decréscimo entre duas leituras vira `creator_sold_seen_at`;
+    conta ausente é `creator_ata_missing` — não medido, nunca "o dev não vendeu". Três coisas mudam na T4.2h-b:
+
+    - **A posição real entra no laço** (`0038`): `meme_live_positions` ganha as **mesmas três colunas**, com os mesmos
+      CHECKs, e o mesmo laço marca papel e dinheiro real na mesma transação. O executor lê `creator_sold_seen_at` no
+      **tique de 5 s** de `exits.py` (`OpenPosition.creator_dump_seen`: venda vista na cadeia **ou** `creator_sold` da
+      fita; `None` da fita nunca é venda). A precedência da §6 não se move — `sell_now` do operador e fechamento de
+      emergência continuam acima do dump, então uma observação do radar nunca passa na frente do kill switch. Nenhum
+      grant se move: a API continua só pedindo a venda.
+    - **Uma fotografia, não duas.** A medição de 15/09 (16:13 BRT, 27 vendas vistas) deu **149 s** entre a venda vista e
+      a saída: o motor de papel avaliava a saída *por fotografia*, então a venda exigia uma foto para decidir e a
+      seguinte para precificar. A venda do criador é uma observação com **relógio próprio** — como o `sell_now` do
+      operador —, então o `exit_intent` nasce com `decided_at = creator_sold_seen_at` e `trigger = "creator_watch"`, e a
+      **primeira** fotografia posterior precifica. O `exit_on_creator_dump` do conjunto continua valendo. Provado em
+      testcontainer: venda vista → saída ≤ 30 s, medido na linha
+      (`services/meme-worker/tests/test_creator_watch_persistence.py`).
+    - **A latência é publicada, medida das linhas.** `creator_watch_sale_to_exit_s_p50/_p95/_n` no heartbeat e em
+      `GET /meme/sources`, percentil por posto sobre as saídas mais novas de papel **e** de posição real — nunca de um
+      contador em memória, então um reinício não zera a única prova de que o laço é rápido o bastante. Ao lado:
+      `creator_watch_mints`, `_live_mints` (quantos são de dinheiro real), `_calls_60s`, `_drops_1h`, `_missing`,
+      `_cycle_s`. Número não medido é `""`, nunca `0`.
+
+13. **Dois braços irmãos da E1, contradizendo o próprio pré-registro (T4.23).** O fechamento de 13/09 mediu
+    `snipers > 2` a R médio +0,25 (n = 17) contra −0,28 nas demais (n = 49) e `top10_share` 0,1767–0,257 a +0,25
+    (n = 14) contra −0,25 nas demais (n = 52) — os dois contradizem a E1 congelada (`snipers ≤ 2`, sem piso em
+    `top10_share`). Pela régua isso não move o que está vivo: planta `flow_v2/3` (braço 2 + `min_snipers 3`) e
+    `flow_v2/4` (braço 2 + o piso e o teto do top-10), ambos pré-registrados `descartar`, medidos ao lado de
+    `flow_v2/1` e `flow_v2/2`; a mesa (`operator/4`) não muda.
 
 ## 11. VM1–VM9 — as nove verificações do motor meme
 

@@ -11,15 +11,12 @@ is a line under that file's "Emendas".
 Three decisions live here rather than in prose:
 
 - **``mode`` is locked to ``'paper'`` by CHECK.** The column exists so T4.8 can
-  add ``'live'`` with its own revision behind ``ENABLE_MEME_LIVE_TRADING``; until
-  then no role, owner included, can write a row claiming to be real.
+  add ``'live'`` with its own revision behind ``ENABLE_MEME_LIVE_TRADING``.
 - **A proposal's states carry their own evidence.** ``filled`` ⟺ ``bet_id``,
-  ``unfilled`` ⟺ ``refusal``, and every decided state names who decided and
-  when. A quiet desk is then explained by rows, never by absence of rows.
+  ``unfilled`` ⟺ ``refusal``; a quiet desk is explained by rows, never absence.
 - **A bet's exit is all-or-nothing.** ``exit_at``, ``exit``, ``pnl_sol`` and
-  ``r_multiple`` are null together or set together, so a half-closed bet cannot
-  exist; ``exit_intent`` (Emendas 4) is the rule that fired while the sale waits
-  for the *next* snapshot — the same non-anticipation the fill obeys.
+  ``r_multiple`` are null together or set together; ``exit_intent`` (Emendas 4)
+  is the rule that fired while the sale waits for the *next* snapshot.
 """
 
 from __future__ import annotations
@@ -263,7 +260,7 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
             "AND (outcome_quality = 'indeterminate') = (outcome_quality_at IS NOT NULL)",
             name="an_indeterminate_outcome_names_its_reason",
         ),
-        # T4.2h (0036); the reason's label CHECK lives in ddl/meme_creator_watch.py only.
+        # T4.2h (0036).
         CheckConstraint(
             "creator_sold_fraction IS NULL OR (creator_sold_fraction > 0 AND creator_sold_fraction <= 1)",
             name="creator_sold_fraction_is_a_fraction",
@@ -271,6 +268,10 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
         CheckConstraint(
             "(creator_sold_seen_at IS NULL) = (creator_sold_fraction IS NULL)",
             name="a_creator_sale_has_its_fraction",
+        ),
+        CheckConstraint(
+            "creator_balance_reason IS NULL OR creator_balance_reason IN ('creator_ata_missing')",
+            name="creator_balance_reason_is_a_known_label",
         ),
     )
 

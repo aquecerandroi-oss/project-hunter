@@ -1129,6 +1129,86 @@ decréscimo é venda), worker unit 226, core unit 1 332, `test_migrations -k "00
 **Fora (declarado):** posições reais (`meme_live_positions`), heartbeat/rótulos `creator_watch_*`, teste de persistência
 do laço (a marca é SQL simples coberta pela migração). Feito pelo orquestrador (agentes no limite semanal).
 
+### T4.23 — dois braços irmãos da E1, contradizendo o próprio pré-registro: `snipers > 2` e top-10 médio (entregue 15/09/2026)
+
+**Por quê:** o fechamento diário de 13/09 (§6.4/§6.5, 66 apostas medidas, IC 95 % por blocos de hora, repetido pelo
+lote de 14/09) mediu `snipers > 2` a R médio +0,25 (n = 17) contra −0,28 nas demais (n = 49) — Δ +0,53 R, IC
+[0,23, 0,88] — e `top10_share` em 0,1767–0,257 a +0,25 (n = 14) contra −0,25 nas demais (n = 52) — Δ +0,50 R, IC
+[0,14, 1,36]. Os dois contradizem o pré-registro da própria E1 (`snipers ≤ 2`, sem piso em `top10_share`); pela
+régua (KB-0092) isso não move os conjuntos vivos — vira dois braços irmãos pré-registrados `descartar`, medidos ao
+lado.
+
+**Entregue:** `rules.py`/`rules_criteria.py`: `min_snipers` (recusa `snipers_below_min`) e `min_top10_share` (recusa
+`top10_below_min`), pisos ao lado dos tetos já existentes (`max_snipers`, `max_top10_share`), desligados por padrão,
+um desconhecido recusa pelo próprio motivo mesmo sem teto; validação dos limiares extraída para `rules_validation.py`
+(teto de 350 linhas); 20 testes novos. `lab_models.py` lê as duas chaves (`GateRow` já carregava `snipers` e
+`top10_share`). Migração `0037_meme_e1_arms_3_4` (§49 do `DATABASE.md`): `flow_v2/3` (braço 2 + `min_snipers 3`) e
+`flow_v2/4` (braço 2 + o piso e o teto do top-10), ambos `research_only`/EXP-M5/`descartar`; nada aposentado —
+`flow_v2/1`, `flow_v2/2` e a mesa (`operator/4`) continuam ativos. `HEAD_REVISION → 0037`; `test_0036_*` estagiado em
+`CREATOR_WATCH_REVISION`; quatro `test_0037_*` novos. EXP-M5 ganha "Braços 3 e 4". Um `0038_meme_creator_watch_live`
+(T4.2h-b) chegou ao mesmo tempo em cima de `0037`: `HEAD_REVISION` desta suíte foi para `0038` e os `test_0037_*`
+passaram a estagiar em `E1_ARMS_3_4_REVISION` — a mesma cortesia que este conjunto de testes já dá a cada revisão
+anterior. **Achado fora do escopo, corrigido de passagem:** `alembic_check` estava quebrado desde a `0036` (T4.2h,
+13/09) — o CHECK `creator_balance_reason_is_a_known_label` existia no DDL de `meme_paper_bets` mas nunca foi
+declarado no modelo ORM (`hunter_core/db/models/meme_lab.py`), um comentário dizia isso ser proposital; adicionado o
+`CheckConstraint` que faltava (a metade de `meme_live_positions`, `0038`, foi corrigida pela T4.2h-b antes desta
+tarefa terminar). **Provas:** indicators `-k meme` 247 (227 antes + 20 novos), worker unit 218 (`-m unit`, 75
+deselecionados), `test_migrations -k "0036 or 0037 or alembic_check or upgrade_head"` 7 passed (60 s, Postgres);
+ruff/`ruff format --check`/pyright 0; `check_file_size` 0 acima atribuível a esta tarefa (`services/meme-worker/hunter_meme_worker/main.py`
+a 353 linhas é da T4.2h-b, concorrente, fora desta tarefa).
+
+**Fora desta tarefa:** validação prospectiva dos braços 3/4 (régua ≥ 100 apostas e 30 dias, o Lab mede sozinho);
+qualquer alteração aos conjuntos vivos (nenhuma régua de descarte foi atingida).
+
+### T4.2h-b — a vigilância do criador nas posições reais, no heartbeat e na tela (entregue 15/09/2026)
+
+**Por quê:** a T4.2h (13/09) entregou a vigilância só para o papel e mediu, em 15/09 às 16:13 BRT, 27 vendas do
+criador vistas na cadeia — com a saída saindo em média **149 s** depois da venda. Duas coisas faltavam: a posição
+**real** (`meme_live_positions`) continuava aprendendo do dump pela fita do minuto (o mesmo atraso de 14 min que
+custou 22 das 35 apostas de 12/09), e ninguém publicava a latência que essa tarefa existe para derrubar.
+
+**Entregue:**
+
+1. **Posições reais** (`0038_meme_creator_watch_live`, §50 do `DATABASE.md`): as **mesmas três colunas**, com os
+   mesmos CHECKs, em `meme_live_positions` — o DDL gera os dois conjuntos de uma função só, e o modelo ORM ganha os
+   três `CheckConstraint`. `_WATCHED` do laço virou a união de apostas de papel abertas **e** posições reais abertas
+   (`bool_or(live)` conta quantas são de dinheiro real), e um decréscimo marca todas as linhas abertas do mint na
+   mesma transação. O executor lê a coluna no **tique de 5 s**: `OpenPosition.creator_sold_seen_at` +
+   `OpenPosition.creator_dump_seen(fita)` (venda vista **ou** `creator_sold`; `None` da fita nunca é venda), e a
+   precedência da §6 (`sell_now`, emergência) não se move. **Nenhum grant se move** — a API continua só pedindo a
+   venda.
+2. **Latência: uma fotografia, não duas.** A venda do criador é uma observação com relógio próprio (como o `sell_now`
+   do operador), então `lab_bets._observed_intent` monta o `exit_intent` com `decided_at = creator_sold_seen_at` e
+   `trigger = "creator_watch"` e a **primeira** fotografia posterior precifica — antes, uma foto decidia e a seguinte
+   precificava, que é a metade evitável dos 149 s (a outra metade é a cadência da foto para moedas com mais de 5 min).
+   O `exit_on_creator_dump` do conjunto continua valendo. `creator_watch_sale_to_exit_s_p50/_p95/_n` são medidos
+   **das linhas** (papel e posição real), não de um contador em memória.
+3. **Heartbeat, API e tela:** `creator_stats.py` (módulo novo — `sources.py` está no teto de 350) publica
+   `creator_watch_enabled/_mints/_live_mints/_calls_60s/_drops_1h/_missing/_cycle_s/_last_cycle_at` e as três de
+   latência; `wiring.heartbeat_once` funde os campos com o `enabled` lido da config no instante da escrita;
+   `GET /meme/sources` repete tudo e `creatorWatchLine` (`meme-sources-format.ts`) escreve em português, com o painel
+   mostrando a linha nas duas variantes. `pnpm gen:types` regenerado. Número não medido é `""`/`null`, nunca `0`.
+4. **Docs:** `RISK_ENGINE_MEME.md` §10.12 reescrita, `DATABASE.md` §48 (ponteiro) e §50 (nova), este plano,
+   `.claude/state/notes-T4.2h-b.md`.
+
+**Provas (saídas reais, 15/09/2026):** `test_creator_watch_persistence.py` **4 passed** (testcontainer: duas leituras
+1000 → 400 marcam papel **e** posição real com fração 0,600000 no mesmo instante; `load_open_bets` diz
+`creator_net_seller = true` e `open_positions().creator_dump_seen(None)` diz `True`; **venda vista → saída ≤ 30 s**
+com `exit.trigger = creator_watch`; conta ausente é `creator_ata_missing` sem saída; `hunter_app` leva
+`permission denied` ao tentar escrever a coluna). Worker unit **232 passed** (61 deselecionados; inclui
+`test_creator_stats.py` 6). Executor unit **30 passed** (inclui `test_exits_creator_watch.py` 5); executor
+integração **10 passed** (inclui a venda vista fechando a posição real com `exit_reason = creator_dump`). Core unit
+**1 333 passed**. `test_migrations -k "0036 or 0037 or 0038 or alembic_check or upgrade_head"` **11 passed** (68 s).
+API `test_meme_sources_service.py` **13 passed**. Vitest `meme-sources-{creator-watch,format}` + painel **116 passed**
+(3 arquivos). `pnpm typecheck` e `pnpm lint` sem erro; ruff/`ruff format --check`/pyright 0; `check_file_size` 0 acima
+(`main.py` voltou de 353 a 350 — a `CreatorWatchStats` entra por `default_factory` no `RadarContext`, não por fiação
+em `main.py`).
+
+**Fora desta tarefa (declarado):** a outra metade dos 149 s — uma moeda com mais de 5 min só é fotografada **uma vez
+por minuto** (a faixa rápida de 15 s cobre `fast_lane_max_age_s = 300`), então a primeira fotografia depois da venda
+pode levar até 60 s mesmo com esta mudança; pôr os mints com venda vista na faixa rápida é orçamento de RPC e fica
+para uma tarefa própria.
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

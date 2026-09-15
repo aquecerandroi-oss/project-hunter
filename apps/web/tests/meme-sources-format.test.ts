@@ -280,9 +280,6 @@ describe("fastLaneLine: the 15-second clock's counters and the decision→fill l
   });
 });
 
-// T4.2g: the batch tape's own heartbeat (`activity_*`) -- the proof the 1-minute
-// window is alive is `activity_live_1m > 0`; a real 0 next to `activity_dark_60s`
-// says the route answered null for everyone and nothing was written as a zero.
 describe("activityLine: the batch tape's counters, exhaustive over the contract's activity_* fields, never a raw key", () => {
   it("joins every reported field in Portuguese", () => {
     const line = activityLine(

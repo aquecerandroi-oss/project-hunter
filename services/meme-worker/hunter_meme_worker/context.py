@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol
 
+from hunter_meme_worker.creator_stats import CreatorWatchStats
 from hunter_meme_worker.features import CurveObservation
 
 if TYPE_CHECKING:
@@ -159,3 +160,9 @@ class RadarContext:
     """The tape by batch (T4.2g, ``activity.py``): ``None`` when
     ``MEME_ACTIVITY_ENABLED`` or the ``swap-api`` itself is off — the folds
     then read only the per-mint tape, and every row without one says why."""
+    creator: CreatorWatchStats = field(default_factory=CreatorWatchStats)
+    """The creator watch's own gauges and its measured sale → exit latency
+    (T4.2h-b, ``creator_stats.py``). Defaulted rather than wired in ``main.py``
+    because it holds only counters: whether the loop *runs* is
+    ``config.creator_watch_enabled``, which the heartbeat reads at write time —
+    so a context built anywhere still reports honestly instead of silently."""

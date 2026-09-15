@@ -108,7 +108,10 @@ def _gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> Ent
         max_dev_share=optional_decimal(params.get("max_dev_share")),
         dev_share_unknown_allowed=bool(params.get("dev_share_unknown_allowed", False)),
         max_snipers=None if params.get("max_snipers") is None else int(params["max_snipers"]),
+        # T4.23 (EXP-M5 arms 3/4): floors beside the ceilings, off unless the set says so.
+        min_snipers=None if params.get("min_snipers") is None else int(params["min_snipers"]),
         max_top10_share=optional_decimal(params.get("max_top10_share")),
+        min_top10_share=optional_decimal(params.get("min_top10_share")),
         # T4.16 (EXP-M5): the flow and the holders, each absent = not a criterion.
         require_positive_flow=bool(params.get("require_positive_flow", False)),
         min_unique_buyers=(

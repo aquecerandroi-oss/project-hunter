@@ -274,6 +274,9 @@ async def heartbeat_once(ctx: RadarContext, write: HeartbeatWriter) -> None:
     fields = ctx.sources.heartbeat_fields(now, tracked=len(ctx.tracker))
     if ctx.wallets is not None:  # T4.12: the observed wallets' own counters
         fields.update(ctx.wallets.heartbeat_fields(now))
+    fields.update(  # T4.2h-b: the creator watch, its budget and its latency
+        ctx.creator.heartbeat_fields(now, enabled=ctx.config.creator_watch_enabled)
+    )
     try:
         await write(fields)
     except Exception:  # a heartbeat that cannot be written must not stop the radar

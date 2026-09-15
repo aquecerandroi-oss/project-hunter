@@ -7006,4 +7006,67 @@ ATAs do criador — Token clássico e Token-2022 — dos mints com aposta aberta
 leituras marca as apostas abertas do mint). Quem lê: `lab_repo_bets._OPEN_BETS` (`creator_sold = true` quando
 `creator_sold_seen_at` existe, senão a fita do minuto) → a saída `creator_dump` do motor de papel dispara na fotografia
 seguinte. A latência venda → saída fica medível: `exit_at − creator_sold_seen_at`. O downgrade recusa enquanto uma
-aposta carregar uma venda vista (§17.7). Ainda **não** cobre `meme_live_positions` (executor real) — declarado.
+aposta carregar uma venda vista (§17.7). A posição real (`meme_live_positions`) ganhou as **mesmas três colunas** na
+`0038` — §50.
+
+## 49. Dois braços irmãos da E1, contradizendo o próprio pré-registro — M4 (`0037_meme_e1_arms_3_4`)
+
+**Por quê (fechamento diário de 13/09/2026, §6.4/§6.5 do `Diario-Meme`, 66 apostas medidas, IC 95 % por blocos de
+hora, repetido pelo lote de 14/09):** `snipers > 2` rendeu R médio +0,25 (n = 17) contra −0,28 nas demais (n = 49) —
+Δ +0,53 R, IC [0,23, 0,88]; `top10_share` em 0,1767–0,257 rendeu +0,25 (n = 14) contra −0,25 nas demais (n = 52) —
+Δ +0,50 R, IC [0,14, 1,36]. Os dois contradizem o pré-registro da própria E1 (`snipers ≤ 2`, sem piso em
+`top10_share`). Pela régua (KB-0092) isso não move os conjuntos vivos: planta dois braços irmãos, pré-registrados
+`descartar`, medidos ao lado.
+
+**O que a migração faz (`ddl/meme_e1_arms_3_4.py`):** semeia `flow_v2/3` (`…000e`, `research_only`, EXP-M5) =
+`flow_v2/2` (`ARM2_OVERRIDES` sobre `FLOW_V2_PARAMS`) + `min_snipers 3` (`max_snipers 10` já era do braço 2) e
+`flow_v2/4` (`…000f`) = `flow_v2/2` + `min_top10_share "0.1767"`, `max_top10_share "0.257"` (nenhuma das duas chaves
+existia no braço 2); nada é aposentado — `flow_v2/1`, `flow_v2/2` e a mesa (`operator/4`) continuam ativos, a
+comparação é o ponto. Dois parâmetros novos no portão (`rules.py`/`rules_criteria.py`): `min_snipers` (recusa
+`snipers_below_min`) e `min_top10_share` (recusa `top10_below_min`), pisos ao lado dos tetos já existentes,
+desligados por padrão; um valor desconhecido recusa pelo próprio motivo mesmo sem teto. A validação dos limiares do
+portão foi extraída para `rules_validation.py` (teto de 350 linhas). `lab_models.py` lê as duas chaves novas.
+Downgrade recusa com proposta ou aposta referenciando qualquer um dos dois conjuntos (§17.7). `HEAD_REVISION → 0037`;
+`test_0036_*` passa a estagiar em `CREATOR_WATCH_REVISION`; quatro `test_0037_*` novos.
+
+## 50. A venda do criador na posição real, e a latência medida — M4 (`0038_meme_creator_watch_live`)
+
+**Por quê (15/09/2026, 16:13 BRT):** a `0036` (§48) deu as três colunas à aposta de papel e o laço viu 27 vendas do
+criador; a saída, porém, saiu em média **149 s** depois da venda vista, e a posição **real** (§40) continuava
+aprendendo do dump só pela fita do minuto — o mesmo atraso de 14 min que custou 22 das 35 apostas medidas de 12/09.
+Duas coisas faltavam, e esta revisão fecha as duas.
+
+**Colunas em `meme_live_positions`:** `creator_sold_seen_at timestamptz`, `creator_sold_fraction numeric(9,6)` e
+`creator_balance_reason text` — **os mesmos nomes, o mesmo significado e os mesmos três CHECKs** da `0036`
+(`ddl/meme_creator_watch.py` gera os dois conjuntos a partir de uma função só). Nomes iguais de propósito: um laço
+escreve os dois livros, uma consulta mede `exit_at − creator_sold_seen_at` em qualquer um dos dois, e o operador que
+aprendeu a coluna do papel não precisa aprender uma segunda palavra para a posição real. **Nenhum grant se move:**
+`hunter_worker` já tinha `SELECT, INSERT, UPDATE` na tabela pela `0028` e `hunter_app` continua com exatamente
+`sell_requested_at`/`sell_requested_by` — a API pede a venda, nunca registra uma (provado por
+`test_0038_moves_no_grant_the_api_may_still_only_ask_for_a_sale` e pelo teste de papel que tenta o `UPDATE` como
+`hunter_app` e leva `permission denied`). O downgrade recusa enquanto uma posição carregar uma venda vista (§17.7).
+
+**Quem escreve:** o mesmo `creator_watch.py`, a cada 15 s. `_WATCHED` virou a união dos mints com **aposta de papel
+aberta** e com **posição real aberta** (`bool_or(live)` diz quantos são de dinheiro real, para o heartbeat contar os
+dois apartados); um decréscimo marca todas as linhas abertas do mint — papel e posição — na **mesma** transação.
+
+**Quem lê:** `hunter_meme_executor.repo_positions.open_positions` traz `creator_sold_seen_at` na `OpenPosition`, e
+`OpenPosition.creator_dump_seen(tape)` é o que o tique de 5 s de `exits.py` pergunta: venda vista na cadeia **ou**
+`creator_sold` da fita; silêncio (`None`) nunca é venda. A precedência da §6 do `RISK_ENGINE_MEME` não se move — o
+`sell_now` do operador e o fechamento de emergência continuam acima do dump, então uma observação do radar nunca
+passa na frente do kill switch.
+
+**A latência, e por que ela era de 149 s.** No papel a saída precisava de **duas** fotografias: uma para a regra
+disparar (`decide_exit` roda por fotografia) e a seguinte para precificar a venda. A venda do criador, porém, é uma
+observação com **relógio próprio** — como o `sell_now` do operador —, então `lab_bets._observed_intent` passa a montar
+o `exit_intent` com `decided_at = creator_sold_seen_at` e `trigger = "creator_watch"`, e a **primeira** fotografia
+posterior precifica: uma foto, não duas. O gate `exit_on_creator_dump` do conjunto continua valendo (um conjunto que
+não sai por dump não passa a sair). Provado em testcontainer por
+`services/meme-worker/tests/test_creator_watch_persistence.py` (venda vista → saída ≤ 30 s, medido na linha).
+
+**Heartbeat (`hb:meme:radar`) e API:** `creator_stats.py` (módulo novo — `sources.py` está no teto de 350) publica
+`creator_watch_enabled`, `_mints`, `_live_mints`, `_calls_60s`, `_drops_1h`, `_missing`, `_cycle_s`, `_last_cycle_at`
+e a latência medida **das linhas** (`_sale_to_exit_s_p50`/`_p95`/`_n`, percentil por posto sobre as 200 saídas mais
+novas de papel **e** de posição real). Um número não medido é `""`, nunca `0`; `GET /meme/sources` repete os campos e
+`meme-sources-format.ts` (`creatorWatchLine`) os escreve em português. `HEAD_REVISION → 0038`; `test_0037_*` passa a
+estagiar em `E1_ARMS_3_4_REVISION`; quatro `test_0038_*` novos.

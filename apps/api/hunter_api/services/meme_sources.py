@@ -219,6 +219,22 @@ def build_meme_sources(
         fast_lane_reads_60s=parse_heartbeat_int(fields.get("fast_lane_reads_60s")),
         fast_lane_calls_60s=parse_heartbeat_int(fields.get("fast_lane_calls_60s")),
         fast_lane_cycle_s=_float(fields.get("fast_lane_cycle_s") or None),
+        # T4.2h-b: the creator watch and the measured seen-sale → exit latency.
+        creator_watch_mints=parse_heartbeat_int(fields.get("creator_watch_mints")),
+        creator_watch_live_mints=parse_heartbeat_int(fields.get("creator_watch_live_mints")),
+        creator_watch_calls_60s=parse_heartbeat_int(fields.get("creator_watch_calls_60s")),
+        creator_watch_drops_1h=parse_heartbeat_int(fields.get("creator_watch_drops_1h")),
+        creator_watch_missing=parse_heartbeat_int(fields.get("creator_watch_missing")),
+        creator_watch_cycle_s=_float(fields.get("creator_watch_cycle_s") or None),
+        creator_watch_sale_to_exit_s_p50=parse_heartbeat_int(
+            fields.get("creator_watch_sale_to_exit_s_p50")
+        ),
+        creator_watch_sale_to_exit_s_p95=parse_heartbeat_int(
+            fields.get("creator_watch_sale_to_exit_s_p95")
+        ),
+        creator_watch_sale_to_exit_n=parse_heartbeat_int(
+            fields.get("creator_watch_sale_to_exit_n")
+        ),
         lab_decision_to_fill_s_p50=parse_heartbeat_int(fields.get("lab_decision_to_fill_s_p50")),
         lab_decision_to_fill_s_p95=parse_heartbeat_int(fields.get("lab_decision_to_fill_s_p95")),
         lab_decision_to_fill_n=parse_heartbeat_int(fields.get("lab_decision_to_fill_n")),

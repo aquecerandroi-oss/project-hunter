@@ -21,6 +21,7 @@ import type { MemeSources } from "@/lib/api/meme-types";
 
 import {
   activityLine,
+  creatorWatchLine,
   BLINDNESS_SENTENCE,
   fastLaneLine,
   type Gauge,
@@ -138,13 +139,15 @@ interface ViewProps {
   fastLane: string | null;
   /** T4.2g: the batch tape's counters (`activity_*`); `null` on a worker that predates the batch route. */
   activity: string | null;
+  /** T4.2h-b: the creator watch's counters and the measured seen-sale -> exit latency; `null` on a worker that predates it. */
+  creatorWatch: string | null;
 }
 
 function radarTitle(sources: MemeSources): string {
   return [`heartbeat do worker (UTC): ${sources.heartbeat_ts ?? "sem leitura"}`, `campos do radar (UTC): ${sources.sources_at ?? "sem leitura"}`].join("\n");
 }
 
-function FullPanel({ sources, chips, gauges, radar, loop, flags, fastLane, activity }: ViewProps) {
+function FullPanel({ sources, chips, gauges, radar, loop, flags, fastLane, activity, creatorWatch }: ViewProps) {
   return (
     <section aria-labelledby="meme-sources-heading" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -181,11 +184,12 @@ function FullPanel({ sources, chips, gauges, radar, loop, flags, fastLane, activ
       </div>
       {fastLane && <p className="font-mono text-[11px] tabular-nums text-fg-subtle">{fastLane}</p>}
       {activity && <p className="font-mono text-[11px] tabular-nums text-fg-subtle">fita por lote: {activity}</p>}
+      {creatorWatch && <p className="font-mono text-[11px] tabular-nums text-fg-subtle">vigilância do criador: {creatorWatch}</p>}
     </section>
   );
 }
 
-function LinePanel({ sources, chips, gauges, radar, loop, flags, fastLane, activity }: ViewProps) {
+function LinePanel({ sources, chips, gauges, radar, loop, flags, fastLane, activity, creatorWatch }: ViewProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
       <span className="font-medium text-fg">Fontes</span>
@@ -203,6 +207,11 @@ function LinePanel({ sources, chips, gauges, radar, loop, flags, fastLane, activ
       {fastLane && (
         <span className="font-mono tabular-nums" title={fastLane}>
           15 s: {fastLane}
+        </span>
+      )}
+      {creatorWatch && (
+        <span className="font-mono tabular-nums" title={creatorWatch}>
+          dev: {creatorWatch}
         </span>
       )}
       {activity && (
@@ -235,6 +244,7 @@ export function MemeSourcesPanel({ sources, loop, variant = "full" }: MemeSource
     flags: minuteFlags(sources),
     fastLane: fastLaneLine(sources),
     activity: activityLine(sources),
+    creatorWatch: creatorWatchLine(sources),
   };
   return variant === "line" ? <LinePanel {...view} /> : <FullPanel {...view} />;
 }

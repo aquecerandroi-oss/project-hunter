@@ -40,7 +40,10 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0036_meme_creator_watch"
+HEAD_REVISION = "0038_meme_creator_watch_live"
+"""``0038`` (T4.2h-b) lands on ``0037`` (T4.23) at the same time this revision
+does; bumped here so the shared fixtures agree with the repository's actual
+chain rather than either task's private assumption."""
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran.
 ``0033`` (T4.19) sits on ``0032_meme_activity`` (T4.2g), which sits on
@@ -102,6 +105,11 @@ OPERATOR_3_REVISION = "0033_meme_operator_3"
 E1_ARM2_REVISION = "0034_meme_gate_e1_arm2"
 ORGANIC_REVISION = "0035_meme_organic_e3"
 """``0033``: where the ``0033`` tests stage now that ``0034`` sits on top (T4.21)."""
+CREATOR_WATCH_REVISION = "0036_meme_creator_watch"
+"""Where the ``0036`` tests stage now that ``0037`` sits on top (T4.23)."""
+E1_ARMS_3_4_REVISION = "0037_meme_e1_arms_3_4"
+"""Where the ``0037`` tests stage now that ``0038`` sits on top (T4.2h-b, landed
+at the same time as T4.23)."""
 
 
 class _staged_at:
@@ -7030,9 +7038,16 @@ _CREATOR_WATCH_COLUMNS = ("creator_sold_seen_at", "creator_sold_fraction", "crea
 def test_0036_adds_the_creator_watch_columns_reverses_and_refuses_under_a_seen_sale(
     upgraded: str,
 ) -> None:
-    config = alembic_config(upgraded)
+    """Staged at ``CREATOR_WATCH_REVISION`` since ``0037`` sits on top (T4.23)."""
     for column in _CREATOR_WATCH_COLUMNS:
         assert asyncio.run(_column_exists(upgraded, "meme_paper_bets", column)), column
+    with _staged_at(upgraded, CREATOR_WATCH_REVISION) as config:
+        _refusal_of_0036(upgraded, config)
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(alembic_config(upgraded))
+
+
+def _refusal_of_0036(upgraded: str, config: Config) -> None:
     proposal = "00000000-0000-4000-8000-000000000e01"
     bet = "00000000-0000-4000-8000-000000000e02"
     asyncio.run(
@@ -7060,7 +7075,9 @@ def test_0036_adds_the_creator_watch_columns_reverses_and_refuses_under_a_seen_s
     try:
         with pytest.raises(DBAPIError, match="carry a creator sale seen on the chain"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == CREATOR_WATCH_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
         asyncio.run(_write(upgraded, list(_CLEAN_0034)))
     command.downgrade(config, ORGANIC_REVISION)
@@ -7069,5 +7086,259 @@ def test_0036_adds_the_creator_watch_columns_reverses_and_refuses_under_a_seen_s
             assert not asyncio.run(_column_exists(upgraded, "meme_paper_bets", column)), column
     finally:
         command.upgrade(config, "head")
+
+
+# ---------------------------------------------------------------------------
+# 0037_meme_e1_arms_3_4 — the E1 gate's sibling arms (T4.23, EXP-M5)
+# ---------------------------------------------------------------------------
+
+_FLOW_V2_ARM3_RULE_SET = "01994d00-6c1a-7000-8000-00000000000e"
+_FLOW_V2_ARM4_RULE_SET = "01994d00-6c1a-7000-8000-00000000000f"
+_ARM3_KEYS = "'min_snipers'"
+_ARM4_KEYS = "'min_top10_share' - 'max_top10_share'"
+_CLEAN_0037: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_paper_bets WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_proposals WHERE mint = 'GUARD_MINT'", {}),
+)
+
+
+def test_0037_seeds_the_sibling_arms_and_retires_nothing(upgraded: str) -> None:
+    """``flow_v2/3`` = arm 2 + ``min_snipers 3`` (``max_snipers 10`` was already
+    arm 2's); ``flow_v2/4`` = arm 2 + the top-10 band; arms 1 and 2 and the
+    desk (``operator/4``) are untouched — both siblings pre-registered
+    ``descartar``, measured beside them."""
+    siblings = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+            "|| status || ':' || coalesce(params ->> 'min_snipers', '-') || ':' "
+            "|| (params ->> 'max_snipers') || ':' || coalesce(params ->> 'min_top10_share', '-') "
+            "|| ':' || coalesce(params ->> 'max_top10_share', '-') "
+            "FROM meme_rule_sets WHERE id IN (:a3, :a4) ORDER BY version",
+            {"a3": _FLOW_V2_ARM3_RULE_SET, "a4": _FLOW_V2_ARM4_RULE_SET},
+        )
+    )
+    assert siblings == [
+        "flow_v2/3:research_only:EXP-M5:active:3:10:-:-",
+        "flow_v2/4:research_only:EXP-M5:active:-:10:0.1767:0.257",
+    ]
+    same_but_snipers = asyncio.run(
+        _scalars(
+            upgraded,
+            f"SELECT ((a.params - {_ARM3_KEYS}) = f.params)::text "  # noqa: S608 - frozen key list
+            "FROM meme_rule_sets a, meme_rule_sets f WHERE a.id = :a AND f.id = :f",
+            {"a": _FLOW_V2_ARM3_RULE_SET, "f": _FLOW_V2_ARM2_RULE_SET},
+        )
+    )
+    assert same_but_snipers == ["true"], "flow_v2/3 minus min_snipers is flow_v2/2, byte for byte"
+    same_but_top10 = asyncio.run(
+        _scalars(
+            upgraded,
+            f"SELECT ((a.params - {_ARM4_KEYS}) = f.params)::text "  # noqa: S608 - frozen key list
+            "FROM meme_rule_sets a, meme_rule_sets f WHERE a.id = :a AND f.id = :f",
+            {"a": _FLOW_V2_ARM4_RULE_SET, "f": _FLOW_V2_ARM2_RULE_SET},
+        )
+    )
+    assert same_but_top10 == ["true"], "flow_v2/4 minus the top-10 band is flow_v2/2, byte for byte"
+    statuses = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || status FROM meme_rule_sets "
+            "WHERE id IN (:f1, :a2) ORDER BY version",
+            {"f1": _FLOW_V2_RULE_SET, "a2": _FLOW_V2_ARM2_RULE_SET},
+        )
+    )
+    assert statuses == ["flow_v2/1:active", "flow_v2/2:active"], "arms 1 and 2 keep being measured"
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"], (
+        "the desk did not move"
+    )
+    command.check(alembic_config(upgraded))
+
+
+def test_0037_refuses_a_downgrade_while_a_proposal_or_a_bet_references_a_sibling(
+    upgraded: str,
+) -> None:
+    """§17.7: a proposal or a bet under either sibling is evidence — count,
+    name, stop. Staged at ``E1_ARMS_3_4_REVISION`` since ``0038`` sits on top."""
+    with _staged_at(upgraded, E1_ARMS_3_4_REVISION) as config:
+        proposal = "00000000-0000-4000-8000-000000000f01"
+        bet = "00000000-0000-4000-8000-000000000f02"
+        guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
+            (
+                [(_A_PROPOSAL, {"id": proposal, "rule_set": _FLOW_V2_ARM3_RULE_SET})],
+                "proposals reference the seeded flow_v2/3 or flow_v2/4",
+            ),
+            (
+                [
+                    (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
+                    (
+                        _A_BET,
+                        {
+                            "id": bet,
+                            "proposal": proposal,
+                            "rule_set": _FLOW_V2_ARM4_RULE_SET,
+                            "mode": "paper",
+                        },
+                    ),
+                ],
+                "bets reference the seeded flow_v2/3 or flow_v2/4",
+            ),
+        ]
+        for statements, message in guarded:
+            asyncio.run(_write(upgraded, statements))
+            try:
+                with pytest.raises(DBAPIError, match=message):
+                    command.downgrade(config, "-1")
+                assert asyncio.run(_revision(upgraded)) == E1_ARMS_3_4_REVISION, (
+                    "the downgrade must not commit"
+                )
+            finally:
+                asyncio.run(_write(upgraded, list(_CLEAN_0037)))
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(alembic_config(upgraded))
+
+
+def test_0037_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The rollback: both siblings go, arm 2 and the desk untouched; the
+    upgrade replants them exactly as seeded."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, CREATOR_WATCH_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == CREATOR_WATCH_REVISION
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id IN (:a3, :a4)",
+                {"a3": _FLOW_V2_ARM3_RULE_SET, "a4": _FLOW_V2_ARM4_RULE_SET},
+            )
+        ) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT status FROM meme_rule_sets WHERE id = :a2",
+                {"a2": _FLOW_V2_ARM2_RULE_SET},
+            )
+        ) == ["active"]
+        assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"]
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0038_meme_creator_watch_live — the creator's sale on the real position (T4.2h-b)
+# ---------------------------------------------------------------------------
+
+_CREATOR_WATCH_LIVE_COLUMNS = _CREATOR_WATCH_COLUMNS
+"""The **same three names** ``0036`` gave the paper bet: one watch loop writes
+both ledgers and one query measures ``exit_at - creator_sold_seen_at`` on
+either, so a second vocabulary for the real position would be a bug, not a
+style. This alias is the assertion."""
+
+
+def test_0038_adds_the_same_three_columns_to_the_real_position(upgraded: str) -> None:
+    for column in _CREATOR_WATCH_LIVE_COLUMNS:
+        assert asyncio.run(_column_exists(upgraded, "meme_live_positions", column)), column
+
+
+def test_0038_moves_no_grant_the_api_may_still_only_ask_for_a_sale(upgraded: str) -> None:
+    """The column grant of ``0028`` is the whole story: ``hunter_app`` writes
+    ``sell_requested_at``/``_by`` and nothing else. A watch column the API could
+    write would let a request forge the evidence the exit is judged by."""
+    for column in _CREATOR_WATCH_LIVE_COLUMNS:
+        assert not asyncio.run(
+            _column_privilege_named(upgraded, "hunter_app", "meme_live_positions", column, "UPDATE")
+        ), column
+        assert asyncio.run(
+            _column_privilege_named(
+                upgraded, "hunter_worker", "meme_live_positions", column, "UPDATE"
+            )
+        ), column
+    live = migration_ddl("meme_live")
+    for column in cast("tuple[str, ...]", live.MEME_LIVE_SELL_REQUEST_COLUMNS):
+        assert asyncio.run(
+            _column_privilege_named(upgraded, "hunter_app", "meme_live_positions", column, "UPDATE")
+        ), column
+
+
+def test_0038_refuses_a_downgrade_under_a_seen_sale_and_reverses_clean(upgraded: str) -> None:
+    config = alembic_config(upgraded)
+    position = "00000000-0000-4000-8000-000000003801"
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_LIVE_PROPOSAL, {"id": _P28, "rule_set": _RESEARCH_RULE_SET, "mode": "paper"}),
+                _a_live_order(),
+                _a_live_position(id=position),
+                (
+                    "UPDATE meme_live_positions SET creator_sold_seen_at = now(), "
+                    "creator_sold_fraction = 0.6 WHERE id = :id",
+                    {"id": position},
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="carry a creator sale seen on the chain"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT creator_sold_fraction::text FROM meme_live_positions WHERE id = :id",
+                {"id": position},
+            )
+        ) == ["0.600000"], "the fraction survives the refused downgrade"
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0028)))
+    with _staged_at(upgraded, E1_ARMS_3_4_REVISION):
+        for column in _CREATOR_WATCH_LIVE_COLUMNS:
+            assert not asyncio.run(_column_exists(upgraded, "meme_live_positions", column)), column
+        assert asyncio.run(_column_exists(upgraded, "meme_paper_bets", "creator_sold_seen_at")), (
+            "reversing 0038 must not touch the paper bet's own columns (0036)"
+        )
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     command.check(config)
+
+
+def test_0038_keeps_the_fraction_a_fraction_and_pairs_it_with_its_instant(upgraded: str) -> None:
+    """The two CHECKs, one failing case each: a sale without its fraction is a
+    stamp nobody can size, and a fraction above 1 is a creator who sold more
+    than he had — both are a broken writer, never a row to keep."""
+    position = "00000000-0000-4000-8000-000000003802"
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_LIVE_PROPOSAL, {"id": _P28, "rule_set": _RESEARCH_RULE_SET, "mode": "paper"}),
+                _a_live_order(),
+                _a_live_position(id=position),
+            ],
+        )
+    )
+    try:
+        for statement in (
+            "UPDATE meme_live_positions SET creator_sold_seen_at = now() WHERE id = :id",
+            "UPDATE meme_live_positions SET creator_sold_seen_at = now(), "
+            "creator_sold_fraction = 1.5 WHERE id = :id",
+            "UPDATE meme_live_positions SET creator_balance_reason = 'dev_is_nice' WHERE id = :id",
+        ):
+            with pytest.raises(DBAPIError, match="violates check constraint"):
+                asyncio.run(_write(upgraded, [(statement, {"id": position})]))
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE meme_live_positions SET creator_balance_reason = "
+                        "'creator_ata_missing' WHERE id = :id",
+                        {"id": position},
+                    )
+                ],
+            )
+        )
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0028)))

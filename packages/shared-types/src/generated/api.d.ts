@@ -3571,6 +3571,24 @@ export interface components {
              * @default cobertura do último minuto dobrado: linhas com progresso ÷ linhas e linhas com fita ÷ linhas; uma linha sem fita diz o motivo em tape_reason (no_trade_feed = nunca puxada, not_polled = o orçamento da fita não a alcançou no ciclo, rate_limited = a fonte recusou); uma linha sem progresso diz progress_reason (denominator_unknown = Mayhem ainda sem a leitura on-chain de MayhemState, mayhem_pending conta quantas); desde a T4.2f a curva de todos os rastreados vem da cadeia uma vez por minuto (chain_read_mints ÷ chain_tracked_mints) e a fita é limitada pela regra do Cloudflare do swap-api (~20 req/60 s por IP, medida — swap_api_effective_budget_60s é o orçamento em vigor), não pelo x-ratelimit-limit de 1000; desde a T4.2g a fita por lote (POST market-activity/batch, 50 moedas por requisição, activity_batch_calls_60s dentro do mesmo orçamento) preenche buys/sells/compradores do minuto quando a fita por mint não cobriu (tape_source = activity_1m; tape_activity_pct é a fração das linhas que vieram do lote; activity_dark_60s conta moedas cuja janela 1m veio nula num ciclo em que ninguém a teve preenchida — nada é escrito como zero nesse caso; no_sol_quote = o lote falou em USD e não havia cotação SOL/USD com menos de 5 min)
              */
             coverage_explanation: string;
+            /** Creator Watch Calls 60S */
+            creator_watch_calls_60s?: number | null;
+            /** Creator Watch Cycle S */
+            creator_watch_cycle_s?: number | null;
+            /** Creator Watch Drops 1H */
+            creator_watch_drops_1h?: number | null;
+            /** Creator Watch Live Mints */
+            creator_watch_live_mints?: number | null;
+            /** Creator Watch Mints */
+            creator_watch_mints?: number | null;
+            /** Creator Watch Missing */
+            creator_watch_missing?: number | null;
+            /** Creator Watch Sale To Exit N */
+            creator_watch_sale_to_exit_n?: number | null;
+            /** Creator Watch Sale To Exit S P50 */
+            creator_watch_sale_to_exit_s_p50?: number | null;
+            /** Creator Watch Sale To Exit S P95 */
+            creator_watch_sale_to_exit_s_p95?: number | null;
             /**
              * Discovery Blind Explanation
              * @default programa fora do escopo do adaptador: a descoberta ouve só o programa pump (PumpPortal subscribeNewToken + boards new/graduating com pg = pump); entradas do board new em raydium_launchpad/StonkFun e afins são invisíveis por construção e não são rastreadas — a fração declara o tamanho da cegueira, não a corrige

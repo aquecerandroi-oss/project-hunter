@@ -282,6 +282,47 @@ def test_the_batch_loop_and_its_share_of_the_tape_are_the_workers_numbers() -> N
     assert older.activity_batch_calls_60s is None and older.activity_live_1m is None
 
 
+def test_the_creator_watch_and_its_measured_latency_are_the_workers_numbers() -> None:
+    """T4.2h-b: the watch's gauges and the **measured** seen-sale → exit latency
+    are read from the heartbeat as written. A worker that predates the watch
+    yields ``None`` for every one of them — never a ``0`` that would read as
+    "nothing to watch" or as "the exit is instant"."""
+    out = build_meme_sources(
+        _heartbeat(
+            creator_watch_mints="12",
+            creator_watch_live_mints="2",
+            creator_watch_calls_60s="4",
+            creator_watch_drops_1h="27",
+            creator_watch_missing="3",
+            creator_watch_cycle_s="0.42",
+            creator_watch_sale_to_exit_s_p50="15",
+            creator_watch_sale_to_exit_s_p95="28",
+            creator_watch_sale_to_exit_n="27",
+        ),
+        _latest(),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    assert (out.creator_watch_mints, out.creator_watch_live_mints) == (12, 2)
+    assert (out.creator_watch_calls_60s, out.creator_watch_drops_1h) == (4, 27)
+    assert out.creator_watch_missing == 3
+    assert out.creator_watch_cycle_s == pytest.approx(0.42)
+    assert (out.creator_watch_sale_to_exit_s_p50, out.creator_watch_sale_to_exit_s_p95) == (15, 28)
+    assert out.creator_watch_sale_to_exit_n == 27
+    older = build_meme_sources(_heartbeat(), _latest(), as_of=AS_OF, heartbeat_key=KEY)
+    assert older.creator_watch_mints is None and older.creator_watch_missing is None
+    assert older.creator_watch_sale_to_exit_s_p50 is None
+    assert older.creator_watch_sale_to_exit_n is None, "a latency nobody measured is not zero"
+    empty = build_meme_sources(
+        _heartbeat(creator_watch_missing="0", creator_watch_sale_to_exit_n="0"),
+        _latest(),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    assert empty.creator_watch_missing == 0, "a real 0 of unmeasured creators is a measurement"
+    assert empty.creator_watch_sale_to_exit_n == 0
+
+
 def test_source_status_reads_the_workers_word_and_never_infers_health() -> None:
     assert source_status("swap_api", None) == ("unknown", "heartbeat_missing")
     assert source_status("swap_api", {"enabled": False}) == ("disabled", "disabled")

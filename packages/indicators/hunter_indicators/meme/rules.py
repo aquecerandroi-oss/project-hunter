@@ -38,6 +38,13 @@ T4.21 adds the four switches of the E1 gate's second arm (EXP-M5 arm 2,
 of "rising", an unknown creator vouched for by a measured ``dev_share``, and
 the 60 s market-cap delta as an alternative to progress rising — off by
 default, so arm 1 reads exactly as it was frozen.
+
+T4.23 adds two more floors, each beside an existing ceiling and off by
+default: ``min_snipers`` (arm 3) and ``min_top10_share`` (arm 4) — the
+closing of 13/09 measured both bands paying, against the E1 pre-registration
+(``snipers <= 2``); both are registered ``descartar``, measured beside arms
+1 and 2. Threshold validation now lives in
+:mod:`hunter_indicators.meme.rules_validation` (the 350-line budget).
 """
 
 from __future__ import annotations
@@ -68,6 +75,7 @@ from hunter_indicators.meme.rules_criteria import (
     hype_refusals,
     line_refusals,
 )
+from hunter_indicators.meme.rules_validation import validate_entry_gate
 
 __all__ = [
     "EXIT_INPUTS",
@@ -144,8 +152,13 @@ class EntryGate:
     """The brief's one exception to "unknown refuses": ``dev_share ≤ 0,10 ou
     NULL com motivo``. Only meaningful with ``max_dev_share`` set."""
     max_snipers: int | None = None
+    min_snipers: int | None = None
+    """T4.23 (EXP-M5 arm 3): floor beside ``max_snipers``; unknown still refuses
+    by name even with no ceiling set."""
     max_top10_share: Decimal | None = None
     """T4.22 (EXP-M7): ceiling on the top-10 holders' share (fraction); unknown refuses by reason."""
+    min_top10_share: Decimal | None = None
+    """T4.23 (EXP-M5 arm 4): floor beside ``max_top10_share``, same unknown reason."""
     require_positive_flow: bool = False
     """T4.16 (EXP-M5): ``net_sol_flow_1m > 0`` — or, when the tape is absent
     and the 15-second series speaks, ``mcap_delta_60s > 0``; unknown refuses."""
@@ -167,31 +180,8 @@ class EntryGate:
     inputs: tuple[str, ...] = GATE_INPUTS
 
     def __post_init__(self) -> None:
-        if self.version < 1:
-            raise ValueError("version starts at 1")
-        if self.min_age_s < 0 or self.max_age_s < self.min_age_s:
-            raise ValueError("age window must satisfy 0 <= min_age_s <= max_age_s")
-        if not 0 <= self.min_progress_pct <= self.max_progress_pct <= HUNDRED:
-            raise ValueError("progress window must satisfy 0 <= min <= max <= 100")
-        if not 0 < self.max_participation_pct <= HUNDRED:
-            raise ValueError("max_participation_pct must be in (0, 100]")
-        low, high = self.min_distance_to_support_pct, self.max_distance_to_support_pct
-        if low is not None and high is not None and low > high:
-            raise ValueError("distance band must satisfy min <= max")
-        if self.min_hype_score is not None and not 0 <= self.min_hype_score <= 1:
-            raise ValueError("min_hype_score must be in [0, 1]")
-        if self.max_dev_share is not None and not 0 <= self.max_dev_share <= 1:
-            raise ValueError("max_dev_share must be in [0, 1]")
-        if self.max_snipers is not None and self.max_snipers < 0:
-            raise ValueError("max_snipers cannot be negative")
-        if self.max_top10_share is not None and not 0 <= self.max_top10_share <= 1:
-            raise ValueError("max_top10_share must be in [0, 1]")
-        if self.min_unique_buyers is not None and self.min_unique_buyers < 0:
-            raise ValueError("min_unique_buyers cannot be negative")
-        if self.max_sells_to_buys is not None and self.max_sells_to_buys < 0:
-            raise ValueError("max_sells_to_buys cannot be negative")
-        if self.min_holders is not None and self.min_holders < 0:
-            raise ValueError("min_holders cannot be negative")
+        """Every threshold check lives in ``rules_validation`` (the 350-line budget)."""
+        validate_entry_gate(self)
 
     def as_parameters(self) -> Mapping[str, str]:
         """Every threshold as a string — what a persisted decomposition stores.
@@ -217,7 +207,9 @@ class EntryGate:
             "max_dev_share": self.max_dev_share,
             "dev_share_unknown_allowed": self.dev_share_unknown_allowed or None,
             "max_snipers": self.max_snipers,
+            "min_snipers": self.min_snipers,
             "max_top10_share": self.max_top10_share,
+            "min_top10_share": self.min_top10_share,
             "require_positive_flow": self.require_positive_flow or None,
             "min_unique_buyers": self.min_unique_buyers,
             "max_sells_to_buys": self.max_sells_to_buys,

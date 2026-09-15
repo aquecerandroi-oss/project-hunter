@@ -203,6 +203,31 @@ perda; a aposta é que holders ≥ 20 e fluxo líquido positivo compensem. **Ré
 30 dias, IC 95 % por blocos de dia, leave-top-out); o braço 1 continua ativo e é a comparação direta (mesmo tique,
 mesma série). **O que não vale:** ajustar os limiares olhando os primeiros dias (KB-0092).
 
+## Braços 3 e 4 (pré-registrados 15/09/2026 16:2x BRT — T4.23)
+
+**Por quê:** o fechamento diário de 13/09 (`obsidian/09-OPERATIONS/Diario-Meme/2026-09-13.md` §6.4 e §6.5, 66 apostas
+medidas, IC 95 % por blocos de hora) mediu: `snipers` **alto (> 2)** rendeu R médio +0,25 (n = 17) contra −0,28 nas
+demais (n = 49) — Δ +0,53 R, IC [0,23, 0,88]; top-10 **médio (0,1767–0,257)** rendeu +0,25 (n = 14) contra −0,25 nas
+demais (n = 52) — Δ +0,50 R, IC [0,14, 1,36]. O lote de 14/09 propôs os mesmos dois braços (mesmos cortes, mesma
+evidência do dia 13); o lote de 15/09 não propôs nada de novo (repete o de 13/09). **Os dois contradizem o
+pré-registro da própria E1** (braço 1 exige `snipers ≤ 2`; nenhum braço vivo tem piso em `top10_share`) — pela régua
+(KB-0092) isso não move os conjuntos vivos, vira dois braços irmãos pré-registrados ao lado deles.
+
+**Regra (`flow_v2/3`, `research_only`, relógio de 15 s):** tudo do braço 2 (`flow_v2/2`) mais `min_snipers 3`
+(`max_snipers 10` já era do braço 2 — a banda fica 3–10). **Regra (`flow_v2/4`, mesmo kind e relógio):** tudo do
+braço 2 mais `min_top10_share 0,1767` e `max_top10_share 0,257` (nenhuma das duas chaves existia no braço 2). Saídas
+iguais às do braço 2 (3×, trailing 35 % após 1,5×, 30 min, `creator_dump`, `line_broken`, −50 %). Nenhum conjunto é
+aposentado: `flow_v2/1`, `flow_v2/2` e a mesa (`operator/4`) continuam ativos, a comparação é o ponto.
+
+**Previsão congelada:** `descartar` para os dois — a evidência vem de um único dia de 66 apostas, dentro da amostra
+que a gerou (KB-0092: "o modelo que morreu no holdout"); a aposta de que a banda de snipers ou a banda de top-10
+generalizam para fora desse dia é exatamente o tipo de ajuste que a régua existe para não premiar sem repetição
+prospectiva. **Régua:** a mesma dos braços 1 e 2 (≥ 100 apostas e 30 dias, IC 95 % por blocos de dia, leave-top-out);
+os braços 1 e 2 continuam ativos e são a comparação direta (mesmo tique, mesma série). **O que não vale:** ajustar os
+cortes olhando os primeiros dias prospectivos (KB-0092).
+
+**Migração:** `0037_meme_e1_arms_3_4` (`…000e` para `flow_v2/3`, `…000f` para `flow_v2/4`); `docs/DATABASE.md` §49.
+
 ## Fontes
 
 `packages/indicators/hunter_indicators/meme/{fast,rules,rules_criteria}.py` · `packages/indicators/tests/unit/{test_meme_fast,test_meme_rules_flow}.py` ·

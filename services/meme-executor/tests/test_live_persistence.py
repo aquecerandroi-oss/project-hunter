@@ -412,6 +412,55 @@ async def test_a_restarted_executor_rebuilds_the_position_and_sells_it_on_sell_n
     assert len(restarted.rpc.sent) == 1
 
 
+async def test_a_creator_sale_seen_on_the_chain_sells_the_real_position(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.2h-b (``0038``): the radar's 15 s watch stamps
+    ``meme_live_positions.creator_sold_seen_at``; the exit loop reads it on its
+    own 5 s tick and sells ``creator_dump`` — with no ``meme_features_1m`` row
+    for this mint, so the minute tape says nothing and cannot be the source.
+
+    Before this, a real position learned of the dump only from that tape, which
+    on 12/09/2026 was on average 14 minutes late.
+    """
+    proposal_id = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(harness.ctx)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        before = [p for p in await open_positions(session) if p.proposal_id == proposal_id]
+    assert before and before[0].creator_sold_seen_at is None
+    assert before[0].creator_dump_seen(None) is False, "nothing seen yet, nothing to sell on"
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_positions SET creator_sold_seen_at = now(), "
+                "creator_sold_fraction = 0.6 WHERE proposal_id = :p"
+            ),
+            {"p": proposal_id},
+        )
+    restarted = _context(db_session_factory, _signer(), harness.redis)
+    restarted.chain.tokens_on_chain = 10**9
+    restarted.rpc.transaction = json.loads(json.dumps(_fixture("rpc_tx_probe_raw.json")["result"]))
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        rebuilt = [p for p in await open_positions(session) if p.proposal_id == proposal_id]
+    assert rebuilt[0].creator_sold_seen_at is not None
+    assert rebuilt[0].creator_dump_seen(None) is True
+    await exits_once(restarted.ctx)
+    sells = await _rows(
+        db_engine,
+        "SELECT * FROM meme_live_orders WHERE proposal_id = :p AND side = 'sell'",
+        p=proposal_id,
+    )
+    assert len(sells) == 1 and sells[0]["status"] == "confirmed", sells
+    assert sells[0]["intent"]["exit_reason"] == "creator_dump"
+    closed = await _rows(
+        db_engine, "SELECT * FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+    )
+    assert closed[0]["status"] == "closed" and closed[0]["exit"]["reason"] == "creator_dump"
+    assert closed[0]["creator_sold_fraction"] == Decimal("0.600000"), (
+        "the evidence stays on the row"
+    )
+
+
 async def test_an_approval_older_than_the_ttl_is_refused_and_never_sent(
     harness: Harness, db_engine: AsyncEngine
 ) -> None:

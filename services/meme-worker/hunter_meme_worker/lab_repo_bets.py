@@ -105,7 +105,7 @@ _UNFILL_PROPOSAL = text(
 _OPEN_BETS = text(
     "SELECT b.id, b.proposal_id, b.rule_set_id, b.mint, b.entry_at, b.entry, b.initial_risk_sol, "
     "       b.params, b.high_water_x, b.mark_sol, b.mark_at, b.exit_intent, "
-    "       b.leg, b.parent_bet_id, b.mark_source, b.mark_stale_s, "
+    "       b.leg, b.parent_bet_id, b.mark_source, b.mark_stale_s, b.creator_sold_seen_at, "
     "       t.migrated_at, t.completed_at, t.total_supply, t.creator, "
     "       CASE WHEN b.creator_sold_seen_at IS NOT NULL THEN true ELSE "
     "         (SELECT f.creator_sold FROM meme_features_1m f WHERE f.mint = b.mint "
@@ -239,6 +239,7 @@ async def load_open_bets(session: AsyncSession) -> list[OpenBet]:
                 creator_net_seller=r["creator_sold"],
                 total_supply=r["total_supply"],
                 creator=None if r["creator"] is None else str(r["creator"]),
+                creator_sold_seen_at=r["creator_sold_seen_at"],
             )
         )
     return out

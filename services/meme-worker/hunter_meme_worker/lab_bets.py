@@ -152,12 +152,21 @@ def _parse(value: Any) -> datetime:
     return datetime.fromisoformat(str(value))
 
 
-def _sell_now_intent(command: CommandRow) -> dict[str, Any]:
+def _observed_intent(reason: str, decided_at: datetime, trigger: str) -> dict[str, Any]:
+    """An exit decided **off** the photos — the operator's hand, or the creator's
+    sale seen on the chain. The observation's own instant is ``decided_at``, so
+    the next photo prices the sale; making it wait for a photo to *decide* and
+    another to *price* is the second 15 s this task exists to remove."""
     return {
-        "reason": "sell_now",
-        "decided_at": command.issued_at.isoformat(),
+        "reason": reason,
+        "decided_at": decided_at.isoformat(),
         "snapshot_observed_at": None,
-        "trigger": "operator",
+        "trigger": trigger,
+    }
+
+
+def _sell_now_intent(command: CommandRow) -> dict[str, Any]:
+    return _observed_intent("sell_now", command.issued_at, "operator") | {
         "command_id": command.id,
         "issued_by": command.issued_by,
     }
@@ -200,6 +209,9 @@ async def _process_one(
     intent: dict[str, Any] | None = dict(state.exit_intent) if state.exit_intent else None
     if intent is None and command is not None:
         intent = _sell_now_intent(command)
+    seen = bet.creator_sold_seen_at  # T4.2h-b: an observation, not a photo
+    if intent is None and seen is not None and state.params.exit_rules().exit_on_creator_dump:
+        intent = _observed_intent("creator_dump", seen, "creator_watch")
     if holds_through_migration(bet):
         # T4.11: the curve stopped being the venue and the set did not sell on
         # that — from here the PumpSwap pool's tape marks and sells the position.

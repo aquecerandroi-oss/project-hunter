@@ -41,6 +41,11 @@ class OpenBet:
     """``meme_tokens.total_supply`` — the pool fee tier is by price × supply (T4.11)."""
     creator: str | None = None
     """``meme_tokens.creator`` — the creator dump is re-read from the pool's tape."""
+    creator_sold_seen_at: datetime | None = None
+    """T4.2h-b: the instant the 15 s watch saw the creator's balance fall
+    (``meme_paper_bets.creator_sold_seen_at``). It is an **observation with its
+    own clock**, so the exit is decided at that instant and priced on the next
+    photo — not decided on one photo and priced on the one after it."""
 
 
 @dataclass(frozen=True, slots=True)

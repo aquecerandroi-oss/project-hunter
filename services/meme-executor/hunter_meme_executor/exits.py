@@ -6,9 +6,9 @@ the curve — or say by name why it cannot.
   ``mark_reason`` and no number (never a fabricated mark).
 - **Precedence** is ``hunter_risk_meme.exits.decide_exit``'s: the operator's
   ``sell_now`` (``sell_requested_at``, set through ``POST /meme/live/...``), the
-  owner-enabled ``emergency_auto_close``, the creator dump (the radar's
-  ``creator_sold``), the venue leaving (complete/migrated), target, trailing,
-  time stop.
+  owner-enabled ``emergency_auto_close``, the creator dump (the sale **seen on
+  the chain** by the radar's 15 s watch, ``creator_sold_seen_at`` of ``0038``, or
+  the minute tape's ``creator_sold``), the venue leaving, target, trailing, time stop.
 - **After ``complete = true`` the curve refuses trades** and the only exit is the
   PumpSwap pool, which T4.8 did not build: the intent is recorded as
   ``blocked:pumpswap_sell_not_implemented``, the position stays ``open`` with its
@@ -161,7 +161,7 @@ async def manage_position(ctx: ExecutorContext, position: OpenPosition, *, now: 
         now,
         _params(position, ctx),
         sell_now=position.sell_requested_at is not None,
-        creator_dump=token.creator_sold is True,
+        creator_dump=position.creator_dump_seen(token.creator_sold),
         emergency_auto_close=(
             ctx.kill.effective is KillSwitchState.EMERGENCY and ctx.config.auto_close_on_emergency
         ),

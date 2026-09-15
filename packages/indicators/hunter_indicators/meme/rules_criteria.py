@@ -17,6 +17,11 @@ newest reading is below the previous one), a measured ``dev_share`` vouching
 for an unknown creator, and ``mcap_delta_60s > 0`` as an alternative to
 progress rising — each behind its own switch, each unknown still refused by
 name (one reading is not "flat", it is ``holders_too_few_readings``).
+
+T4.23 (EXP-M5 arms 3/4, the closing of 13/09): ``min_snipers`` and
+``min_top10_share`` sit beside the existing ceilings as bands — either bound
+alone is a legal gate, and an unknown input still refuses once by its own
+name whether the gate asks a floor, a ceiling or both.
 """
 
 from __future__ import annotations
@@ -90,7 +95,8 @@ def line_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
 
 
 def hype_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
-    """EXP-M3: the documented score floor, the dev's share and the snipers."""
+    """EXP-M3: the documented score floor, the dev's share, the snipers and the
+    top-10 share — the last two now bands (T4.23), a floor beside the ceiling."""
     refusals: list[str] = []
     if gate.min_hype_score is not None:
         if features.hype_score is None:
@@ -103,16 +109,36 @@ def hype_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
                 refusals.append("dev_share_unknown")
         elif features.dev_share > gate.max_dev_share:
             refusals.append("dev_share_above_max")
-    if gate.max_snipers is not None:
-        if features.snipers is None:
-            refusals.append("snipers_unknown")
-        elif features.snipers > gate.max_snipers:
-            refusals.append("snipers_above_max")
-    if gate.max_top10_share is not None:
-        if features.top10_share is None:
-            refusals.append(f"top10_{features.top10_reason or 'unknown'}")
-        elif features.top10_share > gate.max_top10_share:
-            refusals.append("top10_above_max")
+    refusals.extend(_snipers_refusals(features, gate))
+    refusals.extend(_top10_refusals(features, gate))
+    return refusals
+
+
+def _snipers_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    """T4.23 (EXP-M5 arm 3): a floor beside ``max_snipers``, unknown named once."""
+    if gate.max_snipers is None and gate.min_snipers is None:
+        return []
+    if features.snipers is None:
+        return ["snipers_unknown"]
+    refusals: list[str] = []
+    if gate.min_snipers is not None and features.snipers < gate.min_snipers:
+        refusals.append("snipers_below_min")
+    if gate.max_snipers is not None and features.snipers > gate.max_snipers:
+        refusals.append("snipers_above_max")
+    return refusals
+
+
+def _top10_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    """T4.23 (EXP-M5 arm 4): a floor beside ``max_top10_share``, unknown named once."""
+    if gate.max_top10_share is None and gate.min_top10_share is None:
+        return []
+    if features.top10_share is None:
+        return [f"top10_{features.top10_reason or 'unknown'}"]
+    refusals: list[str] = []
+    if gate.min_top10_share is not None and features.top10_share < gate.min_top10_share:
+        refusals.append("top10_below_min")
+    if gate.max_top10_share is not None and features.top10_share > gate.max_top10_share:
+        refusals.append("top10_above_max")
     return refusals
 
 

@@ -261,6 +261,32 @@ export function fastLaneLine(payload: MemeSources): string | null {
 }
 
 /**
+ * T4.2h-b: the creator watch -- the loop that reads the dev's own token account
+ * from the chain every 15 s for every mint the Lab holds (and every real
+ * position) -- and the one number that says whether it is fast enough: the
+ * **measured** seen-sale -> exit latency. `creator_watch_missing` is shown even
+ * at 0 because it is the declared blindness of this watch (a creator with no
+ * token account is unmeasured, never "did not sell"), while a 0 in the other
+ * counters is left out for the same reason the other lines leave it out.
+ * `null` (never an empty line) on a worker that predates the watch.
+ */
+export function creatorWatchLine(payload: MemeSources): string | null {
+  const parts: string[] = [];
+  if (isNum(payload.creator_watch_mints)) {
+    const live = isNum(payload.creator_watch_live_mints) ? ` (${payload.creator_watch_live_mints} com posição real)` : "";
+    parts.push(`${payload.creator_watch_mints} criadores vigiados${live}`);
+  }
+  if (isNum(payload.creator_watch_calls_60s)) parts.push(`${payload.creator_watch_calls_60s} chamadas por minuto`);
+  if (isNum(payload.creator_watch_drops_1h)) parts.push(`${payload.creator_watch_drops_1h} venda(s) do dev vista(s) na última hora`);
+  if (isNum(payload.creator_watch_missing)) parts.push(`${payload.creator_watch_missing} sem conta de token (não medido)`);
+  if (isNum(payload.creator_watch_cycle_s)) parts.push(`ciclo da vigilância ${payload.creator_watch_cycle_s.toFixed(1)} s`);
+  if (isNum(payload.creator_watch_sale_to_exit_s_p50)) parts.push(`venda vista → saída p50 (medido) ${formatAgeS(payload.creator_watch_sale_to_exit_s_p50)}`);
+  if (isNum(payload.creator_watch_sale_to_exit_s_p95)) parts.push(`venda vista → saída p95 (medido) ${formatAgeS(payload.creator_watch_sale_to_exit_s_p95)}`);
+  if (isNum(payload.creator_watch_sale_to_exit_n)) parts.push(`${payload.creator_watch_sale_to_exit_n} saída(s) medida(s)`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/**
  * T4.2g: the batch tape's (`swap_api_activity`) own counters. `activity_live_1m > 0`
  * is the proof the 1-minute window is computed; a real 0 beside
  * `activity_dark_60s` says the route answered null for everyone and nothing

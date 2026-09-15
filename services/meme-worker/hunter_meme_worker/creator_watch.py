@@ -8,16 +8,18 @@ the exit of 22 (−6,2 R), on average 14 min after the entry; the tape by batch
 the loop learned of the dump when the price had already fallen. A real position
 (T4.14) would carry the same delay.
 
-**What this loop does:** for every open paper bet whose token has a known
+**What this loop does:** for every open paper bet **and every open real
+position** (T4.2h-b, ``meme_live_positions``) whose token has a known
 creator, derive the creator's associated token accounts (classic Token program
 and Token-2022 — the ATA is a PDA over the token program, so both are read),
 read them in **one** ``getMultipleAccounts`` (``jsonParsed``, ≤ 100 accounts
 per call) and keep the last balance per mint in memory. The first **decrease**
-between two readings is a sale: the open bets on that mint get
-``creator_sold_seen_at`` (the reading's instant) and ``creator_sold_fraction``
-(sold ÷ previous), ``lab_repo_bets`` reads that as ``creator_net_seller = true``
-and the exit engine closes on the next photo. A creator with **no** token
-account is not "a creator who did not sell": the bet carries
+between two readings is a sale: every open row on that mint — bet and
+position, in one transaction — gets ``creator_sold_seen_at`` (the reading's
+instant) and ``creator_sold_fraction`` (sold ÷ previous). ``lab_repo_bets``
+reads that as ``creator_net_seller = true`` and the paper engine closes on the
+next photo; the executor reads it on its own 5 s tick. A creator with **no**
+token account is not "a creator who did not sell": the row carries
 ``creator_balance_reason = creator_ata_missing`` and stays unmeasured by this
 watch. The chain client is the same ``ctx.chain`` (same budget); a fake without
 ``call`` makes the watch say so once and do nothing.
@@ -43,6 +45,7 @@ from hunter_exchanges.pumpfun.solana_codec import (
     TOKEN_PROGRAM_ID,
     associated_token_address,
 )
+from hunter_meme_worker.creator_stats import sale_to_exit_samples
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,20 +61,36 @@ ATA_MISSING = "creator_ata_missing"
 _FRACTION = Decimal("0.000001")
 _PARSED = {"encoding": "jsonParsed", "commitment": "confirmed"}
 
+WATCHED_TABLES: tuple[str, ...] = ("meme_paper_bets", "meme_live_positions")
+"""T4.2h-b: the paper bet and the **real** position carry the same three columns
+(``0036``/``0038``), so one loop watches both and one query measures either."""
+
 _WATCHED = text(
-    "SELECT DISTINCT b.mint, t.creator FROM meme_paper_bets b "
-    "JOIN meme_tokens t ON t.mint = b.mint "
-    "WHERE b.status = 'open' AND b.creator_sold_seen_at IS NULL AND t.creator IS NOT NULL"
+    "SELECT w.mint, w.creator, bool_or(w.live) AS live FROM ("
+    "  SELECT b.mint AS mint, t.creator AS creator, false AS live FROM meme_paper_bets b "
+    "    JOIN meme_tokens t ON t.mint = b.mint "
+    "   WHERE b.status = 'open' AND b.creator_sold_seen_at IS NULL AND t.creator IS NOT NULL "
+    "  UNION ALL "
+    "  SELECT p.mint AS mint, t.creator AS creator, true AS live FROM meme_live_positions p "
+    "    JOIN meme_tokens t ON t.mint = p.mint "
+    "   WHERE p.status = 'open' AND p.creator_sold_seen_at IS NULL AND t.creator IS NOT NULL"
+    ") w GROUP BY w.mint, w.creator"
 )
-_MARK_SOLD = text(
-    "UPDATE meme_paper_bets SET creator_sold_seen_at = :at, creator_sold_fraction = :fraction, "
-    "  creator_balance_reason = NULL "
-    "WHERE mint = :mint AND status = 'open' AND creator_sold_seen_at IS NULL"
+_MARK_SOLD = tuple(
+    text(
+        f"UPDATE {table} SET creator_sold_seen_at = :at, creator_sold_fraction = :fraction, "  # noqa: S608
+        "  creator_balance_reason = NULL "
+        "WHERE mint = :mint AND status = 'open' AND creator_sold_seen_at IS NULL"
+    )
+    for table in WATCHED_TABLES
 )
-_MARK_REASON = text(
-    "UPDATE meme_paper_bets SET creator_balance_reason = :reason "
-    "WHERE mint = :mint AND status = 'open' AND creator_sold_seen_at IS NULL "
-    "  AND creator_balance_reason IS DISTINCT FROM :reason"
+_MARK_REASON = tuple(
+    text(
+        f"UPDATE {table} SET creator_balance_reason = :reason "  # noqa: S608
+        "WHERE mint = :mint AND status = 'open' AND creator_sold_seen_at IS NULL "
+        "  AND creator_balance_reason IS DISTINCT FROM :reason"
+    )
+    for table in WATCHED_TABLES
 )
 
 
@@ -107,6 +126,10 @@ class CreatorWatchReport:
     drops: int
     missing: int
     duration_s: float = 0.0
+    live_mints: int = 0
+    """How many of ``mints`` carry an **open real position** (T4.2h-b) — the
+    heartbeat says it apart, because a watch that stops mattering to paper and
+    keeps mattering to money is two different incidents."""
 
 
 def ata_targets(pairs: Sequence[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -166,19 +189,24 @@ def _accounts(result: Any, expected: int) -> list[Any] | None:
     return items if len(items) == expected else None
 
 
-async def _watched(session: AsyncSession) -> list[tuple[str, str]]:
+async def _watched(session: AsyncSession) -> tuple[list[tuple[str, str]], int]:
+    """``[(mint, creator)]`` and how many of them carry an open real position."""
     rows = (await session.execute(_WATCHED)).all()
-    return [(str(r[0]), str(r[1])) for r in rows]
+    return [(str(r[0]), str(r[1])) for r in rows], sum(1 for r in rows if bool(r[2]))
 
 
 async def creator_watch_once(ctx: RadarContext, state: CreatorWatchState) -> CreatorWatchReport:
-    """One reading of every watched creator; the drops written on the open bets."""
+    """One reading of every watched creator; the drops written on the open bets
+    **and** on the open real positions (T4.2h-b)."""
     started = time.monotonic()
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        pairs = await _watched(session)
+        pairs, live = await _watched(session)
     if not pairs:
-        return CreatorWatchReport(
-            mints=0, calls=0, drops=0, missing=0, duration_s=_elapsed(started)
+        return await _record(
+            ctx,
+            CreatorWatchReport(
+                mints=0, calls=0, drops=0, missing=0, duration_s=_elapsed(started), live_mints=0
+            ),
         )
     reader = cast(
         "Callable[[str, list[Any]], Awaitable[Any]] | None", getattr(ctx.chain, "call", None)
@@ -187,8 +215,16 @@ async def creator_watch_once(ctx: RadarContext, state: CreatorWatchState) -> Cre
         if not state.unavailable_logged:
             logger.warning("meme_creator_watch_unavailable", reason="chain_source_has_no_call")
             state.unavailable_logged = True
-        return CreatorWatchReport(
-            mints=len(pairs), calls=0, drops=0, missing=0, duration_s=_elapsed(started)
+        return await _record(
+            ctx,
+            CreatorWatchReport(
+                mints=len(pairs),
+                calls=0,
+                drops=0,
+                missing=0,
+                duration_s=_elapsed(started),
+                live_mints=live,
+            ),
         )
     targets = ata_targets(pairs)
     amounts: list[int | None] = []
@@ -211,9 +247,10 @@ async def creator_watch_once(ctx: RadarContext, state: CreatorWatchState) -> Cre
     missing = [mint for mint, balance in current.items() if balance is None]
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         for drop in drops:
-            await session.execute(
-                _MARK_SOLD, {"at": read_at, "fraction": drop.fraction, "mint": drop.mint}
-            )
+            for statement in _MARK_SOLD:  # the paper bet and the real position
+                await session.execute(
+                    statement, {"at": read_at, "fraction": drop.fraction, "mint": drop.mint}
+                )
             logger.info(
                 "meme_creator_balance_dropped",
                 mint=drop.mint,
@@ -225,7 +262,8 @@ async def creator_watch_once(ctx: RadarContext, state: CreatorWatchState) -> Cre
             )
         for mint in missing:
             if mint not in state.reasoned:
-                await session.execute(_MARK_REASON, {"reason": ATA_MISSING, "mint": mint})
+                for statement in _MARK_REASON:
+                    await session.execute(statement, {"reason": ATA_MISSING, "mint": mint})
                 state.reasoned.add(mint)
         await session.commit()
     for mint, balance in current.items():
@@ -237,13 +275,28 @@ async def creator_watch_once(ctx: RadarContext, state: CreatorWatchState) -> Cre
             state.balances.pop(mint, None)
             state.read_at.pop(mint, None)
             state.reasoned.discard(mint)
-    return CreatorWatchReport(
-        mints=len(pairs),
-        calls=calls,
-        drops=len(drops),
-        missing=len(missing),
-        duration_s=_elapsed(started),
+    return await _record(
+        ctx,
+        CreatorWatchReport(
+            mints=len(pairs),
+            calls=calls,
+            drops=len(drops),
+            missing=len(missing),
+            duration_s=_elapsed(started),
+            live_mints=live,
+        ),
     )
+
+
+async def _record(ctx: RadarContext, report: CreatorWatchReport) -> CreatorWatchReport:
+    """The heartbeat's gauges, and the sale → exit latency **measured from the
+    rows** (T4.2h-b) — never from a counter in memory, so a restart does not
+    reset the only number that says whether this loop is fast enough."""
+    now = utcnow()
+    ctx.creator.record_cycle(now, report)
+    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+        ctx.creator.record_latency(await sale_to_exit_samples(session))
+    return report
 
 
 def _elapsed(started: float) -> float:
