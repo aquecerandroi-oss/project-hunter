@@ -40,6 +40,7 @@ def synthetic_bet(i: int, **overrides: Any) -> ClosedBet:
         "same_slot": i < 12,
         "creator_prior_1h": 0,
         "symbol_dup_24h": 0,
+        "creator_prior_dump_count": 0,
     }
     base.update(overrides)
     return ClosedBet(**base)

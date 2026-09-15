@@ -730,6 +730,26 @@ O patch é a única ponte: nada do que o cron escreve entra no `main` sem passar
 pathspec do orquestrador, como todo registro do vault (decisão de operação da T4.15, fechada em
 12/09/2026 à tarde).
 
+**Os gráficos das apostas do dia (T4.25), no mesmo passeio da manhã.** Depois de aplicar o patch do
+cron — e só depois, porque a seção 7 do diário precisa que o arquivo do dia já exista —, exportar na
+VPS, desenhar no laptop e embutir no vault (`docs/PIPELINE.md` §9c). A exportação é **somente
+leitura** e não escreve nada na VPS; o JSONL sai pelo stdout do container:
+
+```bash
+DIA="$(TZ=America/Sao_Paulo date -d yesterday +%F)"
+ssh hunter-vps "cd /opt/project-hunter && ./compose.sh ops python infra/scripts/meme_render_bets.py \
+  export --day $DIA" > "/tmp/meme-bets-$DIA.jsonl"          # ou scp, se preferir gravar lá com --out
+uv run --with matplotlib python infra/scripts/meme_render_bets.py render "/tmp/meme-bets-$DIA.jsonl"
+uv run python infra/scripts/meme_render_bets.py notes "/tmp/meme-bets-$DIA.jsonl"
+uv run python infra/scripts/obsidian_lint.py            # tem de sair limpo antes do commit
+```
+
+Commit por pathspec só do que saiu: `obsidian/attachments/meme/$DIA/**`, as páginas
+`obsidian/03-TRADING/Meme/Apostas-tracadas/*.md`, o `README.md` da pasta, o diário
+`obsidian/09-OPERATIONS/Diario-Meme/$DIA.md` e, na primeira vez, `obsidian/03-TRADING/Meme/README.md`
+(que ganha o link do índice). Rodar de novo o mesmo dia não muda byte nenhum: `render` pula o PNG que
+já existe e `notes` substitui o bloco daquele dia por ele mesmo.
+
 ### 3.7 Executor real de memecoins (`meme-executor`, perfil `meme-live` — T4.14)
 
 Serviço `meme-executor` (`HUNTER_ROLE=meme_executor`, imagem `hunter-api`) nos dois

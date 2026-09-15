@@ -7070,3 +7070,45 @@ e a latência medida **das linhas** (`_sale_to_exit_s_p50`/`_p95`/`_n`, percenti
 novas de papel **e** de posição real). Um número não medido é `""`, nunca `0`; `GET /meme/sources` repete os campos e
 `meme-sources-format.ts` (`creatorWatchLine`) os escreve em português. `HEAD_REVISION → 0038`; `test_0037_*` passa a
 estagiar em `E1_ARMS_3_4_REVISION`; quatro `test_0038_*` novos.
+
+## 51. A reincidência do criador — M4 (`0039_meme_creator_repeat`)
+
+**Por quê (medido no banco da VPS, 15/09/2026, 176 apostas de papel medidas até 20:4x BRT —
+`infra/scripts/sql/research/2026-09-15-t424-reincidencia.sql`):** 89 apostas tinham criador com moeda anterior no
+nosso banco; em **31** o criador **já tinha vendido** numa moeda anterior (`meme_features_1m.creator_sold = true`
+antes da criação da moeda apostada). Essas 31: R médio −0,168 (contra −0,140 nas outras 145), **26 das 85 saídas
+`creator_dump`** e só 4 ganhas (13 %, contra 19 %). Sinal real, modesto — não é bala de prata (a maioria dos golpes
+é de criador **novo**) — mas é o filtro mais barato que ainda não existia.
+
+**A feature nova (`hunter_indicators.meme.pedigree`, T4.24):** `creator_prior_dump_count` conta, em **qualquer
+janela** até a criação da moeda julgada (diferente de `creator_prior_mints_1h`, restrita a 1 h), moedas anteriores
+do mesmo criador em que (a) `meme_features_1m.creator_sold = true`, (b) `meme_paper_bets.creator_sold_seen_at IS
+NOT NULL` (vigilância da cadeia, T4.2h) ou (c) uma aposta nossa saiu por `creator_dump`
+(`lab_repo_fast.pedigree_for`, SQL correlacionado sobre as três fontes). `creator_prior_dead_count` é diagnóstico
+ao lado (moedas anteriores que caíram abaixo de 20 % do próprio topo nos 30 min seguintes à criação; sem série no
+banco, a moeda não entra na contagem nem como viva nem como morta). As duas ficam em `reasons` (`feature:
+pedigree`, junto de `creator_prior_mints_1h`/`symbol_dup_24h`) sempre que o bloco de pedigree existe — mesmo em
+conjuntos que não ligam o filtro.
+
+**A exclusão nova:** `evaluate_repeat_dumper` (mesmo módulo, `PEDIGREE_V1` intocado — não é uma versão nova do
+gate congelado) recusa `creator_repeat_dumper` quando `creator_prior_dump_count ≥ 1`. Parâmetro por conjunto
+`pedigree_repeat_dumper` (`RuleSetSpec`, `bool`, padrão `false`); o criador desconhecido já recusa por
+`creator_unknown` (E2 v1), então a exclusão nova nunca precisa tratar `None` como recusa própria.
+
+**A semente planta dois conjuntos e aposenta um.** `flow_v2/5` (`…0010`, `research_only`, EXP-M6) é `flow_v2/2`
+mais `pedigree_repeat_dumper: true`; `operator/5` (`…0011`, `kind = operator`) é `operator/4` mais o mesmo — a mesa
+passa a usar o filtro. `flow_v2/1` e `flow_v2/2` continuam ativos, a comparação é o ponto. `operator/4` →
+`retired` **antes** do insert, como as aposentadorias anteriores; a invariante de um `operator` ativo é verificada
+nos dois sentidos. Downgrade recusa com proposta ou aposta referenciando qualquer um dos dois conjuntos (§17.7) e
+revive `operator/4`. `HEAD_REVISION → 0039`; `test_0038_*` passa a estagiar em `CREATOR_WATCH_LIVE_REVISION` — e,
+como `0039` finalmente move o `operator` ativo pela primeira vez desde a `0034`, `test_0034_seeds_…`,
+`test_0035_seeds_…` e `test_0037_seeds_…` (que liam `operator/4` ativo sem estagiar, porque nada entre `0034` e
+`0038` mexia nisso) passam a estagiar nas suas próprias revisões também; quatro `test_0039_*` novos.
+
+**Fechamento diário (T4.15):** as recusas `creator_repeat_dumper` por conjunto já chegam de graça pelo mecanismo
+genérico de `meme_close_render_ops.coverage_section` (soma de `meme_lab_ticks.refusals` por nome). Uma comparação
+nova, à parte das nove lições fixas de `day_lessons` (o brief da própria T4.15): `meme_close_lessons.
+lesson_repeat_dumper` mede R das apostas fechadas do dia com `creator_prior_dump_count ≥ 1` contra as demais —
+como só `flow_v2/5`/`operator/5` filtram por esse motivo (e o fazem antes da aposta nascer), o conjunto de apostas
+fechadas de qualquer dia já é "os conjuntos que não filtram"; renderizado dentro de §6.14 (`prereg_section`), a
+comparação que julga o braço, não como décima lição numerada.

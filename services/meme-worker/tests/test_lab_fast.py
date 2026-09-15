@@ -376,6 +376,98 @@ async def test_the_pedigree_refuses_a_serial_creator_and_a_ticker_clone_from_the
     assert report.proposals >= 1
 
 
+# ---- T4.24 (EXP-M6, braço 2): the repeat dumper, over any window -------------------------
+
+_A_FEATURES_1M_ROW = text(
+    "INSERT INTO meme_features_1m (end_time, mint, features_version, coverage, "
+    "  progress_reason, unique_buyers_reason, buy_sell_ratio_reason, top10_share_reason, "
+    "  holders_reason, dev_share_reason, snipers_reason, tape_reason, "
+    "  creator_net_seller_reason, mcap_sol, creator_sold) "
+    "VALUES (:end_time, :mint, 'meme_features_v1', 1, "
+    "  'not_polled', 'no_trade_feed', 'no_trade_feed', 'no_holders_reader', "
+    "  'no_holders_reader', 'no_holders_reader', 'no_holders_reader', 'no_trade_feed', "
+    "  'no_trade_feed', :mcap_sol, :creator_sold)"
+)
+"""A minimal ``meme_features_1m`` row: every absence pairs with its reason
+(T4.16's biconditional CHECKs) except ``mcap_sol``/``creator_sold``, the two
+this test writes."""
+
+
+async def _plant_minute(
+    factory: async_sessionmaker[AsyncSession],
+    mint: str,
+    end_time: datetime,
+    *,
+    mcap_sol: str,
+    creator_sold: bool,
+) -> None:
+    async with role_session(factory, db_role=WORKER) as session:
+        await session.execute(
+            _A_FEATURES_1M_ROW,
+            {
+                "end_time": end_time,
+                "mint": mint,
+                "mcap_sol": mcap_sol,
+                "creator_sold": creator_sold,
+            },
+        )
+        await session.commit()
+
+
+async def test_the_repeat_dumper_counts_any_window_and_the_dead_count_is_diagnostic_only(
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """T4.24: ``creator_prior_dump_count`` reads three sources (here, the tape's
+    ``creator_sold``) over **any** window — unlike ``creator_prior_mints_1h``'s
+    hour; ``creator_prior_dead_count`` is a separate, diagnostic count (a coin
+    that fell under 20 % of its own 30-minute peak), never a refusal input."""
+    creator = f"C_{uuid4().hex[:8]}"
+    dumped_and_dead = f"DEAD_{uuid4().hex[:8]}"
+    alive = f"ALIVE_{uuid4().hex[:8]}"
+    new = f"NEW_{uuid4().hex[:8]}"
+    dumped_created = CREATED - timedelta(hours=5)  # outside the 1h/24h pedigree v1 windows
+    alive_created = CREATED - timedelta(hours=6)
+    await _plant_token(
+        db_session_factory, dumped_and_dead, created_at=dumped_created, creator=creator, symbol="D1"
+    )
+    await _plant_token(
+        db_session_factory, alive, created_at=alive_created, creator=creator, symbol="A1"
+    )
+    await _plant_token(db_session_factory, new, created_at=CREATED, creator=creator, symbol="N1")
+    # dumped_and_dead: a peak, then a crash under 20 % of it, inside its own 30 min — and
+    # the trough's row is the one the tape marks as the creator's sale.
+    await _plant_minute(
+        db_session_factory,
+        dumped_and_dead,
+        dumped_created + timedelta(minutes=5),
+        mcap_sol="100",
+        creator_sold=False,
+    )
+    await _plant_minute(
+        db_session_factory,
+        dumped_and_dead,
+        dumped_created + timedelta(minutes=25),
+        mcap_sol="10",
+        creator_sold=True,
+    )
+    # alive: one reading, no crash, no sale — counts toward neither total.
+    await _plant_minute(
+        db_session_factory,
+        alive,
+        alive_created + timedelta(minutes=10),
+        mcap_sol="50",
+        creator_sold=False,
+    )
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        pedigree = await pedigree_for(session, [new])
+    lineage = pedigree[new]
+    assert lineage.creator_prior_mints_1h == 0, (
+        "both priors are hours before, outside the 1h window"
+    )
+    assert lineage.creator_prior_dump_count == 1, "only dumped_and_dead's tape sale counts"
+    assert lineage.creator_prior_dead_count == 1, "only dumped_and_dead crashed under 20% in 30 min"
+
+
 # ---- the honest scoreboard against Postgres -----------------------------------------------
 
 

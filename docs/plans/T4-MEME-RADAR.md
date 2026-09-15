@@ -1209,6 +1209,117 @@ por minuto** (a faixa rápida de 15 s cobre `fast_lane_max_age_s = 300`), então
 pode levar até 60 s mesmo com esta mudança; pôr os mints com venda vista na faixa rápida é orçamento de RPC e fica
 para uma tarefa própria.
 
+### T4.24 — a reincidência do criador: recusar quem já despejou uma moeda anterior (E2 v2, EXP-M6 braço 2, entregue 15/09/2026)
+
+**Por quê:** medido no banco da VPS (176 apostas de papel até 15/09 20:4x BRT,
+`infra/scripts/sql/research/2026-09-15-t424-reincidencia.sql`): 89 apostas tinham criador com moeda anterior no
+banco; em 31 o criador **já tinha vendido** numa moeda anterior (`meme_features_1m.creator_sold` antes da criação
+da moeda apostada). Essas 31: R médio −0,168 (contra −0,140 nas outras 145), 26 das 85 saídas `creator_dump` e só
+4 ganhas (13 % contra 19 %). Não é bala de prata — a maioria dos golpes é de criador **novo** — mas é o filtro
+mais barato que ainda não existia.
+
+**Entregue:**
+
+1. **A feature (`hunter_indicators.meme.pedigree`):** `creator_prior_dump_count` (qualquer janela até a criação
+   da moeda julgada; conta prévias do mesmo criador onde (a) `meme_features_1m.creator_sold = true`, (b)
+   `meme_paper_bets.creator_sold_seen_at IS NOT NULL` ou (c) uma aposta nossa saiu `creator_dump`) e
+   `creator_prior_dead_count` (diagnóstico: prévias que caíram < 20 % do topo em 30 min; sem série, não conta).
+   Ambas em `PedigreeFeatures`, computadas em `lab_repo_fast.pedigree_for` (SQL correlacionado sobre
+   `meme_tokens`/`meme_features_1m`/`meme_paper_bets`) e gravadas em `reasons` (`feature: pedigree`) sempre que o
+   bloco existe. `evaluate_repeat_dumper` (função pura, nova, `PEDIGREE_V1` intocado) recusa
+   `creator_repeat_dumper` quando o contador é ≥ 1.
+2. **A exclusão:** `RuleSetSpec.pedigree_repeat_dumper` (`bool`, padrão `false`); `evaluate_gate` a aplica ao lado
+   de `pedigree_exclusions`, somando ao invés de esconder o que a porta diria; desconhecido já recusa por
+   `creator_unknown` (E2 v1), então a nova exclusão não repete esse tratamento.
+3. **Migração `0039_meme_creator_repeat`** (`ddl/meme_creator_repeat.py`): `flow_v2/5` (`…0010`, `research_only`,
+   EXP-M6) = `flow_v2/2` + `pedigree_repeat_dumper: true`; `operator/5` (`…0011`) = `operator/4` + o mesmo — a
+   mesa passa a usar o filtro; `operator/4` aposentado como as anteriores; invariante de um `operator` ativo nos
+   dois sentidos; downgrade recusa com proposta/aposta referenciando qualquer um dos dois (§17.7).
+   `HEAD_REVISION → 0039`; `test_0038_*` estagiado em `CREATOR_WATCH_LIVE_REVISION` — e, como `0039` finalmente
+   move o `operator` ativo pela primeira vez desde a `0034`, `test_0034_seeds_…`/`test_0035_seeds_…`/
+   `test_0037_seeds_…` (que liam `operator/4` ativo sem estagiar) passam a estagiar nas próprias revisões
+   também; quatro `test_0039_*` novos.
+4. **Fechamento diário:** as recusas `creator_repeat_dumper` por conjunto já chegam de graça (mecanismo genérico
+   de soma de `meme_lab_ticks.refusals` por nome, `meme_close_render_ops.coverage_section`).
+   `meme_close_lessons.lesson_repeat_dumper` mede R das apostas do dia com `creator_prior_dump_count ≥ 1` contra
+   as demais — à parte das nove lições fixas de `day_lessons` (T4.15), renderizada dentro de §6.14 do diário
+   (`prereg_section`), a comparação que julga o braço.
+5. **Docs:** `DATABASE.md` §51, este plano, `RISK_ENGINE_MEME.md` §10 item 14; EXP-M6 ganha "Braço 2 —
+   reincidência (15/09/2026)".
+6. **Achado fora do escopo, corrigido de passagem (a mesma dívida que a T4.23 já tinha achado uma vez):** rodar a
+   suíte completa de `test_migrations.py` (sem `-k`) achou dois testes antigos que liam o `operator` ativo (ou a
+   contagem de conjuntos ativos) **sem estagiar**, desatualizados desde a `0034` (T4.21) porque, desde então, só
+   se rodava o subconjunto `-k` de cada tarefa. `test_0022_reverses_with_the_seed_alone_and_comes_back_seeded`
+   (contagem `8`, correta só até a `0030`) e `test_0029_adds_the_mark_and_venue_columns_and_seeds_the_moonshot_arms`
+   (`operator/3`, já remendado uma vez na `0033` mas nunca de novo) — corrigidos para `13` e `operator/5`.
+
+**Provas (saídas reais):** indicators `-k meme` **257 passed** (252 antes + 5 novos de
+`test_meme_pedigree.py`); worker unit **220 passed** (`-m unit`); `test_migrations -k "0038 or 0039 or
+alembic_check or upgrade_head"` **11 passed** (54 s); `test_migrations -k "0033 or 0034 or 0035 or 0037"`
+**13 passed** (57 s, retrofits do `operator/4` → `operator/5`); `test_migrations` **completo, sem `-k`, 190
+testes**: 1ª rodada 188 passed/2 failed (os dois achados do item 6, 704 s), 2ª rodada depois do reparo
+**190 passed** (732,79 s / 12m12s); `infra/scripts/tests/test_meme_close_lessons.py`
+**7 passed**; ruff/`ruff format --check`/pyright 0; `check_file_size.py` 0 acima.
+
+**Fora desta tarefa:** validação prospectiva de `flow_v2/5`/`operator/5` (o Lab mede sozinho, régua ≥ 100 apostas
+e 30 dias); rótulo `creator_repeat_dumper` → "criador reincidente" no `apps/web` (fora do escopo, listado nas
+notas para o front); `post_sibling_rank_at_create`/twitter-e-descrição vazios (`exclusoes_de_pedigree v2`, fora
+desta tarefa, T4.2g/T4.12).
+
+### T4.25 — cada aposta meme desenhada no Obsidian, com as linhas que o fold traçou (entregue 15/09/2026)
+
+**Por quê:** o vault tem 681 gráficos das operações de perps/spot (T3.50) e **nenhum** de meme. As linhas
+(`support_line_sol`, `high_15m_sol`, `breakout_15m`, `higher_lows`, T4.10) existiam só como números em
+`meme_features_1m` e como desenho na tela `/meme/{mint}`; quem lê o diário do dia não via a curva de nenhuma
+aposta. Pergunta do Everton em 15/09 21:3x BRT.
+
+**Entregue** — `infra/scripts/meme_render_bets.py` + `_model` (modelo do JSONL e geometria), `_query` (a
+exportação), `_draw` (matplotlib) e `_notes` (as páginas), no mesmo desenho da T3.50: exportar na VPS, desenhar no
+laptop, embutir no vault.
+
+1. **`export --day AAAA-MM-DD [--set nome/versão] [--include-indeterminate]`** roda dentro da imagem
+   (`compose.sh ops`), lê como `hunter_app` e só faz `SELECT`: aposta **fechada** do dia Brasília com conjunto,
+   mint, símbolo, entrada/saída (instantes, mcap em SOL das fotografias que precificaram as duas pontas, motivo,
+   R), `high_water_x`, `creator_sold_seen_at`/fração, os `params` efetivos, os `params` do conjunto, o
+   `manual_plan` da proposta, e **as séries** — `meme_features_15s`, `meme_features_1m` com as nove colunas de
+   linha e as fotografias de `meme_curve_snapshots` — de 10 min antes da entrada a 10 min depois da saída.
+   JSONL no stdout (ou `--out`). Indeterminadas (T4.16) ficam **fora** por padrão e entram rotuladas.
+2. **`render <jsonl>`** (local, `uv run --with matplotlib`, matplotlib fora do lock): um PNG por aposta em
+   `obsidian/attachments/meme/<dia>/<conjunto>/<HHMM>-<símbolo>-<R>.png` — mcap teórico em SOL (15 s quando
+   houver, senão o minuto), fotografias como pontos, **a reta de suporte e a máxima de 15 min anterior lidas no
+   minuto fechado da entrada** com a geometria da tela (`meme-lines.ts`), rompimentos marcados, entrada ▲ e saída
+   ▼ (ou linha vertical quando não houve fotografia para vender), a **venda do criador** como linha vertical, e
+   alvo/piso/arme/trailing/pico como faixas pontilhadas rotuladas `≈`. Fundo branco fixo, dpi 110, teto de 200 KB.
+3. **`notes <jsonl>`** escreve `obsidian/03-TRADING/Meme/Apostas-tracadas/<conjunto>.md` (uma página por conjunto:
+   pré-registro `EXP-M*`, régua congelada dos `params`, e um bloco `## Dia <AAAA-MM-DD>` por dia com a galeria
+   melhor/pior/mais recente e a tabela), o índice da pasta, o link de entrada no `Meme/README.md` e a seção
+   **`## 7. Gráficos`** do diário do dia. Um dia já na página é substituído por si mesmo; **nenhum outro dia é
+   reescrito**.
+
+**Não-antecipação:** a linha desenhada é a do **minuto fechado da entrada** (`minute_at`) e a máxima é a do minuto
+**anterior** a ele — o contrato do `breakout_15m` exclui o próprio minuto. Um teste altera todos os minutos
+posteriores à entrada e exige que nada do que é desenhado mude; a mesma alteração, lida pela trapaça deliberada
+(usar o **último** minuto), muda as duas retas.
+
+**Suposições declaradas:** (a) as faixas de alvo/piso/trailing são desenhadas em **mcap** por multiplicação sobre
+o mcap da entrada, com `≈` no rótulo e no rodapé — as regras medem a **marca em SOL** (§6 do
+`RISK_ENGINE_MEME.md`), e a diferença é o deslize da própria ordem mais 1,75 % por ponta; (b) a pasta é
+`Apostas-tracadas`, não `Operacoes-tracadas`, porque o `obsidian_lint.py` resolve `[[Operacoes-tracadas/README]]`
+por sufixo e um segundo README com esse nome tornaria **ambíguos** 8 links existentes (7 páginas da T3.50 e o
+diário datado de 08/09, que não se reescreve); (c) os embeds são markdown com caminho relativo, a convenção do
+vault, porque `.png` não é alvo linkável do linter (`ASSET_SUFFIXES`) e um `![[…png]]` viraria link morto.
+
+**Provas (saídas reais):** `infra/scripts/tests/test_meme_render_bets.py` **12 passed** (`uv run --with
+matplotlib`; 10 + 2 pulados sem matplotlib), `test_meme_render_bets_integration.py` **3 passed** (24 s,
+testcontainer em `head`: exportação como `hunter_app`, janela e mint corretos, e uma **cópia do vault com as
+páginas novas passando limpa no `obsidian_lint.py`**); ruff/`ruff format --check`/pyright 0; `check_file_size.py`
+0 acima.
+
+**Fora desta tarefa (declarado):** a corrida real de 14/09 e 15/09 — sem acesso à VPS nesta sessão não há JSONL
+real, então nenhum PNG e nenhuma página foram escritos no vault; os três PNGs desta entrega são da fixture
+sintética, desenhados fora da árvore. O primeiro `export → render → notes` real entra pela rotina da manhã
+(`docs/DEPLOYMENT.md` §3.6b).
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

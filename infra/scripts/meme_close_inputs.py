@@ -83,6 +83,10 @@ class CloseInputs:
     indeterminate: int = 0
     """T4.15b: closes of the day with ``outcome_quality = indeterminate`` — outside
     every sum above, counted here so the day says how often the instrument blinked."""
+    repeat_dumper: Lesson | None = None
+    """T4.24 (EXP-M6, braço 2): the R comparison that judges
+    ``pedigree_repeat_dumper`` — outside :attr:`lessons`'s fixed nine,
+    rendered inside §6.14 (``meme_close_render_ops.prereg_section``)."""
 
 
 def brt(at: datetime | None, pattern: str = "%H:%M:%S") -> str:

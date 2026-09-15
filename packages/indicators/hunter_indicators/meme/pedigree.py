@@ -19,6 +19,18 @@ The two other exclusions the study names — ``post_sibling_rank_at_create > 1``
 (T4.2g/T4.12 data), so they are **not** criteria of this version; the
 pre-registration (``obsidian/05-EXPERIMENTS/EXP-M6-exclusoes-de-pedigree.md``)
 says so, and a version that adds them is ``exclusoes_de_pedigree v2``.
+
+**T4.24 (EXP-M6, braço 2) adds a second, independent check** —
+``evaluate_repeat_dumper`` — over two counts our own database can already
+answer, not a bump of ``PEDIGREE_V1`` (its thresholds are frozen):
+``creator_prior_dump_count`` (coins the same creator launched before, in
+**any** window, where the creator sold — by the tape, by the chain watch or
+by one of our own bets exiting ``creator_dump``) and
+``creator_prior_dead_count`` (of those, how many died in their first 30
+minutes; ``None`` per coin without a series is not counted either way). A
+rule set opts in with ``params.pedigree_repeat_dumper: true`` — off by
+default, exactly like a falsification arm's own word for
+``pedigree_exclusions``.
 """
 
 from __future__ import annotations
@@ -31,9 +43,12 @@ __all__ = [
     "PEDIGREE_INPUTS",
     "PEDIGREE_REFUSALS",
     "PEDIGREE_V1",
+    "REPEAT_DUMPER_INPUTS",
+    "REPEAT_DUMPER_REFUSAL",
     "PedigreeFeatures",
     "PedigreeGate",
     "evaluate_pedigree",
+    "evaluate_repeat_dumper",
 ]
 
 PEDIGREE_INPUTS: Final = (
@@ -41,10 +56,24 @@ PEDIGREE_INPUTS: Final = (
     "meme_tokens.symbol",
     "meme_tokens.created_at",
 )
+REPEAT_DUMPER_INPUTS: Final = (
+    "meme_features_1m.creator_sold",
+    "meme_paper_bets.creator_sold_seen_at",
+    "meme_paper_bets.exit->>'reason'",
+)
+"""T4.24: what ``creator_prior_dump_count`` is read from — our own database,
+never a third-party field."""
 PEDIGREE_REFUSALS: Final = frozenset(
-    {"creator_unknown", "creator_serial", "symbol_unknown", "symbol_clone"}
+    {
+        "creator_unknown",
+        "creator_serial",
+        "symbol_unknown",
+        "symbol_clone",
+        "creator_repeat_dumper",
+    }
 )
 """The closed vocabulary this module can add to a gate's refusals."""
+REPEAT_DUMPER_REFUSAL: Final = "creator_repeat_dumper"
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,10 +112,20 @@ class PedigreeGate:
 
 @dataclass(frozen=True, slots=True)
 class PedigreeFeatures:
-    """The two counts at proposal time. ``None`` = the identity is unknown."""
+    """The counts at proposal time. ``None`` = the identity is unknown."""
 
     creator_prior_mints_1h: int | None
     symbol_dup_24h: int | None
+    creator_prior_dump_count: int | None = None
+    """T4.24: prior coins of the same creator (any window) where the creator
+    sold, by our own database (see :data:`REPEAT_DUMPER_INPUTS`). ``None``
+    only when the creator or its creation time is unknown — the same
+    condition that already makes :func:`evaluate_pedigree` refuse
+    ``creator_unknown``."""
+    creator_prior_dead_count: int | None = None
+    """T4.24: of the coins counted above, how many fell under 20 % of their
+    own peak inside their first 30 minutes — diagnostic only, never a
+    refusal; a coin with no series in that window is not counted either way."""
 
 
 PEDIGREE_V1: Final = PedigreeGate(
@@ -115,3 +154,16 @@ def evaluate_pedigree(features: PedigreeFeatures, gate: PedigreeGate) -> tuple[s
     elif features.symbol_dup_24h > gate.max_symbol_dup_24h:
         refusals.append("symbol_clone")
     return tuple(refusals)
+
+
+def evaluate_repeat_dumper(features: PedigreeFeatures) -> tuple[str, ...]:
+    """T4.24 (EXP-M6, braço 2): refuse a creator with at least one prior dump
+    in **our own** database. Pure, and independent of :data:`PEDIGREE_V1` —
+    the caller applies it only when the rule set's own
+    ``pedigree_repeat_dumper`` switch is on. An unknown count (``None``)
+    refuses nothing here: whenever this check runs beside
+    :func:`evaluate_pedigree` (T4.24's only wiring), that one already refuses
+    the same row by name (``creator_unknown``)."""
+    if features.creator_prior_dump_count is None:
+        return ()
+    return (REPEAT_DUMPER_REFUSAL,) if features.creator_prior_dump_count >= 1 else ()

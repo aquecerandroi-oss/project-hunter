@@ -90,6 +90,8 @@ def test_the_flow_set_parses_its_clock_and_its_pedigree_switch() -> None:
     assert spec.gate.max_sells_to_buys == Decimal("0.6") and spec.trailing_arm_x == Decimal("1.5")
     assert _spec().clock == "1m", "every set frozen before T4.16 reads the minute"
     assert _flow_spec(pedigree_exclusions=False).pedigree_exclusions is False
+    assert spec.pedigree_repeat_dumper is False, "T4.24: off unless a set says so"
+    assert _flow_spec(pedigree_repeat_dumper=True).pedigree_repeat_dumper is True
     with pytest.raises(ValueError, match="unknown clock"):
         _flow_spec(clock="5s")
 
@@ -115,6 +117,8 @@ def test_a_passing_15s_row_becomes_a_proposal_that_names_its_series_flow_and_ped
         "symbol_dup_24h": 1,
         "max_creator_prior_mints_1h": 1,
         "max_symbol_dup_24h": 2,
+        "creator_prior_dump_count": None,
+        "creator_prior_dead_count": None,
     }
     assert draft.suggested["trailing_arm_x"] == "1.5" and draft.suggested["exit_on_line_break"]
 
@@ -142,6 +146,57 @@ def test_the_pedigree_refuses_alongside_the_gate_and_by_name(
     assert dict(outcome.refusals) == {refusal: 1, "flow_not_positive": 1}, (
         "both counted: the pedigree does not hide what the gate would have said"
     )
+    assert outcome.drafts == []
+
+
+def test_the_repeat_dumper_refuses_beside_the_gate_only_when_the_set_opts_in() -> None:
+    """T4.24 (EXP-M6, braço 2): ``creator_repeat_dumper`` fires alongside the
+    gate's own refusals, only for a set with ``pedigree_repeat_dumper: true``;
+    the default set records the count in ``reasons`` but never refuses on it."""
+    dumper = PedigreeFeatures(0, 0, creator_prior_dump_count=2)
+    off = evaluate_gate(
+        _flow_spec(),
+        [_fast_row()],
+        now=NOW,
+        ttl_s=120,
+        already_open=frozenset(),
+        pedigree={MINT: dumper},
+    )
+    assert off.refusals == {} and len(off.drafts) == 1, "off by default: recorded, never refused"
+    (draft,) = off.drafts
+    pedigree_block = next(r for r in draft.reasons if r.get("feature") == "pedigree")
+    assert pedigree_block["creator_prior_dump_count"] == 2
+    on = evaluate_gate(
+        _flow_spec(pedigree_repeat_dumper=True),
+        [_fast_row()],
+        now=NOW,
+        ttl_s=120,
+        already_open=frozenset(),
+        pedigree={MINT: dumper},
+    )
+    assert dict(on.refusals) == {"creator_repeat_dumper": 1}
+    assert on.drafts == []
+    clean = evaluate_gate(
+        _flow_spec(pedigree_repeat_dumper=True),
+        [_fast_row()],
+        now=NOW,
+        ttl_s=120,
+        already_open=frozenset(),
+        pedigree={MINT: PedigreeFeatures(0, 0, creator_prior_dump_count=0)},
+    )
+    assert clean.refusals == {} and len(clean.drafts) == 1, "zero prior dumps is a clean pedigree"
+
+
+def test_the_repeat_dumper_is_counted_alongside_the_gates_own_refusal() -> None:
+    outcome = evaluate_gate(
+        _flow_spec(pedigree_repeat_dumper=True),
+        [_fast_row(net_sol_flow_1m=Decimal("-1"))],  # the gate says flow_not_positive too
+        now=NOW,
+        ttl_s=120,
+        already_open=frozenset(),
+        pedigree={MINT: PedigreeFeatures(0, 0, creator_prior_dump_count=1)},
+    )
+    assert dict(outcome.refusals) == {"creator_repeat_dumper": 1, "flow_not_positive": 1}
     assert outcome.drafts == []
 
 

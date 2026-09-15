@@ -125,9 +125,52 @@ pedigree, cortando ≤ 40 % das entradas, em ≥ 100 propostas avaliadas e ≥ 3
 [[EXP-M5-fluxo-e-holders]] · [[EXP-M4-moonshot]] · [[00-INBOX/Hipoteses-do-plantao]] ·
 [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]]
 
+## Braço 2 — reincidência do criador (15/09/2026, T4.24)
+
+**Por quê:** pedido do Everton (15/09 20:4x BRT) — "as apostas, temos que tomar cuidado, pois tem gente que sobe
+moeda golpe e compramos e por isso perdemos." Medido no banco da VPS (176 apostas de papel medidas até 15/09
+20:4x BRT; `infra/scripts/sql/research/2026-09-15-t424-reincidencia.sql`): 89 apostas tinham criador com moeda
+anterior no nosso banco; em **31** o criador **já tinha vendido** numa moeda anterior
+(`meme_features_1m.creator_sold = true` antes da criação da moeda apostada). Essas 31: R médio −0,168 (contra
+−0,140 nas outras 145), **26 das 85 saídas `creator_dump`** e só 4 ganhas (13 %, contra 19 %). Sinal real,
+modesto: excluir reincidentes teria evitado −5,2 R e 4 acertos. Não é bala de prata — a maioria dos golpes é de
+criador **novo** (carteira nova por moeda) — mas é o filtro mais barato que ainda não existia.
+
+**Hipótese (congelada):** **H1:** recusar, em qualquer conjunto, a moeda cujo criador já vendeu numa moeda
+anterior em qualquer janela (`creator_prior_dump_count ≥ 1`) melhora a expectância por ≥ 0,10 R sem cortar mais
+de 40 % das entradas. **H0 (previsão):** a maioria dos golpes é de criador novo, sem histórico algum — o sinal é
+real mas pequeno e não independente do que a fita/holders já medem → `descartar` como filtro autônomo (mantido
+como diagnóstico), a mesma leitura do braço 1.
+
+**Definição congelada (v2, braço 2):** `creator_prior_dump_count` — moedas anteriores do mesmo criador, **em
+qualquer janela** até a criação da moeda julgada, em que (a) `meme_features_1m.creator_sold = true`, (b)
+`meme_paper_bets.creator_sold_seen_at IS NOT NULL` (vigilância da cadeia, T4.2h) ou (c) uma aposta nossa saiu por
+`creator_dump`; limiar `≥ 1` → recusa `creator_repeat_dumper`. `creator_prior_dead_count` — das anteriores, quantas
+caíram abaixo de 20 % do próprio topo nos 30 minutos seguintes à criação, se houver série; sem série, a moeda não
+entra na contagem (nem viva, nem morta) — diagnóstico, nunca uma recusa. Contado em `meme_tokens` +
+`meme_features_1m` + `meme_paper_bets` na hora da proposta (`lab_repo_fast.pedigree_for`); gravado em `reasons`
+(`feature: pedigree`, junto de `creator_prior_mints_1h`/`symbol_dup_24h`) sempre que o bloco existe, mesmo nos
+conjuntos que não ligam o filtro. **`PEDIGREE_V1` (E2 v1: criador em série, clone de ticker) não muda** — esta é
+uma exclusão independente (`evaluate_repeat_dumper`), nunca uma versão nova do gate congelado.
+
+**Regra (`flow_v2/5`, `research_only`, relógio de 15 s; a mesa usa o mesmo braço como `operator/5`):** tudo do
+braço 2 da E1 (`flow_v2/2`/`operator/4`) mais `pedigree_repeat_dumper: true`. Saídas iguais (3×, trailing 35 %
+após 1,5×, 30 min, `creator_dump`, `line_broken`, −50 %).
+
+**Previsão congelada:** `descartar` como filtro autônomo — a mesma leitura do braço 1 (H0): o sinal é real na
+amostra retrospectiva (31 de 89, Δ −0,028 R contra as sem histórico de venda) mas a maioria dos golpes escapa
+dele (criador novo, sem histórico algum). **Régua:** a mesma dos braços anteriores (≥ 100 apostas e 30 dias, IC
+95 % por blocos de dia, leave-top-out, semente 20260912); `flow_v2/1`/`flow_v2/2` continuam ativos, a comparação
+é o ponto. **O que não vale:** ajustar o limiar (`≥ 1`) olhando os primeiros dias prospectivos (KB-0092).
+
+**Migração:** `0039_meme_creator_repeat` (`…0010` para `flow_v2/5`, `…0011` para `operator/5`; `operator/4`
+aposentado); `docs/DATABASE.md` §51.
+
 ## Fontes
 
 `packages/indicators/hunter_indicators/meme/pedigree.py` · `packages/indicators/tests/unit/test_meme_pedigree.py` ·
 `services/meme-worker/hunter_meme_worker/{proposals,proposals_reasons,lab_repo_fast,lab,lab_fast}.py` ·
-`services/meme-worker/tests/{test_proposals_flow,test_lab_fast}.py` · `docs/plans/T4-MEME-RADAR.md` §T4.16 ·
-`infra/scripts/sql/research/2026-09-12-t416-filtros-de-pedigree-nas-21.sql`.
+`services/meme-worker/tests/{test_proposals_flow,test_lab_fast}.py` · `docs/plans/T4-MEME-RADAR.md` §T4.16, §T4.24 ·
+`infra/scripts/sql/research/2026-09-12-t416-filtros-de-pedigree-nas-21.sql` ·
+`infra/scripts/sql/research/2026-09-15-t424-reincidencia.sql` ·
+`infra/scripts/meme_close_{lessons,lesson_kit,render_ops,queries}.py` (braço 2, §6.14 do fechamento diário).

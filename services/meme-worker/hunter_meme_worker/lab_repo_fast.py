@@ -45,8 +45,14 @@ _FAST_ROWS = text(
     "ORDER BY f.as_of, f.mint"
 )
 
+_PRIOR_MINTS = (
+    "SELECT count(*) FROM meme_tokens o WHERE o.creator = t.creator "
+    "  AND o.mint <> t.mint AND o.created_at IS NOT NULL AND o.created_at <= t.created_at"
+)
+"""Every prior coin of this creator, any window — the base ``creator_prior_dump_count``
+and ``creator_prior_dead_count`` (T4.24) both start from and narrow with an ``AND``."""
 _PEDIGREE = text(
-    "SELECT t.mint, "
+    "SELECT t.mint, "  # noqa: S608 - every interpolation below is this module's own frozen SQL text
     "       CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("
     "         SELECT count(*) FROM meme_tokens o WHERE o.creator = t.creator "
     "           AND o.mint <> t.mint AND o.created_at IS NOT NULL "
@@ -58,12 +64,48 @@ _PEDIGREE = text(
     "           AND o.mint <> t.mint AND o.created_at IS NOT NULL "
     "           AND o.created_at <= t.created_at "
     "           AND o.created_at > t.created_at - make_interval(secs => :symbol_window_s)"
-    "       ) END AS symbol_dup_24h "
+    "       ) END AS symbol_dup_24h, "
+    "       CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("
+    f"        {_PRIOR_MINTS}"
+    "           AND ("
+    "             EXISTS (SELECT 1 FROM meme_features_1m pf WHERE pf.mint = o.mint "
+    "                       AND pf.creator_sold = true AND pf.end_time < t.created_at)"
+    "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb WHERE pb.mint = o.mint "
+    "                          AND pb.creator_sold_seen_at IS NOT NULL "
+    "                          AND pb.creator_sold_seen_at < t.created_at)"
+    "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb2 WHERE pb2.mint = o.mint "
+    "                          AND pb2.exit ->> 'reason' = 'creator_dump' "
+    "                          AND pb2.exit_at < t.created_at)"
+    "           )"
+    "       ) END AS creator_prior_dump_count, "
+    "       CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("
+    f"        {_PRIOR_MINTS}"
+    "           AND EXISTS ("
+    "             SELECT 1 FROM ("
+    "               SELECT max(w.mcap_sol) AS peak, min(w.mcap_sol) AS trough "
+    "               FROM meme_features_1m w WHERE w.mint = o.mint AND w.mcap_sol IS NOT NULL "
+    "                 AND w.end_time > o.created_at "
+    "                 AND w.end_time <= o.created_at + interval '30 minutes'"
+    "             ) window_30m "
+    "             WHERE window_30m.peak IS NOT NULL AND window_30m.peak > 0 "
+    "               AND window_30m.trough < window_30m.peak * 0.2"
+    "           )"
+    "       ) END AS creator_prior_dead_count "
     "FROM meme_tokens t WHERE t.mint = ANY(:mints)"
 )
-"""Two correlated counts over ``meme_tokens`` (indexed on ``created_at``; the
+"""Four correlated counts over ``meme_tokens`` (indexed on ``created_at``; the
 tracked set is ~130 mints, the table ~40 k/day). ``NULL`` when the identity
-is unknown — the gate refuses that by name, never reads it as zero."""
+is unknown — the gate refuses that by name, never reads it as zero.
+
+T4.24 (EXP-M6, braço 2): ``creator_prior_dump_count`` counts **any** window
+(unlike the 1 h/24 h of the two above) up to the judged coin's own creation,
+over three sources of evidence — the tape (``meme_features_1m.creator_sold``),
+the chain watch (``meme_paper_bets.creator_sold_seen_at``, T4.2h) or one of
+our own bets exiting ``creator_dump``. ``creator_prior_dead_count`` is
+diagnostic only (never a refusal): a prior coin whose ``mcap_sol`` fell under
+20 % of its own 30-minute peak; a coin with **no** ``meme_features_1m`` row in
+that window is excluded from the count either way (declared "not measured"),
+never read as alive nor as dead."""
 
 
 async def load_fast_gate_rows(
@@ -138,6 +180,16 @@ async def pedigree_for(
                 None if r["creator_prior_mints_1h"] is None else int(r["creator_prior_mints_1h"])
             ),
             symbol_dup_24h=None if r["symbol_dup_24h"] is None else int(r["symbol_dup_24h"]),
+            creator_prior_dump_count=(
+                None
+                if r["creator_prior_dump_count"] is None
+                else int(r["creator_prior_dump_count"])
+            ),
+            creator_prior_dead_count=(
+                None
+                if r["creator_prior_dead_count"] is None
+                else int(r["creator_prior_dead_count"])
+            ),
         )
         for r in (await session.execute(_PEDIGREE, params)).mappings()
     }

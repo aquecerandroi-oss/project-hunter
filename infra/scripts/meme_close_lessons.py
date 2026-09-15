@@ -47,6 +47,7 @@ __all__ = [
     "lesson_exits",
     "lesson_flag",
     "lesson_progress",
+    "lesson_repeat_dumper",
     "lesson_tercile",
 ]
 
@@ -206,6 +207,31 @@ def _serial(bet: ClosedBet) -> bool | None:
 
 def _clone(bet: ClosedBet) -> bool | None:
     return None if bet.symbol_dup_24h is None else bet.symbol_dup_24h >= SYMBOL_CLONE_MIN
+
+
+def _repeat_dumper(bet: ClosedBet) -> bool | None:
+    return None if bet.creator_prior_dump_count is None else bet.creator_prior_dump_count >= 1
+
+
+def lesson_repeat_dumper(bets: Sequence[ClosedBet]) -> Lesson:
+    """T4.24 (EXP-M6, braço 2): the comparison that judges
+    ``pedigree_repeat_dumper`` — R of bets whose creator had already dumped a
+    prior coin, in our own database. **Not** part of :func:`day_lessons`'s
+    fixed nine (T4.15's own brief): the sets that turn the filter on
+    (``flow_v2/5``/``operator/5``, ``0039``) refuse those bets before they are
+    ever placed, so pooling across every closed bet of the day already reads
+    as "the sets that don't filter" — rendered on its own in §6.14 of the
+    diary (``meme_close_render_ops.prereg_section``), not as a numbered
+    lesson."""
+    return lesson_flag(
+        bets,
+        key="reincidente_dumper",
+        title="Criador reincidente (dump) × R",
+        feature="creator_prior_dump_count",
+        flag=_repeat_dumper,
+        yes="criador com dump anterior conhecido (creator_prior_dump_count ≥ 1)",
+        no="criador sem dump anterior conhecido",
+    )
 
 
 def day_lessons(bets: Sequence[ClosedBet]) -> list[Lesson]:

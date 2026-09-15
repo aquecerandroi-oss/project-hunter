@@ -187,6 +187,10 @@ class RuleSetSpec:
     pedigree_exclusions: bool = True
     """T4.16 (EXP-M6): the cross-cutting pedigree refusals apply to this set;
     ``false`` is the falsification arm's word, never the default."""
+    pedigree_repeat_dumper: bool = False
+    """T4.24 (EXP-M6, braço 2): refuse ``creator_prior_dump_count >= 1`` beside
+    ``pedigree_exclusions``; off by default in every frozen set — only
+    ``flow_v2/5``/``operator/5`` (``0039``) turn it on."""
     ttl_s: int | None = None
     """T4.19: how long this set's proposals wait for the desk (``operator/3``:
     180 s, a buy by hand); ``None`` = the loop's ``lab_proposal_ttl_s``."""
@@ -246,6 +250,7 @@ class RuleSetSpec:
             dead_mark_pct=decimal_or(params.get("dead_mark_pct"), DEFAULT_DEAD_MARK_PCT),
             clock=_clock_of(params.get("clock")),
             pedigree_exclusions=bool_or(params.get("pedigree_exclusions"), True),
+            pedigree_repeat_dumper=bool_or(params.get("pedigree_repeat_dumper"), False),
             ttl_s=None if params.get("ttl_s") is None else int(params["ttl_s"]),
         )
 

@@ -26,6 +26,7 @@ from meme_close_lessons import (  # noqa: E402
     lesson_exits,
     lesson_flag,
     lesson_progress,
+    lesson_repeat_dumper,
     lesson_tercile,
 )
 
@@ -54,6 +55,7 @@ def _bet(**overrides: Any) -> ClosedBet:
         "same_slot": False,
         "creator_prior_1h": 0,
         "symbol_dup_24h": 0,
+        "creator_prior_dump_count": 0,
     }
     base.update(overrides)
     return ClosedBet(**base)
@@ -149,6 +151,37 @@ def test_bands_and_terciles_put_the_unknown_apart_and_pick_the_most_deviant_cell
     labels = {cell.label for cell in top10.cells}
     assert "desconhecido" in labels and any(label.startswith("baixo") for label in labels)
     assert all("\n" not in cell.label for cell in top10.cells)
+
+
+def test_the_repeat_dumper_lesson_is_measured_apart_from_the_fixed_nine() -> None:
+    """T4.24 (EXP-M6, braço 2): reuses ``lesson_flag``'s ruler, but is not one
+    of the nine ``day_lessons`` — the VPS render puts it inside §6.14."""
+    bets = [
+        _bet(
+            mint=f"DUMP{i}",
+            creator_prior_dump_count=1,
+            r_multiple=Decimal("-1"),
+            entry_at=NOON_UTC + timedelta(hours=i % 6, minutes=i),
+        )
+        for i in range(12)
+    ] + [
+        _bet(
+            mint=f"CLEAN{i}",
+            creator_prior_dump_count=0,
+            r_multiple=Decimal("0.3") if i % 2 == 0 else Decimal("-0.2"),
+            entry_at=NOON_UTC + timedelta(hours=i % 6, minutes=30 + i),
+        )
+        for i in range(28)
+    ]
+    assert len(day_lessons(bets)) == 9, "the repeat dumper is not one of T4.15's fixed nine"
+    lesson = lesson_repeat_dumper(bets)
+    assert lesson.n == 40
+    cells = {cell.label: cell.interval for cell in lesson.cells}
+    assert cells["criador com dump anterior conhecido (creator_prior_dump_count ≥ 1)"].n == 12
+    assert cells["criador sem dump anterior conhecido"].n == 28
+    assert lesson.contrast is not None and lesson.contrast.delta is not None
+    assert lesson.contrast.delta < 0
+    assert lesson.measured is not None and "Δ" in lesson.measured
 
 
 def test_below_thirty_bets_every_lesson_says_nothing_changes() -> None:

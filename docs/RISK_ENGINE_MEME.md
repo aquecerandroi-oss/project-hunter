@@ -678,6 +678,18 @@ Nada de "preenchido ao último preço visto".
     `flow_v2/4` (braço 2 + o piso e o teto do top-10), ambos pré-registrados `descartar`, medidos ao lado de
     `flow_v2/1` e `flow_v2/2`; a mesa (`operator/4`) não muda.
 
+14. **A reincidência do criador (T4.24, EXP-M6 braço 2).** Medido no banco da VPS (176 apostas de papel,
+    15/09/2026): das 89 apostas com criador com moeda anterior, as 31 em que ele **já tinha vendido** numa moeda
+    anterior pagaram R médio −0,168 (contra −0,140 nas outras 145), 26 das 85 saídas `creator_dump` e só 4
+    ganhas (13 % contra 19 %). `creator_prior_dump_count` (`hunter_indicators.meme.pedigree`) conta, em qualquer
+    janela até a criação da moeda julgada, moedas anteriores do mesmo criador vendidas por nós já sabidas — pela
+    fita (`meme_features_1m.creator_sold`), pela vigilância da cadeia (`creator_sold_seen_at`, T4.2h) ou por uma
+    aposta nossa que saiu `creator_dump`; `creator_prior_dead_count` (moedas que caíram < 20 % do topo em 30 min)
+    é diagnóstico, nunca uma recusa. `evaluate_repeat_dumper` recusa `creator_repeat_dumper` quando o contador é
+    ≥ 1 — parâmetro por conjunto `pedigree_repeat_dumper`, desligado por padrão; `PEDIGREE_V1` (E2 v1, criador em
+    série/clone de ticker) não muda. `flow_v2/5` e `operator/5` (`0039`) ligam o filtro — a mesa passa a usá-lo,
+    `operator/4` aposentado; `flow_v2/1`/`flow_v2/2` continuam medidos ao lado, previsão `descartar`.
+
 ## 11. VM1–VM9 — as nove verificações do motor meme
 
 Equivalente das V1–V9 da T3.9 (`.claude/state/spec-T3.9-verificacoes.md`,

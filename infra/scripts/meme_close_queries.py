@@ -6,6 +6,10 @@ fill** (``meme_features_1m``, ``end_time <= entry_at``, at most 10 minutes
 back) — never from a later row; the pedigree counts (``creator_prior_1h``,
 ``symbol_dup_24h``) count only mints created **before** the bet's mint; both
 are ``NULL`` when the token's creation time is unknown, never zero.
+``creator_prior_dump_count`` (T4.24, EXP-M6 braço 2) counts, in **any**
+window, prior coins of the same creator our own database already knows sold —
+the same read as ``lab_repo_fast.pedigree_for``, replayed against every
+closed bet of the day.
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 
-from meme_close_lessons import ClosedBet, day_lessons, leave_top_out
+from meme_close_lessons import ClosedBet, day_lessons, leave_top_out, lesson_repeat_dumper
 from meme_close_render import CloseInputs, Coverage, ExpAllTime, OperatorDay
 from meme_close_stats import PLACES, Sample, block_ci
 from meme_diary import day_bounds
@@ -45,7 +49,20 @@ _CLOSED_BETS = text(
     "       CASE WHEN t.created_at IS NULL OR t.symbol IS NULL THEN NULL ELSE "
     "         (SELECT count(*) FROM meme_tokens t3 WHERE t3.symbol = t.symbol "
     "            AND t3.mint <> t.mint AND t3.created_at < t.created_at "
-    "            AND t3.created_at >= t.created_at - interval '24 hours') END AS symbol_dup_24h "
+    "            AND t3.created_at >= t.created_at - interval '24 hours') END AS symbol_dup_24h, "
+    "       CASE WHEN t.created_at IS NULL OR t.creator IS NULL THEN NULL ELSE "
+    "         (SELECT count(*) FROM meme_tokens t4 WHERE t4.creator = t.creator "
+    "            AND t4.mint <> t.mint AND t4.created_at IS NOT NULL "
+    "            AND t4.created_at <= t.created_at AND ("
+    "              EXISTS (SELECT 1 FROM meme_features_1m f4 WHERE f4.mint = t4.mint "
+    "                        AND f4.creator_sold = true AND f4.end_time < t.created_at)"
+    "              OR EXISTS (SELECT 1 FROM meme_paper_bets b4 WHERE b4.mint = t4.mint "
+    "                           AND b4.creator_sold_seen_at IS NOT NULL "
+    "                           AND b4.creator_sold_seen_at < t.created_at)"
+    "              OR EXISTS (SELECT 1 FROM meme_paper_bets b5 WHERE b5.mint = t4.mint "
+    "                           AND b5.exit ->> 'reason' = 'creator_dump' "
+    "                           AND b5.exit_at < t.created_at)"
+    "            )) END AS creator_prior_dump_count "
     "FROM meme_paper_bets b "
     "JOIN meme_rule_sets r ON r.id = b.rule_set_id "
     "LEFT JOIN meme_proposals p ON p.id = b.proposal_id "
@@ -134,6 +151,9 @@ def _closed_bet(r: Mapping[str, Any]) -> ClosedBet:
         same_slot=_same_slot(r["created_at"], r["pool_created_at"]),
         creator_prior_1h=None if r["creator_prior_1h"] is None else int(r["creator_prior_1h"]),
         symbol_dup_24h=None if r["symbol_dup_24h"] is None else int(r["symbol_dup_24h"]),
+        creator_prior_dump_count=(
+            None if r["creator_prior_dump_count"] is None else int(r["creator_prior_dump_count"])
+        ),
     )
 
 
@@ -281,4 +301,5 @@ async def gather_close(
         all_time=all_time,
         predictions=predictions,
         indeterminate=indeterminate,
+        repeat_dumper=lesson_repeat_dumper(bets),
     )

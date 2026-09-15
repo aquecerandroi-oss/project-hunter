@@ -929,6 +929,49 @@ uv run python infra/scripts/render_operations.py note /tmp/momentum-v6.jsonl
 7. **Teto de 120 KB por PNG** (`figsize 12,8x6,6`, dpi 96). Medido nas 681 imagens da primeira
    corrida (sete versões, 2026-09-08): entre 47 e 99 KB, 44 MB no total.
 
+## 9c. Apostas meme traçadas — o gráfico de cada aposta fechada do Lab (T4.25)
+
+**Onde:** `infra/scripts/meme_render_bets.py` + os irmãos `_model.py` (modelo do JSONL e geometria
+das linhas), `_query.py` (a exportação), `_draw.py` (matplotlib) e `_notes.py` (as páginas do vault).
+Irmã da §9b para a curva da pump.fun: **não é serviço, não é worker, não escreve nada na VPS**.
+
+```bash
+# 1. exportar (na VPS, dentro da imagem publicada, como `hunter_app`, SOMENTE LEITURA)
+./compose.sh ops python infra/scripts/meme_render_bets.py export --day 2026-09-14 > /tmp/meme-bets-2026-09-14.jsonl
+# 2. desenhar (local; matplotlib NÃO está no pyproject desta árvore)
+uv run --with matplotlib python infra/scripts/meme_render_bets.py render /tmp/meme-bets-2026-09-14.jsonl --max 200
+# 3. escrever a página de cada conjunto e a seção 7 do diário do dia
+uv run python infra/scripts/meme_render_bets.py notes /tmp/meme-bets-2026-09-14.jsonl
+```
+
+1. **O dia é o dia de Brasília** (`meme_diary.day_bounds`, o mesmo do diário e do fechamento), e a
+   aposta entra pelo `entry_at`. Só **fechada** (`status = 'closed'`): sem saída não há R a nomear.
+   Uma aposta `indeterminate` (T4.16, `rug_no_snapshot`) fica **fora** por padrão e entra rotulada
+   com `--include-indeterminate` — desenhada, nunca contada como medição.
+2. **A janela é a aposta ± 10 min**, por mint: `meme_features_15s` (quando a moeda foi jovem o
+   bastante para o relógio de 15 s), `meme_features_1m` com as colunas de linha da
+   `meme_features_v3` (`DATABASE.md` §38.1) e as fotografias cruas de `meme_curve_snapshots`. Em
+   cada instante vale a **maior** `features_version` (`DISTINCT ON`).
+3. **As linhas do gráfico são as features do fold, lidas no minuto fechado da entrada** — a mesma
+   linha que a porta julgou —, com a geometria da tela (`apps/web/components/meme/meme-lines.ts`):
+   suporte = `support_line_sol` em `end_time` projetado por `support_line_slope` (SOL/min) desde a
+   borda da janela de 15 min, e a máxima = `high_15m_sol` do minuto **anterior**, que é o nível
+   contra o qual `breakout_15m` compara (o contrato exclui o próprio minuto). Nenhum minuto
+   posterior à entrada move qualquer uma das duas; a projeção **para no instante da saída**.
+4. **O que o desenho aproxima, e diz que aproxima.** O eixo é a capitalização **teórica** em SOL
+   (T4-MEME-RADAR §4: preço marginal × supply). Alvo, piso, arme e trailing são regras sobre a
+   **marca em SOL** (o que uma venda cheia renderia, taxas incluídas — `RISK_ENGINE_MEME.md` §6),
+   não sobre o mcap: no gráfico eles aparecem como múltiplos do mcap da entrada, rotulados `≈`, e o
+   rodapé diz isso. O R do título é o da linha da aposta, nunca um lido do gráfico.
+5. **Idempotência.** `render` pula o PNG que já existe (`--force` redesenha) e `--max` limita o
+   lote; `notes` substitui o bloco `## Dia <AAAA-MM-DD>` da própria data e **nunca** toca no bloco
+   de outro dia nem na seção 6 do diário (do arquivista). Rodar duas vezes não muda um byte.
+6. **Nome do arquivo:** `obsidian/attachments/meme/<dia>/<conjunto>/<HHMM>-<símbolo>-<R>.png`, com
+   a hora em **Brasília** (o dia da pasta já é o de Brasília, então UTC no nome só confundiria) e o
+   `+` de um R positivo percent-encoded nos links markdown.
+7. **Teto de 200 KB por PNG** (`figsize 12,0x6,4`, dpi 110): medido entre 61 e 95 KB na fixture de
+   três apostas. Fundo branco fixo, para ler igual no tema claro e no escuro do Obsidian.
+
 ## 10. Streams e consumidores
 
 | Stream | Produtor | Consumidores | MAXLEN |

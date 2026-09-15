@@ -35,7 +35,12 @@ from typing import Any
 from hunter_core.domain.types import uuid7
 from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.curve import marginal_price_sol, quote_buy
-from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, evaluate_pedigree
+from hunter_indicators.meme.pedigree import (
+    PEDIGREE_V1,
+    PedigreeFeatures,
+    evaluate_pedigree,
+    evaluate_repeat_dumper,
+)
 from hunter_indicators.meme.rules import EntryFeatures, evaluate_entry
 from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot, money_str, optional_money_str
 from hunter_meme_worker.proposals_plan import manual_plan, ticker_of
@@ -243,7 +248,9 @@ def evaluate_gate(
     gate would have said), and a mint absent from the mapping is a mint whose
     pedigree was not read (``pedigree_unknown``), never a clean one. ``None``
     means the caller did not ask (the scale step, a unit test of the gate
-    alone): the exclusions are not applied.
+    alone): the exclusions are not applied. ``pedigree_repeat_dumper`` (T4.24,
+    EXP-M6 braço 2) adds ``creator_repeat_dumper`` on top, only for a set that
+    reads its lineage in the first place.
 
     ``ttl_s`` is the loop's; a set that names its own (T4.19, ``operator/3``:
     180 s for a buy by hand) overrides it. An ``operator`` proposal also
@@ -262,11 +269,12 @@ def evaluate_gate(
         excluded: tuple[str, ...] = ()
         if spec.pedigree_exclusions and pedigree is not None:
             lineage = pedigree.get(row.mint)
-            excluded = (
-                ("pedigree_unknown",)
-                if lineage is None
-                else evaluate_pedigree(lineage, PEDIGREE_V1)
-            )
+            if lineage is None:
+                excluded = ("pedigree_unknown",)
+            else:
+                excluded = evaluate_pedigree(lineage, PEDIGREE_V1)
+                if spec.pedigree_repeat_dumper:
+                    excluded += evaluate_repeat_dumper(lineage)
         features = entry_features_of(row, spec)
         decision = evaluate_entry(features, spec.gate)
         if excluded or not decision.allowed:

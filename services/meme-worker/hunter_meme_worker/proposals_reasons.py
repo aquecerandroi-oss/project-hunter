@@ -115,6 +115,10 @@ def gate_reasons(
                 "symbol_dup_24h": pedigree.symbol_dup_24h,
                 "max_creator_prior_mints_1h": pedigree_gate.max_creator_prior_mints_1h,
                 "max_symbol_dup_24h": pedigree_gate.max_symbol_dup_24h,
+                # T4.24 (EXP-M6, braço 2): recorded whenever the pedigree block
+                # is, regardless of whether this set applies the exclusion.
+                "creator_prior_dump_count": pedigree.creator_prior_dump_count,
+                "creator_prior_dead_count": pedigree.creator_prior_dead_count,
             }
         )
     return reasons

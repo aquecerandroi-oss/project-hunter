@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 
 from meme_close_inputs import CloseInputs, Coverage, OperatorDay, brt, ci_pair, pct
-from meme_close_lessons import TopOut
+from meme_close_lessons import Lesson, TopOut
 from meme_close_stats import fmt
 from meme_diary_render import WalletTradeLine
 
@@ -175,6 +175,23 @@ def top_out_section(rows: Sequence[TopOut]) -> list[str]:
     return lines
 
 
+def _repeat_dumper_lines(lesson: Lesson | None) -> list[str]:
+    """T4.24 (EXP-M6, braço 2): the R comparison that judges
+    ``pedigree_repeat_dumper`` — a paragraph inside §6.14, not a numbered
+    lesson (``meme_close_lessons.lesson_repeat_dumper``)."""
+    if lesson is None or lesson.n == 0:
+        return []
+    lines = [f"- **EXP-M6, braço 2 (reincidência do criador):** {lesson.note}"]
+    if lesson.contrast is not None and lesson.contrast_label is not None:
+        c = lesson.contrast
+        lines.append(
+            f"  «{lesson.contrast_label}» R médio {fmt(c.mean_a)} (n = {c.n_a}) contra "
+            f"{fmt(c.mean_b)} nas demais (n = {c.n_b}) — Δ {fmt(c.delta)} R."
+        )
+    lines.append(f"  {lesson.change}.")
+    return lines
+
+
 def prereg_section(inputs: CloseInputs) -> list[str]:
     lines = ["### 6.14 Comparação com o pré-registro", ""]
     exps = [e for e in inputs.all_time if e.exp_ref]
@@ -191,6 +208,7 @@ def prereg_section(inputs: CloseInputs) -> list[str]:
             f"{fmt(e.without_best)}. A previsão congelada dizia: {quoted}. Veredito: régua não atingida "
             f"(n {e.n}/100, dias {e.days}/30) — `result` da página não muda."
         ]
+    lines += _repeat_dumper_lines(inputs.repeat_dumper)
     lines += [
         "",
         "**O que muda amanhã:** nada muda (avaliação datada acrescentada à página de cada EXP com aposta hoje; "

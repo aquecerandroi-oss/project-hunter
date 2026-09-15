@@ -54,6 +54,10 @@ class ClosedBet:
     """``pool_created_at − created_at ≤ 1 s``; ``None`` without a creation time."""
     creator_prior_1h: int | None
     symbol_dup_24h: int | None
+    creator_prior_dump_count: int | None = None
+    """T4.24 (EXP-M6, braço 2): prior coins of the same creator, any window,
+    where the creator sold (tape, chain watch or a bet exiting
+    ``creator_dump``) — the counter ``pedigree_repeat_dumper`` refuses on."""
 
 
 @dataclass(frozen=True, slots=True)
