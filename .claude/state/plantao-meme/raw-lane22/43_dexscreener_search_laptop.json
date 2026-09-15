@@ -1,0 +1,1979 @@
+{
+ "_meta": {
+  "name": "43_dexscreener_search_laptop",
+  "url": "https://api.dexscreener.com/latest/dex/search?q=LAPTOP",
+  "final_url": "https://api.dexscreener.com/latest/dex/search?q=LAPTOP",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:19:38.601+00:00",
+  "observed_brt": "18:19:38",
+  "bytes_received": 33644,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:19:38 GMT",
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "HIT",
+   "server": "cloudflare",
+   "cf-ray": "a3baabbaba27b4af-GIG"
+  }
+ },
+ "payload": {
+  "schemaVersion": "1.0.0",
+  "pairs": [
+   {
+    "chainId": "base",
+    "dexId": "aerodrome",
+    "url": "https://dexscreener.com/base/0x99cf3e8bfb02c300312c53aac5d0b082e3d5975c",
+    "pairAddress": "0x99cf3E8bfB02c300312c53Aac5D0B082e3D5975C",
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "0.2302",
+    "priceUsd": "0.2302",
+    "txns": {
+     "m5": {
+      "buys": 31,
+      "sells": 2
+     },
+     "h1": {
+      "buys": 76,
+      "sells": 86
+     },
+     "h6": {
+      "buys": 284,
+      "sells": 701
+     },
+     "h24": {
+      "buys": 4147,
+      "sells": 4842
+     }
+    },
+    "volume": {
+     "h24": 1714093.64,
+     "h6": 128216.12,
+     "h1": 20026.66,
+     "m5": 5772.38
+    },
+    "priceChange": {
+     "m5": 0.56,
+     "h1": -0.67,
+     "h6": -6.22,
+     "h24": 7.06
+    },
+    "liquidity": {
+     "usd": 1406335.8,
+     "base": 3968229,
+     "quote": 492494
+    },
+    "fdv": 226835131,
+    "marketCap": 80601316,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "robinhood",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/robinhood/0x4a922c8dc34270ebbbc48d8209d082c420bfa6e15e99cff18a56b5c1826edee0",
+    "pairAddress": "0x4a922c8dc34270ebbbc48d8209d082c420bfa6e15e99cff18a56b5c1826edee0",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x76Ed1E2A8Fc3873FcB5c514688Ca2Fe8A3600b7F",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x92FD66527192E3e61d4DDd13322Aa222DE86F9B5",
+     "name": "iShares 0-3 Month Treasury Bond • Robinhood Token",
+     "symbol": "SGOV"
+    },
+    "priceNative": "0.0000002695",
+    "priceUsd": "0.00002723",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 1
+     },
+     "h6": {
+      "buys": 3,
+      "sells": 15
+     },
+     "h24": {
+      "buys": 32,
+      "sells": 74
+     }
+    },
+    "volume": {
+     "h24": 2939.28,
+     "h6": 149.83,
+     "h1": 4.21,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -0.11,
+     "h6": -0.95,
+     "h24": -2.41
+    },
+    "liquidity": {
+     "usd": 15199.88,
+     "base": 279003323,
+     "quote": 75.2068
+    },
+    "fdv": 27240,
+    "marketCap": 27240,
+    "pairCreatedAt": 1788792636000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/F7T2uKW4ZM3ohkwr?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/Y3EKy7L4Dl4tUpw0?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x76ed1e2a8fc3873fcb5c514688ca2fe8a3600b7f?timestamp=1789507200000",
+     "websites": [],
+     "socials": [
+      {
+       "url": "https://x.com/laptoptoken_hb",
+       "type": "twitter"
+      },
+      {
+       "url": "https://t.me/laptoptoken_hb",
+       "type": "telegram"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "robinhood",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/robinhood/0x2ff2058a54c8524e19783a74fb572c086e8441e6c34beb527b11798232de1224",
+    "pairAddress": "0x2ff2058a54c8524e19783a74fb572c086e8441e6c34beb527b11798232de1224",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x76Ed1E2A8Fc3873FcB5c514688Ca2Fe8A3600b7F",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+     "name": "Global Dollar",
+     "symbol": "USDG"
+    },
+    "priceNative": "0.00002725",
+    "priceUsd": "0.00002725",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 2,
+      "sells": 12
+     }
+    },
+    "volume": {
+     "h24": 146.71,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": -5.16
+    },
+    "liquidity": {
+     "usd": 1314.96,
+     "base": 28880203,
+     "quote": 527.8232
+    },
+    "fdv": 27255,
+    "marketCap": 27255,
+    "pairCreatedAt": 1788794308000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/F7T2uKW4ZM3ohkwr?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/Y3EKy7L4Dl4tUpw0?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x76ed1e2a8fc3873fcb5c514688ca2fe8a3600b7f?timestamp=1789507200000",
+     "websites": [],
+     "socials": [
+      {
+       "url": "https://x.com/laptoptoken_hb",
+       "type": "twitter"
+      },
+      {
+       "url": "https://t.me/laptoptoken_hb",
+       "type": "telegram"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "robinhood",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/robinhood/0xcd3185db169a6cc182da17ddf74dc32d189d5335e9908b851ee0ad7b21e87ee2",
+    "pairAddress": "0xcd3185db169a6cc182da17ddf74dc32d189d5335e9908b851ee0ad7b21e87ee2",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x64412f58a8488e2302c99f603085E83F9FA09C18",
+     "name": "Gently Used Dell Laptop",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x941AE714EC6D8130c7B75d67160Ca08f1e7d11Dd",
+     "name": "Dell • Robinhood Token",
+     "symbol": "DELL"
+    },
+    "priceNative": "0.000000009189",
+    "priceUsd": "0.000005010",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 1
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 1
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 1
+     }
+    },
+    "volume": {
+     "h24": 35.3,
+     "h6": 35.3,
+     "h1": 35.3,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 7288.67,
+     "base": 727331669,
+     "quote": 6.6837
+    },
+    "fdv": 5011,
+    "marketCap": 5011,
+    "pairCreatedAt": 1788481653000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/NBWpZRALfOeMxkBy?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/hSAHDuJ33RY8OrIY?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x64412f58a8488e2302c99f603085e83f9fa09c18?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.cnbc.com/2026/08/31/trump-account-holders-to-start-receiving-250-dell-grant-spokesperson.html",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/usedlaptoprh",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "robinhood",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/robinhood/0xe2491d25fa308f59f535af046f9fbf8fc9685a4e64f36ce0734724ce1c48ee64",
+    "pairAddress": "0xe2491d25fa308f59f535af046f9fbf8fc9685a4e64f36ce0734724ce1c48ee64",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x5c3938dedd3a74A6F1863d1CB3cDBEeE85accB9E",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.000000001216",
+    "priceUsd": "0.000002937",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 1
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 2
+     }
+    },
+    "volume": {
+     "h24": 0.84,
+     "h6": 0.4,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -3.22,
+     "h24": -3.22
+    },
+    "liquidity": {
+     "usd": 4931.49,
+     "base": 839286116,
+     "quote": 1.02127
+    },
+    "fdv": 2938,
+    "marketCap": 2938,
+    "pairCreatedAt": 1788794417000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/ZvktCKNI1UKlSjw3?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/Vf_F-x1nh_lE5LaA?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x5c3938dedd3a74a6f1863d1cb3cdbeee85accb9e?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoponrh.wtf",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/LaptopOnRH",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "robinhood",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/robinhood/0x51ace391a713753a649ce1735e0bafdee20a4bcc836bb71d52d4e7aa0d2f8721",
+    "pairAddress": "0x51ace391a713753a649ce1735e0bafdee20a4bcc836bb71d52d4e7aa0d2f8721",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x11c6d0fC790bdf3a7Db1B82B4A94CeEd389130Ff",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.000000001073",
+    "priceUsd": "0.000002661",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 1
+     }
+    },
+    "volume": {
+     "h24": 1.15,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 4755.67,
+     "base": 893487000,
+     "quote": 0.9593
+    },
+    "fdv": 2661,
+    "marketCap": 2661,
+    "pairCreatedAt": 1788962025000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/H_fKxXwGzNIKc3cs?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/hrEhLdtIXaXRrsOx?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x11c6d0fc790bdf3a7db1b82b4a94ceed389130ff?timestamp=1789507200000",
+     "websites": [],
+     "socials": [
+      {
+       "url": "https://x.com/Laptoptoken",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "aerodrome",
+    "url": "https://dexscreener.com/base/0xcb4bc943314405c01907ae910e57afc2d0549706",
+    "pairAddress": "0xCb4bC943314405c01907Ae910E57AFC2D0549706",
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0xb200000000000000000000C2e324d24d7eEcd1fb",
+     "name": "Apple Inc.",
+     "symbol": "AAPLc"
+    },
+    "priceNative": "0.0006978",
+    "priceUsd": "0.2313",
+    "txns": {
+     "m5": {
+      "buys": 4,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 65,
+      "sells": 40
+     },
+     "h6": {
+      "buys": 389,
+      "sells": 396
+     },
+     "h24": {
+      "buys": 3815,
+      "sells": 4028
+     }
+    },
+    "volume": {
+     "h24": 875660.82,
+     "h6": 80509.43,
+     "h1": 9519.61,
+     "m5": 621.57
+    },
+    "priceChange": {
+     "m5": 0.95,
+     "h1": -0.19,
+     "h6": -5.77,
+     "h24": 7.63
+    },
+    "liquidity": {
+     "usd": 53661.55,
+     "base": 135506,
+     "quote": 67.2733
+    },
+    "fdv": 227922215,
+    "marketCap": 80987589,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x7702411b3893ea4f6ab96c50231cfec65448ab9f",
+    "pairAddress": "0x7702411B3893ea4F6Ab96C50231cFEc65448AB9F",
+    "labels": [
+     "v3"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "0.2296",
+    "priceUsd": "0.2296",
+    "txns": {
+     "m5": {
+      "buys": 2,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 5,
+      "sells": 13
+     },
+     "h6": {
+      "buys": 38,
+      "sells": 89
+     },
+     "h24": {
+      "buys": 1288,
+      "sells": 1793
+     }
+    },
+    "volume": {
+     "h24": 152877.42,
+     "h6": 2171.55,
+     "h1": 284.26,
+     "m5": 50.11
+    },
+    "priceChange": {
+     "m5": 0.35,
+     "h1": -1.01,
+     "h6": -6.57,
+     "h24": 7.85
+    },
+    "liquidity": {
+     "usd": 23376.93,
+     "base": 85783,
+     "quote": 3673.1262
+    },
+    "fdv": 226247180,
+    "marketCap": 80392399,
+    "pairCreatedAt": 1788800593000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x308f14754a34c6c8ffdf82a3d0938a902a5b6f4dfad7aef101d6b40616903fa8",
+    "pairAddress": "0x308f14754a34c6c8ffdf82a3d0938a902a5b6f4dfad7aef101d6b40616903fa8",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.01265",
+    "priceUsd": "31.87",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 46
+     }
+    },
+    "volume": {
+     "h24": 825.89,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": -6.44
+    },
+    "liquidity": {
+     "usd": 46172.52,
+     "base": 724.3413,
+     "quote": 9.1677
+    },
+    "fdv": 31394048555,
+    "marketCap": 11155245679,
+    "pairCreatedAt": 1788937101000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "solana",
+    "dexId": "raydium",
+    "url": "https://dexscreener.com/solana/aggutknd6alhxg8lzhyjfwf7nuz2wggdgq5sqbthjmux",
+    "pairAddress": "AGGUtKnD6ALHxG8LzhYjfwF7NUz2wGgDgq5SQbthJMUx",
+    "labels": [
+     "CLMM"
+    ],
+    "baseToken": {
+     "address": "6R9VmgYo2RNBPWs5JK7VpbbzRLzqyF9kc5XtSSs9d4aB",
+     "name": "Hunter Biden's Laptop",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "0.005210",
+    "priceUsd": "0.005210",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 2,
+      "sells": 2
+     }
+    },
+    "volume": {
+     "h24": 39.98,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 5205526.8,
+     "base": 998999731,
+     "quote": 12.6844
+    },
+    "fdv": 5210726,
+    "marketCap": 5210726,
+    "pairCreatedAt": 1788898798000
+   },
+   {
+    "chainId": "solana",
+    "dexId": "raydium",
+    "url": "https://dexscreener.com/solana/dzkqdvtb7e8awdap9xui13l4wd9qt1hur89j6ss2y7ju",
+    "pairAddress": "DZKqdVTB7e8AwDap9xUi13L4Wd9qt1hUr89j6sS2y7JU",
+    "labels": [
+     "CLMM"
+    ],
+    "baseToken": {
+     "address": "QTQgJj7irjAxYy37iBWxHitgRoZ6Svua5zpm7cmFamo",
+     "name": "Hunter Biden's Laptop",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "0.05020",
+    "priceUsd": "0.05020",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 2,
+      "sells": 2
+     },
+     "h24": {
+      "buys": 9,
+      "sells": 10
+     }
+    },
+    "volume": {
+     "h24": 186022.06,
+     "h6": 44420,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": -0.01
+    },
+    "liquidity": {
+     "usd": 50150807.2,
+     "base": 998841084,
+     "quote": 8057.2964
+    },
+    "fdv": 50200929,
+    "marketCap": 50200929,
+    "pairCreatedAt": 1788947616000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xd691917230c66aed79ad62913872edf7201cb672b63d8e54176934f93624a40e",
+    "pairAddress": "0xd691917230c66aed79ad62913872edf7201cb672b63d8e54176934f93624a40e",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xA210418d175A59dfF549136329032fCd62a87D61",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.00000004970",
+    "priceUsd": "0.0001253",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 0.04,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 124060.37,
+     "base": 989985818,
+     "quote": 0.000758
+    },
+    "fdv": 125313,
+    "marketCap": 125313,
+    "pairCreatedAt": 1788977727000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xfe5ef99b5800dd62557bc474f149bfa3b0637cf8c4398db64a75d44be64c1c8c",
+    "pairAddress": "0xfe5ef99b5800dd62557bc474f149bfa3b0637cf8c4398db64a75d44be64c1c8c",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xCD7fD3489B5AB255e5392F524AFcdb05946d1e5F",
+     "name": "Hunter Biden's Laptop",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.00000006442",
+    "priceUsd": "0.0001624",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 0.04,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 160807.87,
+     "base": 989989366,
+     "quote": 0.0007385
+    },
+    "fdv": 162432,
+    "marketCap": 162432,
+    "pairCreatedAt": 1788977973000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x894f80cff689707cd039825d3f815664295d9822e559030db845dd3582601c10",
+    "pairAddress": "0x894f80cff689707cd039825d3f815664295d9822e559030db845dd3582601c10",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x11E9a2C0961eCdEe26eD0DC74C47B12eE8935A85",
+     "name": "Laptop (LAPTOP)",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.0000001245",
+    "priceUsd": "0.0003138",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 0.04,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 310757.42,
+     "base": 989997814,
+     "quote": 0.0003233
+    },
+    "fdv": 313896,
+    "marketCap": 313896,
+    "pairCreatedAt": 1788978013000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x31e034a2adf8494b55ff42a7a502a75317928f31d31704e609e50dc866c0e130",
+    "pairAddress": "0x31e034a2adf8494b55ff42a7a502a75317928f31d31704e609e50dc866c0e130",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x24Ce3563b69a03a5858eaB590c2A5b9Da802a203",
+     "name": "Hunter Biden's Laptop - LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.00000009416",
+    "priceUsd": "0.0002374",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 0.04,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 235032.82,
+     "base": 989993063,
+     "quote": 0.0007069
+    },
+    "fdv": 237407,
+    "marketCap": 237407,
+    "pairCreatedAt": 1788978069000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xa66bee70f9965da5134ba6c3d0abf1e66bd6e148c8f7f97e702ade57c9d2b9b5",
+    "pairAddress": "0xa66bee70f9965da5134ba6c3d0abf1e66bd6e148c8f7f97e702ade57c9d2b9b5",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x07cD92c90FC6FbF9cc40FA93e53d35Dba018f579",
+     "name": "Hunter Biden's Laptop (LAPTOP)",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.00000008689",
+    "priceUsd": "0.0002190",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 0.04,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 216901.83,
+     "base": 989842560,
+     "quote": 0.01384
+    },
+    "fdv": 219092,
+    "marketCap": 219092,
+    "pairCreatedAt": 1788977921000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x2cb18fb75f72e2a275b4b2b54be32612c165a56a06c9e40c2596fc17d55eda0c",
+    "pairAddress": "0x2cb18fb75f72e2a275b4b2b54be32612c165a56a06c9e40c2596fc17d55eda0c",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x6b4EFa7180A6149d073B1A9723B7c1B68C0c8C68",
+     "name": "Hunter Biden's Laptop",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.0000002506",
+    "priceUsd": "0.0006030",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 1
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 1
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 1
+     }
+    },
+    "volume": {
+     "h24": 0.01,
+     "h6": 0.01,
+     "h1": 0.01,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 482419.36,
+     "base": 799995333,
+     "quote": 0.001169
+    },
+    "fdv": 603024,
+    "marketCap": 603024,
+    "pairCreatedAt": 1788961489000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x0bcfb8ddc2af0bc61d72be1daf470c8853f568c4b04f619b0a31f1ced1216c4d",
+    "pairAddress": "0x0bcfb8ddc2af0bc61d72be1daf470c8853f568c4b04f619b0a31f1ced1216c4d",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.00009832",
+    "priceUsd": "0.2355",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 120,
+      "sells": 131
+     }
+    },
+    "volume": {
+     "h24": 3361.12,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": 9.69
+    },
+    "liquidity": {
+     "usd": 10639.23,
+     "base": 22627,
+     "quote": 2.2168
+    },
+    "fdv": 231983401,
+    "marketCap": 82430650,
+    "pairCreatedAt": 1788805073000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "robinhood",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/robinhood/0x025553184faebcb3b9c73dfe82d625ca2ec2f273a81f6f09eb96cf701bb25423",
+    "pairAddress": "0x025553184faebcb3b9c73dfe82d625ca2ec2f273a81f6f09eb96cf701bb25423",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x5A23dFCa95eB2A03a887958D3e41FEA49aa41e18",
+     "name": "1 Million",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x941AE714EC6D8130c7B75d67160Ca08f1e7d11Dd",
+     "name": "Dell • Robinhood Token",
+     "symbol": "DELL"
+    },
+    "priceNative": "0.00000004665",
+    "priceUsd": "0.00002546",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 2,
+      "sells": 1
+     },
+     "h24": {
+      "buys": 4,
+      "sells": 5
+     }
+    },
+    "volume": {
+     "h24": 164.77,
+     "h6": 96.39,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": 0.8,
+     "h24": 1.2
+    },
+    "liquidity": {
+     "usd": 26145.89,
+     "base": 956957740,
+     "quote": 3.2483
+    },
+    "fdv": 25469,
+    "marketCap": 25469,
+    "pairCreatedAt": 1788416645000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xeec46a09d828e9521f4cb4f7b66d57b338fae76caf1c3649a126f9206e076326",
+    "pairAddress": "0xeec46a09d828e9521f4cb4f7b66d57b338fae76caf1c3649a126f9206e076326",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xE9deFd31864d1BAD07D3862d1a5A785c903aab07",
+     "name": "LAPTOP BIDEN",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.00000000009882",
+    "priceUsd": "0.0000002482",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 2
+     }
+    },
+    "volume": {
+     "h24": 4.62,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": -0.21
+    },
+    "liquidity": {
+     "usd": 24827.7,
+     "base": 99989656556,
+     "quote": 0.001021
+    },
+    "fdv": 24828,
+    "marketCap": 24828,
+    "pairCreatedAt": 1788837783000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x198b9df7660d25ecedeeced63e4f4484754a06ad037789b7a772cc2d8e7f3333",
+    "pairAddress": "0x198b9df7660d25ecedeeced63e4f4484754a06ad037789b7a772cc2d8e7f3333",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x330EfE76adb8F0E0f30f6Bb4c9dF72141883Ec29",
+     "name": "Hunter Biden's Laptop",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.00000000009921",
+    "priceUsd": "0.0000002459",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 2,
+      "sells": 2
+     }
+    },
+    "volume": {
+     "h24": 0.43,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": -0.55
+    },
+    "liquidity": {
+     "usd": 24589.86,
+     "base": 99722236151,
+     "quote": 0.02749
+    },
+    "fdv": 24590,
+    "marketCap": 24590,
+    "pairCreatedAt": 1788907499000
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xb0ccc1418279f6a766416740c87958b8b8ff426eaae71e6cab06c9f822d0aec7",
+    "pairAddress": "0xb0ccc1418279f6a766416740c87958b8b8ff426eaae71e6cab06c9f822d0aec7",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "0.2388",
+    "priceUsd": "0.2388",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 6
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 17
+     },
+     "h24": {
+      "buys": 117,
+      "sells": 144
+     }
+    },
+    "volume": {
+     "h24": 2352.68,
+     "h6": 65.78,
+     "h1": 33.89,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -1.6,
+     "h6": -3.11,
+     "h24": 9.89
+    },
+    "liquidity": {
+     "usd": 8521.38,
+     "base": 22767,
+     "quote": 3084.4715
+    },
+    "fdv": 235223528,
+    "marketCap": 83581964,
+    "pairCreatedAt": 1788795519000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "aerodrome",
+    "url": "https://dexscreener.com/base/0x0f5a4039d809d93413fe9a67c465dd4336b9c63e",
+    "pairAddress": "0x0F5A4039d809D93413fe9a67c465dd4336B9C63e",
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "0.2308",
+    "priceUsd": "0.2308",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 6,
+      "sells": 7
+     },
+     "h6": {
+      "buys": 62,
+      "sells": 71
+     },
+     "h24": {
+      "buys": 964,
+      "sells": 926
+     }
+    },
+    "volume": {
+     "h24": 7677.8,
+     "h6": 385.7,
+     "h1": 26.47,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -0.02,
+     "h6": -5.58,
+     "h24": 7.48
+    },
+    "liquidity": {
+     "usd": 2967.54,
+     "base": 6427.8701,
+     "quote": 1483.7727
+    },
+    "fdv": 227371766,
+    "marketCap": 80791998,
+    "pairCreatedAt": 1788956619000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xa321d950082166d11db11cfbd6e32a91e6144ff0",
+    "pairAddress": "0xA321D950082166d11DB11cFBd6e32A91e6144Ff0",
+    "labels": [
+     "v3"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.00009623",
+    "priceUsd": "0.2309",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 3,
+      "sells": 7
+     },
+     "h6": {
+      "buys": 17,
+      "sells": 42
+     },
+     "h24": {
+      "buys": 465,
+      "sells": 494
+     }
+    },
+    "volume": {
+     "h24": 5436.78,
+     "h6": 210.18,
+     "h1": 48.08,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -0.79,
+     "h6": -6.07,
+     "h24": 7.25
+    },
+    "liquidity": {
+     "usd": 1717.12,
+     "base": 4961.3519,
+     "quote": 0.238
+    },
+    "fdv": 227477934,
+    "marketCap": 80829723,
+    "pairCreatedAt": 1788888069000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xeca643c8c475053d97499371e34c0332ca57f0f5367b73834f4adc78801d2ad1",
+    "pairAddress": "0xeca643c8c475053d97499371e34c0332ca57f0f5367b73834f4adc78801d2ad1",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "0.2583",
+    "priceUsd": "0.2583",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 3
+     }
+    },
+    "volume": {
+     "h24": 0.91,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": -4.16
+    },
+    "liquidity": {
+     "usd": 56.57,
+     "base": 117.7674,
+     "quote": 26.1479
+    },
+    "fdv": 254501016,
+    "marketCap": 90431833,
+    "pairCreatedAt": 1788949139000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "solana",
+    "dexId": "pumpfun",
+    "url": "https://dexscreener.com/solana/hs6ls6kk78wwkmaj6xzrapjfm1je1ydxjvbrerdjdm2a",
+    "pairAddress": "HS6Ls6Kk78wwkmAj6XzrApjfM1JE1YDxjvBreRdJdm2A",
+    "baseToken": {
+     "address": "5rXPvgoyrvWW9SxGkd4CPRR9d9DUy95tL5utLZo2pump",
+     "name": "Laptop",
+     "symbol": "Laptop"
+    },
+    "quoteToken": {
+     "address": "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp",
+     "name": "Apple xStock",
+     "symbol": "AAPLx"
+    },
+    "priceNative": "0.00000001279",
+    "txns": {
+     "m5": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 0,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "pairCreatedAt": 1789244644000
+   },
+   {
+    "chainId": "solana",
+    "dexId": "raydium",
+    "url": "https://dexscreener.com/solana/hfdjkietbhndohf2jyyeeqwfyscbsmtmlbpzmy4syzwv",
+    "pairAddress": "HfDJKiEtbHndoHf2JyyeEQwFYScBsmTmLBpzMy4sYZwV",
+    "baseToken": {
+     "address": "HLwEJQVzs7SvjXuXpBTRHaLp5S6uWoWTUhLjJxBfy1c7",
+     "name": "Hunter Biden's Laptop",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "So11111111111111111111111111111111111111112",
+     "name": "Wrapped SOL",
+     "symbol": "SOL"
+    },
+    "priceNative": "0.0000001644",
+    "priceUsd": "0.00001599",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 2,
+      "sells": 2
+     },
+     "h24": {
+      "buys": 27,
+      "sells": 19
+     }
+    },
+    "volume": {
+     "h24": 1371.5,
+     "h6": 31.98,
+     "h1": 0.99,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -0.45,
+     "h6": -1.32,
+     "h24": 11
+    },
+    "liquidity": {
+     "usd": 12173.91,
+     "base": 380925085,
+     "quote": 62.5111
+    },
+    "fdv": 20337,
+    "marketCap": 20354,
+    "pairCreatedAt": 1706568353000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/2GZGoI6v57vmSpN5?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/Nqui1HYguBb1vhOU?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/HLwEJQVzs7SvjXuXpBTRHaLp5S6uWoWTUhLjJxBfy1c7?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://hunterbidenlaptop.app/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/thereallaptop?s=11",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x82344f74e6649e61fb962bdec99d0f943d14260ef3d08dd1b6235e2a1381c65b",
+    "pairAddress": "0x82344f74e6649e61fb962bdec99d0f943d14260ef3d08dd1b6235e2a1381c65b",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "0.2406",
+    "priceUsd": "0.2406",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 1
+     },
+     "h24": {
+      "buys": 7,
+      "sells": 4
+     }
+    },
+    "volume": {
+     "h24": 0.96,
+     "h6": 0.01,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -6.92,
+     "h24": 10.41
+    },
+    "liquidity": {
+     "usd": 992.48,
+     "base": 4122.1396,
+     "quote": 0.2933
+    },
+    "fdv": 237088184,
+    "marketCap": 84244532,
+    "pairCreatedAt": 1788959667000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xe15e01d89899f2ce2b4352863705362e3c1a6aae94445fafd0d6e502daebc2f8",
+    "pairAddress": "0xe15e01d89899f2ce2b4352863705362e3c1a6aae94445fafd0d6e502daebc2f8",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.0001048",
+    "priceUsd": "0.2601",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 16,
+      "sells": 6
+     }
+    },
+    "volume": {
+     "h24": 50,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": 15.48
+    },
+    "liquidity": {
+     "usd": 411.36,
+     "base": 1102.8832,
+     "quote": 0.05017
+    },
+    "fdv": 256239055,
+    "marketCap": 91049410,
+    "pairCreatedAt": 1788895339000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xabcc2958de314ca6e06764040bb90ff98abb963e2044da746316760b3f369b62",
+    "pairAddress": "0xabcc2958de314ca6e06764040bb90ff98abb963e2044da746316760b3f369b62",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xB095274743941e953c746F9C228DA9c18Bb6ec29",
+     "name": "LAPTOP",
+     "symbol": "LAPTOP"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.00009575",
+    "priceUsd": "0.2375",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 2
+     }
+    },
+    "volume": {
+     "h24": 0.39,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": 1.48
+    },
+    "liquidity": {
+     "usd": 53.78,
+     "base": 208.9682,
+     "quote": 0.001673
+    },
+    "fdv": 233969680,
+    "marketCap": 83136434,
+    "pairCreatedAt": 1788927857000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/SlCNDwj-QJYvrJW6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/mChUMhmnZG2uFTFN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb095274743941e953c746f9c228da9c18bb6ec29?timestamp=1789507200000",
+     "websites": [
+      {
+       "url": "https://www.laptoptoken.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/HunterBiden/status/2097853144596381759",
+       "type": "twitter"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

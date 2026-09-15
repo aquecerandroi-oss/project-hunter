@@ -1,0 +1,24 @@
+{
+ "_meta": {
+  "name": "37_congress_hr3633_all_actions",
+  "url": "https://www.congress.gov/bill/119th-congress/house-bill/3633/all-actions",
+  "final_url": "https://www.congress.gov/bill/119th-congress/house-bill/3633/all-actions",
+  "http": 403,
+  "request_started_utc": "2026-09-15T21:19:32.952+00:00",
+  "observed_brt": "18:19:33",
+  "bytes_received": 5911,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:19:33 GMT",
+   "content-type": "text/html; charset=UTF-8",
+   "server": "cloudflare",
+   "cf-ray": "a3baab976e35e2b3-GIG"
+  }
+ },
+ "payload": {
+  "meta": {
+   "title": "Just a moment..."
+  },
+  "text_len": 16,
+  "text": "Just a moment..."
+ }
+}

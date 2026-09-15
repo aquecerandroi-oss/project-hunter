@@ -1,0 +1,35 @@
+{
+ "_meta": {
+  "name": "54_gh_pr46_files",
+  "url": "https://api.github.com/repos/pump-fun/pump-public-docs/pulls/46/files",
+  "final_url": "https://api.github.com/repos/pump-fun/pump-public-docs/pulls/46/files",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:21:59.001+00:00",
+  "observed_brt": "18:21:59",
+  "bytes_received": 1499,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:21:59 GMT",
+   "content-type": "application/json; charset=utf-8",
+   "last-modified": "Mon, 14 Sep 2026 06:57:49 GMT",
+   "server": "github.com",
+   "x-ratelimit-limit": "60",
+   "x-ratelimit-remaining": "57",
+   "x-ratelimit-reset": "1789510547",
+   "content-length": "680"
+  }
+ },
+ "payload": [
+  {
+   "sha": "594228fe12eafd017aa9a040d80ffbb5b5f90630",
+   "filename": "docs/HOLDER_REWARDS_README.md",
+   "status": "modified",
+   "additions": 4,
+   "deletions": 2,
+   "changes": 6,
+   "blob_url": "https://github.com/pump-fun/pump-public-docs/blob/6751052583f778c217d7e87e9c25c18537da5983/docs%2FHOLDER_REWARDS_README.md",
+   "raw_url": "https://github.com/pump-fun/pump-public-docs/raw/6751052583f778c217d7e87e9c25c18537da5983/docs%2FHOLDER_REWARDS_README.md",
+   "contents_url": "https://api.github.com/repos/pump-fun/pump-public-docs/contents/docs%2FHOLDER_REWARDS_README.md?ref=6751052583f778c217d7e87e9c25c18537da5983",
+   "patch": "@@ -9,8 +9,10 @@ coins and will not see the new fields described below.\n \n ## What changes for creators\n \n-- A coin is either a regular coin or a holder rewards coin. The choice is made when the coin is created and cannot be\n-  undone afterwards.\n+- A coin is either a regular coin or a holder rewards coin. The choice is made when the coin is created. A regular\n+  coin can later be converted into a holder rewards coin through a community takeover (see\n+  [below](#community-takeovers-and-creator-fee-changes)), but a holder rewards coin can never go back to being a\n+  regular coin.\n - On a holder rewards coin there is nothing for the creator to claim: the creator fee goes to holders.\n - Holders do not need to do anything to receive rewards. pump.fun pays them out; there is no claim instruction for\n   holders to call."
+  }
+ ]
+}

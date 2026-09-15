@@ -1,0 +1,65 @@
+{
+ "_meta": {
+  "name": "23_binance_ticker24h_btc_sol",
+  "url": "https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22SOLUSDT%22%5D",
+  "final_url": "https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22SOLUSDT%22%5D",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:56.463+00:00",
+  "observed_brt": "18:15:56",
+  "bytes_received": 1101,
+  "headers": {
+   "content-type": "application/json;charset=UTF-8",
+   "content-length": "441",
+   "date": "Tue, 15 Sep 2026 21:15:56 GMT",
+   "server": "nginx"
+  }
+ },
+ "payload": [
+  {
+   "symbol": "BTCUSDT",
+   "priceChange": "-3048.10000000",
+   "priceChangePercent": "-3.865",
+   "weightedAvgPrice": "76674.13414425",
+   "prevClosePrice": "78870.00000000",
+   "lastPrice": "75821.90000000",
+   "lastQty": "0.09513000",
+   "bidPrice": "75821.90000000",
+   "bidQty": "0.12951000",
+   "askPrice": "75821.91000000",
+   "askQty": "6.91015000",
+   "openPrice": "78870.00000000",
+   "highPrice": "78989.28000000",
+   "lowPrice": "74967.97000000",
+   "volume": "21372.70951000",
+   "quoteVolume": "1638733995.99582480",
+   "openTime": 1789420556005,
+   "closeTime": 1789506956005,
+   "firstId": 6681714717,
+   "lastId": 6685096581,
+   "count": 3381865
+  },
+  {
+   "symbol": "SOLUSDT",
+   "priceChange": "-6.47000000",
+   "priceChangePercent": "-6.250",
+   "weightedAvgPrice": "99.91648323",
+   "prevClosePrice": "103.53000000",
+   "lastPrice": "97.05000000",
+   "lastQty": "0.24900000",
+   "bidPrice": "97.05000000",
+   "bidQty": "191.47500000",
+   "askPrice": "97.06000000",
+   "askQty": "225.18300000",
+   "openPrice": "103.52000000",
+   "highPrice": "103.87000000",
+   "lowPrice": "95.82000000",
+   "volume": "2753348.55200000",
+   "quoteVolume": "275104904.41493000",
+   "openTime": 1789420555770,
+   "closeTime": 1789506955770,
+   "firstId": 2055228029,
+   "lastId": 2056204643,
+   "count": 976615
+  }
+ ]
+}

@@ -1,0 +1,122 @@
+{
+ "_meta": {
+  "name": "53_gh_commit_6751052_holder_docs",
+  "url": "https://api.github.com/repos/pump-fun/pump-public-docs/commits/6751052583f778c217d7e87e9c25c18537da5983",
+  "final_url": "https://api.github.com/repos/pump-fun/pump-public-docs/commits/6751052583f778c217d7e87e9c25c18537da5983",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:21:58.302+00:00",
+  "observed_brt": "18:21:58",
+  "bytes_received": 5693,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:21:58 GMT",
+   "content-type": "application/json; charset=utf-8",
+   "last-modified": "Mon, 14 Sep 2026 06:52:07 GMT",
+   "server": "github.com",
+   "x-ratelimit-limit": "60",
+   "x-ratelimit-remaining": "58",
+   "x-ratelimit-reset": "1789510547",
+   "content-length": "1579"
+  }
+ },
+ "payload": {
+  "sha": "6751052583f778c217d7e87e9c25c18537da5983",
+  "node_id": "C_kwDOOT4dDNoAKDY3NTEwNTI1ODNmNzc4YzIxN2Q3ZTg3ZTljMjVjMTg1MzdkYTU5ODM",
+  "commit": {
+   "author": {
+    "name": "SushantChandla",
+    "email": "sushant@batoncorporation.com",
+    "date": "2026-09-14T06:52:07Z"
+   },
+   "committer": {
+    "name": "SushantChandla",
+    "email": "sushant@batoncorporation.com",
+    "date": "2026-09-14T06:52:07Z"
+   },
+   "message": "docs: holder rewards choice can be changed via CTO, not irreversible\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_016orPEBRUJrma5UN5JQVpaw",
+   "tree": {
+    "sha": "6160acb5cb35076d023ac2b8db3cc007e01ed4d4",
+    "url": "https://api.github.com/repos/pump-fun/pump-public-docs/git/trees/6160acb5cb35076d023ac2b8db3cc007e01ed4d4"
+   },
+   "url": "https://api.github.com/repos/pump-fun/pump-public-docs/git/commits/6751052583f778c217d7e87e9c25c18537da5983",
+   "comment_count": 0,
+   "verification": {
+    "verified": false,
+    "reason": "unsigned",
+    "signature": null,
+    "payload": null,
+    "verified_at": null
+   }
+  },
+  "url": "https://api.github.com/repos/pump-fun/pump-public-docs/commits/6751052583f778c217d7e87e9c25c18537da5983",
+  "html_url": "https://github.com/pump-fun/pump-public-docs/commit/6751052583f778c217d7e87e9c25c18537da5983",
+  "comments_url": "https://api.github.com/repos/pump-fun/pump-public-docs/commits/6751052583f778c217d7e87e9c25c18537da5983/comments",
+  "author": {
+   "login": "sushant-baton",
+   "id": 253765356,
+   "node_id": "U_kgDODyAm7A",
+   "avatar_url": "https://avatars.githubusercontent.com/u/253765356?v=4",
+   "gravatar_id": "",
+   "url": "https://api.github.com/users/sushant-baton",
+   "html_url": "https://github.com/sushant-baton",
+   "followers_url": "https://api.github.com/users/sushant-baton/followers",
+   "following_url": "https://api.github.com/users/sushant-baton/following{/other_user}",
+   "gists_url": "https://api.github.com/users/sushant-baton/gists{/gist_id}",
+   "starred_url": "https://api.github.com/users/sushant-baton/starred{/owner}{/repo}",
+   "subscriptions_url": "https://api.github.com/users/sushant-baton/subscriptions",
+   "organizations_url": "https://api.github.com/users/sushant-baton/orgs",
+   "repos_url": "https://api.github.com/users/sushant-baton/repos",
+   "events_url": "https://api.github.com/users/sushant-baton/events{/privacy}",
+   "received_events_url": "https://api.github.com/users/sushant-baton/received_events",
+   "type": "User",
+   "user_view_type": "public",
+   "site_admin": false
+  },
+  "committer": {
+   "login": "sushant-baton",
+   "id": 253765356,
+   "node_id": "U_kgDODyAm7A",
+   "avatar_url": "https://avatars.githubusercontent.com/u/253765356?v=4",
+   "gravatar_id": "",
+   "url": "https://api.github.com/users/sushant-baton",
+   "html_url": "https://github.com/sushant-baton",
+   "followers_url": "https://api.github.com/users/sushant-baton/followers",
+   "following_url": "https://api.github.com/users/sushant-baton/following{/other_user}",
+   "gists_url": "https://api.github.com/users/sushant-baton/gists{/gist_id}",
+   "starred_url": "https://api.github.com/users/sushant-baton/starred{/owner}{/repo}",
+   "subscriptions_url": "https://api.github.com/users/sushant-baton/subscriptions",
+   "organizations_url": "https://api.github.com/users/sushant-baton/orgs",
+   "repos_url": "https://api.github.com/users/sushant-baton/repos",
+   "events_url": "https://api.github.com/users/sushant-baton/events{/privacy}",
+   "received_events_url": "https://api.github.com/users/sushant-baton/received_events",
+   "type": "User",
+   "user_view_type": "public",
+   "site_admin": false
+  },
+  "parents": [
+   {
+    "sha": "f216b6724c6ede79d7cef9ce210b741f7e17e93b",
+    "url": "https://api.github.com/repos/pump-fun/pump-public-docs/commits/f216b6724c6ede79d7cef9ce210b741f7e17e93b",
+    "html_url": "https://github.com/pump-fun/pump-public-docs/commit/f216b6724c6ede79d7cef9ce210b741f7e17e93b"
+   }
+  ],
+  "stats": {
+   "total": 6,
+   "additions": 4,
+   "deletions": 2
+  },
+  "files": [
+   {
+    "sha": "594228fe12eafd017aa9a040d80ffbb5b5f90630",
+    "filename": "docs/HOLDER_REWARDS_README.md",
+    "status": "modified",
+    "additions": 4,
+    "deletions": 2,
+    "changes": 6,
+    "blob_url": "https://github.com/pump-fun/pump-public-docs/blob/6751052583f778c217d7e87e9c25c18537da5983/docs%2FHOLDER_REWARDS_README.md",
+    "raw_url": "https://github.com/pump-fun/pump-public-docs/raw/6751052583f778c217d7e87e9c25c18537da5983/docs%2FHOLDER_REWARDS_README.md",
+    "contents_url": "https://api.github.com/repos/pump-fun/pump-public-docs/contents/docs%2FHOLDER_REWARDS_README.md?ref=6751052583f778c217d7e87e9c25c18537da5983",
+    "patch": "@@ -9,8 +9,10 @@ coins and will not see the new fields described below.\n \n ## What changes for creators\n \n-- A coin is either a regular coin or a holder rewards coin. The choice is made when the coin is created and cannot be\n-  undone afterwards.\n+- A coin is either a regular coin or a holder rewards coin. The choice is made when the coin is created. A regular\n+  coin can later be converted into a holder rewards coin through a community takeover (see\n+  [below](#community-takeovers-and-creator-fee-changes)), but a holder rewards coin can never go back to being a\n+  regular coin.\n - On a holder rewards coin there is nothing for the creator to claim: the creator fee goes to holders.\n - Holders do not need to do anything to receive rewards. pump.fun pays them out; there is no claim instruction for\n   holders to call."
+   }
+  ]
+ }
+}

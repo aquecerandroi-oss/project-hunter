@@ -1,0 +1,200 @@
+{
+ "_meta": {
+  "name": "18_llama_pumpfun_fees",
+  "url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees",
+  "final_url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:52.322+00:00",
+  "observed_brt": "18:15:53",
+  "bytes_received": 64509,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:15:53 GMT",
+   "content-type": "application/json",
+   "server": "cloudflare",
+   "last-modified": "Tue, 15 Sep 2026 21:15:53 GMT",
+   "cf-cache-status": "EXPIRED",
+   "cf-ray": "a3baa6342c9dd884-GRU"
+  }
+ },
+ "payload": {
+  "id": "4449",
+  "name": "pump.fun",
+  "address": "solana:pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+  "symbol": "PUMP",
+  "url": "https://www.pump.fun/",
+  "description": "Launch a coin that is instantly tradeable in one click for free",
+  "chain": "Solana",
+  "logo": "https://icons.llamao.fi/icons/protocols/pump.fun",
+  "audits": "0",
+  "gecko_id": null,
+  "cmcId": null,
+  "category": "Launchpad",
+  "module": "pumpdotfun",
+  "twitter": "Pumpfun",
+  "parentProtocol": "parent#pump",
+  "listedAt": 1712427917,
+  "dimensions": {
+   "fees": {
+    "genuineSpikes": [
+     [
+      "2025-07-15",
+      "-"
+     ],
+     [
+      "2025-08-12",
+      "-"
+     ]
+    ],
+    "adapter": "pumpdotfun"
+   },
+   "dexs": {
+    "genuineSpikes": [
+     [
+      "2024-11-23",
+      "-"
+     ],
+     [
+      "2024-11-24",
+      "-"
+     ],
+     [
+      "2024-11-25",
+      "-"
+     ]
+    ],
+    "adapter": "pumpfun"
+   },
+   "active-users": "4449"
+  },
+  "misrepresentedTokens": false,
+  "doublecounted": false,
+  "tvlCodePath": null,
+  "defillamaId": "4449",
+  "displayName": "pump.fun",
+  "methodologyURL": "https://github.com/DefiLlama/dimension-adapters/blob/master/fees/pumpdotfun.ts",
+  "forkedFrom": null,
+  "audit_links": null,
+  "github": null,
+  "governanceID": null,
+  "treasury": null,
+  "previousNames": null,
+  "hallmarks": null,
+  "defaultChartView": null,
+  "breakdownMethodology": {
+   "Fees": {
+    "Pump Fun Protocol Fees": "Pump's slice of the bonding-curve trade fee (1% pre-2025-05-13, 0.95% after).",
+    "Pump Fun Creator Fees": "Creator slice of the bonding-curve trade fee (0.05% from 2025-05-13, 0.30% from Project Ascend / Sept 2025).",
+    "Pump Fun Cashback": "Cashback Coins slice — paid by traders; same 0.30% slot as the creator fee, mutually exclusive per coin (Cashback Coins from Feb 2026).",
+    "Pump Fun Mayhem Fees": "Mayhem-mode fees collected at the Mayhem program fee wallet.",
+    "Pump Fun Graduation Fees": "Fees received by Pump.fun fee wallets from the token graduation during bonding-curve to Raydium migrations."
+   },
+   "Revenue": {
+    "Pump Fun Protocol Fees": "Pump's slice of the bonding-curve trade fee — kept by the protocol.",
+    "Pump Fun Mayhem Fees": "Mayhem-mode fees (no creator/buyback split — 100% protocol).",
+    "Pump Fun Graduation Fees": "Graduation fees kept by the protocol when tokens migrate from Pump.fun bonding curves to Raydium."
+   },
+   "ProtocolRevenue": {
+    "Pump Fun Protocol Fees": "Pump's slice kept by the protocol after the buyback share (100% pre-2025-07-14, 0% from 2025-07-14, 50% from 2026-04-28).",
+    "Pump Fun Mayhem Fees": "Mayhem-mode fees.",
+    "Pump Fun Graduation Fees": "Graduation fees kept by the protocol."
+   },
+   "HoldersRevenue": {
+    "Token Buy Back": "PUMP token buyback (sourced from onchain burns; aggregates buybacks across all pump products)."
+   },
+   "SupplySideRevenue": {
+    "Pump Fun Creator Fees": "Creator fees paid out to coin creators.",
+    "Pump Fun Cashback": "Cashback returned to traders/holders of the coin (Cashback Coins)."
+   }
+  },
+  "slug": "pump.fun",
+  "protocolType": "protocol",
+  "linkedProtocols": [
+   "Pump",
+   "pump.fun",
+   "PumpSwap",
+   "Terminal",
+   "pump.fun Mobile App"
+  ],
+  "hasLabelBreakdown": true,
+  "total24h": 1707784,
+  "total48hto24h": 1552550,
+  "total7d": 9431486,
+  "total30d": 46025497,
+  "total1y": 408724862,
+  "annualized1y": 408724862,
+  "totalAllTime": 1222030044,
+  "change_1d": 10,
+  "chainBreakdown": {
+   "Solana": {
+    "total24h": 1707784,
+    "total48hto24h": 1552550,
+    "total7d": 9431486,
+    "total14dto7d": 8042136,
+    "total30d": 46025497,
+    "total60dto30d": 34373720,
+    "total1y": 408724862,
+    "annualized1y": 408724862,
+    "total7DaysAgo": 1225798,
+    "total30DaysAgo": 1239127,
+    "totalAllTime": 1222030044,
+    "average1y": 1119794.1424657535,
+    "monthlyAverage1y": 34086533.69665754,
+    "change_1d": 10,
+    "change_7d": 39.32,
+    "change_1m": 37.82,
+    "change_7dover7d": 17.28,
+    "change_30dover30d": 33.9
+   }
+  },
+  "totalDataChart_last12": [
+   [
+    1788393600,
+    1309539
+   ],
+   [
+    1788480000,
+    928134
+   ],
+   [
+    1788566400,
+    679806
+   ],
+   [
+    1788652800,
+    695147
+   ],
+   [
+    1788739200,
+    1225798
+   ],
+   [
+    1788825600,
+    1272930
+   ],
+   [
+    1788912000,
+    1412179
+   ],
+   [
+    1788998400,
+    1135509
+   ],
+   [
+    1789084800,
+    950515
+   ],
+   [
+    1789171200,
+    1400019
+   ],
+   [
+    1789257600,
+    1552550
+   ],
+   [
+    1789344000,
+    1707784
+   ]
+  ]
+ }
+}

@@ -1,0 +1,38 @@
+{
+ "_meta": {
+  "name": "36_pumpfun_docs_fees",
+  "url": "https://pump.fun/docs/fees",
+  "final_url": "https://pump.fun/docs/fees",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:19:31.666+00:00",
+  "observed_brt": "18:19:32",
+  "bytes_received": 1788574,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:19:31 GMT",
+   "content-type": "text/html; charset=utf-8",
+   "server": "cloudflare",
+   "cf-cache-status": "DYNAMIC",
+   "cf-ray": "a3baab8f688a8303-GIG"
+  }
+ },
+ "payload": {
+  "meta": {
+   "title": "Pump.fun fees | Pump",
+   "og:title": "Pump.fun — Launch and trade memecoins on Solana",
+   "og:description": "Pump.fun is the fairest way to launch and trade memecoins on Solana. Coins are instantly tradable on a transparent bonding curve — no liquidity to seed, no presales, no team allocations.",
+   "description": "Bonding-curve, graduation, creator, and PumpSwap fees for using the Pump.fun platform."
+  },
+  "text_len": 6999,
+  "html_len": 1788323,
+  "windows": [
+   "[%] … for USDC tokens varies slightly from the fees for SOL tokens. Both sets of fees are described here.\n The bonding curve fees are as follows for both USDC and SOL tokens:\n Creator fee Protocol fee LP fee Total fee \n 0.300% 0.95% 0% 1.25% \n Coins that launched on the pump.fun platform and have graduated have an associated pool on PumpSwap. This pool is referred to as the “canonical pool”. PumpSwap fees for canonical pools vary depending o…",
+   "[%] …SDC tokens varies slightly from the fees for SOL tokens. Both sets of fees are described here.\n The bonding curve fees are as follows for both USDC and SOL tokens:\n Creator fee Protocol fee LP fee Total fee \n 0.300% 0.95% 0% 1.25% \n Coins that launched on the pump.fun platform and have graduated have an associated pool on PumpSwap. This pool is referred to as the “canonical pool”. PumpSwap fees for canonical pools vary depending on the …",
+   "[%] … tokens varies slightly from the fees for SOL tokens. Both sets of fees are described here.\n The bonding curve fees are as follows for both USDC and SOL tokens:\n Creator fee Protocol fee LP fee Total fee \n 0.300% 0.95% 0% 1.25% \n Coins that launched on the pump.fun platform and have graduated have an associated pool on PumpSwap. This pool is referred to as the “canonical pool”. PumpSwap fees for canonical pools vary depending on the SOL…",
+   "[%] …s varies slightly from the fees for SOL tokens. Both sets of fees are described here.\n The bonding curve fees are as follows for both USDC and SOL tokens:\n Creator fee Protocol fee LP fee Total fee \n 0.300% 0.95% 0% 1.25% \n Coins that launched on the pump.fun platform and have graduated have an associated pool on PumpSwap. This pool is referred to as the “canonical pool”. PumpSwap fees for canonical pools vary depending on the SOL or US…",
+   "[%] …lated as the current price of the token in SOL or USDC multiplied by 1 billion tokens. The fee schedule for SOL denominated tokens is as follows:\n Market cap Creator fee Protocol fee LP fee Total fees \n 0 – 420 SOL 0.300% 0.930% 0.020% 1.250% \n 420 – 1470 SOL 0.950% 0.050% 0.200% 1.200% \n 1470 – 2460 SOL 0.900% 0.050% 0.200% 1.150% \n 2460 – 3440 SOL 0.850% 0.050% 0.200% 1.100% \n 3440 – 4420 SOL 0.800% 0.050% 0.200% 1.050% \n 4420 – 9820 …",
+   "[%] …s the current price of the token in SOL or USDC multiplied by 1 billion tokens. The fee schedule for SOL denominated tokens is as follows:\n Market cap Creator fee Protocol fee LP fee Total fees \n 0 – 420 SOL 0.300% 0.930% 0.020% 1.250% \n 420 – 1470 SOL 0.950% 0.050% 0.200% 1.200% \n 1470 – 2460 SOL 0.900% 0.050% 0.200% 1.150% \n 2460 – 3440 SOL 0.850% 0.050% 0.200% 1.100% \n 3440 – 4420 SOL 0.800% 0.050% 0.200% 1.050% \n 4420 – 9820 SOL 0.7…"
+  ],
+  "i18n_keys": [],
+  "head_text": "Pump.fun fees | Pump \n Welcome to Pump . fun!\n Pump lets anyone create coins, giving everyone equal access to buy and sell from the start. Prices can move quickly, so trade carefully.\n Continue \n By clicking this button, you agree to the Terms and Conditions , Privacy Policy , and certify that you are over 18 years old.\n Home \n Explore \n GO \n Mayhem \n Live \n Support \n Terminal \n Home \n Explore \n GO \n Mayhem \n Live \n Support \n Terminal \n Home \n Explore \n GO \n Mayhem \n Live \n Support \n Terminal \n $PUMP \n Create Try app \n Trade faster. Pump is better on mobile. \n Search for coins and users... ⌘ K \n Sign in Signed in \n Fees\n Last Updated: 20 May 2026 \n The following are fees charged by the pump.fun platform when you use the pump.fun platform:\n Action Fee \n Create a coin 0 SOL / 0 USDC \n When a coin graduates from the pump.fun platform to PumpSwap* 0.015 SOL \n On every trade the creator receives some portion of the total fees. This is referred to as the “Creator fee” and is applicable for all coins that were present on the bonding curve or PumpSwap from the date of May 13th 2025. The fee that goes to the pump.fun platform is referred to as the “Protocol fee”. A portion of the fees also goes back to the pool in the form of liquidity – this is referred to as the “LP fee”.\n As of May 21, 2026, token creators can use USDC as the paired token for their launched token instead of SOL. The fees for USDC tokens varies slightly from the fees for SOL tokens. Both sets of fees are described h"
+ }
+}

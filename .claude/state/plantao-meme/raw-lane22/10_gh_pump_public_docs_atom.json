@@ -1,0 +1,141 @@
+{
+ "_meta": {
+  "name": "10_gh_pump_public_docs_atom",
+  "url": "https://github.com/pump-fun/pump-public-docs/commits/main.atom",
+  "final_url": "https://github.com/pump-fun/pump-public-docs/commits/main.atom",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:46.430+00:00",
+  "observed_brt": "18:15:46",
+  "bytes_received": 17573,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:15:46 GMT",
+   "content-type": "application/atom+xml; charset=utf-8",
+   "server": "github.com",
+   "content-length": "17573"
+  }
+ },
+ "payload": {
+  "entries": [
+   {
+    "title": "Merge pull request #46 from pump-fun/fix/holder-docs",
+    "updated": "2026-09-14T06:57:49Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/81091419e4457566469d4e2a27f64ed84d42419c",
+    "author": "sushant-baton"
+   },
+   {
+    "title": "docs: holder rewards choice can be changed via CTO, not irreversible",
+    "updated": "2026-09-14T06:52:07Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/6751052583f778c217d7e87e9c25c18537da5983",
+    "author": "sushant-baton"
+   },
+   {
+    "title": "Merge pull request #45 from pump-fun/feat/holder-rewards",
+    "updated": "2026-09-12T15:58:18Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/f216b6724c6ede79d7cef9ce210b741f7e17e93b",
+    "author": "arv-baton"
+   },
+   {
+    "title": "chore(idl): refresh pump, pump_amm and pump_fees IDLs",
+    "updated": "2026-09-12T14:28:42Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/e0687ae9b7e064a0f54efc7297c65eecfbba3a8f",
+    "author": "arv-baton"
+   },
+   {
+    "title": "docs: holder rewards coins, cashback deprecated, create_v2 is_holder_…",
+    "updated": "2026-09-12T14:28:42Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/4795463147b4469fb9a996487b01cbbe13f6826c",
+    "author": "arv-baton"
+   },
+   {
+    "title": "chore: README virtual quotes reserves",
+    "updated": "2026-07-15T18:22:27Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+    "author": ""
+   },
+   {
+    "title": "feat: pool virtual quotes reserves",
+    "updated": "2026-07-15T18:13:17Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/2c22246b670812e2392e5f94b9543f500d6c9e15",
+    "author": ""
+   },
+   {
+    "title": "Merge pull request #35 from pump-fun/feat/creator-fee-related-examples",
+    "updated": "2026-05-18T19:24:11Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/1b822158844a60ca577df6ca122211b595a1a578",
+    "author": "sushant-baton"
+   },
+   {
+    "title": "feat: add rust examples for public docs",
+    "updated": "2026-05-18T19:21:50Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/a313d980b16f4733a6244734cdc5990fd9c3f8a6",
+    "author": "sushant-baton"
+   },
+   {
+    "title": "Add creator fee docs",
+    "updated": "2026-05-18T19:03:28Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/3c6721a67c0b206b39130b454c8ba22a83ce972e",
+    "author": "arv-baton"
+   },
+   {
+    "title": "USDC paired coins",
+    "updated": "2026-05-07T17:09:01Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/91db6800e55bf341696564bd30a08ed4e3fc7491",
+    "author": "arv-baton"
+   },
+   {
+    "title": "Create BREAKING_FEE_RECIPIENT.md",
+    "updated": "2026-04-22T21:06:52Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/7de0b959fa2bdab379a2f75f5433d3de1e35d229",
+    "author": "arv-baton"
+   },
+   {
+    "title": "feat: permanent fee distribution",
+    "updated": "2026-03-19T11:57:50Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/9d874ec2763ac60f510d2bba80c5126c1fe133a8",
+    "author": ""
+   },
+   {
+    "title": "feat: github fees",
+    "updated": "2026-03-05T11:47:41Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/1059c0d95d1943c3bed41f2abc0dafbd70cd2e68",
+    "author": ""
+   },
+   {
+    "title": "Merge pull request #23 from pump-fun/feat/cashback",
+    "updated": "2026-02-17T18:03:58Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/5ea63cdb1fbe546769339c659d1529252cd80b4d",
+    "author": "drew-baton"
+   },
+   {
+    "title": "chore: mention versions to use with sdks",
+    "updated": "2026-02-17T18:03:47Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/a0a28de6073ed351bad1435706ad53024dae8043",
+    "author": ""
+   },
+   {
+    "title": "feat: cashback update",
+    "updated": "2026-02-17T17:35:12Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/82dacacf15ca93dc0444ab38714f2226210a0a3d",
+    "author": ""
+   },
+   {
+    "title": "feat: creator rewards sharing",
+    "updated": "2026-01-09T17:51:59Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/f0ef005c386adeeb783c27fdcc4ddd9d49b255c5",
+    "author": ""
+   },
+   {
+    "title": "Immutable global volume accumulator and reserved fee recipients",
+    "updated": "2025-11-15T19:58:24Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/7d7abd77403f0646ea17468d7cb6e66b33dbc3ed",
+    "author": "arv-baton"
+   },
+   {
+    "title": "chore: solscan links",
+    "updated": "2025-11-11T11:16:49Z",
+    "link": "https://github.com/pump-fun/pump-public-docs/commit/f5aa8e1589db211eff5526005d60b765995c893f",
+    "author": ""
+   }
+  ]
+ }
+}

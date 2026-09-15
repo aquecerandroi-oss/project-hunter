@@ -1,0 +1,139 @@
+{
+ "_meta": {
+  "name": "17_llama_hacks",
+  "url": "https://api.llama.fi/hacks",
+  "final_url": "https://api.llama.fi/hacks",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:51.821+00:00",
+  "observed_brt": "18:15:51",
+  "bytes_received": 345424,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:15:51 GMT",
+   "content-type": "application/json",
+   "last-modified": "Tue, 15 Sep 2026 20:37:42 GMT",
+   "server": "cloudflare",
+   "cf-cache-status": "HIT",
+   "cf-ray": "a3baa6314c20d884-GRU"
+  }
+ },
+ "payload": {
+  "count_after_2026-09-09": 7,
+  "items": [
+   {
+    "date": 1789084800,
+    "name": "ether.fi Liquid",
+    "classification": "Access Control",
+    "technique": "Arbitrary External Call",
+    "amount": 43260,
+    "chain": [
+     "Ethereum"
+    ],
+    "bridgeHack": false,
+    "targetType": "DeFi Protocol",
+    "source": "",
+    "returnedFunds": null,
+    "defillamaId": "4429",
+    "parentProtocolId": "parent#ether-fi",
+    "language": "Solidity"
+   },
+   {
+    "date": 1788912000,
+    "name": "Nomic",
+    "classification": "Bridge & Cross-Chain",
+    "technique": "Unbacked Cross-Chain Mint",
+    "amount": 3150000,
+    "chain": [
+     "Nomic"
+    ],
+    "bridgeHack": true,
+    "targetType": "DeFi Protocol",
+    "source": "",
+    "returnedFunds": null,
+    "defillamaId": null,
+    "language": "Rust"
+   },
+   {
+    "date": 1788912000,
+    "name": "Zentra Finance",
+    "classification": "Token & Share Accounting",
+    "technique": "Rounding Error",
+    "amount": 140030,
+    "chain": [
+     "Citrea"
+    ],
+    "bridgeHack": false,
+    "targetType": "DeFi Protocol",
+    "source": "",
+    "returnedFunds": null,
+    "defillamaId": "7419",
+    "language": "Solidity"
+   },
+   {
+    "date": 1788998400,
+    "name": "Dominion",
+    "classification": "Key Compromise",
+    "technique": "Private Key Compromised",
+    "amount": null,
+    "chain": [
+     "Solana"
+    ],
+    "bridgeHack": false,
+    "targetType": "DeFi Protocol",
+    "source": "",
+    "returnedFunds": null,
+    "defillamaId": null,
+    "language": null
+   },
+   {
+    "date": 1788912000,
+    "name": "BeatXswap",
+    "classification": "Oracle Manipulation",
+    "technique": "Spot Price Manipulation",
+    "amount": 77512,
+    "chain": [
+     "BSC"
+    ],
+    "bridgeHack": false,
+    "targetType": "DeFi Protocol",
+    "source": "",
+    "returnedFunds": null,
+    "defillamaId": null,
+    "language": "Solidity"
+   },
+   {
+    "date": 1789171200,
+    "name": "Chainflip AMM",
+    "classification": "Bridge & Cross-Chain",
+    "technique": "Bridge Logic Flaw",
+    "amount": 736442.17,
+    "chain": [
+     "Tron"
+    ],
+    "bridgeHack": true,
+    "targetType": "DeFi Protocol",
+    "source": "",
+    "returnedFunds": null,
+    "defillamaId": "3853",
+    "parentProtocolId": "parent#chainflip",
+    "language": "Rust"
+   },
+   {
+    "date": 1788998400,
+    "name": "Symbiosis",
+    "classification": "Bridge & Cross-Chain",
+    "technique": "Unbacked Cross-Chain Mint",
+    "amount": 336000,
+    "chain": [
+     "BSC",
+     "Ethereum"
+    ],
+    "bridgeHack": true,
+    "targetType": "DeFi Protocol",
+    "source": "",
+    "returnedFunds": null,
+    "defillamaId": "1594",
+    "language": "Solidity"
+   }
+  ]
+ }
+}

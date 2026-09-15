@@ -1,0 +1,24 @@
+{
+ "_meta": {
+  "name": "29_thestreet_clarity_tuesday",
+  "url": "https://www.thestreet.com/crypto/policy/clarity-act-faces-decisive-senate-vote-tuesday",
+  "final_url": "https://www.thestreet.com/crypto/policy/clarity-act-faces-decisive-senate-vote-tuesday",
+  "http": 403,
+  "request_started_utc": "2026-09-15T21:16:00.963+00:00",
+  "observed_brt": "18:16:01",
+  "bytes_received": 773,
+  "headers": {
+   "content-length": "773",
+   "content-type": "text/html;charset=utf-8",
+   "server": "DataDome",
+   "date": "Tue, 15 Sep 2026 21:16:01 GMT"
+  }
+ },
+ "payload": {
+  "meta": {
+   "title": "thestreet.com"
+  },
+  "text_len": 57,
+  "text": "thestreet.com Please enable JS and disable any ad blocker"
+ }
+}

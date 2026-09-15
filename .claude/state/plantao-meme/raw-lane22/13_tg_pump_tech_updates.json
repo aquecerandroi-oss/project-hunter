@@ -1,0 +1,142 @@
+{
+ "_meta": {
+  "name": "13_tg_pump_tech_updates",
+  "url": "https://t.me/s/pump_tech_updates",
+  "final_url": "https://t.me/s/pump_tech_updates",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:48.419+00:00",
+  "observed_brt": "18:15:49",
+  "bytes_received": 125130,
+  "headers": {
+   "server": "nginx/1.30.1",
+   "date": "Tue, 15 Sep 2026 21:15:49 GMT",
+   "content-type": "text/html; charset=utf-8",
+   "content-length": "19979"
+  }
+ },
+ "payload": {
+  "channel_meta": "Pump Developer Updates – Telegram \n Pump Developer Updates \n @pump_tech_updates \n 6.72K subscribers \n 1 file \n 22 links \n Updates regarding all technical related changes that may affect integrations\n Download Telegram\n About \n Blog \n Apps \n Platform \n Join\n Pump Developer Updates \n 6.72K subscribers\n Pump Developer Updates \n Pump Developer Updates \n Screenshot 2025-08-29 at 3.38.58 PM.png\n Hello. The new fee schedule from here has been deployed on Devnet already and can be tested there\n 12K views 18:37 \n Pump Developer Updates \n The pump bonding curve contract and the pump swap contract were u",
+  "messages": [
+   {
+    "post": "pump_tech_updates/25",
+    "datetime_utc": "2025-09-01T18:37:51+00:00",
+    "text": "Screenshot 2025-08-29 at 3.38.58 PM.png",
+    "views": "12K"
+   },
+   {
+    "post": "pump_tech_updates/26",
+    "datetime_utc": "2025-10-17T14:49:19+00:00",
+    "text": "The pump bonding curve contract and the pump swap contract were upgraded earlier today at: October 17, 2025 16:47:00 UTC. It was a routine upgrade with no breaking changes.",
+    "views": "9.14K"
+   },
+   {
+    "post": "pump_tech_updates/27",
+    "datetime_utc": "2025-10-31T03:00:58+00:00",
+    "text": "Hi all, we will be doing a breaking program upgrade on pump swap on Tuesday, 4th November, 14:00 UTC. As part of the change, we require you to mark the pool account at account index 1 in pump swap buys and sells as mutable ( as opposed to readonly ). Please make the changes as soon as possible, your integration will not break if you make it mutable before we do the program upgrade.\nIDL change for reference: https://github.com/pump-fun/pump-public-docs/commit/ff9cbf8238b4e459864fed415465cc8163113d1c \nSDK version with update: @pump -fun/pump-swap-sdk@1.9.0",
+    "views": "9.78K"
+   },
+   {
+    "post": "pump_tech_updates/28",
+    "datetime_utc": "2025-11-05T17:10:28+00:00",
+    "text": "The pump bonding curve contract and the pump swap contract were upgraded earlier today at: November 5, 5:02pm UTC. The bonding curve upgrade was a routing upgrade with no breaking changes but Pump swap has breaking changes as mentioned earlier.",
+    "views": "9.12K"
+   },
+   {
+    "post": "pump_tech_updates/29",
+    "datetime_utc": "2025-11-07T16:06:00+00:00",
+    "text": "Hi all, On 11th November at 12:00 UTC, we will enable 2 new breaking features.\n 1. New token creation standard with token2022 called create_v2\n 2. Mayhem Mode\nPlease refer here for the updated IDLs and IDL types: https://github.com/pump-fun/pump-public-docs \nPlease note:\n1. Any coin created with the usual create instruction and owned by the legacy token program can be traded the same way as before. This is not a breaking change for trading or creating such coins, you can continue to use the same accounts and instruction data.\n2. Any new coin created after 11th November at 12:00 UTC with create_v2 will be owned by the Token2022 program. Creating and trading such accounts will need changes as described here: https://github.com/pump-fun/pump-public-docs/blob/main/README.md \nProgram is updated on devnet for testing with both features enabled.\nSDKs for both bonding curve and pump swap are updated\n https://www.npmjs.com/package/@pump-fun/pump-sdk \n https://www.npmjs.com/package/@pump-fun/pump-swap-sdk",
+    "views": "15.5K"
+   },
+   {
+    "post": "pump_tech_updates/30",
+    "datetime_utc": "2025-11-10T21:25:48+00:00",
+    "text": "Hi all, Mayhem mode and create v2 will now be enabled on 12th November 12:00 UTC instead of 11th November.",
+    "views": "16.3K"
+   },
+   {
+    "post": "pump_tech_updates/31",
+    "datetime_utc": "2025-11-15T20:08:09+00:00",
+    "text": "Hi all,\nWe have pushed a non breaking program upgrade on the bonding curve and pump swap program.\nChanges as part of this upgrade:\n1. The global_volume_accumulator account on the buy instruction of bonding curve and pump swap do not need to be mutable anymore.\n2. New fee recipients for mayhem mode: We have introduced 7 new fee recipients that can be used for the buy and sell instruction that can be used when bonding_curve.is_mayhem_mode = true and pool.is_mayhem_mode = true . They can be found in the global and global_config accounts in bonding curve and pump swap respectively.\nAny of the following 8 fee recipients can now be used:\n [\n 'GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS',\n '4budycTjhs9fD6xw62VBducVTNgMgJJ5BgtKq7mAZwn6',\n '8SBKzEQU4nLSzcwF4a74F2iaUDQyTfjGndn6qUWBnrpR',\n '4UQeTP1T39KZ9Sfxzo3WR5skgsaP6NZa87BAkuazLEKH',\n '8sNeir4QsLsJdYpc9RZacohhK1Y5FLU3nC5LXgYB4aa6',\n 'Fh9HmeLNUMVCvejxCtCL2DbYaRyBFVJ5xrWkLnMH6fdk',\n '463MEnMeGyJekNZFQSTUABBEbLnvMTALbT6ZmsxAbAdq',\n '6AUH3WEHucYZyC61hqpqYUWVto5qA5hjHuNQ32GNnNxA'\n] \nUpdated IDLs can be found here: https://github.com/pump-fun/pump-public-docs",
+    "views": "11.6K"
+   },
+   {
+    "post": "pump_tech_updates/32",
+    "datetime_utc": "2026-01-09T05:04:43+00:00",
+    "text": "Hi, we will be pushing an update to our programs on Fri Jan 9, afternoon UTC.\nThis update will make some coins' creator_vault point to new addresses. To ensure buy and sell instructions work seamlessly, always fetch the latest creator on-chain. Do not use cached addresses for bonding_curve.creator or pool.coin_creator. \nThe derivation logic remains the same, so no code changes are needed if you're already fetching fresh data.\n### Pre-Graduation Coins (Bonding Curve)\n const bondingCurve = await pumpProgram.account.bondingCurve.fetch(bondingCurvePda);\nconst creatorVault = PublicKey.findProgramAddressSync(\n [Buffer.from(\"creator-vault\"), bondingCurve.creator.toBuffer()],\n PUMP_PROGRAM_ID\n)[0];\n ### Graduated Coins (AMM Pool)const pool = await pumpAmmProgram.account.pool.fetch(poolPda);\nconst coinCreatorVaultAuthority = PublicKey.findProgramAddressSync(\n [Buffer.from(\"creator_vault\"), pool.coinCreator.toBuffer()],\n PUMP_AMM_PROGRAM_ID\n)[0];\nIf you already fetch the latest bonding_curve.creator and pool.coin_creator from the chain before building your buy and sell instructions, no code changes are needed.",
+    "views": "8.91K"
+   },
+   {
+    "post": "pump_tech_updates/33",
+    "datetime_utc": "2026-01-09T17:38:31+00:00",
+    "text": "# Creator Rewards Sharing - Developer Update \n## Overview\nCreator Rewards Sharing allows token creators to split their creator fees with multiple recipients. Instead of all fees going to a single wallet, creators can configure a list of shareholders with custom percentage splits. \n## Dynamic creator_vault Address\nThis update will make some coins' creator_vault point to new addresses. To ensure buy and sell instructions work seamlessly, always fetch the latest creator on-chain. Do not use cached addresses for bonding_curve.creator or pool.coin_creator .\nThe derivation logic remains the same, so no code changes are needed if you're already fetching fresh data.\n### Pre-Graduation Coins (Bonding Curve) \nconst bondingCurve = await pumpProgram.account.bondingCurve.fetch(bondingCurvePda); const creatorVault = PublicKey.findProgramAddressSync( [Buffer.from(\"creator-vault\"), bondingCurve.creator.toBuffer()], PUMP_PROGRAM_ID )[0];\n### Graduated Coins (AMM Pool) \nconst pool = await pumpAmmProgram.account.pool.fetch(poolPda); const coinCreatorVaultAuthority = PublicKey.findProgramAddressSync( [Buffer.from(\"creator_vault\"), pool.coinCreator.toBuffer()], PUMP_AMM_PROGRAM_ID )[0];\n## How Fee Distribution Works \n1. Fees accumulate in the creator_vault during buy/sell transactions as before\n2. Creator enables sharing by calling create_fee_sharing_config - this changes the coin_creator field to the sharing_config PDA \n3. Creator configures shareholders via update_fee_shares with addresses and ",
+    "views": "10.2K"
+   },
+   {
+    "post": "pump_tech_updates/34",
+    "datetime_utc": "2026-01-09T18:16:42+00:00",
+    "text": "* pump-public-docs has been updated with all the latest IDLs\n* SDKs updated at: https://www.npmjs.com/package/@pump-fun/pump-sdk and https://www.npmjs.com/package/@pump-fun/pump-swap-sdk",
+    "views": "9.1K"
+   },
+   {
+    "post": "pump_tech_updates/35",
+    "datetime_utc": "2026-02-17T18:30:55+00:00",
+    "text": "Cashback Rewards allows token creators to create coins with \"cashback\" enabled which redirects the creator fee to the users. Each user would get the creator fee on their swap volume as cashback rather than paying that fee to the coin creator.\nThis is a backwards compatible change, so if you do not update to the latest IDsL/SDKs it will work but cashback will not be enabled.\n## Integration\nYou can also use our Typescript SDKs for easier integration:\n- [Pump SDK]( https://www.npmjs.com/package/@pump-fun/pump-sdk )\n - Latest version is 1.28.0\n- [PumpSwap SDK]( https://www.npmjs.com/package/@pump-fun/pump-swap-sdk )\n - Latest version is 1.14.0\n- IDLS: https://github.com/pump-fun/pump-public-docs/tree/main/idl \n- Docs: https://github.com/pump-fun/pump-public-docs/blob/main/docs/PUMP_CASHBACK_README.md \n## Changes to Instructions\nCashback is only given to the user if the buy/sell instruction appends the proper remaining accounts.\nIf the coin traded is a cashback coin but the cashback remaining accounts are now added, then the creator fee will\ngo to the creator as it normally would. \n### Bonding Curve Buy Instructions\nNo change. Cashback is handled automatically if the coin has cashback enabled.\n### Bonding Curve Sell Instruction\nExpects the UserVolumeAccumulator PDA for the Pump program at the 0th index in the remaining accounts with isWritable: true\n### Pump Swap Buy Instruction\nExpects the WSOL associated token account of the UserVolumeAccumulator for the Pump AMM program (this i",
+    "views": "7.91K"
+   },
+   {
+    "post": "pump_tech_updates/36",
+    "datetime_utc": "2026-02-26T15:22:56+00:00",
+    "text": "🚨 PROGRAM UPGRADE: NEW REQUIRED ACCOUNTS 🚨 \nWe pushed a program upgrade that requires 1 extra account for an upcoming feature on BOTH:\n• Bonding Curve program\n• Pump Swap AMM program\n ✅ These additions are REQUIRED for BOTH cashback + non-cashback coins.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n 🆕 NEW PDAs TO DERIVE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n1) Bonding Curve v2 PDA\n • Seeds: [\"bonding-curve-v2\", mint]\n • Program ID: Bonding Curve program id\n2) Pool v2 PDA\n • Seeds: [\"pool-v2\", base_mint]\n • Program ID: Pump AMM program id\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nCASE A) If you have done ALL cashback-related changes\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nBonding Curve program:\n• For: buy / buy_exact_in / sell\n → Append: bonding_curve_v2 (readonly)\n → Placement: AT THE END of the account list\nPump AMM program:\n• For: buy / buy_exact_in / sell\n → Append: pool_v2 (readonly)\n → Placement: AT THE END of the account list\nNOTE: Required for BOTH cashback + non-cashback coins.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nCASE If you have NOT done ALL cashback-related changes\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nPlacement rule:\n• Add the new accounts AFTER the fee program\n (i.e. AFTER the FINAL account in the IDL)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nACCOUNT ADDITIONS MATRIX\n(AFTER FEE PROGRAM / FINAL IDL ACC)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n1) BONDING CURVE\n────────────────────────────\nCashback coins:\n• buy\n + bonding_curve_v2 (readonly)\n• buy_exact_in\n + bonding_curve_v2 (readonly)\n• s",
+    "views": "11.6K"
+   },
+   {
+    "post": "pump_tech_updates/37",
+    "datetime_utc": "2026-03-05T19:18:15+00:00",
+    "text": "Hi devs — we’ve shipped Creator Fee V2 integration guidance (docs + SDK helpers). This is not an on-chain update , but you may need to adjust your integration to correctly support all creator-fee configurations.\n- SDK update: @pump-fun/pump-sdk@1.30.0 (new helper functions) \n https://www.npmjs.com/package/@pump-fun/pump-sdk/v/1.30.0 \n- Docs / requirements: GitHub recipient + social fee PDA requirements \n https://github.com/pump-fun/pump-public-docs?tab=readme-ov-file#github-recipient-and-social-fee-pda-requirements \nWhy you should care (quick checklist):\n- Support multiple creators on a coin\n- Correctly add a GitHub account as a creator *(many top apps still do this wrong)*\n- Detect when a coin has multiple creators + their addresses \n- Detect when a creator is a GitHub handle \n- Revoke authority to change creators \nIf you display creator fees or attribute creators anywhere, please review + validate your integration against the updated docs.",
+    "views": "9.05K"
+   },
+   {
+    "post": "pump_tech_updates/38",
+    "datetime_utc": "2026-03-13T15:41:17+00:00",
+    "text": "Hi devs — we've shipped Tokenized Agents.\nTokenized Agents allow agents to collect revenue and use a portion of it for buybacks. This does not alter the trade flow — both buy and sell behavior remain the same. This is an entirely new smart contract that works on top of our Pump bonding curve and Pump AMM smart contracts.\nTo create a tokenized agent, please use the NPM package: @pump -fun/agent-payments-sdk.\nAfter creating the bonding_curve on the Pump bonding curve program, you can send a transaction with the instruction to create a Tokenized Agent.\nTo initialize it, use the following ix:\n\"\"\"\nimport { PumpAgentOffline } from \" @pump -fun/agent-payments-sdk\";\n...\nconst agentInitializeIx = await PumpAgentOffline.load(mint).create({\n authority: creator,\n mint,\n agentAuthority: creator,\n buybackBps: buybackBps,\n});\n\"\"\"\nThe buybackBps parameter represents how much of the agent's revenue is reserved for buybacks, which happen automatically over time.\nAgents can also use functions to verify whether an invoice has been paid and to generate a transaction that a user can send to pay an invoice via the skill here:\n https://github.com/pump-fun/pump-fun-skills/blob/main/tokenized-agents/SKILL.md",
+    "views": "8.96K"
+   },
+   {
+    "post": "pump_tech_updates/39",
+    "datetime_utc": "2026-03-24T16:20:05+00:00",
+    "text": "## One-Time Creator Reward Distribution Policy\nThis update only affects fee-sharing configuration. Trading instructions are unchanged and do not require an upgrade.\n TLDR: After the first configuration, reward distribution is locked and cannot be changed.\nWhat changed:\n- Reward distribution can be configured only once .\n- You can configure it using either updateFeeShares or updateSharingConfigWithSocialRecipients .\n- After it is configured, it is locked and cannot be changed again.\nWhat did not change:\n- Buy and sell instructions are unchanged.\nMigration/compatibility notes:\n- Reward distributions created before this policy are treated as final (locked).\n- RevokeFeeSharingAuthority and TransferFeeSharingAuthority are no longer supported.\n- If you are unsure whether a reward distribution is still editable, call isSharingConfigEditable from the sdk.\nSdk: https://www.npmjs.com/package/@pump-fun/pump-sdk/v/1.32.0 \nDocs: https://github.com/pump-fun/pump-public-docs?tab=readme-ov-file#one-time-creator-reward-distribution-policy",
+    "views": "8.67K"
+   },
+   {
+    "post": "pump_tech_updates/40",
+    "datetime_utc": "2026-04-22T21:07:11+00:00",
+    "text": "━━━━━━━━━━\nPROGRAM UPGRADE\n━━━━━━━━━━\nHi. We will be doing a breaking program upgrade on April 28th, 16:00 UTC, to both the pump bonding curve program and the pump swap amm program. In order to make sure your integrations do not break please see the instructions below:\n━━━━━━━━━━\n8 NEW FEE RECIPIENTS\n( common for both programs )\n━━━━━━━━━━\n5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD\n9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7\nGXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL\n3BpXnfJaUTiwXnJNe7Ej1rcbzqTTQUvLShZaWazebsVR\n5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6\nEHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL\n5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD\nA7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW\n━━━━━━━━━━\nAS PART OF THIS CHANGE\n━━━━━━━━━━\n1. Bonding curve: A new account is required to be added in buys and sells\n2. AMM: 2 new accounts required to be added in buys and sells\nAll accounts till bonding-curve-v2 and pool-v2 remain the same, no change needed\n━━━━━━━━━━\nBONDING CURVE\n━━━━━━━━━━\n1. Add any one of the 8 new fee recipients at the end of the buy and sell instructions.\n2. This new account should be added AFTER the bonding-curve-v2 account for both buys and sells.\n3. Account needs to be mutable\n4. Buy instructions should have 18 accounts in total\n5. Sell instruction should have 16 accounts for non cashback coins\n6. Sell instruction should have 17 accounts for cashback coins\n━━━━━━━━━━\nPUMP SWAP ( AMM )\n━━━━━━━━━━\n1. Add 2 new accounts in this order at the end:\n 1. One of the ",
+    "views": "11K"
+   },
+   {
+    "post": "pump_tech_updates/41",
+    "datetime_utc": "2026-05-07T17:13:02+00:00",
+    "text": "Hello everyone. We just upgraded the Bonding curve contract for a new non breaking feature.\nHappy to announce support of USDC as a quote mint for creating and trading Pump meme coins.\nAs part of this upgrade, we have rolled out 3 new instructions, buy_v2, sell_v2 and buy_exact_quote_in_v2.\nThese new instructions are meant to unify the trading interface so the same instruction can be used to trade USDC and SOL paired coins with no optional accounts depending on the coin mint.\n quote_mint needs to be passed as the wrapped SOL mint to trade coins paired with SOL. The trading and transfer will continue to happen identical to legacy buy, sell and buy_exact_quote_in using native SOL. \nPlease note: We are only announcing the rollout of the new instructions today. USDC paired coins cannot be created until next week. There will be a 72 hours notice before its enabled.\nFor more technical details of the new instructions, please refer to this doc: https://github.com/pump-fun/pump-public-docs \nNew rust sdk: https://crates.io/crates/pump-rust-client",
+    "views": "12.1K"
+   },
+   {
+    "post": "pump_tech_updates/42",
+    "datetime_utc": "2026-05-18T20:37:41+00:00",
+    "text": "Hello everyone,\nOn Thursday, May 21, 2026, we will be enabling USDC mint as a quote mint for creating and trading pump coins.\n* Please note that USDC-paired coins can only be traded using the new V2 instructions announced earlier. \n* SOL paired coins will continue to be traded in native SOL even though the quote mint needs to be passed as the wrapped SOL mint. \n* All legacy instructions will continue to work for SOL paired coins.\nOfficial docs:\n https://github.com/pump-fun/pump-public-docs \nNew documentation has also been added for creator fee-related V2 instructions:\n• Collect Creator Fee\n https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/COLLECT_CREATOR_FEE.md \n• Creator Fee Sharing\n https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/CREATOR_FEE_SHARING.md",
+    "views": "13.6K"
+   },
+   {
+    "post": "pump_tech_updates/43",
+    "datetime_utc": "2026-07-15T19:26:18+00:00",
+    "text": "Hello everyone\nWe're changing how PumpSwap (pump-amm) pool quotes must be computed. This is a breaking change: everyone who prices, quotes, or indexes PumpSwap pools will need to update their integration. We're rolling it out in two phases so you have time to adapt before it takes effect.\n What's changing? \nThe Pool account now carries an additional field, virtual_quote_reserves. Quotes should be computed against the pool's effective quote reserves:\neffective_quote_reserves = quote_vault_balance + virtual_quote_reserves\nBuys and sells must be priced on effective_quote_reserves, not on the raw quote-vault token balance.\nRolling out in two phases:\n1. Now ( Wednesday, July 15, 2026 ): virtual_quote_reserves ships and is 0 on every pool, so effective quote reserves equal the raw vault balance and all quotes are identical to today. There is no behaviour change in this phase; it exists so you can integrate ahead of time. \n2. On ( Monday, July 20, 2026: 10am EST ): all pools will begin carrying a non-zero virtual_quote_reserves. \nAction required\nUpdate your quoting and pricing to use effective_quote_reserves = quote_vault_balance + virtual_quote_reserves . For non launchpad tokens its not a breaking change and that virtual_quote_reserves will continue to be 0.\nFor indexers BuyEvent and SellEvent now include an appended (non-breaking) virtual_quote_reserves field. Update your decoders and use it to reconstruct effective reserves from the event stream.\nDocs: https://github.com/pump-fu",
+    "views": "8.82K"
+   },
+   {
+    "post": "pump_tech_updates/44",
+    "datetime_utc": "2026-07-20T13:50:48+00:00",
+    "text": "Hi all, The update above of enabling non zero virtual quote reserves will be now at 10am EST on july 21, 2026",
+    "views": "6.43K"
+   }
+  ]
+ }
+}

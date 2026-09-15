@@ -1,0 +1,21 @@
+{
+ "_meta": {
+  "name": "26_senate_vote_menu_119_2",
+  "url": "https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.xml",
+  "final_url": "https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.xml",
+  "http": 403,
+  "request_started_utc": "2026-09-15T21:15:58.531+00:00",
+  "observed_brt": "18:15:59",
+  "bytes_received": 493,
+  "headers": {
+   "server": "AkamaiGHost",
+   "content-length": "493",
+   "content-type": "text/html",
+   "date": "Tue, 15 Sep 2026 21:15:59 GMT"
+  }
+ },
+ "payload": {
+  "xml_len": 493,
+  "xml_head": "<HTML><HEAD>\n<TITLE>Access Denied</TITLE>\n</HEAD><BODY>\n<H1>Access Denied</H1>\n \nYou don't have permission to access \"http&#58;&#47;&#47;www&#46;senate&#46;gov&#47;&#36;&#40;SERVE&#95;403&#41;&#47;legislative&#47;LIS&#47;roll&#95;call&#95;lists&#47;vote&#95;menu&#95;119&#95;2&#46;xml&#63;\" on this server.<P>\nReference&#32;&#35;18&#46;470f3417&#46;1789506959&#46;82585957\n<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;470f3417&#46;1789506959&#46;82585957</P>\n</BODY>\n</HTML>\n"
+ }
+}

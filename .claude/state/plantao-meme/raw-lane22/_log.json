@@ -1,0 +1,1147 @@
+{
+ "run": 22,
+ "lane": 2,
+ "start_utc": "2026-09-15T21:13:30.636+00:00",
+ "pumpfun_host_requests": 14,
+ "requests": [
+  {
+   "file": "01_sol_price.json",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:30.226+00:00",
+   "http": 200,
+   "bytes": 74,
+   "latency_ms": 254,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:30 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "50",
+    "x-ratelimit-remaining": "49",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3baa5aaab5de126-GIG"
+   },
+   "read_brt": "18:15:30",
+   "error": "",
+   "final_url": "https://frontend-api-v3.pump.fun/sol-price"
+  },
+  {
+   "file": "02_pumpfun_docs_links.json",
+   "url": "https://pump.fun/docs",
+   "mode": "links",
+   "request_started_utc": "2026-09-15T21:15:31.784+00:00",
+   "http": 200,
+   "bytes": 1648930,
+   "latency_ms": 709,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:31 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baa5b41f7019cb-GIG"
+   },
+   "read_brt": "18:15:32",
+   "error": "",
+   "final_url": "https://pump.fun/docs"
+  },
+  {
+   "file": "03_pumpfun_docs_holder_rewards.json",
+   "url": "https://pump.fun/docs/holder-rewards",
+   "mode": "coinpage",
+   "request_started_utc": "2026-09-15T21:15:33.829+00:00",
+   "http": 200,
+   "bytes": 1648964,
+   "latency_ms": 554,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:33 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baa5c08bb619cb-GIG"
+   },
+   "read_brt": "18:15:34",
+   "error": "",
+   "final_url": "https://pump.fun/docs/holder-rewards"
+  },
+  {
+   "file": "04_pumpfun_blog_links.json",
+   "url": "https://pump.fun/blog",
+   "mode": "links",
+   "request_started_utc": "2026-09-15T21:15:35.716+00:00",
+   "http": 200,
+   "bytes": 1648930,
+   "latency_ms": 763,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:35 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baa5cc5e9519cb-GIG"
+   },
+   "read_brt": "18:15:36",
+   "error": "",
+   "final_url": "https://pump.fun/blog"
+  },
+  {
+   "file": "05_pumpfun_pump_token.json",
+   "url": "https://pump.fun/pump-token",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:15:37.813+00:00",
+   "http": 200,
+   "bytes": 2215861,
+   "latency_ms": 884,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:37 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baa5d96c0719cb-GIG"
+   },
+   "read_brt": "18:15:38",
+   "error": "",
+   "final_url": "https://pump.fun/pump-token"
+  },
+  {
+   "file": "06_coinpage_fone_CTPoyCwk.json",
+   "url": "https://pump.fun/coin/CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
+   "mode": "coinpage",
+   "request_started_utc": "2026-09-15T21:15:40.063+00:00",
+   "http": 200,
+   "bytes": 2050288,
+   "latency_ms": 791,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:40 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baa5e77d6b19cb-GIG"
+   },
+   "read_brt": "18:15:40",
+   "error": "",
+   "final_url": "https://pump.fun/coin/CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump"
+  },
+  {
+   "file": "07_coinpage_POO_8WKCZM.json",
+   "url": "https://pump.fun/coin/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLPXaMJ6nWqyv",
+   "mode": "coinpage",
+   "request_started_utc": "2026-09-15T21:15:42.194+00:00",
+   "http": 200,
+   "bytes": 2048997,
+   "latency_ms": 718,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:42 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baa5f4dccf19cb-GIG"
+   },
+   "read_brt": "18:15:42",
+   "error": "",
+   "final_url": "https://pump.fun/coin/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLPXaMJ6nWqyv"
+  },
+  {
+   "file": "08_coin_fone_CTPoyCwk.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:44.291+00:00",
+   "http": 200,
+   "bytes": 1836,
+   "latency_ms": 259,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:44 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3baa6025d1282e2-GIG"
+   },
+   "read_brt": "18:15:44",
+   "error": "",
+   "final_url": "https://frontend-api-v3.pump.fun/coins/CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump"
+  },
+  {
+   "file": "09_coin_POO_8WKCZM.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLPXaMJ6nWqyv",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:45.853+00:00",
+   "http": 200,
+   "bytes": 2046,
+   "latency_ms": 174,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:46 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3baa60bbd7382e2-GIG"
+   },
+   "read_brt": "18:15:46",
+   "error": "",
+   "final_url": "https://frontend-api-v3.pump.fun/coins/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLPXaMJ6nWqyv"
+  },
+  {
+   "file": "10_gh_pump_public_docs_atom.json",
+   "url": "https://github.com/pump-fun/pump-public-docs/commits/main.atom",
+   "mode": "atom",
+   "request_started_utc": "2026-09-15T21:15:46.430+00:00",
+   "http": 200,
+   "bytes": 17573,
+   "latency_ms": 309,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:46 GMT",
+    "content-type": "application/atom+xml; charset=utf-8",
+    "server": "github.com",
+    "content-length": "17573"
+   },
+   "read_brt": "18:15:46",
+   "error": "",
+   "final_url": "https://github.com/pump-fun/pump-public-docs/commits/main.atom"
+  },
+  {
+   "file": "11_gh_api_contents_docs.json",
+   "url": "https://api.github.com/repos/pump-fun/pump-public-docs/contents/docs",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:47.144+00:00",
+   "http": 200,
+   "bytes": 13670,
+   "latency_ms": 269,
+   "headers": {
+    "content-length": "13670",
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:15:47 GMT",
+    "last-modified": "Tue, 15 Sep 2026 16:00:24 GMT",
+    "server": "github.com",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "1789510547"
+   },
+   "read_brt": "18:15:47",
+   "error": "",
+   "final_url": "https://api.github.com/repos/pump-fun/pump-public-docs/contents/docs"
+  },
+  {
+   "file": "12_gh_raw_holder_rewards_readme.json",
+   "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/HOLDER_REWARDS_README.md",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:15:47.815+00:00",
+   "http": 200,
+   "bytes": 7370,
+   "latency_ms": 200,
+   "headers": {
+    "content-length": "2531",
+    "content-type": "text/plain; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:15:48 GMT"
+   },
+   "read_brt": "18:15:48",
+   "error": "",
+   "final_url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/HOLDER_REWARDS_README.md"
+  },
+  {
+   "file": "13_tg_pump_tech_updates.json",
+   "url": "https://t.me/s/pump_tech_updates",
+   "mode": "tg",
+   "request_started_utc": "2026-09-15T21:15:48.419+00:00",
+   "http": 200,
+   "bytes": 125130,
+   "latency_ms": 892,
+   "headers": {
+    "server": "nginx/1.30.1",
+    "date": "Tue, 15 Sep 2026 21:15:49 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "content-length": "19979"
+   },
+   "read_brt": "18:15:49",
+   "error": "",
+   "final_url": "https://t.me/s/pump_tech_updates"
+  },
+  {
+   "file": "14_tg_pumpfun.json",
+   "url": "https://t.me/s/pumpfun",
+   "mode": "tg",
+   "request_started_utc": "2026-09-15T21:15:49.724+00:00",
+   "http": 200,
+   "bytes": 102040,
+   "latency_ms": 401,
+   "headers": {
+    "server": "nginx/1.30.1",
+    "date": "Tue, 15 Sep 2026 21:15:49 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "content-length": "15208"
+   },
+   "read_brt": "18:15:50",
+   "error": "",
+   "final_url": "https://t.me/s/pumpfun"
+  },
+  {
+   "file": "15_x_synd_timeline_Pumpfun.json",
+   "url": "https://syndication.twitter.com/srv/timeline-profile/screen-name/Pumpfun",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:15:50.535+00:00",
+   "http": 429,
+   "bytes": 20,
+   "latency_ms": 277,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:50 GMT",
+    "content-type": "text/plain;charset=utf-8",
+    "content-length": "46",
+    "server": "cloudflare envoy",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baa6292f9e326e-GRU"
+   },
+   "read_brt": "18:15:50",
+   "error": "",
+   "final_url": "https://syndication.twitter.com/srv/timeline-profile/screen-name/Pumpfun"
+  },
+  {
+   "file": "16_solana_status.json",
+   "url": "https://status.solana.com/api/v2/summary.json",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:51.214+00:00",
+   "http": 200,
+   "bytes": 2973,
+   "latency_ms": 204,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:15:42 GMT",
+    "server": "AtlassianEdge"
+   },
+   "read_brt": "18:15:51",
+   "error": "",
+   "final_url": "https://status.solana.com/api/v2/summary.json"
+  },
+  {
+   "file": "17_llama_hacks.json",
+   "url": "https://api.llama.fi/hacks",
+   "mode": "llama_hacks",
+   "request_started_utc": "2026-09-15T21:15:51.821+00:00",
+   "http": 200,
+   "bytes": 345424,
+   "latency_ms": 91,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:51 GMT",
+    "content-type": "application/json",
+    "last-modified": "Tue, 15 Sep 2026 20:37:42 GMT",
+    "server": "cloudflare",
+    "cf-cache-status": "HIT",
+    "cf-ray": "a3baa6314c20d884-GRU"
+   },
+   "read_brt": "18:15:51",
+   "error": "",
+   "final_url": "https://api.llama.fi/hacks"
+  },
+  {
+   "file": "18_llama_pumpfun_fees.json",
+   "url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees",
+   "mode": "llama_fees",
+   "request_started_utc": "2026-09-15T21:15:52.322+00:00",
+   "http": 200,
+   "bytes": 64509,
+   "latency_ms": 1028,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:53 GMT",
+    "content-type": "application/json",
+    "server": "cloudflare",
+    "last-modified": "Tue, 15 Sep 2026 21:15:53 GMT",
+    "cf-cache-status": "EXPIRED",
+    "cf-ray": "a3baa6342c9dd884-GRU"
+   },
+   "read_brt": "18:15:53",
+   "error": "",
+   "final_url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees"
+  },
+  {
+   "file": "19_dexscreener_boosts_top.json",
+   "url": "https://api.dexscreener.com/token-boosts/top/v1",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:53.757+00:00",
+   "http": 200,
+   "bytes": 23204,
+   "latency_ms": 91,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:53 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3baa63d78e768db-GIG"
+   },
+   "read_brt": "18:15:53",
+   "error": "",
+   "final_url": "https://api.dexscreener.com/token-boosts/top/v1"
+  },
+  {
+   "file": "20_binance_cms_new_listings.json",
+   "url": "https://www.binance.com/bapi/composite/v1/public/cms/article/list/query?type=1&pageNo=1&pageSize=20&catalogId=48",
+   "mode": "binance_cms",
+   "request_started_utc": "2026-09-15T21:15:54.254+00:00",
+   "http": 200,
+   "bytes": 4167,
+   "latency_ms": 57,
+   "headers": {
+    "content-type": "application/json;charset=UTF-8",
+    "content-length": "1486",
+    "date": "Tue, 15 Sep 2026 21:15:04 GMT"
+   },
+   "read_brt": "18:15:54",
+   "error": "",
+   "final_url": "https://www.binance.com/bapi/composite/v1/public/cms/article/list/query?type=1&pageNo=1&pageSize=20&catalogId=48"
+  },
+  {
+   "file": "21_bybit_new_crypto.json",
+   "url": "https://api.bybit.com/v5/announcements/index?locale=en-US&type=new_crypto&limit=20",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:54.714+00:00",
+   "http": 200,
+   "bytes": 9559,
+   "latency_ms": 520,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:15:55 GMT",
+    "server": "Openresty"
+   },
+   "read_brt": "18:15:55",
+   "error": "",
+   "final_url": "https://api.bybit.com/v5/announcements/index?locale=en-US&type=new_crypto&limit=20"
+  },
+  {
+   "file": "22_okx_new_listings.json",
+   "url": "https://www.okx.com/api/v5/support/announcements?annType=announcements-new-listings",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:55.637+00:00",
+   "http": 200,
+   "bytes": 4812,
+   "latency_ms": 421,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:56 GMT",
+    "content-type": "application/json",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3baa6491a7d4d09-GRU"
+   },
+   "read_brt": "18:15:56",
+   "error": "",
+   "final_url": "https://www.okx.com/api/v5/support/announcements?annType=announcements-new-listings"
+  },
+  {
+   "file": "23_binance_ticker24h_btc_sol.json",
+   "url": "https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22SOLUSDT%22%5D",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:56.463+00:00",
+   "http": 200,
+   "bytes": 1101,
+   "latency_ms": 308,
+   "headers": {
+    "content-type": "application/json;charset=UTF-8",
+    "content-length": "441",
+    "date": "Tue, 15 Sep 2026 21:15:56 GMT",
+    "server": "nginx"
+   },
+   "read_brt": "18:15:56",
+   "error": "",
+   "final_url": "https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22SOLUSDT%22%5D"
+  },
+  {
+   "file": "24_binance_klines_btc_1d.json",
+   "url": "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=4",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:57.176+00:00",
+   "http": 200,
+   "bytes": 741,
+   "latency_ms": 275,
+   "headers": {
+    "content-type": "application/json;charset=UTF-8",
+    "content-length": "311",
+    "date": "Tue, 15 Sep 2026 21:15:57 GMT",
+    "server": "nginx"
+   },
+   "read_brt": "18:15:57",
+   "error": "",
+   "final_url": "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=4"
+  },
+  {
+   "file": "25_binance_klines_sol_1d.json",
+   "url": "https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=1d&limit=4",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:57.855+00:00",
+   "http": 200,
+   "bytes": 716,
+   "latency_ms": 273,
+   "headers": {
+    "content-type": "application/json;charset=UTF-8",
+    "content-length": "285",
+    "date": "Tue, 15 Sep 2026 21:15:58 GMT",
+    "server": "nginx"
+   },
+   "read_brt": "18:15:58",
+   "error": "",
+   "final_url": "https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=1d&limit=4"
+  },
+  {
+   "file": "26_senate_vote_menu_119_2.json",
+   "url": "https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.xml",
+   "mode": "xml",
+   "request_started_utc": "2026-09-15T21:15:58.531+00:00",
+   "http": 403,
+   "bytes": 493,
+   "latency_ms": 568,
+   "headers": {
+    "server": "AkamaiGHost",
+    "content-length": "493",
+    "content-type": "text/html",
+    "date": "Tue, 15 Sep 2026 21:15:59 GMT"
+   },
+   "read_brt": "18:15:59",
+   "error": "",
+   "final_url": "https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.xml"
+  },
+  {
+   "file": "27_coingecko_btc_sol.json",
+   "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=usd&include_24hr_change=true",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:15:59.501+00:00",
+   "http": 200,
+   "bytes": 120,
+   "latency_ms": 227,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:15:59 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3baa6615aeeef26-GRU"
+   },
+   "read_brt": "18:15:59",
+   "error": "",
+   "final_url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=usd&include_24hr_change=true"
+  },
+  {
+   "file": "28_cryptotimes_cloture_explainer.json",
+   "url": "https://www.cryptotimes.io/2026/09/15/senate-tests-clarity-act-at-215-p-m-et-what-todays-cloture-vote-can-change-and-what-it-cannot/",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:16:00.132+00:00",
+   "http": 200,
+   "bytes": 437055,
+   "latency_ms": 423,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:16:00 GMT",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare",
+    "cf-cache-status": "REVALIDATED",
+    "cf-ray": "a3baa66619316516-GRU"
+   },
+   "read_brt": "18:16:00",
+   "error": "",
+   "final_url": "https://www.cryptotimes.io/2026/09/15/senate-tests-clarity-act-at-215-p-m-et-what-todays-cloture-vote-can-change-and-what-it-cannot/"
+  },
+  {
+   "file": "29_thestreet_clarity_tuesday.json",
+   "url": "https://www.thestreet.com/crypto/policy/clarity-act-faces-decisive-senate-vote-tuesday",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:16:00.963+00:00",
+   "http": 403,
+   "bytes": 773,
+   "latency_ms": 103,
+   "headers": {
+    "content-length": "773",
+    "content-type": "text/html;charset=utf-8",
+    "server": "DataDome",
+    "date": "Tue, 15 Sep 2026 21:16:01 GMT"
+   },
+   "read_brt": "18:16:01",
+   "error": "",
+   "final_url": "https://www.thestreet.com/crypto/policy/clarity-act-faces-decisive-senate-vote-tuesday"
+  },
+  {
+   "file": "30_kucoin_senate_vote_flash.json",
+   "url": "https://www.kucoin.com/news/flash/senate-to-vote-on-clarity-act-on-september-15-2026",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:16:01.470+00:00",
+   "http": 200,
+   "bytes": 154166,
+   "latency_ms": 1557,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:16:03 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "EXPIRED",
+    "cf-ray": "a3baa66d9ad30135-GRU"
+   },
+   "read_brt": "18:16:03",
+   "error": "",
+   "final_url": "https://www.kucoin.com/news/flash/senate-to-vote-on-clarity-act-on-september-15-2026"
+  },
+  {
+   "file": "31_gokhshtein_holder_rewards.json",
+   "url": "https://gokhshtein.com/news/2026-09-14-pumpfun-shifts-to-holder-rewards-deprecates-cashback-for",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:16:03.433+00:00",
+   "http": 200,
+   "bytes": 184924,
+   "latency_ms": 725,
+   "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 20:58:26 GMT",
+    "server": "Vercel"
+   },
+   "read_brt": "18:16:04",
+   "error": "",
+   "final_url": "https://gokhshtein.com/news/2026-09-14-pumpfun-shifts-to-holder-rewards-deprecates-cashback-for"
+  },
+  {
+   "file": "32_phemex_holder_rewards.json",
+   "url": "https://phemex.com/news/article/pumpfun-ends-cashback-for-new-token-launches-introduces-holder-rewards-96605",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:16:04.567+00:00",
+   "http": 200,
+   "bytes": 124185,
+   "latency_ms": 1883,
+   "headers": {
+    "content-type": "text/html",
+    "date": "Tue, 15 Sep 2026 21:16:05 GMT"
+   },
+   "read_brt": "18:16:06",
+   "error": "",
+   "final_url": "https://phemex.com/news/article/pumpfun-ends-cashback-for-new-token-launches-introduces-holder-rewards-96605"
+  },
+  {
+   "file": "33_tradingview_coinmarketcal_hr.json",
+   "url": "https://www.tradingview.com/news/coinmarketcal:df0f05658094b:0-pump-fun-holder-rewards-launch-replaces-cashback-mode-12-sep-2026/",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:16:06.859+00:00",
+   "http": 200,
+   "bytes": 202437,
+   "latency_ms": 455,
+   "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:16:07 GMT",
+    "server": "tv"
+   },
+   "read_brt": "18:16:07",
+   "error": "",
+   "final_url": "https://www.tradingview.com/news/coinmarketcal:df0f05658094b:0-pump-fun-holder-rewards-launch-replaces-cashback-mode-12-sep-2026/"
+  },
+  {
+   "file": "34_yahoo_why_btc_dropping.json",
+   "url": "https://finance.yahoo.com/markets/crypto/articles/why-bitcoin-dropping-today-204955824.html",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:16:07.722+00:00",
+   "http": 200,
+   "bytes": 840295,
+   "latency_ms": 735,
+   "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:16:07 GMT",
+    "server": "ATS"
+   },
+   "read_brt": "18:16:08",
+   "error": "",
+   "final_url": "https://finance.yahoo.com/markets/crypto/articles/why-bitcoin-dropping-today-204955824.html"
+  },
+  {
+   "file": "35_cryptobriefing_fed_test.json",
+   "url": "https://cryptobriefing.com/bitcoin-fed-test-september-core-inflation/",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:16:08.897+00:00",
+   "http": 200,
+   "bytes": 283108,
+   "latency_ms": 467,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:16:09 GMT",
+    "content-type": "text/html; charset=UTF-8",
+    "cf-ray": "a3baa69d5fa46276-GRU",
+    "cf-cache-status": "HIT",
+    "last-modified": "Tue, 15 Sep 2026 21:16:09 GMT",
+    "server": "cloudflare"
+   },
+   "read_brt": "18:16:09",
+   "error": "",
+   "final_url": "https://cryptobriefing.com/macro/"
+  },
+  {
+   "file": "36_pumpfun_docs_fees.json",
+   "url": "https://pump.fun/docs/fees",
+   "mode": "coinpage",
+   "request_started_utc": "2026-09-15T21:19:31.666+00:00",
+   "http": 200,
+   "bytes": 1788574,
+   "latency_ms": 837,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:19:31 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baab8f688a8303-GIG"
+   },
+   "read_brt": "18:19:32",
+   "error": "",
+   "final_url": "https://pump.fun/docs/fees"
+  },
+  {
+   "file": "37_congress_hr3633_all_actions.json",
+   "url": "https://www.congress.gov/bill/119th-congress/house-bill/3633/all-actions",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:32.952+00:00",
+   "http": 403,
+   "bytes": 5911,
+   "latency_ms": 76,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:19:33 GMT",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare",
+    "cf-ray": "a3baab976e35e2b3-GIG"
+   },
+   "read_brt": "18:19:33",
+   "error": "",
+   "final_url": "https://www.congress.gov/bill/119th-congress/house-bill/3633/all-actions"
+  },
+  {
+   "file": "38_senate_dailypress.json",
+   "url": "https://www.dailypress.senate.gov/",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:33.432+00:00",
+   "http": 403,
+   "bytes": 421,
+   "latency_ms": 629,
+   "headers": {
+    "server": "AkamaiGHost",
+    "content-length": "421",
+    "content-type": "text/html",
+    "date": "Tue, 15 Sep 2026 21:19:33 GMT"
+   },
+   "read_brt": "18:19:34",
+   "error": "",
+   "final_url": "https://www.dailypress.senate.gov/"
+  },
+  {
+   "file": "39_coindesk_policy_clarity_fail.json",
+   "url": "https://www.coindesk.com/policy/2026/09/15/crypto-clarity-act-flames-out-in-failed-u-s-senate-vote",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:34.462+00:00",
+   "http": 200,
+   "bytes": 1723017,
+   "latency_ms": 778,
+   "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:19:35 GMT",
+    "server": "Vercel"
+   },
+   "read_brt": "18:19:35",
+   "error": "",
+   "final_url": "https://www.coindesk.com/policy/2026/09/15/crypto-clarity-act-flames-out-in-failed-u-s-senate-vote"
+  },
+  {
+   "file": "40_coingape_live.json",
+   "url": "https://coingape.com/clarity-act-live-updates-today-sept-15-crypto-bill-senate-cloture-vote/",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:35.674+00:00",
+   "http": 200,
+   "bytes": 701194,
+   "latency_ms": 275,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:19:35 GMT",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baaba84b5f8e32-GRU"
+   },
+   "read_brt": "18:19:35",
+   "error": "",
+   "final_url": "https://coingape.com/clarity-act-live-updates-today-sept-15-crypto-bill-senate-cloture-vote/"
+  },
+  {
+   "file": "41_coinpedia_live.json",
+   "url": "https://coinpedia.org/news/clarity-act-vote-today-live-updates-can-democrats-deliver-60-votes/",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:36.376+00:00",
+   "http": 200,
+   "bytes": 732341,
+   "latency_ms": 674,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:19:36 GMT",
+    "content-type": "text/html",
+    "server": "cloudflare",
+    "last-modified": "Tue, 15 Sep 2026 19:30:43 GMT",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baabad69cc5e5b-GRU"
+   },
+   "read_brt": "18:19:37",
+   "error": "",
+   "final_url": "https://coinpedia.org/news/clarity-act-vote-today-live-updates-can-democrats-deliver-60-votes/"
+  },
+  {
+   "file": "42_yahoo_laptop_launch.json",
+   "url": "https://finance.yahoo.com/markets/crypto/articles/hunter-biden-launches-laptop-memecoin-171336711.html",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:37.468+00:00",
+   "http": 200,
+   "bytes": 828962,
+   "latency_ms": 713,
+   "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:19:37 GMT",
+    "server": "ATS"
+   },
+   "read_brt": "18:19:38",
+   "error": "",
+   "final_url": "https://finance.yahoo.com/markets/crypto/articles/hunter-biden-launches-laptop-memecoin-171336711.html"
+  },
+  {
+   "file": "43_dexscreener_search_laptop.json",
+   "url": "https://api.dexscreener.com/latest/dex/search?q=LAPTOP",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:19:38.601+00:00",
+   "http": 200,
+   "bytes": 33644,
+   "latency_ms": 234,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:19:38 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3baabbaba27b4af-GIG"
+   },
+   "read_brt": "18:19:38",
+   "error": "",
+   "final_url": "https://api.dexscreener.com/latest/dex/search?q=LAPTOP"
+  },
+  {
+   "file": "44_coingecko_trending.json",
+   "url": "https://api.coingecko.com/api/v3/search/trending",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:19:39.245+00:00",
+   "http": 200,
+   "bytes": 70445,
+   "latency_ms": 77,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:19:39 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3baabbeac521927-GRU"
+   },
+   "read_brt": "18:19:39",
+   "error": "",
+   "final_url": "https://api.coingecko.com/api/v3/search/trending"
+  },
+  {
+   "file": "45_gnews_pumpfun.json",
+   "url": "https://news.google.com/rss/search?q=pump.fun&hl=en-US&gl=US&ceid=US:en",
+   "mode": "xml",
+   "request_started_utc": "2026-09-15T21:19:39.729+00:00",
+   "http": 200,
+   "bytes": 119932,
+   "latency_ms": 553,
+   "headers": {
+    "content-type": "application/xml; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:19:40 GMT",
+    "server": "ESF"
+   },
+   "read_brt": "18:19:40",
+   "error": "",
+   "final_url": "https://news.google.com/rss/search?q=pump.fun&hl=en-US&gl=US&ceid=US:en"
+  },
+  {
+   "file": "46_gnews_solana_memecoin.json",
+   "url": "https://news.google.com/rss/search?q=solana+memecoin&hl=en-US&gl=US&ceid=US:en",
+   "mode": "xml",
+   "request_started_utc": "2026-09-15T21:19:40.685+00:00",
+   "http": 200,
+   "bytes": 126204,
+   "latency_ms": 565,
+   "headers": {
+    "content-type": "application/xml; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:19:41 GMT",
+    "server": "ESF"
+   },
+   "read_brt": "18:19:41",
+   "error": "",
+   "final_url": "https://news.google.com/rss/search?q=solana+memecoin&hl=en-US&gl=US&ceid=US:en"
+  },
+  {
+   "file": "47_gnews_clarity_act.json",
+   "url": "https://news.google.com/rss/search?q=%22Clarity+Act%22+Senate&hl=en-US&gl=US&ceid=US:en",
+   "mode": "xml",
+   "request_started_utc": "2026-09-15T21:19:41.653+00:00",
+   "http": 200,
+   "bytes": 123038,
+   "latency_ms": 1835,
+   "headers": {
+    "content-type": "application/xml; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:19:43 GMT",
+    "server": "ESF"
+   },
+   "read_brt": "18:19:43",
+   "error": "",
+   "final_url": "https://news.google.com/rss/search?q=%22Clarity+Act%22+Senate&hl=en-US&gl=US&ceid=US:en"
+  },
+  {
+   "file": "48_npr_clarity.json",
+   "url": "https://www.npr.org/2026/09/15/nx-s1-5968711/clarity-act-crypto-senate-vote",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:43.892+00:00",
+   "http": 200,
+   "bytes": 175125,
+   "latency_ms": 189,
+   "headers": {
+    "content-type": "text/html; charset=UTF-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:19:44 GMT"
+   },
+   "read_brt": "18:19:44",
+   "error": "",
+   "final_url": "https://www.npr.org/2026/09/15/nx-s1-5968711/clarity-act-crypto-senate-vote"
+  },
+  {
+   "file": "49_cnbc_clarity_fail.json",
+   "url": "https://www.cnbc.com/2026/09/15/senate-cloture-vote-on-clarity-act-fails-dealing-regulatory-setback-to-crypto-industry.html",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:44.490+00:00",
+   "http": 200,
+   "bytes": 769661,
+   "latency_ms": 239,
+   "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "content-length": "110421",
+    "date": "Tue, 15 Sep 2026 21:19:44 GMT"
+   },
+   "read_brt": "18:19:44",
+   "error": "",
+   "final_url": "https://www.cnbc.com/2026/09/15/senate-cloture-vote-on-clarity-act-fails-dealing-regulatory-setback-to-crypto-industry.html"
+  },
+  {
+   "file": "50_cryptoslate_revolt.json",
+   "url": "https://cryptoslate.com/clarity-acts-final-deal-is-already-breaking-down-before-tomorrows-senate-vote/",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:19:45.148+00:00",
+   "http": 200,
+   "bytes": 195055,
+   "latency_ms": 341,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:19:45 GMT",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare",
+    "last-modified": "Tue, 15 Sep 2026 20:46:28 GMT",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3baabe3dae70b84-GRU"
+   },
+   "read_brt": "18:19:45",
+   "error": "",
+   "final_url": "https://cryptoslate.com/clarity-acts-final-deal-is-already-breaking-down-before-tomorrows-senate-vote/"
+  },
+  {
+   "file": "51_x_synd_pumpfun_2098818822417375528.json",
+   "url": "https://cdn.syndication.twimg.com/tweet-result?id=2098818822417375528&token=a",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:19:45.898+00:00",
+   "http": 200,
+   "bytes": 3552,
+   "latency_ms": 419,
+   "headers": {
+    "content-length": "1293",
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:19:46 GMT"
+   },
+   "read_brt": "18:19:46",
+   "error": "",
+   "final_url": "https://cdn.syndication.twimg.com/tweet-result?id=2098818822417375528&token=a"
+  },
+  {
+   "file": "52_gnews_memecoin.json",
+   "url": "https://news.google.com/rss/search?q=memecoin&hl=en-US&gl=US&ceid=US:en",
+   "mode": "xml",
+   "request_started_utc": "2026-09-15T21:19:46.721+00:00",
+   "http": 200,
+   "bytes": 129957,
+   "latency_ms": 667,
+   "headers": {
+    "content-type": "application/xml; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:19:47 GMT",
+    "server": "ESF"
+   },
+   "read_brt": "18:19:47",
+   "error": "",
+   "final_url": "https://news.google.com/rss/search?q=memecoin&hl=en-US&gl=US&ceid=US:en"
+  },
+  {
+   "file": "53_gh_commit_6751052_holder_docs.json",
+   "url": "https://api.github.com/repos/pump-fun/pump-public-docs/commits/6751052583f778c217d7e87e9c25c18537da5983",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:21:58.302+00:00",
+   "http": 200,
+   "bytes": 5693,
+   "latency_ms": 296,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:21:58 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "last-modified": "Mon, 14 Sep 2026 06:52:07 GMT",
+    "server": "github.com",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "58",
+    "x-ratelimit-reset": "1789510547",
+    "content-length": "1579"
+   },
+   "read_brt": "18:21:58",
+   "error": "",
+   "final_url": "https://api.github.com/repos/pump-fun/pump-public-docs/commits/6751052583f778c217d7e87e9c25c18537da5983"
+  },
+  {
+   "file": "54_gh_pr46_files.json",
+   "url": "https://api.github.com/repos/pump-fun/pump-public-docs/pulls/46/files",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:21:59.001+00:00",
+   "http": 200,
+   "bytes": 1499,
+   "latency_ms": 377,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:21:59 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "last-modified": "Mon, 14 Sep 2026 06:57:49 GMT",
+    "server": "github.com",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "57",
+    "x-ratelimit-reset": "1789510547",
+    "content-length": "680"
+   },
+   "read_brt": "18:21:59",
+   "error": "",
+   "final_url": "https://api.github.com/repos/pump-fun/pump-public-docs/pulls/46/files"
+  },
+  {
+   "file": "57_coins_newest70.json",
+   "url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true",
+   "mode": "json",
+   "request_started_utc": "2026-09-15T21:22:57.247+00:00",
+   "http": 200,
+   "bytes": 135780,
+   "latency_ms": 372,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:22:57 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3bab0944b60830f-GIG"
+   },
+   "read_brt": "18:22:57",
+   "error": "",
+   "final_url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true"
+  },
+  {
+   "file": "58_thedefiant_holder_rewards.json",
+   "url": "https://thedefiant.io/news/defi/pump-fun-drops-cashback-for-new-launches-adds-holder-rewards",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:22:58.027+00:00",
+   "http": 200,
+   "bytes": 413997,
+   "latency_ms": 402,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:22:58 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3bab0993ecb808f-GRU"
+   },
+   "read_brt": "18:22:58",
+   "error": "",
+   "final_url": "https://thedefiant.io/news/defi/pump-fun-drops-cashback-for-new-launches-adds-holder-rewards"
+  },
+  {
+   "file": "59_memeburn_stonk_fees.json",
+   "url": "https://memeburn.com/pump-fun-copied-stonk-fees/",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:22:58.846+00:00",
+   "http": 404,
+   "bytes": 27949,
+   "latency_ms": 924,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:22:59 GMT",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3bab0a02a24c089-GRU"
+   },
+   "read_brt": "18:22:59",
+   "error": "",
+   "final_url": "https://memeburn.com/pump-fun-copied-stonk-fees/"
+  },
+  {
+   "file": "60_benzinga_laptop_99.json",
+   "url": "https://www.benzinga.com/crypto/cryptocurrency/26/09/hunter-bidens-laptop-memecoin-collapses-99-whats-going-on",
+   "mode": "text",
+   "request_started_utc": "2026-09-15T21:23:00.174+00:00",
+   "http": 404,
+   "bytes": 1342182,
+   "latency_ms": 1104,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:23:01 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "cf-ray": "a3bab0a678868e5a-GRU",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare"
+   },
+   "read_brt": "18:23:01",
+   "error": "",
+   "final_url": "https://www.benzinga.com/crypto/cryptocurrency/26/09/hunter-bidens-laptop-memecoin-collapses-99-whats-going-on"
+  },
+  {
+   "file": "57_coins_newest70_trim.json",
+   "url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true",
+   "mode": "json_rows",
+   "request_started_utc": "2026-09-15T21:23:54.381+00:00",
+   "http": 200,
+   "bytes": 135801,
+   "latency_ms": 264,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:23:54 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3bab1f95e67e12c-GIG"
+   },
+   "read_brt": "18:23:54",
+   "error": "",
+   "final_url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true"
+  },
+  {
+   "file": "61_coinpage_hrcustom_1_2J1Gtr.json",
+   "url": "https://pump.fun/coin/2J1GtrKdM9NsuiP4n94AeL4fq6HN4KFnY9dy3Uhapump",
+   "mode": "coinpage",
+   "request_started_utc": "2026-09-15T21:23:55.610+00:00",
+   "http": 200,
+   "bytes": 2049919,
+   "latency_ms": 1045,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:23:55 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3bab20118bc82eb-GIG"
+   },
+   "read_brt": "18:23:56",
+   "error": "",
+   "final_url": "https://pump.fun/coin/2J1GtrKdM9NsuiP4n94AeL4fq6HN4KFnY9dy3Uhapump"
+  },
+  {
+   "file": "61_coinpage_hrcustom_2_BAdJCw.json",
+   "url": "https://pump.fun/coin/BAdJCwuakCYVwxGpjvDbYe2sXeTrS5sBGqjps6yhpump",
+   "mode": "coinpage",
+   "request_started_utc": "2026-09-15T21:23:58.008+00:00",
+   "http": 200,
+   "bytes": 2049058,
+   "latency_ms": 997,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 21:23:58 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3bab20fbff082eb-GIG"
+   },
+   "read_brt": "18:23:59",
+   "error": "",
+   "final_url": "https://pump.fun/coin/BAdJCwuakCYVwxGpjvDbYe2sXeTrS5sBGqjps6yhpump"
+  }
+ ],
+ "last_utc": "2026-09-15T21:23:59.056+00:00"
+}

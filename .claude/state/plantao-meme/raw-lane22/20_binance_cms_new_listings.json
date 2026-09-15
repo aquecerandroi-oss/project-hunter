@@ -1,0 +1,140 @@
+{
+ "_meta": {
+  "name": "20_binance_cms_new_listings",
+  "url": "https://www.binance.com/bapi/composite/v1/public/cms/article/list/query?type=1&pageNo=1&pageSize=20&catalogId=48",
+  "final_url": "https://www.binance.com/bapi/composite/v1/public/cms/article/list/query?type=1&pageNo=1&pageSize=20&catalogId=48",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:54.254+00:00",
+  "observed_brt": "18:15:54",
+  "bytes_received": 4167,
+  "headers": {
+   "content-type": "application/json;charset=UTF-8",
+   "content-length": "1486",
+   "date": "Tue, 15 Sep 2026 21:15:04 GMT"
+  }
+ },
+ "payload": {
+  "articles": [
+   {
+    "title": "Binance Will Add BNCB bStocks Tokenized Securities as Collateral Asset - 2026-09-14",
+    "releaseDate": 1789378206783,
+    "release_utc": "2026-09-14T09:30:06.783000+00:00",
+    "code": "437f116183e243ce8759ac8cc580881f"
+   },
+   {
+    "title": "Binance Exchange Adds CEA Industries (BNCB) bStocks Trading Pair on Binance Spot/Convert - 2026-09-14",
+    "releaseDate": 1789376404044,
+    "release_utc": "2026-09-14T09:00:04.044000+00:00",
+    "code": "d625f87897a843febc1f4c139740d875"
+   },
+   {
+    "title": "Binance Will Add 牛来 (牛来) on Earn, Buy Crypto, Convert, VIP Loan & Margin",
+    "releaseDate": 1788963315144,
+    "release_utc": "2026-09-09T14:15:15.144000+00:00",
+    "code": "39fe3154675948fbb164b1e63e036629"
+   },
+   {
+    "title": "Binance Will List 牛来 (牛来) with Seed Tag Applied",
+    "releaseDate": 1788953419513,
+    "release_utc": "2026-09-09T11:30:19.513000+00:00",
+    "code": "6133e417dcfe43a8ad20c0db1b53c7e8"
+   },
+   {
+    "title": "Binance Will Add 2 bStocks Tokenized Securities as Collateral Asset - 2026-09-09",
+    "releaseDate": 1788937216577,
+    "release_utc": "2026-09-09T07:00:16.577000+00:00",
+    "code": "026d4dfdc82940a5924b22442bcb651e"
+   },
+   {
+    "title": "Binance Exchange Adds Salesforce (CRMB) and Hims & Hers Health (HIMSB) bStocks Trading Pairs on Binance Spot/Convert - 2026-09-09",
+    "releaseDate": 1788922801882,
+    "release_utc": "2026-09-09T03:00:01.882000+00:00",
+    "code": "7880bcb7f4744d8bbbba88cbbcd43124"
+   },
+   {
+    "title": "Binance Futures Will Launch USDⓈ-Margined PONSUSDT and 哈基米USDT Perpetual Contracts (2026-09-06)",
+    "releaseDate": 1788674111414,
+    "release_utc": "2026-09-06T05:55:11.414000+00:00",
+    "code": "ca3196e008da448da107d397bae0b4b0"
+   },
+   {
+    "title": "Binance Will Add MarsCoin (MARSCOIN) on Earn, Buy Crypto, Convert, VIP Loan & Margin",
+    "releaseDate": 1788525902072,
+    "release_utc": "2026-09-04T12:45:02.072000+00:00",
+    "code": "b8c68539ef9f4925a8d97202d82d98e9"
+   },
+   {
+    "title": "Binance Will List MarsCoin (MARSCOIN) with Seed Tag Applied",
+    "releaseDate": 1788516901870,
+    "release_utc": "2026-09-04T10:15:01.870000+00:00",
+    "code": "c2eaa763831745b2b1701dab45e20225"
+   },
+   {
+    "title": "Binance Futures Will Launch Multiple USDⓈ-Margined TradFi Perpetual Contracts (2026-09-07)",
+    "releaseDate": 1788497186706,
+    "release_utc": "2026-09-04T04:46:26.706000+00:00",
+    "code": "89a035c3ee0e4b7782bf0089323d8e78"
+   },
+   {
+    "title": "Binance Futures Will Launch USDⓈ-Margined GPROUSDT Perpetual Contract (2026-09-03)",
+    "releaseDate": 1788438625942,
+    "release_utc": "2026-09-03T12:30:25.942000+00:00",
+    "code": "0ffd2dbcc12e4a968fbe7ccd2b4cc9f8"
+   },
+   {
+    "title": "Binance Will Add 4 bStocks Tokenized Securities as Collateral Asset - 2026-09-02",
+    "releaseDate": 1788341411613,
+    "release_utc": "2026-09-02T09:30:11.613000+00:00",
+    "code": "8f5c893fa654432883f481b120b0a016"
+   },
+   {
+    "title": "Binance Futures Will Launch Multiple USDⓈ-Margined TradFi Perpetual Contracts (2026-09-02)",
+    "releaseDate": 1788338705651,
+    "release_utc": "2026-09-02T08:45:05.651000+00:00",
+    "code": "989347def916494f98bf3ba5ec8f9557"
+   },
+   {
+    "title": "Binance Exchange Adds 4 bStocks Trading Pairs on Binance Spot/Convert - 2026-09-02",
+    "releaseDate": 1788337801247,
+    "release_utc": "2026-09-02T08:30:01.247000+00:00",
+    "code": "b3ba5cf68daf4264a1260c8da11eef6d"
+   },
+   {
+    "title": "Binance Futures Will Launch USDⓈ-Margined MARSCOINUSDT Perpetual Contract (2026-09-01)",
+    "releaseDate": 1788252305663,
+    "release_utc": "2026-09-01T08:45:05.663000+00:00",
+    "code": "4d9ae75c02114187b699cfe1380ac81e"
+   },
+   {
+    "title": "Binance Futures Will Launch HK0625USDT USDⓈ-Margined Quanto Perpetual Contract (2026-09-01)",
+    "releaseDate": 1788228901077,
+    "release_utc": "2026-09-01T02:15:01.077000+00:00",
+    "code": "969a4628dd5d4a479c071b02175bae57"
+   },
+   {
+    "title": "Binance Futures Will Launch USDⓈ-Margined 牛来USDT Perpetual Contract (2026-08-30)",
+    "releaseDate": 1788078914398,
+    "release_utc": "2026-08-30T08:35:14.398000+00:00",
+    "code": "6e9e9784397745f4a49d3f69b1cfebda"
+   },
+   {
+    "title": "Binance Futures Will Launch Multiple USDⓈ-Margined TradFi Perpetual Contracts (2026-08-28)",
+    "releaseDate": 1787902209365,
+    "release_utc": "2026-08-28T07:30:09.365000+00:00",
+    "code": "32ac927d1cbe4aa3b527eca1c401a98f"
+   },
+   {
+    "title": "Binance Adds bStocks to Spot Trading Bots and Extends Zero Maker Fee Promotion - 2026-08-28",
+    "releaseDate": 1787882405563,
+    "release_utc": "2026-08-28T02:00:05.563000+00:00",
+    "code": "4fea39f8b6e54e1b88e388fc90ce323e"
+   },
+   {
+    "title": "Binance Will Add 1 bStocks Tokenized Securities as Collateral Asset - 2026-08-26",
+    "releaseDate": 1787727601896,
+    "release_utc": "2026-08-26T07:00:01.896000+00:00",
+    "code": "8837d1a33b97422597c14d38ead5dc82"
+   }
+  ]
+ }
+}

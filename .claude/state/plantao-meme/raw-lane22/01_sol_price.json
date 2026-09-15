@@ -1,0 +1,26 @@
+{
+ "_meta": {
+  "name": "01_sol_price",
+  "url": "https://frontend-api-v3.pump.fun/sol-price",
+  "final_url": "https://frontend-api-v3.pump.fun/sol-price",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:30.226+00:00",
+  "observed_brt": "18:15:30",
+  "bytes_received": 74,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:15:30 GMT",
+   "content-type": "application/json; charset=utf-8",
+   "x-ratelimit-limit": "50",
+   "x-ratelimit-remaining": "49",
+   "x-ratelimit-reset": "60",
+   "cf-cache-status": "DYNAMIC",
+   "server": "cloudflare",
+   "cf-ray": "a3baa5aaab5de126-GIG"
+  }
+ },
+ "payload": {
+  "solPrice": 96.96607284142777,
+  "asOfTimestamp": 1789506929925,
+  "stale": false
+ }
+}

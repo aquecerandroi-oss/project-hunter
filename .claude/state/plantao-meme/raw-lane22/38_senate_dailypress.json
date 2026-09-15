@@ -1,0 +1,24 @@
+{
+ "_meta": {
+  "name": "38_senate_dailypress",
+  "url": "https://www.dailypress.senate.gov/",
+  "final_url": "https://www.dailypress.senate.gov/",
+  "http": 403,
+  "request_started_utc": "2026-09-15T21:19:33.432+00:00",
+  "observed_brt": "18:19:34",
+  "bytes_received": 421,
+  "headers": {
+   "server": "AkamaiGHost",
+   "content-length": "421",
+   "content-type": "text/html",
+   "date": "Tue, 15 Sep 2026 21:19:33 GMT"
+  }
+ },
+ "payload": {
+  "meta": {
+   "title": "Access Denied"
+  },
+  "text_len": 238,
+  "text": "Access Denied \n Access Denied \nYou don't have permission to access \"http://www.dailypress.senate.gov/$(SERVE_403)/?\" on this server. \nReference #18.4a0f3417.1789507173.5e2bd232\n https://errors.edgesuite.net/18.4a0f3417.1789507173.5e2bd232"
+ }
+}

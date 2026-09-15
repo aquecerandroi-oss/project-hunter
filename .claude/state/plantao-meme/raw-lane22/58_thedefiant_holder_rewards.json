@@ -1,0 +1,36 @@
+{
+ "_meta": {
+  "name": "58_thedefiant_holder_rewards",
+  "url": "https://thedefiant.io/news/defi/pump-fun-drops-cashback-for-new-launches-adds-holder-rewards",
+  "final_url": "https://thedefiant.io/news/defi/pump-fun-drops-cashback-for-new-launches-adds-holder-rewards",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:22:58.027+00:00",
+  "observed_brt": "18:22:58",
+  "bytes_received": 413997,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:22:58 GMT",
+   "content-type": "text/html; charset=utf-8",
+   "server": "cloudflare",
+   "cf-cache-status": "DYNAMIC",
+   "cf-ray": "a3bab0993ecb808f-GRU"
+  }
+ },
+ "payload": {
+  "meta": {
+   "title": "Pump.fun Drops Cashback for New Launches, Adds Holder Rewards | The Defiant",
+   "article:published_time": "2026-09-14T15:14:09.422Z",
+   "article:modified_time": "2026-09-14T15:14:09.422Z",
+   "og:title": "Pump.fun Drops Cashback for New Launches, Adds Holder Rewards | The Defiant",
+   "og:description": "Pump.fun removed Cashback Mode from new token launches and introduced automatic, fee-funded Holder Rewards for eligible token holders.",
+   "description": "Pump.fun removed Cashback Mode from new token launches and introduced automatic, fee-funded Holder Rewards for eligible token holders.",
+   "ld_datePublished": [
+    "2026-09-14T15:14:09.422Z"
+   ],
+   "ld_dateModified": [
+    "2026-09-14T15:14:09.422Z"
+   ]
+  },
+  "text_len": 3834,
+  "text": "Pump.fun Drops Cashback for New Launches, Adds Holder Rewards | The Defiant \n Toggle navigation menu Toggle navigation menu Toggle theme \n News Converge Newsletters Podcasts Videos Learn Prices DeFi CeFi TradFi & Fintech Blockchains Infrastructure NFTs & Web3 People Markets Regulation & Politics Hacks Research & Opinion Press Releases Sponsored Premium Articles Converge Newsletters Podcasts Videos Learn Prices \n Advertisement\n Home \n News \n DeFi \n Pump.fun Drops Cashback for New Launches, Adds Holder Rewards\n Wallets holding more than $20 of an eligible token receive trading-fee payouts several times an hour, while existing Cashback coins must apply to switch.\n By: The Defiant Team • \n DeFi \n Pump.fun has removed Cashback Mode as an option for new token launches and introduced Holder Rewards, replacing a trading-linked rebate in the creation flow with automatic payouts to wallets that keep qualifying tokens.\n Under the new system , fees assigned to a Holder Rewards token go to a Pump.fun distribution wallet and are sent pro rata several times an hour. Wallets must hold more than $20 worth of the token to qualify, and larger balances receive a larger share.\n Cashback rewards had to be claimed through Pump.fun, its app or Terminal. Holder Rewards payments are automatic and arrive in the token’s quote asset — SOL for a SOL pair, for example, or PUMP for a PUMP pair.\n Pump.fun advertised the product with the phrase “longer hold times, higher ceilings.” Its distribution post says rewards are pro rata and that larger token balances earn more; it does not explain there how holding time affects rewards or ceilings.\n The platform said its protocol fees remain the same regardless of token type. Holder Rewards fees on SOL and USDC pairs use Pump.fun’s existing tiered structure, which declines as a token’s market capitalization rises. For Custom Pairs, creators select a flat Holder Rewards fee between 0.01% and 3%; once chosen, it cannot be changed.\n Existing Cashback Coins Must Opt In\n Cashback had redirected creator fees to traders. In a February post, Pump.fun described that choice as permanent, but the new policy creates a route out.\n Existing Cashback and Creator Fee tokens do not switch automatically. Token teams and communities may apply through Pump.fun’s fee-redirection form, and Custom Pair applicants must specify their new flat fee. Pump.fun said it will accept or reject requests using information it considers best for the token and its community.\n New coin creators can now choose only between a standard Creator Fee token and a Holder Rewards token. Once a coin is converted to Holder Rewards, the decision cannot be reversed.\n PumpFun \n Our articles are stored on Filecoin.\n Advertisement\n Get an edge in Crypto with our free daily newsletter\n Know what matters in Crypto and Web3 with The Defiant Daily newsletter, Mon to Fri\n Subscribe \n 90k+ Defiers informed every day. Unsubscribe anytime.\n Advertisement\n Trending Now\n Bitget Wallet Adds Reality's Tokenized U.S. Stocks Alongside Ondo And xStocks\n Standard Chartered Sets $10 Arbitrum Target on Robinhood and Tokenization Growth\n Bitcoin Falls Below $76,000 as Traders Cut CLARITY Act Odds Hours Before Senate Vote\n MEV Bot Front-Runs $7.8 Million rsETH Exploit on Ethereum\n Will crypto get clarity? Senate votes today\n XRP Leads a Broad Crypto Bid on the Eve of a Senate Vote and a Fed Decision\n News\n Converge \n DeFi \n CeFi \n TradFi & Fintech \n Blockchains \n Infrastructure \n NFTs & Web3 \n People \n News\n Markets \n Regulation & Politics \n Hacks \n Research & Opinion \n Press Releases \n Newsletter \n The Defiant Daily \n Weekly Recap \n DeFi Alpha Letter \n Converge \n Podcasts & Videos\n Podcast \n Videos \n Education \n About\n Defiant Team \n Privacy Policy \n Terms & Conditions \n Contact Us \n ©Defiant Media, Inc, 2026\n X Spotify YouTube"
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "_meta": {
+  "name": "27_coingecko_btc_sol",
+  "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=usd&include_24hr_change=true",
+  "final_url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=usd&include_24hr_change=true",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:59.501+00:00",
+  "observed_brt": "18:15:59",
+  "bytes_received": 120,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:15:59 GMT",
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "HIT",
+   "server": "cloudflare",
+   "cf-ray": "a3baa6615aeeef26-GRU"
+  }
+ },
+ "payload": {
+  "bitcoin": {
+   "usd": 75863,
+   "usd_24h_change": -3.833408726433681
+  },
+  "solana": {
+   "usd": 97.31,
+   "usd_24h_change": -6.025093363658296
+  }
+ }
+}

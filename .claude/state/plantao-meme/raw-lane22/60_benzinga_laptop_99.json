@@ -1,0 +1,28 @@
+{
+ "_meta": {
+  "name": "60_benzinga_laptop_99",
+  "url": "https://www.benzinga.com/crypto/cryptocurrency/26/09/hunter-bidens-laptop-memecoin-collapses-99-whats-going-on",
+  "final_url": "https://www.benzinga.com/crypto/cryptocurrency/26/09/hunter-bidens-laptop-memecoin-collapses-99-whats-going-on",
+  "http": 404,
+  "request_started_utc": "2026-09-15T21:23:00.174+00:00",
+  "observed_brt": "18:23:01",
+  "bytes_received": 1342182,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:23:01 GMT",
+   "content-type": "text/html; charset=utf-8",
+   "cf-ray": "a3bab0a678868e5a-GRU",
+   "cf-cache-status": "MISS",
+   "server": "cloudflare"
+  }
+ },
+ "payload": {
+  "meta": {
+   "title": "Page Not Found - Benzinga",
+   "og:title": "Page Not Found - Benzinga",
+   "og:description": "This page doesn't exist or was removed.",
+   "description": "This page doesn't exist or was removed."
+  },
+  "text_len": 25,
+  "text": "Page Not Found - Benzinga"
+ }
+}

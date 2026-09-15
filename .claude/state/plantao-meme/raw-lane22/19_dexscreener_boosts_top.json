@@ -1,0 +1,645 @@
+{
+ "_meta": {
+  "name": "19_dexscreener_boosts_top",
+  "url": "https://api.dexscreener.com/token-boosts/top/v1",
+  "final_url": "https://api.dexscreener.com/token-boosts/top/v1",
+  "http": 200,
+  "request_started_utc": "2026-09-15T21:15:53.757+00:00",
+  "observed_brt": "18:15:53",
+  "bytes_received": 23204,
+  "headers": {
+   "date": "Tue, 15 Sep 2026 21:15:53 GMT",
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "HIT",
+   "server": "cloudflare",
+   "cf-ray": "a3baa63d78e768db-GIG"
+  }
+ },
+ "payload": [
+  {
+   "url": "https://dexscreener.com/solana/9mbetpjhp7uz4odthxnm44gtvaffoybcmgpdda9rpump",
+   "chainId": "solana",
+   "tokenAddress": "9MBetPjhp7uZ4odThXNm44GTVaffoYBcmGpdda9rpump",
+   "description": "Anatoely Yakovenko will lead Solana to new heights.",
+   "icon": "3cAaGrVn93W0gbrE",
+   "header": "https://cdn.dexscreener.com/cms/images/FoKls-iTPt8ipBjq?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/9MBetPjhp7uZ4odThXNm44GTVaffoYBcmGpdda9rpump?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://anatoely.fun"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/ToelySol"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/anatoelysol"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x4ed2692f5e108724a919de5fcbf267f231d5e333",
+   "chainId": "robinhood",
+   "tokenAddress": "0x4Ed2692F5e108724A919De5FCbf267f231D5e333",
+   "description": "Welcome to $crossrate\n\nCrossrate Market is a launchpad on Robinhood Chain that speaks your currency\n\nChoose a coin’s currency at launch. Its price, fees and payouts stay in that currency for life\n\nEach currency has its own pool of funds. Redemptions in one never draw from another\n\n1% fee goes to $crossrate holders",
+   "icon": "W50cwibSat98Rs7V",
+   "header": "https://cdn.dexscreener.com/cms/images/eHX1k4UJgA73KPQO?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x4ed2692f5e108724a919de5fcbf267f231d5e333?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://crossrate.market/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/crossrate_hood"
+    }
+   ],
+   "totalAmount": 200
+  },
+  {
+   "url": "https://dexscreener.com/solana/gxpoy3liomo8fxrxhuqzfwg2r2jafqre5tasgpqpump",
+   "chainId": "solana",
+   "tokenAddress": "gxPoy3LioMo8FxrXHuqzFwg2R2JafQRe5tAsgPQpump",
+   "description": "A strange little signal slipped through the void, carrying a tiny visitor no one can explain. We don’t know where Lil Eldritch came from, but something tells us the transmission has only just begun.",
+   "icon": "2yD-4sCtEjGqVaxG",
+   "header": "https://cdn.dexscreener.com/cms/images/GU_DJOkcOJKYcWDP?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/gxPoy3LioMo8FxrXHuqzFwg2R2JafQRe5tAsgPQpump?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://lileldritch.xyz/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/LilEldritch"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x4c04014f60af5da0985041ad3df1fd4163fb6f60",
+   "chainId": "robinhood",
+   "tokenAddress": "0x4c04014F60aF5dA0985041ad3dF1Fd4163FB6F60",
+   "description": "*TWO ROBINHOOD EMPLOYEES CHARGED IN CRYPTO INSIDER TRADING SCHEME: US SDNY\n\n*ROBINHOOD ENGINEERS TRADED HYPERLIQUID PERPETUALS AHEAD OF TOKEN LISTINGS: DOJ",
+   "icon": "6RNDTokJWwaPwxpW",
+   "header": "https://cdn.dexscreener.com/cms/images/rWd7vvy_-EgXmfDc?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x4c04014f60af5da0985041ad3df1fd4163fb6f60?timestamp=1789506900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/tradfi/status/2099904599406924104"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x471ce4b9255e0dc19aa0480ceff523be0da3339d",
+   "chainId": "robinhood",
+   "tokenAddress": "0x471ce4b9255E0dC19aa0480CEFf523Be0da3339d",
+   "description": "Introducing freeLLM v1.0 - the FREE AI models directory",
+   "icon": "941AoCfjoean-Z-y",
+   "header": "https://cdn.dexscreener.com/cms/images/cSaLTRN8MJInEApI?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x471ce4b9255e0dc19aa0480ceff523be0da3339d?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://www.robinhop.cc/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/HOPHOPRH"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x948647a06a6422dceea3711297f82aef68ec641c",
+   "chainId": "robinhood",
+   "tokenAddress": "0x948647a06a6422DceEA3711297F82AeF68Ec641C",
+   "description": "A social island game on Robinhood Chain.",
+   "icon": "_wMkCwenlTJI8-fY",
+   "header": "https://cdn.dexscreener.com/cms/images/iZrfuaXYAVtl23fu?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x948647a06a6422dceea3711297f82aef68ec641c?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://waifu.family"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/waifutoken"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/waifufamily"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xbbefd9942f826fba669996d09c7627ede9a2a35e",
+   "chainId": "robinhood",
+   "tokenAddress": "0xbbEFD9942F826fBA669996d09C7627EdE9a2A35E",
+   "description": "NVDA AND SALESFORCE JUST REALESED A NEW MODEL!!!\n\nNAMED KOA!",
+   "icon": "-_snOPGy1pgC2-yK",
+   "header": "https://cdn.dexscreener.com/cms/images/7upWpqAtCQ6o63PP?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xbbefd9942f826fba669996d09c7627ede9a2a35e?timestamp=1789506900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/iprefermen_dev/status/2099836746187825526"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/gyt8ifzvc1dnwkgpanfuvnnnyyxswafxj8y38a79pump",
+   "chainId": "solana",
+   "tokenAddress": "Gyt8ifzVc1DnWKGpanfuvNnNyyxsWAFXJ8y38A79pump",
+   "description": "Strawdog wants to swim.\nThere is only one problem.\nStrawdog can't swim.",
+   "icon": "4E3XTMltIke3Awic",
+   "header": "https://cdn.dexscreener.com/cms/images/RX1hlcJHRl2SjV11?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/Gyt8ifzVc1DnWKGpanfuvNnNyyxsWAFXJ8y38A79pump?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://strawdog.xyz/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/swimstrawdog"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/gprtusgaxvvj67bau4xe3ufd5addmvj7bzy73vtqpump",
+   "chainId": "solana",
+   "tokenAddress": "GPrTuSgAXVVJ67bAU4xe3UFD5aDDmVj7bZy73vTQpump",
+   "description": "clarity cat",
+   "icon": "c7XoG99lADq_AyFT",
+   "header": "https://cdn.dexscreener.com/cms/images/l2xt9PyfCatKr_vQ?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/GPrTuSgAXVVJ67bAU4xe3UFD5aDDmVj7bZy73vTQpump?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "http://clarity-cat.fun/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/claritycatonsol"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/claritycatportal"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xc58872059ab3408799b228fea19398fdab0d4762",
+   "chainId": "robinhood",
+   "tokenAddress": "0xc58872059Ab3408799B228feA19398FDaB0d4762",
+   "description": "The internet’s favorite frog just discovered artificial intelligence. 🐸🤖 $PEPEAI",
+   "icon": "C2k4uEznCde-RlCn",
+   "header": "https://cdn.dexscreener.com/cms/images/1o1-UYoeJBQLOeHf?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xc58872059ab3408799b228fea19398fdab0d4762?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://www.pepeaicoin.wtf"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/PepeAIRobin"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/2horabojpn3ssj6reuucnukrvshdupn7kfhh7j8fpump",
+   "chainId": "solana",
+   "tokenAddress": "2hoRABojpn3SSJ6ReUuCNuKRvsHDuPn7kFHH7J8Fpump",
+   "description": "Tyson’s bike was heavy.\nMJ’s bike is different.\nSame road.\nDifferent rider.\nTyson made you wait.\nMJ knows how to move.\nNo promises.\nJust get on the bike.",
+   "icon": "X62szx8QvZQ-NAYn",
+   "header": "https://cdn.dexscreener.com/cms/images/eX__ZFRG5s5ruKR1?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/2hoRABojpn3SSJ6ReUuCNuKRvsHDuPn7kFHH7J8Fpump?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://bikemj.xyz/"
+    },
+    {
+     "url": "https://pump.fun/coin/2hoRABojpn3SSJ6ReUuCNuKRvsHDuPn7kFHH7J8Fpump?utm_source=terminal"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/the_bikemj"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x0e6d1ebb33f3b8f2d09bacf3b1a1d5c581110c33",
+   "chainId": "robinhood",
+   "tokenAddress": "0x0E6D1eBb33F3b8f2D09Bacf3b1A1d5C581110C33",
+   "description": "A meme coin for the most diamond handed chads on the Robinhood blockchain.",
+   "icon": "MCsvtnHAdg5av9bZ",
+   "header": "https://cdn.dexscreener.com/cms/images/hRe8hv4ijqxfXl4A?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x0e6d1ebb33f3b8f2d09bacf3b1a1d5c581110c33?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://diamondpons.com"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/DiamondPons_"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/Diamondpons"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/76a7g4p4hjmqk4mrwe6sb6dte7bemkcawuhno51tstnk",
+   "chainId": "solana",
+   "tokenAddress": "76a7g4P4HJmQk4Mrwe6sb6dte7BEMKCaWuHNo51tSTNK",
+   "description": "The largest model in the room.\nThe loudest signal on Solana.\nFattensor ($FART) 💨🧠",
+   "icon": "x49-wArYkJ5bWvVT",
+   "header": "https://cdn.dexscreener.com/cms/images/FUpkH5gJwDNN16Em?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/76a7g4P4HJmQk4Mrwe6sb6dte7BEMKCaWuHNo51tSTNK?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://farttensor.site"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/Farttensor"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x828c38b9ac8e0933ead14a6c0318d4494e127777",
+   "chainId": "robinhood",
+   "tokenAddress": "0x828c38B9ac8e0933EAd14A6c0318d4494e127777",
+   "description": "Launch tokens with built-in tax-funded perpetual vaults and custom strategies on @Lighter_xyz.",
+   "icon": "7aBjP5IIw6vL75pb",
+   "header": "https://cdn.dexscreener.com/cms/images/vPjkEHuvysihlDu5?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x828c38b9ac8e0933ead14a6c0318d4494e127777?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://www.perpetuals.wtf/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/PerpetualsWTF"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xa78735badaad80fca7ac7c03bdd029160d45ce68",
+   "chainId": "robinhood",
+   "tokenAddress": "0xA78735baDAAd80Fca7AC7C03bdd029160d45Ce68",
+   "description": "OnRecord is the voting layer for Robinhood Chain. Every shareholder proposal for every Stock Token, pulled from the company's SEC filing, signed by wallets and attested onchain.\n\nEvery trade pays a fee. Every fee buys tokenized shares into one treasury that never sells. When a ballot closes, those shares are voted pro rata to the tally, so instructions reach the real meeting.",
+   "icon": "haJ-5tuMyk4RipZ5",
+   "header": "https://cdn.dexscreener.com/cms/images/FklXgd--ElaF8FAL?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xa78735badaad80fca7ac7c03bdd029160d45ce68?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://onrecord.vote"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/OnRecordVote"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/58nkqggpugepnq5ergdiiubw9rgpcnx37wutlye2nkut",
+   "chainId": "solana",
+   "tokenAddress": "58NKqgGPUgEPNq5ergdiiUBw9rGPcnX37wUTLYe2nKut",
+   "description": "feg",
+   "icon": "647ITsCbI2Wwdmh4",
+   "header": "https://cdn.dexscreener.com/cms/images/TLDBZVnpPL3c0nb6?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/58NKqgGPUgEPNq5ergdiiUBw9rGPcnX37wUTLYe2nKut?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://feg.monster/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/feg_onsol"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/fegportal"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x8ee0fc7156b1718334988ce3b2a94055bf44b7bc",
+   "chainId": "robinhood",
+   "tokenAddress": "0x8EE0Fc7156B1718334988CE3B2A94055bf44b7bC",
+   "description": "the most famous doge on wechat",
+   "icon": "KT2F3C4bEe_fotQb",
+   "header": "https://cdn.dexscreener.com/cms/images/DFLOiVnIkc7UIxwN?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x8ee0fc7156b1718334988ce3b2a94055bf44b7bc?timestamp=1789506900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/thewechatdoge"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/thewechatdoge"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xc2703284e399a9778dce9734e69dd6ab0dc71e18",
+   "chainId": "robinhood",
+   "tokenAddress": "0xC2703284E399a9778DcE9734e69dD6aB0dC71E18",
+   "description": "Cybertruck, Optimus, Robotaxi, Starship, Grok and Mars create a constant stream of catalysts. As Tesla builds autonomy on Earth and SpaceX pushes humanity beyond it, Cyber Inu owns the meme at the intersection.",
+   "icon": "bP9ZLDxOM4B3ekGy",
+   "header": "https://cdn.dexscreener.com/cms/images/QJtu5CTBCA2H3EP1?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xc2703284e399a9778dce9734e69dd6ab0dc71e18?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://bit.ly/4xPZpVk"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/c8pvsby8jbhp6zjaxambzntasqcskivoapcpcf5pump",
+   "chainId": "solana",
+   "tokenAddress": "C8pvSBY8JBhP6zjAXAmbzNTAsqCsKiVoapCpCF5pump",
+   "description": "Dih Fish",
+   "icon": "xukj_ezNWtAg_Hha",
+   "header": "https://cdn.dexscreener.com/cms/images/2hhciKbAIhVZ7qUJ?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/C8pvSBY8JBhP6zjAXAmbzNTAsqCsKiVoapCpCF5pump?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://dihfish.fun/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/DihFishOnSol"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/dihfishcoin"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xc4f730335fb9e439ca5552f7b52b8e638c4245b0",
+   "chainId": "robinhood",
+   "tokenAddress": "0xc4f730335Fb9e439ca5552f7b52B8E638c4245B0",
+   "description": "Note Systems is the on-chain structured notes desk. Earn fixed coupons on tokenised stocks and ETFs. Deposit USDG, pick your underlying, keep collecting as long as it holds above the barrier. Autocallable notes, live on Robinhood Chain.",
+   "icon": "9DTOpN3cRRxlkTxS",
+   "header": "https://cdn.dexscreener.com/cms/images/5nA7yZatj2t6k7lD?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xc4f730335fb9e439ca5552f7b52b8e638c4245b0?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://note.systems/"
+    },
+    {
+     "url": "https://note.systems/docs/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/notesystems"
+    },
+    {
+     "type": "discord",
+     "url": "https://discord.gg/GDrmjADh5"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x232cdfc415d10b673845d83dc02ba2eabe7e30d1",
+   "chainId": "robinhood",
+   "tokenAddress": "0x232CDFc415D10b673845D83Dc02ba2eaBe7e30d1",
+   "description": "What if you never sold? What if the chart didn't shake you out? What if a community decided the game was broken, and simply refused to play it? $IF was born the moment its dev walked away and nobody flinched. No team. No promises. Just holders who looked at years of PvP extraction, snipers, and paper hands and said: not here. What If is the anti-casino. We don't trade each other, we outlast everything. Every holder is the dev now.",
+   "icon": "N5Q4p_8OYzMIXwaL",
+   "header": "https://cdn.dexscreener.com/cms/images/oqnrIFcoCT1q25M8?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x232cdfc415d10b673845d83dc02ba2eabe7e30d1?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://whatifonhood.com/#token"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/WhatIFonHOOD"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/WhatIFonHoodChain"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xcd4e70bfd73952123449e453f08c12e44ab89e58",
+   "chainId": "robinhood",
+   "tokenAddress": "0xCd4E70bfd73952123449E453f08c12e44aB89E58",
+   "description": "SPX of Robinhood",
+   "icon": "UmuWMB_et8Sc3Yk9",
+   "header": "https://cdn.dexscreener.com/cms/images/atq91Brvr6tBgeER?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xcd4e70bfd73952123449e453f08c12e44ab89e58?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://www.index9000.xyz/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/IDX_RH"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/index9000"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x4c40ea08b040385cce2412f7f11849417e12a20f",
+   "chainId": "robinhood",
+   "tokenAddress": "0x4C40eA08b040385cCe2412f7f11849417e12a20F",
+   "description": "Latest Post on Truth Social by President Trump. Featured on CNN and many other US news media.",
+   "icon": "Ur1L-2bTOuq0u7j5",
+   "header": "https://cdn.dexscreener.com/cms/images/Tw-EspSoNqIp2t9v?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x4c40ea08b040385cce2412f7f11849417e12a20f?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "http://thehoaxbuster.fun"
+    },
+    {
+     "url": "https://truthsocial.com/@realDonaldTrump/posts/117271304188365611"
+    },
+    {
+     "url": "https://truthsocial.com/@realDonaldTrump/posts/117271304188365611"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/TheHoaxBuster"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/caej3lqsagou4zfgftctbmo6yegppraw31mawhekpump",
+   "chainId": "solana",
+   "tokenAddress": "Caej3LQSaGou4ZFgFtCtbMo6yegpPRaw31MawHEkpump",
+   "icon": "hIupLmC3ph1W3Tqs",
+   "header": "https://cdn.dexscreener.com/cms/images/vD1vjW8NhAdu8uUW?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/Caej3LQSaGou4ZFgFtCtbMo6yegpPRaw31MawHEkpump?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://www.blastprotocol.meme/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/blastprotocolpf"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/7pboexuhu35tyv4tffkzvmgpj9tfgsbsadjwcase35zu",
+   "chainId": "solana",
+   "tokenAddress": "7PboeXUhu35TYV4TFfKzvMGPj9TfgsbSADjWcasE35zu",
+   "description": "$SENGI (Elephant Shrew) is taking over X with a shrew that sounds like an elephant. One viral sound, one unforgettable meme, and a whole new character entering the meme meta.",
+   "icon": "5kiLS3CY9d39a0Ga",
+   "header": "https://cdn.dexscreener.com/cms/images/REM6FNBgOjoHAN9A?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/7PboeXUhu35TYV4TFfKzvMGPj9TfgsbSADjWcasE35zu?timestamp=1789506900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/sengi_onsol"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/elephant_shrew_sol"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/dahn4rnrnbpzfgnusjty1tp1mx6f76hlhtnh9mucdtkx",
+   "chainId": "solana",
+   "tokenAddress": "DAHn4rnrnbPzfgNusjty1tp1MX6f76HLHtNH9muCdtKX",
+   "description": "Caesar was chosen by Reddit to become Doge2, making him part of real internet Doge history.\n\nReal dog. Real provenance. Real lore.",
+   "icon": "EBZlNWaskwlkXCuB",
+   "header": "https://cdn.dexscreener.com/cms/images/-mF58uio5bsKBcXd?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/DAHn4rnrnbPzfgNusjty1tp1MX6f76HLHtNH9muCdtKX?timestamp=1789506900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/doge2_onsol"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/caesar_doge2"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x5f62c57e5c537887117eef828b7e3ad41c009feb",
+   "chainId": "robinhood",
+   "tokenAddress": "0x5f62C57e5C537887117EeF828b7E3Ad41C009FEb",
+   "description": "$GOOD is not just another dog coin. It represents the culture that welcomes everyday people into crypto without pretending it's easy. This \"hood\" isn't a neighborhood or a place, it's every crypto community. Every discord. Every Telegram. Every X Space. Every meme. Every holder. Every late-night chart watcher. Every degenerate who’s been rugged but still believes. It’s the memecoin trenches where people grind every day, celebrate wins, survive losses, and keep showing up. GOOD isn't a billionaire. He isn't royalty. He isn't trying to be a superhero. He's simply the toughest dog in crypto. The most loyal friend in the trenches. The one that never leaves. He is loyal, protective, fearless, street smart, funny, confident, never arrogant, and always watching over the community. He is the guardian of the hood and every hood needs something $GOOD.",
+   "icon": "WV3AcN3Do_pj4wbf",
+   "header": "https://cdn.dexscreener.com/cms/images/pQdz0KNZJCINkjCF?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x5f62c57e5c537887117eef828b7e3ad41c009feb?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://goodcoin.io/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/GoodCoinRH"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/TheGo0dCoin"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x38bb87cf3e7344a82be7cd671c191f015b97eee6",
+   "chainId": "robinhood",
+   "tokenAddress": "0x38bb87Cf3E7344A82be7CD671c191f015b97eEe6",
+   "description": "The first Santa token on the Robinhood Blockchain — the OG and the original first mover.\n\n$SANTAHOOD is the native token of SANTRO EXCHANGE, the first centralized exchange on Robinhood Chain.\n\nBuilt by the community, fueled by conviction, and driven by a long-term vision, SantaHood is expanding beyond the meme with Santro Exchange.\n\n$SANTAHOOD serves as the governance token of the Santro ecosystem, with platform fees powering buybacks and burns.\n\n“Santa would love Robinhood.” And now, Santa is building on Robinhood.",
+   "icon": "sX8MjxZPTnoQR2YY",
+   "header": "https://cdn.dexscreener.com/cms/images/QV0LsqsEMKGN2cwj?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x38bb87cf3e7344a82be7cd671c191f015b97eee6?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://Santahood.com"
+    },
+    {
+     "url": "https://SantroExchange.com"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/Santahoodcoin"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/Santahood"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/h7y3tzfyyfpbnn5dpwa5m79ndgdqnfs8tcatqe2tpump",
+   "chainId": "solana",
+   "tokenAddress": "H7Y3TzFyyfPBnn5Dpwa5m79NdgDQnFS8TcAtQe2Tpump",
+   "description": "Going all-in on the ultimate cat-powered meme coin gamble.",
+   "icon": "B8TtSQqS65ts-COW",
+   "header": "https://cdn.dexscreener.com/cms/images/4wskVrFAd77RJ1Pj?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/H7Y3TzFyyfPBnn5Dpwa5m79NdgDQnFS8TcAtQe2Tpump?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://allcat.lol"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/ALLCATMEME"
+    }
+   ],
+   "totalAmount": 80
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xbef83da2237be439d0be0b50d452b89a6968b112",
+   "chainId": "robinhood",
+   "tokenAddress": "0xbEF83DA2237be439d0BE0b50d452b89A6968B112",
+   "description": "LootPad is the launchpad for Robinhood Chain that actually pays the crowd.\n\nEvery coin takes 1% a swap and splits it:\n→ 50% to the creator\n→ 37.5% to $LOOT stakers, in ETH",
+   "icon": "WlXV1ObET0Td_kh1",
+   "header": "https://cdn.dexscreener.com/cms/images/tYWEvLedukf4WuBG?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xbef83da2237be439d0be0b50d452b89a6968b112?timestamp=1789506900000",
+   "links": [
+    {
+     "url": "https://lootpad.tech/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/LootPadFun"
+    },
+    {
+     "type": "telegram",
+     "url": "https://telegram.me/lootpad_tech"
+    }
+   ],
+   "totalAmount": 80
+  }
+ ]
+}
