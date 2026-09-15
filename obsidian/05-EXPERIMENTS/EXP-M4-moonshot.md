@@ -166,6 +166,15 @@ Escrita por `infra/scripts/meme_close_day.py --day 2026-09-13` em 2026-09-14 00:
 - **A previsão congelada dizia:** «P3 — expectância: braço 1 entre −0,90 e −0,30 R (ponto −0,60 R); braço 2 pior que o braço 1 em ≥ 0,10 R. Veredito previsto: `descartar` (H0).»
 - **Veredito:** régua não atingida (n 17/100, dias 2/30) — `result` da frontmatter não muda; quem escreve `validada`/`reprovada` é o orquestrador, com a régua completa (2 de 3 janelas, controle, censura).
 
+### Avaliação de 2026-09-14 — fechamento diário (T4.15)
+
+Escrita por `infra/scripts/meme_close_day.py --day 2026-09-14` em 2026-09-15 00:10 BRT (`meme_paper_bets`, conjunto `moonshot_v0/1`, coorte prospectiva). Nada acima desta linha foi editado.
+
+- **Hoje (2026-09-14)**: n = 6, R somado -0.9617; saídas: `creator_dump` 3, `time_stop` 3.
+- **Acumulado até 2026-09-14 23:59 BRT**: n = 23, dias distintos = 3, R médio -0.3404, IC 95 % por blocos de dia [-0.4378, -0.1603], alvo em 0 % das saídas, `dead`/`time_stop` em 34.8 %, leave-top-out (R somado sem a melhor) -8.3984.
+- **A previsão congelada dizia:** «P3 — expectância: braço 1 entre −0,90 e −0,30 R (ponto −0,60 R); braço 2 pior que o braço 1 em ≥ 0,10 R. Veredito previsto: `descartar` (H0).»
+- **Veredito:** régua não atingida (n 23/100, dias 3/30) — `result` da frontmatter não muda; quem escreve `validada`/`reprovada` é o orquestrador, com a régua completa (2 de 3 janelas, controle, censura).
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde |
