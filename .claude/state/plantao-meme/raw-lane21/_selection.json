@@ -1,0 +1,69 @@
+{
+ "hr_true": [
+  [
+   "POO",
+   "8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLPXaMJ6nWqyv",
+   1789505092000,
+   "newest"
+  ],
+  [
+   "Giveback",
+   "8sQ6oSPsC4WFLtDfJMuqg3Nrm5DKh2FzVa95mxJnpump",
+   1789505092000,
+   "newest"
+  ],
+  [
+   "DICKSHIT",
+   "5yd6AFU9iAqDbHPRKnCpmPP1RYE5PA5HhTeG5pcmpump",
+   1789505091000,
+   "newest"
+  ],
+  [
+   "DICKSHIT2DUD",
+   "AoQKSLh1fqqWNGzwoVgqP2neAqM8cXHbJcsG6EHzZWsv",
+   1789505081000,
+   "newest"
+  ],
+  [
+   "dickshit",
+   "DbcSjS2z4qTRpwiEW13LDNdthQ3sgG6NaHQgiVMRaKjL",
+   1789505055000,
+   "newest"
+  ]
+ ],
+ "hr_false": [
+  [
+   "PEPECORN",
+   "GQPGinpuWaVBNGn5SrEdrfn87666Mtx8Q1hBm7Gtpump",
+   1789505101000,
+   "newest"
+  ],
+  [
+   "dickshit",
+   "HRS1LJ1WYur4uyFamDexviyMLS951YxuHwiQ9CiBpump",
+   1789505099000,
+   "newest"
+  ],
+  [
+   "blezed",
+   "EhuWhv97ESiHVMJ6HwNt1NMfAHVtdqhE3w1vFoTRpump",
+   1789505098000,
+   "newest"
+  ],
+  [
+   "cbBTC",
+   "U74TE34HyFwWApt3PaLSa9LmKeBwfMWY1yt81v6pump",
+   1789505095000,
+   "newest"
+  ],
+  [
+   "beer",
+   "BzPDsgkenoS5UVtWHV5eKFQBcHsu1pSEwoXCs9sEpump",
+   1789505095000,
+   "newest"
+  ]
+ ],
+ "newest_unique": 139,
+ "hr_true_in_newest": 26,
+ "hr_false_in_newest": 113
+}

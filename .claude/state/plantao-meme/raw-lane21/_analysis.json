@@ -1,0 +1,3273 @@
+{
+ "rate": {
+  "n": 28,
+  "codes": {
+   "200": 28
+  },
+  "latency_ms": {
+   "min": 140,
+   "med": 205.0,
+   "p90": 592.4,
+   "max": 1282
+  },
+  "gap_s": {
+   "min": 1.291,
+   "med": 1.35,
+   "max": 2.123
+  },
+  "first_brt": "17:45:00",
+  "last_brt": "17:45:40",
+  "hosts": {
+   "frontend-api-v3.pump.fun": {
+    "n": 18,
+    "codes": {
+     "200": 18
+    },
+    "lat_med": 202.0,
+    "ratelimit": [
+     [
+      "/sol-price",
+      "50",
+      "49",
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/mayhem/overview",
+      "60",
+      "59",
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins?sort=created_timestamp&order=DESC",
+      "60",
+      "59",
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins?sort=created_timestamp&order=DESC",
+      "60",
+      "59",
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins?sort=created_timestamp&order=DESC",
+      "60",
+      "59",
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins?sort=created_timestamp&order=DESC",
+      "60",
+      "59",
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/mayhem-mode?limit=60",
+      "60",
+      "59",
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins?sort=market_cap&order=DESC&limit=",
+      "60",
+      "59",
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHL",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/8sQ6oSPsC4WFLtDfJMuqg3Nrm5DKh2FzV",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/5yd6AFU9iAqDbHPRKnCpmPP1RYE5PA5Hh",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/AoQKSLh1fqqWNGzwoVgqP2neAqM8cXHbJ",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/DbcSjS2z4qTRpwiEW13LDNdthQ3sgG6Na",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/GQPGinpuWaVBNGn5SrEdrfn87666Mtx8Q",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/HRS1LJ1WYur4uyFamDexviyMLS951YxuH",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/EhuWhv97ESiHVMJ6HwNt1NMfAHVtdqhE3",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/U74TE34HyFwWApt3PaLSa9LmKeBwfMWY1",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/coins/BzPDsgkenoS5UVtWHV5eKFQBcHsu1pSEw",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ]
+    ]
+   },
+   "advanced-indexer.pump.fun": {
+    "n": 8,
+    "codes": {
+     "200": 8
+    },
+    "lat_med": 187.0,
+    "ratelimit": [
+     [
+      "/boards/new?offset=0&limit=50",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/boards/graduated?offset=0&limit=50",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/boards/graduated?offset=50&limit=50",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/boards/graduated?offset=100&limit=50",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/boards/graduating?offset=0&limit=50",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/boards/movers?offset=0&limit=50",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/in-memory-coin/8WKCZMvdySkco6m4R6eSRcWG",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ],
+     [
+      "/in-memory-coin/8sQ6oSPsC4WFLtDfJMuqg3Nr",
+      null,
+      null,
+      "DYNAMIC",
+      null
+     ]
+    ]
+   },
+   "pump.fun": {
+    "n": 2,
+    "codes": {
+     "200": 2
+    },
+    "lat_med": 1102.5,
+    "ratelimit": [
+     [
+      "/coin/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLP",
+      null,
+      null,
+      "DYNAMIC",
+      "3115"
+     ],
+     [
+      "/coin/8sQ6oSPsC4WFLtDfJMuqg3Nrm5DKh2FzVa",
+      null,
+      null,
+      "DYNAMIC",
+      "3117"
+     ]
+    ]
+   }
+  }
+ },
+ "sol": {
+  "solPrice": 97.1093721139625,
+  "asOf_brt": "15/09 17:45:00",
+  "stale": false
+ },
+ "overview": {
+  "activeCoins": 100,
+  "agentVolumeUsd": {
+   "24h": 4954463.150974135,
+   "7d": 39340904.96665217
+  },
+  "distinctTraders": {
+   "24h": 5643,
+   "7d": 25944
+  },
+  "coinsCreated": {
+   "24h": 9525,
+   "7d": 61681
+  },
+  "coinsCreatedByMode": {
+   "auto": {
+    "24h": 6773,
+    "7d": 47211
+   },
+   "manual": {
+    "24h": 2752,
+    "7d": 14470
+   }
+  },
+  "updatedAt": 1789504326680,
+  "updatedAt_brt": "15/09 17:32:06"
+ },
+ "newest100": {
+  "n": 100,
+  "hr": {
+   "false": 85,
+   "true": 15
+  },
+  "mayhem": 25,
+  "mayhem_states": {
+   "active": 12,
+   "paused": 12,
+   "completed": 1
+  },
+  "quote": {
+   "SOL": 85,
+   "custom": 15
+  },
+  "custom_quotes": {
+   "Xsf9mBkt": 6,
+   "pumpCmXq": 4,
+   "63LfDmNb": 1,
+   "EPjFWdd5": 1,
+   "Ai66LHZG": 1,
+   "Xs8S1uUs": 1,
+   "SPCXxcqX": 1
+  },
+  "span_s": 159.0,
+  "rate_per_min": 37.7,
+  "first_created": "15/09 17:42:22",
+  "last_created": "15/09 17:45:01",
+  "complete": 1,
+  "creators_unique": 68,
+  "cashback": 0,
+  "hr_rows": [
+   [
+    "POO",
+    "8WKCZMvd",
+    "15/09 17:44:52",
+    "abcdEv",
+    "SOL",
+    null,
+    3479,
+    false,
+    "post"
+   ],
+   [
+    "Giveback",
+    "8sQ6oSPs",
+    "15/09 17:44:52",
+    "CtRM61",
+    "SOL",
+    null,
+    2758,
+    false,
+    "nada"
+   ],
+   [
+    "DICKSHIT",
+    "5yd6AFU9",
+    "15/09 17:44:51",
+    "FQxmYn",
+    "Xsf9mB",
+    null,
+    4974,
+    false,
+    "post"
+   ],
+   [
+    "DICKSHIT2DUD",
+    "AoQKSLh1",
+    "15/09 17:44:41",
+    "3a3G94",
+    "Xsf9mB",
+    null,
+    0,
+    false,
+    "nada"
+   ],
+   [
+    "dickshit",
+    "DbcSjS2z",
+    "15/09 17:44:15",
+    "twamXG",
+    "Xsf9mB",
+    null,
+    4759,
+    false,
+    "post"
+   ],
+   [
+    "Mitch",
+    "ED2xKv8M",
+    "15/09 17:44:06",
+    "5wHuMh",
+    "pumpCm",
+    null,
+    6802,
+    false,
+    "post"
+   ],
+   [
+    "DICKSHIT",
+    "ZDJzFLeN",
+    "15/09 17:43:52",
+    "FCUPh2",
+    "Xsf9mB",
+    null,
+    4526,
+    false,
+    "post"
+   ],
+   [
+    "CALLCAT",
+    "47yE2d8K",
+    "15/09 17:43:39",
+    "HgAhL3",
+    "SOL",
+    null,
+    3078,
+    false,
+    "post"
+   ],
+   [
+    "Vaultr",
+    "7cFBuKkp",
+    "15/09 17:43:22",
+    "5FRLa9",
+    "SOL",
+    null,
+    2830,
+    false,
+    "perfil"
+   ],
+   [
+    "Dickshit2dud",
+    "EKmAL1ih",
+    "15/09 17:42:52",
+    "FCUPh2",
+    "Xsf9mB",
+    null,
+    5859,
+    false,
+    "post"
+   ],
+   [
+    "CORONAvirus",
+    "9vnoGxUE",
+    "15/09 17:42:48",
+    "4jSWgg",
+    "SOL",
+    null,
+    2781,
+    false,
+    "post"
+   ],
+   [
+    "DS2N",
+    "Dqn22BWE",
+    "15/09 17:42:39",
+    "BoEVpc",
+    "SPCXxc",
+    null,
+    3815,
+    false,
+    "post"
+   ],
+   [
+    "PUSH",
+    "21m8Y9dV",
+    "15/09 17:42:27",
+    "E31iLK",
+    "SOL",
+    null,
+    2713,
+    false,
+    "perfil"
+   ],
+   [
+    "PUMPERINU",
+    "GXw3syFc",
+    "15/09 17:42:25",
+    "21dANY",
+    "pumpCm",
+    null,
+    3585,
+    false,
+    "nada"
+   ],
+   [
+    "dickshit",
+    "5sBWbnoz",
+    "15/09 17:42:22",
+    "4dY5PE",
+    "Xsf9mB",
+    null,
+    4511,
+    false,
+    "post"
+   ]
+  ],
+  "hr_mayhem": 0,
+  "hr_custom_quote": 9,
+  "hr_complete": 0,
+  "nonhr_n": 85,
+  "nonhr_complete": 1,
+  "usd_mcap_med": 2717.2487,
+  "symbols_top": [
+   [
+    "IGNORE",
+    23
+   ],
+   [
+    "skipoo126",
+    4
+   ],
+   [
+    "dickshit",
+    3
+   ],
+   [
+    "Rich",
+    2
+   ],
+   [
+    "DICKSHIT",
+    2
+   ],
+   [
+    "HALH",
+    2
+   ]
+  ],
+  "keys_original_n": 56,
+  "has_hr_key": true
+ },
+ "newest_all": {
+  "n": 139,
+  "hr": {
+   "false": 113,
+   "true": 26
+  },
+  "mayhem": 39,
+  "mayhem_states": {
+   "active": 13,
+   "paused": 24,
+   "completed": 2
+  },
+  "quote": {
+   "SOL": 110,
+   "custom": 28,
+   "null": 1
+  },
+  "custom_quotes": {
+   "Xsf9mBkt": 8,
+   "pumpCmXq": 5,
+   "63LfDmNb": 1,
+   "EPjFWdd5": 1,
+   "Ai66LHZG": 1,
+   "Xs8S1uUs": 1,
+   "SPCXxcqX": 5,
+   "PFER6ENq": 1,
+   "XsDoVfqe": 1,
+   "6p6xgHyF": 1,
+   "RDDTGbhH": 1,
+   "BoTx8y9y": 1,
+   "BRVaZKg6": 1
+  },
+  "span_s": 271.0,
+  "rate_per_min": 30.8,
+  "first_created": "15/09 17:40:30",
+  "last_created": "15/09 17:45:01",
+  "complete": 1,
+  "creators_unique": 95,
+  "cashback": 0,
+  "hr_rows": [
+   [
+    "POO",
+    "8WKCZMvd",
+    "15/09 17:44:52",
+    "abcdEv",
+    "SOL",
+    null,
+    3479,
+    false,
+    "post"
+   ],
+   [
+    "Giveback",
+    "8sQ6oSPs",
+    "15/09 17:44:52",
+    "CtRM61",
+    "SOL",
+    null,
+    2758,
+    false,
+    "nada"
+   ],
+   [
+    "DICKSHIT",
+    "5yd6AFU9",
+    "15/09 17:44:51",
+    "FQxmYn",
+    "Xsf9mB",
+    null,
+    4974,
+    false,
+    "post"
+   ],
+   [
+    "DICKSHIT2DUD",
+    "AoQKSLh1",
+    "15/09 17:44:41",
+    "3a3G94",
+    "Xsf9mB",
+    null,
+    0,
+    false,
+    "nada"
+   ],
+   [
+    "dickshit",
+    "DbcSjS2z",
+    "15/09 17:44:15",
+    "twamXG",
+    "Xsf9mB",
+    null,
+    4759,
+    false,
+    "post"
+   ],
+   [
+    "Mitch",
+    "ED2xKv8M",
+    "15/09 17:44:06",
+    "5wHuMh",
+    "pumpCm",
+    null,
+    6802,
+    false,
+    "post"
+   ],
+   [
+    "DICKSHIT",
+    "ZDJzFLeN",
+    "15/09 17:43:52",
+    "FCUPh2",
+    "Xsf9mB",
+    null,
+    4526,
+    false,
+    "post"
+   ],
+   [
+    "CALLCAT",
+    "47yE2d8K",
+    "15/09 17:43:39",
+    "HgAhL3",
+    "SOL",
+    null,
+    3078,
+    false,
+    "post"
+   ],
+   [
+    "Vaultr",
+    "7cFBuKkp",
+    "15/09 17:43:22",
+    "5FRLa9",
+    "SOL",
+    null,
+    2830,
+    false,
+    "perfil"
+   ],
+   [
+    "Dickshit2dud",
+    "EKmAL1ih",
+    "15/09 17:42:52",
+    "FCUPh2",
+    "Xsf9mB",
+    null,
+    5859,
+    false,
+    "post"
+   ],
+   [
+    "CORONAvirus",
+    "9vnoGxUE",
+    "15/09 17:42:48",
+    "4jSWgg",
+    "SOL",
+    null,
+    2781,
+    false,
+    "post"
+   ],
+   [
+    "DS2N",
+    "Dqn22BWE",
+    "15/09 17:42:39",
+    "BoEVpc",
+    "SPCXxc",
+    null,
+    3815,
+    false,
+    "post"
+   ],
+   [
+    "PUSH",
+    "21m8Y9dV",
+    "15/09 17:42:27",
+    "E31iLK",
+    "SOL",
+    null,
+    2713,
+    false,
+    "perfil"
+   ],
+   [
+    "PUMPERINU",
+    "GXw3syFc",
+    "15/09 17:42:25",
+    "21dANY",
+    "pumpCm",
+    null,
+    3585,
+    false,
+    "nada"
+   ],
+   [
+    "dickshit",
+    "5sBWbnoz",
+    "15/09 17:42:22",
+    "4dY5PE",
+    "Xsf9mB",
+    null,
+    4511,
+    false,
+    "post"
+   ],
+   [
+    "dwm",
+    "GjYNi8VZ",
+    "15/09 17:41:58",
+    "3Nqd5J",
+    "PFER6E",
+    null,
+    3971,
+    false,
+    "post"
+   ],
+   [
+    "dickshit",
+    "GuauHY6z",
+    "15/09 17:41:55",
+    "2bRoas",
+    "SOL",
+    null,
+    2713,
+    false,
+    "post"
+   ],
+   [
+    "dickshit",
+    "2mwQKzih",
+    "15/09 17:41:47",
+    "twamXG",
+    "Xsf9mB",
+    null,
+    4509,
+    false,
+    "post"
+   ],
+   [
+    "SA",
+    "J6MR79zr",
+    "15/09 17:41:40",
+    "92cLih",
+    "SOL",
+    null,
+    2713,
+    false,
+    "post"
+   ],
+   [
+    "SEX",
+    "FQsB9FGo",
+    "15/09 17:41:31",
+    "F5XvCe",
+    "SPCXxc",
+    null,
+    3771,
+    false,
+    "post"
+   ],
+   [
+    "FEAR",
+    "45houNA6",
+    "15/09 17:41:31",
+    "5nLmY2",
+    "SOL",
+    null,
+    2732,
+    false,
+    "nada"
+   ],
+   [
+    "SpaceX",
+    "9vxVtvfm",
+    "15/09 17:41:27",
+    "iaQFHP",
+    "XsDoVf",
+    null,
+    3874,
+    false,
+    "post"
+   ],
+   [
+    "AI SNITCH",
+    "GLV953T8",
+    "15/09 17:41:25",
+    "ELpuzW",
+    "SOL",
+    null,
+    2713,
+    false,
+    "post"
+   ],
+   [
+    "MariGrand",
+    "2tvehW73",
+    "15/09 17:41:22",
+    "EgUbe3",
+    "SOL",
+    "paused",
+    80,
+    false,
+    "post"
+   ],
+   [
+    "Pussies",
+    "9mL1hLEF",
+    "15/09 17:41:12",
+    "DvBZ85",
+    "SPCXxc",
+    null,
+    3941,
+    false,
+    "post"
+   ],
+   [
+    "batCoV",
+    "7AUTbCDe",
+    "15/09 17:41:08",
+    "JDQKDr",
+    "SOL",
+    null,
+    2930,
+    false,
+    "post"
+   ]
+  ],
+  "hr_mayhem": 1,
+  "hr_custom_quote": 14,
+  "hr_complete": 0,
+  "nonhr_n": 113,
+  "nonhr_complete": 1,
+  "usd_mcap_med": 2720.2913,
+  "symbols_top": [
+   [
+    "IGNORE",
+    23
+   ],
+   [
+    "dickshit",
+    7
+   ],
+   [
+    "skipoo126",
+    6
+   ],
+   [
+    "MESSI",
+    3
+   ],
+   [
+    "CATNIS ",
+    3
+   ],
+   [
+    "SEX",
+    3
+   ]
+  ],
+  "keys_original_n": 56,
+  "has_hr_key": true
+ },
+ "newest_keys": [
+  "associated_bonding_curve",
+  "ath_market_cap",
+  "ath_market_cap_timestamp",
+  "base_decimals",
+  "bonding_curve",
+  "boost_mode",
+  "chain_id",
+  "complete",
+  "created_timestamp",
+  "creator",
+  "description",
+  "hide_banner",
+  "image_uri",
+  "initialized",
+  "inverted",
+  "is_banned",
+  "is_cashback_enabled",
+  "is_currently_live",
+  "is_holder_reward",
+  "last_trade_timestamp",
+  "livestream_ban_expiry",
+  "market_cap",
+  "market_cap_quote",
+  "market_cap_usd",
+  "mayhem_state",
+  "metadata_uri",
+  "mint",
+  "multichain_family",
+  "name",
+  "nsfw",
+  "pool_address",
+  "profile_image",
+  "program",
+  "protocol",
+  "pump_swap_pool",
+  "quote_decimals",
+  "quote_mint",
+  "quote_token_program",
+  "real_quote_reserves",
+  "real_sol_reserves",
+  "real_token_reserves",
+  "reply_count",
+  "show_name",
+  "symbol",
+  "token_program",
+  "total_supply",
+  "total_supply_str",
+  "twitter",
+  "updated_at",
+  "usd_market_cap",
+  "username",
+  "verified",
+  "virtual_quote_reserves",
+  "virtual_sol_reserves",
+  "virtual_token_reserves",
+  "website"
+ ],
+ "run19_newest70": {
+  "n": 70,
+  "hr_true": 7,
+  "mayhem": 14,
+  "quote": {
+   "SOL": 62,
+   "custom": 8
+  }
+ },
+ "complete140": {
+  "n": 140,
+  "hr": {
+   "false": 121,
+   "true": 19
+  },
+  "mayhem": 30,
+  "created_first": "15/09 14:00:49",
+  "created_last": "15/09 17:44:55",
+  "span_h": 3.73,
+  "real_sol_top": [
+   [
+    0.0,
+    70
+   ],
+   [
+    85.005,
+    59
+   ],
+   [
+    83.4,
+    1
+   ],
+   [
+    51.358,
+    1
+   ],
+   [
+    78.627,
+    1
+   ]
+  ],
+  "quote": {
+   "SOL": 133,
+   "CbyTNf7U": 1,
+   "pumpCmXq": 2,
+   "XsueG8Bt": 1,
+   "63LfDmNb": 1,
+   "BABANGA4": 1,
+   "WXMRyRZh": 1
+  },
+  "hr_true": {
+   "n": 19,
+   "mayhem": 2,
+   "pool": 19,
+   "real_sol_85": 0,
+   "real_sol_0": 19,
+   "usd_mcap_med": 3267.5623,
+   "ath_med": 86650.5011,
+   "ath_gt_1m": 0,
+   "mc_lt_10pct_ath": 15,
+   "custom_quote": 3,
+   "create_to_lasttrade_min_med": 97.1,
+   "create_to_ath_min_med": 4.8667
+  },
+  "hr_false": {
+   "n": 121,
+   "mayhem": 28,
+   "pool": 121,
+   "real_sol_85": 59,
+   "real_sol_0": 58,
+   "usd_mcap_med": 1951.1051,
+   "ath_med": 96798.5624,
+   "ath_gt_1m": 31,
+   "mc_lt_10pct_ath": 93,
+   "custom_quote": 4,
+   "create_to_lasttrade_min_med": 78.0833,
+   "create_to_ath_min_med": 7.3167
+  },
+  "hr_rows": [
+   [
+    "SARS-COV-2",
+    "7PkNGtjr",
+    "15/09 17:37:41",
+    "FFdBLY",
+    "SOL",
+    null,
+    6646,
+    39891,
+    0.0,
+    true
+   ],
+   [
+    "PvP",
+    "9FvEay7C",
+    "15/09 17:00:55",
+    "Er5ziy",
+    "SOL",
+    null,
+    2009,
+    74706,
+    0.0,
+    true
+   ],
+   [
+    "Dumbocrat",
+    "4ZUjJ5EJ",
+    "15/09 16:57:54",
+    "AsibLm",
+    "SOL",
+    null,
+    2726,
+    50636,
+    0.0,
+    true
+   ],
+   [
+    "Democrat",
+    "9tgSydUx",
+    "15/09 16:38:02",
+    "FDfyqq",
+    "SOL",
+    null,
+    16260,
+    345473,
+    0.0,
+    true
+   ],
+   [
+    "DEAD",
+    "7LYMcivY",
+    "15/09 16:37:03",
+    "bwamJz",
+    "SOL",
+    null,
+    2702,
+    51056,
+    0.0,
+    true
+   ],
+   [
+    "ok",
+    "3wR88kYE",
+    "15/09 16:26:25",
+    "Biuetd",
+    "SOL",
+    null,
+    3618,
+    44497,
+    0.0,
+    true
+   ],
+   [
+    "ARC",
+    "3DHTADG9",
+    "15/09 16:20:59",
+    "GuAKE5",
+    "XsueG8",
+    null,
+    44275,
+    105510,
+    0.0,
+    true
+   ],
+   [
+    "THOM",
+    "BtzTJkmJ",
+    "15/09 16:04:49",
+    "4Lm2uq",
+    "SOL",
+    null,
+    5928,
+    93380,
+    0.0,
+    true
+   ],
+   [
+    "CRYPTO",
+    "ABbjtYZj",
+    "15/09 15:52:38",
+    "6ePbEv",
+    "SOL",
+    null,
+    2969,
+    58519,
+    0.0,
+    true
+   ],
+   [
+    "CCOIN",
+    "69fmNNTk",
+    "15/09 15:47:07",
+    "D9gQ6R",
+    "SOL",
+    null,
+    3135,
+    145990,
+    0.0,
+    true
+   ],
+   [
+    "NAY",
+    "6pei4VZg",
+    "15/09 15:41:49",
+    "FiwwHe",
+    "SOL",
+    null,
+    2685,
+    137163,
+    0.0,
+    true
+   ],
+   [
+    "Over",
+    "Ej3dwnKL",
+    "15/09 15:37:47",
+    "3JD7zr",
+    "SOL",
+    null,
+    3268,
+    142049,
+    0.0,
+    true
+   ],
+   [
+    "MEMECOIN",
+    "Cizasdp2",
+    "15/09 15:31:58",
+    "6ePbEv",
+    "SOL",
+    null,
+    2432,
+    135885,
+    0.0,
+    true
+   ],
+   [
+    "MEME COIN",
+    "9jmDC6hj",
+    "15/09 15:28:49",
+    "29yFze",
+    "SOL",
+    null,
+    6310,
+    320217,
+    0.0,
+    true
+   ],
+   [
+    "GIGADOG",
+    "C11KeXxU",
+    "15/09 14:58:35",
+    "BU8pQZ",
+    "63LfDm",
+    null,
+    88561,
+    222926,
+    0.0,
+    true
+   ],
+   [
+    "CHINESE",
+    "9wNFRWac",
+    "15/09 14:49:59",
+    "2MH1Gf",
+    "BABANG",
+    null,
+    23587,
+    86651,
+    0.0,
+    true
+   ],
+   [
+    "CLRTY",
+    "9HWSMGz1",
+    "15/09 14:43:37",
+    "4ZrLd7",
+    "SOL",
+    "completed",
+    1,
+    9932,
+    0.0,
+    true
+   ],
+   [
+    "Clarity",
+    "6jeLZNBc",
+    "15/09 14:27:34",
+    "C2TFei",
+    "SOL",
+    null,
+    5712,
+    71850,
+    0.0,
+    true
+   ],
+   [
+    "CR4Y0N",
+    "EpCPgmiQ",
+    "15/09 14:10:56",
+    "CgjND6",
+    "SOL",
+    "completed",
+    2,
+    2872,
+    0.0,
+    true
+   ]
+  ],
+  "symbols_top": [
+   [
+    "WOFI",
+    7
+   ],
+   [
+    "CATE",
+    3
+   ],
+   [
+    "WOTF",
+    3
+   ],
+   [
+    "1",
+    2
+   ],
+   [
+    "WWR",
+    2
+   ],
+   [
+    "XPXGOLD",
+    2
+   ],
+   [
+    "Democrat",
+    2
+   ],
+   [
+    "OpenAI",
+    2
+   ]
+  ],
+  "creators_unique": 133
+ },
+ "mayhem_mode60": {
+  "n": 60,
+  "keys_n": 55,
+  "has_mayhem_obj": false,
+  "has_hr": true,
+  "hr_true": 2,
+  "states": {
+   "active": 19,
+   "paused": 41
+  },
+  "cashback": 0,
+  "real_sol_0": 0
+ },
+ "top50": {
+  "n": 50,
+  "hr_true": 2,
+  "lt24h": 22,
+  "lt24h_top5": [
+   [
+    "WOTF",
+    "Zd8xgiFB",
+    "15/09 15:40:16",
+    804201466,
+    false
+   ],
+   [
+    "WOFI",
+    "Z7zAsKeE",
+    "14/09 21:58:42",
+    588082078,
+    false
+   ],
+   [
+    "WOTF",
+    "8MUcwPaf",
+    "15/09 10:36:00",
+    553114008,
+    false
+   ],
+   [
+    "KIBA",
+    "zp9PDZfk",
+    "14/09 23:03:17",
+    534696669,
+    false
+   ],
+   [
+    "ECTF",
+    "Va1Jg8sD",
+    "15/09 06:02:46",
+    422333427,
+    false
+   ]
+  ],
+  "min_mcap": 15019713,
+  "symbols_top": [
+   [
+    "WOFI",
+    7
+   ],
+   [
+    "WOTF",
+    6
+   ],
+   [
+    "ECTF",
+    3
+   ],
+   [
+    "USGR",
+    2
+   ],
+   [
+    "XPXGOLD",
+    2
+   ]
+  ]
+ },
+ "graduated150": {
+  "n": 149,
+  "pg": {
+   "pump": 126,
+   "raydium_launchpad": 23
+  },
+  "pl": {
+   "": 126,
+   "stonkfun": 22,
+   "raydium": 1
+  },
+  "gd_first": "15/09 13:12:29",
+  "gd_last": "15/09 17:44:55",
+  "per_hour": 32.8,
+  "by_hour_brt": {
+   "15/09 13h": 27,
+   "15/09 14h": 35,
+   "15/09 15h": 32,
+   "15/09 16h": 31,
+   "15/09 17h": 24
+  },
+  "hr": {
+   "false": 126,
+   "true": 23
+  },
+  "mh": {
+   "false": 149
+  },
+  "cb": {
+   "false": 149
+  },
+  "hr_pump": {
+   "false": 103,
+   "true": 23
+  },
+  "pa": {
+   "SOL": 149
+  },
+  "hr_by_pg": {
+   "pump": {
+    "false": 103,
+    "true": 23
+   },
+   "raydium_launchpad": {
+    "false": 23
+   }
+  },
+  "versions": [
+   3689418,
+   3689420,
+   3689423
+  ],
+  "serverTs": [
+   "15/09 17:45:14",
+   "15/09 17:45:15",
+   "15/09 17:45:16"
+  ],
+  "monotone": [
+   true,
+   true,
+   true
+  ],
+  "created_before_1534": 3
+ },
+ "cells_pump": {
+  "mesmo_slot": {
+   "n": 63,
+   "bo_med": 0,
+   "bo_gt0": 10,
+   "t10_med": 0.6117,
+   "dh_med": 0,
+   "sn_med": 37,
+   "nh_med": 36,
+   "mc_med": 1951.1051,
+   "ath_med": 486445.9131,
+   "ath_gt_1m": 24,
+   "mc_lt_3000": 54,
+   "kol_gt0": 16,
+   "hs": 48,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": 5333,
+   "vUsd24h_med": 174375.2395,
+   "pa": {
+    "SOL": 63
+   }
+  },
+  "1-60s": {
+   "n": 15,
+   "bo_med": 0.5828,
+   "bo_gt0": 9,
+   "t10_med": 11.7537,
+   "dh_med": 0,
+   "sn_med": 61,
+   "nh_med": 156,
+   "mc_med": 3034.2619,
+   "ath_med": 96147.9339,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 7,
+   "kol_gt0": 13,
+   "hs": 12,
+   "hr": 5,
+   "mh": 0,
+   "txc_med": 4430,
+   "vUsd24h_med": 206292.3894,
+   "pa": {
+    "SOL": 15
+   }
+  },
+  "60s-5min": {
+   "n": 18,
+   "bo_med": 0.6093,
+   "bo_gt0": 15,
+   "t10_med": 12.7782,
+   "dh_med": 0.0,
+   "sn_med": 26.5,
+   "nh_med": 254.5,
+   "mc_med": 2693.6927,
+   "ath_med": 128227.627,
+   "ath_gt_1m": 1,
+   "mc_lt_3000": 10,
+   "kol_gt0": 12,
+   "hs": 17,
+   "hr": 11,
+   "mh": 0,
+   "txc_med": 7706.5,
+   "vUsd24h_med": 368788.4018,
+   "pa": {
+    "SOL": 18
+   }
+  },
+  "5-120min": {
+   "n": 24,
+   "bo_med": 1.1406,
+   "bo_gt0": 19,
+   "t10_med": 18.8028,
+   "dh_med": 0.0,
+   "sn_med": 22.5,
+   "nh_med": 170.0,
+   "mc_med": 3732.2366,
+   "ath_med": 61721.8405,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 9,
+   "kol_gt0": 17,
+   "hs": 18,
+   "hr": 7,
+   "mh": 0,
+   "txc_med": 4149.5,
+   "vUsd24h_med": 175573.6213,
+   "pa": {
+    "SOL": 24
+   }
+  },
+  ">120min": {
+   "n": 6,
+   "bo_med": 0.4955,
+   "bo_gt0": 5,
+   "t10_med": 28.7983,
+   "dh_med": 1.8975,
+   "sn_med": 5.0,
+   "nh_med": 197.5,
+   "mc_med": 33915.8975,
+   "ath_med": 62772.1542,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 0,
+   "kol_gt0": 3,
+   "hs": 3,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": 3554.5,
+   "vUsd24h_med": 60160.6156,
+   "pa": {
+    "SOL": 6
+   }
+  }
+ },
+ "cells_pump_hr_true": {
+  "mesmo_slot": {
+   "n": 0,
+   "bo_med": null,
+   "bo_gt0": 0,
+   "t10_med": null,
+   "dh_med": null,
+   "sn_med": null,
+   "nh_med": null,
+   "mc_med": null,
+   "ath_med": null,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 0,
+   "kol_gt0": 0,
+   "hs": 0,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": null,
+   "vUsd24h_med": null,
+   "pa": {}
+  },
+  "1-60s": {
+   "n": 5,
+   "bo_med": 0.5828,
+   "bo_gt0": 4,
+   "t10_med": 11.7537,
+   "dh_med": 0,
+   "sn_med": 49,
+   "nh_med": 208,
+   "mc_med": 3134.6137,
+   "ath_med": 135915.8519,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 2,
+   "kol_gt0": 4,
+   "hs": 4,
+   "hr": 5,
+   "mh": 0,
+   "txc_med": 4113,
+   "vUsd24h_med": 240037.0256,
+   "pa": {
+    "SOL": 5
+   }
+  },
+  "60s-5min": {
+   "n": 11,
+   "bo_med": 0.6988,
+   "bo_gt0": 10,
+   "t10_med": 14.6354,
+   "dh_med": 0,
+   "sn_med": 35,
+   "nh_med": 207,
+   "mc_med": 2701.9536,
+   "ath_med": 131885.031,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 6,
+   "kol_gt0": 10,
+   "hs": 11,
+   "hr": 11,
+   "mh": 0,
+   "txc_med": 8113,
+   "vUsd24h_med": 393575.0079,
+   "pa": {
+    "SOL": 11
+   }
+  },
+  "5-120min": {
+   "n": 7,
+   "bo_med": 1.4102,
+   "bo_gt0": 7,
+   "t10_med": 19.8972,
+   "dh_med": 0,
+   "sn_med": 35,
+   "nh_med": 281,
+   "mc_med": 5709.7187,
+   "ath_med": 74706.1739,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 2,
+   "kol_gt0": 6,
+   "hs": 7,
+   "hr": 7,
+   "mh": 0,
+   "txc_med": 6021,
+   "vUsd24h_med": 235038.0611,
+   "pa": {
+    "SOL": 7
+   }
+  },
+  ">120min": {
+   "n": 0,
+   "bo_med": null,
+   "bo_gt0": 0,
+   "t10_med": null,
+   "dh_med": null,
+   "sn_med": null,
+   "nh_med": null,
+   "mc_med": null,
+   "ath_med": null,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 0,
+   "kol_gt0": 0,
+   "hs": 0,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": null,
+   "vUsd24h_med": null,
+   "pa": {}
+  }
+ },
+ "cells_pump_hr_false": {
+  "mesmo_slot": {
+   "n": 63,
+   "bo_med": 0,
+   "bo_gt0": 10,
+   "t10_med": 0.6117,
+   "dh_med": 0,
+   "sn_med": 37,
+   "nh_med": 36,
+   "mc_med": 1951.1051,
+   "ath_med": 486445.9131,
+   "ath_gt_1m": 24,
+   "mc_lt_3000": 54,
+   "kol_gt0": 16,
+   "hs": 48,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": 5333,
+   "vUsd24h_med": 174375.2395,
+   "pa": {
+    "SOL": 63
+   }
+  },
+  "1-60s": {
+   "n": 10,
+   "bo_med": 0.4936,
+   "bo_gt0": 5,
+   "t10_med": 8.899,
+   "dh_med": 0.0,
+   "sn_med": 69.5,
+   "nh_med": 141.0,
+   "mc_med": 2854.5252,
+   "ath_med": 86398.8872,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 5,
+   "kol_gt0": 9,
+   "hs": 8,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": 4545.5,
+   "vUsd24h_med": 187621.2252,
+   "pa": {
+    "SOL": 10
+   }
+  },
+  "60s-5min": {
+   "n": 7,
+   "bo_med": 0.5198,
+   "bo_gt0": 5,
+   "t10_med": 8.292,
+   "dh_med": 0,
+   "sn_med": 24,
+   "nh_med": 337,
+   "mc_med": 2411.5046,
+   "ath_med": 112301.9024,
+   "ath_gt_1m": 1,
+   "mc_lt_3000": 4,
+   "kol_gt0": 2,
+   "hs": 6,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": 6135,
+   "vUsd24h_med": 344001.7957,
+   "pa": {
+    "SOL": 7
+   }
+  },
+  "5-120min": {
+   "n": 17,
+   "bo_med": 0.3781,
+   "bo_gt0": 12,
+   "t10_med": 18.7209,
+   "dh_med": 0,
+   "sn_med": 21,
+   "nh_med": 144,
+   "mc_med": 3420.2695,
+   "ath_med": 59783.2775,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 7,
+   "kol_gt0": 11,
+   "hs": 11,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": 3595,
+   "vUsd24h_med": 152916.064,
+   "pa": {
+    "SOL": 17
+   }
+  },
+  ">120min": {
+   "n": 6,
+   "bo_med": 0.4955,
+   "bo_gt0": 5,
+   "t10_med": 28.7983,
+   "dh_med": 1.8975,
+   "sn_med": 5.0,
+   "nh_med": 197.5,
+   "mc_med": 33915.8975,
+   "ath_med": 62772.1542,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 0,
+   "kol_gt0": 3,
+   "hs": 3,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": 3554.5,
+   "vUsd24h_med": 60160.6156,
+   "pa": {
+    "SOL": 6
+   }
+  }
+ },
+ "hr_vs_nonhr_pump": {
+  "hr": {
+   "n": 23,
+   "bo_med": 0.871,
+   "bo_gt0": 21,
+   "t10_med": 14.6354,
+   "dh_med": 0,
+   "sn_med": 41,
+   "nh_med": 213,
+   "mc_med": 3267.5623,
+   "ath_med": 105547.4883,
+   "ath_gt_1m": 0,
+   "mc_lt_3000": 10,
+   "kol_gt0": 20,
+   "hs": 22,
+   "hr": 23,
+   "mh": 0,
+   "txc_med": 6890,
+   "vUsd24h_med": 340537.6686,
+   "pa": {
+    "SOL": 23
+   }
+  },
+  "nonhr": {
+   "n": 103,
+   "bo_med": 0,
+   "bo_gt0": 37,
+   "t10_med": 1.4558,
+   "dh_med": 0,
+   "sn_med": 32,
+   "nh_med": 102,
+   "mc_med": 2105.1824,
+   "ath_med": 155183.0597,
+   "ath_gt_1m": 25,
+   "mc_lt_3000": 70,
+   "kol_gt0": 41,
+   "hs": 76,
+   "hr": 0,
+   "mh": 0,
+   "txc_med": 4605,
+   "vUsd24h_med": 171888.7153,
+   "pa": {
+    "SOL": 103
+   }
+  },
+  "hr_delta_s": [
+   16,
+   35,
+   46,
+   49,
+   55,
+   64,
+   71,
+   88,
+   88,
+   96,
+   101,
+   149,
+   174,
+   204,
+   272,
+   299,
+   338,
+   837,
+   985,
+   1052,
+   1153,
+   2150,
+   2359
+  ],
+  "hr_delta_med": 148.559,
+  "nonhr_delta_med": 0.559,
+  "hr_rows": [
+   [
+    "SARS-COV-2",
+    "7PkNGtjr",
+    "15/09 17:37:41",
+    "15/09 17:38:30",
+    49,
+    "1-60s",
+    "SOL",
+    19.9,
+    3.4,
+    80,
+    208,
+    9,
+    6359,
+    39891,
+    "FFdBLY",
+    false
+   ],
+   [
+    "PvP",
+    "9FvEay7C",
+    "15/09 17:00:55",
+    "15/09 17:20:08",
+    1153,
+    "5-120min",
+    "SOL",
+    2.1,
+    0.0,
+    35,
+    146,
+    0,
+    2009,
+    74706,
+    "Er5ziy",
+    false
+   ],
+   [
+    "Dumbocrat",
+    "4ZUjJ5EJ",
+    "15/09 16:57:54",
+    "15/09 17:11:51",
+    837,
+    "5-120min",
+    "SOL",
+    7.5,
+    2.39,
+    9,
+    281,
+    3,
+    2726,
+    50636,
+    "AsibLm",
+    false
+   ],
+   [
+    "ARC",
+    "3DHTADG9",
+    "15/09 16:20:59",
+    "15/09 16:56:49",
+    2150,
+    "5-120min",
+    "SOL",
+    40.9,
+    1.41,
+    11,
+    642,
+    11,
+    36859,
+    105547,
+    "GuAKE5",
+    false
+   ],
+   [
+    "Repuplican",
+    "AciZNVav",
+    "15/09 16:44:33",
+    "15/09 16:47:27",
+    174,
+    "60s-5min",
+    "SOL",
+    16.0,
+    1.52,
+    62,
+    463,
+    9,
+    3294,
+    144405,
+    "EBVyC1",
+    false
+   ],
+   [
+    "ok",
+    "3wR88kYE",
+    "15/09 16:26:25",
+    "15/09 16:43:57",
+    1052,
+    "5-120min",
+    "SOL",
+    4.8,
+    0.14,
+    61,
+    87,
+    7,
+    3618,
+    44497,
+    "Biuetd",
+    false
+   ],
+   [
+    "DEAD",
+    "7LYMcivY",
+    "15/09 16:37:03",
+    "15/09 16:41:35",
+    272,
+    "60s-5min",
+    "SOL",
+    11.8,
+    3.05,
+    44,
+    159,
+    5,
+    2702,
+    51056,
+    "bwamJz",
+    false
+   ],
+   [
+    "Democrat",
+    "9tgSydUx",
+    "15/09 16:38:02",
+    "15/09 16:41:26",
+    204,
+    "60s-5min",
+    "SOL",
+    16.1,
+    3.81,
+    94,
+    899,
+    12,
+    15933,
+    345473,
+    "FDfyqq",
+    false
+   ],
+   [
+    "THOM",
+    "BtzTJkmJ",
+    "15/09 16:04:49",
+    "15/09 16:06:17",
+    88,
+    "60s-5min",
+    "SOL",
+    17.8,
+    17.82,
+    53,
+    63,
+    7,
+    5928,
+    93380,
+    "4Lm2uq",
+    false
+   ],
+   [
+    "CRYPTO",
+    "ABbjtYZj",
+    "15/09 15:52:38",
+    "15/09 15:53:13",
+    35,
+    "1-60s",
+    "SOL",
+    11.8,
+    0.58,
+    41,
+    55,
+    7,
+    2969,
+    58362,
+    "6ePbEv",
+    false
+   ],
+   [
+    "CCOIN",
+    "69fmNNTk",
+    "15/09 15:47:06",
+    "15/09 15:47:22",
+    16,
+    "1-60s",
+    "SOL",
+    11.5,
+    0.17,
+    110,
+    213,
+    12,
+    3135,
+    146246,
+    "D9gQ6R",
+    false
+   ],
+   [
+    "NAY",
+    "6pei4VZg",
+    "15/09 15:41:49",
+    "15/09 15:43:25",
+    96,
+    "60s-5min",
+    "SOL",
+    14.6,
+    0.43,
+    26,
+    335,
+    10,
+    2685,
+    137163,
+    "FiwwHe",
+    false
+   ],
+   [
+    "Over",
+    "Ej3dwnKL",
+    "15/09 15:37:47",
+    "15/09 15:39:15",
+    88,
+    "60s-5min",
+    "SOL",
+    18.7,
+    0.01,
+    14,
+    207,
+    13,
+    3268,
+    142542,
+    "3JD7zr",
+    false
+   ],
+   [
+    "MEMECOIN",
+    "Cizasdp2",
+    "15/09 15:31:57",
+    "15/09 15:32:52",
+    55,
+    "1-60s",
+    "SOL",
+    6.2,
+    0,
+    49,
+    67,
+    9,
+    2432,
+    135916,
+    "6ePbEv",
+    false
+   ],
+   [
+    "MEME COIN",
+    "9jmDC6hj",
+    "15/09 15:28:49",
+    "15/09 15:31:18",
+    149,
+    "60s-5min",
+    "SOL",
+    23.1,
+    0.7,
+    35,
+    617,
+    12,
+    6310,
+    320217,
+    "29yFze",
+    false
+   ],
+   [
+    "Clarity",
+    "6jeLZNBc",
+    "15/09 14:27:34",
+    "15/09 15:06:53",
+    2359,
+    "5-120min",
+    "SOL",
+    19.9,
+    0.87,
+    71,
+    383,
+    10,
+    5710,
+    71836,
+    "C2TFei",
+    false
+   ],
+   [
+    "CHINESE",
+    "9wNFRWac",
+    "15/09 14:49:59",
+    "15/09 15:06:24",
+    985,
+    "5-120min",
+    "SOL",
+    57.9,
+    4.38,
+    41,
+    219,
+    2,
+    23159,
+    86651,
+    "2MH1Gf",
+    false
+   ],
+   [
+    "GIGADOG",
+    "C11KeXxU",
+    "15/09 14:58:35",
+    "15/09 14:59:21",
+    46,
+    "1-60s",
+    "SOL",
+    32.7,
+    2.44,
+    6,
+    274,
+    0,
+    88561,
+    222926,
+    "BU8pQZ",
+    false
+   ],
+   [
+    "ROBBIN",
+    "39db6haw",
+    "15/09 13:55:39",
+    "15/09 14:00:39",
+    299,
+    "60s-5min",
+    "SOL",
+    3.0,
+    0.01,
+    26,
+    82,
+    10,
+    2208,
+    48938,
+    "FTuqW6",
+    false
+   ],
+   [
+    "ROBBIN",
+    "4qj4rocf",
+    "15/09 13:59:28",
+    "15/09 14:00:33",
+    64,
+    "60s-5min",
+    "SOL",
+    9.0,
+    0,
+    21,
+    29,
+    0,
+    2106,
+    131885,
+    "373qQq",
+    false
+   ],
+   [
+    "ROBBIN",
+    "46Wu2qYL",
+    "15/09 13:54:29",
+    "15/09 13:55:41",
+    71,
+    "60s-5min",
+    "SOL",
+    8.2,
+    1.83,
+    27,
+    76,
+    11,
+    2279,
+    93302,
+    "Dqv8wh",
+    false
+   ],
+   [
+    "CAT",
+    "AdgZULsS",
+    "15/09 13:43:01",
+    "15/09 13:48:40",
+    338,
+    "5-120min",
+    "SOL",
+    20.6,
+    2.91,
+    27,
+    2935,
+    10,
+    93413,
+    972471,
+    "29yFze",
+    false
+   ],
+   [
+    "cashdog",
+    "AUTgNuik",
+    "15/09 13:14:42",
+    "15/09 13:16:24",
+    101,
+    "60s-5min",
+    "SOL",
+    12.6,
+    0.29,
+    97,
+    302,
+    9,
+    2619,
+    130718,
+    "D9gQ6R",
+    false
+   ]
+  ]
+ },
+ "cells_stonk": {
+  "1-60s": 6,
+  "60s-5min": 7,
+  "5-120min": 9,
+  ">120min": 1
+ },
+ "complete_vs_board": {
+  "complete_85_pool": 59,
+  "not_in_board": 18,
+  "not_in_board_top": [
+   [
+    "WOTF",
+    804201450,
+    false
+   ],
+   [
+    "WOTF",
+    159864458,
+    false
+   ],
+   [
+    "WOFI",
+    145533919,
+    false
+   ],
+   [
+    "WOFI",
+    115195227,
+    false
+   ],
+   [
+    "HUHCAT",
+    28730714,
+    false
+   ],
+   [
+    "XPXGOLD",
+    28253770,
+    false
+   ],
+   [
+    "WOTF",
+    26103869,
+    false
+   ],
+   [
+    "NTDA",
+    12428879,
+    false
+   ]
+  ],
+  "board_pump_in_window_in_list": [
+   89,
+   93
+  ],
+  "hr_in_complete_and_board": 17,
+  "hr_flag_agreement": {
+   "n": 90,
+   "agree": 90,
+   "list_true_board_false": 0,
+   "list_false_board_true": 0
+  }
+ },
+ "board_new": {
+  "n": 50,
+  "serverTs": "15/09 17:45:12",
+  "pg": {
+   "raydium_launchpad": 7,
+   "pump": 43
+  },
+  "hr": {
+   "false": 42,
+   "true": 8
+  },
+  "hr_pump": {
+   "true": 8,
+   "false": 35
+  },
+  "mh": {
+   "false": 39,
+   "true": 11
+  },
+  "cb": 0,
+  "age_min_max_s": [
+   3,
+   89
+  ],
+  "rate_per_min": 34.9,
+  "p_med": 0.35,
+  "pa": {
+   "SOL": 49,
+   "USDC": 1
+  },
+  "kol_gt0": 12,
+  "hr_rows": [
+   [
+    "CORONA2",
+    "7V9f6yPQ",
+    5,
+    "pump",
+    "SOL",
+    2801,
+    0,
+    false,
+    "6v7Ge1",
+    0
+   ],
+   [
+    "Giveback",
+    "8sQ6oSPs",
+    20,
+    "pump",
+    "SOL",
+    2758,
+    0,
+    false,
+    "CtRM61",
+    0
+   ],
+   [
+    "POO",
+    "8WKCZMvd",
+    20,
+    "pump",
+    "SOL",
+    2712,
+    0,
+    false,
+    "abcdEv",
+    0
+   ],
+   [
+    "DICKSHIT",
+    "5yd6AFU9",
+    22,
+    "pump",
+    "SOL",
+    4530,
+    0,
+    false,
+    "FQxmYn",
+    0
+   ],
+   [
+    "DICKSHIT2D",
+    "AoQKSLh1",
+    32,
+    "pump",
+    "SOL",
+    4544,
+    0,
+    false,
+    "3a3G94",
+    0
+   ],
+   [
+    "dickshit",
+    "DbcSjS2z",
+    57,
+    "pump",
+    "SOL",
+    4759,
+    3.3,
+    false,
+    "twamXG",
+    0
+   ],
+   [
+    "Mitch",
+    "ED2xKv8M",
+    66,
+    "pump",
+    "SOL",
+    6896,
+    42.2,
+    false,
+    "5wHuMh",
+    0
+   ],
+   [
+    "DICKSHIT",
+    "ZDJzFLeN",
+    81,
+    "pump",
+    "SOL",
+    4526,
+    0,
+    false,
+    "FCUPh2",
+    0
+   ]
+  ],
+  "dw_repeat": [
+   [
+    "FHh1rjy9",
+    3
+   ],
+   [
+    "6v7YH3nb",
+    2
+   ],
+   [
+    "DC99qH3j",
+    1
+   ]
+  ]
+ },
+ "board_graduating": {
+  "n": 50,
+  "serverTs": "15/09 17:45:18",
+  "pg": {
+   "pump": 37,
+   "raydium_launchpad": 11,
+   "meteora_dbc": 2
+  },
+  "hr": {
+   "false": 48,
+   "true": 2
+  },
+  "hr_pump": {
+   "false": 35,
+   "true": 2
+  },
+  "mh": {
+   "false": 50
+  },
+  "cb": 0,
+  "age_min_max_s": [
+   44,
+   257817
+  ],
+  "rate_per_min": 0.0,
+  "p_med": 73.115,
+  "pa": {
+   "SOL": 48,
+   "USDC": 2
+  },
+  "kol_gt0": 24,
+  "hr_rows": [
+   [
+    "JACK",
+    "4DQjTpKP",
+    1998,
+    "pump",
+    "SOL",
+    9722,
+    63.8,
+    false,
+    "9VhXEP",
+    0
+   ],
+   [
+    "ELIZABUTT",
+    "7goKTwCW",
+    11826,
+    "pump",
+    "SOL",
+    9288,
+    62.2,
+    false,
+    "ETroz4",
+    0
+   ]
+  ],
+  "dw_repeat": [
+   [
+    "9VhXEPw3",
+    2
+   ],
+   [
+    "HbJVCt4s",
+    1
+   ],
+   [
+    "B9zBhpbK",
+    1
+   ]
+  ]
+ },
+ "board_movers": {
+  "n": 50,
+  "serverTs": "15/09 17:45:19",
+  "pg": {
+   "pump": 28,
+   "raydium_launchpad": 7,
+   "pons": 4,
+   "uniswap_v4": 3,
+   "raydium_clmm": 1,
+   "": 4,
+   "pump_amm": 1,
+   "stonkfun": 1,
+   "uniswap_v3": 1
+  },
+  "hr": {
+   "false": 40,
+   "true": 10
+  },
+  "hr_pump": {
+   "false": 18,
+   "true": 10
+  },
+  "mh": {
+   "false": 50
+  },
+  "cb": 0,
+  "age_min_max_s": [
+   45,
+   43376804
+  ],
+  "rate_per_min": 0.0,
+  "p_med": 93.3432,
+  "pa": {
+   "SOL": 38,
+   "null": 12
+  },
+  "kol_gt0": 26,
+  "hr_rows": [
+   [
+    "SARS-COV-2",
+    "7PkNGtjr",
+    458,
+    "pump",
+    "SOL",
+    6358,
+    99.8,
+    false,
+    "FFdBLY",
+    1789504710000
+   ],
+   [
+    "ARC",
+    "3DHTADG9",
+    5060,
+    "pump",
+    "SOL",
+    39881,
+    100,
+    false,
+    "GuAKE5",
+    1789502209000
+   ],
+   [
+    "fone",
+    "3GN5BgDZ",
+    764,
+    "pump",
+    "SOL",
+    9620,
+    53.9,
+    false,
+    "29yFze",
+    0
+   ],
+   [
+    "Mitch",
+    "ED2xKv8M",
+    73,
+    "pump",
+    "SOL",
+    6354,
+    38.3,
+    false,
+    "5wHuMh",
+    0
+   ],
+   [
+    "fone",
+    "CTPoyCwk",
+    1716187,
+    "pump",
+    "SOL",
+    5181308,
+    99.1,
+    false,
+    "D2ChvF",
+    1787789024000
+   ],
+   [
+    "SEX",
+    "FQsB9FGo",
+    229,
+    "pump",
+    "SOL",
+    3771,
+    0.1,
+    false,
+    "F5XvCe",
+    0
+   ],
+   [
+    "baton",
+    "Hg5Ja55T",
+    519189,
+    "pump",
+    "SOL",
+    5844677,
+    100,
+    false,
+    "Fzz2am",
+    1788985936000
+   ],
+   [
+    "dickshit",
+    "2mwQKzih",
+    213,
+    "pump",
+    "SOL",
+    4509,
+    0,
+    false,
+    "twamXG",
+    0
+   ],
+   [
+    "Dickshit2d",
+    "EKmAL1ih",
+    147,
+    "pump",
+    "SOL",
+    5859,
+    16.3,
+    false,
+    "FCUPh2",
+    0
+   ],
+   [
+    "CALLCAT",
+    "47yE2d8K",
+    100,
+    "pump",
+    "SOL",
+    3056,
+    7.8,
+    false,
+    "HgAhL3",
+    0
+   ]
+  ],
+  "dw_repeat": [
+   [
+    "5CEbueQn",
+    2
+   ],
+   [
+    "6RKsroTt",
+    1
+   ],
+   [
+    "CzbN6T1g",
+    1
+   ]
+  ],
+  "chains": {
+   "solana:mainnet": 35,
+   "eip155:4663": 12,
+   "": 3
+  }
+ },
+ "movers_top5": [
+  [
+   "PAID",
+   "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
+   "pump",
+   "",
+   "SOL",
+   "15/09 16:20:19",
+   "15/09 16:22:24",
+   125,
+   802277,
+   1595029,
+   false,
+   false,
+   14,
+   3315,
+   14.5,
+   3.76,
+   0,
+   4302820,
+   64170,
+   898
+  ],
+  [
+   "pill",
+   "DvdmEnztCmXwBnAbedD48XVGZJSxq31zNvnyftXdpump",
+   "pump",
+   "",
+   "SOL",
+   "13/09 20:22:09",
+   "13/09 20:31:12",
+   543,
+   1014918,
+   1568392,
+   false,
+   false,
+   22,
+   2301,
+   28.5,
+   2.8,
+   0,
+   1896802,
+   32718,
+   219
+  ],
+  [
+   "BROS",
+   "BsogQYJki12Nj7kB4S3T3XGhCHjpVpFaio8Zap3r7u2F",
+   "raydium_launchpad",
+   "stonkfun",
+   "SOL",
+   "15/09 17:01:33",
+   null,
+   null,
+   114796,
+   336971,
+   false,
+   false,
+   14,
+   1206,
+   0,
+   0,
+   0,
+   720623,
+   7628,
+   220
+  ],
+  [
+   "HUHCAT",
+   "A9AHYeqb7nQk7LZUraw7rBCzYRjy2DRvE6NqWfFHKRdH",
+   "pump",
+   "",
+   "SOL",
+   "14/09 22:08:15",
+   "14/09 23:12:56",
+   3881,
+   2457520,
+   3074277,
+   false,
+   false,
+   17,
+   5962,
+   14.4,
+   4.07,
+   0,
+   7254758,
+   40145,
+   598
+  ],
+  [
+   "dickshit",
+   "4GtYQVgyKMuAmbYQw9q7iX4ZozuNAF1KU9uQDypoNkXP",
+   "raydium_launchpad",
+   "stonkfun",
+   "SOL",
+   "15/09 17:41:09",
+   "15/09 17:42:40",
+   91,
+   8247,
+   54427,
+   false,
+   false,
+   7,
+   173,
+   0.0,
+   0,
+   0,
+   109690,
+   109690,
+   2361
+  ]
+ ],
+ "details": [
+  {
+   "file": "20_coin_hrT_01_8WKCZM.json",
+   "symbol": "POO",
+   "mint": "8WKCZMvd",
+   "created": "15/09 17:44:52",
+   "keys_n": 50,
+   "hr": true,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": null,
+   "mayhem": null,
+   "quote": "SOL",
+   "qdec": 9,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 30000000001,
+   "vtok": 1073000000000000,
+   "rsol": 1,
+   "rtok": 793100000000000,
+   "supply": 1000000000000000,
+   "mc_quote": 27.95899347716682,
+   "usd_mcap": 2712,
+   "complete": false,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "46s2Hnqt",
+   "status": null
+  },
+  {
+   "file": "20_coin_hrT_02_8sQ6oS.json",
+   "symbol": "Giveback",
+   "mint": "8sQ6oSPs",
+   "created": "15/09 17:44:52",
+   "keys_n": 50,
+   "hr": true,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": null,
+   "mayhem": null,
+   "quote": "SOL",
+   "qdec": 9,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 30247518046,
+   "vtok": 1064219548574457,
+   "rsol": 247518046,
+   "rtok": 784319548574457,
+   "supply": 1000000000000000,
+   "mc_quote": 28.422253741267152,
+   "usd_mcap": 2758,
+   "complete": false,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "DwqAyYvq",
+   "status": null
+  },
+  {
+   "file": "20_coin_hrT_03_5yd6AF.json",
+   "symbol": "DICKSHIT",
+   "mint": "5yd6AFU9",
+   "created": "15/09 17:44:51",
+   "keys_n": 52,
+   "hr": true,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": null,
+   "mayhem": null,
+   "quote": "Xsf9mBkt",
+   "qdec": 8,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 22601028287,
+   "vtok": 1073000000000000,
+   "rsol": 1,
+   "rtok": 793100000000000,
+   "supply": 1000000000000000,
+   "mc_quote": 210.6340008108108,
+   "usd_mcap": 4530,
+   "complete": false,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "CGUT2Wvs",
+   "status": null
+  },
+  {
+   "file": "20_coin_hrT_04_AoQKSL.json",
+   "symbol": "DICKSHIT2DUD",
+   "mint": "AoQKSLh1",
+   "created": "15/09 17:44:41",
+   "keys_n": 44,
+   "hr": true,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": null,
+   "mayhem": null,
+   "quote": "Xsf9mBkt",
+   "qdec": 8,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 22601028286,
+   "vtok": 1073000000000000,
+   "rsol": 0,
+   "rtok": 793100000000000,
+   "supply": 1000000000000000,
+   "mc_quote": 210.63400080149114,
+   "usd_mcap": 0,
+   "complete": false,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "Drf5FgPr",
+   "status": null
+  },
+  {
+   "file": "20_coin_hrT_05_DbcSjS.json",
+   "symbol": "dickshit",
+   "mint": "DbcSjS2z",
+   "created": "15/09 17:44:15",
+   "keys_n": 51,
+   "hr": true,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": null,
+   "mayhem": null,
+   "quote": "Xsf9mBkt",
+   "qdec": 8,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 23165720158,
+   "vtok": 1046844354291921,
+   "rsol": 564691872,
+   "rtok": 766944354291921,
+   "supply": 1000000000000000,
+   "mc_quote": 221.29096902537293,
+   "usd_mcap": 4759,
+   "complete": false,
+   "pool": true,
+   "verdict": "unknown",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "4A1P5sNw",
+   "status": null
+  },
+  {
+   "file": "21_coin_hrF_01_GQPGin.json",
+   "symbol": "PEPECORN",
+   "mint": "GQPGinpu",
+   "created": "15/09 17:45:01",
+   "keys_n": 49,
+   "hr": false,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": null,
+   "mayhem": null,
+   "quote": "SOL",
+   "qdec": 9,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 30029704343,
+   "vtok": 1071938625613600,
+   "rsol": 29704343,
+   "rtok": 792038625613600,
+   "supply": 1000000000000000,
+   "mc_quote": 28.01438778811648,
+   "usd_mcap": 2717,
+   "complete": false,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "Au6gSJch",
+   "status": null
+  },
+  {
+   "file": "21_coin_hrF_02_HRS1LJ.json",
+   "symbol": "dickshit",
+   "mint": "HRS1LJ1W",
+   "created": "15/09 17:44:59",
+   "keys_n": 51,
+   "hr": false,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": null,
+   "mayhem": null,
+   "quote": "SOL",
+   "qdec": 9,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 30000000001,
+   "vtok": 1073000000000000,
+   "rsol": 1,
+   "rtok": 793100000000000,
+   "supply": 1000000000000000,
+   "mc_quote": 27.95899347716682,
+   "usd_mcap": 2712,
+   "complete": false,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "9sAR4kKC",
+   "status": null
+  },
+  {
+   "file": "21_coin_hrF_03_EhuWhv.json",
+   "symbol": "blezed",
+   "mint": "EhuWhv97",
+   "created": "15/09 17:44:58",
+   "keys_n": 51,
+   "hr": false,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": "active",
+   "mayhem": {
+    "state": "active",
+    "mode": "auto"
+   },
+   "quote": "SOL",
+   "qdec": 9,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 22540696629,
+   "vtok": 825329451923539,
+   "rsol": 3782259584,
+   "rtok": 545429451923539,
+   "supply": 1000000000000000,
+   "mc_quote": 27.311150203674348,
+   "usd_mcap": 2649,
+   "complete": false,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "EjZbJ5hv",
+   "status": null
+  },
+  {
+   "file": "21_coin_hrF_04_U74TE3.json",
+   "symbol": "cbBTC",
+   "mint": "U74TE34H",
+   "created": "15/09 17:44:55",
+   "keys_n": 52,
+   "hr": false,
+   "cashback": false,
+   "boost": "IN_PROGRESS",
+   "mayhem_state": null,
+   "mayhem": null,
+   "quote": "SOL",
+   "qdec": 9,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 115005359057,
+   "vtok": 279900000000000,
+   "rsol": 85005359057,
+   "rtok": 0,
+   "supply": 1000000000000000,
+   "mc_quote": 13250.539567555326,
+   "usd_mcap": 1286845,
+   "complete": true,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "C5wT5CZW",
+   "status": null
+  },
+  {
+   "file": "21_coin_hrF_05_BzPDsg.json",
+   "symbol": "beer",
+   "mint": "BzPDsgke",
+   "created": "15/09 17:44:55",
+   "keys_n": 52,
+   "hr": false,
+   "cashback": false,
+   "boost": "NONE",
+   "mayhem_state": "paused",
+   "mayhem": {
+    "state": "paused",
+    "mode": "manual",
+    "pause_reason": "low_sol_reserves"
+   },
+   "quote": "SOL",
+   "qdec": 9,
+   "program": "pump",
+   "protocol": "pump",
+   "vsol": 41592359914,
+   "vtok": 1045888524388308,
+   "rsol": 1,
+   "rtok": 765988524388308,
+   "supply": 1000000000000000,
+   "mc_quote": 39.767488545995334,
+   "usd_mcap": 3857,
+   "complete": false,
+   "pool": true,
+   "verdict": "allow",
+   "fee_keys": [
+    "is_holder_reward"
+   ],
+   "token_program": "TokenzQd",
+   "bc": "FLJXMyBM",
+   "status": null
+  }
+ ],
+ "details_keydiff": {
+  "only_hr_true": [],
+  "only_hr_false": [
+   "inverted",
+   "mayhem",
+   "mayhem_state",
+   "pump_swap_pool"
+  ],
+  "union_n": 56
+ },
+ "details_list_vs_detail_hr": [
+  [
+   "POO",
+   true,
+   true
+  ],
+  [
+   "Giveback",
+   true,
+   true
+  ],
+  [
+   "DICKSHIT",
+   true,
+   true
+  ],
+  [
+   "DICKSHIT2DUD",
+   true,
+   true
+  ],
+  [
+   "dickshit",
+   true,
+   true
+  ],
+  [
+   "PEPECORN",
+   false,
+   false
+  ],
+  [
+   "dickshit",
+   false,
+   false
+  ],
+  [
+   "blezed",
+   false,
+   false
+  ],
+  [
+   "cbBTC",
+   false,
+   false
+  ],
+  [
+   "beer",
+   false,
+   false
+  ]
+ ],
+ "imc": [
+  {
+   "file": "30_imc_hrT_01_8WKCZM.json",
+   "status": null,
+   "ticker": "POO",
+   "isHolderReward": true,
+   "isCashbackEnabled": false,
+   "isMayhemMode": false,
+   "numHolders": 0,
+   "progress": 0,
+   "quoteMint": "11111111",
+   "totalFees": 1.5e-05,
+   "tradingAppFeeSolV2": 0,
+   "keys_n": 66,
+   "graduationDate": 0
+  },
+  {
+   "file": "30_imc_hrT_02_8sQ6oS.json",
+   "status": null,
+   "ticker": "Giveback",
+   "isHolderReward": true,
+   "isCashbackEnabled": false,
+   "isMayhemMode": false,
+   "numHolders": 0,
+   "progress": 0,
+   "quoteMint": "11111111",
+   "totalFees": 0,
+   "tradingAppFeeSolV2": 0,
+   "keys_n": 66,
+   "graduationDate": 0
+  }
+ ],
+ "pages": [
+  {
+   "file": "40_coinpage_hrT_01_8WKCZM.json",
+   "html_bytes": 2048647,
+   "windows": [
+    "Blog Resources Legal POO Poo-smelling 44s ago 8WKCZM Chain and launchpad : Pump Creator rewards recipient : Rewards → holders dailystar dailystar dailystar Market cap. Stats 5m 1h 24h View bubble map Creator abcdEv MC Log in to trade "
+   ],
+   "i18n": [
+    "rewards_to_creator",
+    "rewards_to_holders",
+    "rewards_to_holders_with_fee",
+    "rewards_to_traders"
+   ],
+   "holders_pct": [
+    "Rewards → holders",
+    "Rewards → holders\\",
+    "Rewards → holders · {{percent}}%\\"
+   ],
+   "status": null
+  },
+  {
+   "file": "40_coinpage_hrT_02_8sQ6oS.json",
+   "html_bytes": 2048813,
+   "windows": [
+    "log Resources Legal Giveback AwayGive 47s ago 8sQ6oS Chain and launchpad : Pump Creator rewards recipient : Rewards → holders Market cap. Stats 5m 1h 24h View bubble map Creator CtRM61 MC Log in to trade "
+   ],
+   "i18n": [
+    "rewards_to_creator",
+    "rewards_to_holders",
+    "rewards_to_holders_with_fee",
+    "rewards_to_traders"
+   ],
+   "holders_pct": [
+    "Rewards → holders",
+    "Rewards → holders\\",
+    "Rewards → holders · {{percent}}%\\"
+   ],
+   "status": null
+  }
+ ],
+ "raw_bytes": 862119
+}

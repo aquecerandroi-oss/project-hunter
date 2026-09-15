@@ -1,0 +1,511 @@
+{
+ "run": 21,
+ "lane": 1,
+ "start_utc": "2026-09-15T20:45:00.201423+00:00",
+ "pumpfun_host_requests": 28,
+ "requests": [
+  {
+   "file": "01_sol_price.json",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "request_started_utc": "2026-09-15T20:45:00.485+00:00",
+   "latency_ms": 510,
+   "http": 200,
+   "bytes": 73,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:00 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "50",
+    "x-ratelimit-remaining": "49",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba78ffcfbe82f7-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:00.995+00:00",
+   "read_brt": "17:45:00"
+  },
+  {
+   "file": "02_mayhem_overview.json",
+   "url": "https://frontend-api-v3.pump.fun/mayhem/overview",
+   "request_started_utc": "2026-09-15T20:45:02.146+00:00",
+   "latency_ms": 262,
+   "http": 200,
+   "bytes": 279,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:02 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba7908e9a682f7-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:02.408+00:00",
+   "read_brt": "17:45:02"
+  },
+  {
+   "file": "03_coins_newest_p1.json",
+   "url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true&offset=0",
+   "request_started_utc": "2026-09-15T20:45:03.559+00:00",
+   "latency_ms": 619,
+   "http": 200,
+   "bytes": 132342,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:03 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba7911bb8f82f7-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:04.181+00:00",
+   "read_brt": "17:45:04"
+  },
+  {
+   "file": "04_coins_newest_p2.json",
+   "url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true&offset=70",
+   "request_started_utc": "2026-09-15T20:45:05.332+00:00",
+   "latency_ms": 253,
+   "http": 200,
+   "bytes": 135012,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:05 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba791c6e7d82f7-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:05.587+00:00",
+   "read_brt": "17:45:05"
+  },
+  {
+   "file": "05_coins_complete_p1.json",
+   "url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true&complete=true&offset=0",
+   "request_started_utc": "2026-09-15T20:45:06.738+00:00",
+   "latency_ms": 581,
+   "http": 200,
+   "bytes": 140813,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:07 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79253f5082f7-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:07.321+00:00",
+   "read_brt": "17:45:07"
+  },
+  {
+   "file": "06_coins_complete_p2.json",
+   "url": "https://frontend-api-v3.pump.fun/coins?sort=created_timestamp&order=DESC&limit=70&includeNsfw=true&complete=true&offset=70",
+   "request_started_utc": "2026-09-15T20:45:08.473+00:00",
+   "latency_ms": 285,
+   "http": 200,
+   "bytes": 141642,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:08 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba7930293782f7-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:08.761+00:00",
+   "read_brt": "17:45:08"
+  },
+  {
+   "file": "07_coins_mayhem_mode60.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/mayhem-mode?limit=60",
+   "request_started_utc": "2026-09-15T20:45:09.912+00:00",
+   "latency_ms": 253,
+   "http": 200,
+   "bytes": 115919,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:10 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba793918c182f7-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:10.167+00:00",
+   "read_brt": "17:45:10"
+  },
+  {
+   "file": "08_coins_top_mcap50.json",
+   "url": "https://frontend-api-v3.pump.fun/coins?sort=market_cap&order=DESC&limit=50&includeNsfw=true",
+   "request_started_utc": "2026-09-15T20:45:11.318+00:00",
+   "latency_ms": 194,
+   "http": 200,
+   "bytes": 99387,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:11 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba7941d91b82f7-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:11.514+00:00",
+   "read_brt": "17:45:11"
+  },
+  {
+   "file": "09_boards_new.json",
+   "url": "https://advanced-indexer.pump.fun/boards/new?offset=0&limit=50",
+   "request_started_utc": "2026-09-15T20:45:12.665+00:00",
+   "latency_ms": 235,
+   "http": 200,
+   "bytes": 42883,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:12 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba794ac88a09d2-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:12.902+00:00",
+   "read_brt": "17:45:12"
+  },
+  {
+   "file": "10_boards_graduated_p1.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=0&limit=50",
+   "request_started_utc": "2026-09-15T20:45:14.052+00:00",
+   "latency_ms": 153,
+   "http": 200,
+   "bytes": 45667,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:14 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba7952fca209d2-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:14.207+00:00",
+   "read_brt": "17:45:14"
+  },
+  {
+   "file": "11_boards_graduated_p2.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=50&limit=50",
+   "request_started_utc": "2026-09-15T20:45:15.357+00:00",
+   "latency_ms": 224,
+   "http": 200,
+   "bytes": 44197,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:15 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba795b1aba09d2-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:15.583+00:00",
+   "read_brt": "17:45:15"
+  },
+  {
+   "file": "12_boards_graduated_p3.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=100&limit=50",
+   "request_started_utc": "2026-09-15T20:45:16.734+00:00",
+   "latency_ms": 173,
+   "http": 200,
+   "bytes": 44847,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:16 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba7963bd1909d2-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:16.909+00:00",
+   "read_brt": "17:45:16"
+  },
+  {
+   "file": "13_boards_graduating.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduating?offset=0&limit=50",
+   "request_started_utc": "2026-09-15T20:45:18.059+00:00",
+   "latency_ms": 174,
+   "http": 200,
+   "bytes": 45946,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:18 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba796bf98e09d2-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:18.236+00:00",
+   "read_brt": "17:45:18"
+  },
+  {
+   "file": "14_boards_movers.json",
+   "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=50",
+   "request_started_utc": "2026-09-15T20:45:19.387+00:00",
+   "latency_ms": 232,
+   "http": 200,
+   "bytes": 45896,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:19 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79744ce809d2-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:19.620+00:00",
+   "read_brt": "17:45:19"
+  },
+  {
+   "file": "20_coin_hrT_01_8WKCZM.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLPXaMJ6nWqyv",
+   "request_started_utc": "2026-09-15T20:45:20.772+00:00",
+   "latency_ms": 239,
+   "http": 200,
+   "bytes": 2046,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:20 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba797d6951e119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:21.010+00:00",
+   "read_brt": "17:45:21"
+  },
+  {
+   "file": "20_coin_hrT_02_8sQ6oS.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/8sQ6oSPsC4WFLtDfJMuqg3Nrm5DKh2FzVa95mxJnpump",
+   "request_started_utc": "2026-09-15T20:45:22.162+00:00",
+   "latency_ms": 156,
+   "http": 200,
+   "bytes": 2189,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:22 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba7985a98be119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:22.318+00:00",
+   "read_brt": "17:45:22"
+  },
+  {
+   "file": "20_coin_hrT_03_5yd6AF.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/5yd6AFU9iAqDbHPRKnCpmPP1RYE5PA5HhTeG5pcmpump",
+   "request_started_utc": "2026-09-15T20:45:23.469+00:00",
+   "latency_ms": 192,
+   "http": 200,
+   "bytes": 2444,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:23 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba798e0a54e119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:23.661+00:00",
+   "read_brt": "17:45:23"
+  },
+  {
+   "file": "20_coin_hrT_04_AoQKSL.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/AoQKSLh1fqqWNGzwoVgqP2neAqM8cXHbJcsG6EHzZWsv",
+   "request_started_utc": "2026-09-15T20:45:24.812+00:00",
+   "latency_ms": 153,
+   "http": 200,
+   "bytes": 1625,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:24 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79963b0fe119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:24.965+00:00",
+   "read_brt": "17:45:24"
+  },
+  {
+   "file": "20_coin_hrT_05_DbcSjS.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/DbcSjS2z4qTRpwiEW13LDNdthQ3sgG6NaHQgiVMRaKjL",
+   "request_started_utc": "2026-09-15T20:45:26.116+00:00",
+   "latency_ms": 150,
+   "http": 200,
+   "bytes": 1972,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:26 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba799e5b75e119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:26.266+00:00",
+   "read_brt": "17:45:26"
+  },
+  {
+   "file": "21_coin_hrF_01_GQPGin.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/GQPGinpuWaVBNGn5SrEdrfn87666Mtx8Q1hBm7Gtpump",
+   "request_started_utc": "2026-09-15T20:45:27.416+00:00",
+   "latency_ms": 167,
+   "http": 200,
+   "bytes": 1887,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:27 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79a68c61e119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:27.582+00:00",
+   "read_brt": "17:45:27"
+  },
+  {
+   "file": "21_coin_hrF_02_HRS1LJ.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/HRS1LJ1WYur4uyFamDexviyMLS951YxuHwiQ9CiBpump",
+   "request_started_utc": "2026-09-15T20:45:28.733+00:00",
+   "latency_ms": 210,
+   "http": 200,
+   "bytes": 2054,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:28 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79aebd48e119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:28.942+00:00",
+   "read_brt": "17:45:28"
+  },
+  {
+   "file": "21_coin_hrF_03_EhuWhv.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/EhuWhv97ESiHVMJ6HwNt1NMfAHVtdqhE3w1vFoTRpump",
+   "request_started_utc": "2026-09-15T20:45:30.093+00:00",
+   "latency_ms": 154,
+   "http": 200,
+   "bytes": 1966,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:30 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79b73ebfe119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:30.247+00:00",
+   "read_brt": "17:45:30"
+  },
+  {
+   "file": "21_coin_hrF_04_U74TE3.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/U74TE34HyFwWApt3PaLSa9LmKeBwfMWY1yt81v6pump",
+   "request_started_utc": "2026-09-15T20:45:31.398+00:00",
+   "latency_ms": 148,
+   "http": 200,
+   "bytes": 2223,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:31 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79bf5e38e119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:31.546+00:00",
+   "read_brt": "17:45:31"
+  },
+  {
+   "file": "21_coin_hrF_05_BzPDsg.json",
+   "url": "https://frontend-api-v3.pump.fun/coins/BzPDsgkenoS5UVtWHV5eKFQBcHsu1pSEwoXCs9sEpump",
+   "request_started_utc": "2026-09-15T20:45:32.698+00:00",
+   "latency_ms": 152,
+   "http": 200,
+   "bytes": 1976,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:32 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79c77d07e119-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:32.851+00:00",
+   "read_brt": "17:45:32"
+  },
+  {
+   "file": "30_imc_hrT_01_8WKCZM.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLPXaMJ6nWqyv",
+   "request_started_utc": "2026-09-15T20:45:34.001+00:00",
+   "latency_ms": 200,
+   "http": 200,
+   "bytes": 1623,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:34 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79cff81d9a45-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:34.201+00:00",
+   "read_brt": "17:45:34"
+  },
+  {
+   "file": "30_imc_hrT_02_8sQ6oS.json",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/8sQ6oSPsC4WFLtDfJMuqg3Nrm5DKh2FzVa95mxJnpump",
+   "request_started_utc": "2026-09-15T20:45:35.351+00:00",
+   "latency_ms": 140,
+   "http": 200,
+   "bytes": 1792,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:35 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "a3ba79d80a4b9a45-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:35.491+00:00",
+   "read_brt": "17:45:35"
+  },
+  {
+   "file": "40_coinpage_hrT_01_8WKCZM.json",
+   "url": "https://pump.fun/coin/8WKCZMvdySkco6m4R6eSRcWGRrPWHcRHLPXaMJ6nWqyv",
+   "request_started_utc": "2026-09-15T20:45:36.642+00:00",
+   "latency_ms": 923,
+   "http": 200,
+   "bytes": 2048999,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:36 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "age": "3115",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3ba79e0894782eb-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:37.614+00:00",
+   "read_brt": "17:45:37"
+  },
+  {
+   "file": "40_coinpage_hrT_02_8sQ6oS.json",
+   "url": "https://pump.fun/coin/8sQ6oSPsC4WFLtDfJMuqg3Nrm5DKh2FzVa95mxJnpump",
+   "request_started_utc": "2026-09-15T20:45:38.765+00:00",
+   "latency_ms": 1282,
+   "http": 200,
+   "bytes": 2049165,
+   "headers": {
+    "date": "Tue, 15 Sep 2026 20:45:38 GMT",
+    "content-type": "text/html; charset=utf-8",
+    "age": "3117",
+    "server": "cloudflare",
+    "cf-cache-status": "DYNAMIC",
+    "cf-ray": "a3ba79ed7e3282eb-GIG"
+   },
+   "response_received_utc": "2026-09-15T20:45:40.106+00:00",
+   "read_brt": "17:45:40"
+  }
+ ],
+ "end_utc": "2026-09-15T20:45:40.109313+00:00"
+}
