@@ -89,3 +89,20 @@ vantagem; o estágio 1 garante que, no dia em que ela provar, o robô já esteja
 ## Ligações
 [[06-DECISIONS/2026-09-12-mesa-do-operador-e-caminho-inerte]] · [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas]] ·
 [[05-EXPERIMENTS/EXP-M4-moonshot]] · [[11-KNOWLEDGE/KB-0094-pump-fun-upgrade-de-12-09-2026-holder-rewards-e-bonding-curve-v2|KB-0094]]
+
+## Ligado — 16/09/2026 11:2x BRT (estágio 1, sozinho)
+- **Carteira do robô:** `ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4`, gerada pelo Everton na própria VPS (chave só no `.env`; uma primeira
+  carteira, `G1Jnek…`, foi descartada porque a chave apareceu parcialmente num print). Saldo depositado: **0,717 SOL** (do Terminal,
+  `6nAh…`, que ficou com 0,0098 SOL). Ele mandou mais do que os 0,30 combinados; em vez de devolver, subiu o escopo.
+- **Escopo em vigor (`meme_gates.json`, editado por ele):** `max_sol_per_trade` 0,05 · `max_total_sol` **0,72** · `max_trades` 5 ·
+  validade 2026-09-18. `.env`: `MEME_WALLET_MAX_SOL=0.80` (teto efetivo = min(0,80; 0,72) = **0,72 SOL**). Na prática o gasto máximo
+  continua 5 × 0,05 = 0,25 SOL; o que mudou é o teto "aceita perder inteiro", que passou de 0,25 para 0,72.
+- **Subida:** `MEME_LIVE=1 MEME=1 MEME_ENABLED=true MEME_ACTIVITY_ENABLED=true STRATEGY_SHARDS=4 MARKET_SPOT=1 MARKET_SHARDS=4
+  bash infra/vps/compose.sh update` rodado **pelo Everton** (o classificador bloqueou a Sexta-feira: primeiro deploy com perfil
+  `meme-live`). Executor `hunter-api:9f828dd`, boot aceito (`meme_executor_program_identity_ok`, slot 447 228 373), `auto_approve
+  true`, kill switch ACTIVE, 0 reinícios. Como o executor lê os portões só no boot, o escopo novo exigiu `docker restart
+  hunter-meme-executor-1` (dele, 11:3x BRT) — T4.28d: recarregar os portões no tique do kill switch.
+- **Fato de operação:** o executor só lê o saldo da carteira quando existe candidata; `wallet_sol_balance` fica vazio até a primeira
+  proposta do conjunto `operator` ativo. Horário útil da mesa: 13–22 BRT (KB-0098).
+- **Sacar da carteira do robô:** importar a chave (lida do `.env` na VPS, sem print) no Phantom → "Importar chave privada", com o
+  executor desligado (`meme.kill`). Acompanhar: `solscan.io/account/ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4` e a mesa (`/ever/meme/mesa`).
