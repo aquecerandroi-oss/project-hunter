@@ -21,6 +21,19 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.quote import GlobalParams
 
 
+def _identity(value: str | None) -> str | None:
+    """T4.26b (hotfix 16/09 00:5x BRT): the REST sends ``twitter``/``website``/
+    ``telegram``/``description`` as ``""`` when the creator left them blank; the
+    CHECK ``social_identity_is_not_empty`` refuses the empty string (an identity
+    that is blank is not an identity), so it becomes NULL = not observed — the
+    same rule ``discovery._identity`` applies to ``uri`` since the 12/09 crash.
+    Deploy efbefd1 died on this in the poll loop (10 restarts in 2 minutes)."""
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped if stripped else None
+
+
 def snapshot_row(state: NormalizedCurveState) -> SnapshotRow:
     """A normalized reading -> one row of ``meme_curve_snapshots``."""
     return SnapshotRow(
@@ -73,11 +86,11 @@ def token_row_from_curve(
         # T4.26: the identity the same REST read already carried — never a
         # second call. ``uri`` (metadata_uri) fills a mint the WS ``create``
         # event missed; the RPC reading never attempted any of these.
-        uri=state.uri,
-        twitter=state.twitter,
-        website=state.website,
-        telegram=state.telegram,
-        description=state.description,
+        uri=_identity(state.uri),
+        twitter=_identity(state.twitter),
+        website=_identity(state.website),
+        telegram=_identity(state.telegram),
+        description=_identity(state.description),
         twitter_kind=state.twitter_kind,
         twitter_post_id=state.twitter_post_id,
         twitter_post_at=state.twitter_post_at,
