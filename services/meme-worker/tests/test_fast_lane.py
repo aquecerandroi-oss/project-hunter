@@ -115,8 +115,10 @@ async def test_the_fast_lane_reads_the_young_subset_through_the_same_path(
         return [object()] * len(tracked_)
 
     monkeypatch.setattr(fast_lane, "fold_fast", fake_fold)
+    monkeypatch.delenv("MEME_FAST_LANE_COMMITMENT", raising=False)
     report = await fast_once(ctx)
     assert chain.calls == [young], "the young subset only, newest first, one batch"
+    assert chain.commitments == ["confirmed"], "T4.42: the default fast-lane read is confirmed"
     assert (report.mints, report.read, report.rows, report.failed) == (5, 5, 5, False)
     assert report.calls == 2, "one getMultipleAccounts and one getBlockTime for five mints"
     snapshots = [p for s, p in log if s.startswith("INSERT INTO meme_curve_snapshots")]
@@ -135,6 +137,30 @@ async def test_the_fast_lane_reads_the_young_subset_through_the_same_path(
     assert ctx.sources[SOLANA_RPC].used_60s.total(NOW) == 2, "two calls, counted once each"
     later = ctx.sources.heartbeat_fields(NOW + timedelta(seconds=61), tracked=25)
     assert later["fast_lane_reads_60s"] == "0" and later["fast_lane_mints"] == "5"
+
+
+async def test_meme_fast_lane_commitment_env_is_honoured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.42: ``MEME_FAST_LANE_COMMITMENT=finalized`` reaches the chain call —
+    the operator's escape hatch back to the pre-T4.42 read, no code change."""
+    _patch(monkeypatch)
+    monkeypatch.setattr("hunter_meme_worker.fast_lane.utcnow", lambda: NOW)
+    monkeypatch.setenv("MEME_FAST_LANE_COMMITMENT", "finalized")
+    kinds = _kinds()
+    young = kinds["midlife"][:2]
+    tracked = [_tracked(m, age_s=90) for m in young]
+    chain = FakeChain()
+    ctx = _context(chain, [], tracked=tracked)
+
+    async def fake_fold(
+        ctx_: RadarContext, tracked_: list[TrackedMint], *, as_of: datetime
+    ) -> list[Any]:
+        return [object()] * len(tracked_)
+
+    monkeypatch.setattr(fast_lane, "fold_fast", fake_fold)
+    await fast_once(ctx)
+    assert chain.commitments == ["finalized"]
 
 
 async def test_a_failed_read_is_counted_and_the_lane_stays_alive(

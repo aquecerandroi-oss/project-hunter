@@ -66,10 +66,11 @@ class ChainSource(Protocol):
         ...
 
     async def get_curve_states(
-        self, mints: Sequence[str], *, with_block_time: bool = True
+        self, mints: Sequence[str], *, with_block_time: bool = True, commitment: str = "finalized"
     ) -> CurveBatch:
         """The curve of every mint, 100 per call, stamped with the slot's block
-        time (T4.2f, ``chain.py``)."""
+        time (T4.2f, ``chain.py``). ``commitment`` defaults to ``finalized``;
+        the fast lane (T4.42, ``fast_lane.py``) passes ``confirmed``."""
         ...
 
 

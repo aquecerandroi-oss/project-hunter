@@ -54,6 +54,7 @@ from hunter_exchanges.rate_limit import TokenBucketRateLimiter
 
 PUBLIC_RPC_URL = "https://api.mainnet-beta.solana.com"
 _FINALIZED = {"encoding": "base64", "commitment": "finalized"}
+_KNOWN_COMMITMENTS = frozenset({"confirmed", "finalized"})
 METHOD_SPACING_S = 1.0
 """One call per second per method on the public endpoint: its own header says
 ``x-ratelimit-method-limit: 10`` (module docstring)."""
@@ -164,12 +165,23 @@ class SolanaRpcClient:
         return datetime.fromtimestamp(result, tz=UTC)
 
     async def get_curve_states(
-        self, mints: Sequence[str], *, with_block_time: bool = True
+        self, mints: Sequence[str], *, with_block_time: bool = True, commitment: str = "finalized"
     ) -> CurveBatch:
         """The curve of every mint, 100 per ``getMultipleAccounts`` (T4.2f,
         ``rpc_curves.py``). ``observed_at`` is the slot's block time; a slot
         without one keeps ``received_at`` and is counted. A refusal is by name,
-        never a number; a failed call raises and the caller counts it."""
+        never a number; a failed call raises and the caller counts it.
+
+        ``commitment`` (T4.42) is ``"finalized"`` unless the caller asks
+        otherwise — the minute loop that marks ``meme_curve_snapshots`` for
+        paper PnL never does. The fast lane's own 15 s clock passes
+        ``"confirmed"`` (``MEME_FAST_LANE_COMMITMENT``): proposal/paper reads
+        only, and the admissor re-reads the curve live before money moves, so
+        a rare ``confirmed`` reorg costs nothing money can lose. An unknown
+        label is rejected before the call is made, never sent to the RPC."""
+        if commitment not in _KNOWN_COMMITMENTS:
+            raise ValueError(f"unknown commitment: {commitment!r}")
+        options = {"encoding": "base64", "commitment": commitment}
         states: dict[str, NormalizedCurveState] = {}
         refused: dict[str, str] = {}
         slots: list[int] = []
@@ -178,7 +190,7 @@ class SolanaRpcClient:
         for start in range(0, len(mints), ACCOUNTS_PER_CALL):
             pairs = curve_addresses(mints[start : start + ACCOUNTS_PER_CALL])
             result = await self._call(
-                "getMultipleAccounts", [[address for _, address in pairs], _FINALIZED]
+                "getMultipleAccounts", [[address for _, address in pairs], options]
             )
             calls += 1
             received_at = utcnow()
@@ -200,7 +212,11 @@ class SolanaRpcClient:
                         block_times[slot] = None
                 block_time = block_times[slot]
             chunk_states, chunk_refused, _ = decode_curve_batch(
-                [mint for mint, _ in pairs], result, block_time=block_time, received_at=received_at
+                [mint for mint, _ in pairs],
+                result,
+                block_time=block_time,
+                received_at=received_at,
+                commitment=commitment,
             )
             if with_block_time and block_time is None:
                 missing += len(chunk_states)

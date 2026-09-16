@@ -104,6 +104,7 @@ class FakeChain:
 
     def __init__(self, *, fail: Exception | None = None) -> None:
         self.calls: list[list[str]] = []
+        self.commitments: list[str] = []
         self.fail = fail
         _, self.accounts = _accounts()
 
@@ -113,8 +114,11 @@ class FakeChain:
     async def get_mayhem_flows(self, mints: Any) -> Any:
         raise AssertionError("not the Mayhem loop")
 
-    async def get_curve_states(self, mints: Any, *, with_block_time: bool = True) -> CurveBatch:
+    async def get_curve_states(
+        self, mints: Any, *, with_block_time: bool = True, commitment: str = "finalized"
+    ) -> CurveBatch:
         self.calls.append(list(mints))
+        self.commitments.append(commitment)
         if self.fail is not None:
             raise self.fail
         states: dict[str, Any] = {}
@@ -124,7 +128,7 @@ class FakeChain:
             chunk = list(mints[start : start + ACCOUNTS_PER_CALL])
             result = {"context": {"slot": SLOT}, "value": [self.accounts.get(m) for m in chunk]}
             s, r, slot = decode_curve_batch(
-                chunk, result, block_time=BLOCK_TIME, received_at=RECEIVED
+                chunk, result, block_time=BLOCK_TIME, received_at=RECEIVED, commitment=commitment
             )
             states.update(s)
             refused.update(r)

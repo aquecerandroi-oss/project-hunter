@@ -18,7 +18,15 @@ the young subset is smaller than that.
 per read, ≤ 16 calls a minute on top of the minute loop's ~4; the RPC's own
 per-method window (10/10 s, T4.2f) is respected by the client's spacing.
 The heartbeat says ``fast_lane_mints``, ``fast_lane_reads_60s``,
-``fast_lane_calls_60s``, ``fast_lane_cycle_s``.
+``fast_lane_calls_60s``, ``fast_lane_cycle_s``, ``fast_lane_commitment``.
+
+**The read is ``confirmed``, not ``finalized`` (T4.42).** KB-0117 (16/09)
+measured ``finalized`` costing ~11-12 s of structural lag on top of the
+series' own age; ``fast_lane_config.fast_lane_commitment`` reads
+``MEME_FAST_LANE_COMMITMENT`` (default ``confirmed``) fresh every tick. Only
+a proposal or a paper mark reads this way — the admissor re-reads the curve
+live at ``finalized`` before any money moves — so a rare ``confirmed`` reorg
+costs a mispriced paper row, never a fill.
 
 **Pinned mints keep the clock past 300 s (T4.33).** KB-0113 (16/09) measured
 that ``young_mints`` dropped a mint at ``age_s = 300`` even with an open paper
@@ -57,9 +65,15 @@ from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.rpc_curves import CURVE_EMPTIED, UNSUPPORTED_QUOTE
 from hunter_meme_worker.activity import batch_minute
 from hunter_meme_worker.collect import persist_reading
+from hunter_meme_worker.fast_lane_config import fast_lane_commitment
 from hunter_meme_worker.features import UNSUPPORTED_QUOTE as UNSUPPORTED_QUOTE_REASON
 from hunter_meme_worker.features_fast import Fast15sRow, FastInputs, build_fast_row
-from hunter_meme_worker.features_tape import HoldersObservation, TapeTrade, tape_for
+from hunter_meme_worker.features_tape import (
+    HoldersObservation,
+    TapeTrade,
+    choose_tape,
+    tape_for,
+)
 from hunter_meme_worker.metrics import meme_polls_total, meme_rows_total
 from hunter_meme_worker.repo_fast import insert_fast_rows, load_fast_points
 from hunter_meme_worker.repo_tape import load_tape
@@ -153,15 +167,25 @@ async def fold_fast(
         minute = None
         absence = UNSUPPORTED_QUOTE_REASON if t.quote_unsupported else "no_trade_feed"
         if ctx.trades is not None and not t.quote_unsupported:
-            minute = tape_for(
+            own = tape_for(
                 tape.get(t.mint, []),
                 end_time=as_of,
                 creator=t.creator,
                 covered_since=ctx.trades.coverage_for(t.mint, as_of),
             )
             absence = ctx.trades.absence_reason(t.mint, at=as_of)
-            if minute is None:  # T4.2g: the batch's 1m window, at most 60 s before the instant
-                minute, absence = batch_minute(ctx, t.mint, at=as_of, absence=absence)
+            # T4.2g/T4.41: the batch's 1m window (at most 60 s before the instant)
+            # **first** — KB-0116 measured the per-mint tape writing zero while the
+            # curve moved; it now only fills in what the batch did not cover, and
+            # the creator columns, which no batch can say.
+            batch, absence = batch_minute(ctx, t.mint, at=as_of, absence=absence)
+            # The chain's own delta (``chain_flow``) is the flow's third
+            # source when neither tape covers; it is not written to the row
+            # until a migration widens ``tape_source`` and splits the flow out
+            # of the tape's all-or-nothing CHECK (``ChainFlow``'s docstring).
+            choice = choose_tape(batch=batch, tape=own, absence=absence)
+            minute = choice.minute
+            absence = choice.absence
         rows.append(
             build_fast_row(
                 FastInputs(
@@ -199,7 +223,9 @@ async def fast_once(ctx: RadarContext) -> FastReport:
         _record(ctx, now, mints=0, read=0, calls=0, pinned=0, started=started)
         return FastReport(mints=0, read=0, calls=0, rows=0, duration_s=_elapsed(started))
     try:
-        batch = await ctx.chain.get_curve_states([t.mint for t in tracked])
+        batch = await ctx.chain.get_curve_states(
+            [t.mint for t in tracked], commitment=fast_lane_commitment()
+        )
     except Exception as exc:  # the whole read: counted, the minute loop still covers
         meme_polls_total.labels(source="solana_rpc", outcome="error").inc()
         if ctx.sources is not None:

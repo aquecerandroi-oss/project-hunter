@@ -29,6 +29,7 @@ from hunter_exchanges.rate_limit import TokenBucketRateLimiter
 from hunter_meme_worker.activity import ActivityPuller
 from hunter_meme_worker.boards import BoardCollector
 from hunter_meme_worker.config import TRENCHES_STREAM
+from hunter_meme_worker.fast_lane_config import fast_lane_commitment
 from hunter_meme_worker.metrics import meme_gaps_total, meme_rows_total, meme_source_messages_total
 from hunter_meme_worker.repo import GapRow, record_gap, upsert_token
 from hunter_meme_worker.repo_tape import pending_operator_mints
@@ -288,6 +289,7 @@ async def heartbeat_once(ctx: RadarContext, write: HeartbeatWriter) -> None:
     fields.update(  # T4.2h-b: the creator watch, its budget and its latency
         ctx.creator.heartbeat_fields(now, enabled=ctx.config.creator_watch_enabled)
     )
+    fields["fast_lane_commitment"] = fast_lane_commitment()  # T4.42
     try:
         await write(fields)
     except Exception:  # a heartbeat that cannot be written must not stop the radar

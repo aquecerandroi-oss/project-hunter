@@ -16,6 +16,11 @@ read like any other. The REST poll keeps only the identity reads
 (``tracker.needs_rest``); when this loop fails, the poll's full plan is the
 fallback (``RadarState.chain_covers``).
 
+**Commitment stays ``finalized`` here (T4.42).** This loop's own
+``get_curve_states`` call takes the client's default — unlike the fast lane
+(``fast_lane.py``, ``confirmed``) — because this is the read that marks
+``meme_curve_snapshots`` for the Lab's paper PnL, not a proposal's own state.
+
 **What a refusal teaches.** ``unsupported_quote`` drops the mint from the set as
 the REST refusal does (23 of 140 fresh coins are not SOL-quoted); ``curve_emptied``
 — ``complete`` with every reserve zero — is the chain's own migration signal and

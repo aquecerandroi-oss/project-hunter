@@ -719,6 +719,22 @@ cada `MEME_REST_MAYHEM_REFRESH_S`, leitura final, apostas abertas) e volta ao pl
 dois ciclos; a reconciliação top-K não roda com o laço ligado. Heartbeat: `chain_cycle_s`,
 `chain_tracked_mints`, `chain_read_mints`, `chain_calls_60s`, `chain_refused_1h`, `chain_block_time_missing_60s`.
 
+**Via rápida em `confirmed`, não `finalized` (T4.42, 16/09/2026).** KB-0117 mediu a foto do laço acima
+nascendo ~11-12 s velha por construção (`finalized` = 32 slots) — somado à idade da própria série de
+15 s, a mesa decide sobre um estado com **20,7 s (p50) / 30,8 s (p90)** no instante da proposta. A via
+rápida (`fast_lane.py`, também 15 s) agora lê `getCurveStates` em `commitment = confirmed`
+(`hunter_exchanges.pumpfun.rpc.SolanaRpcClient.get_curve_states(..., commitment=...)`, propagado a
+`rpc_curves.decode_curve_batch` e gravado como o `commitment` de cada leitura, sem migração — a coluna
+já existia e já aceitava `'confirmed' | 'finalized'`). O valor vem de
+`hunter_meme_worker.fast_lane_config.fast_lane_commitment()`, que lê `MEME_FAST_LANE_COMMITMENT`
+(padrão **`confirmed`**) a cada leitura, nunca em cache; um valor desconhecido vira o padrão e um aviso,
+nunca uma queda. **Por que é seguro sem tocar em dinheiro:** essa leitura só alimenta uma proposta ou
+uma marca de papel — o admissor real (`services/meme-executor/hunter_meme_executor/chain.py`) relê a
+curva ao vivo antes de qualquer ordem, então uma reorg de `confirmed` (rara, e nunca despercebida — o
+próximo tick relê) custa uma linha de papel mal precificada, nunca uma entrada. O laço de minuto
+(`chain.py`, acima) que marca `meme_curve_snapshots` para o PnL de papel **continua em `finalized`** —
+leitura e propósito diferentes, comportamento inalterado. Heartbeat: `fast_lane_commitment`.
+
 ---
 
 ## 6. O que a execução vai precisar depois (descrição, sem código de assinatura)

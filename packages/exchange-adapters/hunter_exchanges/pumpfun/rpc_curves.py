@@ -99,10 +99,17 @@ def decode_curve_batch(
     *,
     block_time: datetime | None,
     received_at: datetime,
+    commitment: str = FINALIZED,
 ) -> tuple[dict[str, NormalizedCurveState], dict[str, str], int]:
     """One ``getMultipleAccounts`` result (for ``mints``, in order) into readings
     and named refusals. Returns ``(states, refused, slot)``; raises
-    :class:`MalformedMessage` when the response as a whole is not one."""
+    :class:`MalformedMessage` when the response as a whole is not one.
+
+    ``commitment`` is stamped on every reading as-is — it is the commitment the
+    call was *made* at (T4.42: the fast lane reads ``confirmed``, ≤ 300 ms
+    behind the chain, against ``finalized``'s ~11 s; the minute loop that marks
+    ``meme_curve_snapshots`` for paper PnL keeps ``finalized``, the default),
+    never re-derived here."""
     try:
         slot = result["context"]["slot"]
         if type(slot) is not int or slot < 0:
@@ -141,7 +148,7 @@ def decode_curve_batch(
         states[mint] = state.model_copy(
             update={
                 "slot": slot,
-                "commitment": FINALIZED,
+                "commitment": commitment,
                 "observed_at": observed_at,
                 "received_at": received_at,
             }

@@ -56,6 +56,7 @@ def _transport(
     batches: dict[int, dict[str, Any]] | None = None,
     status: int = 200,
     calls: list[str] | None = None,
+    commitment: str = "finalized",
 ) -> httpx.MockTransport:
     expected = {1: _batch(1)[1], 2: _batch(2)[1]}
     raws = batches or {1: _batch(1)[2], 2: _batch(2)[2]}
@@ -73,7 +74,7 @@ def _transport(
             return httpx.Response(200, json=times[str(body["params"][0])])
         assert body["method"] == "getMultipleAccounts"
         addresses, options = body["params"]
-        assert options == {"encoding": "base64", "commitment": "finalized"}
+        assert options == {"encoding": "base64", "commitment": commitment}
         index = 1 if len(addresses) == ACCOUNTS_PER_CALL else 2
         assert addresses == expected[index], "the derived PDAs are the capture's addresses"
         return httpx.Response(200, json=raws[index])
@@ -132,6 +133,44 @@ async def test_a_slot_without_a_block_time_keeps_received_at_and_is_counted() ->
     assert erring.block_time_missing == READ and len(erring.states) == READ, (
         "an RPC error on the block time is a counted absence, never a lost batch"
     )
+
+
+async def test_the_default_commitment_is_finalized_and_is_stamped_on_every_reading() -> None:
+    """T4.42: no caller passes ``commitment`` yet keeps the pre-existing wire
+    shape — ``finalized``, exactly as ``_transport``'s own default asserts."""
+    batch = await _read(_transport(), _mints())
+    first = _batch(1)[0]
+    state = next(batch.states[m] for m in first if m in batch.states)
+    assert state.commitment == "finalized"
+
+
+async def test_a_caller_may_ask_confirmed_and_it_is_sent_and_stamped() -> None:
+    """T4.42: the fast lane's own read (``MEME_FAST_LANE_COMMITMENT``, default
+    ``confirmed``) — the RPC call itself carries the label, and every reading
+    it produces is stamped with it, never silently promoted to ``finalized``."""
+    batch = await _read(_transport(commitment="confirmed"), _mints(), commitment="confirmed")
+    first = _batch(1)[0]
+    state = next(batch.states[m] for m in first if m in batch.states)
+    assert state.commitment == "confirmed"
+
+
+async def test_an_unknown_commitment_is_rejected_before_the_call() -> None:
+    """A typo in ``MEME_FAST_LANE_COMMITMENT`` must never reach the RPC as a
+    silent ``None`` — it fails loudly, in-process, before any HTTP call."""
+    with pytest.raises(ValueError):
+        await _read(_transport(calls=[]), _mints(), commitment="processed")
+
+
+def test_decode_curve_batch_defaults_to_finalized_and_stamps_what_it_is_given() -> None:
+    mints, _, raw = _batch(1)
+    now = datetime(2026, 9, 12, 13, 8, tzinfo=UTC)
+    default, _, _ = decode_curve_batch(mints, raw["result"], block_time=None, received_at=now)
+    confirmed, _, _ = decode_curve_batch(
+        mints, raw["result"], block_time=None, received_at=now, commitment="confirmed"
+    )
+    sample = next(m for m in mints if m in default)
+    assert default[sample].commitment == "finalized"
+    assert confirmed[sample].commitment == "confirmed"
 
 
 async def test_without_block_time_the_batch_costs_one_call_per_hundred() -> None:
