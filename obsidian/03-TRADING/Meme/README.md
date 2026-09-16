@@ -102,3 +102,4 @@ banco com hora e SQL anexados.
 
 - [[03-TRADING/Meme/Candidatas/2026-09-16-16h|2026-09-16 — R1 (14:47–15:47 BRT)]]
 - [[03-TRADING/Meme/Candidatas/2026-09-16-17h|2026-09-16 — R14 (15:18–16:18 BRT)]] — porta calibrada = porta em vigor (5 propostas/h vs 3 da anterior), termos `PAID`/`ARGUS`/`ZEC` sem candidata comprável, conclusão: nenhuma
+- [[03-TRADING/Meme/Candidatas/2026-09-16-17h02-brt|2026-09-16 — R23 (16:17–17:02 BRT)]] — mesa: 7 ordens reais, todas recusadas na admissão (2 recusas boas, 1 ruim: BRINAA +31,5 %); porta em vigor entrega 9 moedas/h (0,15/min) e o executor admitiria **0** (7 sem retrato de risco, 2 com top-10 em 27 %); Kintsugi passou a porta às 16:20, foi a 66 % com 408 holders e **não virou proposta**; `X*`/`casinu`/`ZEC` sem candidata comprável; conclusão: nenhuma
