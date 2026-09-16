@@ -586,6 +586,30 @@ assume:
 > cotada num token custom, recusada por nome antes de simular; a mais barata ainda não tinha comprador
 > real na cadeia — `t48c_simulation_proof_mainnet_raw.json`).
 
+> **T4.29c (16/09/2026):** as taxas deixaram de ser uma constante datada. `fee_config.py` decodifica
+> a conta `FeeConfig` do **programa de taxas** (`pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ`, PDA
+> `["fee_config", <programa>]`, a mesma conta que o índice 12 de todo `sell` real desde 12/09 carrega) e
+> `quote.curve_fee_bps` seleciona o tier pelo *market cap* com a regra exata do programa
+> (`calculate_fee_tier`: vence o maior limiar `<=` o market cap; abaixo do primeiro limiar, o primeiro
+> tier — `docs/FEE_PROGRAM_README.md`, commit `81091419…`, sha256 `c03c0cc7…`). **Leitura ao vivo
+> (slot 447 586 137, `tests/fixtures/pumpfun/rpc_fee_config_raw.json`): a conta da curva tem UM tier,
+> limiar 0, lp 0 / protocolo 95 / criador 30** — ou seja 1,25 %, exatamente a constante datada, e
+> independente do market cap; a tabela de 25 tiers da `fees.png` está na conta da **PumpSwap**
+> (`t429c_rpc_fee_config_amm_raw.json`), para pools. Quando a conta não pode ser lida, o retorno é a
+> constante e o chamador loga `meme_fee_config_unavailable`. O executor (`build.fee_bps`) **ainda não**
+> chama isso — o gancho de uma linha está descrito em `.claude/state/notes-T4.29c.md` (`build.py` é de
+> outro agente nesta leva).
+>
+> **A venda numa curva `is_holder_reward = true` deixou de ser fé** (o concern nº 1 da T4.8c): simulada na
+> mainnet pelo caminho do executor em 16/09 18:21 UTC (`infra/scripts/meme_simulate_trade.py`, moeda
+> `Bo5vHuDB…`, detentor real achado na fita pública, `ok=True`, 53 041 CU, **nada assinado, nada enviado** —
+> `t429c_simulation_proof_hr_sell_raw.json`). Duas coisas que a simulação provou e que o concern nº 2 da
+> T4.8c deixava em aberto: (1) `GetFeesWithQuoteMint` devolveu `lp 0 / protocolo 95 / criador 30`, idêntico
+> ao tier que o `FeeConfig` decodificado seleciona; (2) o `TradeEvent` veio com
+> `holder_rewards_bps = 30` e `holder_rewards = 112 933` **iguais** a `creator_fee_bps`/`creator_fee` — ou
+> seja, na moeda HR a taxa do criador é a mesma, só muda quem recebe; **não** é uma taxa a mais, e
+> `quote_sell` com 95 + 30 bps reproduz o evento ao lamport. O custo modelado continua correto.
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |

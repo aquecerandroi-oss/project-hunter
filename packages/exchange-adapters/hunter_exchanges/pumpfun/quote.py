@@ -13,10 +13,15 @@ and ``rpc_tx_buy_raw.json`` — a buy), lamport-exact:
 
 The fee basis points are an **input** (:class:`FeeBps`), never a constant:
 the program computes them per trade through ``GetFeesWithQuoteMint`` and
-reports them in ``TradeEvent``. What the official fee page says the bonding
-curve tier is *today* is exposed as :data:`BONDING_CURVE_FEE_TIER_2026_05_20`
-for callers that have no fresher number, with the date in its name so nobody
-mistakes it for protocol truth (T4.0d §1.4b, ``curve.py`` finding).
+reports them in ``TradeEvent``. Since T4.29c the honest way to produce that
+input is ``fee_config.curve_fee_bps``, which selects the tier out of the
+``FeeConfig`` account the program itself reads (``fee_config.py``, PDA
+``["fee_config", pump program]``). :data:`BONDING_CURVE_FEE_TIER_2026_05_20` —
+what the official fee page said the bonding-curve tier was on that date — stays
+here as the **documented fallback** for when that account cannot be read (the
+caller logs ``fee_config.FEE_CONFIG_UNAVAILABLE_EVENT``), with the date in its
+name so nobody mistakes it for protocol truth (T4.0d §1.4b, ``curve.py``
+finding). On 2026-09-16 the account says exactly what the constant says.
 
 Slippage is explicit: every quote needs ``max_slippage_bps`` and refuses a
 missing or absurd value — the instruction has no "%" field, only

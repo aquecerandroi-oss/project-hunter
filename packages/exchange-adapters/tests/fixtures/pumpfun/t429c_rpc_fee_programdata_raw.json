@@ -1,0 +1,26 @@
+{
+ "task": "T4.29c",
+ "program": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+ "programdata": "75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw",
+ "last_deploy_slot": 446465969,
+ "last_deploy_block_time": 1789227660,
+ "last_deploy_utc": "2026-09-12T15:41:00+00:00",
+ "upgrade_authority_present": 1,
+ "result": {
+  "context": {
+   "apiVersion": "4.3.0-rc.0",
+   "slot": 447586155
+  },
+  "value": {
+   "data": [
+    "AwAAALGHnBoAAAAAAWNI+4ICMfurc9wwg+Hz8Un/EltxiCDzLrGhW/781hsJ",
+    "base64"
+   ],
+   "executable": false,
+   "lamports": 4821514360,
+   "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+   "rentEpoch": 18446744073709551615,
+   "space": 948989
+  }
+ }
+}

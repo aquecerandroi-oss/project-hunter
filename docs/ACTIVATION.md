@@ -859,6 +859,47 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    arquivo **completo** que diz não (vencido, Portão C desligado, escopo sumido com o robô armado)
    continua travando na hora.
 
+10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
+    rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
+    numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca
+    foi simulada. A doc oficial diz que nada muda na instrução (`docs/HOLDER_REWARDS_README.md` do
+    commit `81091419e4457566469d4e2a27f64ed84d42419c` de `pump-fun/pump-public-docs`, sha256
+    `ce2a57883f342aa7f4142058e58f93e639efd64fed426b2f1f2d63d21f4cc6a1`: "Trading holder rewards coins —
+    There are **no changes to any trade instruction**"), e o `sell` do `idl/pump.json` do mesmo commit
+    continua com as mesmas 14 contas + `fee_config`/`fee_program`. Isto aqui é a prova disso na cadeia.
+
+    Na VPS, com a moeda HR já **na carteira do robô** (o `--user` é o endereço **público**; o script
+    nunca lê `.env`, nunca lê a chave e não tem caminho para `sendTransaction`):
+
+    ```bash
+    cd /opt/project-hunter && uv run python infra/scripts/meme_simulate_trade.py \
+        --simulate-only --sell --mint <MINT_HR> \
+        --user ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4 \
+        --rpc "$SOLANA_RPC_URL" --json-out /tmp/sim_sell_hr.json
+    ```
+
+    **"ok" é:** `is_holder_reward=True` na linha da curva; `verify ok=True` (verificador §9.1);
+    `simulateTransaction SELL ... ok=True err=None` com `units_consumed` na casa de 50–70 mil e um log
+    `Program log: Instruction: Sell`; e a última linha `rpc calls=N sendTransaction=0`. Vender só parte:
+    `--amount <subunidades>`. Uma compra se simula igual, com `--buy --budget-sol 0.01`.
+
+    **Não é ok** e o que significa: `err=Custom:3` (sem saldo do token naquela ATA — a moeda não está
+    nessa carteira); `bonding curve not found` (moeda já graduou — a venda seria na PumpSwap, que não
+    existe, item (a) abaixo); `unsupported_quote:<mint>` (moeda cotada em token que não é SOL nativo —
+    o executor recusa antes de cotar, como na T4.8b/T4.8c); `holds no <mint>` (o script se recusa a
+    simular uma venda sem saldo real, porque isso não provaria nada). Sem `--simulate-only` ele sai com
+    código 2 antes da primeira chamada de RPC.
+
+    **Já rodado uma vez (16/09/2026 18:21 UTC), sem carteira dele:** numa moeda HR com um detentor real
+    achado na fita pública (`Bo5vHuDB…`), `ok=True`, 53 041 CU, `Instruction: Sell` — a venda em curva HR
+    deixou de ser fé. O `TradeEvent` da simulação mostrou `holder_rewards = creator_fee` (mesma taxa, outro
+    destinatário), então o custo que o executor já usa continua certo. O que continua **sem** prova é a
+    venda **da carteira dele**, com a posição dele — é isso que o comando acima faz.
+
+    O script também imprime o `FeeConfig` lido da cadeia (`fee_config <PDA> slot=… tiers=1 …`, T4.29c) ou
+    `meme_fee_config_unavailable` quando a conta não pôde ser lida — neste caso as taxas usadas são a
+    constante datada de 20/05/2026 (95 + 30 bps), que em 16/09/2026 é exatamente o que a conta diz.
+
 **O que não está pronto e ele precisa saber antes de ligar:** (a) venda **depois** da
 migração para a PumpSwap não existe — uma posição que migrar fica `open` com
 `blocked: pumpswap_sell_not_implemented` e sai só pelo site, na mão; com `max_hold_s`

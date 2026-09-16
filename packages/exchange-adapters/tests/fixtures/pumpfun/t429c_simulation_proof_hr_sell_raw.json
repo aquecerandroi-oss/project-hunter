@@ -1,0 +1,87 @@
+{
+ "task": "T4.29c",
+ "started_at_utc": "2026-09-16T18:21:25.365196+00:00",
+ "side": "sell",
+ "mint": "Bo5vHuDBfcm2bou5YobKeNR1XvgFyBzpVETndv8hUL2u",
+ "user": "7K1kWCdJE87eX3sDY1EQJXC7TkEi6BAbtLNbKHWZuutu",
+ "simulate_only": true,
+ "send_transaction_calls": 0,
+ "rpc_methods": [
+  "getAccountInfo",
+  "getAccountInfo",
+  "getAccountInfo",
+  "getAccountInfo",
+  "getLatestBlockhash",
+  "getAccountInfo",
+  "getTokenAccountBalance",
+  "simulateTransaction"
+ ],
+ "fee_config": {
+  "address": "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+  "slot": 447589440,
+  "fee_tiers": [
+   {
+    "threshold": 0,
+    "fees": {
+     "lp_fee_bps": 0,
+     "protocol_fee_bps": 95,
+     "creator_fee_bps": 30
+    }
+   }
+  ]
+ },
+ "curve": {
+  "slot": 447589448,
+  "is_holder_reward": true,
+  "is_mayhem_mode": false,
+  "layout": "with-holder-reward-125b",
+  "complete": false,
+  "creator": "FE9GGTbti9rF1XeUUhRqC59nagah7ieAXfZ1oq3omz1E"
+ },
+ "intent": {
+  "side": "sell",
+  "mint": "Bo5vHuDBfcm2bou5YobKeNR1XvgFyBzpVETndv8hUL2u",
+  "token_amount": 1075853044455,
+  "sol_limit": 36373720,
+  "blockhash": "7tWnSeFbmAsDhig5e2akUkkE4GLtaygTXnVgVF5i9zRf",
+  "last_valid_block_height": 425631024,
+  "compute_unit_limit": 150000,
+  "compute_unit_price_micro_lamports": 1,
+  "creates_ata": false,
+  "price_impact_bps": 12,
+  "max_slippage_bps": 500,
+  "net_proceeds_lamports": 38288127,
+  "min_sol_output": 36373720
+ },
+ "verified": true,
+ "simulation": {
+  "ok": true,
+  "err": null,
+  "units_consumed": 53041,
+  "slot": 447589469,
+  "logs": [
+   "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+   "Program ComputeBudget111111111111111111111111111111 success",
+   "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+   "Program ComputeBudget111111111111111111111111111111 success",
+   "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+   "Program log: Instruction: Sell",
+   "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+   "Program log: Instruction: GetFeesWithQuoteMint",
+   "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 119437 compute units",
+   "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+   "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+   "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+   "Program log: Instruction: TransferChecked",
+   "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2562 of 112632 compute units",
+   "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+   "Program data: vdt/007mYe6gYyXww5Mg7+MbRZ5DKja7N5mUC56GmzjEiKL5pRI4ckxnPgIAAAAA56rWffoAAAAAXcNsmXSNzsnKOpk2Wvy5/Y5HgKt8eDcB5eYkIyT85VIt3qpqAAAAAGRNQs8HAAAAiZZ0yNVoAwBkoR7TAAAAAIn+YXxEagIASsL40N1cvJfjKJwZfLUGKlTz2Va5zm5RFfllZ6pcs+ZfAAAAAAAAAPR0BQAAAAAA02GCv4f/Wo72yFLKm4Y9HeNSKC8GKf5Q/Q+MQyJidxEeAAAAAAAAACW5AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAHNlbGwAAAAAAAAAAAAAAAAAAAAAAIgTAAAAAAAAeroCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMZz4CAAAAAGRNQs8HAAAAZKEe0wAAAAAeAAAAAAAAACW5AQAAAAAA",
+   "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [2]",
+   "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 2143 of 100383 compute units",
+   "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+   "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 52741 of 149700 compute units",
+   "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"
+  ]
+ },
+ "note": "T4.29c 2026-09-16 18:21 UTC \u2014 sell simulated on mainnet on a is_holder_reward=true curve through infra/scripts/meme_simulate_trade.py (sigVerify=false, never signed, never sent). The seller is a REAL holder found on the public trade tape (swap-api.pump.fun), impersonated for the simulation only; no key of his exists here and nothing was submitted."
+}

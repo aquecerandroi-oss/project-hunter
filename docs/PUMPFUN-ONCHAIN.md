@@ -365,6 +365,20 @@ pesquisa para não arriscar inventar um endereço errado; a tabela acima (fonte 
 `fees.png` do repo oficial) e o campo `fee_basis_points` do `TradeEvent` cobrem a necessidade sem
 isso.
 
+> **Corrigido na T4.29c (16/09/2026) — a PDA foi derivada e a conta, lida.**
+> `["fee_config", <program_id>]` **sob o programa de taxas** (as seeds que o próprio IDL declara para
+> a conta `fee_config` de `buy`/`sell`/`get_fees`) dá `8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt`
+> para a curva — o mesmo endereço que o índice 12 do `sell` real de 15/09 (`t48c_rpc_tx_sell_raw.json`)
+> carrega, o que fecha a derivação sem depender de fé. A conta lida ao vivo (slot 447 586 137,
+> `tests/fixtures/pumpfun/rpc_fee_config_raw.json`, 4 097 bytes, disc `8f3492bbdb7b4c9b`) tem
+> **um único tier, limiar 0, lp 0 / protocolo 95 / criador 30**: na curva a taxa **não** escalona por
+> market cap hoje, e a tabela acima descreve a conta da **PumpSwap** (`5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx`,
+> 25 tiers, limiares 420/1470/… SOL — `t429c_rpc_fee_config_amm_raw.json`). Layout novo em relação ao
+> registrado na T4.0d: `FeeConfig` ganhou `exotic_flat_fees: Fees` no fim (presente nos bytes vivos e no
+> IDL do GitHub do commit `81091419…`; **ausente** da conta de IDL on-chain do próprio programa de taxas,
+> `6hgWp61YgGzJ9QmvxyFtLnGfA8MYgx93Hby6fdq8gG31`, sha256 canônico `37729b75…`, que está atrasada em uma
+> instrução — `set_exotic_flat_fees`). Decodificador: `hunter_exchanges/pumpfun/fee_config.py`.
+
 ### 1.5 Fee recipients — as 24 contas fixas
 
 `docs/FEE_RECIPIENTS.md` (mesmo commit): 8 "normais" (moedas não-Mayhem), 8 "reserved" (moedas
