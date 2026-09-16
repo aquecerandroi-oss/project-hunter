@@ -134,7 +134,7 @@ async def test_set_param_apply_updates_only_the_sets_that_differ_and_leaves_an_a
     )
     assert code == 0 and "applied: 2 row(s) updated" in report
     update, params = conn.update()
-    assert "params = params || jsonb_build_object(:key, CAST(:value AS jsonb))" in update
+    assert "params = params || jsonb_build_object(CAST(:key AS text), CAST(:value AS jsonb))" in update
     assert "AND status = 'active'" in update
     assert params == {
         "key": "exclude_mayhem",
@@ -251,3 +251,14 @@ async def test_mayhem_with_nothing_to_do_exits_zero_and_writes_nothing() -> None
     conn = FakeConn([])
     code, report = await script.run(conn, day=None, ids=None, apply=True, reason="x" * 20)
     assert code == 0 and "nothing to do" in report and conn.writes() == []
+
+
+def test_set_param_statement_types_the_key_for_asyncpg() -> None:
+    """16/09/2026 15:0x BRT, VPS: ``--set-param max_progress_pct=50 --rule-set operator/5
+    --apply`` failed with asyncpg ``IndeterminateDatatypeError: could not determine data
+    type of parameter $1`` — ``jsonb_build_object(:key, …)`` leaves the key untyped for a
+    prepared statement. The unit tests above run on fakes and never executed the SQL, so
+    this pins the cast in the statement text itself."""
+    from meme_rule_set import _SET_PARAM
+
+    assert "jsonb_build_object(CAST(:key AS text), CAST(:value AS jsonb))" in str(_SET_PARAM)

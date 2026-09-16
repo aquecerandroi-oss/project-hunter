@@ -100,7 +100,7 @@ _RETIRE = text(
     "WHERE id = CAST(:id AS uuid) AND status = 'active' RETURNING id"
 )
 _SET_PARAM = text(
-    "UPDATE meme_rule_sets SET params = params || jsonb_build_object(:key, CAST(:value AS jsonb)) "
+    "UPDATE meme_rule_sets SET params = params || jsonb_build_object(CAST(:key AS text), CAST(:value AS jsonb)) "
     "WHERE id = ANY(CAST(:ids AS uuid[])) AND status = 'active' RETURNING id"
 )
 
