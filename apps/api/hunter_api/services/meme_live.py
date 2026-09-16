@@ -54,6 +54,29 @@ def _bool(raw: str | None) -> bool | None:
     return None if raw is None or raw == "" else raw == "true"
 
 
+def _int(raw: str | None) -> int | None:
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _int_dict(raw: dict[str, Any] | None) -> dict[str, int]:
+    """A JSON object read off the heartbeat as ``{reason: count}`` -- a value
+    that fails to parse as an int is dropped, never crashes the read."""
+    if not raw:
+        return {}
+    out: dict[str, int] = {}
+    for key, value in raw.items():
+        try:
+            out[str(key)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def _json(raw: str | None) -> dict[str, Any] | None:
     if not raw:
         return None
@@ -117,6 +140,18 @@ def read_executor(
         auto_close_on_emergency=_bool(fields.get("auto_close_on_emergency")),
         last_entries_tick_at=tick,
         last_exits_tick_at=parse_heartbeat_datetime(fields.get("last_exits_tick_at")),
+        auto_approve=_bool(fields.get("auto_approve")),
+        auto_approve_max_per_hour=_int(fields.get("auto_approve_max_per_hour")),
+        auto_approved_1h=_int(fields.get("auto_approved_1h")),
+        auto_refused_1h=_int_dict(_json(fields.get("auto_refused_1h"))),
+        auto_skipped=_int_dict(_json(fields.get("auto_skipped"))),
+        small_test_used_sol=_decimal(fields.get("small_test_used_sol")),
+        small_test_trades_done=_int(fields.get("small_test_trades_done")),
+        small_test_remaining_sol=_decimal(fields.get("small_test_remaining_sol")),
+        small_test_exhausted=fields.get("small_test_exhausted") or None,
+        gates_mtime=parse_heartbeat_datetime(fields.get("gates_mtime")),
+        gates_reloaded_at=parse_heartbeat_datetime(fields.get("gates_reloaded_at")),
+        gates_reload_error=fields.get("gates_reload_error") or None,
     )
 
 

@@ -8,6 +8,8 @@
 import { formatSol } from "@/components/meme/meme-format";
 import { formatBrasiliaShort } from "@/lib/time";
 
+import { scopeExhaustedLabel } from "./refusal-labels";
+
 /** "9eoC…HWpvzN" -- same 5+5 shape `proposal-card.tsx` uses for a mint, applied to a wallet's public key. */
 export function truncateAddress(address: string): string {
   return address.length <= 12 ? address : `${address.slice(0, 5)}…${address.slice(-5)}`;
@@ -73,6 +75,62 @@ export function gatesLines(gates: Record<string, unknown> | null | undefined): s
   const signedBy = stringField(gates, "signed_by") ?? "não informado";
   const validUntil = stringField(gates, "valid_until");
   return [`Portões A e B verdes, assinado por ${signedBy}${validUntil ? ` · válido até ${formatBrasiliaShort(validUntil) ?? validUntil}` : ""}`];
+}
+
+/** T4.28c -- "aprovadas na hora N / M": both numbers from the heartbeat, never a fabricated total when one of the two is missing. */
+export function autoApprovedLine(approved: number | null, maxPerHour: number | null): string {
+  if (approved === null && maxPerHour === null) return "aprovadas na hora: sem leitura";
+  if (approved === null) return `aprovadas na hora: sem leitura (teto ${maxPerHour})`;
+  if (maxPerHour === null) return `aprovadas na hora: ${approved} (teto: sem leitura)`;
+  return `aprovadas na hora: ${approved} de ${maxPerHour}`;
+}
+
+export interface AutoScopeCounters {
+  usedSol: string | null;
+  remainingSol: string | null;
+  tradesDone: number | null;
+  exhausted: string | null;
+}
+
+export interface AutoScopeLine {
+  tradesLine: string;
+  solLine: string;
+  exhaustedLabel: string | null;
+}
+
+function tradesLineOf(tradesDone: number | null, maxTrades: number | null): string {
+  if (tradesDone === null && maxTrades === null) return "compras: sem leitura";
+  const done = tradesDone ?? "sem leitura";
+  return maxTrades !== null ? `compras: ${done} de ${maxTrades}` : `compras: ${done}`;
+}
+
+function solLineOf(counters: AutoScopeCounters, maxTotalSol: string | null): string {
+  const parts: string[] = [];
+  if (counters.usedSol) parts.push(`usado ${formatSol(counters.usedSol)}`);
+  if (counters.remainingSol) parts.push(`restante ${formatSol(counters.remainingSol)}`);
+  if (maxTotalSol) parts.push(`teto ${formatSol(maxTotalSol)}`);
+  return parts.length > 0 ? parts.join(" · ") : "SOL do escopo: sem leitura";
+}
+
+/**
+ * T4.28c -- the written small-test scope's usage: the ceilings come from
+ * `gates.small_test` (`max_trades`/`max_total_sol`, written once by the owner),
+ * the usage from the executor's own counters (`LiveExecutorOut.small_test_*`,
+ * T4.28). A missing number says "sem leitura", never zero (CLAUDE.md).
+ */
+export function autoScopeLine(
+  gates: Record<string, unknown> | null | undefined,
+  counters: AutoScopeCounters,
+): AutoScopeLine {
+  const smallTest = gates ? readSmallTest(gates) : null;
+  const maxTrades = smallTest ? intField(smallTest, "max_trades") : null;
+  const maxTotalSol = smallTest ? stringField(smallTest, "max_total_sol") : null;
+
+  const tradesLine = tradesLineOf(counters.tradesDone, maxTrades);
+  const solLine = solLineOf(counters, maxTotalSol);
+
+  const exhaustedLabel = counters.exhausted ? scopeExhaustedLabel(counters.exhausted) : null;
+  return { tradesLine, solLine, exhaustedLabel };
 }
 
 export interface KillSwitchSourceLine {

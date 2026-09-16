@@ -42,6 +42,8 @@ function executor(overrides: Partial<LiveExecutor> = {}): LiveExecutor {
     orders_by_state: {},
     positions_open: 0,
     blocked_exits: {},
+    auto_refused_1h: {},
+    auto_skipped: {},
     last_signature: null,
     last_refusal: null,
     day_start_sol_equity: null,

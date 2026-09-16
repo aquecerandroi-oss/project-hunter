@@ -67,6 +67,36 @@ class LiveExecutorOut(BaseModel):
     auto_close_on_emergency: bool | None = None
     last_entries_tick_at: datetime | None = None
     last_exits_tick_at: datetime | None = None
+    auto_approve: bool | None = None
+    """T4.28 stage 1 ("liga sozinho"): the executor opens the desk's ``operator``
+    proposal itself, inside the written small-test scope, without the click."""
+    auto_approve_max_per_hour: int | None = None
+    auto_approved_1h: int | None = None
+    """Proposals the robot opened **and the admission let through** in the last
+    hour (T4.28e: a refusal costs no slot of this budget)."""
+    auto_refused_1h: dict[str, int] = {}
+    """The last hour's admission refusals of robot-opened proposals, by reason —
+    the same vocabulary as ``LiveOrderOut.reason``/``first_refusal``."""
+    auto_skipped: dict[str, int] = {}
+    """Passes where the robot did not even open a proposal, by reason (in-memory
+    since the process's last restart) — ``expired``, ``too_old``, ``mint_busy``,
+    ``recently_refused`` (T4.28f), ``exceeds_max_sol_per_bet``, ``hourly_cap``,
+    ``tick_cap``, ``mint_repeated``, ``kill_switch``, ``program_upgraded``,
+    ``scope_exhausted:<max_trades|max_total_sol>``, ``decided_concurrently``."""
+    small_test_used_sol: DecimalStr | None = None
+    small_test_trades_done: int | None = None
+    small_test_remaining_sol: DecimalStr | None = None
+    small_test_exhausted: str | None = None
+    """``max_trades`` or ``max_total_sol`` when the written scope is spent, or
+    ``None`` while there is room left."""
+    gates_mtime: datetime | None = None
+    """When ``meme_gates.json`` was last written, per ``stat`` (T4.28d)."""
+    gates_reloaded_at: datetime | None = None
+    """When this process last swapped its policy from a reload of that file."""
+    gates_reload_error: str | None = None
+    """The latched reload reason, or ``deferred:<reason>`` during the one-tick
+    grace after a parse failure (T4.28f) — empty/``None`` means the last read
+    of the file was a good one."""
 
 
 class LiveOrderOut(BaseModel):

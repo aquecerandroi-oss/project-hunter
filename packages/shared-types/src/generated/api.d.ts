@@ -2598,8 +2598,28 @@ export interface components {
          * @description What ``hb:meme:executor`` says, field by field — ``None`` when it does not say.
          */
         LiveExecutorOut: {
+            /** Auto Approve */
+            auto_approve?: boolean | null;
+            /** Auto Approve Max Per Hour */
+            auto_approve_max_per_hour?: number | null;
+            /** Auto Approved 1H */
+            auto_approved_1h?: number | null;
             /** Auto Close On Emergency */
             auto_close_on_emergency?: boolean | null;
+            /**
+             * Auto Refused 1H
+             * @default {}
+             */
+            auto_refused_1h: {
+                [key: string]: number;
+            };
+            /**
+             * Auto Skipped
+             * @default {}
+             */
+            auto_skipped: {
+                [key: string]: number;
+            };
             /**
              * Blocked Exits
              * @default {}
@@ -2623,6 +2643,12 @@ export interface components {
             gates?: {
                 [key: string]: unknown;
             } | null;
+            /** Gates Mtime */
+            gates_mtime?: string | null;
+            /** Gates Reload Error */
+            gates_reload_error?: string | null;
+            /** Gates Reloaded At */
+            gates_reloaded_at?: string | null;
             /** Heartbeat Key */
             heartbeat_key: string;
             /** Heartbeat Ts */
@@ -2663,6 +2689,14 @@ export interface components {
             } | null;
             /** Positions Open */
             positions_open?: number | null;
+            /** Small Test Exhausted */
+            small_test_exhausted?: string | null;
+            /** Small Test Remaining Sol */
+            small_test_remaining_sol?: string | null;
+            /** Small Test Trades Done */
+            small_test_trades_done?: number | null;
+            /** Small Test Used Sol */
+            small_test_used_sol?: string | null;
             /**
              * Status
              * @enum {string}

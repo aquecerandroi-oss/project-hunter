@@ -9,22 +9,17 @@
 import { BrasiliaShort } from "@/components/time/brasilia-instant";
 import { Badge } from "@/components/ui/badge";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
-import { computeAgeMs, formatAge } from "@/lib/age";
 import { type LiveExecutor, type MemeLive, executorPanelState } from "@/lib/api/meme-live-types";
 
+import { AgeNote } from "./age-note";
+import { AutoStage1Block } from "./auto-stage1-panel";
 import { executorStatusLabel, killSwitchBadgeVariant, killSwitchStateLabel } from "./labels";
 import { gatesLines, killSwitchSourceLines, policyLines, truncateAddress } from "./live-format";
 import { RealBadge } from "./real-confirm";
-import { executorRefusalLabel } from "./refusal-labels";
+import { executorRefusalLabel, killSwitchLatchReasonLabel } from "./refusal-labels";
 
 function formatSolPlain(value: string | null | undefined): string {
   return value ? `${value} SOL` : "sem leitura";
-}
-
-function AgeNote({ iso, nowMs }: { iso: string | null | undefined; nowMs: number }) {
-  const age = computeAgeMs(iso, nowMs);
-  if (age === null) return <span className="text-fg-subtle">sem leitura</span>;
-  return <span className="text-fg-subtle">atualizado há {formatAge(age)}</span>;
 }
 
 function PanelHeader({ executor, apiLiveEnabled, state }: { executor: LiveExecutor; apiLiveEnabled: boolean; state: string }) {
@@ -109,7 +104,9 @@ function KillSwitchBlock({ executor }: { executor: LiveExecutor }) {
         <Badge variant={killSwitchBadgeVariant(effective)}>{killSwitchStateLabel(effective)}</Badge>
         {executor.kill_switch_latched && <Badge variant="negative">travado (só o dono destrava)</Badge>}
       </div>
-      {executor.kill_switch_latch_reason && <p className="mt-1 text-fg-muted">motivo da trava: {executor.kill_switch_latch_reason}</p>}
+      {killSwitchLatchReasonLabel(executor.kill_switch_latch_reason) && (
+        <p className="mt-1 text-fg-muted">motivo da trava: {killSwitchLatchReasonLabel(executor.kill_switch_latch_reason)}</p>
+      )}
       <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-fg-muted">
         {killSwitchSourceLines(executor.kill_switch_sources).map((source) => (
           <li key={source.key}>
@@ -189,6 +186,11 @@ function LigadoBody({ live, nowMs }: { live: MemeLive; nowMs: number }) {
         <div className="text-xs">
           <p className="font-medium text-warning">Última recusa</p>
           <p className="text-fg">{refusal}</p>
+        </div>
+      )}
+      {executor.auto_approve && (
+        <div className="sm:col-span-2">
+          <AutoStage1Block executor={executor} nowMs={nowMs} />
         </div>
       )}
     </div>

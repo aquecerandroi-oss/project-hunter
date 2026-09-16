@@ -128,3 +128,96 @@ export function markReasonLabel(reason: string | null | undefined): string | nul
   if (reason.startsWith("rpc_unreachable:")) return `RPC inalcançável (${reason.slice("rpc_unreachable:".length)})`;
   return `recusa: ${reason}`;
 }
+
+/**
+ * The stage-1 "modo sozinho" (T4.28/T4.28e/T4.28f, `hunter_meme_executor.auto_approve`)
+ * skip vocabulary -- passes where the robot did **not** even open a proposal,
+ * named in `LiveExecutorOut.auto_skipped`. A different vocabulary from
+ * `CHECK_REFUSAL_LABEL` above: these are the robot's own pre-filters (a
+ * proposal that would certainly be refused, or a budget that is not there),
+ * never one of the 25 admission checks. `scope_exhausted:<max_trades|max_total_sol>`
+ * is the one dynamic member (`auto_approve.py::auto_approve_once`).
+ */
+const AUTO_SKIP_LABEL: Record<string, string> = {
+  expired: "proposta expirou antes de decidir",
+  too_old: "proposta velha demais para o robô decidir (só o clique, agora)",
+  mint_busy: "mint já tem posição aberta ou compra em voo",
+  recently_refused: "mint em carência — recusa recente que o relógio não desfaz",
+  suggested_incomplete: "sugestão do conjunto de regras incompleta (sem tamanho)",
+  exceeds_max_sol_per_bet: "tamanho acima do teto por aposta do conjunto de regras",
+  hourly_cap: "teto de aprovações da hora atingido",
+  tick_cap: "já abriu uma proposta neste tique",
+  mint_repeated: "mesmo mint já escolhido neste tique",
+  decided_concurrently: "outra decisão chegou antes (clique ou outro tique)",
+  kill_switch: "corta-circuito bloqueando entradas",
+  program_upgraded: "o programa da pump.fun mudou — pausado até revalidar",
+};
+
+const SCOPE_EXHAUSTED_LABEL: Record<string, string> = {
+  max_trades: "esgotado — nº de compras",
+  max_total_sol: "esgotado — SOL do escopo",
+};
+
+/** `ScopeUse.exhausted` (`scope.py`) -- which counter closed the tap. Shared by the skip chip below and the scope line in `live-format.ts`'s `autoScopeLine` so the two never disagree on the wording. */
+export function scopeExhaustedLabel(reason: string): string {
+  return SCOPE_EXHAUSTED_LABEL[reason] ?? `esgotado (${reason})`;
+}
+
+/** One Portuguese sentence for a stage-1 skip reason -- never a bare, untranslated slug (DESIGN-5). An unrecognized code is still shown, always prefixed with "pulo:". */
+export function autoSkipLabel(code: string): string {
+  const known = AUTO_SKIP_LABEL[code];
+  if (known !== undefined) return known;
+  if (code.startsWith("scope_exhausted:")) return `escopo ${scopeExhaustedLabel(code.slice("scope_exhausted:".length))}`;
+  return `pulo: ${code}`;
+}
+
+/**
+ * `LiveExecutorOut.gates_reload_error` (T4.28d/T4.28f) -- the reload's own
+ * failure vocabulary (`hunter_core.execution.meme.gates`), distinct from the
+ * admission's. A `deferred:<reason>` prefix means the process is giving the
+ * parse failure one tick of grace before latching (T4.28f) -- the previous
+ * policy still holds.
+ */
+const GATES_RELOAD_ERROR_LABEL: Record<string, string> = {
+  gates_file_missing: "arquivo de portões não encontrado",
+  gates_file_invalid: "arquivo de portões ilegível (JSON quebrado ou incompleto)",
+  gates_schema_mismatch: "arquivo de portões com schema não reconhecido",
+  gate_a_engineering_not_passed: "portão A (engenharia) não assinado",
+  gate_b_evidence_not_passed: "portão B (evidência) não assinado",
+  gate_c_owner_not_enabled: "portão C (dono) não habilitado",
+  gates_unsigned: "arquivo de portões sem assinatura",
+  gates_date_in_future: "data de assinatura no futuro no arquivo de portões",
+  gates_expired: "autorização dos portões expirada",
+  gates_without_evidence: "portão B sem evidência anexada",
+  small_test_invalid: "autorização do teste pequeno inválida no arquivo",
+  small_test_unauthorized: "teste pequeno sem autorização por escrito no arquivo",
+  small_test_expired: "autorização do teste pequeno expirada no arquivo",
+  auto_approve_needs_small_test: "modo sozinho ligado sem teste pequeno escrito — trava por contrato",
+};
+
+function gatesReasonLabel(reason: string): string {
+  return GATES_RELOAD_ERROR_LABEL[reason] ?? `recusa: ${reason}`;
+}
+
+/** One Portuguese sentence for the gates reload's own error, or `null` when the last read was good. Never a bare, untranslated slug (DESIGN-5). */
+export function gatesReloadErrorLabel(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const deferred = raw.startsWith("deferred:") ? raw.slice("deferred:".length) : null;
+  const known = gatesReasonLabel(deferred ?? raw);
+  return deferred !== null
+    ? `leitura anterior mantida por um tique (falha ainda não confirmada): ${known}`
+    : `trava dos portões: ${known}`;
+}
+
+/**
+ * `LiveExecutorOut.kill_switch_latch_reason` -- either the wallet's daily-loss
+ * latch (`daily_loss_cap_reached`, `CHECK_REFUSAL_LABEL` above) or a
+ * `gates_invalid:<reason>` this process latched itself when the gates file
+ * stopped being valid in flight (T4.28d, `GATES_LATCH_PREFIX`). `null` means
+ * not latched -- callers already gate this on `kill_switch_latched`.
+ */
+export function killSwitchLatchReasonLabel(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (raw.startsWith("gates_invalid:")) return `portões inválidos — ${gatesReasonLabel(raw.slice("gates_invalid:".length))}`;
+  return executorRefusalLabel(raw) ?? `recusa: ${raw}`;
+}
