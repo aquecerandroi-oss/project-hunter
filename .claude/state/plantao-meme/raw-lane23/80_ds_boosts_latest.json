@@ -1,0 +1,129 @@
+{
+ "_meta": {
+  "file": "80_ds_boosts_latest.json",
+  "url": "https://api.dexscreener.com/token-boosts/latest/v1",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:37.362+00:00",
+  "http": 200,
+  "bytes": 21141,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "HIT",
+   "server": "cloudflare",
+   "cf-ray": "a3bae4d4ded1c60a-GIG",
+   "date": "Tue, 15 Sep 2026 21:58:37 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:37.593+00:00",
+  "read_brt": "18:58:37",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "n": 30,
+  "solana": [
+   {
+    "tokenAddress": "4wzLxapFN8VCKVDXENHU9y9rMwNRjTtuqKXb5TZod7uF",
+    "amount": 30,
+    "totalAmount": 30,
+    "description": "Buy this crap and earn BTC"
+   },
+   {
+    "tokenAddress": "jJVDNfZNZzRs6EXnBb2Co68SSfrn8PX8DgX955Upump",
+    "amount": 10,
+    "totalAmount": 10,
+    "description": "$LAST arrives as Solana’s “final token,” admitting the mission to stop new launches already failed 🪦\nJust vibes, exit-plan roadmap, afterlife archive, and a disappointed counter keep the joke painfully alive 🧾"
+   },
+   {
+    "tokenAddress": "GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom",
+    "amount": 10,
+    "totalAmount": 10,
+    "description": "DOOM's game fully inscribed onto the solana blockchain forever."
+   },
+   {
+    "tokenAddress": "8omgduFEjztUuJy1gpo2rzpX95FA9n6y96NAEVdRT6oi",
+    "amount": 10,
+    "totalAmount": 10,
+    "description": null
+   },
+   {
+    "tokenAddress": "FHPg1sktNjCTmAb1mv4DRDGrb2hk9jBDX1V9a8JRsmaB",
+    "amount": 10,
+    "totalAmount": 10,
+    "description": "Live StonkFun market intelligence - Paired with $STONK rewarding holders.\n\nBuilt using StonkFun Gitlab API."
+   },
+   {
+    "tokenAddress": "GTNG2fYPx59tjrHxyoUJ7MiMfx3mVup7Zbphurq3pump",
+    "amount": 30,
+    "totalAmount": 30,
+    "description": "The internet's favorite tech-inspired capsule, delivering daily doses of Solana memes."
+   },
+   {
+    "tokenAddress": "5GefefPX1mDs6ZJB1apYmz6fCTCiNJpHturZ9bvFpump",
+    "amount": 30,
+    "totalAmount": 40,
+    "description": "The meme that pumps for Halloween!"
+   },
+   {
+    "tokenAddress": "H7Y3TzFyyfPBnn5Dpwa5m79NdgDQnFS8TcAtQe2Tpump",
+    "amount": 50,
+    "totalAmount": 80,
+    "description": "Going all-in on the ultimate cat-powered meme coin gamble."
+   },
+   {
+    "tokenAddress": "9MBetPjhp7uZ4odThXNm44GTVaffoYBcmGpdda9rpump",
+    "amount": 500,
+    "totalAmount": 500,
+    "description": "Anatoely Yakovenko will lead Solana to new heights."
+   },
+   {
+    "tokenAddress": "2A1Qu9FcQPvQeXTY6WvvL27v7hqWRdPg6yP2iwJMpump",
+    "amount": 30,
+    "totalAmount": 40,
+    "description": "the brain has strong arms"
+   },
+   {
+    "tokenAddress": "2d4xZo72fDfFQaHTzqH3yJXWSnyEbh2H99EqJiUPpump",
+    "amount": 10,
+    "totalAmount": 10,
+    "description": "Legendary Doge energy meets the internet's most iconic hat. Built for fun, powered by the pack, and pointed straight at the moon."
+   },
+   {
+    "tokenAddress": "H7Y3TzFyyfPBnn5Dpwa5m79NdgDQnFS8TcAtQe2Tpump",
+    "amount": 30,
+    "totalAmount": 80,
+    "description": "Going all-in on the ultimate cat-powered meme coin gamble."
+   },
+   {
+    "tokenAddress": "Husm4id3wRvUvtTETpRDgKmdisvM1b7ks6N25Yiipump",
+    "amount": 10,
+    "totalAmount": 20,
+    "description": "Creator, Artist, Dancer. I Love Music, Dance, Creativity, Funny. \n\nhttps://opensea.io/collection/lopemuda\n\nhttps://www.youtube.com/@LOPEMUDAOFFICIAL\n\nhttps://x.com/LOPEMUDA"
+   },
+   {
+    "tokenAddress": "FMSRDb6ZnCec5RGMjbGNwMTCNmoB718HEKNzkdgtpump",
+    "amount": 50,
+    "totalAmount": 50,
+    "description": "TROLLP brings fearless humor, unstoppable confidence, and legendary meme energy to the blockchain, building a community that trolls together and wins together."
+   },
+   {
+    "tokenAddress": "DAHn4rnrnbPzfgNusjty1tp1MX6f76HLHtNH9muCdtKX",
+    "amount": 100,
+    "totalAmount": 100,
+    "description": "Caesar was chosen by Reddit to become Doge2, making him part of real internet Doge history.\n\nReal dog. Real provenance. Real lore."
+   },
+   {
+    "tokenAddress": "C8pvSBY8JBhP6zjAXAmbzNTAsqCsKiVoapCpCF5pump",
+    "amount": 100,
+    "totalAmount": 100,
+    "description": "Dih Fish"
+   },
+   {
+    "tokenAddress": "Cc996qQUy8Y17YMrNp75H4vJTUgkaYKBfJx6Zww8pump",
+    "amount": 50,
+    "totalAmount": 50,
+    "description": "BullishCat claws through every dip, hunts green candles, and purrs straight toward the moon."
+   }
+  ]
+ }
+}

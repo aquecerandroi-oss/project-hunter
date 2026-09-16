@@ -1,0 +1,241 @@
+{
+ "_meta": {
+  "file": "69_rugcheck_LABb_DmccGw.json",
+  "url": "https://api.rugcheck.xyz/v1/tokens/DmccGwRcUUnkfwdiZ9qAhRrTozx25o98tBS7DcXNpump/report",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:23.642+00:00",
+  "http": 200,
+  "bytes": 9116,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "server": "nginx",
+   "date": "Tue, 15 Sep 2026 21:58:25 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:25.344+00:00",
+  "read_brt": "18:58:25",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "mint": "DmccGwRcUUnkfwdiZ9qAhRrTozx25o98tBS7DcXNpump",
+  "creator": "4dazvc1uyinGtonBGKqrf4rZ9SWYKwDGXtdXT7cdTWq7",
+  "creatorBalance": 0,
+  "detectedAt": "2026-09-14T19:44:15.023001027Z",
+  "rugged": false,
+  "score": 1,
+  "score_normalised": 1,
+  "risks": [],
+  "insiderNetworks": null,
+  "graphInsidersDetected": 0,
+  "totalHolders": 340,
+  "totalLPProviders": 0,
+  "totalMarketLiquidity": 2753.3700758020022,
+  "launchpad": "Pump.Fun",
+  "deployPlatform": "unknown",
+  "tokenMeta": {
+   "name": "Ben Driller",
+   "symbol": "BenDrillr",
+   "uri": "https://ipfs.io/ipfs/Qmbb9ZGj9FwKS5Uf6wAzoEPJ5Q2n5PwjGP3AYYgJJzRVSR",
+   "mutable": false,
+   "updateAuthority": "11111111111111111111111111111111"
+  },
+  "token": {
+   "mintAuthority": null,
+   "supply": 999999325158693,
+   "decimals": 6,
+   "isInitialized": true,
+   "freezeAuthority": null
+  },
+  "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  "verification": null,
+  "transferFee": {
+   "pct": 0,
+   "maxAmount": 0,
+   "authority": "11111111111111111111111111111111"
+  },
+  "events": [],
+  "topHolders20": [
+   {
+    "owner": "CM2pEDTYjcaSvMtdpqEK8yDo3Q1JHZNi2o8ZK1QscKPH",
+    "pct": 86.97418912366166,
+    "insider": false,
+    "known": "AMM"
+   },
+   {
+    "owner": "4G3jQwGVsKXov8cca51ci6DZDjgg9mTSNY5GituVzVAu",
+    "pct": 3.0000020245252874,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "9L8Lke2SZKZrmXE1uWZxiwDgZFgzyxhpMZKYNufWMU5c",
+    "pct": 2.7598778896362024,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "11111111111111111111111111111111",
+    "pct": 1.9420474721861543,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "11111111111111111111111111111111",
+    "pct": 1.5007823782345415,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "EQVLxFGs4wWzHkXZaoNdZVPUm67DESzc4UY7JfwJTv6b",
+    "pct": 1.3246003053890014,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "HGByCJAonNaRp4SwvkPozuXDREX3ZzHk1jNWKUraJRJN",
+    "pct": 1.2861629550623896,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "A2amRomPpax7N9xigbaki6KK2oaCAU3Et4CYGv3BEVw5",
+    "pct": 1.2313376237642912,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6SKCSRuaCEhW4CbvrfpXr1cpVC1zMH7tXpADX6nNrUtF",
+    "pct": 1.1238667469318044,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "CSfsJAk4ff3FX2TSemzYCJcDyYSV77wSx2bNtcFrcjJq",
+    "pct": 1.0751126729294413,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "45hcrKriGc8hTezoGYtiLpKahBva7KQ7EFZwfwJTMKsr",
+    "pct": 0.9189544387632146,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "9BQgKwedxuyxc6kMF5w3iLAzgnYfpiuWvLD6jeKzAKAR",
+    "pct": 0.8887048845731658,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "H2YJgJgug9FpWHxJxSXuVdVLDGF3DZLkHXDQPSfCru1B",
+    "pct": 0.5877716508404891,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "7LNy6r7zpf27f6s4vdrb6kEfE3LZnx4DZDnuRcXoPK6A",
+    "pct": 0.5800886658013934,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "3ADNbQGrpgq9aavroXUtQdLJvhFwfN5r9CWKgf9GLDrH",
+    "pct": 0.559018231639394,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "8LgeCEpEjrwkEbNRuysKB3b2wfZn6qnZKCA8TTBGwenT",
+    "pct": 0.5178710258199599,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6N4DkDkQGun4dKkts16PGszjAEXdY6yst2LDY78kgUXb",
+    "pct": 0.4549017276379764,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "AQjA8xhZD6p1KXVbWqUAwdR8sSHmRxf9MZxp5FZaUraL",
+    "pct": 0.42266354869252165,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "8qGyRAb34Hn8yJRJpQXfV2XjnbZ5u7yDpf1j3DqDkoeE",
+    "pct": 0.33832852908836675,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "J51g4XpM2ksw8kCakng3xR6yYao1PwrVFWFwmv1DCiFt",
+    "pct": 0.3066287542785493,
+    "insider": false,
+    "known": null
+   }
+  ],
+  "markets": [
+   {
+    "marketType": "pump_fun",
+    "pubkey": "CM2pEDTYjcaSvMtdpqEK8yDo3Q1JHZNi2o8ZK1QscKPH",
+    "mintB": "So111111",
+    "lpLockedPct": 100,
+    "lpLockedUSD": 2753.3700758020022,
+    "quoteUSD": 400.8842312948537,
+    "baseUSD": 2352.4858445071486,
+    "lpTotalSupply": 4145104981
+   }
+  ],
+  "knownAccounts_types": [
+   "AMM",
+   "CREATOR",
+   "LOCKER"
+  ],
+  "keys": [
+   "creator",
+   "creatorBalance",
+   "creatorTokens",
+   "deployPlatform",
+   "detectedAt",
+   "events",
+   "fileMeta",
+   "freezeAuthority",
+   "graphInsidersDetected",
+   "insiderNetworks",
+   "knownAccounts",
+   "launchpad",
+   "lockerOwners",
+   "lockerScanStatus",
+   "lockers",
+   "markets",
+   "mint",
+   "mintAuthority",
+   "price",
+   "risks",
+   "rugged",
+   "score",
+   "score_normalised",
+   "token",
+   "tokenMeta",
+   "tokenProgram",
+   "tokenType",
+   "token_extensions",
+   "topHolders",
+   "totalHolders",
+   "totalLPProviders",
+   "totalMarketLiquidity",
+   "totalStableLiquidity",
+   "transferFee",
+   "validation",
+   "verification"
+  ],
+  "mentions": {
+   "holder_reward": 0,
+   "reward": 0,
+   "creator history": 0
+  }
+ }
+}

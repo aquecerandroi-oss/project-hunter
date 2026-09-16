@@ -1,0 +1,42 @@
+AVISO: a Astra alterou a árvore de trabalho num modo que não permite alterações:
+2,3d1
+<  M docs/DATABASE.md
+<  M docs/DEPLOYMENT.md
+5,16d2
+<  M docs/PIPELINE.md
+<  M docs/RISK_ENGINE_MEME.md
+<  M docs/plans/T4-MEME-RADAR.md
+<  M infra/scripts/meme_close_inputs.py
+<  M infra/scripts/meme_close_lesson_kit.py
+<  M infra/scripts/meme_close_lessons.py
+<  M infra/scripts/meme_close_queries.py
+<  M infra/scripts/meme_close_render_ops.py
+<  M infra/scripts/tests/meme_close_fixtures.py
+<  M infra/scripts/tests/test_meme_close_lessons.py
+<  M obsidian/05-EXPERIMENTS/EXP-M6-exclusoes-de-pedigree.md
+<  M packages/core/tests/integration/test_migrations.py
+18,25d3
+<  M packages/indicators/hunter_indicators/meme/pedigree.py
+<  M packages/indicators/tests/unit/test_meme_pedigree.py
+<  M services/meme-worker/hunter_meme_worker/lab_models.py
+<  M services/meme-worker/hunter_meme_worker/lab_repo_fast.py
+<  M services/meme-worker/hunter_meme_worker/proposals.py
+<  M services/meme-worker/hunter_meme_worker/proposals_reasons.py
+<  M services/meme-worker/tests/test_lab_fast.py
+<  M services/meme-worker/tests/test_proposals_flow.py
+30a9
+> ?? .claude/state/astra-review-plantao-meme-20260915-1848.md
+204,205d182
+< ?? .claude/state/notes-T4.24.md
+< ?? .claude/state/notes-T4.25.md
+304,313d280
+< ?? infra/migrations/ddl/meme_creator_repeat.py
+< ?? infra/migrations/versions/0039_meme_creator_repeat.py
+< ?? infra/scripts/meme_render_bets.py
+< ?? infra/scripts/meme_render_bets_draw.py
+< ?? infra/scripts/meme_render_bets_model.py
+< ?? infra/scripts/meme_render_bets_notes.py
+< ?? infra/scripts/meme_render_bets_query.py
+< ?? infra/scripts/sql/research/2026-09-15-t424-reincidencia.sql
+< ?? infra/scripts/tests/test_meme_render_bets.py
+< ?? infra/scripts/tests/test_meme_render_bets_integration.py

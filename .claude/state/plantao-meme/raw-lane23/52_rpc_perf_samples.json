@@ -1,0 +1,60 @@
+{
+ "_meta": {
+  "file": "52_rpc_perf_samples.json",
+  "url": "https://api.mainnet-beta.solana.com",
+  "method": "POST",
+  "request_started_utc": "2026-09-15T21:57:54.664+00:00",
+  "http": 200,
+  "bytes": 601,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "date": "Tue, 15 Sep 2026 21:57:54 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:57:55.736+00:00",
+  "read_brt": "18:57:55",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "jsonrpc": "2.0",
+  "result": [
+   {
+    "numNonVoteTransactions": 189169,
+    "numSlots": 191,
+    "numTransactions": 315848,
+    "samplePeriodSecs": 60,
+    "slot": 447357703
+   },
+   {
+    "numNonVoteTransactions": 170232,
+    "numSlots": 181,
+    "numTransactions": 292489,
+    "samplePeriodSecs": 60,
+    "slot": 447357512
+   },
+   {
+    "numNonVoteTransactions": 180108,
+    "numSlots": 187,
+    "numTransactions": 306247,
+    "samplePeriodSecs": 60,
+    "slot": 447357331
+   },
+   {
+    "numNonVoteTransactions": 177644,
+    "numSlots": 180,
+    "numTransactions": 299390,
+    "samplePeriodSecs": 60,
+    "slot": 447357144
+   },
+   {
+    "numNonVoteTransactions": 180139,
+    "numSlots": 191,
+    "numTransactions": 309292,
+    "samplePeriodSecs": 60,
+    "slot": 447356964
+   }
+  ],
+  "id": 1
+ }
+}

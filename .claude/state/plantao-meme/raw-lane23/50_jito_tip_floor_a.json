@@ -1,0 +1,30 @@
+{
+ "_meta": {
+  "file": "50_jito_tip_floor_a.json",
+  "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:57:50.292+00:00",
+  "http": 200,
+  "bytes": 295,
+  "headers": {
+   "content-type": "application/json",
+   "date": "Tue, 15 Sep 2026 21:57:49 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:57:50.683+00:00",
+  "read_brt": "18:57:50",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": [
+  {
+   "time": "2026-09-15T21:56:46+00:00",
+   "landed_tips_25th_percentile": 1.69425e-06,
+   "landed_tips_50th_percentile": 4.4525e-06,
+   "landed_tips_75th_percentile": 8.401e-06,
+   "landed_tips_95th_percentile": 2.185525e-05,
+   "landed_tips_99th_percentile": 0.0001,
+   "ema_landed_tips_50th_percentile": 0.0001671958750067144
+  }
+ ]
+}

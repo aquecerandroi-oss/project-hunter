@@ -1,0 +1,259 @@
+{
+ "_meta": {
+  "file": "62_rugcheck_hr_H2d5yt.json",
+  "url": "https://api.rugcheck.xyz/v1/tokens/H2d5yt3zFxt3nGGR1NnwHo9p6HrbTUREonVQZC81pump/report",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:03.333+00:00",
+  "http": 200,
+  "bytes": 11649,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "server": "nginx",
+   "date": "Tue, 15 Sep 2026 21:58:04 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:04.471+00:00",
+  "read_brt": "18:58:04",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "mint": "H2d5yt3zFxt3nGGR1NnwHo9p6HrbTUREonVQZC81pump",
+  "creator": "HSVE6aLPq5Vhar8DauknoaZW7irxpkm2gXpvjnUvSSMh",
+  "creatorBalance": 0,
+  "detectedAt": "2026-09-15T21:41:55.027387882Z",
+  "rugged": false,
+  "score": 2425,
+  "score_normalised": 31,
+  "risks": [
+   {
+    "name": "Low Liquidity",
+    "value": "$575.23",
+    "description": "Low amount of liquidity in the token pool",
+    "score": 2424,
+    "level": "danger"
+   }
+  ],
+  "insiderNetworks": null,
+  "graphInsidersDetected": 0,
+  "totalHolders": 1019,
+  "totalLPProviders": 0,
+  "totalMarketLiquidity": 2821.591959110846,
+  "launchpad": "Pump.Fun",
+  "deployPlatform": "unknown",
+  "tokenMeta": {
+   "name": "Weally?",
+   "symbol": "WEALLY",
+   "uri": "https://meta.lqsgqxmvlk.uk/metadata/SHzjOYRj",
+   "mutable": false,
+   "updateAuthority": "11111111111111111111111111111111"
+  },
+  "token": {
+   "mintAuthority": null,
+   "supply": 846735026445580,
+   "decimals": 6,
+   "isInitialized": true,
+   "freezeAuthority": null
+  },
+  "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  "verification": null,
+  "transferFee": {
+   "pct": 0,
+   "maxAmount": 0,
+   "authority": "11111111111111111111111111111111"
+  },
+  "events": [],
+  "topHolders20": [
+   {
+    "owner": "9NWDTyqNsJRJ9FWk9XgVuFHeKt2TQJ7EKoARjag6gGS9",
+    "pct": 89.91456887728437,
+    "insider": false,
+    "known": "AMM"
+   },
+   {
+    "owner": "Leyten1iTYhuM6Jcn1tJpEBakcDWuMVj1fyXPo146WN",
+    "pct": 3.2660914986369005,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6HCvnqFLoav92677quSLzmS83p7BysxUQjviVy4jiM9",
+    "pct": 1.5526809705658218,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "5narggpAacVjomcfD9GiV2RDat6SHxRBLaLYK11ss2L3",
+    "pct": 0.9856166306477192,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "EdSUTDnKxnPA6ky6uqvmCFrNWsdStRcKLHZtGzZvASJN",
+    "pct": 0.3377352420339252,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "GvD5HiZuNcZvny8zhUXStLwEiWmA2spbikj22wEN5LYR",
+    "pct": 0.2722095724843782,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "9KsiDB8VWiA2t97XSGFHsqC1zMzUpiPbC7ek78tKF9XX",
+    "pct": 0.249434558121323,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "BNx55LUhJZBYn7y3EKqEp9CUPuAY8pQS9xFz7QbKdpA9",
+    "pct": 0.24438517295835457,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "FncYc1xCJufhrxmp4kyLanQvTgehqck4AwXvFXJomkyu",
+    "pct": 0.23236307010129953,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "63YpR5uMxLfvSMW4a5hgamzF23mQiDhBDEK3R2eqpwra",
+    "pct": 0.2064328016110883,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "DhQxZHZuu1MikxsYLp7b5Ffjscj7wVZmrv6HpE7ZqSq6",
+    "pct": 0.20212385160931992,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "CEHW7zngKT1SmyJTENQ6X6a1y47CzEk72pifwnDWRCmS",
+    "pct": 0.1583823857504248,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "3QTkdVMnQFAhNpQX71F9wBWF3BHw8VZpSZZsrvHkTQbH",
+    "pct": 0.14331300449728013,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6MzsmmS5xEBBdSCGuoVmHwBQUY7K2Kwkfkgumbx2J5y6",
+    "pct": 0.14120616012438508,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "ET36wrXSsLaK5tPCuAMVg5vgaM9SSfbRbNdsFCH97B9C",
+    "pct": 0.1393917611981364,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "GzgtycRSyJmMMrrDX4rr7ph8YF9nArLDxjdnqrBwgXyc",
+    "pct": 0.12151787363577665,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "B7WBXQq1qF76jLaYpAKKYVPRpHyGa4uPDamg9MPhLsaq",
+    "pct": 0.10830628319684142,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "3P9rUddCYxQGNHd1mwmKVm8Z6L5GMYupmPJKQkwn5UBD",
+    "pct": 0.10823489864581637,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "8xP8dM9wr4Vi4h3dFqxXYaufS5z4UZ2ZP1E9V7LZ5wtG",
+    "pct": 0.10485537764122037,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "99uLfD7K265894cEvN8GTVWe7dqKLB4iYA7PnNDGzupp",
+    "pct": 0.08353247380565972,
+    "insider": false,
+    "known": null
+   }
+  ],
+  "markets": [
+   {
+    "marketType": "pump_fun_amm",
+    "pubkey": "9NWDTyqNsJRJ9FWk9XgVuFHeKt2TQJ7EKoARjag6gGS9",
+    "mintB": "So111111",
+    "lpLockedPct": 100,
+    "lpLockedUSD": 2817.090999093284,
+    "quoteUSD": 570.7266058519941,
+    "baseUSD": 2246.36439324129,
+    "lpTotalSupply": 4193388284776
+   },
+   {
+    "marketType": "meteora_damm_v2",
+    "pubkey": "76AQh46bhaX8i9xHfC4ydg4dWZRNfSKrmizy6mBf2sC8",
+    "mintB": "So111111",
+    "lpLockedPct": 0,
+    "lpLockedUSD": 0,
+    "quoteUSD": 4.500960017558901,
+    "baseUSD": 2.950547529354261e-12,
+    "lpTotalSupply": 0
+   }
+  ],
+  "knownAccounts_types": [
+   "AMM",
+   "CREATOR",
+   "LOCKER"
+  ],
+  "keys": [
+   "creator",
+   "creatorBalance",
+   "creatorTokens",
+   "deployPlatform",
+   "detectedAt",
+   "events",
+   "fileMeta",
+   "freezeAuthority",
+   "graphInsidersDetected",
+   "insiderNetworks",
+   "knownAccounts",
+   "launchpad",
+   "lockerOwners",
+   "lockerScanStatus",
+   "lockers",
+   "markets",
+   "mint",
+   "mintAuthority",
+   "price",
+   "risks",
+   "rugged",
+   "score",
+   "score_normalised",
+   "token",
+   "tokenMeta",
+   "tokenProgram",
+   "tokenType",
+   "token_extensions",
+   "topHolders",
+   "totalHolders",
+   "totalLPProviders",
+   "totalMarketLiquidity",
+   "totalStableLiquidity",
+   "transferFee",
+   "validation",
+   "verification"
+  ],
+  "mentions": {
+   "holder_reward": 0,
+   "reward": 0,
+   "creator history": 0
+  }
+ }
+}

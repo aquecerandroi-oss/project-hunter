@@ -1,0 +1,103 @@
+{
+ "_meta": {
+  "file": "82_ds_profiles_latest.json",
+  "url": "https://api.dexscreener.com/token-profiles/latest/v1",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:40.366+00:00",
+  "http": 200,
+  "bytes": 22834,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "HIT",
+   "server": "cloudflare",
+   "cf-ray": "a3bae4e76d86e0f6-GIG",
+   "date": "Tue, 15 Sep 2026 21:58:40 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:40.564+00:00",
+  "read_brt": "18:58:40",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "n": 30,
+  "solana": [
+   {
+    "tokenAddress": "CTNuubniAGjAzQhNVLpZBCXQU2hb2NtuBhzuSebFpump",
+    "description": "Adam Sander posted about his new Solana token project. The background is a celebrity meme coin launch.\nIts logo features Adam Sandler with a power sander."
+   },
+   {
+    "tokenAddress": "GY9mZfyPpxXxBXBxS2hB2XjhP3kfUsywTvgveozxpump",
+    "description": null
+   },
+   {
+    "tokenAddress": "A1cr4bSAWKeSSmTXLrNuZmqL2Qk4waDWyNYzDfZkLz1s",
+    "description": ""
+   },
+   {
+    "tokenAddress": "DwcgRJAZhGRdxjKdPMkZnbrqXCzadC1bg9Y6f3YuyUdP",
+    "description": "Laser Cat is a Dutch Bros secret menu favorite. The cat has lasers. Meow."
+   },
+   {
+    "tokenAddress": "HN3RNTWouzabY9Fcje119ncrj7uwXAfqKvXiBR1jpump",
+    "description": "The first LLM stored in Solana v1 transactions."
+   },
+   {
+    "tokenAddress": "AbwhhKmSC7xk321jpJ1SZBco7Winv1tqvxBrATg3pump",
+    "description": "Optimus chose a truck. Megan chose to be a fox."
+   },
+   {
+    "tokenAddress": "5YYEhvrPubHGJyTSBa6o92NSwbERksrgX49hzQe5pump",
+    "description": null
+   },
+   {
+    "tokenAddress": "Tqr5qoMk5qz85DY7Qg9MX99aCU7u67hEFhnRUj2pump",
+    "description": "slopper paired with OPENAI"
+   },
+   {
+    "tokenAddress": "H7MBQPaLjqC3UxR6yJE2zWp8KJTXCa6DW2iomNNspump",
+    "description": "FUCK YOU HIGHER"
+   },
+   {
+    "tokenAddress": "oP3ziG59gh69LPxtvEe6pdyJaYXBieYog8SPdKYpump",
+    "description": ""
+   },
+   {
+    "tokenAddress": "4wzLxapFN8VCKVDXENHU9y9rMwNRjTtuqKXb5TZod7uF",
+    "description": "Buy this crap and earn BTC"
+   },
+   {
+    "tokenAddress": "BLuEgQHNqF8YtGQhY3Ruvqiq1m2w1mgS9uMY9hhdZtrr",
+    "description": "Circle put USDC on the Blues. We put $BLUES on Arc."
+   },
+   {
+    "tokenAddress": "jJVDNfZNZzRs6EXnBb2Co68SSfrn8PX8DgX955Upump",
+    "description": "$LAST arrives as Solana’s “final token,” admitting the mission to stop new launches already failed 🪦\nJust vibes, exit-plan roadmap, afterlife archive, and a disappointed counter keep the joke painfully alive 🧾"
+   },
+   {
+    "tokenAddress": "BPiRy6he4hx5GNanaUSXriPNKcBuaq97da63UgyHpump",
+    "description": "the real carl johnson"
+   },
+   {
+    "tokenAddress": "68E6XXsT8nHM95AVgRNMpFuzYr15tRGQRBtfWBV6bxkR",
+    "description": "New method to clear the national debt dropped."
+   },
+   {
+    "tokenAddress": "BgQ1z9FosAa8swAVbxqiMiiBhQUfaKFSa2VF3EYq8DW7",
+    "description": "The launchpad for your launchpad.\n\n$LAUNCHY"
+   },
+   {
+    "tokenAddress": "CuaQE1HxjcMotLWnVJeFHHanDFEkbpkHDwrT4YRDpump",
+    "description": null
+   },
+   {
+    "tokenAddress": "Xrc25dcwPA2CotpZdJJ4mFEE8UbHbsCKpkFTCbLpump",
+    "description": "Like TikTok. But onchain. Powered by Solana V1"
+   },
+   {
+    "tokenAddress": "4DQjTpKPhe7G3eCWnxsYsdj4LF5ALYJANLM2DPSVpump",
+    "description": null
+   }
+  ]
+ }
+}

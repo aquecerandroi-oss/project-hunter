@@ -1,0 +1,42 @@
+{
+ "_meta": {
+  "file": "94_ds_orders_ctl_jJVDNf.json",
+  "url": "https://api.dexscreener.com/orders/v1/solana/jJVDNfZNZzRs6EXnBb2Co68SSfrn8PX8DgX955Upump",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:53.235+00:00",
+  "http": 200,
+  "bytes": 335,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "HIT",
+   "server": "cloudflare",
+   "cf-ray": "a3bae5395b1564e7-GIG",
+   "date": "Tue, 15 Sep 2026 21:58:53 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:53.861+00:00",
+  "read_brt": "18:58:53",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "orders": [
+   {
+    "chainId": "solana",
+    "tokenAddress": "jJVDNfZNZzRs6EXnBb2Co68SSfrn8PX8DgX955Upump",
+    "type": "tokenProfile",
+    "status": "approved",
+    "paymentTimestamp": 1789506916217
+   }
+  ],
+  "boosts": [
+   {
+    "chainId": "solana",
+    "tokenAddress": "jJVDNfZNZzRs6EXnBb2Co68SSfrn8PX8DgX955Upump",
+    "id": "4Z7UkUYme125RhvXEycf",
+    "amount": 10,
+    "paymentTimestamp": 1789507194771
+   }
+  ]
+ }
+}

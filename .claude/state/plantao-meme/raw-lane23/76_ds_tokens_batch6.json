@@ -1,0 +1,115 @@
+{
+ "_meta": {
+  "file": "76_ds_tokens_batch6.json",
+  "url": "https://api.dexscreener.com/tokens/v1/solana/Hp9aqfw8xjwXTXKu2wFGR7k59djMzjCTFdJFCiEApump,DmccGwRcUUnkfwdiZ9qAhRrTozx25o98tBS7DcXNpump",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:35.424+00:00",
+  "http": 200,
+  "bytes": 1495,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "MISS",
+   "server": "cloudflare",
+   "cf-ray": "a3bae4cac99564a9-GIG",
+   "date": "Tue, 15 Sep 2026 21:58:36 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:36.159+00:00",
+  "read_brt": "18:58:36",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "n_pairs": 2,
+  "pairs": [
+   {
+    "dexId": "pumpfun",
+    "pairAddress": "4zoHvkjXQ2st2RWGCTk4aG4ABL23oJHdgMdYmR9Hyuqk",
+    "priceUsd": "0.000003266",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 2
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 21
+     },
+     "h24": {
+      "buys": 433,
+      "sells": 463
+     }
+    },
+    "volume": {
+     "h24": 33716.29,
+     "h6": 551.92,
+     "h1": 139.58,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -8.56,
+     "h6": -30.09,
+     "h24": 0.61
+    },
+    "fdv": 3266.41,
+    "marketCap": 3266.41,
+    "pairCreatedAt": 1789435140000,
+    "base": "Hp9aqfw8xjwXTXKu2wFGR7k59djMzjCTFdJFCiEApump",
+    "symbol": "LBN",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpfun",
+    "pairAddress": "CM2pEDTYjcaSvMtdpqEK8yDo3Q1JHZNi2o8ZK1QscKPH",
+    "priceUsd": "0.000003502",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 3
+     },
+     "h6": {
+      "buys": 14,
+      "sells": 17
+     },
+     "h24": {
+      "buys": 565,
+      "sells": 457
+     }
+    },
+    "volume": {
+     "h24": 32630.58,
+     "h6": 1380.62,
+     "h1": 2.84,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -0.49,
+     "h6": 2.2,
+     "h24": -73.23
+    },
+    "fdv": 3502.01,
+    "marketCap": 3502.01,
+    "pairCreatedAt": 1789415053000,
+    "base": "DmccGwRcUUnkfwdiZ9qAhRrTozx25o98tBS7DcXNpump",
+    "symbol": "BenDrillr",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   }
+  ]
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "_meta": {
+  "file": "95_ds_orders_ctl_Gcg2cy.json",
+  "url": "https://api.dexscreener.com/orders/v1/solana/Gcg2cykuoxw6Zv9PHxpfiHSukh3jLuN8VMuogRQtpump",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:56.683+00:00",
+  "http": 200,
+  "bytes": 25,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "REVALIDATED",
+   "server": "cloudflare",
+   "cf-ray": "a3bae54ddfb90c61-GIG",
+   "date": "Tue, 15 Sep 2026 21:58:57 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:57.152+00:00",
+  "read_brt": "18:58:57",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "orders": [],
+  "boosts": []
+ }
+}

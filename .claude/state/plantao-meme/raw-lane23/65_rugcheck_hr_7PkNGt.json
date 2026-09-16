@@ -1,0 +1,269 @@
+{
+ "_meta": {
+  "file": "65_rugcheck_hr_7PkNGt.json",
+  "url": "https://api.rugcheck.xyz/v1/tokens/7PkNGtjrcD3fMdfRG9JYyL8qU4gUuvHh9ewFveDLYu6T/report",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:17.143+00:00",
+  "http": 200,
+  "bytes": 14035,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "server": "nginx",
+   "date": "Tue, 15 Sep 2026 21:58:17 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:18.063+00:00",
+  "read_brt": "18:58:18",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "mint": "7PkNGtjrcD3fMdfRG9JYyL8qU4gUuvHh9ewFveDLYu6T",
+  "creator": "GKV2tj2E59755XMYqEVZu5i1yuWYvjyfB9CXwKnvM9GV",
+  "creatorBalance": 0,
+  "detectedAt": "2026-09-15T20:37:42.435574574Z",
+  "rugged": false,
+  "score": 2254,
+  "score_normalised": 30,
+  "risks": [
+   {
+    "name": "Low Liquidity",
+    "value": "$746.42",
+    "description": "Low amount of liquidity in the token pool",
+    "score": 2253,
+    "level": "danger"
+   }
+  ],
+  "insiderNetworks": null,
+  "graphInsidersDetected": 0,
+  "totalHolders": 1034,
+  "totalLPProviders": 0,
+  "totalMarketLiquidity": 3166.9606937448707,
+  "launchpad": "Pump.Fun",
+  "deployPlatform": "unknown",
+  "tokenMeta": {
+   "name": "SARS-CoV-2",
+   "symbol": "SARS-COV-2",
+   "uri": "https://metadata.j7tracker.io/metadata/2U2WDevgMD.json",
+   "mutable": false,
+   "updateAuthority": "11111111111111111111111111111111"
+  },
+  "token": {
+   "mintAuthority": null,
+   "supply": 867055860010065,
+   "decimals": 6,
+   "isInitialized": true,
+   "freezeAuthority": null
+  },
+  "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  "verification": null,
+  "transferFee": {
+   "pct": 0,
+   "maxAmount": 0,
+   "authority": "11111111111111111111111111111111"
+  },
+  "events": [],
+  "topHolders20": [
+   {
+    "owner": "CQeDoyGJbPK7eQdv9Ncye6vxCccYbWUwH3Z8K2jL1RqH",
+    "pct": 80.57176293830625,
+    "insider": false,
+    "known": "AMM"
+   },
+   {
+    "owner": "AQyMkZ7c2mVs4fJG8x6MUv64VXbPh968H2sX9BubZXrG",
+    "pct": 3.4030518093525695,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "EPvHEyS4JhRbxBjUimzRpxiuSFUaz8NajJL4aLfyxhQ3",
+    "pct": 2.5754101194273438,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "EsM1TfSegaGq4WhYo3CiqHKfhGekq6S2ALADVyNufsVo",
+    "pct": 2.4929944268617343,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "HTcPDpzxMuMZF9Xbb7iTHGsZ77BFUGqJPqDp2GefnuWQ",
+    "pct": 2.388698723272867,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "AUqecMFs5jxCv5mnMsBE6zgEA5rXcZqsWJ8pDMq9Cyp9",
+    "pct": 2.3853650703503595,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "4exTUsCJVY22NRGUrNiB4MCtGjyEuxtYbZ1XaMUn2vss",
+    "pct": 2.1089584491065816,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6J93BFzRgjyS9Ce35NxjUBNzoMScHek2HsSUiRUGW5fw",
+    "pct": 0.9733659222116359,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "ABwqEeGZ1rMgHYhQ6Jyncc4MrwQp98JVYg1dRAMdPa3H",
+    "pct": 0.8539556983230642,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "BwBsoGeqN2St2vcurGBSUKXbC2WTZ73eKRcfAYhfgQtK",
+    "pct": 0.340078892093039,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6wMsBMGNJ5R2t79foKzV33C96H2kXk13zeZtHCbJtHtE",
+    "pct": 0.2033086401508822,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "7Wt8EXsu1Y4YiFPcKsbLwN9DUh8aGBWH5QEQizcWSdS",
+    "pct": 0.15523352753666594,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "69QKzKvogpDsRozKrtdAv5xVeQJ2KRGTQvngUVKvznYR",
+    "pct": 0.10305608211893377,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "GELAjrC1sZgWy4y9USyyb17DZSKvhUsUWqvm1ueVJc8X",
+    "pct": 0.09784539738341101,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "Gvo3p85W8WxnDyuBw8QuRdat9rNDDJy64TWHgGXE22nj",
+    "pct": 0.08371164287103422,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6heiC65Lcahp6ex5P2Qa6Jg8JzeMafiyrASn8P71Pigk",
+    "pct": 0.06998168788017375,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "4VrJauzvCTp66Ti1xfbwcmgjFjUsLX4PhCnXvFyqTg7y",
+    "pct": 0.0653560005637263,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "GhVzF7TLvE8LVjkq8LTA4eWRkm6FpL167PtGVUrhBvyt",
+    "pct": 0.06501753907406334,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "8ydRDfSSHAaXJ73ophjfRt15Fr2cCt9LyBLSxhc5aoZa",
+    "pct": 0.06112846866461953,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "AFXyxspMBGxXnAuouHpkVmcRJz8pT9VEvbSMhurx9r3q",
+    "pct": 0.059351903524188884,
+    "insider": false,
+    "known": null
+   }
+  ],
+  "markets": [
+   {
+    "marketType": "pump_fun_amm",
+    "pubkey": "CQeDoyGJbPK7eQdv9Ncye6vxCccYbWUwH3Z8K2jL1RqH",
+    "mintB": "So111111",
+    "lpLockedPct": 100,
+    "lpLockedUSD": 3162.956303806283,
+    "quoteUSD": 743.4322693997641,
+    "baseUSD": 2419.5240344065187,
+    "lpTotalSupply": 4193388296026
+   },
+   {
+    "marketType": "meteora_damm_v2",
+    "pubkey": "HQxLtTx32fUeHNnpBPTquunfxnuvcdxq3p2Aj5DcceKQ",
+    "mintB": "So111111",
+    "lpLockedPct": 0,
+    "lpLockedUSD": 0,
+    "quoteUSD": 2.9714222308508385,
+    "baseUSD": 1.0198478794874384,
+    "lpTotalSupply": 1720151315698706753
+   },
+   {
+    "marketType": "meteora_damm_v2",
+    "pubkey": "85tfUcnetsofmCizxGpEf9pkGh7XFFXWxjLfJhDvhWha",
+    "mintB": "So111111",
+    "lpLockedPct": 0,
+    "lpLockedUSD": 0,
+    "quoteUSD": 0.013119828246168834,
+    "baseUSD": 3.4633788182618177e-12,
+    "lpTotalSupply": 0
+   }
+  ],
+  "knownAccounts_types": [
+   "AMM",
+   "CREATOR",
+   "LOCKER"
+  ],
+  "keys": [
+   "creator",
+   "creatorBalance",
+   "creatorTokens",
+   "deployPlatform",
+   "detectedAt",
+   "events",
+   "fileMeta",
+   "freezeAuthority",
+   "graphInsidersDetected",
+   "insiderNetworks",
+   "knownAccounts",
+   "launchpad",
+   "lockerOwners",
+   "lockerScanStatus",
+   "lockers",
+   "markets",
+   "mint",
+   "mintAuthority",
+   "price",
+   "risks",
+   "rugged",
+   "score",
+   "score_normalised",
+   "token",
+   "tokenMeta",
+   "tokenProgram",
+   "tokenType",
+   "token_extensions",
+   "topHolders",
+   "totalHolders",
+   "totalLPProviders",
+   "totalMarketLiquidity",
+   "totalStableLiquidity",
+   "transferFee",
+   "validation",
+   "verification"
+  ],
+  "mentions": {
+   "holder_reward": 0,
+   "reward": 0,
+   "creator history": 0
+  }
+ }
+}

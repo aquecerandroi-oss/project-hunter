@@ -1,0 +1,29 @@
+{
+ "_meta": {
+  "file": "01_sol_price.json",
+  "url": "https://frontend-api-v3.pump.fun/sol-price",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:57:00.000+00:00",
+  "http": 200,
+  "bytes": 74,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "x-ratelimit-limit": "50",
+   "x-ratelimit-remaining": "49",
+   "cf-cache-status": "DYNAMIC",
+   "server": "cloudflare",
+   "cf-ray": "a3bae275b8a88303-GIG",
+   "date": "Tue, 15 Sep 2026 21:57:00 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:57:00.622+00:00",
+  "read_brt": "18:57:00",
+  "pump_host": true,
+  "pump_count": 1,
+  "error": null
+ },
+ "payload": {
+  "solPrice": 96.37178454803441,
+  "asOfTimestamp": 1789509419132,
+  "stale": false
+ }
+}

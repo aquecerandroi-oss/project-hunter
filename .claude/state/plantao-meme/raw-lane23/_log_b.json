@@ -1,0 +1,749 @@
+{
+ "run": 23,
+ "lane": 3,
+ "pump_host_requests": 0,
+ "requests": [
+  {
+   "file": "50_jito_tip_floor_a.json",
+   "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:57:50.292+00:00",
+   "http": 200,
+   "bytes": 295,
+   "headers": {
+    "content-type": "application/json",
+    "date": "Tue, 15 Sep 2026 21:57:49 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:57:50.683+00:00",
+   "read_brt": "18:57:50",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "51_rpc_prioritization_fees_pump.json",
+   "url": "https://api.mainnet-beta.solana.com",
+   "method": "POST",
+   "request_started_utc": "2026-09-15T21:57:51.871+00:00",
+   "http": 200,
+   "bytes": 6206,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:57:52 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:57:53.459+00:00",
+   "read_brt": "18:57:53",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "52_rpc_perf_samples.json",
+   "url": "https://api.mainnet-beta.solana.com",
+   "method": "POST",
+   "request_started_utc": "2026-09-15T21:57:54.664+00:00",
+   "http": 200,
+   "bytes": 601,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 15 Sep 2026 21:57:54 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:57:55.736+00:00",
+   "read_brt": "18:57:55",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "53_status_solana.json",
+   "url": "https://status.solana.com/api/v2/summary.json",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:57:56.939+00:00",
+   "http": 200,
+   "bytes": 2973,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "AtlassianEdge",
+    "date": "Tue, 15 Sep 2026 21:57:57 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:57:57.522+00:00",
+   "read_brt": "18:57:57",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "61_rugcheck_hr_G2P8Jq.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/G2P8JqyPKidWhBtgeTmmZUe2uFw2ZN7nvuUyppArTo3H/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:57:58.725+00:00",
+   "http": 200,
+   "bytes": 9750,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:57:59 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:00.012+00:00",
+   "read_brt": "18:58:00",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "61_rugcheck_ctl_CTNuub.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/CTNuubniAGjAzQhNVLpZBCXQU2hb2NtuBhzuSebFpump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:01.200+00:00",
+   "http": 200,
+   "bytes": 9605,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:02 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:02.127+00:00",
+   "read_brt": "18:58:02",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "62_rugcheck_hr_H2d5yt.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/H2d5yt3zFxt3nGGR1NnwHo9p6HrbTUREonVQZC81pump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:03.333+00:00",
+   "http": 200,
+   "bytes": 11649,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:04 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:04.471+00:00",
+   "read_brt": "18:58:04",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "62_rugcheck_ctl_HN3RNT.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/HN3RNTWouzabY9Fcje119ncrj7uwXAfqKvXiBR1jpump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:05.677+00:00",
+   "http": 200,
+   "bytes": 9696,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:07 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:07.183+00:00",
+   "read_brt": "18:58:07",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "63_rugcheck_hr_6mijNe.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/6mijNe1mtBxY5LUSMTjiFN6bsCWoiGSodjw2kMqg8VJE/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:08.371+00:00",
+   "http": 200,
+   "bytes": 10118,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:09 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:09.673+00:00",
+   "read_brt": "18:58:09",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "63_rugcheck_ctl_qLf3mz.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/qLf3mzbGA82LpU5R31K5fRySktbiABHuijjQ3Pepump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:10.878+00:00",
+   "http": 200,
+   "bytes": 10003,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:11 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:11.729+00:00",
+   "read_brt": "18:58:11",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "64_rugcheck_hr_oP3ziG.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/oP3ziG59gh69LPxtvEe6pdyJaYXBieYog8SPdKYpump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:12.932+00:00",
+   "http": 200,
+   "bytes": 9786,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:13 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:13.943+00:00",
+   "read_brt": "18:58:13",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "64_rugcheck_ctl_jJVDNf.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/jJVDNfZNZzRs6EXnBb2Co68SSfrn8PX8DgX955Upump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:15.148+00:00",
+   "http": 200,
+   "bytes": 9671,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:15 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:15.951+00:00",
+   "read_brt": "18:58:15",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "65_rugcheck_hr_7PkNGt.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/7PkNGtjrcD3fMdfRG9JYyL8qU4gUuvHh9ewFveDLYu6T/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:17.143+00:00",
+   "http": 200,
+   "bytes": 14035,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:17 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:18.063+00:00",
+   "read_brt": "18:58:18",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "65_rugcheck_ctl_Gcg2cy.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/Gcg2cykuoxw6Zv9PHxpfiHSukh3jLuN8VMuogRQtpump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:19.270+00:00",
+   "http": 200,
+   "bytes": 9661,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:20 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:20.231+00:00",
+   "read_brt": "18:58:20",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "69_rugcheck_LABa_Hp9aqf.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/Hp9aqfw8xjwXTXKu2wFGR7k59djMzjCTFdJFCiEApump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:21.420+00:00",
+   "http": 200,
+   "bytes": 9054,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:22 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:22.437+00:00",
+   "read_brt": "18:58:22",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "69_rugcheck_LABb_DmccGw.json",
+   "url": "https://api.rugcheck.xyz/v1/tokens/DmccGwRcUUnkfwdiZ9qAhRrTozx25o98tBS7DcXNpump/report",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:23.642+00:00",
+   "http": 200,
+   "bytes": 9116,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "server": "nginx",
+    "date": "Tue, 15 Sep 2026 21:58:25 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:25.344+00:00",
+   "read_brt": "18:58:25",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "71_ds_tokens_batch1.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/129hJmrKLVwrSkKJt5MxTaQvzRtzshuFtT9WBjbtpump,2A1Qu9FcQPvQeXTY6WvvL27v7hqWRdPg6yP2iwJMpump,2Qxw5TJ5aGwxZgKzji7j1nL2VY6cuRYzY2UdXoV5pump,2Y9QmsmRyScWYHYdKWfJPctDJNC5WN5XtEN4ZSzWf51a,3DHTADG9AywZeac4kHu366s23yzanUVPFWSmUGAYU1Ku,3bNtq6ZYQ11PNXq5ZKeWBrfmTWUEcotJtSN5eyL5DFfX,3f6ACaSW2wAYno61Y5KdyhccfmGq2y1Ud4AfpFAwpump,3hLDj47BbSFYoNqUPD2YLCHtuGPeyvNy5aGJQB4Spump,3j7sRXJ1sew7hacEXFnddTANhFXv2XC5XbzPHtqMpump,3k2Uscqejw55g6f8bSqXmxULq46bAERY7rPuJ5V2pump,3nfS1yk8XaqLm6DwzHDw5NdPrVAfyRkWgimPWqW3pump,3wR88kYEovkNjW9uaLJum5sH1FXxUgwTR8roMeKPsk4t,3zNeTW8oy7vXpkiimtg1evokbbdJU5yd4KWUuBAipaid,3zuomKpLKA1fMFmhNagBa34JTsCzW19ocM9hnGqmpump,4CY9BZS4wmvJznanGymwFXF5aNevM5aabuyVfQLCpump,4GtYQVgyKMuAmbYQw9q7iX4ZozuNAF1KU9uQDypoNkXP,4HUVobGSUsUr7eVhpb6gzyj39wTMvXfuebHRXr9epump,4XwHMLjyShkigWzfA1KDUaM9EkVPHDpy6Kr618e6pump,4ZUjJ5EJbwfh7teotB29uHc1SC3SiqbrkwJoNgsxibbU,4cRJ7GmVJ49uG3dpYFK7ku4xzyBNVQuq6fhXcvZ1pump,4qLcghvNYDnhgrxB7W5SnaczLtMV9kFUDjf5rHoFCodv,4uziyG9CHZBkqo1aucAxfC5UnqA6b2U7YiFKAaDhpaid,4wzLxapFN8VCKVDXENHU9y9rMwNRjTtuqKXb5TZod7uF,4zsuzEsJSWuW76HTRYtM8PkYRsrrcKotkov3AP5HLcr,5QAxDNJRPVoRqw3QaxzwmhXxt59s3gWd4z6S21qpump,5Qj6sq1V7EP7A4iYQYduRtodXTinXbdaooP6mGZJpump,5QqVyMNcLsyr7QiBQdFMnjPL7Jdtp7F3hULvXJtspump,5QvYDMPQJfJdqTa6nN5R9F65TiFsMrddeQWZ3Vq5pump,5g6trycp4bP6KDsqZejcxywCajamApxbTmBT5JWT76c8,5kxCLgbUMfYHKwHXnDZDuZz8s1x31yhKrPdjeJF1pump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:26.551+00:00",
+   "http": 200,
+   "bytes": 28103,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4923c876d4e-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:27 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:27.163+00:00",
+   "read_brt": "18:58:27",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "72_ds_tokens_batch2.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/5sm5fNjEjVoZUqRxCqLZQERM5ejj1yFiKUWwtNhGpump,5zj1NBdjKWcFwkhfSy6ho63Zo6qHAxH4jKAnKBLCpump,69fmNNTkyAfWSTG5Fs86cULWC3bBxLxkY4mM88Ptpump,6GSgc4n9rvSx5ndxf6fJ7sKtixDUdLLHFbPJHzgppump,6ZDPWccfTmVNzsVR4Rbsy9w2g1nbJukCaYYAi5Nopump,6jeLZNBcF2AbcH4XhmPxwndqk6KaHV1S7tFE6YY6pump,6mijNe1mtBxY5LUSMTjiFN6bsCWoiGSodjw2kMqg8VJE,6oXAA7z3EyLE3uZ6emNs1Mu95tVbMmjSSo9R7AZy8shP,6orppG13FHK2rMPzqk7UUMKeGoBNbt338fj3A1sSpaid,6pei4VZghASa2zCq64UEknBE7r3asoPLFNvsDRWhR358,749EK6eB7YDRCFwsyLhtTbUugjpoxF1YiGyGFnvbpump,7FajoWbDe6REzTCsGi1XRZUJH9HjMaugPoLQRzpm5zW3,7GSVfYo715E5FnTyT29XnBzCjyXkdjAQyeubYyK3STNK,7LYMcivYToCttQigteg8C9G5PfK39rFNBUT1P4mCBtsw,7PNsPVqaRMggKwHjgpry7jz7hEupu21B8vrL79h4pump,7PkNGtjrcD3fMdfRG9JYyL8qU4gUuvHh9ewFveDLYu6T,7TGLqYeyhifW38b3Z969TjU6WQYFRjhzaMcLgY8Ppump,7UD6E8kPbkPgbToygBpeSqFycKQdv2KxLYFTFyFmpump,7hJ2SM9jnxfGwveud9XtCtYA2uBmXco2uRA8KX6mpaid,7quoWHUtV1y9ezNgEHvgXMQkRjECraSXmJfBw534pump,7sMQaGNAXAjqLVQ7Gx7Vnd4oAnc9on3ytS6kMpqBpump,7uvoamXmhQdhKQAWxN8qzUtHK3pB7MwrzXBbHnnDpump,8FC8gPsFuzXwix8etiw8JNSvaMWYDouaeAjs3p2kG7bq,8LA99HrtuTtZ39Zmno81d5c3yhpCwJAkTcsWabebx5jG,8Zqm233uThHXHEgKEa89Ze9bsoTyEACp12fUMHwjz2Y2,8dmRsXrBciJt5HdVDZvTcE1LcLrywNESt7QhsRrzpump,8fJjPjFc9PpvXMHf5YKxNMvAsxnP7yZ4FWPALCeFpump,8pAFpALcNuautWQAwva36pX2iBuAw4p8jzG6TiCspump,98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump,9AoKNzw8X4gktBG3R3AhZSJtd5yprJvyTvtBPha9GzL6",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:28.379+00:00",
+   "http": 200,
+   "bytes": 27692,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare",
+    "cf-ray": "a3bae49d2bc96508-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:28 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:28.890+00:00",
+   "read_brt": "18:58:28",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "73_ds_tokens_batch3.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/9CacTHqLYfQf6TD1z86A13RdgEfoiDDfKRAbjwMHGNAU,9DVtSJrSRupJwLd5FNkuoDgCriQ5cVdbQ6GoyNezDwW2,9FvEay7CD5XFSFRPAZpz4UWVcugsjenvXcsEdihgpump,9KJtRgekHsCoum2nHt4ePf6xf88gFtDSM6RvKif8uray,9Sq7cCn2bgBqc4ChkEgD3enXgdQm6ga3jnoFTmNXpump,9jmDC6hjfsXTs72xj8muCmP6ZJDkfsyUF6KvZRrvTLR1,9jpWHbVcsMM49ib9iiHPuZWL6X4kCN3jcTN9SZnQJSAv,9tfuoEF9jXbrvz5Ey3aS5UAZubVL2F5zu1m1qyrpump,9tgSydUxn1KDwoHyBLnCMN6MTPqYnbeorZdz88N33koC,9wNFRWac9zBcVs81ezkVmfY7Y6on7QqKxwwLTfuKpump,A45uJvqs554GEjH3nS9eU9fpeX9H82ZeEkk57iPqpump,A8CEgypH7rdkzqhW8RzXMTfhiihb8XUvkN7w7tuCpump,ABbjtYZjvk59QmUcvnMFSsUyScNddPqwXrCZMYyApump,AJEocehCZhqH2qB1p5Txjmma2LeezXEt94XEJytSpump,AQFsCfJp5s897bKTcYd4fjm1ryFjWUtFPsUz1s8Lpump,ASS3SNDLCeQMxu89ZxTDkyjLZVacqTgPa1auMuCHpump,AciZNVavjShSqBAWYJykVaEtBwuPrNyKCGqk8EA374tX,AcqxANtuQ5FQ3pTpdZYR7sTe8dQtjYPBKEFbAKxzYBeY,AkrtytXkoUcZosqa8HP3v8UmxAvDRN2MAAGQi86UXT5M,AuU4atjmMAMEfk6S7MWv4S6M8tgTGuCrJiPfBKCwpump,AxbLxpRuXPhxWGXYr1G8tGu254Vw5WWujijvcYEypump,B2icRYVFv3BzHKqV5aiSpZp1Hq6ic5ZLbQqQQxF7paid,B4qSoFfob1CgctNzXxD5cCSgSnMogas2R9XrjNw4pump,B9zYgvcTQwiSLmcoVuzLPGHZfndRQMdpZANkMpe6gCaq,BLuEgQHNqF8YtGQhY3Ruvqiq1m2w1mgS9uMY9hhdZtrr,BcUBWw1kh2csoNMf6PxcqLCVRmPL1YQui9mYsgccpump,BtttfBjYXuyo1xD9sBmKjcJHHaZhaUpUcdBW2mqRpump,BtzTJkmJivjHy8gsXysgPGXHR2VmNZQUVWtE9JKDniaG,BuMtRZ4Lb7vQpbeuRLx7YaybQJKRTRG98mkzHW6wYwQ1,ByeG3pfwi2BjbTY41qcYfYAZRghS333y6gagEeMYpump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:30.098+00:00",
+   "http": 200,
+   "bytes": 27883,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4a8bcf682fa-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:30 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:30.734+00:00",
+   "read_brt": "18:58:30",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "74_ds_tokens_batch4.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/C11KeXxUJkcF4Mj5Knj7DKJ4L4N6uchAx61DDnYmpump,C8pvSBY8JBhP6zjAXAmbzNTAsqCsKiVoapCpCF5pump,CEv5D6GLhfqFEXwpksdd5XbaahA3eiYEn3YGVEup3N16,CRGZV7eNpSoxNTzMjCVWnfAYg3pk9CqE1S43a9bDpump,CTNuubniAGjAzQhNVLpZBCXQU2hb2NtuBhzuSebFpump,CXjk1R53rpzwbG3BMx8w1HZW6S3f6UnbnexUxzb9paid,CZyTWsy2zN9BwH17UjGzHhT3ZESK4P26uhW3vdj4pump,CcJS4ddNoyBxafpfUabY2S564ULXXyKj9anC7Pmgpump,CeUDkrhiue8t2akd5jsPZNnPYXVMKvm26FQxmTKWpump,Cizasdp25SJbC5xTefBhJ27GvouQw2NySuKpQox2pump,CuaQE1HxjcMotLWnVJeFHHanDFEkbpkHDwrT4YRDpump,DCrTqeDiQKWopVXdPTG9QeyQfWhhyET5GdhexpDCD1e,DUGNKGDy7Qc5C1Lud1xLjry1mvkcbBZQgQjnR6SEpump,DpgnQMBBYBWVYrHzygwv4kAZZ6EYwzAMtv8Cy1Sopump,DwcgRJAZhGRdxjKdPMkZnbrqXCzadC1bg9Y6f3YuyUdP,Dwmc8HqH4U3zJ5GB3fXTWdCZAopUWgga34xcqcnypump,E6ExRcpjar1CMCYX6S9jEard4tBBwFnef946AUF2pump,EHrb1j276rh8B72yB9zraZBb7aFxhMFM143Xefa3pump,EZdoYwMPiSFVUf68t4RnndQuPnCNtUCkZZNGnSLgwZCB,Eg5cQFqQ1B6PdNYy1o5oE38ofu5aKmnim7DcC2WXpump,Ej3dwnKLYsYFSAHXw4k3s9EQM1KGJkYSHtDrunCjQjru,ErU4GojuJ5X7pCicoebfSzBPPb88yjCQwiUmgoqfpump,FCFRgSXMavYze4zBu2iSQkNdsVRT771yHaFAVruwpump,FRXMTen6kpHuuuQopSptX63zJ9Br1G8UCa9z87EZpump,FUxKqGVGzSchuXVaQHy7svs5EBX3MEEU9nVjSQKjpump,FkL4hFUE7Kkii69VWHid1c67neSnrHAaXgzRBbLmpump,FqMc1JorN93wiiqSUckpEYFHcK1Ki1NU8McLacggpump,G2P8JqyPKidWhBtgeTmmZUe2uFw2ZN7nvuUyppArTo3H,G5im68AmQ8c6C56Kdapufyu8dZddYkMBGoLbqtb98j7,GE2j19bLPf4hKHWhFP4VXS5x86aHt5pnkdWmudrvdoom",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:31.940+00:00",
+   "http": 200,
+   "bytes": 28409,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4b43b6a82fb-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:32 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:32.583+00:00",
+   "read_brt": "18:58:32",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "75_ds_tokens_batch5.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/GHrzjLaSDPszhJBbQL1YPyGBACXNrqXZ9Td4ZVHRz6w,GMkocLXWp4xVAgggGqaK8kEzHFXN3qATGg785kSzpump,GPZNXf911YjwkWhuWQaCDD7GQxzQt8g9RDkhhbAFpump,GTNG2fYPx59tjrHxyoUJ7MiMfx3mVup7Zbphurq3pump,GYNGnceaeGQWFGpZF7FrBjcbYR1DKBd7hsJyj8fhpump,Gcg2cykuoxw6Zv9PHxpfiHSukh3jLuN8VMuogRQtpump,GiBouKqFnNumhkoxYh68Up6h8qg2SS9ZGqshyiwTpaid,Gn9EQk9kZ5GEC1d7emUpCMqusCnMyQLRdYCEBXJ9pump,H1CrHF8QGGhwMU1Gf364t2P9kDbPc8P3q4mBc4aEpaid,H2d5yt3zFxt3nGGR1NnwHo9p6HrbTUREonVQZC81pump,H4Fx7kqZcxbyNnF7qKBZsiJ1VGeTTSQMWjCXFp9maugQ,H7Y3TzFyyfPBnn5Dpwa5m79NdgDQnFS8TcAtQe2Tpump,HN3RNTWouzabY9Fcje119ncrj7uwXAfqKvXiBR1jpump,Hk8Uiq8CeNdmZzu1aPaT7MhvujtJifFS9kKhfpXmpaid,JJEZRy29wgMzfgdR1YBufazHbv7kWn4J3MwHbZRpump,Jx2s7Whgc6DbcyViw3awc3fH2zjs4PAAaiZghZ1pump,TbyvXnoaRvenymghrddqWDge91PbjjwjezvNTcJpump,U6ranLPd7HAM2kPQHhWK2QtoAZC6xMM1QyfSKCDpump,UMYXK837qToDfUzzqAa2tzjsE3ampZiyjKnthKDf1Cq,VteFppzaTe3kYjoriGooCGRs3Xz4Qj2ECqVDDKASTNK,Xrc25dcwPA2CotpZdJJ4mFEE8UbHbsCKpkFTCbLpump,gDbLj4bN1rYs2g9QTh2d7V8UWM2UoKztaGPxo8Apump,hUPv4tpydcoksZKTZMoMh5FmPxZe2GzsaW6jHoTpump,jJVDNfZNZzRs6EXnBb2Co68SSfrn8PX8DgX955Upump,oP3ziG59gh69LPxtvEe6pdyJaYXBieYog8SPdKYpump,qLf3mzbGA82LpU5R31K5fRySktbiABHuijjQ3Pepump,qpdTzejgjyTajc7nomqJ7oZn24XvLDoKcam5qL5pump,vGzwmsLRnNboTXDdE2x1izVt867V7EbP1fASSx2pump,xgRCHMvkBVy4JhZ9WibBNP6rPZ9G85VMdxqjPAtpump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:33.789+00:00",
+   "http": 200,
+   "bytes": 27644,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4be6a62978d-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:34 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:34.219+00:00",
+   "read_brt": "18:58:34",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "76_ds_tokens_batch6.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/Hp9aqfw8xjwXTXKu2wFGR7k59djMzjCTFdJFCiEApump,DmccGwRcUUnkfwdiZ9qAhRrTozx25o98tBS7DcXNpump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:35.424+00:00",
+   "http": 200,
+   "bytes": 1495,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "MISS",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4cac99564a9-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:36 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:36.159+00:00",
+   "read_brt": "18:58:36",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "80_ds_boosts_latest.json",
+   "url": "https://api.dexscreener.com/token-boosts/latest/v1",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:37.362+00:00",
+   "http": 200,
+   "bytes": 21141,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4d4ded1c60a-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:37 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:37.593+00:00",
+   "read_brt": "18:58:37",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "81_ds_boosts_top.json",
+   "url": "https://api.dexscreener.com/token-boosts/top/v1",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:38.798+00:00",
+   "http": 200,
+   "bytes": 23204,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4de7c37649c-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:39 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:39.159+00:00",
+   "read_brt": "18:58:39",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "82_ds_profiles_latest.json",
+   "url": "https://api.dexscreener.com/token-profiles/latest/v1",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:40.366+00:00",
+   "http": 200,
+   "bytes": 22834,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4e76d86e0f6-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:40 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:40.564+00:00",
+   "read_brt": "18:58:40",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "91_ds_orders_hr_G2P8Jq.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/G2P8JqyPKidWhBtgeTmmZUe2uFw2ZN7nvuUyppArTo3H",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:41.768+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4f10fee353d-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:42 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:42.265+00:00",
+   "read_brt": "18:58:42",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "91_ds_orders_ctl_CTNuub.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/CTNuubniAGjAzQhNVLpZBCXQU2hb2NtuBhzuSebFpump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:43.472+00:00",
+   "http": 200,
+   "bytes": 184,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae4faed3c8301-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:43 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:43.703+00:00",
+   "read_brt": "18:58:43",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "92_ds_orders_hr_H2d5yt.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/H2d5yt3zFxt3nGGR1NnwHo9p6HrbTUREonVQZC81pump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:44.907+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae503ca9b5035-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:45 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:45.290+00:00",
+   "read_brt": "18:58:45",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "92_ds_orders_ctl_HN3RNT.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/HN3RNTWouzabY9Fcje119ncrj7uwXAfqKvXiBR1jpump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:46.493+00:00",
+   "http": 200,
+   "bytes": 182,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae50e78633ea7-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:46 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:46.987+00:00",
+   "read_brt": "18:58:46",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "93_ds_orders_hr_6mijNe.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/6mijNe1mtBxY5LUSMTjiFN6bsCWoiGSodjw2kMqg8VJE",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:48.189+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae51969a264d5-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:48 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:48.748+00:00",
+   "read_brt": "18:58:48",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "93_ds_orders_ctl_qLf3mz.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/qLf3mzbGA82LpU5R31K5fRySktbiABHuijjQ3Pepump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:49.951+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae52389a5cb2d-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:50 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:50.360+00:00",
+   "read_brt": "18:58:50",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "94_ds_orders_hr_oP3ziG.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/oP3ziG59gh69LPxtvEe6pdyJaYXBieYog8SPdKYpump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:51.566+00:00",
+   "http": 200,
+   "bytes": 181,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae52dcbb5cac3-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:51 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:52.044+00:00",
+   "read_brt": "18:58:52",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "94_ds_orders_ctl_jJVDNf.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/jJVDNfZNZzRs6EXnBb2Co68SSfrn8PX8DgX955Upump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:53.235+00:00",
+   "http": 200,
+   "bytes": 335,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "HIT",
+    "server": "cloudflare",
+    "cf-ray": "a3bae5395b1564e7-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:53 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:53.861+00:00",
+   "read_brt": "18:58:53",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "95_ds_orders_hr_7PkNGt.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/7PkNGtjrcD3fMdfRG9JYyL8qU4gUuvHh9ewFveDLYu6T",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:55.065+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "REVALIDATED",
+    "server": "cloudflare",
+    "cf-ray": "a3bae54378a3d5e8-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:55 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:55.479+00:00",
+   "read_brt": "18:58:55",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "95_ds_orders_ctl_Gcg2cy.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/Gcg2cykuoxw6Zv9PHxpfiHSukh3jLuN8VMuogRQtpump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:56.683+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "REVALIDATED",
+    "server": "cloudflare",
+    "cf-ray": "a3bae54ddfb90c61-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:57 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:57.152+00:00",
+   "read_brt": "18:58:57",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "99_ds_orders_LABa_Hp9aqf.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/Hp9aqfw8xjwXTXKu2wFGR7k59djMzjCTFdJFCiEApump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:58.354+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "REVALIDATED",
+    "server": "cloudflare",
+    "cf-ray": "a3bae5580c9682fb-GIG",
+    "date": "Tue, 15 Sep 2026 21:58:58 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:58:58.776+00:00",
+   "read_brt": "18:58:58",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "99_ds_orders_LABb_DmccGw.json",
+   "url": "https://api.dexscreener.com/orders/v1/solana/DmccGwRcUUnkfwdiZ9qAhRrTozx25o98tBS7DcXNpump",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:58:59.979+00:00",
+   "http": 200,
+   "bytes": 25,
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cf-cache-status": "REVALIDATED",
+    "server": "cloudflare",
+    "cf-ray": "a3bae5622d10cb5c-GIG",
+    "date": "Tue, 15 Sep 2026 21:59:00 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:59:00.395+00:00",
+   "read_brt": "18:59:00",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "55_defillama_pumpfun_fees_trim.json",
+   "url": "https://api.llama.fi/summary/fees/pump.fun",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:59:01.601+00:00",
+   "http": 200,
+   "bytes": 64509,
+   "headers": {
+    "content-type": "application/json",
+    "cf-cache-status": "EXPIRED",
+    "server": "cloudflare",
+    "cf-ray": "a3bae56cbc651f4b-GRU",
+    "date": "Tue, 15 Sep 2026 21:59:02 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:59:02.900+00:00",
+   "read_brt": "18:59:02",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  },
+  {
+   "file": "50_jito_tip_floor_b.json",
+   "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+   "method": "GET",
+   "request_started_utc": "2026-09-15T21:59:04.089+00:00",
+   "http": 200,
+   "bytes": 343,
+   "headers": {
+    "content-type": "application/json",
+    "date": "Tue, 15 Sep 2026 21:59:03 GMT"
+   },
+   "response_received_utc": "2026-09-15T21:59:04.388+00:00",
+   "read_brt": "18:59:04",
+   "pump_host": false,
+   "pump_count": null,
+   "error": null
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+{
+ "_meta": {
+  "file": "93_ds_orders_hr_6mijNe.json",
+  "url": "https://api.dexscreener.com/orders/v1/solana/6mijNe1mtBxY5LUSMTjiFN6bsCWoiGSodjw2kMqg8VJE",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:48.189+00:00",
+  "http": 200,
+  "bytes": 25,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "HIT",
+   "server": "cloudflare",
+   "cf-ray": "a3bae51969a264d5-GIG",
+   "date": "Tue, 15 Sep 2026 21:58:48 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:48.748+00:00",
+  "read_brt": "18:58:48",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "orders": [],
+  "boosts": []
+ }
+}

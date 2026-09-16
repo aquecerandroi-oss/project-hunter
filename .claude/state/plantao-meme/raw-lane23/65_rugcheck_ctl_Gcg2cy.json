@@ -1,0 +1,249 @@
+{
+ "_meta": {
+  "file": "65_rugcheck_ctl_Gcg2cy.json",
+  "url": "https://api.rugcheck.xyz/v1/tokens/Gcg2cykuoxw6Zv9PHxpfiHSukh3jLuN8VMuogRQtpump/report",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:19.270+00:00",
+  "http": 200,
+  "bytes": 9661,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "server": "nginx",
+   "date": "Tue, 15 Sep 2026 21:58:20 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:20.231+00:00",
+  "read_brt": "18:58:20",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "mint": "Gcg2cykuoxw6Zv9PHxpfiHSukh3jLuN8VMuogRQtpump",
+  "creator": "FNfQFfiuZ4iD6RjnG3xV5PxttETznGXXb6VaFJ6ZvZkz",
+  "creatorBalance": 0,
+  "detectedAt": "2026-09-15T20:37:49.077901968Z",
+  "rugged": false,
+  "score": 2971,
+  "score_normalised": 34,
+  "risks": [
+   {
+    "name": "Low Liquidity",
+    "value": "$29.40",
+    "description": "Low amount of liquidity in the token pool",
+    "score": 2970,
+    "level": "danger"
+   }
+  ],
+  "insiderNetworks": null,
+  "graphInsidersDetected": 0,
+  "totalHolders": 40,
+  "totalLPProviders": 0,
+  "totalMarketLiquidity": 1769.591975440197,
+  "launchpad": "Pump.Fun",
+  "deployPlatform": "unknown",
+  "tokenMeta": {
+   "name": "National Trust Fund System",
+   "symbol": "NTFS",
+   "uri": "https://ipfs.io/ipfs/QmSWgqovYkPbHg2Pm4aFqBqXR59rwzMt2pAdEayrH7bCgw",
+   "mutable": false,
+   "updateAuthority": "11111111111111111111111111111111"
+  },
+  "token": {
+   "mintAuthority": null,
+   "supply": 991904000505000,
+   "decimals": 6,
+   "isInitialized": true,
+   "freezeAuthority": null
+  },
+  "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  "verification": null,
+  "transferFee": {
+   "pct": 0,
+   "maxAmount": 0,
+   "authority": "11111111111111111111111111111111"
+  },
+  "events": [],
+  "topHolders20": [
+   {
+    "owner": "6tQ4SXNMNmWY8RXKfC2HUM5akwy4BfmKVSZauqeDS1qQ",
+    "pct": 99.70378663684126,
+    "insider": false,
+    "known": "AMM"
+   },
+   {
+    "owner": "8oTJAsbLtwaYnfyHPNPexL6xZvK5VfecxphPtYAks1eQ",
+    "pct": 0.13463264972952071,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "9UnZnrFJ1CXCmCorgGU9NvYkX5np1h4v4ympx3Nrdw3v",
+    "pct": 0.05503283115191432,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "EHUKYQnuPR6Q2UPSasrsUNCkSmbYjVYAR1roanvA6Fkd",
+    "pct": 0.026002619317866123,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "2s53435AHPb9YcoGqjvWyE1yoFTwzNsX5YmchTChbo11",
+    "pct": 0.018511623907002724,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "49ie2XDbwFq67umLsnkKBPGgfyCiy93uFUX9ELNaVmg2",
+    "pct": 0.01737229608442651,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "4FL6GCJZYfxKAugea2RvXGES1h242mPt9otoqM168WdE",
+    "pct": 0.009068617146740359,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "49sRD45WNBpGC9rYCZjZuLDBD5qarN7c94zc74H5LkyT",
+    "pct": 0.00906165691541103,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6dYiFqQm89dJCXV5pU64Vp5F3vznYMK4S3T5UFG5t8dp",
+    "pct": 0.0057838135263888184,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "9TjMGKtD5Yi5thJy5L8inqMN2zXiEzdjDfvWyFNX5gGL",
+    "pct": 0.004420859264674269,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "HKoPNnuEFVdJL2VgtbEDEhxkNmmJ1hRpze7reJxpsxCb",
+    "pct": 0.004166473694526819,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "8Bzvvxyd6WGwe5Q2Xpim1RYwaypqwWyoXBhDmqc814UY",
+    "pct": 0.0035914308930968396,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "GE1CnHPinvbbSqBXiE6PsjERvu9woGak1ACKY191Xd6F",
+    "pct": 0.0022020638273340543,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "FtHmMLjincu2Mk8TzwHQyCdCjVwrofYtSv9wWjdXbQ9y",
+    "pct": 0.0019832532432558564,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "HFS6KNv9TQv4fuikxYXTkhqxHidurj36BWCBm146mU7p",
+    "pct": 0.0017494978227898098,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "6BcRusuAia27bEbmiQxsg1jC6RCpBQYtTgpojhPBH69L",
+    "pct": 0.0010493979706403583,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "FYqCY3gsNtDkJSJPQowEasNufczvrErPQUGRLuG4VoaU",
+    "pct": 0.0007812022049568234,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "B1wBZMEMCK2w3f9ahKTs8vsBXMvqnLcBspVCEBrTrqA4",
+    "pct": 0.00046069482718826536,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "8niXXbwUoLk78HGvz21iSHtAqZCxY4qJ1fw4HyYBVNT",
+    "pct": 0.00032762853323965583,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "8N4QDR8m54PuV2KgHSu39QRHrNooNEK667hBeKVokZoc",
+    "pct": 1.3263367315084927e-05,
+    "insider": false,
+    "known": null
+   }
+  ],
+  "markets": [
+   {
+    "marketType": "pump_fun_amm",
+    "pubkey": "6tQ4SXNMNmWY8RXKfC2HUM5akwy4BfmKVSZauqeDS1qQ",
+    "mintB": "So111111",
+    "lpLockedPct": 100,
+    "lpLockedUSD": 1769.591975440197,
+    "quoteUSD": 29.39965301835698,
+    "baseUSD": 1740.1923224218401,
+    "lpTotalSupply": 4193388282605
+   }
+  ],
+  "knownAccounts_types": [
+   "AMM",
+   "CREATOR",
+   "LOCKER"
+  ],
+  "keys": [
+   "creator",
+   "creatorBalance",
+   "creatorTokens",
+   "deployPlatform",
+   "detectedAt",
+   "events",
+   "fileMeta",
+   "freezeAuthority",
+   "graphInsidersDetected",
+   "insiderNetworks",
+   "knownAccounts",
+   "launchpad",
+   "lockerOwners",
+   "lockerScanStatus",
+   "lockers",
+   "markets",
+   "mint",
+   "mintAuthority",
+   "price",
+   "risks",
+   "rugged",
+   "score",
+   "score_normalised",
+   "token",
+   "tokenMeta",
+   "tokenProgram",
+   "tokenType",
+   "token_extensions",
+   "topHolders",
+   "totalHolders",
+   "totalLPProviders",
+   "totalMarketLiquidity",
+   "totalStableLiquidity",
+   "transferFee",
+   "validation",
+   "verification"
+  ],
+  "mentions": {
+   "holder_reward": 0,
+   "reward": 0,
+   "creator history": 0
+  }
+ }
+}

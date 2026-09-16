@@ -1,0 +1,241 @@
+{
+ "_meta": {
+  "file": "69_rugcheck_LABa_Hp9aqf.json",
+  "url": "https://api.rugcheck.xyz/v1/tokens/Hp9aqfw8xjwXTXKu2wFGR7k59djMzjCTFdJFCiEApump/report",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:21.420+00:00",
+  "http": 200,
+  "bytes": 9054,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "server": "nginx",
+   "date": "Tue, 15 Sep 2026 21:58:22 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:22.437+00:00",
+  "read_brt": "18:58:22",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "mint": "Hp9aqfw8xjwXTXKu2wFGR7k59djMzjCTFdJFCiEApump",
+  "creator": "4J41dvJW5Doj8TMf4GSXqsf3oCSKuPuRYYjoTP7um6QN",
+  "creatorBalance": 35301792350258,
+  "detectedAt": "2026-09-15T01:19:01.137412618Z",
+  "rugged": false,
+  "score": 1,
+  "score_normalised": 1,
+  "risks": [],
+  "insiderNetworks": null,
+  "graphInsidersDetected": 0,
+  "totalHolders": 111,
+  "totalLPProviders": 0,
+  "totalMarketLiquidity": 2752.0666983932565,
+  "launchpad": "Pump.Fun",
+  "deployPlatform": "unknown",
+  "tokenMeta": {
+   "name": "LeBron Jameson",
+   "symbol": "LBN",
+   "uri": "https://ipfs.io/ipfs/QmVvZj2FcuLkDLq2BYbKxdu9ZpBJmyMmc78nhh9ta1w9Nx",
+   "mutable": false,
+   "updateAuthority": "11111111111111111111111111111111"
+  },
+  "token": {
+   "mintAuthority": null,
+   "supply": 999992075678380,
+   "decimals": 6,
+   "isInitialized": true,
+   "freezeAuthority": null
+  },
+  "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  "verification": null,
+  "transferFee": {
+   "pct": 0,
+   "maxAmount": 0,
+   "authority": "11111111111111111111111111111111"
+  },
+  "events": [],
+  "topHolders20": [
+   {
+    "owner": "4zoHvkjXQ2st2RWGCTk4aG4ABL23oJHdgMdYmR9Hyuqk",
+    "pct": 90.40132490805524,
+    "insider": false,
+    "known": "AMM"
+   },
+   {
+    "owner": "8nyazh9Mr11btARQ3Hbq5dhe7fECoHSZz5pPWC8AtdCx",
+    "pct": 7.080431855838834,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "4J41dvJW5Doj8TMf4GSXqsf3oCSKuPuRYYjoTP7um6QN",
+    "pct": 3.5302072095231134,
+    "insider": false,
+    "known": "CREATOR"
+   },
+   {
+    "owner": "J6NEBkg9mvnYeD2daW7vb7kYKyNp3UjYw7C1U7KD2wyz",
+    "pct": 3.38789406937722,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "8p5YxvAsJ4dTCiZVcT8LS7hqYTLvfbCQqXHe8bDguaeX",
+    "pct": 2.9423348009393764,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "C5r2K2rGp7RJZDX6GFVm7zXPTzLGBQeVc9RkSemhfc22",
+    "pct": 1.9524763734472386,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "EmFL9SjAX8QHHfzdoAYaGJ5c8hiQ34zHRLDXrCdMubsP",
+    "pct": 1.6673137954749568,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "2D1d1qMAPtaE8xNQ9JHnCePUt6yRNFQxefJQSPVJ82FF",
+    "pct": 1.6667605717995346,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "UcUgm9HN2A4bv9MVsWmHRCg1D2VfSQxX2vdFDBPyPwc",
+    "pct": 1.3049548273576514,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "11111111111111111111111111111111",
+    "pct": 1.2602621960179667,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "5jRxH5q68vBe4iMnn7njhnKiJRfYUhNHYm5wf1pkp7Tx",
+    "pct": 1.2586002910912977,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "5tzb8mhZNpajjzuPcH6aqBDudsQkqfCKmjejpDTAvBUn",
+    "pct": 1.2392908964914444,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "11111111111111111111111111111111",
+    "pct": 1.1733848127041397,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "BpCpFcSPFFsLJnepLWaaVhRMith8a55DAkwqWq6Y54Lx",
+    "pct": 1.133183331837776,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "Be5A3KVecpnhLpXmSrTKgPoBN1gtnuEtpwPKGaRwds91",
+    "pct": 1.061180666976802,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "3xNzjkUuQaiPRrk6MfDaFNVhYvNqCYi4JR4CfAEh1Wyw",
+    "pct": 0.8658735720120668,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "9fhaSgV4vJgqAD9GUt878f4F7E6ZxpAfPumSgiGT3HQY",
+    "pct": 0.8332327757177991,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "BFHDDTUmDVbpSk4BgiUcCUsxbqnobEgJP72X1ctRmgLc",
+    "pct": 0.6184986149688465,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "GCm4ZDxLkbEQdWp3otgPxv3KP4BtxF1mExagjK4AsVwz",
+    "pct": 0.5029549864628731,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "HGzXxgZZojTATfKr9ydYi4g63JB9kNVaCy95h6iwh1DX",
+    "pct": 0.5004748623228717,
+    "insider": false,
+    "known": null
+   }
+  ],
+  "markets": [
+   {
+    "marketType": "pump_fun",
+    "pubkey": "4zoHvkjXQ2st2RWGCTk4aG4ABL23oJHdgMdYmR9Hyuqk",
+    "mintB": "So111111",
+    "lpLockedPct": 100,
+    "lpLockedUSD": 2752.0666983932565,
+    "quoteUSD": 285.0775351784569,
+    "baseUSD": 2466.9891632147996,
+    "lpTotalSupply": 2947594466
+   }
+  ],
+  "knownAccounts_types": [
+   "AMM",
+   "CREATOR",
+   "LOCKER"
+  ],
+  "keys": [
+   "creator",
+   "creatorBalance",
+   "creatorTokens",
+   "deployPlatform",
+   "detectedAt",
+   "events",
+   "fileMeta",
+   "freezeAuthority",
+   "graphInsidersDetected",
+   "insiderNetworks",
+   "knownAccounts",
+   "launchpad",
+   "lockerOwners",
+   "lockerScanStatus",
+   "lockers",
+   "markets",
+   "mint",
+   "mintAuthority",
+   "price",
+   "risks",
+   "rugged",
+   "score",
+   "score_normalised",
+   "token",
+   "tokenMeta",
+   "tokenProgram",
+   "tokenType",
+   "token_extensions",
+   "topHolders",
+   "totalHolders",
+   "totalLPProviders",
+   "totalMarketLiquidity",
+   "totalStableLiquidity",
+   "transferFee",
+   "validation",
+   "verification"
+  ],
+  "mentions": {
+   "holder_reward": 0,
+   "reward": 0,
+   "creator history": 0
+  }
+ }
+}

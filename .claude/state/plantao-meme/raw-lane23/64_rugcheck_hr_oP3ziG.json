@@ -1,0 +1,256 @@
+{
+ "_meta": {
+  "file": "64_rugcheck_hr_oP3ziG.json",
+  "url": "https://api.rugcheck.xyz/v1/tokens/oP3ziG59gh69LPxtvEe6pdyJaYXBieYog8SPdKYpump/report",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:12.932+00:00",
+  "http": 200,
+  "bytes": 9786,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "server": "nginx",
+   "date": "Tue, 15 Sep 2026 21:58:13 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:13.943+00:00",
+  "read_brt": "18:58:13",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "mint": "oP3ziG59gh69LPxtvEe6pdyJaYXBieYog8SPdKYpump",
+  "creator": "HcGs6K4NGBBhQHQkWZJgaqakX7zibYnnuGuTWv7sDS6S",
+  "creatorBalance": 0,
+  "detectedAt": "2026-09-15T21:10:42.775699333Z",
+  "rugged": false,
+  "score": 1,
+  "score_normalised": 1,
+  "risks": [],
+  "insiderNetworks": [
+   {
+    "id": "happy-beige-stingray",
+    "size": 4,
+    "type": "transfer",
+    "tokenAmount": 33553967882730,
+    "activeAccounts": 4
+   },
+   {
+    "id": "useful-carmine-cougar",
+    "size": 5,
+    "type": "transfer",
+    "tokenAmount": 31826777871503,
+    "activeAccounts": 5
+   }
+  ],
+  "graphInsidersDetected": 9,
+  "totalHolders": 1846,
+  "totalLPProviders": 0,
+  "totalMarketLiquidity": 16209.791129424693,
+  "launchpad": "Pump.Fun",
+  "deployPlatform": "rapidlaunch",
+  "tokenMeta": {
+   "name": "apu",
+   "symbol": "apu",
+   "uri": "https://m.rapidlaunch.io/m/lxk6c6k7V",
+   "mutable": false,
+   "updateAuthority": "11111111111111111111111111111111"
+  },
+  "token": {
+   "mintAuthority": null,
+   "supply": 959006735386390,
+   "decimals": 6,
+   "isInitialized": true,
+   "freezeAuthority": null
+  },
+  "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  "verification": null,
+  "transferFee": {
+   "pct": 0,
+   "maxAmount": 0,
+   "authority": "11111111111111111111111111111111"
+  },
+  "events": [],
+  "topHolders20": [
+   {
+    "owner": "rV1Jxer9mPQaMQxzwF5usSXjTUDZwH2pA9aMvuEocxS",
+    "pct": 27.601892629373665,
+    "insider": false,
+    "known": "AMM"
+   },
+   {
+    "owner": "6DQAGJT7VZPVBsuG4kn3AvpyHCEi7B2RFFvMZdbqQqqP",
+    "pct": 3.171573205967251,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "EH2PW25JUdHQQGizfcEmtxk5krF4GKzmio5SCkpJNuTW",
+    "pct": 3.0143955424692273,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "signeraMNtVHUcVSAV9HCCCJUhQTLsbQneHZGmUQcWk",
+    "pct": 2.3637561696649274,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "DzNpMpCoaYrzm9UpDLgCZwuwrzvubLcqPqVYfnYfT5hF",
+    "pct": 2.2387352866910524,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "Fx7cFtZADewodJQ6KgzpDhqZDzPNe46iGbPwyuQZJpfk",
+    "pct": 2.0878794265743754,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "AH39BneW9UeWxQysUcwogQrYFdPvJuRVZ5w4ccq9SKfL",
+    "pct": 1.9062029935264866,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "9bqx8GEcwuw4r3WzhWnJx8fpjt7aXdvVZhWE56bzWBoK",
+    "pct": 1.6781129965356227,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "7x5Tp6XGA3ctBCzRRrDTf4g1n7cdfMBemHi6Z6EVveY4",
+    "pct": 1.6639989303762786,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "BoRPFT2ejwCni1TS6iTGFUgpog5h3mxfEDL787k68mc6",
+    "pct": 1.5867333540351019,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "j38fhfqWsJyt8hzym48P8QMsXWx1FfLUxQwuor7Ti4o",
+    "pct": 1.5775312390381258,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "3MzNCLrVpdLs6iuMWH5iLhQLfb4hTSvRNB2tfVww6iBH",
+    "pct": 1.4917260907970704,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "EsXKFY7ZqWeBqPHQFiPy2AkxeT8Sec9xS1nbKA4cXybV",
+    "pct": 1.4709312339917477,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "9iaawVBEsFG35PSwd4PahwT8fYNQe9XYuRdWm872dUqY",
+    "pct": 1.416175617318479,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "7hqe6a4mWvE97gKrhzpVa1AThtzG3N4QUaFPgvQi5tbB",
+    "pct": 1.4016734258260528,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "F9k8AknujBQLa9WtcQrK1reRAdwjgPGm5TsT2PKKrLUx",
+    "pct": 1.345980306267637,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "7NmXvPDeZiFHNiAMVDTHBkgcSMjPNReCUhMDmCvGg8KT",
+    "pct": 1.2756920179321634,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "FwnPE7wYqHKWJGzZTmccdJ2Yg5JHyoe73FXWWYyHxg8J",
+    "pct": 1.2702541427081704,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "H7PKyDYaESrpuZEMcPv7wjCnSjYA5R3n4i11bRKZFB2E",
+    "pct": 1.1996664649090927,
+    "insider": false,
+    "known": null
+   },
+   {
+    "owner": "HRd8A2YjhMBSGEQaPYZ9NF6DUSKM3FGyLDciHDwMoWNK",
+    "pct": 1.1943419855085984,
+    "insider": false,
+    "known": null
+   }
+  ],
+  "markets": [
+   {
+    "marketType": "pump_fun_amm",
+    "pubkey": "rV1Jxer9mPQaMQxzwF5usSXjTUDZwH2pA9aMvuEocxS",
+    "mintB": "pumpCmXq",
+    "lpLockedPct": 100,
+    "lpLockedUSD": 16209.791129424693,
+    "quoteUSD": 6220.683387169573,
+    "baseUSD": 9989.10774225512,
+    "lpTotalSupply": 24190141007246
+   }
+  ],
+  "knownAccounts_types": [
+   "AMM",
+   "CREATOR",
+   "LOCKER"
+  ],
+  "keys": [
+   "creator",
+   "creatorBalance",
+   "creatorTokens",
+   "deployPlatform",
+   "detectedAt",
+   "events",
+   "fileMeta",
+   "freezeAuthority",
+   "graphInsidersDetected",
+   "insiderNetworks",
+   "knownAccounts",
+   "launchpad",
+   "lockerOwners",
+   "lockerScanStatus",
+   "lockers",
+   "markets",
+   "mint",
+   "mintAuthority",
+   "price",
+   "risks",
+   "rugged",
+   "score",
+   "score_normalised",
+   "token",
+   "tokenMeta",
+   "tokenProgram",
+   "tokenType",
+   "token_extensions",
+   "topHolders",
+   "totalHolders",
+   "totalLPProviders",
+   "totalMarketLiquidity",
+   "totalStableLiquidity",
+   "transferFee",
+   "validation",
+   "verification"
+  ],
+  "mentions": {
+   "holder_reward": 0,
+   "reward": 0,
+   "creator history": 0
+  }
+ }
+}

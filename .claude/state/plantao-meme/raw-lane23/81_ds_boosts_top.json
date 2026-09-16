@@ -1,0 +1,99 @@
+{
+ "_meta": {
+  "file": "81_ds_boosts_top.json",
+  "url": "https://api.dexscreener.com/token-boosts/top/v1",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:38.798+00:00",
+  "http": 200,
+  "bytes": 23204,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "HIT",
+   "server": "cloudflare",
+   "cf-ray": "a3bae4de7c37649c-GIG",
+   "date": "Tue, 15 Sep 2026 21:58:39 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:39.159+00:00",
+  "read_brt": "18:58:39",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "n": 30,
+  "solana": [
+   {
+    "tokenAddress": "9MBetPjhp7uZ4odThXNm44GTVaffoYBcmGpdda9rpump",
+    "amount": null,
+    "totalAmount": 500,
+    "description": "Anatoely Yakovenko will lead Solana to new heights."
+   },
+   {
+    "tokenAddress": "gxPoy3LioMo8FxrXHuqzFwg2R2JafQRe5tAsgPQpump",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "A strange little signal slipped through the void, carrying a tiny visitor no one can explain. We don’t know where Lil Eldritch came from, but something tells us the transmission has only just begun."
+   },
+   {
+    "tokenAddress": "Gyt8ifzVc1DnWKGpanfuvNnNyyxsWAFXJ8y38A79pump",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "Strawdog wants to swim.\nThere is only one problem.\nStrawdog can't swim."
+   },
+   {
+    "tokenAddress": "GPrTuSgAXVVJ67bAU4xe3UFD5aDDmVj7bZy73vTQpump",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "clarity cat"
+   },
+   {
+    "tokenAddress": "2hoRABojpn3SSJ6ReUuCNuKRvsHDuPn7kFHH7J8Fpump",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "Tyson’s bike was heavy.\nMJ’s bike is different.\nSame road.\nDifferent rider.\nTyson made you wait.\nMJ knows how to move.\nNo promises.\nJust get on the bike."
+   },
+   {
+    "tokenAddress": "76a7g4P4HJmQk4Mrwe6sb6dte7BEMKCaWuHNo51tSTNK",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "The largest model in the room.\nThe loudest signal on Solana.\nFattensor ($FART) 💨🧠"
+   },
+   {
+    "tokenAddress": "58NKqgGPUgEPNq5ergdiiUBw9rGPcnX37wUTLYe2nKut",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "feg"
+   },
+   {
+    "tokenAddress": "C8pvSBY8JBhP6zjAXAmbzNTAsqCsKiVoapCpCF5pump",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "Dih Fish"
+   },
+   {
+    "tokenAddress": "Caej3LQSaGou4ZFgFtCtbMo6yegpPRaw31MawHEkpump",
+    "amount": null,
+    "totalAmount": 100,
+    "description": null
+   },
+   {
+    "tokenAddress": "7PboeXUhu35TYV4TFfKzvMGPj9TfgsbSADjWcasE35zu",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "$SENGI (Elephant Shrew) is taking over X with a shrew that sounds like an elephant. One viral sound, one unforgettable meme, and a whole new character entering the meme meta."
+   },
+   {
+    "tokenAddress": "DAHn4rnrnbPzfgNusjty1tp1MX6f76HLHtNH9muCdtKX",
+    "amount": null,
+    "totalAmount": 100,
+    "description": "Caesar was chosen by Reddit to become Doge2, making him part of real internet Doge history.\n\nReal dog. Real provenance. Real lore."
+   },
+   {
+    "tokenAddress": "H7Y3TzFyyfPBnn5Dpwa5m79NdgDQnFS8TcAtQe2Tpump",
+    "amount": null,
+    "totalAmount": 80,
+    "description": "Going all-in on the ultimate cat-powered meme coin gamble."
+   }
+  ]
+ }
+}

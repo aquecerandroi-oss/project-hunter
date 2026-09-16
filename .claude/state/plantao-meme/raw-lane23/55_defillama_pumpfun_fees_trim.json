@@ -1,0 +1,78 @@
+{
+ "_meta": {
+  "file": "55_defillama_pumpfun_fees_trim.json",
+  "url": "https://api.llama.fi/summary/fees/pump.fun",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:59:01.601+00:00",
+  "http": 200,
+  "bytes": 64509,
+  "headers": {
+   "content-type": "application/json",
+   "cf-cache-status": "EXPIRED",
+   "server": "cloudflare",
+   "cf-ray": "a3bae56cbc651f4b-GRU",
+   "date": "Tue, 15 Sep 2026 21:59:02 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:59:02.900+00:00",
+  "read_brt": "18:59:02",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "name": "pump.fun",
+  "total24h": 1707784,
+  "total48hto24h": 1552550,
+  "total7d": 9431486,
+  "totalDataChart_last12": [
+   [
+    1788393600,
+    1309539
+   ],
+   [
+    1788480000,
+    928134
+   ],
+   [
+    1788566400,
+    679806
+   ],
+   [
+    1788652800,
+    695147
+   ],
+   [
+    1788739200,
+    1225798
+   ],
+   [
+    1788825600,
+    1272930
+   ],
+   [
+    1788912000,
+    1412179
+   ],
+   [
+    1788998400,
+    1135509
+   ],
+   [
+    1789084800,
+    950515
+   ],
+   [
+    1789171200,
+    1400019
+   ],
+   [
+    1789257600,
+    1552550
+   ],
+   [
+    1789344000,
+    1707784
+   ]
+  ]
+ }
+}

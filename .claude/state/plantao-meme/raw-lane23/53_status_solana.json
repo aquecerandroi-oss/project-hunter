@@ -1,0 +1,77 @@
+{
+ "_meta": {
+  "file": "53_status_solana.json",
+  "url": "https://status.solana.com/api/v2/summary.json",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:57:56.939+00:00",
+  "http": 200,
+  "bytes": 2973,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "server": "AtlassianEdge",
+   "date": "Tue, 15 Sep 2026 21:57:57 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:57:57.522+00:00",
+  "read_brt": "18:57:57",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "status": {
+   "indicator": "none",
+   "description": "All Systems Operational"
+  },
+  "page": {
+   "id": "rm9mn997x8jd",
+   "name": "Solana",
+   "url": "https://status.solana.com",
+   "time_zone": "Etc/UTC",
+   "updated_at": "2026-09-15T19:44:43.585Z"
+  },
+  "incidents": [],
+  "scheduled_maintenances": [],
+  "components": [
+   {
+    "name": "Mainnet Beta - Cluster",
+    "status": "operational",
+    "updated_at": "2024-02-06T15:09:24.815Z"
+   },
+   {
+    "name": "Mainnet Beta - RPC Nodes",
+    "status": "operational",
+    "updated_at": "2021-03-22T23:27:09.122Z"
+   },
+   {
+    "name": "Explorer",
+    "status": "operational",
+    "updated_at": "2023-12-22T14:41:18.719Z"
+   },
+   {
+    "name": "US RPC Nodes",
+    "status": "operational",
+    "updated_at": "2023-02-26T15:53:41.087Z"
+   },
+   {
+    "name": "EU RPC Nodes",
+    "status": "operational",
+    "updated_at": "2023-02-26T15:54:19.864Z"
+   },
+   {
+    "name": "Asia RPC Nodes",
+    "status": "operational",
+    "updated_at": "2023-02-26T15:54:44.711Z"
+   },
+   {
+    "name": "solana.com",
+    "status": "operational",
+    "updated_at": "2023-12-22T14:40:31.870Z"
+   },
+   {
+    "name": "Break Solana",
+    "status": "operational",
+    "updated_at": "2021-05-01T19:56:26.321Z"
+   }
+  ]
+ }
+}

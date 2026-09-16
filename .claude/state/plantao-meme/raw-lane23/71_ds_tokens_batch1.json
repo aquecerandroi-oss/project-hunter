@@ -1,0 +1,1541 @@
+{
+ "_meta": {
+  "file": "71_ds_tokens_batch1.json",
+  "url": "https://api.dexscreener.com/tokens/v1/solana/129hJmrKLVwrSkKJt5MxTaQvzRtzshuFtT9WBjbtpump,2A1Qu9FcQPvQeXTY6WvvL27v7hqWRdPg6yP2iwJMpump,2Qxw5TJ5aGwxZgKzji7j1nL2VY6cuRYzY2UdXoV5pump,2Y9QmsmRyScWYHYdKWfJPctDJNC5WN5XtEN4ZSzWf51a,3DHTADG9AywZeac4kHu366s23yzanUVPFWSmUGAYU1Ku,3bNtq6ZYQ11PNXq5ZKeWBrfmTWUEcotJtSN5eyL5DFfX,3f6ACaSW2wAYno61Y5KdyhccfmGq2y1Ud4AfpFAwpump,3hLDj47BbSFYoNqUPD2YLCHtuGPeyvNy5aGJQB4Spump,3j7sRXJ1sew7hacEXFnddTANhFXv2XC5XbzPHtqMpump,3k2Uscqejw55g6f8bSqXmxULq46bAERY7rPuJ5V2pump,3nfS1yk8XaqLm6DwzHDw5NdPrVAfyRkWgimPWqW3pump,3wR88kYEovkNjW9uaLJum5sH1FXxUgwTR8roMeKPsk4t,3zNeTW8oy7vXpkiimtg1evokbbdJU5yd4KWUuBAipaid,3zuomKpLKA1fMFmhNagBa34JTsCzW19ocM9hnGqmpump,4CY9BZS4wmvJznanGymwFXF5aNevM5aabuyVfQLCpump,4GtYQVgyKMuAmbYQw9q7iX4ZozuNAF1KU9uQDypoNkXP,4HUVobGSUsUr7eVhpb6gzyj39wTMvXfuebHRXr9epump,4XwHMLjyShkigWzfA1KDUaM9EkVPHDpy6Kr618e6pump,4ZUjJ5EJbwfh7teotB29uHc1SC3SiqbrkwJoNgsxibbU,4cRJ7GmVJ49uG3dpYFK7ku4xzyBNVQuq6fhXcvZ1pump,4qLcghvNYDnhgrxB7W5SnaczLtMV9kFUDjf5rHoFCodv,4uziyG9CHZBkqo1aucAxfC5UnqA6b2U7YiFKAaDhpaid,4wzLxapFN8VCKVDXENHU9y9rMwNRjTtuqKXb5TZod7uF,4zsuzEsJSWuW76HTRYtM8PkYRsrrcKotkov3AP5HLcr,5QAxDNJRPVoRqw3QaxzwmhXxt59s3gWd4z6S21qpump,5Qj6sq1V7EP7A4iYQYduRtodXTinXbdaooP6mGZJpump,5QqVyMNcLsyr7QiBQdFMnjPL7Jdtp7F3hULvXJtspump,5QvYDMPQJfJdqTa6nN5R9F65TiFsMrddeQWZ3Vq5pump,5g6trycp4bP6KDsqZejcxywCajamApxbTmBT5JWT76c8,5kxCLgbUMfYHKwHXnDZDuZz8s1x31yhKrPdjeJF1pump",
+  "method": "GET",
+  "request_started_utc": "2026-09-15T21:58:26.551+00:00",
+  "http": 200,
+  "bytes": 28103,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "cf-cache-status": "MISS",
+   "server": "cloudflare",
+   "cf-ray": "a3bae4923c876d4e-GIG",
+   "date": "Tue, 15 Sep 2026 21:58:27 GMT"
+  },
+  "response_received_utc": "2026-09-15T21:58:27.163+00:00",
+  "read_brt": "18:58:27",
+  "pump_host": false,
+  "pump_count": null,
+  "error": null
+ },
+ "payload": {
+  "n_pairs": 30,
+  "pairs": [
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "HEgn22NpAXZmjjHh8p3qMTHuwjKMP7iYC3ZXE1DKHDGA",
+    "priceUsd": "0.000001773",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 19768,
+      "sells": 9712
+     },
+     "h24": {
+      "buys": 19768,
+      "sells": 9712
+     }
+    },
+    "volume": {
+     "h24": 161494.07,
+     "h6": 161494.07,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -95.73,
+     "h24": -95.73
+    },
+    "liquidity": {
+     "usd": 1788.06,
+     "base": 988555231,
+     "quote": 0.3612
+    },
+    "fdv": 1771,
+    "marketCap": 1771,
+    "pairCreatedAt": 1789496097000,
+    "base": "129hJmrKLVwrSkKJt5MxTaQvzRtzshuFtT9WBjbtpump",
+    "symbol": "EMBER",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "jDEcAEekmW2AFb3f1f4j5dbnEcYgTiW3XFdSQhPeqz4",
+    "priceUsd": "0.00002453",
+    "txns": {
+     "m5": {
+      "buys": 9,
+      "sells": 7
+     },
+     "h1": {
+      "buys": 147,
+      "sells": 96
+     },
+     "h6": {
+      "buys": 1248,
+      "sells": 927
+     },
+     "h24": {
+      "buys": 1248,
+      "sells": 927
+     }
+    },
+    "volume": {
+     "h24": 71572.59,
+     "h6": 71572.59,
+     "h1": 5455.39,
+     "m5": 485.32
+    },
+    "priceChange": {
+     "m5": -10.4,
+     "h1": -26.04,
+     "h6": -38.63,
+     "h24": -38.63
+    },
+    "liquidity": {
+     "usd": 11256.29,
+     "base": 265056582,
+     "quote": 49.1529
+    },
+    "fdv": 23655,
+    "marketCap": 23655,
+    "pairCreatedAt": 1789498510000,
+    "boosts": {
+     "active": 40
+    },
+    "base": "2A1Qu9FcQPvQeXTY6WvvL27v7hqWRdPg6yP2iwJMpump",
+    "symbol": "armstrong",
+    "quote": "SOL",
+    "info": true,
+    "info_keys": [
+     "header",
+     "imageUrl",
+     "openGraph",
+     "socials",
+     "websites"
+    ],
+    "socials_n": 2,
+    "websites_n": 1
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "2xgLRPHNQvNtdwnvZQbSQrVtmwVeroakRdcxUrUhXs1U",
+    "priceUsd": "0.000001713",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 6294,
+      "sells": 8555
+     },
+     "h24": {
+      "buys": 6294,
+      "sells": 8555
+     }
+    },
+    "volume": {
+     "h24": 161373.01,
+     "h6": 161373.01,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -95.8,
+     "h24": -95.8
+    },
+    "liquidity": {
+     "usd": 1725.6,
+     "base": 998871118,
+     "quote": 0.1451
+    },
+    "fdv": 1713,
+    "marketCap": 1713,
+    "pairCreatedAt": 1789499700000,
+    "base": "2Qxw5TJ5aGwxZgKzji7j1nL2VY6cuRYzY2UdXoV5pump",
+    "symbol": "GTA 6 Coin",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "raydium",
+    "pairAddress": "3MMuneSan9fB9KcUXkRFkQnGmVfzPxZFyrqm9eHim9ie",
+    "priceUsd": "0.000002397",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 10,
+      "sells": 37
+     },
+     "h6": {
+      "buys": 524,
+      "sells": 509
+     },
+     "h24": {
+      "buys": 524,
+      "sells": 509
+     }
+    },
+    "volume": {
+     "h24": 40516.07,
+     "h6": 40516.07,
+     "h1": 1929.24,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -56,
+     "h6": -94.21,
+     "h24": -94.21
+    },
+    "liquidity": {
+     "usd": 4158.22,
+     "base": 867273504,
+     "quote": 48.3673
+    },
+    "fdv": 2397,
+    "marketCap": 2397,
+    "pairCreatedAt": 1789504159000,
+    "labels": [
+     "CPMM"
+    ],
+    "base": "2Y9QmsmRyScWYHYdKWfJPctDJNC5WN5XtEN4ZSzWf51a",
+    "symbol": "lasercat",
+    "quote": "BROS",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "DuArt6yeK5dF64ktuZLgYKy8xcxcGprhCMGHkYpkn9NG",
+    "txns": {
+     "m5": {
+      "buys": 18,
+      "sells": 6
+     },
+     "h1": {
+      "buys": 545,
+      "sells": 427
+     },
+     "h6": {
+      "buys": 5012,
+      "sells": 3689
+     },
+     "h24": {
+      "buys": 5012,
+      "sells": 3689
+     }
+    },
+    "volume": {
+     "h24": 0,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "m5": 9.01,
+     "h1": -63.32,
+     "h6": -69.74,
+     "h24": -69.74
+    },
+    "pairCreatedAt": 1789502208000,
+    "base": "3DHTADG9AywZeac4kHu366s23yzanUVPFWSmUGAYU1Ku",
+    "symbol": "ARC",
+    "quote": "CRCLx",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "raydium",
+    "pairAddress": "78KfKhK9hUQkXgb9BhAN3Zd254YTSwtZk21G9iBfK2sG",
+    "priceUsd": "0.00001912",
+    "txns": {
+     "m5": {
+      "buys": 1,
+      "sells": 6
+     },
+     "h1": {
+      "buys": 238,
+      "sells": 152
+     },
+     "h6": {
+      "buys": 521,
+      "sells": 411
+     },
+     "h24": {
+      "buys": 521,
+      "sells": 411
+     }
+    },
+    "volume": {
+     "h24": 69968.25,
+     "h6": 69968.25,
+     "h1": 28025.28,
+     "m5": 574.24
+    },
+    "priceChange": {
+     "m5": -5.25,
+     "h1": 93.53,
+     "h6": -56.73,
+     "h24": -56.73
+    },
+    "liquidity": {
+     "usd": 13494.42,
+     "base": 352732824,
+     "quote": 682042
+    },
+    "fdv": 19128,
+    "marketCap": 19128,
+    "pairCreatedAt": 1789503643000,
+    "labels": [
+     "CPMM"
+    ],
+    "base": "3bNtq6ZYQ11PNXq5ZKeWBrfmTWUEcotJtSN5eyL5DFfX",
+    "symbol": "DOLLO",
+    "quote": "ALLINU",
+    "info": true,
+    "info_keys": [
+     "header",
+     "imageUrl",
+     "openGraph",
+     "socials",
+     "websites"
+    ],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "6Bqb5L5PEXhm8F3Z3uHcNKePSUwGE9QsdSztFb6C2UzP",
+    "priceUsd": "0.000004487",
+    "txns": {
+     "m5": {
+      "buys": 1,
+      "sells": 1
+     },
+     "h1": {
+      "buys": 45,
+      "sells": 67
+     },
+     "h6": {
+      "buys": 1340,
+      "sells": 1540
+     },
+     "h24": {
+      "buys": 1340,
+      "sells": 1540
+     }
+    },
+    "volume": {
+     "h24": 129221.6,
+     "h6": 129221.6,
+     "h1": 3633.22,
+     "m5": 103.95
+    },
+    "priceChange": {
+     "m5": -6.92,
+     "h1": -43.46,
+     "h6": -88.9,
+     "h24": -88.9
+    },
+    "liquidity": {
+     "usd": 3863.71,
+     "base": 619677186,
+     "quote": 11.2022
+    },
+    "fdv": 4280,
+    "marketCap": 4280,
+    "pairCreatedAt": 1789502491000,
+    "base": "3f6ACaSW2wAYno61Y5KdyhccfmGq2y1Ud4AfpFAwpump",
+    "symbol": "CHEESEBALL",
+    "quote": "SOL",
+    "info": true,
+    "info_keys": [
+     "header",
+     "imageUrl",
+     "openGraph",
+     "socials",
+     "websites"
+    ],
+    "socials_n": 1,
+    "websites_n": 1
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "9ATyaBbKeCQdGaW8Ph91qJ24x2st9ruG1cm8Fz18ctf2",
+    "priceUsd": "0.000001733",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 696,
+      "sells": 157
+     },
+     "h6": {
+      "buys": 5476,
+      "sells": 253
+     },
+     "h24": {
+      "buys": 5476,
+      "sells": 253
+     }
+    },
+    "volume": {
+     "h24": 1030794.09,
+     "h6": 1030794.09,
+     "h1": 515234.22,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -100,
+     "h6": -95.72,
+     "h24": -95.72
+    },
+    "liquidity": {
+     "usd": 1758.41,
+     "base": 999428206,
+     "quote": 0.2684
+    },
+    "fdv": 1733,
+    "marketCap": 1733,
+    "pairCreatedAt": 1789503687000,
+    "base": "3hLDj47BbSFYoNqUPD2YLCHtuGPeyvNy5aGJQB4Spump",
+    "symbol": "WOFI",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "AQsbfPeUBQgjxS7xLXXCmdVyLH2LzdSJcimZGctvyMJZ",
+    "priceUsd": "0.000001930",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 10394,
+      "sells": 7800
+     },
+     "h24": {
+      "buys": 10394,
+      "sells": 7800
+     }
+    },
+    "volume": {
+     "h24": 469778.2,
+     "h6": 469778.2,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -97.27,
+     "h24": -97.27
+    },
+    "liquidity": {
+     "usd": 2029.6,
+     "base": 961757767,
+     "quote": 1.7853
+    },
+    "fdv": 1930,
+    "marketCap": 1930,
+    "pairCreatedAt": 1789501852000,
+    "base": "3j7sRXJ1sew7hacEXFnddTANhFXv2XC5XbzPHtqMpump",
+    "symbol": "CRUISE",
+    "quote": "SOL",
+    "info": true,
+    "info_keys": [
+     "header",
+     "imageUrl",
+     "openGraph",
+     "socials",
+     "websites"
+    ],
+    "socials_n": 1,
+    "websites_n": 1
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "77rSn3Hzj1ePCnsCgpjYumeii5mMxSWD4dS9QdrQrNW7",
+    "priceUsd": "0.000002264",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 7
+     },
+     "h6": {
+      "buys": 2032,
+      "sells": 1979
+     },
+     "h24": {
+      "buys": 2032,
+      "sells": 1979
+     }
+    },
+    "volume": {
+     "h24": 206036.19,
+     "h6": 206036.19,
+     "h1": 23.36,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -4.36,
+     "h6": -94.19,
+     "h24": -94.19
+    },
+    "liquidity": {
+     "usd": 2287.68,
+     "base": 875048977,
+     "quote": 3.1671
+    },
+    "fdv": 2196,
+    "marketCap": 2196,
+    "pairCreatedAt": 1789500254000,
+    "base": "3k2Uscqejw55g6f8bSqXmxULq46bAERY7rPuJ5V2pump",
+    "symbol": "HTML",
+    "quote": "SOL",
+    "info": true,
+    "info_keys": [
+     "header",
+     "imageUrl",
+     "openGraph",
+     "socials",
+     "websites"
+    ],
+    "socials_n": 1,
+    "websites_n": 1
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "2xAXkAk1JHMsKgsryf6qYMSM77HbpFgkA84wEiuGf97H",
+    "priceUsd": "0.000001748",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 5446,
+      "sells": 8619
+     },
+     "h24": {
+      "buys": 5446,
+      "sells": 8619
+     }
+    },
+    "volume": {
+     "h24": 105524.47,
+     "h6": 105524.47,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -95.76,
+     "h24": -95.76
+    },
+    "liquidity": {
+     "usd": 1766.49,
+     "base": 995697079,
+     "quote": 0.2615
+    },
+    "fdv": 1743,
+    "marketCap": 1743,
+    "pairCreatedAt": 1789497753000,
+    "base": "3nfS1yk8XaqLm6DwzHDw5NdPrVAfyRkWgimPWqW3pump",
+    "symbol": "LV",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "2PspsZQ4nHvtM37bAkk79qgcz2zcJCZuxCobnQxtkhvy",
+    "priceUsd": "0.000003503",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 1
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 6
+     },
+     "h6": {
+      "buys": 379,
+      "sells": 571
+     },
+     "h24": {
+      "buys": 379,
+      "sells": 571
+     }
+    },
+    "volume": {
+     "h24": 26060.05,
+     "h6": 26060.05,
+     "h1": 19.04,
+     "m5": 1.02
+    },
+    "priceChange": {
+     "m5": -0.09,
+     "h1": -2.22,
+     "h6": -91.31,
+     "h24": -91.31
+    },
+    "liquidity": {
+     "usd": 3184.28,
+     "base": 692832792,
+     "quote": 7.8294
+    },
+    "fdv": 2594,
+    "marketCap": 2594,
+    "pairCreatedAt": 1789501437000,
+    "base": "3wR88kYEovkNjW9uaLJum5sH1FXxUgwTR8roMeKPsk4t",
+    "symbol": "ok",
+    "quote": "SOL",
+    "info": true,
+    "info_keys": [
+     "header",
+     "imageUrl",
+     "openGraph",
+     "socials",
+     "websites"
+    ],
+    "socials_n": 1,
+    "websites_n": 1
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "4eMoz2Xvrsm67WTrtspv2rrrXs4ZyP2MzdYYJ1HUqPAF",
+    "priceUsd": "0.00002463",
+    "txns": {
+     "m5": {
+      "buys": 324,
+      "sells": 291
+     },
+     "h1": {
+      "buys": 324,
+      "sells": 291
+     },
+     "h6": {
+      "buys": 324,
+      "sells": 291
+     },
+     "h24": {
+      "buys": 324,
+      "sells": 291
+     }
+    },
+    "volume": {
+     "h24": 36533.21,
+     "h6": 36533.21,
+     "h1": 36533.21,
+     "m5": 36533.21
+    },
+    "priceChange": {
+     "m5": -38.27,
+     "h1": -38.27,
+     "h6": -38.27,
+     "h24": -38.27
+    },
+    "liquidity": {
+     "usd": 11250.62,
+     "base": 262011021,
+     "quote": 49.6095
+    },
+    "fdv": 24601,
+    "marketCap": 24601,
+    "pairCreatedAt": 1789509266000,
+    "base": "3zNeTW8oy7vXpkiimtg1evokbbdJU5yd4KWUuBAipaid",
+    "symbol": "LCAT",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpfun",
+    "pairAddress": "2G8CMN1fjvbcMUVy6xN2C5HBTfSRJVtcK9fRbKD4rCeQ",
+    "priceUsd": "0.00004002",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 7,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 7,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 7,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 8280.37,
+     "h6": 8280.37,
+     "h1": 8280.37,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 1365,
+     "h6": 1365,
+     "h24": 1365
+    },
+    "fdv": 40023.84,
+    "marketCap": 40023.84,
+    "pairCreatedAt": 1789506027000,
+    "base": "3zuomKpLKA1fMFmhNagBa34JTsCzW19ocM9hnGqmpump",
+    "symbol": "MEIRA",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "Hv2FZEGHA5Xs6uJV1VxqiHKZTNva3LHM8tLjtaBsweeV",
+    "priceUsd": "0.000001744",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 4341,
+      "sells": 6337
+     },
+     "h6": {
+      "buys": 6200,
+      "sells": 7929
+     },
+     "h24": {
+      "buys": 6200,
+      "sells": 7929
+     }
+    },
+    "volume": {
+     "h24": 80004.86,
+     "h6": 80004.86,
+     "h1": 48470.08,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -99.4,
+     "h6": -95.68,
+     "h24": -95.68
+    },
+    "liquidity": {
+     "usd": 1759.49,
+     "base": 993557635,
+     "quote": 0.2683
+    },
+    "fdv": 1745,
+    "marketCap": 1745,
+    "pairCreatedAt": 1789505523000,
+    "base": "4CY9BZS4wmvJznanGymwFXF5aNevM5aabuyVfQLCpump",
+    "symbol": "WOTF",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "raydium",
+    "pairAddress": "GTS1oaujNBWjgDyCYcUCBP233nYP8nkNQwQWaif31N2Q",
+    "priceUsd": "0.000001833",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 1,
+      "sells": 10
+     },
+     "h6": {
+      "buys": 944,
+      "sells": 896
+     },
+     "h24": {
+      "buys": 944,
+      "sells": 896
+     }
+    },
+    "volume": {
+     "h24": 65991.03,
+     "h6": 65991.03,
+     "h1": 69.46,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -8.13,
+     "h6": -95.67,
+     "h24": -95.67
+    },
+    "liquidity": {
+     "usd": 3588.64,
+     "base": 978687208,
+     "quote": 4059553
+    },
+    "fdv": 1833,
+    "marketCap": 1833,
+    "pairCreatedAt": 1789504961000,
+    "labels": [
+     "CPMM"
+    ],
+    "base": "4GtYQVgyKMuAmbYQw9q7iX4ZozuNAF1KU9uQDypoNkXP",
+    "symbol": "dickshit",
+    "quote": "GME",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "DTHKsLHxGfSKy8ZMdQFzkkF6y5fcXWw3jAne1yakh6mM",
+    "priceUsd": "0.00004287",
+    "txns": {
+     "m5": {
+      "buys": 1,
+      "sells": 1
+     },
+     "h1": {
+      "buys": 18,
+      "sells": 17
+     },
+     "h6": {
+      "buys": 108,
+      "sells": 98
+     },
+     "h24": {
+      "buys": 108,
+      "sells": 98
+     }
+    },
+    "volume": {
+     "h24": 9490.13,
+     "h6": 9490.13,
+     "h1": 1500.3,
+     "m5": 13.01
+    },
+    "priceChange": {
+     "m5": -0.1,
+     "h1": -11.61,
+     "h6": 5.96,
+     "h24": 5.96
+    },
+    "liquidity": {
+     "usd": 15392.14,
+     "base": 198229135,
+     "quote": 71.2962
+    },
+    "fdv": 41282,
+    "marketCap": 41282,
+    "pairCreatedAt": 1789503641000,
+    "base": "4HUVobGSUsUr7eVhpb6gzyj39wTMvXfuebHRXr9epump",
+    "symbol": "Arc",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "G6NTdkMkDoiVsjekD5uUa7ggxpwqAK85XeQprZ84V6R6",
+    "priceUsd": "0.000001769",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 12285,
+      "sells": 14235
+     },
+     "h24": {
+      "buys": 12285,
+      "sells": 14235
+     }
+    },
+    "volume": {
+     "h24": 364149.16,
+     "h6": 364149.16,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -95.67,
+     "h24": -95.67
+    },
+    "liquidity": {
+     "usd": 1842.42,
+     "base": 997650861,
+     "quote": 0.7906
+    },
+    "fdv": 1770,
+    "marketCap": 1770,
+    "pairCreatedAt": 1789500053000,
+    "base": "4XwHMLjyShkigWzfA1KDUaM9EkVPHDpy6Kr618e6pump",
+    "symbol": "biketyson",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "F7D2PD8S4Gchj52KNStWLCV3fJiMfyGczmAWi4jtR5QK",
+    "priceUsd": "0.000002612",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 3
+     },
+     "h1": {
+      "buys": 4,
+      "sells": 27
+     },
+     "h6": {
+      "buys": 1542,
+      "sells": 1578
+     },
+     "h24": {
+      "buys": 1542,
+      "sells": 1578
+     }
+    },
+    "volume": {
+     "h24": 86593.78,
+     "h6": 86593.78,
+     "h1": 141.65,
+     "m5": 22.65
+    },
+    "priceChange": {
+     "m5": -2.12,
+     "h1": -8.25,
+     "h6": -93.48,
+     "h24": -93.48
+    },
+    "liquidity": {
+     "usd": 2531.09,
+     "base": 805373574,
+     "quote": 4.4131
+    },
+    "fdv": 2458,
+    "marketCap": 2458,
+    "pairCreatedAt": 1789503111000,
+    "base": "4ZUjJ5EJbwfh7teotB29uHc1SC3SiqbrkwJoNgsxibbU",
+    "symbol": "Dumbocrat",
+    "quote": "SOL",
+    "info": true,
+    "info_keys": [
+     "header",
+     "imageUrl",
+     "openGraph",
+     "socials",
+     "websites"
+    ],
+    "socials_n": 1,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "4mMuYsQJdZ5AtBouXy5yiXa1eLBMqqwViPXTAmVUTw38",
+    "priceUsd": "0.000001727",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 3,
+      "sells": 1
+     },
+     "h6": {
+      "buys": 18172,
+      "sells": 19227
+     },
+     "h24": {
+      "buys": 18172,
+      "sells": 19227
+     }
+    },
+    "volume": {
+     "h24": 179659.73,
+     "h6": 179659.73,
+     "h1": 8.69,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -0.26,
+     "h6": -95.75,
+     "h24": -95.75
+    },
+    "liquidity": {
+     "usd": 1741.08,
+     "base": 997125101,
+     "quote": 0.1962
+    },
+    "fdv": 1725,
+    "marketCap": 1725,
+    "pairCreatedAt": 1789501254000,
+    "base": "4cRJ7GmVJ49uG3dpYFK7ku4xzyBNVQuq6fhXcvZ1pump",
+    "symbol": "BMW",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "5L8hLWjye3KFmjs14WCwpGNMupEc5FNhrSQtuSp6nCcb",
+    "priceUsd": "0.00001993",
+    "txns": {
+     "m5": {
+      "buys": 49,
+      "sells": 30
+     },
+     "h1": {
+      "buys": 1277,
+      "sells": 1236
+     },
+     "h6": {
+      "buys": 1277,
+      "sells": 1236
+     },
+     "h24": {
+      "buys": 1277,
+      "sells": 1236
+     }
+    },
+    "volume": {
+     "h24": 90858.57,
+     "h6": 90858.57,
+     "h1": 90858.57,
+     "m5": 3014.31
+    },
+    "priceChange": {
+     "m5": 82.15,
+     "h1": -50.06,
+     "h6": -50.06,
+     "h24": -50.06
+    },
+    "liquidity": {
+     "usd": 9963.8,
+     "base": 292516151,
+     "quote": 42.7348
+    },
+    "fdv": 19932,
+    "marketCap": 19932,
+    "pairCreatedAt": 1789508372000,
+    "base": "4qLcghvNYDnhgrxB7W5SnaczLtMV9kFUDjf5rHoFCodv",
+    "symbol": "X",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "DSu85nLZy3RQQZospLJ6wCiYu4A5ZEKtXuBaVg9VWzRo",
+    "priceUsd": "0.000005423",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 4
+     },
+     "h1": {
+      "buys": 1267,
+      "sells": 1173
+     },
+     "h6": {
+      "buys": 1267,
+      "sells": 1173
+     },
+     "h24": {
+      "buys": 1267,
+      "sells": 1173
+     }
+    },
+    "volume": {
+     "h24": 102413.49,
+     "h6": 102413.49,
+     "h1": 102413.49,
+     "m5": 101.45
+    },
+    "priceChange": {
+     "m5": -7,
+     "h1": -86.46,
+     "h6": -86.46,
+     "h24": -86.46
+    },
+    "liquidity": {
+     "usd": 4405.13,
+     "base": 560173602,
+     "quote": 14.141
+    },
+    "fdv": 5423,
+    "marketCap": 5423,
+    "pairCreatedAt": 1789506674000,
+    "base": "4uziyG9CHZBkqo1aucAxfC5UnqA6b2U7YiFKAaDhpaid",
+    "symbol": "DYLAN",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "raydium",
+    "pairAddress": "4Hd1HPaJCMjhpNMF1W1BhBhHVKszqaxoinzL74VhgYXK",
+    "priceUsd": "0.00001431",
+    "txns": {
+     "m5": {
+      "buys": 2,
+      "sells": 1
+     },
+     "h1": {
+      "buys": 120,
+      "sells": 112
+     },
+     "h6": {
+      "buys": 120,
+      "sells": 112
+     },
+     "h24": {
+      "buys": 120,
+      "sells": 112
+     }
+    },
+    "volume": {
+     "h24": 17377.67,
+     "h6": 17377.67,
+     "h1": 17377.67,
+     "m5": 130.69
+    },
+    "priceChange": {
+     "m5": 1.56,
+     "h1": -69.17,
+     "h6": -69.17,
+     "h24": -69.17
+    },
+    "liquidity": {
+     "usd": 9887.94,
+     "base": 345261578,
+     "quote": 0.06561
+    },
+    "fdv": 14320,
+    "marketCap": 14320,
+    "pairCreatedAt": 1789506601000,
+    "labels": [
+     "CPMM"
+    ],
+    "boosts": {
+     "active": 30
+    },
+    "base": "4wzLxapFN8VCKVDXENHU9y9rMwNRjTtuqKXb5TZod7uF",
+    "symbol": "BTC",
+    "quote": "WBTC",
+    "info": true,
+    "info_keys": [
+     "header",
+     "imageUrl",
+     "openGraph",
+     "socials",
+     "websites"
+    ],
+    "socials_n": 1,
+    "websites_n": 0
+   },
+   {
+    "dexId": "raydium",
+    "pairAddress": "3T88tHWJbE3M2Y3wMKfbULJamR8Vgd7AbguTf6yjpuLH",
+    "priceUsd": "0.000002617",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 29,
+      "sells": 47
+     },
+     "h6": {
+      "buys": 1247,
+      "sells": 985
+     },
+     "h24": {
+      "buys": 1247,
+      "sells": 985
+     }
+    },
+    "volume": {
+     "h24": 111955.55,
+     "h6": 111955.55,
+     "h1": 2999.85,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": -34.48,
+     "h6": -93.51,
+     "h24": -93.51
+    },
+    "liquidity": {
+     "usd": 4363.51,
+     "base": 833484843,
+     "quote": 102.226
+    },
+    "fdv": 2618,
+    "marketCap": 2618,
+    "pairCreatedAt": 1789505065000,
+    "labels": [
+     "CPMM"
+    ],
+    "base": "4zsuzEsJSWuW76HTRYtM8PkYRsrrcKotkov3AP5HLcr",
+    "symbol": "dickshit",
+    "quote": "GMEx",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "HoUNTgKJ8cnQ1dVPkJSQHK1J4wh5ifG7NC57vk6ikb21",
+    "priceUsd": "0.000001715",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 473,
+      "sells": 164
+     },
+     "h24": {
+      "buys": 473,
+      "sells": 164
+     }
+    },
+    "volume": {
+     "h24": 61083.23,
+     "h6": 61083.23,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -95.78,
+     "h24": -95.78
+    },
+    "liquidity": {
+     "usd": 1725.22,
+     "base": 995654193,
+     "quote": 0.1795
+    },
+    "fdv": 1715,
+    "marketCap": 1715,
+    "pairCreatedAt": 1789502582000,
+    "base": "5QAxDNJRPVoRqw3QaxzwmhXxt59s3gWd4z6S21qpump",
+    "symbol": "Democrat",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpfun",
+    "pairAddress": "EV9S3Pfrok87saCxdXSfgvua57a6QGCeLmhvqia25bFJ",
+    "priceUsd": "0.00004022",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 8,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 8,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 8322.02,
+     "h6": 8322.02,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": 1360,
+     "h24": 1360
+    },
+    "fdv": 40225.17,
+    "marketCap": 40225.17,
+    "pairCreatedAt": 1789502468000,
+    "base": "5Qj6sq1V7EP7A4iYQYduRtodXTinXbdaooP6mGZJpump",
+    "symbol": "huhbike",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpswap",
+    "pairAddress": "7ikhiAU9k6my3wpJP6fac8Ms5RpnC6G3J5GHTQEMj1Jh",
+    "priceUsd": "0.000001734",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 14975,
+      "sells": 250
+     },
+     "h24": {
+      "buys": 14975,
+      "sells": 250
+     }
+    },
+    "volume": {
+     "h24": 236662.31,
+     "h6": 236662.31,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -95.69,
+     "h24": -95.69
+    },
+    "liquidity": {
+     "usd": 1749.27,
+     "base": 999155876,
+     "quote": 0.1669
+    },
+    "fdv": 1734,
+    "marketCap": 1734,
+    "pairCreatedAt": 1789498346000,
+    "base": "5QqVyMNcLsyr7QiBQdFMnjPL7Jdtp7F3hULvXJtspump",
+    "symbol": "GOLDENARRO",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpfun",
+    "pairAddress": "71r5U2FAQ9d1KYLTDELn4zkeRNHa6yb8F5f1ktw7dQpS",
+    "priceUsd": "0.00004089",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 7,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 7,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 8460.58,
+     "h6": 8460.58,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": 1360,
+     "h24": 1360
+    },
+    "fdv": 40894.9,
+    "marketCap": 40894.9,
+    "pairCreatedAt": 1789497109000,
+    "base": "5QvYDMPQJfJdqTa6nN5R9F65TiFsMrddeQWZ3Vq5pump",
+    "symbol": "KARY",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "meteora",
+    "pairAddress": "9w47dbukXDmdNNDhgor2J5sQrjbtaadCwReiWsUk9uiA",
+    "priceUsd": "0.00008526",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 62,
+      "sells": 93
+     },
+     "h24": {
+      "buys": 62,
+      "sells": 93
+     }
+    },
+    "volume": {
+     "h24": 2190.47,
+     "h6": 2190.47,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -24.92,
+     "h24": -24.92
+    },
+    "liquidity": {
+     "usd": 501.01,
+     "base": 5655837,
+     "quote": 0.193
+    },
+    "fdv": 85263,
+    "marketCap": 85263,
+    "pairCreatedAt": 1789503655000,
+    "labels": [
+     "DLMM"
+    ],
+    "base": "5g6trycp4bP6KDsqZejcxywCajamApxbTmBT5JWT76c8",
+    "symbol": "BALLERINA",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   },
+   {
+    "dexId": "pumpfun",
+    "pairAddress": "5gAn39D26RBvvTyA4WZ7WEnq17ipCR8be149CZZiVM7z",
+    "priceUsd": "0.00004106",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 8,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 8,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 8496.28,
+     "h6": 8496.28,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": 1366,
+     "h24": 1366
+    },
+    "fdv": 41067.47,
+    "marketCap": 41067.47,
+    "pairCreatedAt": 1789494108000,
+    "base": "5kxCLgbUMfYHKwHXnDZDuZz8s1x31yhKrPdjeJF1pump",
+    "symbol": "bikeconor",
+    "quote": "SOL",
+    "info": false,
+    "info_keys": [],
+    "socials_n": 0,
+    "websites_n": 0
+   }
+  ]
+ }
+}
