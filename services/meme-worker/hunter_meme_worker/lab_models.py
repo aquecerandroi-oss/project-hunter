@@ -193,6 +193,9 @@ class RuleSetSpec:
     """T4.24 (EXP-M6, braço 2): refuse ``creator_prior_dump_count >= 1`` beside
     ``pedigree_exclusions``; off by default in every frozen set — only
     ``flow_v2/5``/``operator/5`` (``0039``) turn it on."""
+    pedigree_e2b: bool = False
+    """T4.31 (EXP-M9): the E2-b criterion (born full / one buyer paying a third
+    of the rise) applies to this set; only ``flow_v2/6`` (``0044``) turns it on."""
     require_twitter: bool = False
     """T4.26 (EXP-M8): refuse ``no_twitter`` when the mint carries none; off
     by default in every frozen set."""
@@ -263,6 +266,7 @@ class RuleSetSpec:
             clock=_clock_of(params.get("clock")),
             pedigree_exclusions=bool_or(params.get("pedigree_exclusions"), True),
             pedigree_repeat_dumper=bool_or(params.get("pedigree_repeat_dumper"), False),
+            pedigree_e2b=bool_or(params.get("pedigree_e2b"), False),
             require_twitter=bool_or(params.get("require_twitter"), False),
             require_event=bool_or(params.get("require_event"), False),
             declares_mayhem="exclude_mayhem" in params,

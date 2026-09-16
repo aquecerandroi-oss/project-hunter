@@ -17,7 +17,8 @@ from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
 from hunter_meme_worker.lab_repo import insert_proposals, open_mints_for
-from hunter_meme_worker.lab_repo_fast import fast_window, load_fast_gate_rows, pedigree_for
+from hunter_meme_worker.lab_repo_e2b import lineage_for
+from hunter_meme_worker.lab_repo_fast import fast_window, load_fast_gate_rows
 from hunter_meme_worker.proposals import evaluate_gate
 
 if TYPE_CHECKING:
@@ -50,7 +51,9 @@ async def fast_gate_step(
         )
         if not rows:
             return 0, 0
-        pedigree = await pedigree_for(session, sorted({row.mint for row in rows}))
+        # T4.31 (EXP-M9): the E2-b tape is bounded by each row's own instant,
+        # never by the tick's clock — a backlog row would read the future.
+        pedigree, e2b = await lineage_for(session, rows, fast)
         for spec in fast:
             already_open = await open_mints_for(session, spec.id)
             outcome = evaluate_gate(
@@ -60,6 +63,7 @@ async def fast_gate_step(
                 ttl_s=ctx.config.lab_proposal_ttl_s,
                 already_open=already_open,
                 pedigree=pedigree,
+                e2b=e2b,
             )
             refusals.setdefault(spec.name, Counter()).update(outcome.refusals)
             rows_total += outcome.evaluated

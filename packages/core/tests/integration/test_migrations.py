@@ -40,11 +40,14 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0043_meme_events_scan_cursor"
-"""``0043`` (T4.26b) lands on ``0042`` (T4.27), which lands on ``0041`` (T4.26),
-which lands on ``0040`` (T4.24b); bumped here so the shared fixtures agree
-with the repository's actual chain rather than any one task's private
-assumption."""
+HEAD_REVISION = "0044_meme_gate_e2b_arm"
+"""``0044`` (T4.31) lands on ``0043`` (T4.26b), which lands on ``0042`` (T4.27),
+which lands on ``0041`` (T4.26), which lands on ``0040`` (T4.24b); bumped here
+so the shared fixtures agree with the repository's actual chain rather than any
+one task's private assumption."""
+EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
+"""Where the ``0043`` tests stage now that ``0044`` sits on top (T4.31): ``"-1"``
+stopped meaning 0043 the day 0044 landed, exactly as every revision before."""
 EXECUTABLE_MCAP_REVISION = "0042_meme_executable_mcap"
 """Where the ``0042`` tests stage now that ``0043`` sits on top (T4.26b)."""
 SOCIAL_REVISION = "0041_meme_social"
@@ -8282,7 +8285,6 @@ def test_0043_check_refuses_an_unknown_match_kind(upgraded: str) -> None:
 
 
 def test_0043_refuses_a_downgrade_while_a_match_exists(upgraded: str) -> None:
-    config = alembic_config(upgraded)
     event_id = "00000000-0000-4000-8000-000000004303"
     asyncio.run(
         _write(
@@ -8299,9 +8301,15 @@ def test_0043_refuses_a_downgrade_while_a_match_exists(upgraded: str) -> None:
         )
     )
     try:
-        with pytest.raises(DBAPIError, match="coin an event named cannot be forgotten"):
-            command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        # T4.31: staged at ``0043`` since ``0044`` sits on top — ``"-1"`` from the
+        # head would reverse the E2-b seed, not this revision (the ``_staged_at``
+        # pattern every older revision's tests already follow).
+        with _staged_at(upgraded, EVENTS_SCAN_CURSOR_REVISION) as config:
+            with pytest.raises(DBAPIError, match="coin an event named cannot be forgotten"):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == EVENTS_SCAN_CURSOR_REVISION, (
+                "the downgrade must not commit"
+            )
     finally:
         asyncio.run(
             _write(
@@ -8333,4 +8341,141 @@ def test_0043_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0044_meme_gate_e2b_arm — E2-b as a pre-registered research arm (T4.31, EXP-M9)
+# ---------------------------------------------------------------------------
+
+_FLOW_V2_E2B_RULE_SET = "01994d00-6c1a-7000-8000-000000000013"
+_E2B_CALIBRATION = (
+    '{"gate_version": 3, "require_holders_rising": false, "require_progress_rising": false, '
+    '"min_snipers": 21, "max_snipers": 1000, "max_progress_pct": "50", "exclude_mayhem": true}'
+)
+"""The desk's calibrated numbers of 16/09 (KB-0099 §3, KB-0102 §2, T4.27),
+spelled out here instead of imported: a test that agrees with the migration by
+construction proves nothing."""
+_CLEAN_0044: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_paper_bets WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_proposals WHERE mint = 'GUARD_MINT'", {}),
+)
+
+
+def test_0044_seeds_the_e2b_arm_without_touching_the_desk(upgraded: str) -> None:
+    """``flow_v2/6`` = ``flow_v2/5`` + the desk's calibration +
+    ``pedigree_e2b: true``, ``research_only`` under EXP-M9 on the 15-second
+    clock; ``flow_v2/5`` stays active (the comparison is the point) and the
+    desk's ``operator/5`` is untouched — E2-b is paper only."""
+    seeded = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+            "|| status || ':' || (params ->> 'pedigree_e2b') || ':' || (params ->> 'clock') "
+            "|| ':' || (params ->> 'gate_key') || '/' || (params ->> 'gate_version') "
+            "|| ':' || (params ->> 'min_snipers') || ':' || (params ->> 'max_progress_pct') "
+            "|| ':' || (params ->> 'require_progress_rising') "
+            "FROM meme_rule_sets WHERE id = :e",
+            {"e": _FLOW_V2_E2B_RULE_SET},
+        )
+    )
+    assert seeded == [
+        "flow_v2/6:research_only:EXP-M9:active:true:15s:fluxo_e_holders/3:21:50:false"
+    ]
+    same_but_the_switch = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT ((e.params - 'pedigree_e2b') = (f.params || CAST(:calibration AS jsonb)))::text "
+            "FROM meme_rule_sets e, meme_rule_sets f WHERE e.id = :e AND f.id = :f",
+            {
+                "e": _FLOW_V2_E2B_RULE_SET,
+                "f": _FLOW_V2_ARM5_RULE_SET,
+                "calibration": _E2B_CALIBRATION,
+            },
+        )
+    )
+    assert same_but_the_switch == ["true"], (
+        "flow_v2/6 minus the switch is flow_v2/5 plus the desk's calibration, byte for byte"
+    )
+    untouched = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || status FROM meme_rule_sets "
+            "WHERE id IN (:a5, :o5) ORDER BY name",
+            {"a5": _FLOW_V2_ARM5_RULE_SET, "o5": _OPERATOR_5_RULE_SET},
+        )
+    )
+    assert untouched == ["flow_v2/5:active", "operator/5:active"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"], (
+        "the desk keeps its own set: E2-b never fires on money by hand"
+    )
+    command.check(alembic_config(upgraded))
+
+
+def test_0044_refuses_a_downgrade_while_a_proposal_or_a_bet_references_the_arm(
+    upgraded: str,
+) -> None:
+    """§17.7: a proposal or a bet under ``flow_v2/6`` is evidence — count,
+    name, stop. At the head, so ``"-1"`` is this revision."""
+    config = alembic_config(upgraded)
+    proposal = "00000000-0000-4000-8000-000000004401"
+    bet = "00000000-0000-4000-8000-000000004402"
+    guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
+        (
+            [(_A_PROPOSAL, {"id": proposal, "rule_set": _FLOW_V2_E2B_RULE_SET})],
+            "proposals reference the seeded flow_v2/6 set",
+        ),
+        (
+            [
+                (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
+                (
+                    _A_BET,
+                    {
+                        "id": bet,
+                        "proposal": proposal,
+                        "rule_set": _FLOW_V2_E2B_RULE_SET,
+                        "mode": "paper",
+                    },
+                ),
+            ],
+            "bets reference the seeded flow_v2/6 set",
+        ),
+    ]
+    for statements, message in guarded:
+        asyncio.run(_write(upgraded, statements))
+        try:
+            with pytest.raises(DBAPIError, match=message):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
+                "the downgrade must not commit"
+            )
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0044)))
+    command.check(config)
+
+
+def test_0044_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The arm goes and comes back; nothing else moves."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, EVENTS_SCAN_CURSOR_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == EVENTS_SCAN_CURSOR_REVISION
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id = :e",
+                {"e": _FLOW_V2_E2B_RULE_SET},
+            )
+        ) == ["0"]
+        assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT status FROM meme_rule_sets WHERE id = :e",
+            {"e": _FLOW_V2_E2B_RULE_SET},
+        )
+    ) == ["active"]
     command.check(config)

@@ -1,0 +1,24 @@
+rows=200026
+pairs=130
+Hash Right Join  (cost=5230.38..5281.28 rows=130 width=128)
+  Hash Cond: ((j_1.mint = j.mint) AND (j_1.as_of = j.as_of))
+  CTE judged
+    ->  Hash Join  (cost=2.93..59.14 rows=130 width=56)
+          Hash Cond: (t.mint = u.mint)
+          ->  Seq Scan on meme_tokens t  (cost=0.00..47.06 rows=2006 width=29)
+          ->  Hash  (cost=1.30..1.30 rows=130 width=40)
+                ->  Function Scan on u  (cost=0.01..1.30 rows=130 width=40)
+  ->  GroupAggregate  (cost=5166.69..5214.08 rows=200 width=112)
+        Group Key: j_1.mint, j_1.as_of
+        ->  GroupAggregate  (cost=5166.69..5190.32 rows=945 width=75)
+              Group Key: j_1.mint, j_1.as_of, tr.trader
+              ->  Sort  (cost=5166.69..5169.06 rows=945 width=51)
+                    Sort Key: j_1.mint, j_1.as_of, tr.trader
+                    ->  Nested Loop  (cost=0.42..5119.99 rows=945 width=51)
+                          ->  CTE Scan on judged j_1  (cost=0.00..2.60 rows=129 width=48)
+                                Filter: (created_at IS NOT NULL)
+                          ->  Index Scan using meme_trades_2026_09_mint_block_time_idx on meme_trades_2026_09 tr  (cost=0.42..39.60 rows=7 width=32)
+                                Index Cond: ((mint = j_1.mint) AND (block_time >= (j_1.created_at - '00:01:00'::interval)) AND (block_time <= j_1.as_of) AND (block_time >= '2026-09-24 12:00:00+00'::timestamp with time zone) AND (block_time <= '2026-09-25 12:00:00+00'::timestamp with time zone))
+                                Filter: (side = 'buy'::text)
+  ->  Hash  (cost=2.60..2.60 rows=130 width=56)
+        ->  CTE Scan on judged j  (cost=0.00..2.60 rows=130 width=56)

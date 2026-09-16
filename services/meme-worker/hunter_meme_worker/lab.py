@@ -57,7 +57,7 @@ from hunter_meme_worker.lab_repo import (
     pending_commands,
 )
 from hunter_meme_worker.lab_repo_bets import count_indeterminate
-from hunter_meme_worker.lab_repo_fast import pedigree_for
+from hunter_meme_worker.lab_repo_e2b import lineage_for
 from hunter_meme_worker.lab_repo_lines import open_probes_for, scaled_parent_ids
 from hunter_meme_worker.lab_repo_mayhem import load_gate_rows_with_mayhem
 from hunter_meme_worker.lab_ticks import record_tick
@@ -238,8 +238,7 @@ async def _gate_step(
             rows = await load_gate_rows_with_mayhem(  # T4.27: the flag rides with the row
                 session, minute=minute, features_version=ctx.config.features_version
             )
-            # T4.16 (EXP-M6): the pedigree of the minute's mints, read once.
-            pedigree = await pedigree_for(session, sorted({row.mint for row in rows}))
+            pedigree, e2b = await lineage_for(session, rows, minute_specs)
             for spec in minute_specs:
                 already_open = await open_mints_for(session, spec.id)
                 outcome = evaluate_gate(
@@ -249,6 +248,7 @@ async def _gate_step(
                     ttl_s=ctx.config.lab_proposal_ttl_s,
                     already_open=already_open,
                     pedigree=pedigree,
+                    e2b=e2b,
                 )
                 refusals[spec.name].update(outcome.refusals)
                 rows_total += outcome.evaluated

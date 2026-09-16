@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from hunter_indicators.meme.pedigree_e2b import E2B_V1
 from hunter_indicators.meme.rules import EntryFeatures, participation_pct
 from hunter_meme_worker.lab_models import RuleSetSpec, money_str, optional_money_str
 
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from hunter_indicators.meme.event_gate import EventFeatures
     from hunter_indicators.meme.identity import IdentityFeatures
     from hunter_indicators.meme.pedigree import PedigreeFeatures, PedigreeGate
+    from hunter_indicators.meme.pedigree_e2b import E2bFeatures
 
 __all__ = ["gate_reasons"]
 
@@ -35,6 +37,7 @@ def gate_reasons(
     series: str | None = None,
     identity: IdentityFeatures | None = None,
     event: EventFeatures | None = None,
+    e2b: E2bFeatures | None = None,
 ) -> list[dict[str, Any]]:
     """Which rule fired and the value of every feature it read — the decomposition."""
     gate = spec.gate
@@ -123,6 +126,20 @@ def gate_reasons(
                 # is, regardless of whether this set applies the exclusion.
                 "creator_prior_dump_count": pedigree.creator_prior_dump_count,
                 "creator_prior_dead_count": pedigree.creator_prior_dead_count,
+            }
+        )
+    # T4.31 (EXP-M9): the E2-b decomposition — the two legs, the guard and the
+    # frozen thresholds — only for the set that turns the criterion on.
+    if e2b is not None and spec.pedigree_e2b:
+        reasons.append(
+            {
+                "feature": "pedigree_e2b",
+                "rule": f"{E2B_V1.key}/{E2B_V1.version}",
+                "top_buyer_share": optional_money_str(e2b.top_buyer_share),
+                "buyers": e2b.buyers,
+                "fill_seconds": e2b.fill_seconds,
+                "tape_reason": e2b.tape_reason,
+                **E2B_V1.as_parameters(),
             }
         )
     # T4.26 (EXP-M8): like every other optional criterion, the block is

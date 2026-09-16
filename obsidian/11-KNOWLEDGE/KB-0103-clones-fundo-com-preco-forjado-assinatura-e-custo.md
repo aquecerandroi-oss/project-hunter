@@ -10,7 +10,7 @@ astra: nao consultada nesta nota (pesquisa quant, 16/09 ~19h BRT)
 confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
-status: vivo
+status: vivo (com errata 1, 16/09 — janelas deslocadas em 3 h)
 ---
 
 # KB-0103 — Clones "fundo" com preco forjado: a assinatura medida e o custo de uma regra E2-b
@@ -116,6 +116,29 @@ dia", que hoje conta 55 % de moedas que ninguem comprou.
   e em 42,7 % das graduadas ele cai <= -1 s do `created_at` (mesmo bloco, arredondamento). "Encheu <= 60 s"
   le *no maximo* o mesmo minuto — nao e' tempo on-chain de preenchimento, e a nota nao o chama assim.
 - **3 dias.** Sem replicacao, e' anedota com n grande, nao taxa (mesmo aviso de KB-0100).
+
+## Errata 1 — 2026-09-16 (T4.31), append-only: as janelas do R9 estao deslocadas em 3 h
+
+**O erro.** As consultas do R9 (`2026-09-16-r9-q0{1,2,3,4}-*.sql`) recortaram o "dia BRT" com
+`date 'X' AT TIME ZONE 'America/Sao_Paulo'`. Esse operador aplicado a um `date` devolve um
+**`timestamp` sem fuso**, que a sessao (em UTC) compara depois como se fosse UTC: cada janela deste
+KB comeca **as 18h BRT do dia anterior** e termina as 18h BRT do dia nomeado — **3 h deslocada**.
+As consultas do R13 (KB-0105) ja usam `timestamptz '2026-09-12 00:00:00-03'`, que e' a forma certa.
+
+**O que muda e o que nao muda.** Os conjuntos "14, 15 e 16/09" desta nota **nao sao dias BRT**: sao
+janelas de 24 h deslocadas em 3 h. Numeros afetados: todos os contadores por dia da §0 (2 877
+graduadas, 1 413 com serie, 701 com fita, 390 rotuladas) e, por consequencia, as taxas das §1–§3 —
+as moedas nas bordas trocam de balde. **O que nao muda:** a direcao e a ordem de grandeza do achado.
+O R13 refez a mesma medida com `timestamptz` em **dois dias diferentes** (12 e 13/09) e a conclusao
+se manteve — E2-b com recall 92–100 % a um custo de 3,9–11,4 % das organicas, contra 35–54 % de
+recall a 30–40 % de custo da E2 de hoje (KB-0105 §2). O nivel do custo, sim, oscila: os 2,0 % desta
+nota viraram 11,4 % em 12/09.
+
+**Como citar esta nota a partir de hoje.** As tabelas §1–§3 valem como **ordem de grandeza**, nunca
+como taxa de um dia BRT nomeado; quem precisar de numero por dia refaz a consulta com
+`timestamptz '<data> 00:00:00-03'` (o padrao do R13) antes de citar. O pre-registro que nasce deste
+achado ([[05-EXPERIMENTS/EXP-M9-pedigree-e2b|EXP-M9]], braco `flow_v2/6`, migracao `0044`) congelou os
+limiares pelo R13, nao por estas tabelas.
 
 ## Ligacoes
 [[11-KNOWLEDGE/KB-0100-evento-move-moeda-primeira-medida-16-09|KB-0100]] ·

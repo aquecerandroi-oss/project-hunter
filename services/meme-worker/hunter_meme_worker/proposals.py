@@ -44,6 +44,12 @@ from hunter_indicators.meme.pedigree import (
     evaluate_pedigree,
     evaluate_repeat_dumper,
 )
+from hunter_indicators.meme.pedigree_e2b import (
+    E2B_UNKNOWN_REFUSAL,
+    E2B_V1,
+    E2bFeatures,
+    evaluate_e2b,
+)
 from hunter_indicators.meme.rules import EntryFeatures, evaluate_entry
 from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot, money_str, optional_money_str
 from hunter_meme_worker.proposals_identity import event_features_of, identity_features_of
@@ -188,6 +194,7 @@ def evaluate_gate(
     ttl_s: int,
     already_open: Mapping[str, Any] | frozenset[str] | set[str],
     pedigree: Mapping[str, PedigreeFeatures] | None = None,
+    e2b: Mapping[tuple[str, datetime], E2bFeatures] | None = None,
 ) -> GateOutcome:
     """Every row of one instant (a closed minute, or a 15-second row) through
     the gate of one rule set.
@@ -203,6 +210,13 @@ def evaluate_gate(
     alone): the exclusions are not applied. ``pedigree_repeat_dumper`` (T4.24,
     EXP-M6 braço 2) adds ``creator_repeat_dumper`` on top, only for a set that
     reads its lineage in the first place.
+
+    ``e2b`` (T4.31, EXP-M9) is the same idea one instant deeper: the largest
+    buyer's share of the SOL bought since the mint **up to the row's own
+    ``end_time``**, keyed by ``(mint, end_time)`` because a tick can carry
+    rows of several instants. Only a set with ``pedigree_e2b`` reads it; a
+    judged pair absent from the mapping is a datum that was not read
+    (``e2b_top_buyer_unknown``), never a clean one.
 
     ``ttl_s`` is the loop's; a set that names its own (T4.19, ``operator/3``:
     180 s for a buy by hand) overrides it. An ``operator`` proposal also
@@ -227,6 +241,10 @@ def evaluate_gate(
                 excluded = evaluate_pedigree(lineage, PEDIGREE_V1)
                 if spec.pedigree_repeat_dumper:
                     excluded += evaluate_repeat_dumper(lineage)
+        forged: E2bFeatures | None = None
+        if spec.pedigree_e2b and e2b is not None:
+            forged = e2b.get((row.mint, row.end_time))
+            excluded += (E2B_UNKNOWN_REFUSAL,) if forged is None else evaluate_e2b(forged, E2B_V1)
         identity = identity_features_of(row)
         excluded += evaluate_identity_gate(identity, require_twitter=spec.require_twitter)
         event = event_features_of(row)
@@ -254,6 +272,7 @@ def evaluate_gate(
                     spec,
                     pedigree=lineage,
                     pedigree_gate=PEDIGREE_V1 if lineage is not None else None,
+                    e2b=forged,
                     series=row.series,
                     identity=identity,
                     event=event,
