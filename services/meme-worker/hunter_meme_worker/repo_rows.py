@@ -26,6 +26,10 @@ class TokenRow:
     creator: str | None = None
     created_at: datetime | None = None
     bonding_curve: str | None = None
+    bonding_curve_raw: str | None = None
+    """T4.39: the create frame's own value, kept only when it disagreed with
+    the derived PDA now stored in ``bonding_curve`` (a Mayhem sol-vault, R36).
+    ``None`` = the frame's value was already correct."""
     initial_virtual_sol_reserves: Decimal | None = None
     initial_virtual_token_reserves: Decimal | None = None
     initial_real_token_reserves: Decimal | None = None

@@ -23,6 +23,7 @@ from hunter_exchanges.pumpfun.models import (
     NormalizedMemeMigration,
     NormalizedMemeTokenCreated,
 )
+from hunter_exchanges.pumpfun.pdas import bonding_curve_address
 from hunter_exchanges.pumpfun.social import classify_twitter_url, truncate_description
 
 
@@ -125,14 +126,22 @@ def parse_new_token(raw: dict[str, Any]) -> NormalizedMemeTokenCreated:
             f"pool {pool!r} is out of scope for parse_new_token; check is_in_scope_pool() first"
         )
     now = utcnow()
+    mint = str(raw["mint"])
+    # T4.39/R36: a Mayhem coin's ``create`` frame carries the program's shared
+    # sol-vault in ``bondingCurveKey`` instead of the coin's own curve — never
+    # trust it blindly. The PDA is a pure function of the mint, so it is always
+    # derived; the frame's own value is kept alongside only when it disagrees.
+    frame_curve = str(raw["bondingCurveKey"])
+    derived_curve = bonding_curve_address(mint)
     return NormalizedMemeTokenCreated(
-        mint=str(raw["mint"]),
+        mint=mint,
         name=str(raw["name"]),
         symbol=str(raw["symbol"]),
         uri=str(raw["uri"]),
         creator=str(raw["traderPublicKey"]),
         created_at=now,
-        bonding_curve=str(raw["bondingCurveKey"]),
+        bonding_curve=derived_curve,
+        bonding_curve_raw=frame_curve if frame_curve != derived_curve else None,
         initial_virtual_sol_reserves=_decimal(raw["vSolInBondingCurve"], "vSolInBondingCurve"),
         initial_virtual_token_reserves=_decimal(
             raw["vTokensInBondingCurve"], "vTokensInBondingCurve"

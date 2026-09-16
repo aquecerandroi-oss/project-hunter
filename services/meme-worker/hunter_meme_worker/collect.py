@@ -48,6 +48,7 @@ from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import RateLimited
 from hunter_exchanges.pumpfun.normalize import UnsupportedQuote
+from hunter_exchanges.pumpfun.pdas import bonding_curve_address
 from hunter_meme_worker.config import CURVE_STREAM
 from hunter_meme_worker.curve_rows import snapshot_row, token_row_from_curve, tracked_from_curve
 from hunter_meme_worker.features import (
@@ -58,6 +59,7 @@ from hunter_meme_worker.features import (
     FeatureRow,
 )
 from hunter_meme_worker.fold import fold_minute
+from hunter_meme_worker.lab_trail import maybe_prune_trail
 from hunter_meme_worker.metrics import (
     meme_budget_skipped_total,
     meme_gaps_total,
@@ -247,17 +249,22 @@ async def _record_budget_gap(
 
 
 async def reconcile_once(ctx: RadarContext) -> int:
-    """Read the top-K by market cap from the chain. Both readings are kept."""
+    """Read the top-K by market cap from the chain. Both readings are kept.
+
+    T4.39/R36: the address is always the PDA **derived from the mint**, never
+    ``tracked.bonding_curve`` — a Mayhem ``create`` frame stores the program's
+    shared sol-vault in that column for 13 615 of 112 108 seven-day rows, and
+    an RPC read against that account fails closed (``meme_chain_read_failed``)
+    for every one of them, burning top-K budget for nothing. Deriving is a
+    pure function of the mint and costs nothing extra per tick; the column is
+    kept only for display/audit (``docs/PUMPFUN.md`` §9).
+    """
     read = 0
     for mint in ctx.tracker.top_by_mcap(ctx.config.rpc_top_k):
-        tracked = ctx.tracker.get(mint)
-        if tracked is None or tracked.bonding_curve is None:
-            # The RPC reads an *account*, so a mint whose bonding curve address we
-            # never observed cannot be reconciled. Declared, not guessed: deriving
-            # the PDA is T4.2b's job and the adapter refuses to guess it either.
+        if ctx.tracker.get(mint) is None:
             continue
         try:
-            state = await ctx.chain.get_curve_state(mint, tracked.bonding_curve)
+            state = await ctx.chain.get_curve_state(mint, bonding_curve_address(mint))
         except Exception as exc:
             meme_polls_total.labels(source="solana_rpc", outcome="error").inc()
             if ctx.sources is not None:
@@ -305,6 +312,12 @@ async def prune_once(ctx: RadarContext) -> int:
     if total:
         meme_tokens_pruned_total.inc(total)
         logger.info("meme_tokens_pruned", rows=total, cutoff=cutoff.isoformat())
+    # T4.43: the per-mint gate refusal trail, once a day — not every hour.
+    trail_deleted, ctx.state.last_trail_prune_day = await maybe_prune_trail(
+        ctx.session_factory, ctx.state.last_trail_prune_day, batch=ctx.config.retention_batch
+    )
+    if trail_deleted:
+        logger.info("meme_gate_refusal_trail_pruned", rows=trail_deleted)
     return total
 
 

@@ -8,11 +8,13 @@ import pytest
 from hunter_exchanges.base import MalformedMessage
 from hunter_exchanges.pumpfun.curve import market_cap_sol
 from hunter_exchanges.pumpfun.decode import PUMP_PROGRAM_ID, decode_bonding_curve_account
+from hunter_exchanges.pumpfun.mayhem_state import mayhem_pdas
 from hunter_exchanges.pumpfun.normalize import (
     curve_state_from_rpc_account,
     parse_curve_state_rest,
     parse_new_token,
 )
+from hunter_exchanges.pumpfun.pdas import bonding_curve_address
 
 FIXTURES = Path(__file__).parents[1] / "fixtures/pumpfun"
 
@@ -65,6 +67,39 @@ def test_creation_has_observation_and_mayhem() -> None:
     assert market_cap_sol(Decimal(30), Decimal(1073000000), Decimal(1000000000)) == (
         Decimal(30) / Decimal(1073000000) * Decimal(1000000000)
     )
+    assert event.bonding_curve == raw["bondingCurveKey"]
+    assert event.bonding_curve_raw is None, "a correct frame has nothing to keep as evidence"
+
+
+def test_a_mayhem_create_frame_carrying_the_shared_sol_vault_is_never_trusted() -> None:
+    """R36/T4.39: a real captured Mayhem ``create`` frame
+    (``pumpportal_ws_capture_raw.jsonl`` line 8, mint ``CGuNLUVmr…``) carries
+    the Mayhem program's shared sol-vault in ``bondingCurveKey`` instead of the
+    coin's own curve. ``bonding_curve`` must be the derived PDA; the frame's
+    lie is kept only in ``bonding_curve_raw``."""
+    raw = json.loads(
+        (FIXTURES / "pumpportal_ws_capture_raw.jsonl").read_text().splitlines()[7],
+        parse_float=Decimal,
+    )
+    assert raw["mint"] == "CGuNLUVmrers2FwnLjjVr9Tv8B726caZbRkY116Apump"
+    assert raw["bondingCurveKey"] == mayhem_pdas().sol_vault
+    event = parse_new_token(raw)
+    assert event.bonding_curve == bonding_curve_address(raw["mint"])
+    assert event.bonding_curve != mayhem_pdas().sol_vault
+    assert event.bonding_curve_raw == mayhem_pdas().sol_vault
+
+
+def test_a_mayhem_create_frame_with_a_correct_curve_keeps_no_raw_evidence() -> None:
+    """43/100 diverge, 57/100 do not (R36): a Mayhem coin whose frame already
+    carries the right PDA leaves ``bonding_curve_raw`` at ``None``."""
+    raw = json.loads(
+        (FIXTURES / "pumpportal_ws_capture_raw.jsonl").read_text().splitlines()[5],
+        parse_float=Decimal,
+    )
+    assert raw["is_mayhem_mode"] is True
+    event = parse_new_token(raw)
+    assert event.bonding_curve == raw["bondingCurveKey"] == bonding_curve_address(raw["mint"])
+    assert event.bonding_curve_raw is None
 
 
 @pytest.mark.parametrize(

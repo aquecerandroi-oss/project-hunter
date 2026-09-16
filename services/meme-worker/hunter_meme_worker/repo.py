@@ -39,6 +39,7 @@ from sqlalchemy.engine import RowMapping
 from hunter_core.domain.types import uuid7
 from hunter_meme_worker.features import FeatureRow
 from hunter_meme_worker.repo_rows import GapRow, SnapshotRow, TokenRow
+from hunter_meme_worker.repo_token_sql import UPSERT_TOKEN
 from hunter_meme_worker.tracker import TrackedMint
 
 if TYPE_CHECKING:
@@ -63,94 +64,6 @@ RETENTION_MARKER = "app.meme_retention"
 scoped, therefore safe behind the pooler; it is isolation, not authorization
 (§18.8), and what it buys is that pruning discovery history is an act."""
 
-
-_IDENTITY_COLUMNS = (
-    "name",
-    "symbol",
-    "uri",
-    "creator",
-    "created_at",
-    "bonding_curve",
-    "initial_virtual_sol_reserves",
-    "initial_virtual_token_reserves",
-    "initial_real_token_reserves",
-    "progress_denominator_source",
-    "total_supply",
-    "pool",
-    "mayhem_enabled",
-    "rest_complete_seen_at",
-    "curve_filled_seen_at",
-    "graduated_board_seen_at",
-    "pool_created_at",
-    "pool_created_source",
-    "migrated_at",
-    "migrated_pool",
-    # T4.26 (``0041``): nine of the eleven social columns — written once,
-    # together (``WRITE_ONCE_COLUMNS_0041``, ``ddl/meme_social.py``).
-    "twitter",
-    "telegram",
-    "website",
-    "description",
-    "twitter_kind",
-    "twitter_post_id",
-    "twitter_post_at",
-    "social_observed_at",
-    "social_source",
-)
-"""Filled once; ``COALESCE(meme_tokens.<c>, excluded.<c>)`` keeps the first answer.
-The same list the database freezes in ``ddl/meme_graduation.py``
-(``WRITE_ONCE_COLUMNS_0024``) — copied, never imported, because
-``infra/migrations`` is not importable from a service and because the contract of
-the database must not follow a later edit of a Python constant. ``completed_at``
-left this list in ``0024``: it is reduced, not observed (module docstring)."""
-
-_ALL_TOKEN_COLUMNS = (
-    "mint",
-    "first_seen_source",
-    "first_seen_at",
-    "last_seen_at",
-    "completed_at",
-    *_IDENTITY_COLUMNS,
-    # T4.26: the two reuse-count columns are mutable (like ``mayhem_state``),
-    # so they are inserted here but updated by their own COALESCE below, not
-    # by the write-once loop over ``_IDENTITY_COLUMNS``.
-    "twitter_reuse_count",
-    "twitter_reuse_observed_at",
-)
-
-_UPSERT_TOKEN = text(
-    # ``mayhem_mode``/``mayhem_state`` are mutable state, so they are not in the
-    # write-once list — but they must be *inserted* (T4.2e: until then the
-    # INSERT omitted them, ``excluded.mayhem_state`` was always NULL, the column
-    # never held a value and ``_LOAD_TRACKED``'s "a paused agent keeps the mint"
-    # never fired). The CASE is the CHECK ``a_disabled_token_has_no_agent_state``.
-    f"INSERT INTO meme_tokens ({', '.join(_ALL_TOKEN_COLUMNS)}, mayhem_mode, mayhem_state) "  # noqa: S608
-    f"VALUES ({', '.join(':' + column for column in _ALL_TOKEN_COLUMNS)}, :mayhem_mode, "
-    "CASE WHEN :mayhem_enabled IS FALSE THEN NULL ELSE :mayhem_state END) "
-    "ON CONFLICT (mint) DO UPDATE SET "
-    + ", ".join(
-        f"{column} = COALESCE(meme_tokens.{column}, excluded.{column})"
-        for column in _IDENTITY_COLUMNS
-    )
-    # The earliest of the four completion signals, across every observation.
-    + ", completed_at = LEAST(meme_tokens.completed_at, excluded.completed_at)"
-    # Mutable state: the newest observation wins, because that is what state means.
-    + ", mayhem_mode = COALESCE(excluded.mayhem_mode, meme_tokens.mayhem_mode)"
-    # And a token measured as *not* Mayhem carries no agent state: the CHECK
-    # ``a_disabled_token_has_no_agent_state`` refuses that pair, and letting the
-    # upsert build it would abort a whole collector cycle over a disagreement
-    # between two sources. The conflict is reported by the caller, not written.
-    + ", mayhem_state = CASE WHEN COALESCE(meme_tokens.mayhem_enabled, excluded.mayhem_enabled)"
-    " IS FALSE THEN NULL ELSE COALESCE(excluded.mayhem_state, meme_tokens.mayhem_state) END"
-    # T4.26: the indexer's reuse count is mutable too — a clone can start
-    # reusing a handle long after this mint was discovered, so the newest
-    # observation (when one arrived) wins, exactly like mayhem_mode.
-    + ", twitter_reuse_count = COALESCE(excluded.twitter_reuse_count, meme_tokens.twitter_reuse_count)"
-    + ", twitter_reuse_observed_at = COALESCE(excluded.twitter_reuse_observed_at, "
-    "meme_tokens.twitter_reuse_observed_at)"
-    + ", last_seen_at = GREATEST(meme_tokens.last_seen_at, excluded.last_seen_at)"
-    + ", updated_at = now()"
-)
 
 _SNAPSHOT_COLUMNS = (
     "observed_at",
@@ -274,8 +187,13 @@ loaded anyway, because a pinned mint is never optional inventory."""
 
 _PRUNE_TOKENS = text(
     "WITH doomed AS ("
-    "  SELECT mint FROM meme_tokens "
+    "  SELECT mint FROM meme_tokens t "
     "  WHERE first_seen_at < :cutoff AND (created_at IS NULL OR created_at < :cutoff) "
+    # T4.26b's ``fk_meme_event_matches_mint_meme_tokens`` (0043) is a real FK,
+    # unlike every bet/proposal's bare-text ``mint`` — a matched mint left in
+    # the batch would fail the whole ``DELETE`` on the FK violation, not just
+    # skip itself; excluded here the same way a pinned mint already is above.
+    "    AND NOT EXISTS (SELECT 1 FROM meme_event_matches m WHERE m.mint = t.mint) "
     "  ORDER BY first_seen_at LIMIT :batch"
     ") DELETE FROM meme_tokens t USING doomed d WHERE t.mint = d.mint RETURNING t.mint"
 )
@@ -286,7 +204,7 @@ a day of WAL in a single transaction while the collector is inserting."""
 
 async def upsert_token(session: AsyncSession, row: TokenRow) -> None:
     """Insert or fill in one mint. Never blanks a value it already knew."""
-    await session.execute(_UPSERT_TOKEN, asdict(row))
+    await session.execute(UPSERT_TOKEN, asdict(row))
 
 
 async def insert_snapshot(session: AsyncSession, row: SnapshotRow) -> None:

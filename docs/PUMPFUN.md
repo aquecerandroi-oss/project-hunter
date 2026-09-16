@@ -605,3 +605,24 @@ quanto nas contas de `buy`/`sell` — portanto o executor lê e compra na conta 
 essa derivação por "usar `meme_tokens.bonding_curve` quando existir" (pinado em
 `services/meme-executor/tests/test_mayhem_curve_account.py`); quem precisa do campo — o
 `reconcile_once` do radar — deve validar dono/discriminador ou derivar o PDA.
+
+### 9.1 Feito — o radar também deriva agora, e os 13 615 já foram (T4.39, `0047_meme_bonding_curve_raw`)
+
+A recomendação da §9 acima ("`reconcile_once` deve validar dono/discriminador ou derivar o PDA") virou
+código: `hunter_exchanges.pumpfun.normalize.parse_new_token` deriva `bonding_curve_address(mint)`
+(`pumpfun/pdas.py`, extraído de `tx.py`) e grava **sempre** o PDA derivado em `bonding_curve` — nunca
+mais o `bondingCurveKey` cru do frame. Quando o frame discordava do PDA (as moedas Mayhem contaminadas
+com o sol-vault, e só elas: R36 mediu 0/100 divergências fora de Mayhem), o valor original sobrevive em
+`bonding_curve_raw` (coluna nova, `0047`) — auditoria, nunca lido para derivar endereço nenhum — e
+`discovery._handle` conta (`hunter_meme_token_bonding_curve_replaced_total{mayhem_enabled}`) e loga
+(`meme_token_bonding_curve_replaced`) a substituição no instante em que ela vira linha durável.
+`hunter_meme_worker.collect.reconcile_once` parou de ler `tracked.bonding_curve` — deriva o PDA do mint
+a cada tique, o mesmo que o executor já fazia — então o efeito colateral que a §9 media (RPC gasto lendo
+o sol-vault e falhando fechado para 13 615 mints) parou na origem, não só na leitura.
+
+Os 13 615 já gravados foram reparados por `infra/scripts/meme_repair_bonding_curve.py` — auditado,
+*dry-run* por padrão, candidato é toda linha cujo `bonding_curve` discorda do PDA derivado do próprio
+mint (nunca o endereço fixo do sol-vault), `--apply` exige `--reason` e deixa uma linha em
+`system_events` com a contagem por `mayhem_enabled`. Ver `docs/DATABASE.md` §55 para o esquema, o
+gatilho de escrita única estendido e o downgrade recusado enquanto alguma linha carregar um valor em
+`bonding_curve_raw`.

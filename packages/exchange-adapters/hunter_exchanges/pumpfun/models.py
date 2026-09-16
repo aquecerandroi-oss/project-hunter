@@ -80,6 +80,15 @@ class NormalizedMemeTokenCreated(_ReceivedAtMixin):
     creator: str
     created_at: datetime
     bonding_curve: str
+    """The **derived** ``["bonding-curve", mint]`` PDA (``normalize.py``), never
+    the frame's raw ``bondingCurveKey`` blindly — a Mayhem ``create`` frame
+    carries the program's shared sol-vault there instead (R36,
+    ``docs/PUMPFUN.md`` §9), and this field feeds ``meme_tokens.bonding_curve``,
+    which the radar's ``reconcile_once`` used to read as an account address."""
+    bonding_curve_raw: str | None = None
+    """The frame's own ``bondingCurveKey``, kept only when it disagrees with
+    :attr:`bonding_curve` — ``None`` means the frame already carried the
+    correct PDA. Audit trail, never read to derive an address (T4.39)."""
     initial_virtual_sol_reserves: Decimal
     initial_virtual_token_reserves: Decimal
     signature: str

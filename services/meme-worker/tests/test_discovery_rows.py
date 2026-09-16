@@ -69,6 +69,31 @@ def test_a_real_identity_is_untouched() -> None:
     assert (row.name, row.symbol, row.uri) == (frame["name"], frame["symbol"], frame["uri"])
 
 
+def _mayhem_vault_create() -> dict[str, Any]:
+    """T4.39/R36: a real captured Mayhem ``create`` frame whose ``bondingCurveKey``
+    is the program's shared sol-vault, not the coin's curve."""
+    raw = (FIXTURES / "pumpportal_ws_capture_raw.jsonl").read_text(encoding="utf-8")
+    frame = json.loads(raw.splitlines()[7], parse_float=Decimal)
+    assert frame["mint"] == "CGuNLUVmrers2FwnLjjVr9Tv8B726caZbRkY116Apump"
+    return frame
+
+
+def test_bonding_curve_raw_survives_the_row_mapping_when_the_frame_disagreed() -> None:
+    frame = _mayhem_vault_create()
+    event = normalize.parse_new_token(frame)
+    assert event.bonding_curve_raw is not None
+    row = token_row_from_event(event)
+    assert row.bonding_curve == event.bonding_curve
+    assert row.bonding_curve_raw == event.bonding_curve_raw
+    assert row.bonding_curve != row.bonding_curve_raw
+
+
+def test_bonding_curve_raw_is_none_when_the_frame_already_agreed() -> None:
+    frame = _first_pump_create()
+    row = token_row_from_event(normalize.parse_new_token(frame))
+    assert row.bonding_curve_raw is None
+
+
 def _first_migrate() -> dict[str, Any]:
     raw = (FIXTURES / "pumpportal_ws_capture_raw.jsonl").read_text(encoding="utf-8")
     for line in raw.splitlines():

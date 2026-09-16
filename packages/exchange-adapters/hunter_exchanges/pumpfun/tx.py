@@ -31,6 +31,7 @@ from typing import Literal
 
 from hunter_exchanges.pumpfun.decode import PUMP_PROGRAM_ID
 from hunter_exchanges.pumpfun.global_state import GlobalAccount
+from hunter_exchanges.pumpfun.pdas import bonding_curve_address, bonding_curve_v2_address
 from hunter_exchanges.pumpfun.solana_codec import (
     ASSOCIATED_TOKEN_PROGRAM_ID,
     SYSTEM_PROGRAM_ID,
@@ -123,15 +124,6 @@ def pump_pdas() -> PumpPdas:
         fee_config=_pda([b"fee_config", pubkey_bytes(PUMP_PROGRAM_ID)], PUMP_FEE_PROGRAM_ID),
         global_volume_accumulator=_pda([b"global_volume_accumulator"]),
     )
-
-
-def bonding_curve_address(mint: str) -> str:
-    return _pda([b"bonding-curve", pubkey_bytes(mint)])
-
-
-def bonding_curve_v2_address(mint: str) -> str:
-    """The remaining account the 2026-09-12 program validates (6074) — derived, never typed."""
-    return _pda([b"bonding-curve-v2", pubkey_bytes(mint)])
 
 
 def creator_vault_address(creator: str) -> str:

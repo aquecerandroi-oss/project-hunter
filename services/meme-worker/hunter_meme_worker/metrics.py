@@ -93,3 +93,12 @@ meme_rows_total = Counter(
     ["table"],
     registry=registry,
 )
+
+meme_token_bonding_curve_replaced_total = Counter(
+    "hunter_meme_token_bonding_curve_replaced_total",
+    "Create frames whose bondingCurveKey disagreed with the derived PDA and "
+    "were replaced at ingest (R36: the Mayhem program's shared sol-vault), "
+    "by whether the coin was Mayhem-flagged.",
+    ["mayhem_enabled"],
+    registry=registry,
+)

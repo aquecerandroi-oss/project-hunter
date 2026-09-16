@@ -36,7 +36,12 @@ from hunter_meme_worker.graduation import (
     CompletionSignals,
     earliest_completion,
 )
-from hunter_meme_worker.metrics import meme_events_total, meme_gaps_total, meme_ws_generation
+from hunter_meme_worker.metrics import (
+    meme_events_total,
+    meme_gaps_total,
+    meme_token_bonding_curve_replaced_total,
+    meme_ws_generation,
+)
 from hunter_meme_worker.repo import GapRow, TokenRow, record_gap, upsert_token
 from hunter_meme_worker.sources import PUMPPORTAL_WS
 from hunter_meme_worker.tracker import TrackedMint
@@ -83,6 +88,7 @@ def token_row_from_event(event: MemeEvent) -> TokenRow:
             creator=_identity(event.creator),
             created_at=event.created_at,
             bonding_curve=event.bonding_curve,
+            bonding_curve_raw=event.bonding_curve_raw,
             initial_virtual_sol_reserves=event.initial_virtual_sol_reserves,
             initial_virtual_token_reserves=event.initial_virtual_token_reserves,
             pool=event.pool,
@@ -126,6 +132,22 @@ def _tracked_from_row(row: TokenRow) -> TrackedMint:
     )
 
 
+def _report_bonding_curve_replaced(row: TokenRow) -> None:
+    """T4.39/R36: name the substitution once, at the moment it happens — the
+    counter is bounded by ``mayhem_enabled`` (never ``mint``: unbounded
+    cardinality), the log line carries the mint and both addresses for a human
+    to check against a specific coin."""
+    mayhem = bool(row.mayhem_enabled)
+    logger.warning(
+        "meme_token_bonding_curve_replaced",
+        mint=row.mint,
+        raw=row.bonding_curve_raw,
+        derived=row.bonding_curve,
+        mayhem_enabled=row.mayhem_enabled,
+    )
+    meme_token_bonding_curve_replaced_total.labels(mayhem_enabled=str(mayhem).lower()).inc()
+
+
 async def run_discovery(ctx: RadarContext) -> None:
     """Consume the stream forever; one transaction per frame, one row per frame."""
     async for event in ctx.events.stream():
@@ -135,6 +157,8 @@ async def run_discovery(ctx: RadarContext) -> None:
 async def _handle(ctx: RadarContext, event: MemeEvent) -> None:
     kind = "migration" if isinstance(event, NormalizedMemeMigration) else "created"
     row = token_row_from_event(event)
+    if row.bonding_curve_raw is not None:
+        _report_bonding_curve_replaced(row)
     generation = ctx.events.state.reconnects
     try:
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:

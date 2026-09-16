@@ -5671,7 +5671,8 @@ exigir RLS — o teste é o que obriga a conversa.
 meme_tokens                                  (global, não particionada)
   mint text PK
   name, symbol, uri, creator                 -- todos ANULÁVEIS: NULL = não observado
-  created_at, bonding_curve
+  created_at, bonding_curve                  -- SEMPRE o PDA ["bonding-curve", mint] derivado (§55)
+  bonding_curve_raw text NULL                -- só quando o frame discordou do PDA (0047, §55)
   initial_virtual_sol_reserves, initial_virtual_token_reserves NUMERIC(28,10)
   initial_real_token_reserves NUMERIC(28,10) -- o denominador do progresso
   total_supply NUMERIC(28,10), pool
@@ -7441,3 +7442,56 @@ disso) — retenção de 7 dias por poda linha a linha (`lab_repo_fast.prune_ref
 o ponto de chamada dentro de `lab_fast.fast_gate_step`, que hoje só recebe de `proposals.evaluate_gate` a
 recusa **agregada** do tique, nunca por linha. Ver `docs/RISK_ENGINE_MEME.md` e
 `.claude/state/notes-T4.35.md` para o motivo de a ligação ter ficado para a próxima tarefa.
+
+## 55. `bonding_curve` deixa de confiar no frame — o sol-vault do Mayhem, derivado em vez de gravado — M5 (`0047_meme_bonding_curve_raw`)
+
+**Por quê (R36, 16/09/2026, `.claude/state/notes-R36-pda-mayhem.md`, `docs/PUMPFUN.md` §9):** 13 615 das
+112 108 linhas de 7 dias de `meme_tokens` que têm `bonding_curve` gravam o *mesmo* endereço em 13 615
+mints distintos — todas `mayhem_enabled`. Esse endereço é `mayhem_pdas().sol_vault`, o PDA
+`["sol-vault"]` do programa Mayhem: uma conta **compartilhada por toda moeda Mayhem**, dono System
+Program, zero byte de dado — não a curva de ninguém. O frame `create` do PumpPortal (`bondingCurveKey`)
+traz esse valor para essas moedas em vez da curva própria; `discovery.py` gravava como veio. O executor
+nunca leu a coluna (deriva o PDA por mint tanto na leitura quanto nas contas de `buy`/`sell` — por isso
+R36 concluiu "o executor está seguro"), mas o radar's `reconcile_once` lia, batia numa conta de 0 byte, e
+falhava fechado gastando orçamento de RPC do top-K para 13 615 mints.
+
+**O que esta revisão muda: nada que já existia, uma coluna nova.** `bonding_curve` continua sendo o que
+sempre devia ser — o PDA `["bonding-curve", mint]` — porque a correção real fica do lado do código, não
+do schema: `hunter_exchanges.pumpfun.normalize.parse_new_token` agora **deriva** o PDA
+(`hunter_exchanges.pumpfun.pdas.bonding_curve_address`) e nunca confia cegamente no `bondingCurveKey` do
+frame; `hunter_meme_worker.collect.reconcile_once` também deriva, nunca lê `tracked.bonding_curve`. A
+única coisa nova no schema é onde a mentira do frame vai parar: `bonding_curve_raw text NULL` —
+`NULL` quando o frame já concordava com o PDA derivado (a maioria: R36 mediu 57/100 moedas Mayhem
+batendo), o valor do frame quando discordou (as outras 43/100). Um sinal de auditoria, nunca lido para
+derivar endereço nenhum — o mesmo motivo pelo qual `bonding_curve` em si nunca deveria ter sido lido como
+conta sem verificar dono/discriminador.
+
+**Gatilho de escrita única estendido, não recriado.** `create_meme_token_guards_0047` substitui a função
+`meme_tokens_identity_is_written_once` por inteiro (como toda revisão anterior que mexeu nessa lista:
+`0024`, `0041`) com `bonding_curve_raw` somado à lista — a primeira observação da coluna nova é tão
+definitiva quanto a de `bonding_curve` em si, e pelo mesmo motivo: o canal grátis do PumpPortal não tem
+replay, então a mentira original de um frame não é reobservável depois que a coluna é apagada. O
+downgrade (`refuse_a_downgrade_that_would_lose_bonding_curve_raw`, §17.7) recusa enquanto qualquer linha
+carregar um valor — inclusive `NULL`-ar a coluna para permitir o downgrade exige desligar o gatilho
+primeiro (`ALTER TABLE meme_tokens DISABLE TRIGGER meme_tokens_identity_is_written_once`), porque
+`NULL` também é `IS DISTINCT FROM` o valor já observado; `packages/core/tests/integration
+/test_migration_0047.py` prova as duas pontas contra um Postgres real.
+
+**O reparo dos 13 615 já gravados não é migração.** Uma migração não é o lugar para reescrever 112 108
+linhas de forma revisável; `infra/scripts/meme_repair_bonding_curve.py` faz isso contra o banco em
+produção — *dry-run* por padrão, candidato é toda linha com `bonding_curve IS NOT NULL AND
+bonding_curve_raw IS NULL` cujo valor gravado discorda do PDA derivado do próprio mint (nunca um endereço
+fixo de sol-vault: a mesma função `bonding_curve_address` que o executor e o `reconcile_once` usam),
+`--apply` exige `--reason` de pelo menos dez caracteres, desliga e religa o mesmo gatilho **dentro da
+mesma transação** (a disciplina que `0024`'s `backfill_graduation_signals` já usa para esse gatilho),
+grava `bonding_curve = <derivado>`/`bonding_curve_raw = <valor antigo>` em um único `UPDATE` (a expressão
+à direita do `SET` lê a linha antes da mudança, então as duas colunas mudam juntas, atomicamente) e deixa
+uma linha em `system_events` com a contagem por `mayhem_enabled` e o motivo humano. Rodar de novo depois
+de aplicar não encontra nada: toda linha reparada passa a ter `bonding_curve_raw IS NOT NULL` e sai da
+lista de candidatas — idempotente por construção, não por checagem extra.
+
+**Métrica e log no momento da descoberta.** `discovery._handle` nomeia a substituição assim que ela chega
+a uma linha durável: `hunter_meme_token_bonding_curve_replaced_total{mayhem_enabled}` (nunca por `mint` —
+cardinalidade ilimitada) e um log `meme_token_bonding_curve_replaced` com o mint e os dois endereços, para
+um humano conferir uma moeda específica. Nada disparado quando o frame já concordava — o caso comum não
+gera ruído.
