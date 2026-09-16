@@ -48,8 +48,20 @@ def gates_fields(ctx: ExecutorContext) -> dict[str, str]:
         "gates_reloaded_at": ""
         if state.gates_reloaded_at is None
         else state.gates_reloaded_at.isoformat(),
-        "gates_reload_error": state.gates_invalid or "",
+        "gates_reload_error": _reload_error(ctx),
     }
+
+
+def _reload_error(ctx: ExecutorContext) -> str:
+    """The latched reason, or (T4.28f) the parse failure this process is still
+    giving one tick of grace — ``deferred:<reason>``. Empty means the last read
+    of the file was a good one."""
+    state = ctx.state
+    if state.gates_invalid is not None:
+        return state.gates_invalid
+    if state.gates_deferred_failure is not None:
+        return f"deferred:{state.gates_deferred_failure}"
+    return ""
 
 
 def _gates(ctx: ExecutorContext) -> str:

@@ -265,10 +265,22 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
   escopo esgotado ⇒ o passe não abre proposta nenhuma; e **toda recusa da admissão** de uma proposta
   aberta pelo robô grava a ordem `refused` **e** marca a proposta `rejected` com o motivo em
   `decision.auto_refusal` (mesma transação) — a mesa mostra por quê.
+- **Carência depois de uma recusa determinística** (`recently_refused`, T4.28f,
+  `MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S`, padrão 120 s, `0` desliga): a mesa repropõe o mesmo
+  mint a cada ~20 s (medido em 16/09/2026 11:46–11:48 BRT: o robô abriu a mesma moeda 5 vezes e a
+  admissão recusou as 5 por `progress_below_window`), e reabrir uma moeda cuja recusa **não pode
+  mudar em dois minutos** só gasta uma leitura RPC da curva, uma linha `refused` e uma proposta
+  `rejected`. Contam para a carência apenas as recusas de `hunter_risk_meme.checks` que dependem do
+  **mercado ou do banco** mudar — `progress_above_window`, `token_too_old`,
+  `token_age_unknown`, `program_not_allowed`, `unsupported_quote`, `progress_denominator_missing`.
+  Uma recusa que **o relógio sozinho** limpa nunca segura a retentativa: `token_too_young` (a janela
+  abre em `token_age_min_s`, 30 s), `curve_state_stale`, `volume_unavailable`, `marks_incomplete`,
+  `wallet_over_max_sol`. A carência **atrasa**, não proíbe: passada a janela o mesmo mint volta a ser
+  elegível, e ela nunca deixa uma ordem existir — só deixa de abrir proposta.
 - **Quem liga:** só o Everton, no `.env` da VPS; o guardião de padrões recusa a flag ligada em arquivo
   rastreado (`infra/scripts/forbidden_patterns.sh`). **Desligar:** a flag em `false` + `update`, ou o
   kill switch (que também pára as aprovações automáticas). **O estágio 2 continua exigindo clique.**
-- Implementado em `services/meme-executor/hunter_meme_executor/{auto_approve,scope}.py`, testes
+- Implementado em `services/meme-executor/hunter_meme_executor/{auto_approve,refusal_cooldown,scope}.py`, testes
   `tests/test_auto_approve.py` (unit) e `tests/test_live_persistence.py::test_stage_1_*` (Postgres).
 
 ## 4. Checks de admissão de uma compra na curva
@@ -474,11 +486,23 @@ chave e as posições abertas não pode ser o preço de mudar um número que o d
   armado, arquivo apagado) ⇒ o kill switch é travado `gates_invalid:<motivo>`** — a mesma trava
   latched desta §7, que só o dono destrava — e a política **anterior** fica em memória só para o
   heartbeat relatar. O laço não cai: derrubar o processo com posição aberta é pior que pará-lo.
+- **Um tique de carência antes de travar por falha de leitura (T4.28f).** O dono edita o arquivo com
+  `nano` na VPS — escrita **não atômica**, no lugar —, então um tique pode dar `stat` e ler o arquivo
+  **pela metade**. Por isso uma falha de *parse* (`gates_file_invalid`, `gates_file_missing`) na
+  primeira vez é **adiada**: nada trava, nada é trocado, a política anterior continua valendo e o log
+  registra `meme_executor_gates_reload_deferred`; o **tique seguinte** decide — se o arquivo parseia,
+  é só uma releitura normal; se falha de novo (mesmo `mtime` ou um novo), **trava**. Invalidade
+  *semântica* (vencido, Portão C desligado, escopo sumido com o robô armado) é um arquivo completo
+  dizendo não e **trava na hora**. O conselho de gravar com `mv`/`sed -i` (atômico) continua valendo:
+  a carência é a segunda rede, não a primeira.
+- No heartbeat, enquanto a carência corre, `gates_reload_error = "deferred:<motivo>"`; depois da
+  trava é o motivo cru (`gates_file_invalid`, …).
 - **Contador nenhum é zerado por uma releitura.** `max_trades` e `max_total_sol` continuam contados
   contra `meme_live_orders` (§12, variante); um escopo que **encolheu abaixo do que já foi gasto**
   não levanta erro: `remaining_sol` trava em 0 e a admissão recusa com o `small_test_scope_exhausted`
   de sempre.
-- Publicado em `hb:meme:executor`: `gates`, `gates_mtime`, `gates_reloaded_at`, `gates_reload_error`.
+- Publicado em `hb:meme:executor`: `gates`, `gates_mtime`, `gates_reloaded_at`, `gates_reload_error`
+  (vazio, `deferred:<motivo>` ou o motivo travado).
 
 ## 8. Falhar fechado
 

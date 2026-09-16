@@ -23,6 +23,17 @@ re-read every tick (``kill_switch.py``); the gates now follow the same pattern:
   policy in memory for the heartbeat to report. The loop returns normally: the
   entries are already stopped by the latch, and a raise here would take the
   process down while positions are open;
+- **one tick of grace before latching a parse failure** (T4.28f): the owner edits
+  the file with ``nano`` on the VPS — a non-atomic, in-place rewrite — so a tick
+  can stat and read a **half-written** file and latch a process holding real
+  money, with resume manual by contract (§7). A parse failure
+  (:data:`GRACE_REASONS`: ``gates_file_invalid``, ``gates_file_missing``) is
+  therefore *deferred* on its first sighting: nothing is latched, nothing is
+  swapped, the previous policy stays in force and
+  ``meme_executor_gates_reload_deferred`` is logged. The **next** tick decides —
+  parses (reload, no latch) or fails again, same mtime or not (latch). A
+  **semantic** refusal (expired, gate C off, the scope gone while armed) is a
+  complete file saying no and still latches on the first tick;
 - **counters are never reset**: the written scope's two counters (trades sent,
   SOL spent) are read from ``meme_live_orders`` on every pass (``scope.py``), so a
   reload cannot forget what the scope already used. A scope that shrank below what
@@ -37,7 +48,7 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from hunter_core.domain.types import utcnow
 from hunter_core.execution.meme.gates import (
@@ -51,7 +62,7 @@ from hunter_meme_executor.config import with_gates
 if TYPE_CHECKING:
     from hunter_meme_executor.context import ExecutorContext
 
-__all__ = ["GATES_LATCH_PREFIX", "GatesReload", "gates_reload_once", "prime_gates"]
+__all__ = ["GATES_LATCH_PREFIX", "GRACE_REASONS", "GatesReload", "gates_reload_once", "prime_gates"]
 
 logger = get_logger(__name__)
 
@@ -61,6 +72,13 @@ named refusal from ``hunter_core.execution.meme.gates`` (``gates_expired``,
 ``gate_c_owner_not_enabled``, ``gates_file_invalid``, ``gates_file_missing``,
 ``small_test_expired``, …) or ``auto_approve_needs_small_test``."""
 
+GRACE_REASONS: Final[frozenset[str]] = frozenset({"gates_file_invalid", "gates_file_missing"})
+"""T4.28f — the two refusals that mean *these bytes are not a file yet*, and are
+therefore given one tick before they latch. Everything else named in
+:data:`GATES_LATCH_PREFIX` is a file that parsed and said no; waiting a tick on
+those would only keep the robot trading under a policy the owner already
+withdrew."""
+
 
 @dataclass(frozen=True, slots=True)
 class GatesReload:
@@ -69,6 +87,10 @@ class GatesReload:
     refusal: str | None = None
     """``gates_invalid:<reason>`` when the file on disk is not one this process
     may trade under; the previous policy is kept and the switch is latched."""
+    deferred: str | None = None
+    """T4.28f — a parse failure seen for the first time: **not** latched, the
+    previous policy stays in force and the next tick decides. The heartbeat
+    publishes it as ``gates_reload_error = "deferred:<reason>"``."""
 
 
 def _stat_ns(path: str) -> int | None:
@@ -94,6 +116,34 @@ def _as_utc(mtime_ns: int) -> datetime:
     return datetime.fromtimestamp(mtime_ns / 1_000_000_000, tz=UTC)
 
 
+def _clear_deferred(ctx: ExecutorContext) -> None:
+    ctx.state.gates_deferred_failure = None
+    ctx.state.gates_deferred_mtime_ns = None
+
+
+async def _failed(
+    ctx: ExecutorContext, reason: str, detail: str, *, mtime_ns: int | None, deferred: str | None
+) -> GatesReload:
+    """One tick of grace for a parse failure, then the latch (T4.28f).
+
+    ``deferred`` is what the **previous** tick left: ``None`` means this is the
+    first failure in a row, and a parse failure then only remembers itself. A
+    semantic refusal never waits — the file is complete and says no."""
+    if reason in GRACE_REASONS and deferred is None:
+        ctx.state.gates_deferred_failure = reason
+        ctx.state.gates_deferred_mtime_ns = mtime_ns
+        logger.warning(
+            "meme_executor_gates_reload_deferred",
+            reason=reason,
+            detail=detail,
+            mtime_ns=mtime_ns,
+            note="not latched: the next tick decides (a half-written file is not a red gate)",
+        )
+        return GatesReload(deferred=reason)
+    _clear_deferred(ctx)
+    return GatesReload(refusal=await _latch(ctx, reason, detail))
+
+
 async def _latch(ctx: ExecutorContext, reason: str, detail: str) -> str:
     """Stop this process by name. The memory latch first (it needs nothing that
     can fail), the durable row second (it is what survives a restart)."""
@@ -115,8 +165,11 @@ async def gates_reload_once(ctx: ExecutorContext, *, now: datetime | None = None
         return GatesReload()  # an inert executor has no gates to re-read
     at = now or utcnow()
     mtime_ns = await asyncio.to_thread(_stat_ns, path)
-    if mtime_ns is not None and mtime_ns == ctx.state.gates_mtime_ns:
+    deferred = ctx.state.gates_deferred_failure
+    if mtime_ns is not None and mtime_ns == ctx.state.gates_mtime_ns and deferred is None:
         return GatesReload()
+    # A deferred failure is re-read even under the same mtime: that is exactly the
+    # "still failing on the next tick" the grace waits for (T4.28f).
     if mtime_ns is None and ctx.state.gates_invalid is not None:
         # A file that is still gone: already latched and already logged; saying it
         # again every 10 s only buries the first line.
@@ -126,12 +179,16 @@ async def gates_reload_once(ctx: ExecutorContext, *, now: datetime | None = None
     try:
         gates = await asyncio.to_thread(load_gates, Path(path), today=at.date())
     except MemeLiveTradingRefused as exc:
-        return GatesReload(refusal=await _latch(ctx, exc.reason, str(exc)))
+        return await _failed(ctx, exc.reason, str(exc), mtime_ns=mtime_ns, deferred=deferred)
     except Exception as exc:  # an unreadable file is a red gate, not a crash
-        return GatesReload(refusal=await _latch(ctx, "gates_file_invalid", type(exc).__name__))
+        return await _failed(
+            ctx, "gates_file_invalid", type(exc).__name__, mtime_ns=mtime_ns, deferred=deferred
+        )
     if ctx.config.auto_approve and gates.small_test is None:
         # The boot's rule (``auto_approve_needs_small_test``) cannot become false
-        # at runtime: the robot only decides inside a scope the owner wrote.
+        # at runtime: the robot only decides inside a scope the owner wrote. The
+        # file parsed, so there is nothing to wait for: latch now.
+        _clear_deferred(ctx)
         return GatesReload(
             refusal=await _latch(
                 ctx, "auto_approve_needs_small_test", "the written scope is gone while armed"
@@ -144,6 +201,7 @@ async def gates_reload_once(ctx: ExecutorContext, *, now: datetime | None = None
     ctx.config, ctx.mode = config, MemeExecutionMode(live=True, gates=gates)
     ctx.state.gates_reloaded_at = at
     ctx.state.gates_invalid = None
+    _clear_deferred(ctx)  # the bytes parse: whatever the last tick saw is history
     logger.warning(
         "meme_executor_gates_reloaded",
         valid_until=gates.valid_until.isoformat(),

@@ -33,7 +33,13 @@ from hunter_meme_executor.auto_approve import (
     plan_auto_approvals,
 )
 from hunter_meme_executor.config import boot
+from hunter_meme_executor.refusal_cooldown import (
+    DETERMINISTIC_REFUSALS,
+    cooling_mints_of,
+    refusal_window_start,
+)
 from hunter_meme_executor.scope import scope_use
+from hunter_risk_meme.checks import REFUSAL_NAMES
 
 pytestmark = pytest.mark.unit
 
@@ -165,6 +171,84 @@ class TestPlanner:
         assert plan.skipped == {"hourly_cap": 1}
 
 
+class TestRefusalCooldown:
+    """T4.28f — measured 16/09/2026 11:46–11:48 BRT: the desk re-proposed the same
+    mint every ~20 s, the robot opened it five times and the admission refused it
+    five times with the same ``progress_below_window``. A refusal that cannot
+    change in the next couple of minutes buys nothing on a retry: one RPC curve
+    read, one ``refused`` order row and one ``rejected`` proposal each time."""
+
+    MINT = "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump"
+
+    def test_every_cooling_reason_is_a_real_admission_refusal(self) -> None:
+        """The set is a subset of §4's names: a typo here would silently never
+        cool anything (no refusal would ever match it)."""
+        assert DETERMINISTIC_REFUSALS <= REFUSAL_NAMES
+        assert (
+            "progress_above_window" in DETERMINISTIC_REFUSALS
+            and "progress_below_window" not in DETERMINISTIC_REFUSALS
+        )
+        # Reversible on the next tick — these must never block a retry. The last
+        # one is the rule's own boundary: ``token_too_young`` is cleared by the
+        # **clock** at ``token_age_min_s`` (30 s), well inside a 120 s cooldown,
+        # so cooling it would sit on a coin that is already admissible.
+        for reason in (
+            "curve_state_stale",
+            "volume_unavailable",
+            "marks_incomplete",
+            "wallet_over_max_sol",
+            "token_too_young",
+        ):
+            assert reason in REFUSAL_NAMES
+            assert reason not in DETERMINISTIC_REFUSALS
+        # And the gate's own refusals are not admission refusals at all: a mint
+        # the radar gate refused never reaches ``meme_live_orders``.
+        for gate_only in ("creator_serial", "symbol_clone", "mayhem_curve", "mayhem_unknown"):
+            assert gate_only not in REFUSAL_NAMES
+            assert gate_only not in DETERMINISTIC_REFUSALS
+
+    def test_a_mint_refused_thirty_seconds_ago_is_not_reopened(self) -> None:
+        refused_at = NOW - timedelta(seconds=30)
+        assert refusal_window_start(NOW, 120.0) == NOW - timedelta(seconds=120)
+        assert refused_at >= (refusal_window_start(NOW, 120.0) or NOW), "inside the window"
+        cooling = cooling_mints_of([(self.MINT, "progress_above_window")])
+        assert cooling == frozenset({self.MINT})
+        plan = _plan([_proposal()], cooling_mints=cooling)
+        assert plan.picks == () and plan.skipped == {"recently_refused": 1}
+
+    def test_the_same_mint_refused_two_hundred_seconds_ago_is_opened_again(self) -> None:
+        """Past the cooldown the query no longer returns the row (``received_at >=
+        :since``), so nothing cools and the next proposal is opened."""
+        since = refusal_window_start(NOW, 120.0)
+        assert since is not None and NOW - timedelta(seconds=200) < since
+        plan = _plan([_proposal()], cooling_mints=frozenset())
+        assert [p.id for p in plan.picks] == ["01994d00-6c1a-7000-8000-000000000101"]
+
+    def test_a_refusal_that_can_clear_on_the_next_tick_never_cools(self) -> None:
+        cooling = cooling_mints_of([(self.MINT, "curve_state_stale")])
+        assert cooling == frozenset()
+        assert _plan([_proposal()], cooling_mints=cooling).picks != ()
+        # Mixed rows: only the deterministic one cools its mint.
+        other = "2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump"
+        mixed = cooling_mints_of([(self.MINT, "curve_state_stale"), (other, "token_too_old")])
+        assert mixed == frozenset({other})
+
+    def test_the_cooldown_at_zero_disables_the_skip(self) -> None:
+        assert refusal_window_start(NOW, 0.0) is None, "no window, no query, no skip"
+        assert refusal_window_start(NOW, -5.0) is None
+        plan = _plan([_proposal()], cooling_mints=frozenset())
+        assert plan.picks != () and plan.skipped == {}
+
+    def test_a_cooling_mint_does_not_hide_a_fresh_one(self) -> None:
+        other = _proposal(
+            id="01994d00-6c1a-7000-8000-000000000102",
+            mint="2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump",
+        )
+        plan = _plan([_proposal(), other], cooling_mints=frozenset({self.MINT}))
+        assert [p.id for p in plan.picks] == [other.id]
+        assert plan.skipped == {"recently_refused": 1}
+
+
 class TestScope:
     def test_inside_the_scope_the_request_passes_whole(self) -> None:
         use = scope_use(
@@ -274,6 +358,34 @@ class TestBoot:
         config, _, _ = boot(env, today=TODAY, system_kill_switch=KillSwitchState.ACTIVE)
         assert config.auto_approve is True
         assert config.auto_approve_max_per_hour == 2
+        assert config.auto_approve_refusal_cooldown_s == 120.0, "T4.28f default"
+
+    def test_the_refusal_cooldown_comes_from_the_environment(self, tmp_path: Path) -> None:
+        env = _live_env(
+            tmp_path,
+            small_test=True,
+            MEME_LIVE_AUTO_APPROVE="1",
+            MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S="30",
+        )
+        config, _, _ = boot(env, today=TODAY, system_kill_switch=KillSwitchState.ACTIVE)
+        assert config.auto_approve_refusal_cooldown_s == 30.0
+        off = _live_env(
+            tmp_path,
+            small_test=True,
+            MEME_LIVE_AUTO_APPROVE="1",
+            MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S="0",
+        )
+        config, _, _ = boot(off, today=TODAY, system_kill_switch=KillSwitchState.ACTIVE)
+        assert config.auto_approve_refusal_cooldown_s == 0.0
+        assert refusal_window_start(NOW, config.auto_approve_refusal_cooldown_s) is None
+        junk = _live_env(
+            tmp_path,
+            small_test=True,
+            MEME_LIVE_AUTO_APPROVE="1",
+            MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S="-9",
+        )
+        config, _, _ = boot(junk, today=TODAY, system_kill_switch=KillSwitchState.ACTIVE)
+        assert config.auto_approve_refusal_cooldown_s == 0.0, "never negative"
 
     def test_the_flag_without_a_written_scope_refuses_to_boot(self, tmp_path: Path) -> None:
         env = _live_env(tmp_path, small_test=False, MEME_LIVE_AUTO_APPROVE="1")

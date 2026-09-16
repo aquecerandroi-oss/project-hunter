@@ -63,6 +63,13 @@ class ExecutorState:
     gates_invalid: str | None = None
     """T4.28d: the named refusal of the last gates file that failed to validate —
     the kill switch is latched ``gates_invalid:<reason>`` while it is set."""
+    gates_deferred_failure: str | None = None
+    """T4.28f: a **parse** failure (``gates_file_invalid``/``gates_file_missing``)
+    seen on the last tick and not latched yet — the one tick of grace a
+    non-atomic edit (``nano``) needs. The next tick either clears it (the file
+    parses) or latches it."""
+    gates_deferred_mtime_ns: int | None = None
+    """The mtime the deferred failure was read at, for the log line."""
 
 
 @dataclass(slots=True)

@@ -23,6 +23,10 @@ Brakes that exist only in this mode, all named in the heartbeat:
   before it;
 - a blocking kill switch, a diverged program or an exhausted scope skip the
   pass instead of opening a proposal the admission would refuse;
+- ``MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S`` (default 120 s, ``0`` disables,
+  T4.28f): a mint the admission refused for a reason that cannot change in the
+  next couple of minutes is not re-opened while the cooldown runs — skip
+  ``recently_refused``, the reasons and the query in ``refusal_cooldown.py``;
 - any admission refusal of an auto-opened proposal writes the ``refused`` order
   **and** marks the proposal ``rejected`` with the reason (``entries._refuse``
   → :func:`reject_auto_proposal`), so the desk shows why.
@@ -49,6 +53,7 @@ from hunter_core.execution.meme.approval import (
 )
 from hunter_core.logging import get_logger
 from hunter_meme_executor.journal_db import WORKER_ROLE
+from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
 from hunter_meme_executor.repo import open_positions, pending_attempts
 from hunter_meme_executor.scope import read_scope_use, requested_sol_of
 
@@ -142,12 +147,15 @@ def plan_auto_approvals(
     max_per_tick: int = 1,
     max_age_s: float = AUTO_APPROVE_MAX_AGE_S,
     busy_mints: frozenset[str] = frozenset(),
+    cooling_mints: frozenset[str] = frozenset(),
 ) -> AutoPlan:
     """Pure: which ``proposed`` rows become live this tick, and why the rest do not.
 
     Skip names: ``expired`` · ``too_old`` · ``mint_busy`` (an open live position or
     a buy in flight on that mint — the admission would refuse ``duplicate_position``)
-    · ``suggested_incomplete`` · ``exceeds_max_sol_per_bet`` (the click's rule) ·
+    · ``recently_refused`` (T4.28f: the admission refused this mint for a reason
+    that needs more than a tick to change — ``refusal_cooldown``) ·
+    ``suggested_incomplete`` · ``exceeds_max_sol_per_bet`` (the click's rule) ·
     ``hourly_cap`` · ``tick_cap`` · ``mint_repeated``. Candidates are visited in the
     order given (oldest first)."""
     picks: list[OperatorProposal] = []
@@ -163,6 +171,9 @@ def plan_auto_approvals(
             continue
         if candidate.mint in busy_mints:
             skipped["mint_busy"] += 1
+            continue
+        if candidate.mint in cooling_mints:
+            skipped["recently_refused"] += 1
             continue
         size = requested_sol_of(candidate.suggested)
         if size <= 0:
@@ -281,6 +292,9 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
         approved_1h = await auto_approved_last_hour(session, now=now)
         busy = {p.mint for p in await open_positions(session)}
         busy |= {a.mint for a in await pending_attempts(session)}
+        cooling = await refusal_cooling_mints(
+            session, now=now, cooldown_s=cfg.auto_approve_refusal_cooldown_s
+        )
 
     def skip(reason: str, count: int = 1) -> None:
         state.auto_skipped[reason] = state.auto_skipped.get(reason, 0) + count
@@ -303,6 +317,7 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
         approved_last_hour=approved_1h,
         max_per_hour=cfg.auto_approve_max_per_hour,
         busy_mints=frozenset(busy),
+        cooling_mints=cooling,
     )
     for reason, count in plan.skipped.items():
         skip(reason, count)

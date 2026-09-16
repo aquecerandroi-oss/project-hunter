@@ -830,7 +830,15 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    modo: 1 compra por tique e por mint, proposta com mais de 60 s fica para a mão dele,
    `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR` (padrão 5; desde a T4.28e conta só as propostas que a
    admissão deixou passar — recusa não gasta vaga), e toda recusa da admissão marca a proposta
-   `rejected` com o motivo (a mesa mostra por quê). O heartbeat `hb:meme:executor` publica
+   `rejected` com o motivo (a mesa mostra por quê). Desde a **T4.28f** há também uma **carência por
+   mint**: uma moeda que a admissão acabou de recusar por um motivo que não muda em dois minutos
+   (`progress_below_window`, `progress_above_window`, `token_too_old`, `token_age_unknown`,
+   `program_not_allowed`, `unsupported_quote`, `progress_denominator_missing`) não é reaberta por
+   `MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S` (padrão 120 s; `0` desliga) — a mesa repropõe o mesmo
+   mint a cada ~20 s e em 16/09 o robô abriu a mesma moeda 5 vezes para levar 5 recusas iguais. Motivo
+   que o relógio limpa sozinho (`token_too_young`, `curve_state_stale`, `volume_unavailable`,
+   `marks_incomplete`, `wallet_over_max_sol`) **não** segura a retentativa. O pulo aparece no
+   heartbeat em `auto_skipped.recently_refused`. O heartbeat `hb:meme:executor` publica
    `auto_approve`, `auto_approved_1h`, `auto_refused_1h`, `auto_skipped`, `small_test_used_sol`,
    `small_test_trades_done`, `small_test_remaining_sol`. **Desligar:** `MEME_LIVE_AUTO_APPROVE=false`
    (ou apagar a linha) + `MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update` —
@@ -844,7 +852,12 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    switch com `gates_invalid:<motivo>` (destrava só na mão dele). Grave o arquivo de forma atômica
    (`cp gates.json gates.tmp && editar && mv gates.tmp meme_gates.json`) para o tique nunca ler um
    JSON pela metade; os contadores do escopo (compras feitas, SOL gasto) **não** são zerados pela
-   releitura.
+   releitura. **T4.28f:** se mesmo assim um tique pegar o arquivo pela metade (`nano` grava no lugar),
+   a primeira falha de leitura **não trava** — ela é adiada por um tique (o heartbeat mostra
+   `gates_reload_error = deferred:gates_file_invalid` e o log,
+   `meme_executor_gates_reload_deferred`), e a trava só vem se o tique seguinte falhar de novo. Um
+   arquivo **completo** que diz não (vencido, Portão C desligado, escopo sumido com o robô armado)
+   continua travando na hora.
 
 **O que não está pronto e ele precisa saber antes de ligar:** (a) venda **depois** da
 migração para a PumpSwap não existe — uma posição que migrar fica `open` com

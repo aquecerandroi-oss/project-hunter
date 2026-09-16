@@ -16,7 +16,11 @@ b. a valid edit ⇒ the effective policy is recomposed from the **owner's env
    heartbeat shows the new scope, and no counter is touched;
 c. an invalid edit ⇒ the kill switch is latched ``gates_invalid:<reason>``, the
    previous policy stays in memory for reporting, and the loop keeps ticking
-   (a second tick over a still-broken file returns normally);
+   (a second tick over a still-broken file returns normally). T4.28f: a
+   **parse** failure (half-written file, missing file) gets one tick of grace —
+   it latches on the second failing tick, never on the first; a **semantic**
+   refusal (expired, gate C off, the scope gone while armed) is a complete file
+   saying no and latches immediately;
 d. a scope that shrank **below what was already spent** ⇒ ``remaining_sol``
    clamps at 0 and ``exhausted`` is ``max_total_sol`` — the existing refusal
    (``small_test_scope_exhausted``) — instead of a negative number or a raise.
@@ -239,7 +243,6 @@ class TestInvalidChange:
     @pytest.mark.parametrize(
         ("payload", "reason"),
         [
-            ("{ truncated", "gates_file_invalid"),
             (_doc() | {"valid_until": "2026-09-15"}, "gates_expired"),
             (
                 _doc() | {"gate_c_owner": {"enabled": False, "date": "2026-09-12"}},
@@ -247,9 +250,11 @@ class TestInvalidChange:
             ),
         ],
     )
-    async def test_an_invalid_edit_latches_the_kill_switch_and_keeps_the_old_policy(
+    async def test_a_semantically_invalid_edit_latches_on_the_first_tick(
         self, tmp_path: Path, payload: object, reason: str
     ) -> None:
+        """A file that parses and says no is complete: there is nothing to wait
+        for, so it latches at once (no grace — T4.28f)."""
         path = tmp_path / "meme_gates.json"
         _write(path, _doc())
         ctx, kill = _context(path)
@@ -257,7 +262,7 @@ class TestInvalidChange:
 
         outcome = await gates_reload_once(ctx, now=NOW)
 
-        assert outcome.reloaded is False
+        assert outcome.reloaded is False and outcome.deferred is None
         assert outcome.refusal == f"{GATES_LATCH_PREFIX}{reason}"
         assert kill.local_latch_reason == outcome.refusal
         assert kill.latched and kill.latched[0].startswith(f"{GATES_LATCH_PREFIX}{reason}|")
@@ -266,23 +271,114 @@ class TestInvalidChange:
         assert ctx.config.limits.wallet_max_sol == Decimal("0.25")
         assert _scope_of(ctx).max_total_sol == Decimal("0.25")
         assert gates_fields(ctx)["gates_reload_error"] == reason
-        # And the loop keeps ticking: a second pass over the same broken file is
-        # a no-op (same mtime), a third over a differently broken one re-latches.
-        assert (await gates_reload_once(ctx, now=NOW)).reloaded is False
+
+    async def test_a_file_that_stopped_parsing_latches_on_the_second_tick(
+        self, tmp_path: Path
+    ) -> None:
+        """T4.28f — ``nano`` rewrites the file in place: a tick can stat+read a
+        half-written one. The first parse failure is **deferred** (named in the
+        heartbeat), the second latches; the policy in force never changes."""
+        path = tmp_path / "meme_gates.json"
+        _write(path, _doc())
+        ctx, kill = _context(path)
+        _write(path, "{ truncated", mtime_ns=path.stat().st_mtime_ns + 1_000_000_000)
+
+        first = await gates_reload_once(ctx, now=NOW)
+
+        assert first.deferred == "gates_file_invalid"
+        assert first.refusal is None and first.reloaded is False
+        assert kill.latched == [] and kill.local_latch_reason is None, "still trading"
+        assert ctx.state.gates_invalid is None
+        assert gates_fields(ctx)["gates_reload_error"] == "deferred:gates_file_invalid"
+
+        # Same mtime, still broken: the grace is over even though nothing moved.
+        second = await gates_reload_once(ctx, now=NOW)
+
+        assert second.refusal == f"{GATES_LATCH_PREFIX}gates_file_invalid"
+        assert second.deferred is None
+        assert kill.local_latch_reason == second.refusal
+        assert kill.latched and kill.latched[0].startswith(
+            f"{GATES_LATCH_PREFIX}gates_file_invalid|"
+        )
+        assert ctx.config.limits.wallet_max_sol == Decimal("0.25")
+        assert gates_fields(ctx)["gates_reload_error"] == "gates_file_invalid"
+
+    async def test_a_second_broken_write_latches_too(self, tmp_path: Path) -> None:
+        """A new mtime that also fails is the second tick: two different broken
+        bytes in a row are not a race, they are a broken file."""
+        path = tmp_path / "meme_gates.json"
+        _write(path, _doc())
+        ctx, kill = _context(path)
+        _write(path, "{ truncated", mtime_ns=path.stat().st_mtime_ns + 1_000_000_000)
+        assert (await gates_reload_once(ctx, now=NOW)).deferred == "gates_file_invalid"
         _write(path, "{ also broken", mtime_ns=path.stat().st_mtime_ns + 1_000_000_000)
-        assert (await gates_reload_once(ctx, now=NOW)).refusal is not None
+
+        outcome = await gates_reload_once(ctx, now=NOW)
+
+        assert outcome.refusal == f"{GATES_LATCH_PREFIX}gates_file_invalid"
+        assert kill.local_latch_reason == outcome.refusal
+
+    async def test_a_half_written_file_that_becomes_valid_is_just_a_reload(
+        self, tmp_path: Path
+    ) -> None:
+        """The case the grace exists for: the tick read the middle of the owner's
+        ``nano`` write. The next tick reads the whole file — no latch, the new
+        policy applies, and nothing is left in the heartbeat."""
+        path = tmp_path / "meme_gates.json"
+        _write(path, _doc())
+        ctx, kill = _context(path)
+        half = json.dumps(_doc(max_total_sol="0.72"))[:120]
+        _write(path, half, mtime_ns=path.stat().st_mtime_ns + 1_000_000_000)
+        assert (await gates_reload_once(ctx, now=NOW)).deferred == "gates_file_invalid"
+
+        _write(path, _doc(max_total_sol="0.72"), mtime_ns=path.stat().st_mtime_ns + 1_000_000_000)
+        outcome = await gates_reload_once(ctx, now=NOW)
+
+        assert outcome.reloaded is True
+        assert outcome.refusal is None and outcome.deferred is None
+        assert kill.latched == [] and kill.local_latch_reason is None
+        assert ctx.config.limits.wallet_max_sol == Decimal("0.72")
+        assert _scope_of(ctx).max_total_sol == Decimal("0.72")
+        fields = gates_fields(ctx)
+        assert fields["gates_reload_error"] == "", "no error left behind"
+        assert fields["gates_reloaded_at"] == NOW.isoformat()
 
     async def test_the_file_being_deleted_is_an_invalid_edit_not_a_crash(
         self, tmp_path: Path
     ) -> None:
+        """A missing file is a parse failure too (``mv`` in flight): deferred once,
+        latched on the second tick, and then said only once."""
         path = tmp_path / "meme_gates.json"
         _write(path, _doc())
         ctx, kill = _context(path)
         path.unlink()
+        assert (await gates_reload_once(ctx, now=NOW)).deferred == "gates_file_missing"
+        assert kill.local_latch_reason is None
+
         outcome = await gates_reload_once(ctx, now=NOW)
         assert outcome.refusal == f"{GATES_LATCH_PREFIX}gates_file_missing"
         assert kill.local_latch_reason == outcome.refusal
         assert ctx.config.limits.wallet_max_sol == Decimal("0.25")
+        # Still gone on the next tick: already latched, already logged.
+        assert (await gates_reload_once(ctx, now=NOW)).refusal == outcome.refusal
+        assert len(kill.latched) == 1, "one line, not one every 10 s"
+
+    async def test_a_file_that_came_back_before_the_second_tick_never_latches(
+        self, tmp_path: Path
+    ) -> None:
+        """``mv new old`` seen mid-flight: gone on one tick, whole on the next."""
+        path = tmp_path / "meme_gates.json"
+        _write(path, _doc())
+        ctx, kill = _context(path)
+        path.unlink()
+        assert (await gates_reload_once(ctx, now=NOW)).deferred == "gates_file_missing"
+        _write(path, _doc(max_total_sol="0.72"))
+
+        outcome = await gates_reload_once(ctx, now=NOW)
+
+        assert outcome.reloaded is True and kill.latched == []
+        assert ctx.config.limits.wallet_max_sol == Decimal("0.72")
+        assert gates_fields(ctx)["gates_reload_error"] == ""
 
     async def test_dropping_the_written_scope_while_the_robot_is_armed_is_refused(
         self, tmp_path: Path
@@ -304,6 +400,7 @@ class TestInvalidChange:
 
         outcome = await gates_reload_once(ctx, now=NOW)
 
+        assert outcome.deferred is None, "a complete file saying no latches at once"
         assert outcome.refusal == f"{GATES_LATCH_PREFIX}auto_approve_needs_small_test"
         assert kill.local_latch_reason == outcome.refusal
         assert _scope_of(ctx).max_total_sol == Decimal("0.25"), "the old scope is kept"
@@ -315,6 +412,7 @@ class TestInvalidChange:
         kill.raises = True
         _write(path, "{ truncated", mtime_ns=path.stat().st_mtime_ns + 1_000_000_000)
 
+        assert (await gates_reload_once(ctx, now=NOW)).deferred == "gates_file_invalid"
         outcome = await gates_reload_once(ctx, now=NOW)
 
         assert outcome.refusal == f"{GATES_LATCH_PREFIX}gates_file_invalid"

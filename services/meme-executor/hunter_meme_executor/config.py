@@ -87,6 +87,11 @@ class ExecutorConfig:
     on **and** a written small test in the gates (``auto_approve_needs_small_test``
     otherwise); inert without the live flag."""
     auto_approve_max_per_hour: int = 5
+    auto_approve_refusal_cooldown_s: float = 120.0
+    """T4.28f — ``MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S``: how long a mint the
+    admission refused for a reason that needs more than a tick to change
+    (``auto_approve.DETERMINISTIC_REFUSALS``) is not re-opened by the robot. ``0``
+    disables the skip (and the query with it)."""
     gates_file: str | None = None
     """T4.28d — the path the gates were read from, so the runtime can re-read it
     on an mtime change (``gates_reload``). ``None`` while the live flag is off."""
@@ -228,6 +233,9 @@ def boot(
         small_test_max_total_sol=None if small is None else small.max_total_sol,
         auto_approve=auto_approve,
         auto_approve_max_per_hour=max(0, _int(env, "MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR", 5)),
+        auto_approve_refusal_cooldown_s=max(
+            0.0, _float(env, "MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S", 120.0)
+        ),
         gates_file=(env.get(ENV_GATES_FILE) or "").strip() or None if mode.live else None,
         env_limits=env_limits,
     )

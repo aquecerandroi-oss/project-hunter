@@ -41,6 +41,7 @@ from hunter_core.execution.meme.journal import SigningLocked
 from hunter_core.execution.meme.signer import ENV_SECRET_KEY, MemeSigner
 from hunter_exchanges.pumpfun.decode import BondingCurveAccount
 from hunter_exchanges.pumpfun.global_state import decode_global_account
+from hunter_meme_executor.auto_approve import auto_approve_once
 from hunter_meme_executor.build import decode_fills
 from hunter_meme_executor.chain import ChainReader, CurveRead, TokenAccountRead, WalletRead
 from hunter_meme_executor.config import ExecutorConfig
@@ -50,6 +51,7 @@ from hunter_meme_executor.exits import exits_once
 from hunter_meme_executor.heartbeat import heartbeat_fields
 from hunter_meme_executor.journal_db import PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
+from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
 from hunter_meme_executor.repo import TokenContext, open_positions
 from hunter_risk_meme import limits_from_env
 
@@ -355,6 +357,64 @@ async def _plant_operator_proposal(
                         "manual_plan": "Comprar 0,01 SOL de X ate ...",
                     }
                 ),
+            },
+        )
+    return proposal_id
+
+
+async def _plant_refused_buy(
+    engine: AsyncEngine,
+    *,
+    mint: str,
+    reason: str,
+    received_at: datetime,
+    decided_by: str = AUTO_STAGE1_DECIDED_BY,
+    side: str = "buy",
+    status: str = "refused",
+) -> str:
+    """T4.28f — one row of what the cooldown query reads: a live proposal this
+    executor (or a human) decided, plus the order the admission refused."""
+    proposal_id = str(uuid4())
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO meme_tokens (mint, first_seen_source, first_seen_at, last_seen_at, created_at, "
+                "  creator, initial_real_token_reserves, progress_denominator_source, total_supply) "
+                "VALUES (:mint, 'pumpportal_ws', :t, :t, :t, :creator, 793100000, 'observed_virgin', 1000000000) "
+                "ON CONFLICT (mint) DO NOTHING"
+            ),
+            {"mint": mint, "t": received_at - timedelta(seconds=120), "creator": CREATOR},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO meme_proposals (id, mint, rule_set_id, origin, status, proposed_at, expires_at, "
+                "  quote, reasons, suggested, decision, decided_by, decided_at, mode) "
+                "VALUES (:id, :mint, :rs, 'operator', 'rejected', :proposed, :expires, '{}', "
+                "  '[\"operator_manual\"]', '{}', '{}'::jsonb, :by, :decided, 'live')"
+            ),
+            {
+                "id": proposal_id,
+                "mint": mint,
+                "rs": OPERATOR_RULE_SET,
+                "proposed": received_at - timedelta(seconds=5),
+                "expires": received_at + timedelta(seconds=120),
+                "by": decided_by,
+                "decided": received_at,
+            },
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO meme_live_orders (id, proposal_id, side, client_order_id, status, reason, "
+                "  received_at) VALUES (:id, :p, :side, :key, :status, :reason, :t)"
+            ),
+            {
+                "id": str(uuid4()),
+                "p": proposal_id,
+                "side": side,
+                "key": f"{side}:{proposal_id}",
+                "status": status,
+                "reason": reason,
+                "t": received_at,
             },
         )
     return proposal_id
@@ -881,6 +941,104 @@ async def test_stage_1_rejects_by_name_what_its_own_admission_refuses(
     assert armed.ctx.state.auto_rejected == 1
     hb = await heartbeat_fields(armed.ctx)
     assert json.loads(hb["auto_refused_1h"]) == {"bundled_share_unmeasurable": 1}
+
+
+async def test_the_cooldown_query_reads_only_this_executors_deterministic_refusals(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.28f — the SQL behind the ``recently_refused`` skip, against the real
+    schema: our own buy refusals inside the window, the reason filtered in Python.
+    Everything else in the table is noise it must not read."""
+    now = datetime.now(UTC)
+    cooling_mint = MINT
+    stale_mint = "2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump"
+    old_mint = "3pQ4hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump"
+    click_mint = "4rT5hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump"
+    sell_mint = "6uV7hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump"
+    await _plant_refused_buy(
+        db_engine,
+        mint=cooling_mint,
+        reason="progress_above_window",
+        received_at=now - timedelta(seconds=30),
+    )
+    await _plant_refused_buy(  # reversible on the next tick — never cools
+        db_engine,
+        mint=stale_mint,
+        reason="curve_state_stale",
+        received_at=now - timedelta(seconds=30),
+    )
+    await _plant_refused_buy(  # deterministic, but older than the 120 s window
+        db_engine,
+        mint=old_mint,
+        reason="progress_above_window",
+        received_at=now - timedelta(seconds=200),
+    )
+    await _plant_refused_buy(  # a human's proposal: the robot's cooldown is its own
+        db_engine,
+        mint=click_mint,
+        reason="progress_above_window",
+        received_at=now - timedelta(seconds=30),
+        decided_by="user_x",
+    )
+    await _plant_refused_buy(  # a refused **sale** never stops a buy
+        db_engine,
+        mint=sell_mint,
+        reason="progress_above_window",
+        received_at=now - timedelta(seconds=30),
+        side="sell",
+    )
+    await _plant_refused_buy(  # a confirmed buy is not a refusal
+        db_engine,
+        mint="7wX8hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump",
+        reason="progress_above_window",
+        received_at=now - timedelta(seconds=30),
+        status="admitted",
+    )
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        cooling = await refusal_cooling_mints(session, now=now, cooldown_s=120.0)
+        disabled = await refusal_cooling_mints(session, now=now, cooldown_s=0.0)
+        wide = await refusal_cooling_mints(session, now=now, cooldown_s=3600.0)
+
+    assert cooling == frozenset({cooling_mint})
+    assert disabled == frozenset(), "cooldown 0 asks the database nothing"
+    assert wide == frozenset({cooling_mint, old_mint}), "the window is the only clock"
+
+
+async def test_stage_1_does_not_reopen_a_mint_it_just_had_refused(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The measured loop of 16/09/2026 11:46–11:48 BRT: the desk re-proposes the
+    same mint every ~20 s. With the cooldown the robot opens nothing, writes no
+    order and leaves the row ``proposed`` — the heartbeat names the skip."""
+    now = datetime.now(UTC)
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    await _plant_refused_buy(
+        db_engine,
+        mint=MINT,
+        reason="progress_above_window",
+        received_at=now - timedelta(seconds=30),
+    )
+    proposal_id = await _plant_operator_proposal(db_engine, proposed_at=now)
+
+    opened = await auto_approve_once(armed.ctx, now=now)
+
+    assert opened == []
+    assert armed.ctx.state.auto_approved == 0
+    assert armed.ctx.state.auto_skipped == {"recently_refused": 1}
+    row = await _proposal(db_engine, proposal_id)
+    assert row["status"] == "proposed" and row["mode"] == "paper", "left for the human"
+    orders = await _rows(
+        db_engine, "SELECT id FROM meme_live_orders WHERE proposal_id = :p", p=proposal_id
+    )
+    assert orders == [], "no RPC read, no refused row, no rejected proposal"
+    hb = await heartbeat_fields(armed.ctx)
+    assert json.loads(hb["auto_skipped"]) == {"recently_refused": 1}
+    # Past the cooldown the same proposal is opened: the skip is a delay, not a ban.
+    armed.ctx.state.auto_skipped.clear()
+    later = now + timedelta(seconds=121)
+    assert await auto_approve_once(armed.ctx, now=later) == []  # the row is older than 60 s now
+    assert armed.ctx.state.auto_skipped == {"too_old": 1}, "not cooling any more"
 
 
 async def test_stage_1_leaves_an_old_proposal_and_a_click_proposal_alone(
