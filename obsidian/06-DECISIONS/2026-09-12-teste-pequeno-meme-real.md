@@ -106,3 +106,15 @@ vantagem; o estágio 1 garante que, no dia em que ela provar, o robô já esteja
   proposta do conjunto `operator` ativo. Horário útil da mesa: 13–22 BRT (KB-0098).
 - **Sacar da carteira do robô:** importar a chave (lida do `.env` na VPS, sem print) no Phantom → "Importar chave privada", com o
   executor desligado (`meme.kill`). Acompanhar: `solscan.io/account/ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4` e a mesa (`/ever/meme/mesa`).
+
+## Decisão A — 16/09/2026 15:0x BRT: a mesa alinhada ao teto de progresso do executor
+**Everton: "confirma o A".** Fato que motivou: nas 24 h anteriores, 51 de 68 propostas da mesa (`operator/5`, progresso 5–100 %)
+estavam acima dos 50 % que o executor real aceita (`curve_progress_max_pct`, §3.1); depois da volta da fita (14:00–14:14) foram 6 de 6.
+O teto do executor **não muda** (a venda depois da migração não existe — T4.29a em construção): a mesa passa a propor só até 50 %.
+Gravado por `meme_rule_set.py --set-param max_progress_pct=50 --rule-set operator/5 --apply`, auditado em `system_events`.
+Opção B (subir o teto para 85 %) fica registrada como o passo natural **depois** que a venda na PumpSwap existir e for simulada.
+
+**Estágio 2 em paralelo (mesma mensagem: "já vai fazendo o estágio 2 agora mesmo em paralelo"):** T4.29a venda na PumpSwap,
+T4.29b estudo do tamanho (o que US$ 1 000 por operação permite sob os nossos tetos de participação e impacto), T4.29c `FeeConfig`
++ simulação de venda em curva com holder rewards, T4.28c painel do modo sozinho. Nada disso liga dinheiro novo: o escopo do estágio 2
+continua exigindo o segundo `meme_gates.json` assinado por ele e o clique por compra.
