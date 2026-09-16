@@ -134,7 +134,9 @@ async def test_set_param_apply_updates_only_the_sets_that_differ_and_leaves_an_a
     )
     assert code == 0 and "applied: 2 row(s) updated" in report
     update, params = conn.update()
-    assert "params = params || jsonb_build_object(CAST(:key AS text), CAST(:value AS jsonb))" in update
+    assert (
+        "params = params || jsonb_build_object(CAST(:key AS text), CAST(:value AS jsonb))" in update
+    )
     assert "AND status = 'active'" in update
     assert params == {
         "key": "exclude_mayhem",
