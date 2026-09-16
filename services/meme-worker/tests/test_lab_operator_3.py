@@ -44,8 +44,9 @@ pytestmark = pytest.mark.integration
 
 WORKER = "hunter_worker"
 OPERATOR_3_ID = "01994d00-6c1a-7000-8000-00000000000a"
-OPERATOR_4_ID = "01994d00-6c1a-7000-8000-00000000000c"
-"""T4.21 (``0034``): the desk moved to ``operator/4`` (E1 arm 2); ``operator/3`` is retired."""
+OPERATOR_5_ID = "01994d00-6c1a-7000-8000-000000000011"
+"""T4.24 (``0039``): the desk moved to ``operator/5`` (repeat-dumper filter on);
+``operator/4`` is retired."""
 PLAN = (
     "Comprar 0,05 SOL de PEPE até 09:05:03 (proposta expira). "
     "Vender até 09:32 (30 min) — antes disso se triplicar (3×), se recuar 35 % do topo depois "
@@ -78,13 +79,16 @@ async def _proposals_of(factory: async_sessionmaker[AsyncSession], mint: str) ->
     return {str(r["label"]): r for r in rows}
 
 
-async def test_the_seed_hands_the_desk_to_operator_4_on_the_flow_gate_arm_2(
+async def test_the_seed_hands_the_desk_to_operator_5_on_the_flow_gate_arm_2(
     db_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with role_session(db_session_factory, db_role=WORKER) as session:
         specs = {s.label: s for s in await load_active_rule_sets(session)}
-    operator, flow = specs["operator/4"], specs["flow_v2/2"]
-    assert "operator/3" not in specs and operator.id == OPERATOR_4_ID
+    # The desk is whichever ``kind = 'operator'`` set is active — never a hardcoded
+    # version: it moved 2 -> 3 -> 4 -> 5 and will move again.
+    operator = next(s for s in specs.values() if s.kind == "operator" and s.name == "operator")
+    flow = specs["flow_v2/2"]
+    assert "operator/4" not in specs and operator.id == OPERATOR_5_ID
     assert "flow_v2/1" in specs, "arm 1 keeps being measured next to arm 2"
     assert operator.kind == "operator" and operator.exp_ref is None
     assert operator.clock == "15s" and operator.ttl_s == 180 and operator.max_open_positions == 2
@@ -99,11 +103,11 @@ async def test_the_seed_hands_the_desk_to_operator_4_on_the_flow_gate_arm_2(
     assert (operator.max_hold_s, operator.max_loss_pct) == (1800, Decimal(50))
     assert operator.exit_on_line_break and flow.ttl_s is None
     assert [s.label for s in specs.values() if s.kind == "operator" and s.name == "operator"] == [
-        "operator/4"
+        "operator/5"
     ], "exactly one seeded operator set (test_lab_persistence plants throwaway operator-kind sets)"
 
 
-async def test_operator_4_proposes_the_same_coin_as_flow_v2_2_waits_180_s_and_fills_once_approved(
+async def test_operator_5_proposes_the_same_coin_as_flow_v2_2_waits_180_s_and_fills_once_approved(
     lab: LabContext,
     db_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -123,7 +127,7 @@ async def test_operator_4_proposes_the_same_coin_as_flow_v2_2_waits_180_s_and_fi
     report = await lab_tick(lab, now=tick_1)
     assert report.proposals >= 2 and report.fills.filled == 0
     by_set = await _proposals_of(db_session_factory, mint)
-    research, proposal = by_set["flow_v2/2"], by_set["operator/4"]
+    research, proposal = by_set["flow_v2/2"], by_set["operator/5"]
     # The same coin, the same instant, the same decomposition — one approved by
     # rules, the other waiting for the desk 180 s (the set's ttl_s, not the loop's).
     assert research["status"] == "approved" and proposal["status"] == "proposed"
@@ -164,7 +168,7 @@ async def test_operator_4_proposes_the_same_coin_as_flow_v2_2_waits_180_s_and_fi
     bet = await _bet_of(db_session_factory, str(proposal["id"]))
     assert bet["proposal_status"] == "filled" and bet["status"] == "open"
     assert bet["entry_at"] == next_photo and bet["entry"]["decision_to_fill_s"] == 2
-    assert str(bet["rule_set_id"]) == OPERATOR_4_ID
+    assert str(bet["rule_set_id"]) == OPERATOR_5_ID
     assert (bet["params"]["target_x"], bet["params"]["max_hold_s"]) == ("3", 1800)
     assert bet["params"]["trailing_arm_x"] == "1.5" and bet["params"]["exit_on_line_break"]
     still_one = await _one(
@@ -172,6 +176,6 @@ async def test_operator_4_proposes_the_same_coin_as_flow_v2_2_waits_180_s_and_fi
         "SELECT count(*) AS n FROM meme_proposals WHERE mint = :m "
         "AND rule_set_id = CAST(:rs AS uuid)",
         m=mint,
-        rs=OPERATOR_4_ID,
+        rs=OPERATOR_5_ID,
     )
     assert still_one["n"] == 1, "an open bet keeps the mint from being proposed again"

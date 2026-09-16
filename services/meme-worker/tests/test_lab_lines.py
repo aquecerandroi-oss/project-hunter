@@ -247,6 +247,12 @@ async def test_a_probe_scales_once_when_the_line_is_born_and_sells_when_it_break
             (fill_2, ABOVE, "946000000"),  # the second leg's fill: first after tick 2
         ],
         created_at=CREATED,
+        # T4.16 (EXP-M6): pedigree_exclusions is on by default (both sets never
+        # opt out) — an unknown creator/symbol refuses every proposal by name
+        # before the gate is even read. Unique per test run, never colliding
+        # with another mint's pedigree window.
+        creator=f"C_{mint}",
+        symbol=mint,
     )
     await _fold(db_session_factory, _minute(mint, minute_a, observed_at=photo_a, with_line=False))
 
@@ -283,7 +289,12 @@ async def test_a_probe_scales_once_when_the_line_is_born_and_sells_when_it_break
         if b["rule_set_id"] == HYPE_PROBE_ID
     ]
     assert legs == [("probe", None, "open"), ("scale", probe["id"], "open")]
-    scale = next(b for b in bets if b["leg"] == "scale")
+    # ``hype_probe_v0/2`` (``0030``, EXP-M5 arm 2 — same numbers, an added
+    # flow condition) is active too and this curve satisfies it as well: a
+    # second, independent probe/scale pair on the same mint under a sibling
+    # rule set is the comparison doing its job, not a bug — but ``bets``
+    # carries both, so every lookup below must stay pinned to our own set.
+    scale = next(b for b in bets if b["leg"] == "scale" and b["rule_set_id"] == HYPE_PROBE_ID)
     assert scale["entry_at"] == fill_2 and scale["entry"]["sol_spent"] == "0.04"
     assert scale["entry"]["parent_bet_id"] == probe["id"]
     assert scale["params"]["exit_on_line_break"] is True
@@ -312,8 +323,9 @@ async def test_a_probe_scales_once_when_the_line_is_born_and_sells_when_it_break
         pending = await session.scalar(
             text(
                 "SELECT count(*) FROM meme_proposals WHERE mint = :mint "
+                "AND rule_set_id = CAST(:rs AS uuid) "
                 "AND suggested ->> 'parent_bet_id' IS NOT NULL"
             ),
-            {"mint": mint},
+            {"mint": mint, "rs": HYPE_PROBE_ID},
         )
-    assert pending == 1, "exactly one scale proposal was ever written"
+    assert pending == 1, "exactly one scale proposal was ever written under our own set"

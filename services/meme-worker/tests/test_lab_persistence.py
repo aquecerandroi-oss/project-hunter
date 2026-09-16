@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -143,9 +144,19 @@ async def _plant_curve(
     *,
     created_at: datetime,
     complete_from: datetime | None = None,
+    creator: str | None = None,
+    symbol: str | None = None,
 ) -> None:
+    """``creator``/``symbol`` stay ``None`` by default — most callers here never
+    exercise the pedigree gate; a test that does (``lab_tick`` through a set with
+    ``pedigree_exclusions``, the default) must pass a unique pair, the same way
+    ``test_lab_fast._plant_token`` already does, or every proposal is refused
+    ``creator_unknown``/``symbol_unknown`` (T4.16, EXP-M6 — cross-cutting)."""
     async with role_session(factory, db_role=WORKER) as session:
-        await upsert_token(session, _token(mint, created_at=created_at))
+        token = _token(mint, created_at=created_at)
+        if creator is not None or symbol is not None:
+            token = replace(token, creator=creator, symbol=symbol)
+        await upsert_token(session, token)
         for at, sol, tokens in points:
             complete = complete_from is not None and at >= complete_from
             await insert_snapshot(session, _snapshot(mint, at, sol, tokens, complete=complete))

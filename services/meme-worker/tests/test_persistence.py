@@ -16,6 +16,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
@@ -335,6 +336,63 @@ async def test_retention_prunes_only_what_aged_out_and_needs_the_marker(
             (await session.execute(text("SELECT mint FROM meme_tokens"))).scalars().all()
         )
     assert old not in survivors and young in survivors
+
+
+async def test_retention_skips_a_mint_still_matched_to_an_event_instead_of_aborting_the_batch(
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """0043 gave ``meme_event_matches.mint`` a real FK to ``meme_tokens`` — unlike
+    every bet or proposal, which keep ``mint`` as bare text exactly so an aged-out
+    coin can still be pruned (T4.16b: only a *pinned* mint, tracked in memory, is
+    ever an exception to that). Without a guard, ``_PRUNE_TOKENS``'s single batched
+    ``DELETE`` fails on the FK violation and aborts the **whole** batch — not just
+    the matched row — so a coin two years old that once triggered an event would
+    permanently jam retention behind it (raw SQL here, not ``upsert_token``/
+    ``TokenRow``, so this test does not depend on T4.39's in-flight columns)."""
+    cutoff = datetime(2026, 10, 1, tzinfo=UTC)
+    matched, plain = "EVT_MATCHED_OLD", "EVT_PLAIN_OLD"
+    event_id = str(uuid4())
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        for mint in (matched, plain):
+            await session.execute(
+                text(
+                    "INSERT INTO meme_tokens (mint, first_seen_source, first_seen_at, "
+                    "last_seen_at) VALUES (:mint, 'pumpportal_ws', :seen, :seen)"
+                ),
+                {"mint": mint, "seen": cutoff - timedelta(days=10)},
+            )
+        await session.execute(
+            text(
+                "INSERT INTO meme_events (id, observed_at, source, kind, title, "
+                "confidence, recorded_by) VALUES (:id, :observed_at, 'manual', "
+                "'incident', 'retention test event', 'rumor', 'test')"
+            ),
+            {"id": event_id, "observed_at": cutoff - timedelta(days=10)},
+        )
+        await session.execute(
+            text(
+                "INSERT INTO meme_event_matches (event_id, mint, match_kind) "
+                "VALUES (:event_id, :mint, 'buy')"
+            ),
+            {"event_id": event_id, "mint": matched},
+        )
+
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        deleted = await prune_tokens(session, cutoff=cutoff, batch=100)
+    assert deleted >= 1
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        survivors = set(
+            (
+                await session.execute(
+                    text("SELECT mint FROM meme_tokens WHERE mint = ANY(:mints)"),
+                    {"mints": [matched, plain]},
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert plain not in survivors, "an unmatched aged-out mint is pruned same as ever"
+    assert matched in survivors, "a matched mint is skipped, not fatal to the whole batch"
 
 
 async def test_the_tracked_set_is_rebuilt_from_the_rows_a_restart_left_behind(

@@ -206,10 +206,16 @@ async def test_a_pair_matched_once_stays_matched_across_ticks(
     pair already recorded and does not return it again."""
     event_id = str(uuid.uuid4())
     async with db_session_factory() as session:
+        # "ONCE", not "BUM" — this whole file runs against one shared, session-scoped
+        # database (``conftest.py``'s ``migrated_db_url`` is never reset between
+        # tests): "BUM" is already the symbol of
+        # ``test_a_handle_match_and_a_symbol_match_both_name_their_mint``'s own
+        # event, still inside the 72h scan window, and its cross product with
+        # this test's own "BUM" mint would name two events for the one pair.
         await upsert_token(
-            session, _token("T426B_ONCE", created_at=NOW + timedelta(minutes=1), symbol="BUM")
+            session, _token("T426B_ONCE", created_at=NOW + timedelta(minutes=1), symbol="ONCE")
         )
-        await _insert_event(session, event_id=event_id, observed_at=NOW, symbol_hint="BUM")
+        await _insert_event(session, event_id=event_id, observed_at=NOW, symbol_hint="ONCE")
         await session.commit()
 
         first = await match_events_once(session, now=NOW + timedelta(minutes=5))
