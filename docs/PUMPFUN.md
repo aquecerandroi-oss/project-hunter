@@ -592,3 +592,16 @@ com RPC próprio e a carteira real: um script `--simulate-only` (no mesmo molde 
 .build_pumpswap_sell` e chama `rpc.simulate_transaction(..., sig_verify=False)` — sem nunca chamar
 `send_transaction`. Também não confirmados: o arredondamento exato do produto constante contra um
 fill real, e o layout do `SellEvent` (inferido da IDL, nunca decodificado de uma transação real).
+
+## 9. A conta da curva em moedas Mayhem — R36, 2026-09-16
+
+`meme_tokens.bonding_curve` **não é confiável em moeda Mayhem**: 13 615 das 112 108 linhas de 7 dias
+que têm o campo gravam o *mesmo* endereço, `BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s`, em 13 615
+mints distintos (todas `mayhem_enabled`) — é o PDA `["sol-vault"]` do programa Mayhem
+(`mayhem_state.mayhem_pdas`), na mainnet dono System Program e zero byte de dado, não a curva de
+ninguém. A curva real é o PDA por mint (`3aYHwMeo…` → `Ck72XTyT…`, dono `6EF8rrec…`,
+`is_mayhem_mode=true`), que é o que o executor deriva e usa tanto na leitura (`ChainReader.curve`)
+quanto nas contas de `buy`/`sell` — portanto o executor lê e compra na conta certa. **Nunca** trocar
+essa derivação por "usar `meme_tokens.bonding_curve` quando existir" (pinado em
+`services/meme-executor/tests/test_mayhem_curve_account.py`); quem precisa do campo — o
+`reconcile_once` do radar — deve validar dono/discriminador ou derivar o PDA.
