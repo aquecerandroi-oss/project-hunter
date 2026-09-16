@@ -12,7 +12,8 @@ on, the gates, the policy, the RPC URL and the key are required in that order,
 and the first missing one ends the process with a named ``MemeLiveTradingRefused``.
 
 Loops: ``entries`` (1 s), ``exits`` (mark cadence), ``kill_switch`` (10 s, with
-or without events), ``reconcile`` (30 s: every ``submitted_unconfirmed`` row is
+or without events — and since T4.28d the gates file's mtime rides the same tick:
+``gates_reload``), ``reconcile`` (30 s: every ``submitted_unconfirmed`` row is
 settled by ``getSignatureStatuses``, never re-sent), ``heartbeat`` (10 s).
 """
 
@@ -36,6 +37,7 @@ from hunter_meme_executor.config import ExecutorConfig, boot, process_environmen
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.entries import entries_once
 from hunter_meme_executor.exits import exits_once
+from hunter_meme_executor.gates_reload import gates_reload_once, prime_gates
 from hunter_meme_executor.heartbeat import heartbeat_once
 from hunter_meme_executor.journal_db import WORKER_ROLE, PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
@@ -94,6 +96,9 @@ async def reconcile_once(ctx: ExecutorContext) -> None:
 
 async def kill_switch_once(ctx: ExecutorContext) -> None:
     await ctx.kill.refresh()
+    # T4.28d: the gates file rides this same tick — one stat, parsed only when the
+    # owner's bytes changed; invalid ⇒ latched, never a raise out of this loop.
+    await gates_reload_once(ctx)
     await program_check_once(ctx)
 
 
@@ -162,6 +167,9 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
         logger.error("meme_executor_boot_refused", reason=exc.reason, detail=str(exc))
         raise
     ctx = build_context(runtime, config, mode, signer)
+    # T4.28d: remember the mtime of the file the boot just parsed — the first
+    # kill-switch tick then reloads only if the owner edited it since.
+    prime_gates(ctx)
     _register_health(runtime, ctx)
     try:
         # T4.8b: the chain's program must be the one the builder was proven against.

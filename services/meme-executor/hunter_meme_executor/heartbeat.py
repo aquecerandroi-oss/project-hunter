@@ -31,10 +31,25 @@ from hunter_meme_executor.scope import read_scope_use
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["heartbeat_fields", "heartbeat_once"]
+__all__ = ["gates_fields", "heartbeat_fields", "heartbeat_once"]
 
 logger = get_logger(__name__)
 LAMPORTS = Decimal(1_000_000_000)
+
+
+def gates_fields(ctx: ExecutorContext) -> dict[str, str]:
+    """The gates as published, plus (T4.28d) when the file was last written and
+    when this process last swapped its policy from it — so the desk and ops can
+    see a hot reload happened without reading the container's log."""
+    state = ctx.state
+    return {
+        "gates": _gates(ctx),
+        "gates_mtime": "" if state.gates_mtime is None else state.gates_mtime.isoformat(),
+        "gates_reloaded_at": ""
+        if state.gates_reloaded_at is None
+        else state.gates_reloaded_at.isoformat(),
+        "gates_reload_error": state.gates_invalid or "",
+    }
 
 
 def _gates(ctx: ExecutorContext) -> str:
@@ -103,7 +118,6 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         "label": "REAL",
         "live_enabled": str(cfg.live).lower(),
         "cluster": cfg.cluster,
-        "gates": _gates(ctx),
         "wallet_pubkey": "" if ctx.signer is None else ctx.signer.pubkey,
         "wallet_sol_balance": ""
         if state.wallet_lamports is None
@@ -148,6 +162,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         if anchor is None or equity is None
         else str(max(Decimal(0), anchor.day_start_sol_equity - equity)),
     }
+    fields.update(gates_fields(ctx))
     fields.update(auto)
     fields.update(ctx.kill.describe())
     return fields

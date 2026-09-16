@@ -456,6 +456,27 @@ drawdown_pct     = max(0, 1 − equity_sol / peak_equity_sol)
   acontece **na mesma transação que aplica o efeito de entrada**, com ordem fixa de travas
   **sistema → organização → carteira**. Aprovação antiga não é salvo-conduto (§9.5).
 
+### 7.1 Os portões também são relidos em voo (T4.28d)
+
+No mesmo tique de 10 s do kill switch o executor dá **um `stat`** no `meme_gates.json` e só **lê o
+arquivo quando o `mtime` mudou** — medido em 16/09/2026 (11:3x BRT): o Everton subiu
+`small_test_authorization.scope.max_total_sol` de 0,25 para 0,72 na VPS e o `hb:meme:executor`
+continuou publicando `wallet_max_sol 0.25` até um `docker restart`; reiniciar o processo que segura a
+chave e as posições abertas não pode ser o preço de mudar um número que o dono escreveu.
+
+- **Válido ⇒ política recomposta e trocada em memória**, pela mesma função do boot
+  (`config.effective_limits`, `min` dos cinco `MEME_*` com o escopo escrito) e sempre a partir da
+  política do ambiente — recompor sobre a política já apertada nunca deixaria um escopo **crescer**.
+- **Inválido (JSON quebrado, `valid_until` vencido, Portão C desligado, escopo sumido com o robô
+  armado, arquivo apagado) ⇒ o kill switch é travado `gates_invalid:<motivo>`** — a mesma trava
+  latched desta §7, que só o dono destrava — e a política **anterior** fica em memória só para o
+  heartbeat relatar. O laço não cai: derrubar o processo com posição aberta é pior que pará-lo.
+- **Contador nenhum é zerado por uma releitura.** `max_trades` e `max_total_sol` continuam contados
+  contra `meme_live_orders` (§12, variante); um escopo que **encolheu abaixo do que já foi gasto**
+  não levanta erro: `remaining_sol` trava em 0 e a admissão recusa com o `small_test_scope_exhausted`
+  de sempre.
+- Publicado em `hb:meme:executor`: `gates`, `gates_mtime`, `gates_reloaded_at`, `gates_reload_error`.
+
 ## 8. Falhar fechado
 
 ### 8.1 O padrão

@@ -97,6 +97,13 @@ class KillSwitchReader:
     wallet_state: KillSwitchState = KillSwitchState.ACTIVE
     latched: bool = False
     latch_reason: str | None = None
+    local_latch_reason: str | None = None
+    """T4.28d — a latch **this process** decided (today: gates that stopped being
+    valid, ``gates_invalid:<reason>``). ``latch`` persists it in the row; the
+    memory copy exists because a Postgres that refuses the write must not leave
+    the executor trading on gates it no longer trusts, and a ``refresh`` that
+    reads an unlatched row never clears it. Released with the process, or by the
+    owner's ``UPDATE`` plus a restart — §7: a resume is always manual."""
     anchor: DayAnchor | None = None
     last_read_at: datetime | None = None
     legible: bool = False
@@ -109,7 +116,7 @@ class KillSwitchReader:
             states.append(self.redis_state)
         if self.file_state is not None:
             states.append(self.file_state)
-        if self.latched:
+        if self.latched or self.local_latch_reason is not None:
             states.append(KillSwitchState.TRADING_DISABLED)
         return most_restrictive(*states)
 
@@ -122,6 +129,11 @@ class KillSwitchReader:
             self.system,
             self.redis_state or KillSwitchState.ACTIVE,
             self.file_state or KillSwitchState.ACTIVE,
+            # The process's own stop is a system-scope stop for the engine: the
+            # admission must refuse by itself, not only at the pre-signature re-read.
+            KillSwitchState.TRADING_DISABLED
+            if self.local_latch_reason is not None
+            else KillSwitchState.ACTIVE,
         )
         return MemeKillSwitchInputs(
             system=system, wallet=self.wallet_state, daily_loss_latched=self.latched
@@ -165,13 +177,17 @@ class KillSwitchReader:
             self.errors["postgres"] = type(exc).__name__
         self.last_read_at = utcnow()
 
-    async def latch(self, reason: str) -> bool:
-        """Persist the daily block. Idempotent: a second latch changes nothing."""
+    async def latch(self, reason: str, *, event: str = "meme_daily_loss_latched") -> bool:
+        """Persist the block. Idempotent: a second latch changes nothing.
+
+        ``event`` names *why* in the log — the daily cap by default, and
+        ``meme_executor_gates_latched`` when the gates stopped being valid
+        (T4.28d); the row is the same latch either way, released only by hand."""
         async with role_session(self.session_factory, db_role=WORKER_ROLE) as session:
             latched = (await session.execute(_LATCH, {"reason": reason, "now": utcnow()})).scalar()
         if latched is not None:
             self.latched, self.latch_reason = True, reason
-            logger.warning("meme_daily_loss_latched", reason=reason)
+            logger.warning(event, reason=reason)
             return True
         return False
 
@@ -204,8 +220,8 @@ class KillSwitchReader:
             "kill_switch_redis": "" if self.redis_state is None else self.redis_state.value,
             "kill_switch_file": "" if self.file_state is None else self.file_state.value,
             "kill_switch_wallet": self.wallet_state.value,
-            "kill_switch_latched": str(self.latched).lower(),
-            "kill_switch_latch_reason": self.latch_reason or "",
+            "kill_switch_latched": str(self.latched or self.local_latch_reason is not None).lower(),
+            "kill_switch_latch_reason": self.latch_reason or self.local_latch_reason or "",
             "kill_switch_read_at": ""
             if self.last_read_at is None
             else self.last_read_at.isoformat(),

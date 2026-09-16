@@ -54,6 +54,15 @@ class ExecutorState:
     """T4.28: auto-opened proposals the admission then refused (marked ``rejected``)."""
     auto_skipped: dict[str, int] = field(default_factory=lambda: dict[str, int]())
     """T4.28: why a ``proposed`` row was left to the human, by name."""
+    gates_mtime_ns: int | None = None
+    """T4.28d: the gates file's mtime as last seen (the cheap stat the reload
+    compares); ``None`` until the boot primes it."""
+    gates_mtime: datetime | None = None
+    gates_reloaded_at: datetime | None = None
+    """When the effective policy was last swapped by a runtime reload (never at boot)."""
+    gates_invalid: str | None = None
+    """T4.28d: the named refusal of the last gates file that failed to validate —
+    the kill switch is latched ``gates_invalid:<reason>`` while it is set."""
 
 
 @dataclass(slots=True)

@@ -837,6 +837,13 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    proposta com o switch bloqueando). **O estágio 2 (US$ 1 000/operação) continua exigindo o clique**
    até nova decisão escrita. A validade do `meme_gates.json` tem de cobrir o estágio (hoje:
    `small_test_authorization.expires_at` e `valid_until` ≥ 2026-09-18 — ele edita o arquivo).
+   **Editar o `meme_gates.json` vale em até um tique (10 s), sem `docker restart`** (T4.28d): o
+   executor relê o arquivo quando o `mtime` muda, recompõe a política (`hb:meme:executor` mostra
+   `gates`, `gates_mtime`, `gates_reloaded_at`) e, se o arquivo ficar inválido, **trava** o kill
+   switch com `gates_invalid:<motivo>` (destrava só na mão dele). Grave o arquivo de forma atômica
+   (`cp gates.json gates.tmp && editar && mv gates.tmp meme_gates.json`) para o tique nunca ler um
+   JSON pela metade; os contadores do escopo (compras feitas, SOL gasto) **não** são zerados pela
+   releitura.
 
 **O que não está pronto e ele precisa saber antes de ligar:** (a) venda **depois** da
 migração para a PumpSwap não existe — uma posição que migrar fica `open` com

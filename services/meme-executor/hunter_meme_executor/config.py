@@ -22,18 +22,33 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping, MutableMapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
 from typing import Literal
 
 from hunter_core.domain.enums import KillSwitchState
-from hunter_core.execution.meme.gates import MemeExecutionMode, MemeLiveTradingRefused, parse_flag
+from hunter_core.execution.meme.gates import (
+    ENV_GATES_FILE,
+    MemeExecutionMode,
+    MemeGates,
+    MemeLiveTradingRefused,
+    SmallTestAuthorization,
+    parse_flag,
+)
 from hunter_core.execution.meme.signer import MemeSigner, boot_meme_execution
 from hunter_exchanges.pumpfun.tx_rpc import MAINNET_PUBLIC_RPC_URL
 from hunter_risk_meme import MEME_PAPER_V0, MemeLimits, MemePolicyMissing, limits_from_env
 
-__all__ = ["ENV_AUTO_APPROVE", "INSTANCE", "ROLE", "ExecutorConfig", "boot"]
+__all__ = [
+    "ENV_AUTO_APPROVE",
+    "INSTANCE",
+    "ROLE",
+    "ExecutorConfig",
+    "boot",
+    "effective_limits",
+    "with_gates",
+]
 
 ROLE = "meme"
 INSTANCE = "executor"
@@ -72,6 +87,19 @@ class ExecutorConfig:
     on **and** a written small test in the gates (``auto_approve_needs_small_test``
     otherwise); inert without the live flag."""
     auto_approve_max_per_hour: int = 5
+    gates_file: str | None = None
+    """T4.28d — the path the gates were read from, so the runtime can re-read it
+    on an mtime change (``gates_reload``). ``None`` while the live flag is off."""
+    env_limits: MemeLimits | None = None
+    """The owner's policy **before** the written scope's ceiling. A reload
+    recomposes from this, never from ``limits``: ``min`` over an
+    already-tightened value would pin yesterday's smaller number forever."""
+
+    @property
+    def base_limits(self) -> MemeLimits:
+        """What ``effective_limits`` composes on top of (``limits`` for a config
+        built before T4.28d, which has no written scope folded in)."""
+        return self.env_limits or self.limits
 
     @property
     def priority_fee_sol(self) -> Decimal:
@@ -102,33 +130,55 @@ def _cluster(env: Mapping[str, str]) -> Cluster:
     return "devnet" if raw == "devnet" else "mainnet"
 
 
-def _limits(env: Mapping[str, str], mode: MemeExecutionMode) -> MemeLimits:
+def effective_limits(base: MemeLimits, small: SmallTestAuthorization | None) -> MemeLimits:
+    """The owner's policy with the written scope's ceiling folded in — **one**
+    place for this arithmetic, used by the boot and by the runtime reload (T4.28d).
+
+    ``base`` is always the environment's policy, never an already-composed one: a
+    scope the owner widens (0,25 → 0,72 on 16/09/2026) must widen the effective
+    policy too, and ``min`` over the previous composition never would.
+    """
+    if small is None:
+        return base
+    return MemeLimits.model_validate(
+        {
+            **base.model_dump(),
+            "profile": f"{base.profile}+small_test",
+            "max_sol_per_trade": min(base.max_sol_per_trade, small.max_sol_per_trade),
+            "max_exposure_per_mint_sol": min(
+                base.max_exposure_per_mint_sol, small.max_sol_per_trade
+            ),
+            "wallet_max_sol": min(base.wallet_max_sol, small.max_total_sol),
+        }
+    )
+
+
+def with_gates(config: ExecutorConfig, gates: MemeGates) -> ExecutorConfig:
+    """The same config against a freshly read gates file: the effective policy and
+    the scope's two published numbers, recomposed. Counters live in the ledger and
+    are not touched here."""
+    small = gates.small_test
+    return replace(
+        config,
+        limits=effective_limits(config.base_limits, small),
+        small_test_max_trades=None if small is None else small.max_trades,
+        small_test_max_total_sol=None if small is None else small.max_total_sol,
+    )
+
+
+def _base_limits(env: Mapping[str, str], mode: MemeExecutionMode) -> MemeLimits:
+    """The five ``MEME_*`` numbers, before any written ceiling."""
     if not mode.live:
         try:
             return limits_from_env(env)
         except MemePolicyMissing:
             return MEME_PAPER_V0
     try:
-        limits = limits_from_env(env)
+        return limits_from_env(env)
     except MemePolicyMissing as exc:
         raise MemeLiveTradingRefused("policy_missing", str(exc)) from exc
     except ValueError as exc:
         raise MemeLiveTradingRefused("policy_invalid", str(exc)) from exc
-    small = mode.gates.small_test if mode.gates is not None else None
-    if small is not None:
-        # The written authorization is a ceiling on top of the owner's policy.
-        limits = MemeLimits.model_validate(
-            {
-                **limits.model_dump(),
-                "profile": f"{limits.profile}+small_test",
-                "max_sol_per_trade": min(limits.max_sol_per_trade, small.max_sol_per_trade),
-                "max_exposure_per_mint_sol": min(
-                    limits.max_exposure_per_mint_sol, small.max_sol_per_trade
-                ),
-                "wallet_max_sol": min(limits.wallet_max_sol, small.max_total_sol),
-            }
-        )
-    return limits
 
 
 def boot(
@@ -136,7 +186,9 @@ def boot(
 ) -> tuple[ExecutorConfig, MemeExecutionMode, MemeSigner | None]:
     """Gates → policy → RPC → key. Live with anything missing never reaches the key."""
     mode = _mode_only(env, today=today)
-    limits = _limits(env, mode)
+    env_limits = _base_limits(env, mode)
+    small_at_boot = mode.gates.small_test if mode.gates is not None else None
+    limits = effective_limits(env_limits, small_at_boot)
     cluster = _cluster(env)
     rpc_url = (env.get("SOLANA_RPC_URL") or "").strip()
     if mode.live and not rpc_url:
@@ -176,6 +228,8 @@ def boot(
         small_test_max_total_sol=None if small is None else small.max_total_sol,
         auto_approve=auto_approve,
         auto_approve_max_per_hour=max(0, _int(env, "MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR", 5)),
+        gates_file=(env.get(ENV_GATES_FILE) or "").strip() or None if mode.live else None,
+        env_limits=env_limits,
     )
     return config, mode, signer
 
