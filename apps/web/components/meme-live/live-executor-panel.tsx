@@ -9,7 +9,7 @@
 import { BrasiliaShort } from "@/components/time/brasilia-instant";
 import { Badge } from "@/components/ui/badge";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
-import { computeAgeMs, formatAge } from "@/hooks/useAgeTicker";
+import { computeAgeMs, formatAge } from "@/lib/age";
 import { type LiveExecutor, type MemeLive, executorPanelState } from "@/lib/api/meme-live-types";
 
 import { executorStatusLabel, killSwitchBadgeVariant, killSwitchStateLabel } from "./labels";

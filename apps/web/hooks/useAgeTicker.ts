@@ -78,35 +78,9 @@ export function useAgeTicker(serverNowIso?: string | null, intervalMs = 1000): A
 }
 
 /**
- * A worker heartbeat (`WorkerHeartbeatOut`, `/system/workers`) carries both
- * its own `ts` and the server-computed `age_s` (`now - ts` at scan time) --
- * their sum is the exact instant the API's own clock read as "now" when it
- * built that row, without needing a separate `server_now` field (T3.16:
- * `/system/workers` is a bare `list[WorkerHeartbeatOut]`, not a
- * `stale_after_ms`-carrying envelope like `MarketListPage`/`MarketDetailOut`).
- * Feed the result into `useAgeTicker` instead of the worker's own `ts` alone,
- * so its age keeps advancing off the server's clock, never the viewer's.
- * `null` only when `ts` itself is unparseable.
+ * The pure helpers live in `@/lib/age` (no `"use client"`), so Server
+ * Components can call them too; re-exported here so every client caller keeps
+ * its import. Importing them from this module in a Server Component hands it a
+ * client reference and throws at render (`/meme/mesa`, 16/09/2026).
  */
-export function heartbeatServerNowIso(ts: string, ageS: number): string | null {
-  const parsed = new Date(ts).getTime();
-  return Number.isNaN(parsed) ? null : new Date(parsed + ageS * 1000).toISOString();
-}
-
-/** Age in ms of an ISO timestamp against `now`, or `null` when there is no timestamp at all. */
-export function computeAgeMs(tsIso: string | null | undefined, now: number): number | null {
-  if (!tsIso) return null;
-  const ts = new Date(tsIso).getTime();
-  if (Number.isNaN(ts)) return null;
-  return Math.max(0, now - ts);
-}
-
-/** Short, human age: "12s", "3min", "2h" -- never more precision than the badge/label has room for. */
-export function formatAge(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}min`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h`;
-}
+export { computeAgeMs, formatAge, heartbeatServerNowIso } from "@/lib/age";
