@@ -118,3 +118,14 @@ Opção B (subir o teto para 85 %) fica registrada como o passo natural **depois
 T4.29b estudo do tamanho (o que US$ 1 000 por operação permite sob os nossos tetos de participação e impacto), T4.29c `FeeConfig`
 + simulação de venda em curva com holder rewards, T4.28c painel do modo sozinho. Nada disso liga dinheiro novo: o escopo do estágio 2
 continua exigindo o segundo `meme_gates.json` assinado por ele e o clique por compra.
+
+## Estágio 2 redefinido — 16/09/2026 16:0x BRT ("aceito")
+**Fato medido (T4.29b, [[03-TRADING/Meme/Estudo-2026-09-16-tamanho-estagio-2|estudo]]):** o impacto de uma compra na curva é
+`SOL ÷ reserva virtual` (30–115 SOL); com o teto de impacto de 0,5 % cabem 0,15–0,58 SOL por compra; **1, 2, 5 e 9,8 SOL admitem
+zero minutos-moeda em 24 h**; na pool, 9,8 SOL cabem em 0 % dos instantes medidos. US$ 1 000 por operação não existe sob os nossos tetos.
+**Decisão do Everton:** o estágio 2 passa a ser **0,25 SOL por operação** (impacto ≤ 0,5 %, participação ≤ 1 % mantidos) e o
+**US$ 1 000 vira teto de exposição do dia** (≈ 10 SOL à cotação de 16/09), não tamanho de ticket. Cada compra continua aprovada
+pelo clique dele. Pré-requisitos inalterados: estágio 1 fecha 5 vendas reais; venda na PumpSwap (T4.29a) implementada e simulada.
+Números sugeridos para o segundo `meme_gates.json`/`.env` (ele fixa): `max_sol_per_trade 0,25` · `MEME_WALLET_MAX_SOL 10` ·
+`MEME_MAX_OPEN_POSITIONS 5` · `MEME_DAILY_LOSS_CAP_SOL` a escolher · `MEME_LIVE_AUTO_APPROVE=false`. Tickets maiores só com compra
+na pool com liquidez medida — frente nova, não autorizada.
