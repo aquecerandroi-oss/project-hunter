@@ -5793,6 +5793,14 @@ Vocabulário congelado (a T4.3 renderiza estes e só estes):
 `no_trade_feed`, `no_holders_reader`, `denominator_unknown`, `not_polled`,
 `rate_limited`, `insufficient_coverage`, `unsupported_quote`.
 
+### 33.5a Unidades de `curve_progress_pct`: fração na série, porcentagem no envelope
+
+`meme_features_1m.curve_progress_pct` e `meme_features_15s.curve_progress_pct` são **fração 0–1** (0,410918 = 41,09 % da
+curva vendida); `meme_proposals.quote ->> 'curve_progress_pct'` e os parâmetros de `meme_rule_sets`
+(`min_progress_pct`/`max_progress_pct`) são **porcentagem 0–100**. A mesma foto lê `0.410918` na série e `41.0918` na
+proposta — uma porta de 5–50 % se escreve `BETWEEN 0.05 AND 0.50` em SQL sobre as séries e `BETWEEN 5 AND 50` sobre o
+envelope. Numa Mayhem a fração pode ser **negativa** (efeito declarado da `0038`); `age_s` da série de 15 s é sempre ≤ 300.
+
 ### 33.6 Grants: leitura para a API, acréscimo para o motor, e uma exceção
 
 | Classe (congelada em `ddl/meme_radar.py`) | Papel | Privilégios | Tabelas |
