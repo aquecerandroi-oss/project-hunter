@@ -393,7 +393,9 @@ caso do criador que largou tudo antes da primeira medição: a foto é corrente,
 **O que muda em relação ao SPOT, e por quê:** não existe `book_depth` nem `spread` — não há livro
 (T4-MEME-RADAR §0). O papel deles é feito por **dois** checks que a curva permite fazer melhor: o
 `price_impact` (22), que é **exato** porque sai da fórmula das reservas, e a `participation` (21),
-que mede quanto do fluxo real somos. E não existe `beta_validity`: β contra o BTC numa moeda de 10
+que mede quanto do fluxo real somos — e cujo denominador (`curve_volume_1m_sol`) vem, desde a T4.41,
+**do lote `activity_1m` antes da fita por mint** (KB-0116: o lote acompanha a cadeia, sinal igual
+85,7 % e razão mediana 1,00; a fita escrevia 0,00 na mediana e inflava a participação). E não existe `beta_validity`: β contra o BTC numa moeda de 10
 minutos de vida seria número inventado (§14, pergunta 7).
 
 ## 5. Sizing — o mínimo entre os tetos, com o limitante publicado
@@ -899,6 +901,23 @@ Nada de "preenchido ao último preço visto".
       tem nenhuma linha precificada mais de 90 s depois do `exit_at` dentro dos 35 min seguintes.
       A linha mantém seus números; a soma continua excluindo-a, agora por um motivo que se nomeia.
       Dry-run por padrão; `--day`/`--bet-id` reaplicam sobre dias já fechados.
+
+16. **Por que a moeda X não virou proposta (T4.35, R27).** O estudo de 16/09/2026
+    (`obsidian/03-TRADING/Meme/Estudo-2026-09-16-a-porta-real-versus-a-replica.md`) gastou uma hora de
+    perícia em SQL para provar que a Kintsugi foi recusada por `snipers_above_max` às 16:20 — porque
+    `operator/5` foi editado quatro vezes naquela hora sem nenhuma linha guardando o teto anterior, e o
+    único registro por decisão do portão (`meme_lab_ticks.refusals`) é uma contagem por tique, nunca por
+    moeda. Duas respostas, a partir de agora: `infra/scripts/meme_rule_set.py --history NAME/VERSION`
+    imprime a linha do tempo de cada parâmetro que o operador mudou num conjunto (`meme_rule_set_param_history`,
+    `docs/DATABASE.md` §54.1), e `meme_gate_refusals_by_mint` (§54.2) guarda, por moeda e por instante, a
+    proposta (`refusal IS NULL`) ou a recusa por um único critério (o quase-passou) — pequena por
+    construção, porque a maioria das recusas falha vários critérios de uma vez e não vale a pena manter.
+    Uma consulta por `mint` nessa tabela, cruzada com `--history` do conjunto vigente naquele `as_of`,
+    responde em segundos o que hoje custa uma reconstrução foto a foto. **Ainda não ligada ao tique de
+    15 s** — o seletor e o repositório estão prontos e testados; falta o ponto de chamada dentro de
+    `lab_fast.fast_gate_step`, adiado porque `proposals.evaluate_gate` só devolve a recusa agregada do
+    tique hoje (não por linha) e os dois módulos que carregariam os contadores novos no heartbeat
+    (`lab.py`, `config.py`) já estão no teto de 350 linhas.
 
 ## 11. VM1–VM9 — as nove verificações do motor meme
 

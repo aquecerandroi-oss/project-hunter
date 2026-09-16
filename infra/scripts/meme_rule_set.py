@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Retire a meme Lab rule set, or set one parameter on the live sets — audited,
-dry-run by default (T4.16; ``--set-param`` since T4.27).
+dry-run by default (T4.16; ``--set-param`` since T4.27; ``--history``/
+``--backfill`` since T4.35, ``meme_rule_set_params.py``).
 
     uv run python infra/scripts/meme_rule_set.py --list
     uv run python infra/scripts/meme_rule_set.py --deprecate meme_paper_v0/1 \
@@ -9,6 +10,8 @@ dry-run by default (T4.16; ``--set-param`` since T4.27).
         --reason "EXP-M3: descartar (8/8 sondas em giro, vendas ≈ compras); sucessora hype_probe_v0/2 (EXP-M5)"
     uv run python infra/scripts/meme_rule_set.py --set-param exclude_mayhem=true --all-active \
         --apply --reason "T4.27: os picos de mcap sao SOL virtual do agente Mayhem, nao demanda"
+    uv run python infra/scripts/meme_rule_set.py --history operator/5
+    uv run python infra/scripts/meme_rule_set.py --backfill --apply
 
 ``--deprecate name/version`` sets ``status = 'retired'``, ``retired_at = now()``
 on an **active** row and leaves a ``system_events`` row with the reason — the
@@ -24,9 +27,16 @@ and closed** (a bet is evidence), and its pending proposals are refused
 — a bare word that is not JSON is taken as a string), one ``system_events``
 row naming the sets, the key, the old values and the reason. A set that
 already carries the value is listed and left alone; nothing to change is a
-plain exit 0. The only key written this way so far is ``exclude_mayhem``,
-whose code default is already ``true`` (``hunter_indicators.meme.rules``):
-the row is made to say it, so the registration and the EXP-M* pages agree.
+plain exit 0.
+
+**``--set-param --apply`` also writes ``meme_rule_set_param_history`` (T4.35),
+in the same transaction as the ``UPDATE``** — R27 (16/09/2026) found
+``operator/5`` edited four times in 100 minutes with no row keeping the old
+value. ``--history NAME/VERSION`` prints that table's timeline for one set;
+``--backfill`` (dry-run by default, ``--apply`` to write) recovers what it can
+of the changes made **before** this revision from the free-text
+``system_events`` message that was, until now, the only copy — see
+``meme_rule_set_params.py`` for both.
 
 Refusals, by name and with nothing written: ``rule_set_missing``,
 ``already_retired``, ``last_operator_set`` (the desk files manual buys under
@@ -43,25 +53,31 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any
 
 from meme_ops_db import migration_url, record_event
+from meme_rule_set_params import backfill_history, history_for, parse_param
+from meme_rule_set_params import set_param as _apply_set_param
+from meme_rule_set_types import COMPONENT, Connection, Refused, load
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-COMPONENT = "meme_rule_set"
 MIN_REASON_LENGTH = 10
 EX_USAGE, EX_REFUSED = 64, 65
 
-__all__ = ["Refused", "RuleSetRow", "list_rule_sets", "load", "main", "parse_param", "run"]
-
-
-class Connection(Protocol):
-    async def execute(self, statement: Any, parameters: Any = None, /) -> Any: ...
+__all__ = [
+    "Connection",
+    "Refused",
+    "RuleSetRow",
+    "list_rule_sets",
+    "load",
+    "main",
+    "parse_param",
+    "run",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,12 +97,6 @@ class RuleSetRow:
         return f"{self.name}/{self.version}"
 
 
-class Refused(Exception):
-    def __init__(self, reason: str, detail: str) -> None:
-        super().__init__(f"{reason}: {detail}")
-        self.reason = reason
-
-
 _ROWS = text(
     "SELECT r.id::text AS id, r.name, r.version, r.kind, r.exp_ref, r.status, r.params, "
     "       (SELECT count(*) FROM meme_paper_bets b WHERE b.rule_set_id = r.id "
@@ -98,10 +108,6 @@ _ROWS = text(
 _RETIRE = text(
     "UPDATE meme_rule_sets SET status = 'retired', retired_at = now() "
     "WHERE id = CAST(:id AS uuid) AND status = 'active' RETURNING id"
-)
-_SET_PARAM = text(
-    "UPDATE meme_rule_sets SET params = params || jsonb_build_object(CAST(:key AS text), CAST(:value AS jsonb)) "
-    "WHERE id = ANY(CAST(:ids AS uuid[])) AND status = 'active' RETURNING id"
 )
 
 
@@ -121,15 +127,6 @@ async def list_rule_sets(conn: Connection) -> list[RuleSetRow]:
         )
         for r in rows
     ]
-
-
-def load(rows: Sequence[RuleSetRow], label: str) -> RuleSetRow:
-    """The row ``name/version`` names, or ``rule_set_missing``."""
-    name, _, version = label.partition("/")
-    for row in rows:
-        if row.name == name and row.version == version:
-            return row
-    raise Refused("rule_set_missing", label)
 
 
 def _describe(rows: Sequence[RuleSetRow]) -> str:
@@ -178,82 +175,6 @@ async def _deprecate(
     return 0, plan + "\napplied: retired; system_events written"
 
 
-def parse_param(spec: str) -> tuple[str, Any]:
-    """``KEY=VALUE`` → ``(key, value)``, the value as JSON when it parses as such."""
-    key, sep, raw = spec.partition("=")
-    if not sep or not key.strip():
-        raise Refused("param_invalid", f"--set-param wants KEY=VALUE, got {spec!r}")
-    try:
-        value: Any = json.loads(raw)
-    except ValueError:
-        value = raw
-    return key.strip(), value
-
-
-def _targets(
-    rows: Sequence[RuleSetRow], *, all_active: bool, labels: Sequence[str]
-) -> list[RuleSetRow]:
-    if all_active:
-        return [r for r in rows if r.status == "active"]
-    if not labels:
-        raise Refused("no_target", "--set-param needs --all-active or --rule-set NAME/VERSION")
-    chosen = [load(rows, label) for label in labels]
-    retired = [r.label for r in chosen if r.status != "active"]
-    if retired:
-        raise Refused("rule_set_retired", ", ".join(retired))
-    return chosen
-
-
-async def _set_param(
-    conn: Connection,
-    rows: Sequence[RuleSetRow],
-    spec: str,
-    *,
-    all_active: bool,
-    labels: Sequence[str],
-    apply: bool,
-    reason: str,
-) -> tuple[int, str]:
-    key, value = parse_param(spec)
-    targets = _targets(rows, all_active=all_active, labels=labels)
-    encoded = json.dumps(value)
-    to_change = [r for r in targets if r.params.get(key) != value]
-    lines = [f"set-param {key} = {encoded} on {len(targets)} active set(s):"]
-    for r in targets:
-        current = "<unset>" if key not in r.params else json.dumps(r.params[key])
-        verb = "unchanged" if r.params.get(key) == value else "change"
-        lines.append(
-            f"  {r.label:<20} {r.kind:<14} {r.exp_ref or '-':<7} {current} -> {encoded} ({verb})"
-        )
-    lines.append(f"reason: {reason}")
-    plan = "\n".join(lines)
-    if not to_change:
-        return 0, plan + "\nnothing to do: every target already carries the value"
-    if not apply:
-        return 0, plan + "\ndry-run: nothing written (add --apply)"
-    updated = (
-        (
-            await conn.execute(
-                _SET_PARAM, {"key": key, "value": encoded, "ids": [r.id for r in to_change]}
-            )
-        )
-        .scalars()
-        .all()
-    )
-    changed = ", ".join(
-        f"{r.label} ({'<unset>' if key not in r.params else json.dumps(r.params[key])})"
-        for r in to_change
-    )
-    await record_event(
-        conn,
-        component=COMPONENT,
-        level="info",
-        event="param_set",
-        message=f"{key} = {encoded} on {len(updated)} set(s): {changed}; reason: {reason}",
-    )
-    return 0, plan + f"\napplied: {len(updated)} row(s) updated; system_events written"
-
-
 async def run(
     conn: Connection,
     *,
@@ -263,9 +184,15 @@ async def run(
     set_param: str | None = None,
     all_active: bool = False,
     rule_sets: Sequence[str] = (),
+    history: str | None = None,
+    backfill: bool = False,
 ) -> tuple[int, str]:
     """``(exit code, report)``. Writes only with ``--apply`` and a reason."""
     rows = await list_rule_sets(conn)
+    if history is not None:
+        return await history_for(conn, load(rows, history))
+    if backfill:
+        return await backfill_history(conn, rows, apply=apply)
     if deprecate is None and set_param is None:
         return 0, _describe(rows)
     if deprecate is not None:
@@ -273,7 +200,7 @@ async def run(
             conn, rows, deprecate, apply=apply, reason=_require_reason(reason, "--deprecate")
         )
     assert set_param is not None
-    return await _set_param(
+    return await _apply_set_param(
         conn,
         rows,
         set_param,
@@ -293,13 +220,24 @@ def _parse(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument(
         "--rule-set", dest="rule_sets", metavar="NAME/VERSION", action="append", default=[]
     )
+    parser.add_argument("--history", metavar="NAME/VERSION", default=None)
+    parser.add_argument("--backfill", action="store_true")
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--reason", default=None)
     args = parser.parse_args(argv)
-    if not args.list and args.deprecate is None and args.set_param is None:
-        parser.error("one of --list, --deprecate NAME/VERSION or --set-param KEY=VALUE is required")
-    if args.deprecate is not None and args.set_param is not None:
-        parser.error("--deprecate and --set-param are two acts; run them one at a time")
+    acts = [
+        args.deprecate is not None,
+        args.set_param is not None,
+        args.history is not None,
+        args.backfill,
+    ]
+    if not args.list and not any(acts):
+        parser.error(
+            "one of --list, --deprecate NAME/VERSION, --set-param KEY=VALUE, "
+            "--history NAME/VERSION or --backfill is required"
+        )
+    if sum(acts) > 1:
+        parser.error("--deprecate/--set-param/--history/--backfill are acts; run one at a time")
     return args
 
 
@@ -317,6 +255,8 @@ async def _main(argv: Sequence[str]) -> int:
                     set_param=args.set_param,
                     all_active=args.all_active,
                     rule_sets=args.rule_sets,
+                    history=args.history,
+                    backfill=args.backfill,
                 )
             except Refused as refused:
                 print(f"refused: {refused}", file=sys.stderr)

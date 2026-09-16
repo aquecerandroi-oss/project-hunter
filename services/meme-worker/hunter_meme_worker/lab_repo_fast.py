@@ -20,13 +20,19 @@ from sqlalchemy.exc import DBAPIError
 
 from hunter_core.logging import get_logger
 from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, PedigreeGate
+from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
 from hunter_meme_worker.lab_rows import snapshot_from_row
 from hunter_meme_worker.proposals import SERIES_15S, GateRow
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["load_fast_gate_rows", "pedigree_for"]
+__all__ = [
+    "insert_refusal_trail",
+    "load_fast_gate_rows",
+    "pedigree_for",
+    "prune_refusal_trail",
+]
 
 _EVENT_MATCH_LATERAL = (
     "SELECT e.kind, e.title, e.source, e.confidence, e.observed_at, m.match_kind "
@@ -260,3 +266,56 @@ def fast_window(now: datetime, last: datetime | None, *, backlog_s: int) -> date
     proposal, it is a price that already moved)."""
     floor = now - timedelta(seconds=backlog_s)
     return floor if last is None else max(last, floor)
+
+
+_INSERT_REFUSAL_TRAIL = text(
+    "INSERT INTO meme_gate_refusals_by_mint "
+    '(id, as_of, rule_set_id, mint, refusal, value, "limit") '
+    "VALUES (gen_random_uuid(), :as_of, CAST(:rule_set_id AS uuid), :mint, :refusal, :value, :limit) "
+    "ON CONFLICT (rule_set_id, mint, as_of) DO NOTHING"
+)
+_PRUNE_REFUSAL_TRAIL = text(
+    "WITH doomed AS ("
+    "  SELECT id FROM meme_gate_refusals_by_mint WHERE as_of < :cutoff "
+    "  ORDER BY as_of LIMIT :batch"
+    ") DELETE FROM meme_gate_refusals_by_mint t USING doomed d WHERE t.id = d.id RETURNING t.id"
+)
+
+
+async def insert_refusal_trail(session: AsyncSession, rows: Sequence[RefusalTrailRow]) -> int:
+    """One row per near-miss/proposal the fast lane's selection kept
+    (:mod:`hunter_meme_worker.gate_refusal_trail`), already capped by the
+    caller. ``ON CONFLICT DO NOTHING`` on the same natural key
+    (``rule_set_id``, ``mint``, ``as_of``): a restart re-judging the same
+    instant writes nothing twice."""
+    if not rows:
+        return 0
+    await session.execute(
+        _INSERT_REFUSAL_TRAIL,
+        [
+            {
+                "as_of": row.as_of,
+                "rule_set_id": row.rule_set_id,
+                "mint": row.mint,
+                "refusal": row.refusal,
+                "value": row.value,
+                "limit": row.limit,
+            }
+            for row in rows
+        ],
+    )
+    return len(rows)
+
+
+async def prune_refusal_trail(session: AsyncSession, *, cutoff: datetime, batch: int) -> int:
+    """Row-wise retention (7 d, ``docs/DATABASE.md``): the table is small by
+    construction (the selector already keeps it so), so a monthly partition
+    buys nothing a batched ``DELETE`` does not — the same shape
+    ``repo.prune_tokens`` uses for ``meme_tokens``, in ``as_of`` order (its
+    own index) so one call never holds the lock over a whole week at once."""
+    deleted = (
+        (await session.execute(_PRUNE_REFUSAL_TRAIL, {"cutoff": cutoff, "batch": batch}))
+        .scalars()
+        .all()
+    )
+    return len(deleted)

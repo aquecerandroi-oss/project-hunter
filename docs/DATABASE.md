@@ -6899,7 +6899,7 @@ deles, por um mês).
 
 | coluna | `meme_features_1m` | `meme_features_15s` |
 |---|---|---|
-| `tape_source` | `swap_api_trades` (a fita por mint dobrada sobre `(end_time − 60 s, end_time]`) ou `activity_1m` (a janela `1m` do lote, usada **só** quando a fita por mint não cobriu o minuto) | idem, com `as_of` no lugar de `end_time` |
+| `tape_source` | `activity_1m` (a janela `1m` do lote — **a preferida desde a T4.41**) ou `swap_api_trades` (a fita por mint dobrada sobre `(end_time − 60 s, end_time]`, usada **só** quando o lote não cobriu aquele mint naquele minuto) | idem, com `as_of` no lugar de `end_time` |
 | `tape_window_s` | `60` | `60` |
 | `tape_as_of` | o fim da janela: `end_time` para a fita por mint; o `Date` da resposta do lote (≤ 60 s antes do fecho — o laço dispara 3 s antes de cada minuto) | `as_of` para a fita; o `Date` do lote (≤ 60 s antes do instante — a serie de 15 s recebe a leitura mais nova) |
 
@@ -6908,7 +6908,26 @@ caracteres e o `alembic check` não casa um nome truncado): as três são `NULL`
 uma fonte implica uma fita (`buys_1m`/`buys_60s` não nulos) — a recíproca **não** é exigida, por isso as linhas
 dobradas antes da `0032` (sem procedência) continuam legais (o argumento do `line_points IS NULL` da `0026`). Uma
 linha dobrada do lote diz `unique_buyers` **com** o criador e `creator_sold`/`creator_net_seller = NULL` com
-`no_trade_feed` — o lote não diz quem vendeu; a porta `flow_v2/1` continua recusando por nome o que não sabe.
+`no_trade_feed` quando nem a fita por mint cobriu o mint — o lote não diz quem negociou; a porta `flow_v2/1`
+continua recusando por nome o que não sabe.
+
+**A precedência (T4.41, `features_tape.choose_tape`).** Até a T4.41 a ordem era a inversa: a fita por mint
+primeiro, o lote só quando ela faltasse. A KB-0116 (16/09) mediu o custo disso contra o Δ `real_sol_reserves`
+da cadeia, minuto a minuto: `activity_1m` acerta o **sinal em 85,7 %** dos pares (razão mediana **1,00**,
+correlação 0,835, n = 6 688), `swap_api_trades` em **34,9 %** (razão mediana **0,00**, n = 1 820 — o puxador
+traz uma página por minuto e o fold atribuía o minuto inteiro a ela). Agora **o lote tem precedência** para
+`buys`/`sells`/`unique_buyers`/`curve_volume_*_sol`/`net_sol_flow_*`; a fita por mint entra quando o lote não
+cobriu o mint naquele minuto, e **sempre** empresta `creator_sold`/`creator_net_seller` à linha do lote (só
+`meme_trades` diz *quem* negociou). `tape_source` continua dizendo qual foi.
+
+**A terceira fonte do fluxo, ainda não persistida.** Quando nenhuma das duas cobre, `features_tape.chain_flow`
+calcula o fluxo como Δ `real_sol_reserves` entre duas fotos de curva dos últimos ~60 s (cadência medida: 12 s,
+p90 18 s) — rótulo `chain_delta`, com `buys`/`sells`/`unique_buyers` **desconhecidos** (`buyers_unknown` na
+porta: um Δ de reservas não conta pessoas nem pernas). Escrevê-lo exige migração: o CHECK
+`tape_source_is_consistent` só admite `swap_api_trades`/`activity_1m` **e** exige `buys_*` não nulo, e o CHECK
+`tape_is_null_with_a_reason` (`0023`) amarra `net_sol_flow_*` a `buys_*` na mesma condição de nulidade. Até lá a
+função existe, é pura e testada (`services/meme-worker/tests/test_tape_precedence.py`), e nenhuma linha afirma
+um número que a fonte não disse.
 Motivo novo no vocabulário das colunas `*_reason` (§35): **`no_sol_quote`** — o lote falou em USD e não havia cotação
 SOL/USD com menos de cinco minutos; as colunas de fita ficam `NULL` em vez de carregar uma conversão inventada.
 
@@ -7347,3 +7366,78 @@ maior comprador aos ~2 min é alta por construção (mediana 0,428 com 21 compra
 regra recusaria por **juventude**, não por vício. O bloco `reasons` (`feature: "pedigree_e2b"`) só aparece
 para o conjunto que liga o parâmetro, como identidade e evento (§52.4), e carrega as duas pernas, a fita
 lida e os três limiares.
+
+## 54. O histórico de parâmetros do conjunto, e a recusa por moeda, amostrada — M5 (`0046_meme_rule_set_history`)
+
+**Por quê (R27, 16/09/2026, `obsidian/03-TRADING/Meme/Estudo-2026-09-16-a-porta-real-versus-a-replica.md`):**
+`operator/5` foi editado quatro vezes em 100 minutos por `infra/scripts/meme_rule_set.py --set-param`, e
+nenhuma linha em lugar nenhum guardava o valor anterior — o estudo teve que **inferir** o teto antigo de
+snipers a partir do contador agregado por tique. E o único registro por decisão do portão é
+`meme_lab_ticks.refusals` (§42): uma contagem **por tique**, por nome, nunca por moeda — "por que a
+Kintsugi não virou proposta às 16:20" custou uma hora de perícia em SQL, refazendo o portão foto a foto
+contra os parâmetros em vigor naquele instante. Duas tabelas, nenhuma coluna nova em tabela existente,
+nenhuma view, nenhum enum, nenhuma política nova; nada tocado em `meme_rule_sets`/`meme_features_15s` além
+de uma chave estrangeira de cada uma para `meme_rule_sets`.
+
+**Nota de encadeamento:** a `0045` não existia ainda quando esta revisão foi escrita, e a `0044_meme_gate_e2b_arm`
+(T4.31) estava em disco mas **não commitada** — usada como `down_revision` mesmo assim, para não
+transformar `"head"` numa ambiguidade para a suíte de `services/meme-worker/tests` (que a resolve uma vez
+por sessão) enquanto os dois trabalhos correm em paralelo. Quem integrar isto precisa confirmar a cadeia
+depois que `0044`/`0045` forem commitadas.
+
+### 54.1 `meme_rule_set_param_history` — o diário do parâmetro
+
+```
+meme_rule_set_param_history      sem partição, sem retenção (diário, poucas linhas por calibragem)
+  id uuid PK
+  rule_set_id uuid FK → meme_rule_sets, changed_at, changed_by, reason, key,
+  old_value jsonb NULL, new_value jsonb NOT NULL, system_event_id uuid NULL
+  INDEX (rule_set_id, changed_at)
+```
+
+Escrita **só** por `infra/scripts/meme_rule_set.py --set-param --apply` (`meme_rule_set_params.py`,
+`insert_history_row`), uma linha por conjunto mudado, **na mesma transação** do `UPDATE` em
+`meme_rule_sets.params` — o mesmo padrão do `system_events` que o script já escrevia, agora com uma
+segunda metade estruturada. Nenhum grant a `hunter_app`/`hunter_worker`: ao contrário de toda outra tabela
+`meme_*` (§1.1), nada aqui é lido ou escrito por um serviço em execução — só o script do operador, sobre
+`DATABASE_URL_MIGRATIONS`, exatamente como `meme_rule_sets` em si só é mutada dessa forma.
+`system_event_id` **não é** chave estrangeira (`system_events` é particionada por `created_at` com
+retenção de 30 dias — §1.3 — e uma tabela particionada não sustenta uma FK simples de uma coluna): um
+`NULL` depois de 30 dias não é corrupção, é a metade estruturada do audit sobrevivendo à metade em texto
+livre. `--history NAME/VERSION` (`meme_rule_set_params.history_for`) imprime a linha do tempo de um
+conjunto; `--backfill` (dry-run por padrão, `--apply` grava) recupera o que dá dos `system_events` de
+`param_set` anteriores a esta revisão — **achado ao verificar o formato**: `meme_ops_db.record_event` nunca
+gravou um `data` estruturado antes de T4.35, só a `message` livre (`KEY = VALOR on N set(s): RÓTULO
+(ANTIGO), …; reason: MOTIVO`), então o backfill faz *parsing* dessa forma congelada — uma mensagem que não
+bate é contada `unparsed` e ignorada, nunca adivinhada.
+
+### 54.2 `meme_gate_refusals_by_mint` — a recusa por moeda, amostrada
+
+```
+meme_gate_refusals_by_mint       sem partição, retenção 7 d (poda por linha, como meme_tokens)
+  id uuid PK
+  as_of timestamptz, rule_set_id uuid FK → meme_rule_sets, mint text,
+  refusal text NULL, value numeric NULL, "limit" numeric NULL
+  UNIQUE (rule_set_id, mint, as_of), INDEX (mint, as_of)
+```
+
+**Pequena por construção, não por corte arbitrário.** Só duas classes de linha valem a pena: a moeda que
+**virou proposta** (`refusal IS NULL` — uma proposta também se explica sozinha) e a moeda que falhou **um
+único** critério nomeado (o quase-passou: `passed_criteria >= total - 1`) — a maioria das recusas falha
+vários critérios de uma vez e não ensina nada que uma linha isolada resolvesse; R27 mediu a Kintsugi
+falhando só por `snipers_above_max`. `value`/`limit` são o número julgado e o teto/piso contra o qual foi
+julgado, quando o nome da recusa já decodifica um par numérico (`snipers_above_max` → `snipers`/
+`max_snipers`); uma recusa que esta revisão ainda não decodifica grava a linha do mesmo jeito, com os dois
+`NULL`. Sem partição mensal — o volume já é pequeno pela própria seleção (a estimativa, sobre o heartbeat
+de hoje: `lab_fast_rows_evaluated` na ordem de algumas centenas por tique, e near-misses são a minoria
+disso) — retenção de 7 dias por poda linha a linha (`lab_repo_fast.prune_refusal_trail`, o mesmo desenho de
+`repo.prune_tokens` para `meme_tokens`), documentada aqui em vez de no fechamento diário
+(`meme_close_day.py` não foi tocado por esta tarefa). Grants: `hunter_worker` `SELECT`/`INSERT`/`DELETE`
+(o laço de 15 s escreve e poda); `hunter_app` `SELECT` (a resposta a "por que não a moeda X" é uma consulta).
+
+**Ainda não ligada ao tique de 15 s** (nota de escopo, T4.35): o seletor
+(`hunter_meme_worker.gate_refusal_trail.select_trail_row`/`cap_trail_rows`) e as duas funções de repositório
+(`lab_repo_fast.insert_refusal_trail`/`prune_refusal_trail`) estão prontas e testadas contra Postgres; falta
+o ponto de chamada dentro de `lab_fast.fast_gate_step`, que hoje só recebe de `proposals.evaluate_gate` a
+recusa **agregada** do tique, nunca por linha. Ver `docs/RISK_ENGINE_MEME.md` e
+`.claude/state/notes-T4.35.md` para o motivo de a ligação ter ficado para a próxima tarefa.

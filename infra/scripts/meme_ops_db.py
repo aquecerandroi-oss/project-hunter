@@ -10,6 +10,8 @@ and an audit row with the component's own name.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
 from typing import Any, Protocol
 
 from sqlalchemy import text
@@ -37,14 +39,40 @@ def migration_url() -> str:
 
 
 async def record_event(
-    conn: Connection, *, component: str, level: str, event: str, message: str
-) -> None:
-    """Every applied run leaves a ``system_events`` row — the audit the brief asks for."""
-    await conn.execute(
+    conn: Connection,
+    *,
+    component: str,
+    level: str,
+    event: str,
+    message: str,
+    data: Mapping[str, Any] | None = None,
+) -> str | None:
+    """Every applied run leaves a ``system_events`` row — the audit the brief asks for.
+
+    ``data`` (T4.35) is the structured half the free-text ``message`` never
+    carried: a caller that wants its payload readable by a script later (not
+    just by a human reading the message) passes it here and gets the row's
+    ``id`` back — ``None`` against any of this repo's fake connections (none
+    of them model ``RETURNING``'s ``.scalars()``, and each has its own shape),
+    never a crash: an event this call cannot confirm the id of is still an
+    event worth writing.
+    """
+    result = await conn.execute(
         text(
-            "INSERT INTO system_events (id, created_at, level, component, event, message) "
+            "INSERT INTO system_events (id, created_at, level, component, event, message, data) "
             "VALUES (gen_random_uuid(), now(), CAST(:level AS event_severity), :component, "
-            ":event, :message)"
+            ":event, :message, CAST(:data AS jsonb)) RETURNING id"
         ),
-        {"level": level, "component": component, "event": event, "message": message[:1000]},
+        {
+            "level": level,
+            "component": component,
+            "event": event,
+            "message": message[:1000],
+            "data": json.dumps(data or {}),
+        },
     )
+    try:
+        rows = result.scalars().all()
+    except AttributeError:
+        return None
+    return None if not rows else str(rows[0])

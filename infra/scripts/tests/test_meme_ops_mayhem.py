@@ -261,6 +261,6 @@ def test_set_param_statement_types_the_key_for_asyncpg() -> None:
     type of parameter $1`` — ``jsonb_build_object(:key, …)`` leaves the key untyped for a
     prepared statement. The unit tests above run on fakes and never executed the SQL, so
     this pins the cast in the statement text itself."""
-    from meme_rule_set import _SET_PARAM
+    from meme_rule_set_params import _SET_PARAM  # pyright: ignore[reportPrivateUsage]
 
     assert "jsonb_build_object(CAST(:key AS text), CAST(:value AS jsonb))" in str(_SET_PARAM)
