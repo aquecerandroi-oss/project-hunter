@@ -511,3 +511,57 @@ async def test_a_close_without_a_photo_is_indeterminate_and_leaves_every_sum(
         "the loop's wallet does not count the artefact: the daily cap cannot latch on it"
     )
     assert int(heartbeat_fields(lab.state)["lab_bets_indeterminate_total"]) >= 1
+
+
+# ---- T4.43: the per-mint refusal trail, wired into the 15-second tick ---------------------
+
+
+async def test_the_tick_writes_a_proposal_and_a_near_miss_to_the_refusal_trail(
+    lab: LabContext,
+    db_session_factory: async_sessionmaker[AsyncSession],
+    db_engine: AsyncEngine,
+) -> None:
+    """One row passes ``flow_v2/1`` outright (0 refusals, a proposal); its
+    twin fails only ``snipers_above_max`` (``max_snipers`` is 2, the fixture's
+    5) — R27's own near-miss: everything else about it is identical."""
+    rule_set = await _flow_set(db_engine)
+    proposal_mint, miss_mint = f"TRAILP_{uuid4().hex[:8]}", f"TRAILM_{uuid4().hex[:8]}"
+    for mint in (proposal_mint, miss_mint):
+        await _plant_token(
+            db_session_factory,
+            mint,
+            created_at=CREATED,
+            creator=f"C_{mint}",
+            symbol=f"S{mint[-4:]}",
+        )
+    photo = CREATED + timedelta(seconds=120)
+    as_of = photo + timedelta(seconds=2)
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        for mint in (proposal_mint, miss_mint):
+            await insert_snapshot(session, _snapshot(mint, photo, "34", "946000000"))
+        await insert_fast_rows(
+            session,
+            [
+                _fast_row(proposal_mint, as_of, photo),
+                _fast_row(miss_mint, as_of, photo, snipers=5),
+            ],
+        )
+    report = await lab_tick(lab, now=as_of + timedelta(seconds=1))
+    assert report.proposals >= 1
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        rows = (
+            await session.execute(
+                text(
+                    'SELECT mint, refusal, value, "limit" FROM meme_gate_refusals_by_mint '
+                    "WHERE rule_set_id = CAST(:rs AS uuid) AND mint IN (:a, :b)"
+                ),
+                {"rs": rule_set, "a": proposal_mint, "b": miss_mint},
+            )
+        ).all()
+    by_mint = {r.mint: r for r in rows}
+    assert by_mint[proposal_mint].refusal is None, "the proposal explains itself"
+    assert by_mint[miss_mint].refusal == "snipers_above_max"
+    assert by_mint[miss_mint].value == 5 and by_mint[miss_mint].limit == 2
+    fields = heartbeat_fields(lab.state)
+    assert int(fields["lab_refusal_trail_rows"]) >= 2
+    assert fields["lab_refusal_trail_capped"] == "0"

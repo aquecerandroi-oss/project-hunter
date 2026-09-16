@@ -70,6 +70,9 @@ def heartbeat_fields(state: LabState, *, enabled: bool = True) -> dict[str, str]
         "bets_indeterminate_total": (
             "" if state.bets_indeterminate_total is None else str(state.bets_indeterminate_total)
         ),
+        # T4.43: the per-mint refusal trail, since boot.
+        "refusal_trail_rows": str(state.trail.rows_total),
+        "refusal_trail_capped": str(state.trail.capped_total),
     }
     return {HEARTBEAT_PREFIX + key: str(value) for key, value in fields.items()}
 

@@ -7436,12 +7436,46 @@ disso) — retenção de 7 dias por poda linha a linha (`lab_repo_fast.prune_ref
 (`meme_close_day.py` não foi tocado por esta tarefa). Grants: `hunter_worker` `SELECT`/`INSERT`/`DELETE`
 (o laço de 15 s escreve e poda); `hunter_app` `SELECT` (a resposta a "por que não a moeda X" é uma consulta).
 
-**Ainda não ligada ao tique de 15 s** (nota de escopo, T4.35): o seletor
-(`hunter_meme_worker.gate_refusal_trail.select_trail_row`/`cap_trail_rows`) e as duas funções de repositório
-(`lab_repo_fast.insert_refusal_trail`/`prune_refusal_trail`) estão prontas e testadas contra Postgres; falta
-o ponto de chamada dentro de `lab_fast.fast_gate_step`, que hoje só recebe de `proposals.evaluate_gate` a
-recusa **agregada** do tique, nunca por linha. Ver `docs/RISK_ENGINE_MEME.md` e
-`.claude/state/notes-T4.35.md` para o motivo de a ligação ter ficado para a próxima tarefa.
+#### 54.2.1 Ligada ao tique de 15 s (T4.43)
+
+`lab_fast.fast_gate_step` passou a chamar `proposals.evaluate_gate` uma vez por linha em vez de uma vez
+por lote (mudança que preserva o comportamento: o corpo do laço do portão não depende de linhas irmãs) —
+o que expõe `GateOutcome.refusals` da própria linha, não mais só a soma do tique. Para cada linha e cada
+conjunto avaliado, `_trail_row` (`hunter_meme_worker.lab_fast`) decide:
+
+- **zero recusas** → uma proposta (`refusal IS NULL`);
+- **exatamente uma recusa, e não `already_open`** → o quase-passou — a definição de R27: recusada no
+  último critério que o portão teria checado, um passo antes de virar proposta;
+- **`already_open` sozinha** → **descartada**, de propósito: essa recusa dispara *antes* de o portão ler
+  um único critério (é uma posição já aberta, não um julgamento), então uma aposta aberta reavaliada a
+  cada tique não ensinaria "por que não" e afogaria o teto num nome que não é recusa de portão nenhuma;
+- **duas ou mais recusas** → descartada (`is_trail_candidate`), o caso comum que nada ensina.
+
+`gate_refusal_trail.decode_value_limit` decodifica `value`/`limit` para os nomes que já formam um par
+numérico conhecido (`age_below_min`/`age_above_max`, `progress_below_min`/`progress_above_max`,
+`participation_above_cap`, `distance_below_min`/`distance_above_max`, `hype_below_min`,
+`dev_share_above_max`, `snipers_below_min`/`snipers_above_max`, `top10_below_min`/`top10_above_max`,
+`buyers_below_min`, `holders_below_min`) — um nome fora dessa tabela grava a linha do mesmo jeito, com os
+dois `NULL`. Todos os candidatos do tique (todo conjunto, toda linha) são escritos **uma vez**, no fim do
+`fast_gate_step`, já com o teto aplicado (`config_trail.trail_max_rows_per_tick`, padrão 200,
+`MEME_GATE_TRAIL_MAX_ROWS_PER_TICK`) — `lab_trail.write_refusal_trail` não faz `INSERT` nenhum num tique
+sem candidatos. Os dois campos do heartbeat (`hb:meme:radar`, desde o boot): `lab_refusal_trail_rows`
+(linhas de fato gravadas) e `lab_refusal_trail_capped` (linhas **descartadas** pelo teto — não a
+contagem de tiques que estouraram o teto, porque quanto se perde importa mais que com que frequência).
+
+A poda (7 d) roda **uma vez por dia**, não a cada hora como a retenção de `meme_tokens` ao lado — a
+tabela já é pequena por construção (o próprio seletor a mantém assim), então uma varredura diária basta.
+`collect.prune_once` (o laço de retenção existente, `RadarContext`) chama `lab_trail.maybe_prune_trail`,
+que só toca o banco quando o dia calendário (UTC) mudou desde a última vez
+(`RadarState.last_trail_prune_day`) — decisão pura em `lab_trail.should_prune_trail_today`, testada sem
+banco.
+
+Módulos novos (o teto de 350 linhas de `lab.py`/`config.py` não sobrava espaço para os dois campos e as
+duas funções): `hunter_meme_worker.lab_trail` (o estado `RefusalTrailState`, `write_refusal_trail`,
+`maybe_prune_trail`/`prune_trail_batches`/`should_prune_trail_today`) e `hunter_meme_worker.config_trail`
+(`trail_max_rows_per_tick`, `TRAIL_RETENTION_DAYS`) — o mesmo padrão de `events_config.py`/
+`fast_lane_config.py`: um módulo pequeno, lido direto do ambiente, em vez de mais um campo em
+`MemeConfig`.
 
 ## 55. `bonding_curve` deixa de confiar no frame — o sol-vault do Mayhem, derivado em vez de gravado — M5 (`0047_meme_bonding_curve_raw`)
 

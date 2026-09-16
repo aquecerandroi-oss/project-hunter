@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Protocol
 
 from hunter_meme_worker.creator_stats import CreatorWatchStats
@@ -119,6 +119,11 @@ class RadarState:
     tracked set. While this is fresh the REST poll narrows to what only the
     mirror can teach (``tracker.needs_rest``); when it goes stale — the RPC is
     down, or the loop never ran — the poll falls back to the full plan."""
+
+    last_trail_prune_day: date | None = None
+    """T4.43: the calendar day (UTC) ``collect.prune_once`` last swept
+    ``meme_gate_refusals_by_mint`` — once a day, not every hour like the
+    token retention beside it (``lab_trail.should_prune_trail_today``)."""
 
     def chain_covers(self, now: datetime, *, within_s: float) -> bool:
         return self.chain_ok_at is not None and (now - self.chain_ok_at).total_seconds() <= within_s

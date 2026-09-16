@@ -61,6 +61,7 @@ from hunter_meme_worker.lab_repo_e2b import lineage_for
 from hunter_meme_worker.lab_repo_lines import open_probes_for, scaled_parent_ids
 from hunter_meme_worker.lab_repo_mayhem import load_gate_rows_with_mayhem
 from hunter_meme_worker.lab_ticks import record_tick
+from hunter_meme_worker.lab_trail import RefusalTrailState
 from hunter_meme_worker.proposals import evaluate_gate
 from hunter_meme_worker.proposals_scale import REFUSAL_SCALE_GATE_INACTIVE, evaluate_scale
 
@@ -126,6 +127,7 @@ class LabState:
     sample ``lab_decision_to_fill_s_p50``/``_p95`` are taken over (measured,
     never the cadence assumed)."""
     bets_indeterminate_total: int | None = None
+    trail: RefusalTrailState = field(default_factory=RefusalTrailState)
 
     def record_fill_delay(self, seconds: int) -> None:
         self.fill_delays.append(seconds)

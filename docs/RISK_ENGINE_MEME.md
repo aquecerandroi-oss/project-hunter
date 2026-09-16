@@ -913,11 +913,19 @@ Nada de "preenchido ao último preço visto".
     proposta (`refusal IS NULL`) ou a recusa por um único critério (o quase-passou) — pequena por
     construção, porque a maioria das recusas falha vários critérios de uma vez e não vale a pena manter.
     Uma consulta por `mint` nessa tabela, cruzada com `--history` do conjunto vigente naquele `as_of`,
-    responde em segundos o que hoje custa uma reconstrução foto a foto. **Ainda não ligada ao tique de
-    15 s** — o seletor e o repositório estão prontos e testados; falta o ponto de chamada dentro de
-    `lab_fast.fast_gate_step`, adiado porque `proposals.evaluate_gate` só devolve a recusa agregada do
-    tique hoje (não por linha) e os dois módulos que carregariam os contadores novos no heartbeat
-    (`lab.py`, `config.py`) já estão no teto de 350 linhas.
+    responde em segundos o que antes custava uma reconstrução foto a foto:
+
+    ```sql
+    SELECT as_of, refusal, value, "limit"
+    FROM meme_gate_refusals_by_mint
+    WHERE mint = 'Kintsugi...' AND rule_set_id = '<uuid do conjunto>'
+    ORDER BY as_of;
+    ```
+
+    **Ligada ao tique de 15 s desde T4.43** (`lab_fast.fast_gate_step`): `evaluate_gate` passou a ser
+    chamado uma vez por linha (não mais em lote), o que expõe a recusa da própria linha em vez da soma
+    do tique; `docs/DATABASE.md` §54.2 tem o desenho completo (o corte `already_open`, o cálculo de
+    `value`/`limit`, o teto por tique e a poda diária).
 
 ## 11. VM1–VM9 — as nove verificações do motor meme
 

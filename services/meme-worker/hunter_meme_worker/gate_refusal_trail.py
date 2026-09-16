@@ -11,30 +11,41 @@ only a mint that became a proposal (``refusal is None``) or missed by
 rows fail several criteria at once, and a pile of those teaches nothing this
 table exists to answer.
 
-**Not yet wired into the fast lane's tick** (T4.35's own scope note): the
-selector and the cap below are pure and fully tested; the call site inside
-``lab_fast.fast_gate_step`` needs either ``proposals.evaluate_gate`` to expose
-a row's own refusal count (it currently only returns a tick-wide aggregate)
-or one ``evaluate_gate`` call per row instead of per batch (behaviour-
-preserving — the loop body depends on no other row — but a control-flow
-change to a hot loop this task's file-level constraints put out of reach:
-``proposals.py`` is another agent's file this session, and ``lab.py``/
-``config.py`` already sit at the 350-line budget, so carrying the two new
-heartbeat counters through ``LabState``/``MemeConfig`` needs a split first).
-See ``.claude/state/notes-T4.35.md`` for the one-paragraph plan.
+**Wired into the fast lane's tick since T4.43** (``lab_fast.fast_gate_step``,
+one ``evaluate_gate`` call per row instead of per batch — behaviour-
+preserving, since the gate's loop body depends on no other row): the drafts
+are still batched into one ``insert_proposals`` per rule set, but each row's
+own ``GateOutcome.refusals`` is now visible, which is what
+:func:`select_trail_row` needs. ``decode_value_limit`` below is the numeric
+half of a near-miss row — the value the gate read and the threshold it was
+judged against, for the refusal names this revision already knows how to
+decode (``rules.py``/``rules_criteria.py``'s own naming: ``snipers_above_max``
+→ ``snipers``/``max_snipers``, and so on); a name not in the table still gets
+a row, with both ``NULL`` (docs/DATABASE.md §54.2's own declared behaviour).
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from hunter_indicators.meme.rules import participation_pct
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-__all__ = ["RefusalTrailRow", "cap_trail_rows", "is_trail_candidate", "select_trail_row"]
+    from hunter_indicators.meme.rules import EntryFeatures, EntryGate
+
+__all__ = [
+    "RefusalTrailRow",
+    "cap_trail_rows",
+    "decode_value_limit",
+    "is_trail_candidate",
+    "select_trail_row",
+]
 
 DEFAULT_TRAIL_CAP = 200
 """Rows written per tick, ceiling. R27's own numbers: 524 ticks/3 h with 5
@@ -98,3 +109,55 @@ def cap_trail_rows(
     if len(rows) <= limit:
         return list(rows), False
     return list(rows[:limit]), True
+
+
+_Numeric = Decimal | int | None
+_NUMERIC_REFUSALS: dict[
+    str, tuple[Callable[[EntryFeatures], _Numeric], Callable[[EntryGate], _Numeric]]
+] = {
+    "age_below_min": (lambda f: f.age_s, lambda g: g.min_age_s),
+    "age_above_max": (lambda f: f.age_s, lambda g: g.max_age_s),
+    "progress_below_min": (lambda f: f.progress_pct, lambda g: g.min_progress_pct),
+    "progress_above_max": (lambda f: f.progress_pct, lambda g: g.max_progress_pct),
+    "participation_above_cap": (
+        lambda f: participation_pct(f.intended_size_sol, f.curve_volume_1m_sol),
+        lambda g: g.max_participation_pct,
+    ),
+    "distance_below_min": (
+        lambda f: f.distance_to_support_pct,
+        lambda g: g.min_distance_to_support_pct,
+    ),
+    "distance_above_max": (
+        lambda f: f.distance_to_support_pct,
+        lambda g: g.max_distance_to_support_pct,
+    ),
+    "hype_below_min": (lambda f: f.hype_score, lambda g: g.min_hype_score),
+    "dev_share_above_max": (lambda f: f.dev_share, lambda g: g.max_dev_share),
+    "snipers_below_min": (lambda f: f.snipers, lambda g: g.min_snipers),
+    "snipers_above_max": (lambda f: f.snipers, lambda g: g.max_snipers),
+    "top10_below_min": (lambda f: f.top10_share, lambda g: g.min_top10_share),
+    "top10_above_max": (lambda f: f.top10_share, lambda g: g.max_top10_share),
+    "buyers_below_min": (lambda f: f.unique_buyers_1m, lambda g: g.min_unique_buyers),
+    "holders_below_min": (lambda f: f.holders, lambda g: g.min_holders),
+}
+"""One entry per refusal name this revision already decodes into a numeric
+pair (docs/DATABASE.md §54.2's own example, ``snipers_above_max``). A name
+absent here — most refusals, including every *unknown* one (``*_unknown``)
+and every boolean one (``creator_is_net_seller``, ``mayhem_curve``…) — is not
+a coding gap: those refusals have no single number to show, and
+:func:`decode_value_limit` answers ``(None, None)`` for them, same as the
+schema already allows."""
+
+
+def decode_value_limit(
+    refusal: str, features: EntryFeatures, gate: EntryGate
+) -> tuple[_Numeric, _Numeric]:
+    """The number the gate read and the threshold it judged it against, for a
+    near-miss's one named refusal — ``(None, None)`` when ``refusal`` is not
+    in :data:`_NUMERIC_REFUSALS` (not yet decoded, or nothing numeric to
+    show)."""
+    decoder = _NUMERIC_REFUSALS.get(refusal)
+    if decoder is None:
+        return None, None
+    value_of, limit_of = decoder
+    return value_of(features), limit_of(gate)
