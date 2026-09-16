@@ -227,7 +227,12 @@ MINT = "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump"
 CREATOR = "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd"
 
 
-def _full_token_context(now: datetime) -> TokenContext:
+def _full_token_context(
+    now: datetime,
+    *,
+    creator_sold: bool | None = False,
+    dev_share: Decimal | None = None,
+) -> TokenContext:
     return TokenContext(
         created_at=now - timedelta(seconds=120),
         creator=CREATOR,
@@ -236,9 +241,12 @@ def _full_token_context(now: datetime) -> TokenContext:
         migrated_at=None,
         curve_volume_1m_sol=Decimal("20"),
         features_end_time=now - timedelta(seconds=30),
-        creator_sold=False,
+        creator_sold=creator_sold,
         top10_share=Decimal("0.15"),
         bundled_share=Decimal("0.05"),
+        dev_share=dev_share,
+        dev_share_source=None if dev_share is None else "meme_risk_snapshots",
+        dev_share_observed_at=None if dev_share is None else now - timedelta(seconds=60),
     )
 
 
@@ -284,15 +292,17 @@ def _context(
     live: bool = True,
     auto: SmallTestAuthorization | None = None,
     allow_send: bool = True,
+    policy: dict[str, str] | None = None,
 ) -> Harness:
-    """``auto`` (T4.28) arms stage 1: the written scope in the gates and the flag on."""
+    """``auto`` (T4.28) arms stage 1: the written scope in the gates and the flag on.
+    ``policy`` is the owner's environment — T4.28h's allowance rides on it."""
     rpc = FakeRpc(allow_send=allow_send)
     chain = FakeChain(rpc, MINT, CREATOR)
     config = ExecutorConfig(
         live=live,
         cluster="devnet",
         rpc_url="https://fake",
-        limits=limits_from_env(POLICY),
+        limits=limits_from_env(policy or POLICY),
         system_kill_switch=KillSwitchState.ACTIVE,
         kill_file=None,
         auto_approve=auto is not None,
@@ -531,6 +541,16 @@ async def harness(
                 "OR (status = 'proposed' AND mint = :mint)"
             ),
             {"mint": MINT},
+        )
+        # T4.28h: and the rug reads. ``_plant_operator_proposal`` plants one per
+        # test (T4.28g's precondition), so a read left by the previous test is a
+        # precondition nobody asked for: with Docker up,
+        # ``test_stage_1_waits_for_the_rug_read_*`` passed alone and failed in the
+        # suite because ``test_stage_1_opens_…`` had planted a 25 s-old
+        # ``bundled_share`` for the same mint — the robot then opened the proposal
+        # the test expects it to leave alone.
+        await connection.execute(
+            text("DELETE FROM meme_risk_snapshots WHERE mint = :mint"), {"mint": MINT}
         )
         await connection.execute(
             text(
@@ -1023,6 +1043,121 @@ async def test_token_context_reads_the_real_schema_and_the_bundled_share_from_th
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
         stale = await token_context(session, MINT)
     assert stale.bundled_share is None, "a two-hour-old read is not an input (§8)"
+
+
+async def test_token_context_reads_the_dev_share_and_dates_it(
+    db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.28h: the dev share is read from the real schema (``meme_risk_snapshots.dev_share``
+    and ``meme_features_1m.dev_share`` + ``holders_observed_at``/``holders_source`` — the
+    columns ``0023`` added), with its instant, and a reading older than the window is no
+    reading at all. Without this test the query would only be proved by the fakes, which
+    is exactly how T4.14 shipped ``bundled_share`` on the wrong table."""
+    from hunter_meme_executor.repo import token_context
+
+    now = datetime.now(UTC)
+    await _plant_operator_proposal(db_engine, proposed_at=now, risk_snapshot=False)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        blind = await token_context(session, MINT)
+    assert (blind.dev_share, blind.dev_share_observed_at) == (None, None)
+    fresh_at = now - timedelta(seconds=45)
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO meme_risk_snapshots (observed_at, mint, received_at, source, dev_share, raw) "
+                "VALUES (:t, :mint, :t, 'pumpfun_rest', 0.048000, '{}'::jsonb)"
+            ),
+            {"t": fresh_at, "mint": MINT},
+        )
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        read = await token_context(session, MINT)
+    assert read.dev_share == Decimal("0.048000")
+    assert read.dev_share_source == "meme_risk_snapshots"
+    assert read.dev_share_observed_at == fresh_at
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text("DELETE FROM meme_risk_snapshots WHERE mint = :mint AND observed_at = :t"),
+            {"mint": MINT, "t": fresh_at},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO meme_risk_snapshots (observed_at, mint, received_at, source, dev_share, raw) "
+                "VALUES (:t, :mint, :t, 'pumpfun_rest', 0.048000, '{}'::jsonb)"
+            ),
+            {"t": now - timedelta(seconds=RISK_SNAPSHOT_MAX_AGE_S + 60), "mint": MINT},
+        )
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        stale = await token_context(session, MINT)
+    assert stale.dev_share is None, "past the window it is not an input (§8)"
+
+
+async def test_an_unknown_creator_is_admitted_only_when_the_owner_allowed_the_measured_dev_share(
+    harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.28h end to end on the real ledger. Same coin, same ``creator_sold = NULL``
+    (the fold's 1 m photo lands +123–441 s after creation while the entry happens at
+    30–300 s, R5 16/09/2026), same measured ``dev_share`` of 5 %: **off** the buy is
+    refused ``creator_flow_unknown`` and no order is sent; **on** it is admitted, sent
+    and confirmed, and the admission says which of the two passes it was."""
+    import hunter_meme_executor.entries as entries_module
+
+    async def unknown_creator(_session: AsyncSession, _mint: str) -> TokenContext:
+        return _full_token_context(datetime.now(UTC), creator_sold=None, dev_share=Decimal("0.05"))
+
+    monkeypatch.setattr(entries_module, "token_context", unknown_creator)
+
+    refused_id = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(harness.ctx)
+    refused = await _rows(
+        db_engine, "SELECT * FROM meme_live_orders WHERE proposal_id = :p", p=refused_id
+    )
+    assert len(refused) == 1 and refused[0]["status"] == "refused"
+    assert refused[0]["reason"] == "creator_flow_unknown"
+    assert harness.rpc.sent == [], "the default refuses and sends nothing"
+
+    allowed = _context(
+        db_session_factory,
+        _signer(),
+        harness.redis,
+        policy={**POLICY, "MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED": "true"},
+    )
+    assert allowed.ctx.config.limits.creator_unknown_allowed_if_dev_measured
+    approved_id = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(allowed.ctx)
+    orders = await _rows(
+        db_engine, "SELECT * FROM meme_live_orders WHERE proposal_id = :p", p=approved_id
+    )
+    assert len(orders) == 1 and orders[0]["status"] == "confirmed", orders
+    assert orders[0]["admission"]["approved"] is True
+    line = next(c for c in orders[0]["admission"]["checks"] if c["name"] == "creator_behaviour")
+    assert line["state"] == "passed" and line["refusal"] is None
+    assert line["message"] == "creator_unknown_dev_share_measured"
+    # The canonical JSON normalises the Decimals it stores ("0.10" → "0.1").
+    assert (Decimal(line["value"]), Decimal(line["limit"])) == (Decimal("0.05"), Decimal("0.10"))
+
+
+async def test_the_heartbeat_publishes_the_allowance_the_owner_turned_on(
+    harness: Harness, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    off = json.loads((await heartbeat_fields(harness.ctx))["policy"])
+    assert off["creator_unknown_allowed_if_dev_measured"] is False
+    assert off["creator_unknown_max_dev_share_pct"] == "0.10"
+    on = _context(
+        db_session_factory,
+        _signer(),
+        harness.redis,
+        policy={
+            **POLICY,
+            "MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED": "on",
+            "MEME_CREATOR_UNKNOWN_MAX_DEV_SHARE_PCT": "0.03",
+        },
+    )
+    published = json.loads((await heartbeat_fields(on.ctx))["policy"])
+    assert published["creator_unknown_allowed_if_dev_measured"] is True
+    assert published["creator_unknown_max_dev_share_pct"] == "0.03"
 
 
 # ---------------------------------------------------------------- T4.28 stage 1

@@ -143,6 +143,12 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
                 "daily_loss_cap_sol": str(limits.daily_loss_cap_sol),
                 "max_open_positions": limits.max_open_positions,
                 "rug_cooldown_s": limits.rug_cooldown_s,
+                # T4.28h: an allowance on check 10 the owner turned on is a fact
+                # about how this process admits, so it is published, not implied.
+                "creator_unknown_allowed_if_dev_measured": (
+                    limits.creator_unknown_allowed_if_dev_measured
+                ),
+                "creator_unknown_max_dev_share_pct": str(limits.creator_unknown_max_dev_share_pct),
             }
         ),
         "orders_by_state": json.dumps(by_state),

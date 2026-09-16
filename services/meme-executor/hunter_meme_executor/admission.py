@@ -10,9 +10,13 @@ What each input is built from, so the provenance is one place:
   admission input);
 - the **context** from ``meme_tokens`` (age with provenance, denominator,
   migration) and the newest ``meme_features_1m`` row of the mint (organic 1 m
-  volume, creator flow, top-10, bundled share). What the radar does not measure
-  arrives as ``None`` and refuses by name — today that is ``bundled_share``
-  and, on most mints, the volume and the creator flow (§4's declared consequence);
+  volume, creator flow, top-10) plus the ``/in-memory-coin`` reads of
+  ``meme_risk_snapshots`` (bundled share, dev share). What the radar does not
+  measure arrives as ``None`` and refuses by name — today that is
+  ``bundled_share`` and, on most mints, the volume and the creator flow (§4's
+  declared consequence). The **dev share** is the one input that can undo a
+  refusal instead of causing one (T4.28h, :func:`dev_share_input`), and only
+  when the owner turned ``creator_unknown_allowed_if_dev_measured`` on;
 - the **wallet** from the chain's balance, the open positions' honest marks, the
   pending attempts' reservations and the **persisted** day anchor.
 """
@@ -26,7 +30,13 @@ from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 from hunter_exchanges.pumpfun.curve import TOKEN_SUBUNITS_PER_TOKEN
-from hunter_meme_executor.repo import Candidate, OpenPosition, PendingAttempt, TokenContext
+from hunter_meme_executor.repo import (
+    DEV_SHARE_MAX_AGE_S,
+    Candidate,
+    OpenPosition,
+    PendingAttempt,
+    TokenContext,
+)
 from hunter_risk_meme import (
     CurveState,
     MemeContext,
@@ -129,6 +139,29 @@ def denominator_subunits(tokens: int | Decimal | None) -> int | None:
     return int((Decimal(tokens) * TOKEN_SUBUNITS_PER_TOKEN).to_integral_value())
 
 
+def dev_share_input(
+    token: TokenContext, now: datetime
+) -> tuple[Decimal | None, str | None, datetime | None]:
+    """T4.28h — the dev share only reaches the engine dated and inside its window.
+
+    ``None`` on three cases, all fail-closed: no reading, a reading with no
+    instant (``0023`` stamps the holders read only when ``holders`` was read), and
+    a reading older than :data:`DEV_SHARE_MAX_AGE_S`. A stamp **in the future** is
+    two clocks disagreeing, not a fresh reading, and is dropped too — the same
+    doctrine ``state_freshness`` applies to the curve (§8.2). What this returns is
+    the only thing that may vouch for an unknown creator, so "stale is absent"
+    matters here more than anywhere: a ten-minute-old 5 % says nothing about a dev
+    who dumped two minutes ago.
+    """
+    stamp = token.dev_share_observed_at
+    if token.dev_share is None or stamp is None:
+        return None, None, None
+    age = now - stamp
+    if age < timedelta(0) or age > timedelta(seconds=DEV_SHARE_MAX_AGE_S):
+        return None, None, None
+    return token.dev_share, token.dev_share_source, stamp
+
+
 def context_from(
     mint: str, token: TokenContext, *, participation_used_sol: Decimal, now: datetime
 ) -> MemeContext:
@@ -136,6 +169,7 @@ def context_from(
         token.features_end_time is not None
         and now - token.features_end_time <= timedelta(seconds=120)
     )
+    dev_share, dev_source, dev_at = dev_share_input(token, now)
     return MemeContext(
         mint=mint,
         token_created_at=token.created_at,
@@ -153,6 +187,9 @@ def context_from(
         creator_net_sol=None
         if token.creator_sold is None
         else (Decimal(-1) if token.creator_sold else Decimal(1)),
+        dev_share_pct=dev_share,
+        dev_share_source=dev_source,
+        dev_share_ts=dev_at,
     )
 
 

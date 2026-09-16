@@ -188,9 +188,23 @@ Everton escrever o dele** (§14).
 | `day_timezone` | `"America/Sao_Paulo"` | — | o dia de negociação, igual ao SPOT |
 | `max_leverage` | `1` | — | identidade: sem empréstimo, sem short |
 | `quote` | `"SOL"` | — | §1 |
+| `MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED` | `false` | **decisão do dono** | T4.28h: com `true`, um `creator_net_sol` desconhecido **passa** no check 10 quando o `dev_share` foi medido e está dentro do teto abaixo. **Padrão desligado**; ausente é política completa (não entra nas cinco do `POLICY_ENV`), e um valor que ninguém consegue ler (`maybe`, `sim`) **recusa o boot** com o nome da variável, como as cinco |
+| `MEME_CREATOR_UNKNOWN_MAX_DEV_SHARE_PCT` | `0.10` | **decisão do dono** | o teto dessa permissão — os mesmos 10 % que a mesa já usa no `operator/5` (E1 braço 2). Fora de `[0, 1]` ou ilegível: recusa o boot pelo nome |
 
 **O teto é teto, não meta** — a frase do contrato SPOT vale igual: nada aqui aumenta tamanho para
 "chegar" ao teto.
+
+**A permissão do check 10 é do dono, e é a única do motor (T4.28h).** As duas variáveis acima não
+são política de capital nem parâmetro de estratégia: são a autorização explícita para o executor
+aplicar a mesma regra que a mesa já aplica. Medido em 16/09/2026: das 22 ordens reais do dia, **11**
+foram recusadas `creator_flow_unknown` porque o `creator_sold` do fold de 1 min chega +123 a +441 s
+depois da criação e a entrada acontece entre 30 e 300 s — enquanto o `operator/5` (E1 braço 2,
+`creator_unknown_allowed_if_dev_measured`) já propunha a moeda com `dev_share` medido ≤ 10 %. Ou
+seja: **a mesa propunha o que o executor recusava.** Com a permissão desligada (o padrão) nada muda.
+Ligada, ela **nunca** salva um criador que se sabe vendedor líquido (`creator_net_seller` continua
+reprovando), nunca inventa o `dev_share` e nunca aceita uma leitura velha: o executor só entrega ao
+motor um `dev_share` medido, **datado** e com ≤ 600 s (`DEV_SHARE_MAX_AGE_S`, a mesma janela do
+`bundled_share`).
 
 ### 3.2 A carteira dedicada
 
@@ -331,7 +345,7 @@ Todos os checks avaliáveis são registrados em `decision.checks[]` como
 | 7 | `state_freshness` | idade > `max_state_age_s`; sem carimbo; carimbo à frente além de 2 s; commitment abaixo do mínimo | `curve_state_stale`, `curve_state_undated`, `curve_state_clock_skew`, `commitment_too_weak` |
 | 8 | `token_age` | fora de `[token_age_min_s, token_age_max_s]`, ou idade de procedência desconhecida | `token_too_young`, `token_too_old`, `token_age_unknown` |
 | 9 | `curve_progress` | fora da janela; curva completa; denominador (`initial_real_token_reserves`) ausente | `progress_below_window`, `progress_above_window`, `curve_complete`, `progress_denominator_missing` |
-| 10 | `creator_behaviour` | criador é vendedor líquido; fluxo do criador desconhecido | `creator_net_seller`, `creator_flow_unknown` |
+| 10 | `creator_behaviour` | criador é vendedor líquido; fluxo do criador desconhecido — **exceto** (T4.28h, só com `MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED=true`) quando o `dev_share` foi medido, datado, fresco (≤ 600 s) e ≤ `MEME_CREATOR_UNKNOWN_MAX_DEV_SHARE_PCT`: aí o check **passa** com `message = creator_unknown_dev_share_measured`, `value` = dev share e `limit` = o teto, e a admissão distingue "desconhecido mas permitido" de "conhecido e bom". Desconhecido com `dev_share` ausente **ou acima do teto** continua sendo `creator_flow_unknown` — o mesmo nome, com o teto publicado em `limit`/`message`, nunca um nome novo | `creator_net_seller`, `creator_flow_unknown` |
 | 11 | `bundled_share` | acima do teto; **nulo** | `bundled_share_above_cap`, `bundled_share_unmeasurable` |
 | 12 | `top10_share` | acima do teto; desconhecido; denominador sem exclusão de curva/pool/burn | `top10_share_above_cap`, `top10_share_unknown`, `holder_denominator_invalid` |
 | 13 | `mayhem_policy` | moeda Mayhem sem política aprovada; estado do agente desconhecido | `mayhem_not_allowed`, `mayhem_state_unknown` |
@@ -369,7 +383,12 @@ da cadeia no instante da decisão — ler a ATA do criador e comparar com a aloc
 depois da criação). Usá-la como base faria um criador que largou tudo aos 20 s da moeda ser lido
 como "segura ≥ inicial" e **passar** o check 10 — exatamente o dump que o check existe para barrar.
 Enquanto a alocação inicial não for persistida na criação (ou a fita cobrir o mint desde o minuto
-zero), `creator_net_sol` continua `None` e o check recusa por nome.
+zero), `creator_net_sol` continua `None` e o check recusa por nome. **T4.28h dá a única saída
+honesta enquanto isso, e ela é do dono:** não derivar o fluxo que não existe, e sim deixar o
+`dev_share` **medido** responder pelo criador desconhecido — a regra que a mesa já aplica — atrás de
+`MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED`, desligada por padrão (§3.1). Isso **não** resolve o
+caso do criador que largou tudo antes da primeira medição: a foto é corrente, e por isso a permissão
+é uma decisão escrita e reversível, não o novo padrão.
 
 **O que muda em relação ao SPOT, e por quê:** não existe `book_depth` nem `spread` — não há livro
 (T4-MEME-RADAR §0). O papel deles é feito por **dois** checks que a curva permite fazer melhor: o

@@ -38,6 +38,11 @@ POLICY_ENV: Final[tuple[str, ...]] = (
 )
 """The five numbers only the owner writes (§3, "política de capital")."""
 
+ENV_CREATOR_UNKNOWN_ALLOWED: Final = "MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED"
+ENV_CREATOR_UNKNOWN_MAX_DEV_SHARE: Final = "MEME_CREATOR_UNKNOWN_MAX_DEV_SHARE_PCT"
+"""T4.28h — **not** part of :data:`POLICY_ENV`: absent is a valid, complete policy
+(the allowance stays off). Present and unreadable refuses the boot by name."""
+
 
 class MemePolicyMissing(RuntimeError):
     """The live flag is on and the wallet policy is incomplete: boot refusal, by name."""
@@ -96,6 +101,16 @@ class MemeLimits(MemeModel):
     day_timezone: str = "America/Sao_Paulo"
     max_leverage: Literal[1] = 1
     quote: Literal["SOL"] = "SOL"
+    # ---- the owner's allowance on check 10 (§4, T4.28h) ---------------------
+    creator_unknown_allowed_if_dev_measured: bool = False
+    """**Off** by default: an unknown creator flow refuses ``creator_flow_unknown``.
+    On (``MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED``, the owner's decision
+    alone) a **measured** ``dev_share_pct`` within
+    :attr:`creator_unknown_max_dev_share_pct` lets the unknown creator pass — the
+    same allowance the desk's ``operator/5`` gate already applies (E1 arm 2). It
+    never rescues a *known* net seller."""
+    creator_unknown_max_dev_share_pct: Decimal = Field(ge=0, le=1, default=Decimal("0.10"))
+    """``MEME_CREATOR_UNKNOWN_MAX_DEV_SHARE_PCT`` — the desk's 10 % by default."""
 
     @model_validator(mode="after")
     def _coherent(self) -> MemeLimits:
@@ -155,6 +170,51 @@ def _decimal(raw: str) -> Decimal:
     return value
 
 
+_TRUE: Final[frozenset[str]] = frozenset({"1", "true", "yes", "on"})
+_FALSE: Final[frozenset[str]] = frozenset({"0", "false", "no", "off"})
+
+
+def _flag(raw: str) -> bool:
+    """The vocabulary of every other flag of this system — and **nothing else**.
+
+    A word nobody can read is not a "no": it is an owner who believes they wrote
+    one thing and got another, so it joins ``invalid`` and the boot refuses by name.
+    """
+    value = raw.strip().lower()
+    if value in _TRUE:
+        return True
+    if value in _FALSE:
+        return False
+    raise ValueError(raw)
+
+
+def _creator_unknown_allowance(
+    env: Mapping[str, str], invalid: list[str]
+) -> dict[str, bool | Decimal]:
+    """T4.28h's two optional variables: absent ⇒ the base's values (off, 10 %);
+    present and unreadable ⇒ named in the boot refusal, like the five."""
+    values: dict[str, bool | Decimal] = {}
+    raw_flag = (env.get(ENV_CREATOR_UNKNOWN_ALLOWED) or "").strip()
+    if raw_flag:
+        try:
+            values["creator_unknown_allowed_if_dev_measured"] = _flag(raw_flag)
+        except ValueError:
+            invalid.append(ENV_CREATOR_UNKNOWN_ALLOWED)
+    raw_cap = (env.get(ENV_CREATOR_UNKNOWN_MAX_DEV_SHARE) or "").strip()
+    if not raw_cap:
+        return values
+    try:
+        cap = _decimal(raw_cap)
+    except (InvalidOperation, ValueError):
+        invalid.append(ENV_CREATOR_UNKNOWN_MAX_DEV_SHARE)
+        return values
+    if not (0 <= cap <= 1):
+        invalid.append(ENV_CREATOR_UNKNOWN_MAX_DEV_SHARE)
+        return values
+    values["creator_unknown_max_dev_share_pct"] = cap
+    return values
+
+
 def limits_from_env(
     env: Mapping[str, str], *, base: MemeLimits = MEME_PAPER_V0, profile: str = "meme_live_v0"
 ) -> MemeLimits:
@@ -174,6 +234,7 @@ def limits_from_env(
                 values[name] = _decimal(raw)
         except (InvalidOperation, ValueError):
             invalid.append(name)
+    allowance = _creator_unknown_allowance(env, invalid)
     if missing or invalid:
         raise MemePolicyMissing(missing, tuple(invalid))
     per_trade = values["MEME_MAX_SOL_PER_TRADE"]
@@ -190,5 +251,6 @@ def limits_from_env(
             "rug_cooldown_s": values["MEME_COOLDOWN_S"],
             # v0: no position reinforcement, so the per-mint cap *is* the per-trade cap.
             "max_exposure_per_mint_sol": per_trade,
+            **allowance,
         }
     )

@@ -859,6 +859,19 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    arquivo **completo** que diz não (vencido, Portão C desligado, escopo sumido com o robô armado)
    continua travando na hora.
 
+9c. **Deixar o `dev_share` medido responder por um criador desconhecido (T4.28h) — decisão dele.**
+   `MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED=true` (+ opcional
+   `MEME_CREATOR_UNKNOWN_MAX_DEV_SHARE_PCT`, padrão `0.10`) no `.env` da VPS faz o executor admitir
+   uma compra com `creator_flow_unknown` **desde que** o `dev_share` esteja medido, datado, com
+   ≤ 600 s e dentro do teto — a mesma regra do `operator/5` da mesa. **Motivo medido (16/09/2026):**
+   11 das 22 ordens reais do dia foram recusadas `creator_flow_unknown` porque o `creator_sold` do
+   fold de 1 min chega +123 a +441 s depois da criação e a entrada acontece entre 30 e 300 s — a mesa
+   propunha o que o executor recusava. Ligar isto **afrouxa** o check 10 para o caso "desconhecido";
+   um criador **conhecido** vendedor líquido continua recusado, e a admissão marca o caso com
+   `creator_unknown_dev_share_measured` (o heartbeat mostra os dois campos em `policy`). Desligar é
+   apagar a linha + `compose.sh update`. Um valor ilegível (`sim`, `maybe`) **recusa o boot** pelo
+   nome da variável.
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca

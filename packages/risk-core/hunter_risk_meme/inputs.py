@@ -104,6 +104,16 @@ class MemeContext(MemeModel):
     holder_denominator_valid: bool | None = None
     creator_net_sol: Decimal | None = None
     """Creator's net SOL flow since creation; negative = net seller. ``None`` = unknown."""
+    dev_share_pct: Decimal | None = None
+    """The newest **measured** share of the supply the dev still holds (a fraction).
+    T4.28h: the only thing that may vouch for an unknown ``creator_net_sol``, and
+    only when the owner turned ``creator_unknown_allowed_if_dev_measured`` on. A
+    stale reading is dropped by the caller that read it (the executor's 600 s
+    window), never here — ``None`` is the honest value and it vouches for nothing."""
+    dev_share_source: str | None = None
+    """Where that share was read (``meme_features_1m`` / ``meme_risk_snapshots``)."""
+    dev_share_ts: datetime | None = None
+    """The instant of that reading — a share without one is not an input (§8)."""
     mayhem_agent_state_known: bool = False
     mayhem_policy_approved: bool = False
     rug_signals: tuple[str, ...] = ()

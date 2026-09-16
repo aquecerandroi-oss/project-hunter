@@ -86,10 +86,24 @@ def check(
 
 
 def unavailable(
-    name: str, refusal: str, message: str, *, limit: Decimal | None = None
+    name: str,
+    refusal: str,
+    message: str,
+    *,
+    value: Decimal | None = None,
+    limit: Decimal | None = None,
+    input_ts: str | None = None,
 ) -> MemeCheck:
+    """``value`` is what **was** measured while the input this check needs was not
+    (T4.28h: a dev share above the cap, next to an unmeasured creator flow)."""
     return MemeCheck(
-        name=name, state=CheckState.UNAVAILABLE, refusal=refusal, limit=limit, message=message
+        name=name,
+        state=CheckState.UNAVAILABLE,
+        refusal=refusal,
+        value=value,
+        limit=limit,
+        input_ts=input_ts,
+        message=message,
     )
 
 

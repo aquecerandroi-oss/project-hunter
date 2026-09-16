@@ -195,12 +195,56 @@ def curve_progress_check(curve: CurveState, context: MemeContext, limits: MemeLi
     )
 
 
-def creator_behaviour_check(context: MemeContext) -> MemeCheck:
+def creator_behaviour_check(context: MemeContext, limits: MemeLimits) -> MemeCheck:
     name = "creator_behaviour"
     if context.creator_net_sol is None:
-        return unavailable(name, "creator_flow_unknown", "creator net flow not measured")
+        return _unknown_creator(context, limits)
     seller = context.creator_net_sol < 0
     return check(name, not seller, "creator_net_seller", value=context.creator_net_sol)
+
+
+def _unknown_creator(context: MemeContext, limits: MemeLimits) -> MemeCheck:
+    """T4.28h — the owner's allowance, and the three ways it does **not** apply.
+
+    ``creator_sold`` lands +123 to +441 s after a coin is created (R5, 16/09/2026)
+    while the entry happens at 30–300 s, so 11 of 22 real orders that day were
+    refused ``creator_flow_unknown``. With
+    ``creator_unknown_allowed_if_dev_measured`` on, a **measured** dev share
+    within the cap vouches for the unknown creator — the desk's own ``operator/5``
+    rule (E1 arm 2), now sayable by the executor. Off (the default), unmeasured,
+    or above the cap: the same refusal name as before, never a new one, with the
+    cap published so the admission says *why*.
+    """
+    name, cap = "creator_behaviour", limits.creator_unknown_max_dev_share_pct
+    if not limits.creator_unknown_allowed_if_dev_measured:
+        return unavailable(name, "creator_flow_unknown", "creator net flow not measured")
+    dev = context.dev_share_pct
+    if dev is None:
+        return unavailable(
+            name,
+            "creator_flow_unknown",
+            "creator net flow and dev share both unmeasured",
+            limit=cap,
+        )
+    stamp = None if context.dev_share_ts is None else context.dev_share_ts.isoformat()
+    if dev > cap:
+        return unavailable(
+            name,
+            "creator_flow_unknown",
+            f"creator net flow unmeasured and dev share above {cap}",
+            value=dev,
+            limit=cap,
+            input_ts=stamp,
+        )
+    return check(
+        name,
+        True,
+        "creator_flow_unknown",
+        value=dev,
+        limit=cap,
+        input_ts=stamp,
+        message="creator_unknown_dev_share_measured",
+    )
 
 
 def bundled_share_check(context: MemeContext, limits: MemeLimits) -> MemeCheck:
@@ -262,7 +306,7 @@ def coin_checks(
         state_freshness_check(wallet, curve, limits),
         token_age_check(wallet, context, limits),
         curve_progress_check(curve, context, limits),
-        creator_behaviour_check(context),
+        creator_behaviour_check(context, limits),
         bundled_share_check(context, limits),
         top10_share_check(context, limits),
         mayhem_policy_check(curve, context),
