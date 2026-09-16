@@ -101,3 +101,4 @@ encanamento produziria e o pedigree dos criadores. Não é pré-registro nem rec
 banco com hora e SQL anexados.
 
 - [[03-TRADING/Meme/Candidatas/2026-09-16-16h|2026-09-16 — R1 (14:47–15:47 BRT)]]
+- [[03-TRADING/Meme/Candidatas/2026-09-16-17h|2026-09-16 — R14 (15:18–16:18 BRT)]] — porta calibrada = porta em vigor (5 propostas/h vs 3 da anterior), termos `PAID`/`ARGUS`/`ZEC` sem candidata comprável, conclusão: nenhuma
