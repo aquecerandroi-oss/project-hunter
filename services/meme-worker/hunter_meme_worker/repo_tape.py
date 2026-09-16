@@ -184,6 +184,23 @@ async def open_bet_mints(session: AsyncSession) -> frozenset[str]:
     return frozenset(str(m) for m in (await session.execute(_OPEN_BETS)).scalars().all())
 
 
+_PENDING_OPERATOR = text(
+    "SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets r ON r.id = p.rule_set_id "
+    "WHERE r.kind = 'operator' AND r.status = 'active' AND p.status = 'proposed' "
+    "  AND p.expires_at > :now"
+)
+
+
+async def pending_operator_mints(session: AsyncSession, *, now: datetime) -> frozenset[str]:
+    """T4.28b: the desk's live proposals waiting on a decision (a click or the
+    stage-1 executor). The rug-risk reader (``bundled_share``, top-10, dev) must
+    reach them **before** the executor judges them: the real admission refuses
+    ``bundled_share_unmeasurable`` by doctrine, so a candidate the reader never
+    saw can never be bought — the auto-approve mode would refuse everything."""
+    rows = (await session.execute(_PENDING_OPERATOR, {"now": now})).scalars().all()
+    return frozenset(str(m) for m in rows)
+
+
 __all__ = [
     "CURVE_PROGRAM",
     "CURVE_TOKEN_DECIMALS",
@@ -195,5 +212,6 @@ __all__ = [
     "insert_trades",
     "load_tape",
     "open_bet_mints",
+    "pending_operator_mints",
     "trade_rows",
 ]

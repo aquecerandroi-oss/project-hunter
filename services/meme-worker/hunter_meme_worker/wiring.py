@@ -31,6 +31,7 @@ from hunter_meme_worker.boards import BoardCollector
 from hunter_meme_worker.config import TRENCHES_STREAM
 from hunter_meme_worker.metrics import meme_gaps_total, meme_rows_total, meme_source_messages_total
 from hunter_meme_worker.repo import GapRow, record_gap, upsert_token
+from hunter_meme_worker.repo_tape import pending_operator_mints
 from hunter_meme_worker.risk import RiskReader
 from hunter_meme_worker.sources import (
     INDEXER_RISK,
@@ -252,10 +253,16 @@ async def trades_once(ctx: RadarContext) -> None:
 
 async def risk_once(ctx: RadarContext) -> None:
     assert ctx.risk is not None
+    now = utcnow()
     candidates = set(ctx.state.open_bets)
     if ctx.boards is not None:
         candidates |= {mint for mint in ctx.boards.listed_on("graduating") if mint in ctx.tracker}
-    report = await ctx.risk.read_once(ctx.session_factory, candidates, now=utcnow())
+    # T4.28b: the desk's pending proposals — the executor's real admission needs the
+    # rug-risk read (bundled/top-10/dev) or it refuses by name; one read per mint per
+    # 5 min, the same budget rule as every other candidate here.
+    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+        candidates |= await pending_operator_mints(session, now=now)
+    report = await ctx.risk.read_once(ctx.session_factory, candidates, now=now)
     meme_rows_total.labels(table="meme_risk_snapshots").inc(report.read)
 
 
