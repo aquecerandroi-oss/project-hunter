@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medicao propria (SQL em infra/scripts/sql/research/2026-09-16-r19-q0{1,2}-*.sql; 344 moedas na porta da mesa, 5 dias, 39 saidas em 3x)
 hipotese_testavel: sim
 astra: nao consultada nesta nota (pesquisa quant, 16/09 ~23h BRT)
-confianca: backtest do autor; 3 dias cheios + 2 parciais
+confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo

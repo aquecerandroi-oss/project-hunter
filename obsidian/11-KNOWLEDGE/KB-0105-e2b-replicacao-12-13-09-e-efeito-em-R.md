@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medicao propria (SQL em infra/scripts/sql/research/2026-09-16-r13-q0{1,2,3,4,5}-*.sql; 1 828 graduadas em 2 dias, rotulo de fita em 307 delas, 103 apostas medidas)
 hipotese_testavel: sim
 astra: nao consultada nesta nota (pesquisa quant, 16/09 ~20h BRT)
-confianca: 2 dias fora da amostra; rotulo so nas 21-25 % de graduadas com meme_trades; 13 forjadas rotuladas em 13/09 (n pequeno de um lado)
+confiança: replicado
 owner: astra-quant
 updated: 2026-09-16
 status: vivo

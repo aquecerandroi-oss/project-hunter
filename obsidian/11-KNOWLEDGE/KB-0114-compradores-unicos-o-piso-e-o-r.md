@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medição própria (SQL em infra/scripts/sql/research/2026-09-16-r28-q0{1,2,3}-*.sql; mesma coorte do KB-0112, 345 entradas em 5 dias, 3 cheios)
 hipotese_testavel: sim
 astra: não consultada nesta nota (pesquisa quant, 16/09 noite BRT)
-confianca: backtest do autor, in-sample; 5 dias (2 parciais)
+confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo

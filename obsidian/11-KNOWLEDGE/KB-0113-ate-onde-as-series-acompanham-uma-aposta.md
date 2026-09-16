@@ -10,7 +10,8 @@ codigo: services/meme-worker/hunter_meme_worker/fast_lane.py, tracker.py, tracke
 evidencia: medição própria — 132 entradas da porta atual (REUSE `r20-q01`) e 73 apostas de papel fechadas em 15/09
 hipotese_testavel: sim
 astra: não consultada (medição de instrumentação)
-confiança: ALTA na cobertura medida (é contagem de linhas), MÉDIA na atribuição de motivo
+confiança: backtest do autor
+lido_em: 2026-09-16
 owner: astra-quant
 status: vivo
 updated: 2026-09-16

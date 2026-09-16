@@ -10,7 +10,8 @@ script: infra/scripts/research/2026-09-16-r20-sim-saidas-15s.py
 evidencia: medicao propria, 322 entradas (291 com serie de 15 s), 5 dias (12 e 16/09 parciais)
 hipotese_testavel: sim
 astra: nao consultada (pesquisa quant)
-confianca: BAIXA em nivel, MEDIA em ordenacao - ver §1b (a serie de 15 s dura 162 s medianos depois da entrada)
+confiança: backtest do autor
+lido_em: 2026-09-16
 owner: astra-quant
 status: vivo
 updated: 2026-09-16

@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medição própria (SQL em infra/scripts/sql/research/2026-09-16-r15-q0{1,2}-*.sql; 64 879 moedas não-Mayhem, 5 dias, 551 graduações orgânicas)
 hipotese_testavel: sim
 astra: não consultada nesta nota (pesquisa quant, 16/09 ~22h BRT)
-confianca: backtest do autor; 3 dias cheios + 2 parciais
+confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo

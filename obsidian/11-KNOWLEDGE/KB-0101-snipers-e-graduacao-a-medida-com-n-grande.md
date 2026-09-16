@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medicao propria (SQL em infra/scripts/sql/research/2026-09-16-r7-q0{1,2}-*.sql; 64 267 moedas nao-Mayhem, 5 dias)
 hipotese_testavel: sim
 astra: nao consultada nesta nota (pesquisa quant, 16/09)
-confianca: backtest do autor
+confiança: backtest do autor
 owner: astra
 updated: 2026-09-16
 status: vivo

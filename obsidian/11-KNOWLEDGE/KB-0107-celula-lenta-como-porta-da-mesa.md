@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medição própria (SQL em infra/scripts/sql/research/2026-09-16-r16-q0{1,2,3}-*.sql; 807 lentas em 5 dias, 591 entradas simuladas na variante sem teto de progresso)
 hipotese_testavel: sim
 astra: não consultada nesta nota (medição quant, 16/09 ~21h BRT)
-confianca: backtest do autor (3 dias cheios + 2 parciais)
+confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo

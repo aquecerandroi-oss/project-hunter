@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medicao propria (SQL em infra/scripts/sql/research/2026-09-16-r9-q0{1,2,3,4}-*.sql; 2 877 graduadas em 3 dias, rotulo de fita em 390 delas)
 hipotese_testavel: sim
 astra: nao consultada nesta nota (pesquisa quant, 16/09 ~19h BRT)
-confianca: 3 dias, rotulo em 390 moedas com cobertura de meme_trades (24 % das graduadas) — amostra enviesada para as moedas que o radar seguiu
+confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo

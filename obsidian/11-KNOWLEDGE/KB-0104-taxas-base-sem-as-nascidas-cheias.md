@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medição própria (SQL em infra/scripts/sql/research/2026-09-16-r12-q0{1,2,3,4}-*.sql; 52 146 moedas não-Mayhem em 3 dias cheios, 3 293 graduadas em 5 dias)
 hipotese_testavel: sim
 astra: não consultada nesta nota (pesquisa quant, 16/09 ~20h BRT)
-confiança: 3 dias cheios (13–15/09) + 2 parciais; rótulo por carimbo de observação, não por tempo on-chain
+confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo

@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medição própria (SQL em infra/scripts/sql/research/2026-09-16-r8-q0{1,2}-*.sql; 315 apostas em 5 dias)
 hipotese_testavel: sim
 astra: não consultada nesta nota (medição quant, 16/09)
-confianca: backtest do autor
+confiança: backtest do autor
 owner: astra
 updated: 2026-09-16
 status: vivo

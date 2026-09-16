@@ -1,9 +1,13 @@
 ---
 tipo: estudo
+tags: [meme, pumpfun, estudo, r10, m4]
+owner: astra-quant
+status: vivo
 data: 2026-09-16
 tema: meme
 conjunto: operator/5
 tarefa: R10
+updated: 2026-09-16
 fontes:
   - infra/scripts/sql/research/2026-09-16-r10-q01-propostas-do-dia.sql
   - infra/scripts/sql/research/2026-09-16-r10-q02-simulacao-por-proposta.sql

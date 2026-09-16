@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medicao propria (SQL em infra/scripts/sql/research/2026-09-16-r6-q0{1,2,3,4,5}.sql; 1 009 moedas casadas, amostras de 200 + controle pareado por hora)
 hipotese_testavel: sim
 astra: nao consultada nesta nota (medida de banco, 16/09 16:0x BRT)
-confianca: medicao de um dia so (n pequeno, sem replicacao)
+confiança: anedótico
 owner: astra-quant
 updated: 2026-09-16
 status: vivo

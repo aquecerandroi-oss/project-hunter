@@ -7,7 +7,8 @@ fonte: banco da VPS (meme_features_15s, meme_features_1m, meme_trades, meme_toke
 sql: infra/scripts/sql/research/2026-09-16-r17-q01..q07
 owner: astra/quant
 status: vivo
-confianca: media — n grande no dia 15 (879 moedas), mas a cobertura de série morre em ~5 min (ver §1b)
+confiança: backtest do autor
+lido_em: 2026-09-16
 updated: 2026-09-16
 ---
 

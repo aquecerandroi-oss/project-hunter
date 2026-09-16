@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medicao propria (SQL em infra/scripts/sql/research/2026-09-16-r22-q0{1..5}-*.sql; 20 486 retratos, 15 565 pares mint-minuto, 24 ordens reais)
 hipotese_testavel: sim
 astra: nao consultada nesta nota (pesquisa quant, 16/09 ~17h BRT)
-confianca: alta para o diagnostico (115/115 nao acontece por acaso); media para o efeito em decisao (n = 24 ordens)
+confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo
