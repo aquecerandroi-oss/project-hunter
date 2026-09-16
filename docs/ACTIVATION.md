@@ -828,7 +828,8 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    `max_total_sol` também fecha a torneira (`small_test_scope_exhausted`, somando o SOL real que cada
    compra confirmada tirou da carteira) e a última compra é **clampada** ao que sobra. Freios só deste
    modo: 1 compra por tique e por mint, proposta com mais de 60 s fica para a mão dele,
-   `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR` (padrão 5), e toda recusa da admissão marca a proposta
+   `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR` (padrão 5; desde a T4.28e conta só as propostas que a
+   admissão deixou passar — recusa não gasta vaga), e toda recusa da admissão marca a proposta
    `rejected` com o motivo (a mesa mostra por quê). O heartbeat `hb:meme:executor` publica
    `auto_approve`, `auto_approved_1h`, `auto_refused_1h`, `auto_skipped`, `small_test_used_sol`,
    `small_test_trades_done`, `small_test_remaining_sol`. **Desligar:** `MEME_LIVE_AUTO_APPROVE=false`

@@ -161,7 +161,7 @@ Everton escrever o dele** (§14).
 | `max_jito_tip_sol` | `0.001` | **a decidir** | teto do tip; `0` significa "sem bundle" (§9.3) |
 | `token_age_min_s` | `30` | — | tempo mínimo de vida do token |
 | `token_age_max_s` | `600` | — | tempo máximo (10 min) |
-| `curve_progress_min_pct` / `max_pct` | `0.02` / `0.50` | — | janela de progresso `1 − real_token_reserves/initial_real_token_reserves` |
+| `curve_progress_min_pct` / `max_pct` | `0.02` / `0.50` | — | janela de progresso `1 − real_token_reserves/initial_real_token_reserves`. **Unidade (T4.28e):** o numerador é a conta da curva lida por RPC, em subunidades (6 casas); o denominador vem de `meme_tokens.initial_real_token_reserves`, que o radar grava em **tokens** (793,1 M numa curva padrão) — a admissão converte para subunidades em `denominator_subunits()` ao montar o `MemeContext`. Em 16/09/2026 11:46 BRT, sem a conversão, as quatro primeiras compras do estágio 1 foram recusadas com `progress ≈ −541 546` |
 | `max_bundled_share_pct` | `0.20` | — | **nulo → recusa** (§4, check 11) |
 | `max_top10_share_pct` | `0.25` | — | por **owner**, excluindo curva, pool e burn |
 | `max_state_age_s` | `5` | — | idade máxima do estado da curva (a curva anda em segundos) |
@@ -258,7 +258,10 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
 - **Freios que só existem neste modo** (todos nomeados no heartbeat, `auto_skipped`): no máximo 1
   compra por tique e por mint; proposta com `age > 60 s` fica para o humano (a `operator` expira em
   180 s para a mão; o robô decide na primeira passada ou não decide); `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR`
-  (padrão 5, contado das linhas — sobrevive a restart); kill switch bloqueando, programa divergente ou
+  (padrão 5, contado das linhas — sobrevive a restart — e **só das propostas que a admissão não
+  rejeitou**, T4.28e: uma recusa não gasta vaga, então no estágio 1 o cap é igual ao `max_trades` do
+  escopo e nunca trava antes dele; em 16/09 quatro recusas de um mint em 80 s tinham comido 4 das 5
+  vagas da hora sem um lamport sair); kill switch bloqueando, programa divergente ou
   escopo esgotado ⇒ o passe não abre proposta nenhuma; e **toda recusa da admissão** de uma proposta
   aberta pelo robô grava a ordem `refused` **e** marca a proposta `rejected` com o motivo em
   `decision.auto_refusal` (mesma transação) — a mesa mostra por quê.

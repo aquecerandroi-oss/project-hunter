@@ -17,7 +17,10 @@ Brakes that exist only in this mode, all named in the heartbeat:
 - a proposal older than :data:`AUTO_APPROVE_MAX_AGE_S` (60 s) is left to the
   human (the ``operator`` set expires in 180 s for a hand; the robot decides on
   its first pass or not at all);
-- ``MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR`` (default 5), counted from the rows;
+- ``MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR`` (default 5), counted from the rows —
+  only proposals the admission did **not** reject (T4.28e): a refusal costs no
+  slot, so in stage 1 the cap equals the scope's ``max_trades`` and never binds
+  before it;
 - a blocking kill switch, a diverged program or an exhausted scope skip the
   pass instead of opening a proposal the admission would refuse;
 - any admission refusal of an auto-opened proposal writes the ``refused`` order
@@ -86,8 +89,17 @@ _OPERATOR_PROPOSED = text(
     "ORDER BY p.proposed_at, p.id"
 )
 _APPROVED_LAST_HOUR = text(
-    "SELECT count(*) FROM meme_proposals WHERE decided_by = :by AND decided_at >= :since"
+    "SELECT count(*) FROM meme_proposals "
+    "WHERE decided_by = :by AND decided_at >= :since AND status <> 'rejected'"
 )
+"""What the hourly cap counts: proposals the robot opened **and the admission
+let through**. An auto-opened proposal the admission refused is ``rejected`` in
+the same transaction as its ``refused`` order (:func:`reject_if_auto`) and does
+not spend the budget — T4.28e, 16/09/2026: four refusals of one mint in 80 s
+had eaten 4 of the 5 slots of the hour before a single lamport moved, and the
+owner said he does not want the robot rate-limited by its own refusals. The
+money brakes are the scope (``max_trades``, ``max_total_sol``) and the
+admission; the hourly cap only bounds *fills*."""
 _REFUSED_LAST_HOUR = text(
     "SELECT o.reason, count(*) AS n FROM meme_live_orders o "
     "JOIN meme_proposals p ON p.id = o.proposal_id "

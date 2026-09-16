@@ -25,6 +25,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
+from hunter_exchanges.pumpfun.curve import TOKEN_SUBUNITS_PER_TOKEN
 from hunter_meme_executor.repo import Candidate, OpenPosition, PendingAttempt, TokenContext
 from hunter_risk_meme import (
     CurveState,
@@ -109,6 +110,25 @@ def curve_from(read: CurveRead) -> CurveState:
     )
 
 
+def denominator_subunits(tokens: int | Decimal | None) -> int | None:
+    """``meme_tokens.initial_real_token_reserves`` → the curve's unit.
+
+    The radar stores the launch denominator in **tokens** (793,1 M on a stock
+    curve; 100 654 rows on 16/09/2026, none above 1e12), while the bonding-curve
+    account the executor reads by RPC counts **sub-units** (6 decimals,
+    ``TOKEN_SUBUNITS_PER_TOKEN``). ``curve_progress_check`` divides one by the
+    other, so the conversion happens here, once, on the way into
+    :class:`MemeContext`. T4.28e, 16/09/2026 11:46–11:48 BRT: with the raw value
+    the first four auto-approved buys of stage 1 were refused
+    ``progress_below_window`` with ``progress ≈ −541 546`` — every coin would
+    have been. A missing or non-positive value stays ``None`` and refuses by name
+    (``progress_denominator_missing``), as before.
+    """
+    if tokens is None or tokens <= 0:
+        return None
+    return int((Decimal(tokens) * TOKEN_SUBUNITS_PER_TOKEN).to_integral_value())
+
+
 def context_from(
     mint: str, token: TokenContext, *, participation_used_sol: Decimal, now: datetime
 ) -> MemeContext:
@@ -120,7 +140,7 @@ def context_from(
         mint=mint,
         token_created_at=token.created_at,
         token_age_source=None if token.created_at is None else "meme_tokens.created_at",
-        initial_real_token_reserves=token.initial_real_token_reserves,
+        initial_real_token_reserves=denominator_subunits(token.initial_real_token_reserves),
         organic_volume_1m_sol=token.curve_volume_1m_sol if volume_fresh else None,
         volume_ts=token.features_end_time if volume_fresh else None,
         volume_window_complete=True

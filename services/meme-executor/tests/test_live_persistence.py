@@ -180,7 +180,7 @@ def _full_token_context(now: datetime) -> TokenContext:
     return TokenContext(
         created_at=now - timedelta(seconds=120),
         creator=CREATOR,
-        initial_real_token_reserves=793_100_000_000_000,
+        initial_real_token_reserves=793_100_000,  # tokens, as meme_tokens stores it (T4.28e)
         completed_at=None,
         migrated_at=None,
         curve_volume_1m_sol=Decimal("20"),
