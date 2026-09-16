@@ -100,6 +100,7 @@ from hunter_core.db.models.meme_lab import (
     MemeProposal,
     MemeRuleSet,
 )
+from hunter_core.db.models.meme_lab_audit import MemeGateRefusalByMint, MemeRuleSetParamHistory
 from hunter_core.db.models.meme_lab_ticks import MemeLabTick
 from hunter_core.db.models.meme_live import MemeLiveKillSwitch, MemeLiveOrder, MemeLivePosition
 from hunter_core.db.models.meme_series import MemeCurveSnapshot, MemeTrade
@@ -218,6 +219,7 @@ __all__ = [
     "MemeEvent",
     "MemeEventMatch",
     "MemeFeatures15s",
+    "MemeGateRefusalByMint",
     "MemeFeatures1m",
     "MemeIngestGap",
     "MemeLabTick",
@@ -230,6 +232,7 @@ __all__ = [
     "MemeProposal",
     "MemeRiskSnapshot",
     "MemeRuleSet",
+    "MemeRuleSetParamHistory",
     "MemeToken",
     "MemeTrade",
     "MemeWalletPosition",

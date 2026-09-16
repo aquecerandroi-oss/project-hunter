@@ -162,6 +162,12 @@ class MemeToken(Base):
     provider's clock. ``NULL`` when only a migration was ever seen."""
 
     bonding_curve: Mapped[str | None] = mapped_column(Text)
+    bonding_curve_raw: Mapped[str | None] = mapped_column(Text)
+    """``0047`` (T4.39): what the create frame *said* the curve was, kept only
+    when it differed from the PDA derived from the mint (Mayhem coins carry the
+    shared sol vault there — 13 615 rows on 16/09/2026); ``bonding_curve`` is
+    always the derived PDA since then. Write-once by trigger, repaired by
+    ``infra/scripts/meme_repair_bonding_curve.py``."""
 
     initial_virtual_sol_reserves: Mapped[Decimal | None]
     initial_virtual_token_reserves: Mapped[Decimal | None]
