@@ -40,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0039_meme_creator_repeat"
+HEAD_REVISION = "0040_meme_tokens_creator_index"
 """``0039`` (T4.24) lands on ``0038`` (T4.2h-b); bumped here so the shared
 fixtures agree with the repository's actual chain rather than either task's
 private assumption."""
@@ -104,6 +104,7 @@ MEME_ACTIVITY_REVISION = "0032_meme_activity"
 OPERATOR_3_REVISION = "0033_meme_operator_3"
 E1_ARM2_REVISION = "0034_meme_gate_e1_arm2"
 ORGANIC_REVISION = "0035_meme_organic_e3"
+CREATOR_REPEAT_REVISION = "0039_meme_creator_repeat"
 """``0033``: where the ``0033`` tests stage now that ``0034`` sits on top (T4.21)."""
 CREATOR_WATCH_REVISION = "0036_meme_creator_watch"
 """Where the ``0036`` tests stage now that ``0037`` sits on top (T4.23)."""
@@ -7443,8 +7444,13 @@ def test_0039_refuses_a_downgrade_while_a_proposal_or_a_bet_references_a_repeat_
     upgraded: str,
 ) -> None:
     """§17.7: a proposal under ``operator/5`` or a bet under ``flow_v2/5`` is
-    evidence — count, name, stop. ``0039`` is the head: no staging."""
-    config = alembic_config(upgraded)
+    evidence — count, name, stop. Staged at ``0039`` since ``0040`` sits on top."""
+    with _staged_at(upgraded, CREATOR_REPEAT_REVISION) as config:
+        _refusal_of_0039(upgraded, config)
+    command.check(alembic_config(upgraded))
+
+
+def _refusal_of_0039(upgraded: str, config: Config) -> None:
     proposal = "00000000-0000-4000-8000-000000001001"
     bet = "00000000-0000-4000-8000-000000001002"
     guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
@@ -7473,12 +7479,11 @@ def test_0039_refuses_a_downgrade_while_a_proposal_or_a_bet_references_a_repeat_
         try:
             with pytest.raises(DBAPIError, match=message):
                 command.downgrade(config, "-1")
-            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
+            assert asyncio.run(_revision(upgraded)) == CREATOR_REPEAT_REVISION, (
                 "the downgrade must not commit"
             )
         finally:
             asyncio.run(_write(upgraded, list(_CLEAN_0039)))
-    command.check(alembic_config(upgraded))
 
 
 def test_0039_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
@@ -7545,3 +7550,25 @@ def test_0039_refuses_to_upgrade_a_desk_that_already_has_another_active_operator
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"]
+
+
+# ---------------------------------------------------------------------------
+# 0040_meme_tokens_creator_index — the pedigree counts stop scanning (T4.24b)
+# ---------------------------------------------------------------------------
+
+_CREATOR_INDEX = (
+    "SELECT count(*)::text FROM pg_indexes WHERE tablename = 'meme_tokens' "
+    "AND indexname = 'ix_meme_tokens_creator_created_at'"
+)
+
+
+def test_0040_adds_the_creator_index_and_reverses(upgraded: str) -> None:
+    config = alembic_config(upgraded)
+    assert asyncio.run(_scalars(upgraded, _CREATOR_INDEX, {})) == ["1"]
+    command.downgrade(config, CREATOR_REPEAT_REVISION)
+    try:
+        assert asyncio.run(_scalars(upgraded, _CREATOR_INDEX, {})) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)

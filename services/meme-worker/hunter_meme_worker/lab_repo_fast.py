@@ -16,7 +16,9 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
+from hunter_core.logging import get_logger
 from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, PedigreeGate
 from hunter_meme_worker.lab_rows import snapshot_from_row
 from hunter_meme_worker.proposals import SERIES_15S, GateRow
@@ -45,9 +47,17 @@ _FAST_ROWS = text(
     "ORDER BY f.as_of, f.mint"
 )
 
+_logger = get_logger(__name__)
+
+PRIOR_WINDOW_S = 7 * 86_400
+"""T4.24b (hotfix, 15/09/2026 19:3x BRT): the prior-coin counts look back **7 days**, not
+forever — the unbounded version scanned ``meme_tokens`` (105 k rows, no creator index)
+once per judged mint per tick and hit the statement timeout, killing the Lab loop
+(11 restarts after deploy 8293c2b). ``0040`` adds the ``(creator, created_at)`` index."""
 _PRIOR_MINTS = (
     "SELECT count(*) FROM meme_tokens o WHERE o.creator = t.creator "
-    "  AND o.mint <> t.mint AND o.created_at IS NOT NULL AND o.created_at <= t.created_at"
+    "  AND o.mint <> t.mint AND o.created_at IS NOT NULL AND o.created_at <= t.created_at "
+    "  AND o.created_at > t.created_at - make_interval(secs => :prior_window_s)"
 )
 """Every prior coin of this creator, any window — the base ``creator_prior_dump_count``
 and ``creator_prior_dead_count`` (T4.24) both start from and narrow with an ``AND``."""
@@ -173,7 +183,19 @@ async def pedigree_for(
         "mints": list(mints),
         "creator_window_s": gate.creator_window_s,
         "symbol_window_s": gate.symbol_window_s,
+        "prior_window_s": PRIOR_WINDOW_S,
     }
+    try:
+        async with session.begin_nested():
+            await session.execute(text("SET LOCAL statement_timeout = 8000"))
+            rows = (await session.execute(_PEDIGREE, params)).mappings().all()
+    except DBAPIError as exc:
+        # T4.24b: the savepoint rolled back; the tick goes on with the pedigree unread
+        # (every gate refuses ``pedigree_unknown`` by name) instead of dying.
+        _logger.warning(
+            "meme_pedigree_read_failed", mints=len(mints), error=type(exc.orig).__name__
+        )
+        return {}
     return {
         str(r["mint"]): PedigreeFeatures(
             creator_prior_mints_1h=(
@@ -191,7 +213,7 @@ async def pedigree_for(
                 else int(r["creator_prior_dead_count"])
             ),
         )
-        for r in (await session.execute(_PEDIGREE, params)).mappings()
+        for r in rows
     }
 
 
