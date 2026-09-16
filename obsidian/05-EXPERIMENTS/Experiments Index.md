@@ -1,6 +1,6 @@
 ---
 tags: [experimentos, indice]
-updated: 2026-09-11
+updated: 2026-09-16
 status: em-andamento
 owner: sexta-feira
 ---
@@ -421,6 +421,24 @@ com uma parada; e a **cobertura do tape voltou a andar** (`covered_until` a 0,7�
 sessão contínua desde 04:33:05Z), o que muda a disponibilidade das features de tape rio acima de
 [[EXP-0003-baselines-v1]]. A avaliação datada do próximo turno tem de começar por confirmar as duas
 coisas com SQL. Ver [[Diario/2026-09-07]].
+
+## Fila de braços pré-registrados (16/09)
+
+Três braços nasceram dos estudos quant de 16/09 **com pré-registro escrito antes de existir qualquer proposta** —
+a regra do laboratório ([[11-KNOWLEDGE/KB-0092-o-modelo-pre-registrado-que-morreu-no-holdout|KB-0092]],
+[[06-DECISIONS/2026-09-10-validacao-em-um-dia-e-lucro-real|decisão de 10/09]]): protocolo congelado, previsão
+padrão `descartar`, régua de **≥ 100 apostas medidas e 30 dias**, IC 95 % por blocos de dia e leave-top-out.
+**Nenhum dos três está implantado**; os números abaixo são in-sample, das KBs citadas.
+
+| Experimento | Braço | O que muda (uma coisa só) | Número in-sample | Previsão | Pré-condição |
+|---|---|---|---|---|---|
+| [[EXP-M10-compradores-25]] | `flow_v2/7` (porta) | `min_unique_buyers` 10 → **25**, aplicado **na escolha da barra** (reentrada); todo o resto é clone do vivo | Δ **+0,090 R** [+0,038; +0,201] em 273 entradas de 5 dias; cadência 79 % do controle ([[11-KNOWLEDGE/KB-0114-compradores-unicos-o-piso-e-o-r\|KB-0114]]) | `descartar`; leitura única a **150 propostas E 10 dias**, Δ previsto [+0,04; +0,20] | nenhuma — só criar o conjunto |
+| [[EXP-M11-saida-drawdown-20-apos-1p5x]] | `dd20_after_15x` (saída) | trailing 35 % → **recuo de 20 % do pico na série de 15 s, armado só depois de 1,5×**; entradas congeladas iguais às da mesa | Δ pareado **+0,0115 R** [−0,003; +0,027] em 291 apostas; gatilho toca 11,3 % delas a +0,359 R; cauda intacta ([[11-KNOWLEDGE/KB-0110-saida-por-drawdown-20-na-serie-de-15s\|KB-0110]]) | `descartar` — o IC de hoje **cruza o zero** | **T4.33**: a série de 15 s morre aos 300 s de vida da moeda e ignora o pin ([[11-KNOWLEDGE/KB-0113-ate-onde-as-series-acompanham-uma-aposta\|KB-0113]]); sem ela o braço não é julgável |
+| [[EXP-M12-celula-lenta-L2]] | `celula_lenta` **L2′** (porta) | entra na 1.ª barra de 1 min com **30 SOL reais**, idade ≥ 180 s, holders ≥ 20, fita, fluxo > 0, não-Mayhem, não nascida cheia, **teto de progresso 0,90 próprio do conjunto** | R médio **+0,349**, **mediana +0,046**, IC de blocos [+0,26; +0,41], **3,2 propostas/hora** admissíveis ([[11-KNOWLEDGE/KB-0107-celula-lenta-como-porta-da-mesa\|KB-0107]]) | `descartar`; prospectivo previsto [−0,10; +0,25], ponto +0,05 | **`curve_progress_max_pct` por conjunto** no motor de risco — mexer no risco é **decisão do dono**; até lá, papel e só papel |
+
+**O que estas três páginas deliberadamente não fazem:** não ligam dinheiro real, não ajustam limiar olhando os
+primeiros dias, não combinam duas mudanças no mesmo braço e não leem veredito antes da régua. Braço reprovado só
+volta com **mecanismo novo**, nunca com dados novos.
 
 ## Relacionadas
 
