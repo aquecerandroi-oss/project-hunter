@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:16px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#E6EDF3">
+  <sc-if value="{{ isCarteira }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+      <div><h1 style="margin:0;font-size:20px;font-weight:600">Carteira virtual · paper</h1><div style="font-size:12px;color:#98A6B5;margin-top:4px">Aberta com R$ 100.000,00 convertidos a {{ fx }} USDT/BRL (Binance spot, ticker) = {{ initial }} · spot · sem alavancagem, short ou futuros · Fonte: demonstração</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button onClick="{{ goRisco }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">Risk Engine e controles</button><button onClick="{{ goAmb }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">Ambientes</button></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6"><div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5">{{ k.label }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:20px;white-space:nowrap;color: {{ k.color }}">{{ k.value }}</span><span style="font-size:12px;color:#74828F">{{ k.sub }}</span></div></sc-for>
+    </div>
+    <div role="tablist" style="display:flex;gap:2px;border-bottom:1px solid #1F2A36">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4"><button role="tab" aria-selected="{{ t.active }}" onClick="{{ t.go }}" style="border:0;border-bottom:2px solid {{ t.border }};background:transparent;color: {{ t.color }};padding:10px 14px;font-size:13px;font-weight:500;cursor:pointer">{{ t.label }} <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#74828F">{{ t.count }}</span></button></sc-for>
+    </div>
+
+    <sc-if value="{{ tabPos }}" hint-placeholder-val="{{ true }}">
+      <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr auto;gap:8px;padding:0 12px;height:36px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;border-bottom:1px solid #1F2A36"><span>Ativo</span><span style="text-align:right">Qtd.</span><span style="text-align:right">Entrada</span><span style="text-align:right">Atual</span><span style="text-align:right">Stop</span><span style="text-align:right">Alvo</span><span style="text-align:right">Valor</span><span style="text-align:right">Não realizado</span><span style="text-align:right">Risco plan.</span><span></span></div>
+        <sc-for list="{{ positions }}" as="p" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr auto;gap:8px;padding:0 12px;height:44px;align-items:center;font-size:13px;border-bottom:1px solid #1F2A36;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">
+            <button onClick="{{ p.goOpp }}" style="border:0;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;padding:0;font:inherit">{{ p.sym }}<span style="display:block;font-size:11px;color:#74828F">{{ p.opp }} · {{ p.age }}</span></button>
+            <span style="text-align:right">{{ p.qty }}</span><span style="text-align:right">{{ p.entry }}</span><span style="text-align:right">{{ p.price }}</span><span style="text-align:right;color:#EF4444">{{ p.stop }}</span><span style="text-align:right;color:#22C55E">{{ p.target }}</span><span style="text-align:right">{{ p.value }}</span><span style="text-align:right;color: {{ p.color }}">{{ p.unreal }}<span style="display:block;font-size:11px">{{ p.pct }}</span></span><span style="text-align:right;color:#98A6B5">{{ p.risk }}</span>
+            <button onClick="{{ p.close }}" title="{{ p.closeTitle }}" style="border:1px solid #2C3947;background:transparent;color: {{ p.closeColor }};border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif">Encerrar</button>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noPositions }}" hint-placeholder-val="{{ false }}"><div style="padding:24px;font-size:13px;color:#98A6B5">Nenhuma posição aberta. Saldo integralmente disponível.</div></sc-if>
+      </div>
+      <div style="font-size:12px;color:#74828F;line-height:1.6">Não realizado = (preço atual − entrada) × quantidade − taxa de entrada; é marcação, não lucro. Risco planejado = distância até o stop × quantidade — pode ser excedido por gaps ou slippage. Encerrar gera uma ordem paper a mercado com taxa 0,10% e slippage 5 bps.</div>
+    </sc-if>
+
+    <sc-if value="{{ tabOrd }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:90px 110px 1fr 1fr 1fr 1fr 1fr 1fr;gap:8px;padding:0 12px;height:36px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;border-bottom:1px solid #1F2A36"><span>Id</span><span>Ativo</span><span>Tipo</span><span>Finalidade</span><span style="text-align:right">Preço</span><span style="text-align:right">Qtd.</span><span>Status</span><span>Criada</span></div>
+        <sc-for list="{{ orders }}" as="o" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:90px 110px 1fr 1fr 1fr 1fr 1fr 1fr;gap:8px;padding:0 12px;height:40px;align-items:center;font-size:13px;border-bottom:1px solid #1F2A36;font-variant-numeric:tabular-nums"><span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ o.id }}</span><span style="font-family:'JetBrains Mono',monospace">{{ o.sym }}</span><span>{{ o.type }}</span><span>{{ o.purpose }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace">{{ o.price }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace">{{ o.qty }}</span><span style="font-size:11px"><span style="padding:2px 8px;border-radius:10px;background: {{ o.bg }};color: {{ o.fg }}">{{ o.status }}</span></span><span style="font-size:12px;color:#98A6B5;font-family:'JetBrains Mono',monospace">{{ o.at }}</span></div></sc-for>
+        <sc-if value="{{ noOrders }}" hint-placeholder-val="{{ false }}"><div style="padding:24px;font-size:13px;color:#98A6B5">Nenhuma ordem simulada registrada.</div></sc-if>
+      </div>
+      <div style="font-size:12px;color:#74828F">Ordens de stop e alvo são paper: o preenchimento segue as regras de simulação (toque no preço + slippage), não o preço observado.</div>
+    </sc-if>
+
+    <sc-if value="{{ tabHist }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:80px 110px 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr;gap:8px;padding:0 12px;height:36px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;border-bottom:1px solid #1F2A36"><span>Id</span><span>Ativo</span><span style="text-align:right">Qtd.</span><span style="text-align:right">Entrada</span><span style="text-align:right">Saída</span><span style="text-align:right">Taxas</span><span style="text-align:right">Resultado</span><span>Motivo</span><span>Encerrada</span></div>
+        <sc-for list="{{ trades }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.go }}" style="display:grid;grid-template-columns:80px 110px 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr;gap:8px;padding:0 12px;height:40px;align-items:center;font-size:13px;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;width:100%;font-variant-numeric:tabular-nums" style-hover="background:#121A22"><span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ t.id }}</span><span style="font-family:'JetBrains Mono',monospace">{{ t.sym }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace">{{ t.qty }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace">{{ t.entry }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace">{{ t.exit }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ t.fees }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;color: {{ t.color }}">{{ t.pnl }}</span><span style="font-size:12px">{{ t.reason }}</span><span style="font-size:12px;color:#98A6B5;font-family:'JetBrains Mono',monospace">{{ t.closedAt }}</span></button></sc-for>
+        <sc-if value="{{ noTrades }}" hint-placeholder-val="{{ false }}"><div style="padding:24px;font-size:13px;color:#98A6B5">Nenhuma operação encerrada ainda.</div></sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ tabMov }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden">
+        <sc-for list="{{ movements }}" as="m" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:150px 1fr auto auto;gap:12px;padding:0 12px;height:40px;align-items:center;font-size:13px;border-bottom:1px solid #1F2A36"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#98A6B5">{{ m.at }}</span><span>{{ m.text }}</span><span style="font-family:'JetBrains Mono',monospace;color: {{ m.color }}">{{ m.amount }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#74828F">{{ m.kind }}</span></div></sc-for>
+      </div>
+      <div style="font-size:12px;color:#74828F">Movimentações em USDT. Sem aportes ou resgates: a carteira é única, permanente e sem reset. Valores em BRL são apenas referência pela taxa de abertura.</div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ isRisco }}" hint-placeholder-val="{{ false }}">
+    <div><h1 style="margin:0;font-size:20px;font-weight:600">Risk Engine e controles operacionais</h1><div style="font-size:12px;color:#98A6B5;margin-top:4px">Barreira obrigatória antes de qualquer nova operação paper. Todos os limites são verificados em conjunto — atender a um não dispensa os demais.</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+      <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Limites aprovados · estado atual</h2>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+          <sc-for list="{{ limits }}" as="l" hint-placeholder-count="6">
+            <div><div style="display:flex;justify-content:space-between;font-size:13px"><span>{{ l.label }}</span><span style="font-family:'JetBrains Mono',monospace;color: {{ l.color }}">{{ l.value }} <span style="color:#74828F">/ {{ l.limit }}</span></span></div><div style="height:6px;background:#161E27;border-radius:3px;margin-top:4px;overflow:hidden"><div style="height:100%;background: {{ l.color }};width: {{ l.bar }}"></div></div><div style="font-size:11px;color:#74828F;margin-top:2px">{{ l.note }}</div></div>
+          </sc-for>
+        </div>
+      </section>
+      <section style="background:#10161D;border:1px solid {{ ksBorder }};border-radius:8px;padding:16px;min-width:0;display:flex;flex-direction:column;gap:12px">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Controles — ações distintas</h2>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:600;background: {{ ksBg }};color: {{ ksFg }}">KILL SWITCH {{ ks }}</span><span style="font-size:12px;color:#98A6B5">{{ ksNote }}</span></div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-size:13px">
+          <div><strong>Pausa operacional</strong><div style="font-size:12px;color:#98A6B5">Suspende novas entradas paper. Não mexe em ordens nem posições.</div></div>
+          <button onClick="{{ togglePause }}" style="border:1px solid #F5A524;background: {{ pauseBg }};color: {{ pauseFg }};border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap">{{ pauseLabel }}</button>
+          <div><strong>Cancelar ordens pendentes</strong><div style="font-size:12px;color:#98A6B5">Cancela stops e alvos paper pendentes ({{ pendingCount }}). Posições continuam abertas sem proteção.</div></div>
+          <button onClick="{{ cancelOrders }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap">Cancelar pendentes</button>
+          <div><strong>Encerrar todas as posições</strong><div style="font-size:12px;color:#98A6B5">Gera uma ordem paper a mercado por posição ({{ posCount }}). Só aqui posições são encerradas.</div></div>
+          <button onClick="{{ closeAll }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap">Encerrar todas</button>
+          <div><strong style="color:#EF4444">Kill switch</strong><div style="font-size:12px;color:#98A6B5">Bloqueia novas entradas e registra o evento. Não encerra nem esconde posições abertas.</div></div>
+          <button onClick="{{ toggleKill }}" style="border:0;background: {{ killBtnBg }};color: {{ killBtnFg }};border-radius:6px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">{{ killLabel }}</button>
+        </div>
+        <div style="font-size:11px;color:#74828F">Permissões administrativas, pontuação de agentes e gamificação não alteram estes limites. Papel atual: {{ role }} — {{ roleNote }}</div>
+      </section>
+    </div>
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px">
+      <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Decisões do Risk Engine</h2>
+      <div style="display:flex;flex-direction:column;margin-top:6px">
+        <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="4"><button onClick="{{ d.go }}" style="display:grid;grid-template-columns:140px 90px 100px 1fr auto;gap:12px;padding:8px 0;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;font-size:13px;align-items:center" style-hover="background:#121A22"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#98A6B5">{{ d.at }}</span><span style="font-family:'JetBrains Mono',monospace">{{ d.id }}</span><span style="font-family:'JetBrains Mono',monospace">{{ d.sym }}</span><span style="font-size:12px;color:#98A6B5">{{ d.reason }}</span><span style="font-size:11px;padding:2px 8px;border-radius:10px;background: {{ d.bg }};color: {{ d.fg }}">{{ d.result }} · {{ d.n }}</span></button></sc-for>
+        <sc-if value="{{ noDecisions }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#98A6B5;padding-top:6px">Nenhuma decisão registrada.</div></sc-if>
+      </div>
+    </section>
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px">
+      <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Eventos de controle</h2>
+      <div style="display:flex;flex-direction:column;margin-top:6px"><sc-for list="{{ controlEvents }}" as="e" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:140px 1fr;gap:12px;padding:7px 0;border-bottom:1px solid #1F2A36;font-size:13px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#98A6B5">{{ e.at }}</span><span>{{ e.text }}</span></div></sc-for><sc-if value="{{ noControl }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#98A6B5;padding-top:6px">Nenhum acionamento de pausa ou kill switch registrado.</div></sc-if></div>
+    </section>
+  </sc-if>
+
+  <sc-if value="{{ isAmb }}" hint-placeholder-val="{{ false }}">
+    <div><h1 style="margin:0;font-size:20px;font-weight:600">Ambientes de execução</h1><div style="font-size:12px;color:#98A6B5;margin-top:4px">Fonte dos dados (real ou demonstração) e ambiente de execução (shadow, paper, backtest) são informações separadas. Dados reais de mercado nunca significam dinheiro real. Nenhum envio de ordem real existe nesta entrega.</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+      <sc-for list="{{ envs }}" as="e" hint-placeholder-count="3">
+        <section style="background:#10161D;border:1px solid {{ e.border }};border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0;font-size:16px;font-weight:600;color: {{ e.color }}">{{ e.name }}</h2><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#161E27;color:#98A6B5">{{ e.tag }}</span></div>
+          <div style="font-size:13px;color:#98A6B5;line-height:1.5">{{ e.desc }}</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:13px;border-top:1px solid #1F2A36;padding-top:10px"><sc-for list="{{ e.stats }}" as="st" hint-placeholder-count="4"><span style="color:#98A6B5">{{ st.label }}</span><span style="font-family:'JetBrains Mono',monospace;text-align:right">{{ st.value }}</span></sc-for></div>
+          <button onClick="{{ e.go }}" style="align-self:flex-start;border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer">{{ e.cta }}</button>
+        </section>
+      </sc-for>
+    </div>
+    <div style="font-size:12px;color:#74828F;line-height:1.6">Os resultados dos três ambientes nunca são somados em uma única curva. A curva do dashboard é exclusivamente paper. Sinais do Lab nascem como pesquisa e a ponte de execução recusa esse rótulo antes de qualquer outra verificação.</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ctx&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const ctx = this.props.ctx; if (!ctx) return {};
+    const { org, pf, D, C, s } = ctx;
+    const go = (r, p) => C.go(r, p);
+    const now = Date.now();
+    const col = (v) => (v > 0 ? "#22C55E" : v < 0 ? "#EF4444" : "#E6EDF3");
+    const route = s.route; const tab = s.params.tab || s.carteiraTab || "posicoes";
+    const canOp = C.can("operar_paper"), canKill = C.can("kill_switch");
+    const closePos = (p) => () => {
+      if (!canOp) return C.toast(`Papel ${s.role} não pode encerrar posições paper.`, "#EF4444");
+      const exit = p.price * (1 - D.LIMITS.slippageBps / 10000), fee = exit * p.qty * D.LIMITS.feeRate, pnl = (exit - p.entry) * p.qty - p.fees - fee;
+      C.confirm(`Encerrar ${p.sym}?`, `Ordem paper a mercado: ${D.fmtNum(p.qty, 4)} a ≈ ${D.fmtPrice(exit)} (slippage 5 bps), taxa ${D.fmtUSDT(fee)}.\nResultado estimado: ${D.fmtSigned(pnl)} USDT. Ordens pendentes da posição serão canceladas.`, "Encerrar posição", () => {
+        C.mutate((g) => {
+          g.positions = g.positions.filter((x) => x.id !== p.id);
+          g.orders.forEach((o) => { if (o.pos === p.id && o.status === "Pendente") o.status = "Cancelada"; });
+          g.trades.unshift({ id: "T-" + (300 + g.trades.length), opp: p.opp, sym: p.sym, qty: p.qty, entry: p.entry, exit, openedAt: p.openedAt, fees: p.fees + fee, reason: "Manual", closedAt: new Date().toISOString(), env: "paper" });
+          const o = g.opps.find((x) => x.id === p.opp); if (o) o.stage = "encerrada";
+          C.event(g, "execucao", `Posição ${p.sym} encerrada manualmente a ${D.fmtPrice(exit)} · ${D.fmtSigned(pnl)} USDT`, p.opp);
+        });
+        C.toast("Posição encerrada. Carteira, dashboard e histórico atualizados.", "#22C55E");
+      }, "#EF4444");
+    };
+    const positions = pf.posRows.map((p) => ({ sym: p.sym, opp: p.opp, age: D.fmtAgo(p.openedAt, now), qty: D.fmtNum(p.qty, 4), entry: D.fmtPrice(p.entry), price: D.fmtPrice(p.price), stop: D.fmtPrice(p.stop), target: p.target ? D.fmtPrice(p.target) : "—", value: D.fmtNum(p.value), unreal: D.fmtSigned(p.unreal), pct: D.fmtPct(p.unrealPct), color: col(p.unreal), risk: D.fmtNum(p.riskPlanned), goOpp: go("oportunidade", { id: p.opp }), close: closePos(p), closeTitle: canOp ? "Gera ordem paper a mercado" : `Indisponível: papel ${s.role} não opera`, closeColor: canOp ? "#E6EDF3" : "#74828F" }));
+    const oSt = { Pendente: ["#2E1F06", "#F5A524"], Preenchida: ["#0E2A1A", "#22C55E"], Cancelada: ["#161E27", "#98A6B5"], Rejeitada: ["#2A0E0E", "#EF4444"] };
+    const orders = [...org.orders].sort((a, b) => b.at.localeCompare(a.at)).map((o) => ({ ...o, price: D.fmtPrice(o.price), qty: D.fmtNum(o.qty, 4), at: D.fmtDT(o.at), bg: oSt[o.status][0], fg: oSt[o.status][1] }));
+    const trades = [...org.trades].sort((a, b) => b.closedAt.localeCompare(a.closedAt)).map((t) => { const pnl = (t.exit - t.entry) * t.qty - t.fees; return { id: t.id, sym: t.sym, qty: D.fmtNum(t.qty, 4), entry: D.fmtPrice(t.entry), exit: D.fmtPrice(t.exit), fees: D.fmtNum(t.fees), pnl: D.fmtSigned(pnl), color: col(pnl), reason: t.reason, closedAt: D.fmtDT(t.closedAt), go: go("oportunidade", { id: t.opp }) }; });
+    const movements = [
+      ...org.trades.map((t) => { const pnl = (t.exit - t.entry) * t.qty - t.fees; return { at: t.closedAt, text: `Encerramento ${t.sym} (${t.reason}) — liberação do capital + resultado`, amount: D.fmtSigned(t.entry * t.qty + pnl), color: col(pnl), kind: "encerramento" }; }),
+      ...org.positions.map((p) => ({ at: p.openedAt, text: `Entrada ${p.sym} — capital alocado + taxa ${D.fmtNum(p.fees)}`, amount: D.fmtSigned(-(p.entry * p.qty + p.fees)), color: "#98A6B5", kind: "alocação" })),
+      ...org.trades.map((t) => ({ at: t.openedAt, text: `Entrada ${t.sym} — capital alocado`, amount: D.fmtSigned(-t.entry * t.qty), color: "#98A6B5", kind: "alocação" })),
+      { at: "2026-08-01T12:00:00.000Z", text: `Abertura da carteira: R$ 100.000,00 → USDT a ${D.fmtNum(D.LIMITS.fxBRLUSDT)}`, amount: D.fmtSigned(pf.initialUSDT), color: "#22D3EE", kind: "abertura" },
+    ].sort((a, b) => b.at.localeCompare(a.at)).map((m) => ({ ...m, at: D.fmtDT(m.at) }));
+    const kpis = [
+      { label: "Patrimônio", value: D.fmtUSDT(pf.equity), sub: `≈ ${D.fmtBRL(pf.equity * D.LIMITS.fxBRLUSDT)} (ref. abertura)`, color: "#E6EDF3" },
+      { label: "Disponível / alocado", value: `${D.fmtNum(pf.cash, 0)} / ${D.fmtNum(pf.allocated, 0)}`, sub: "USDT · alocado = custo das posições", color: "#E6EDF3" },
+      { label: "Realizado", value: D.fmtSigned(pf.realized) + " USDT", sub: "líquido de taxas", color: col(pf.realized) },
+      { label: "Não realizado", value: D.fmtSigned(pf.unrealized) + " USDT", sub: "marcação · pode reverter", color: col(pf.unrealized) },
+      { label: "Exposição", value: D.fmtPct(pf.exposure * 100), sub: "limite 40% · 10% por moeda", color: "#E6EDF3" },
+      { label: "Risco planejado", value: D.fmtPct(pf.riskAgg * 100, 2), sub: `limite 1% · ${pf.positionsCount}/5 posições`, color: "#E6EDF3" },
+    ];
+    const tabsDef = [["posicoes", "Posições", pf.positionsCount], ["ordens", "Ordens simuladas", org.orders.filter((o) => o.status === "Pendente").length], ["historico", "Execuções e histórico", org.trades.length], ["movimentacoes", "Movimentações", movements.length]];
+    const tabs = tabsDef.map(([id, label, n]) => ({ label, count: String(n), active: tab === id, border: tab === id ? "#22D3EE" : "transparent", color: tab === id ? "#E6EDF3" : "#98A6B5", go: () => C.setState({ carteiraTab: id, params: { ...s.params, tab: id } }) }));
+    // risco
+    const pending = org.orders.filter((o) => o.status === "Pendente");
+    const maxCoin = Math.max(0, ...pf.byCoin.map((c) => c.pct));
+    const lim = (label, v, max, fmtV, fmtL, note) => ({ label, value: fmtV, limit: fmtL, bar: `${Math.min(100, (v / max) * 100)}%`, color: v / max > 0.9 ? "#EF4444" : v / max > 0.7 ? "#F5A524" : "#22D3EE", note });
+    const limits = [
+      lim("Exposição total", pf.exposure, 0.4, D.fmtPct(pf.exposure * 100), "40%", "valor de mercado das posições ÷ patrimônio"),
+      lim("Maior exposição por moeda", maxCoin, 0.1, D.fmtPct(maxCoin * 100), "10%", pf.byCoin.length ? pf.byCoin.sort((a, b) => b.pct - a.pct)[0].sym : "sem posições"),
+      lim("Risco planejado agregado", pf.riskAgg, 0.01, D.fmtPct(pf.riskAgg * 100, 2), "1,00%", "soma das distâncias até o stop · 0,25% por operação"),
+      lim("Posições simultâneas", pf.positionsCount, 5, String(pf.positionsCount), "5", "spot, sem alavancagem"),
+      lim("Drawdown desde o pico", -pf.drawdown, 0.05, D.fmtPct(pf.drawdown * 100, 2), "alerta 5%", `pico ${D.fmtUSDT(pf.peak, 0)}`),
+      { label: "Volume mínimo elegível", value: "50 mi USDT", limit: "24 h", bar: "100%", color: "#2C3947", note: "soma das últimas 24 velas 1 h da exchange; abaixo disso só observação ou shadow" },
+    ];
+    const ksOn = org.killSwitch === "ATIVO";
+    const toggleKill = () => {
+      if (!canKill) return C.toast(`Papel ${s.role} não pode acionar o kill switch.`, "#EF4444");
+      C.confirm(ksOn ? "Acionar kill switch?" : "Reativar entradas?", ksOn ? `Bloqueia novas entradas paper e registra o evento. As ${pf.positionsCount} posições abertas continuam abertas e visíveis; ${pending.length} ordens pendentes não são alteradas. Para encerrar posições use a ação específica.` : "Novas entradas voltam a passar pelo Risk Engine normalmente. O evento fica registrado.", ksOn ? "Acionar kill switch" : "Reativar", () => C.mutate((g) => { g.killSwitch = ksOn ? "BLOQUEADO" : "ATIVO"; C.event(g, "risco", `Kill switch ${ksOn ? "ACIONADO" : "reativado"} por ${s.role} — novas entradas ${ksOn ? "bloqueadas" : "liberadas"}; posições abertas: ${g.positions.length}`, ""); }), ksOn ? "#EF4444" : "#22D3EE");
+    };
+    const togglePause = () => { if (!canKill) return C.toast(`Papel ${s.role} não pode pausar a operação.`, "#EF4444"); C.mutate((g) => { g.paused = !g.paused; C.event(g, "risco", `Pausa operacional ${g.paused ? "ativada" : "desativada"} por ${s.role}`, ""); }); };
+    const cancelOrders = () => { if (!canOp) return C.toast(`Papel ${s.role} não pode cancelar ordens.`, "#EF4444"); if (!pending.length) return C.toast("Não há ordens pendentes."); C.confirm("Cancelar ordens pendentes?", `${pending.length} ordens paper (stops e alvos) serão canceladas. As posições ficam abertas sem proteção automática.`, "Cancelar ordens", () => C.mutate((g) => { g.orders.forEach((o) => { if (o.status === "Pendente") o.status = "Cancelada"; }); C.event(g, "execucao", `${pending.length} ordens pendentes canceladas por ${s.role}`, ""); }), "#F5A524"); };
+    const closeAll = () => { if (!canOp) return C.toast(`Papel ${s.role} não pode encerrar posições.`, "#EF4444"); if (!pf.posRows.length) return C.toast("Não há posições abertas."); C.confirm("Encerrar todas as posições?", `${pf.posRows.length} ordens paper a mercado serão simuladas (taxa 0,10%, slippage 5 bps). Esta é a única ação que encerra posições.`, "Encerrar todas", () => { C.mutate((g) => { pf.posRows.forEach((p) => { const exit = p.price * (1 - D.LIMITS.slippageBps / 10000), fee = exit * p.qty * D.LIMITS.feeRate; g.trades.unshift({ id: "T-" + (300 + g.trades.length), opp: p.opp, sym: p.sym, qty: p.qty, entry: p.entry, exit, openedAt: p.openedAt, fees: p.fees + fee, reason: "Manual", closedAt: new Date().toISOString(), env: "paper" }); const o = g.opps.find((x) => x.id === p.opp); if (o) o.stage = "encerrada"; g.orders.forEach((od) => { if (od.pos === p.id && od.status === "Pendente") od.status = "Cancelada"; }); C.event(g, "execucao", `Posição ${p.sym} encerrada (encerrar todas) a ${D.fmtPrice(exit)}`, p.opp); }); g.positions = []; }); C.toast("Todas as posições encerradas com execução registrada.", "#22C55E"); }, "#EF4444"); };
+    const decisions = org.opps.filter((o) => o.riskLog).sort((a, b) => b.riskLog.at.localeCompare(a.riskLog.at)).map((o) => ({ at: D.fmtDT(o.riskLog.at), id: o.id, sym: o.sym, reason: o.riskLog.reason, result: o.riskLog.result, n: `${o.riskLog.checks.filter((c) => c.ok).length}/${o.riskLog.checks.length}`, bg: o.riskLog.result === "aprovado" ? "#0E2A1A" : "#2A0E0E", fg: o.riskLog.result === "aprovado" ? "#22C55E" : "#EF4444", go: go("oportunidade", { id: o.id }) }));
+    const controlEvents = org.events.filter((e) => /kill switch|pausa operacional|canceladas/i.test(e.text)).map((e) => ({ at: D.fmtDT(e.at), text: e.text }));
+    // ambientes
+    const shadowOpps = org.opps.filter((o) => o.env === "shadow" || o.stage === "shadow");
+    const bt = org.experiments.filter((x) => x.env === "backtest");
+    const envs = [
+      { name: "Shadow", tag: "sem carteira", color: "#60A5FA", border: "#1F2A36", desc: "Acompanha sinais e marca o que teria acontecido, sem movimentar a carteira paper. Serve para ativos inelegíveis e para amadurecer estratégias.", stats: [{ label: "Sinais acompanhados", value: String(shadowOpps.length) }, { label: "Fonte dos dados", value: "demonstração" }, { label: "Resultado", value: "não entra na curva" }], cta: "Ver oportunidades em shadow", go: go("oportunidades", { stage: "shadow" }) },
+      { name: "Paper", tag: "carteira virtual", color: "#22D3EE", border: "#22D3EE", desc: "Executa operações simuladas com as regras aprovadas (0,25% por operação, 1% agregado, 40% exposição, 10% por moeda, 5 posições, volume ≥ 50 mi). Considera taxas, spread e slippage.", stats: [{ label: "Patrimônio", value: D.fmtUSDT(pf.equity, 0) }, { label: "Posições abertas", value: `${pf.positionsCount}/5` }, { label: "Operações encerradas", value: String(org.trades.length) }, { label: "Kill switch", value: org.killSwitch }], cta: "Abrir carteira", go: go("carteira") },
+      { name: "Backtest", tag: "dados históricos", color: "#98A6B5", border: "#1F2A36", desc: "Testa estratégias sobre velas persistidas, com avaliação dentro e fora da amostra. Nunca conta para a régua de maturidade nem para a carteira.", stats: [{ label: "Experimentos", value: String(bt.length) }, { label: "Operações simuladas", value: String(bt.reduce((a, x) => a + x.trades, 0)) }, { label: "Custos considerados", value: "taxa + slippage" }], cta: "Abrir laboratório", go: go("lab") },
+    ];
+    return {
+      isCarteira: route === "carteira", isRisco: route === "risco", isAmb: route === "ambientes",
+      fx: D.fmtNum(D.LIMITS.fxBRLUSDT), initial: D.fmtUSDT(pf.initialUSDT), goRisco: go("risco"), goAmb: go("ambientes"), kpis, tabs,
+      tabPos: tab === "posicoes", tabOrd: tab === "ordens", tabHist: tab === "historico", tabMov: tab === "movimentacoes",
+      positions, noPositions: positions.length === 0, orders, noOrders: orders.length === 0, trades, noTrades: trades.length === 0, movements,
+      limits, ks: org.killSwitch, ksOn, ksBorder: ksOn ? "#1F2A36" : "#EF4444", ksBg: ksOn ? "#0E2A1A" : "#2A0E0E", ksFg: ksOn ? "#22C55E" : "#EF4444", ksNote: ksOn ? "entradas liberadas (sujeitas às verificações)" : "novas entradas bloqueadas · posições abertas permanecem visíveis",
+      togglePause, pauseLabel: org.paused ? "Retomar operação" : "Pausar operação", pauseBg: org.paused ? "#2E1F06" : "transparent", pauseFg: "#F5A524", pendingCount: String(pending.length), posCount: String(pf.positionsCount), cancelOrders, closeAll,
+      toggleKill, killLabel: ksOn ? "Acionar kill switch" : "Reativar entradas", killBtnBg: ksOn ? "#EF4444" : "#22D3EE", killBtnFg: "#061014", role: s.role, roleNote: canKill ? "pode acionar pausa e kill switch" : "somente leitura nesta tela",
+      decisions, noDecisions: decisions.length === 0, controlEvents, noControl: controlEvents.length === 0, envs,
+    };
+  }
+}
+</script>
+</body>
+</html>

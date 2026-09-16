@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0B0F14;color:#E6EDF3;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+a{color:#22D3EE;text-decoration:none}a:hover{color:#67E8F9}
+button{font-family:inherit}input,select,textarea{font-family:inherit}
+*:focus-visible{outline:2px solid #22D3EE;outline-offset:1px}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2C3947;border-radius:6px}
+@media (max-width:1180px){[data-hide-narrow]{display:none !important}}
+@media (max-width:900px){[data-hide-mobile]{display:none !important}}
+</style>
+</helmet>
+<div style="display:flex;height:100vh;width:100%;overflow:hidden;background:#0B0F14;color:#E6EDF3">
+  <aside style="display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid #1F2A36;background:#10161D;transition:width .15s;overflow:hidden;width: {{ sidebarWidth }}">
+    <div style="display:flex;align-items:center;justify-content:space-between;height:56px;padding:0 12px;flex-shrink:0">
+      <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="font-weight:600;letter-spacing:.12em;color:#22D3EE;font-size:13px;text-shadow:0 0 14px rgba(34,211,238,.35)">HUNTER</span></sc-if>
+      <button onClick="{{ toggleSidebar }}" aria-label="Recolher ou expandir menu" style="background:transparent;border:1px solid transparent;color:#98A6B5;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:14px" style-hover="background:#161E27;color:#E6EDF3">{{ sidebarGlyph }}</button>
+    </div>
+    <nav aria-label="Navegação principal" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0 8px 16px;display:flex;flex-direction:column;gap:14px">
+      <sc-for list="{{ navGroups }}" as="g" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#74828F;padding:4px 12px 6px;font-weight:500">{{ g.label }}</div></sc-if>
+          <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+            <button onClick="{{ it.go }}" aria-current="{{ it.current }}" title="{{ it.label }}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:6px;border:0;border-left:2px solid {{ it.bar }};background: {{ it.bg }};color: {{ it.color }};font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#161E27;color:#E6EDF3">
+              <span style="width:16px;text-align:center;color: {{ it.iconColor }};font-family:'JetBrains Mono',monospace;font-size:12px;flex-shrink:0">{{ it.glyph }}</span>
+              <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">{{ it.label }}</span></sc-if>
+              <sc-if value="{{ it.showBadge }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#98A6B5;background:#161E27;padding:1px 6px;border-radius:10px">{{ it.badge }}</span></sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </sc-for>
+    </nav>
+  </aside>
+
+  <div style="display:flex;flex-direction:column;flex:1;min-width:0">
+    <header style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid #1F2A36;background:#10161D;padding:0 16px;flex-shrink:0">
+      <select value="{{ orgId }}" onChange="{{ onOrgChange }}" aria-label="Organização" style="background:#161E27;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:500;cursor:pointer">
+        <option value="alfa">Mesa Alfa</option>
+        <option value="labs">Hunter Labs</option>
+      </select>
+      <div data-hide-mobile="1" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span data-hide-narrow="1" style="font-size:11px;color:#98A6B5;text-transform:uppercase;letter-spacing:.06em">Fonte</span>
+        <span style="font-size:12px;font-weight:500;padding:2px 8px;border-radius:10px;background:#2E1F06;color:#F5A524">Demonstração</span>
+        <span data-hide-narrow="1" style="font-size:11px;color:#98A6B5;text-transform:uppercase;letter-spacing:.06em;margin-left:6px">Ambiente</span>
+        <span style="font-size:12px;font-weight:500;padding:2px 8px;border-radius:10px;background:#0A2A33;color:#22D3EE">Paper</span>
+      </div>
+      <div style="flex:1;display:flex;justify-content:center;min-width:40px">
+        <button onClick="{{ openSearch }}" aria-label="Busca global" style="display:flex;align-items:center;gap:8px;width:100%;max-width:420px;min-width:36px;background:#0B0F14;border:1px solid #2C3947;color:#74828F;border-radius:6px;padding:7px 12px;font-size:13px;cursor:text;text-align:left;overflow:hidden" style-hover="border-color:#22D3EE">
+          <span style="color:#98A6B5">⌕</span><span data-hide-narrow="1" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Buscar ativos, oportunidades, contatos…</span><span data-hide-narrow="1" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#74828F;border:1px solid #2C3947;border-radius:4px;padding:0 5px">Ctrl K</span>
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <button onClick="{{ openQuick }}" title="Criação rápida" style="height:32px;padding:0 10px;border-radius:6px;border:1px solid #2C3947;background:transparent;color:#E6EDF3;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap" style-hover="background:#161E27">+ Criar</button>
+        <button onClick="{{ goSistema }}" title="{{ servicesTitle }}" aria-label="Status dos serviços" style="display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:6px;border:1px solid #2C3947;background:transparent;color:#98A6B5;font-size:12px;cursor:pointer" style-hover="background:#161E27">
+          <span style="width:8px;height:8px;border-radius:50%;background: {{ servicesDot }}"></span><span data-hide-narrow="1">Serviços</span>
+        </button>
+        <button onClick="{{ toggleNotif }}" aria-label="Notificações" style="position:relative;height:32px;width:32px;border-radius:6px;border:1px solid #2C3947;background:transparent;color:#98A6B5;cursor:pointer;font-size:13px" style-hover="background:#161E27">◔<span style="position:absolute;top:-4px;right:-4px;font-size:10px;font-family:'JetBrains Mono',monospace;background:#22D3EE;color:#061014;border-radius:8px;padding:0 4px;font-weight:600">{{ notifCount }}</span></button>
+        <button onClick="{{ toggleAssistant }}" style="height:32px;padding:0 10px;border-radius:6px;border:1px solid #22D3EE;background: {{ assistantBg }};color:#22D3EE;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">Assistente</button>
+        <div style="position:relative">
+          <button onClick="{{ toggleUser }}" aria-label="Menu do usuário" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 8px 0 4px;border-radius:6px;border:1px solid #2C3947;background:transparent;color:#E6EDF3;cursor:pointer;font-size:12px">
+            <span style="width:24px;height:24px;border-radius:50%;background:#0A2A33;color:#22D3EE;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:11px">{{ userInitials }}</span><span data-hide-narrow="1" style="white-space:nowrap">{{ role }}</span><span style="color:#74828F">▾</span>
+          </button>
+          <sc-if value="{{ userOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;right:0;top:38px;width:260px;background:#161E27;border:1px solid #2C3947;border-radius:8px;padding:8px;z-index:30;box-shadow:0 12px 32px rgba(0,0,0,.5)">
+              <div style="padding:6px 8px;font-size:13px;font-weight:600">{{ userName }}</div>
+              <div style="padding:0 8px 8px;font-size:12px;color:#98A6B5">{{ userEmail }}</div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;padding:6px 8px">Papel demonstrativo</div>
+              <sc-for list="{{ roleOptions }}" as="r" hint-placeholder-count="6">
+                <button onClick="{{ r.pick }}" style="display:flex;justify-content:space-between;width:100%;text-align:left;padding:6px 8px;border:0;background: {{ r.bg }};color:#E6EDF3;border-radius:4px;font-size:13px;cursor:pointer" style-hover="background:#1F2A36">{{ r.label }}<span style="color:#22D3EE">{{ r.check }}</span></button>
+              </sc-for>
+              <div style="border-top:1px solid #2C3947;margin:8px 0"></div>
+              <button onClick="{{ goPerfil }}" style="display:block;width:100%;text-align:left;padding:6px 8px;border:0;background:transparent;color:#E6EDF3;border-radius:4px;font-size:13px;cursor:pointer" style-hover="background:#1F2A36">Editar perfil e preferências</button>
+              <div style="padding:6px 8px;font-size:11px;color:#74828F">A troca de papel é demonstrativa; as restrições reais são aplicadas pela API.</div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </header>
+
+    <sc-if value="{{ notifOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;right:16px;top:60px;width:380px;background:#161E27;border:1px solid #2C3947;border-radius:8px;z-index:30;box-shadow:0 12px 32px rgba(0,0,0,.5)">
+        <div style="padding:10px 12px;border-bottom:1px solid #2C3947;font-size:13px;font-weight:600;display:flex;justify-content:space-between"><span>Notificações</span><button onClick="{{ toggleNotif }}" style="border:0;background:transparent;color:#98A6B5;cursor:pointer">✕</button></div>
+        <sc-for list="{{ notifications }}" as="n" hint-placeholder-count="4">
+          <button onClick="{{ n.go }}" style="display:flex;gap:10px;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer" style-hover="background:#1F2A36">
+            <span style="width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0;background: {{ n.dot }}"></span>
+            <span style="flex:1;font-size:13px;line-height:1.4">{{ n.text }}<span style="display:block;font-size:11px;color:#74828F;font-family:'JetBrains Mono',monospace;margin-top:2px">{{ n.when }}</span></span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ killBanner }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#2A0E0E;border-bottom:1px solid #EF4444;color:#FCA5A5;padding:8px 24px;font-size:13px;display:flex;gap:12px;align-items:center"><strong style="color:#EF4444">KILL SWITCH BLOQUEADO</strong><span>Novas entradas bloqueadas. Posições abertas continuam abertas e visíveis — nenhuma foi encerrada.</span><button onClick="{{ goRisco }}" style="margin-left:auto;border:1px solid #EF4444;background:transparent;color:#FCA5A5;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">Ver controles</button></div>
+    </sc-if>
+    <sc-if value="{{ pausedBanner }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#2E1F06;border-bottom:1px solid #F5A524;color:#FCD48A;padding:8px 24px;font-size:13px;display:flex;gap:12px;align-items:center"><strong style="color:#F5A524">PAUSA OPERACIONAL</strong><span>Novas entradas paper suspensas. Ordens pendentes e posições não foram alteradas.</span></div>
+    </sc-if>
+
+    <div style="display:flex;flex:1;min-height:0">
+      <main style="flex:1;overflow-y:auto;overflow-x:hidden;padding:24px;min-width:0" data-screen-label="{{ routeLabel }}">
+        <sc-if value="{{ ready }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ is.dashboard }}" hint-placeholder-val="{{ true }}"><dc-import name="Tela Dashboard" ctx="{{ ctx }}" hint-size="100%,600px"></dc-import></sc-if>
+          <sc-if value="{{ is.mercados }}" hint-placeholder-val="{{ false }}"><dc-import name="Tela Mercados" ctx="{{ ctx }}" hint-size="100%,600px"></dc-import></sc-if>
+          <sc-if value="{{ is.oportunidades }}" hint-placeholder-val="{{ false }}"><dc-import name="Tela Oportunidades" ctx="{{ ctx }}" hint-size="100%,600px"></dc-import></sc-if>
+          <sc-if value="{{ is.agentes }}" hint-placeholder-val="{{ false }}"><dc-import name="Tela Agentes" ctx="{{ ctx }}" hint-size="100%,600px"></dc-import></sc-if>
+          <sc-if value="{{ is.carteira }}" hint-placeholder-val="{{ false }}"><dc-import name="Tela Carteira" ctx="{{ ctx }}" hint-size="100%,600px"></dc-import></sc-if>
+          <sc-if value="{{ is.lab }}" hint-placeholder-val="{{ false }}"><dc-import name="Tela Lab" ctx="{{ ctx }}" hint-size="100%,600px"></dc-import></sc-if>
+          <sc-if value="{{ is.crm }}" hint-placeholder-val="{{ false }}"><dc-import name="Tela CRM" ctx="{{ ctx }}" hint-size="100%,600px"></dc-import></sc-if>
+          <sc-if value="{{ is.admin }}" hint-placeholder-val="{{ false }}"><dc-import name="Tela Administracao" ctx="{{ ctx }}" hint-size="100%,600px"></dc-import></sc-if>
+        </sc-if>
+        <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><div style="color:#98A6B5;font-size:13px">Carregando dados demonstrativos…</div></sc-if>
+      </main>
+
+      <sc-if value="{{ assistantOpen }}" hint-placeholder-val="{{ false }}">
+        <aside aria-label="Assistente operacional" style="width:360px;flex-shrink:0;border-left:1px solid #1F2A36;background:#10161D;display:flex;flex-direction:column">
+          <div style="padding:12px 16px;border-bottom:1px solid #1F2A36;display:flex;align-items:center;justify-content:space-between">
+            <div><div style="font-size:13px;font-weight:600">Assistente operacional</div><div style="font-size:11px;color:#F5A524">Demonstrativo · respostas por regras sobre os registros</div></div>
+            <button onClick="{{ toggleAssistant }}" aria-label="Fechar assistente" style="border:0;background:transparent;color:#98A6B5;cursor:pointer;font-size:14px">✕</button>
+          </div>
+          <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid #1F2A36">
+            <sc-for list="{{ assistantSuggestions }}" as="s" hint-placeholder-count="5">
+              <button onClick="{{ s.ask }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:14px;padding:4px 10px;font-size:12px;cursor:pointer;text-align:left" style-hover="border-color:#22D3EE;color:#22D3EE">{{ s.text }}</button>
+            </sc-for>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ assistantLog }}" as="m" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="align-self:flex-end;background:#0A2A33;color:#E6EDF3;border-radius:10px 10px 2px 10px;padding:8px 12px;font-size:13px;max-width:90%">{{ m.q }}</div>
+                <div style="background:#161E27;border:1px solid #1F2A36;border-radius:10px 10px 10px 2px;padding:10px 12px;font-size:13px;line-height:1.5;white-space:pre-wrap">{{ m.a }}
+                  <sc-if value="{{ m.hasRefs }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                    <sc-for list="{{ m.refs }}" as="r" hint-placeholder-count="2"><button onClick="{{ r.go }}" style="border:1px solid #2C3947;background:transparent;color:#22D3EE;border-radius:4px;padding:2px 8px;font-size:11px;font-family:'JetBrains Mono',monospace;cursor:pointer">{{ r.label }}</button></sc-for>
+                  </div></sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <form onSubmit="{{ askSubmit }}" style="padding:12px 16px;border-top:1px solid #1F2A36;display:flex;gap:8px">
+            <input value="{{ askText }}" onChange="{{ onAskText }}" placeholder="Pergunte sobre a operação…" aria-label="Pergunta" style="flex:1;background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px">
+            <button type="submit" style="background:#22D3EE;color:#061014;border:0;border-radius:6px;padding:0 12px;font-weight:600;font-size:13px;cursor:pointer">Enviar</button>
+          </form>
+        </aside>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ confirmOpen }}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-modal="true" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50">
+      <div style="width:440px;background:#161E27;border:1px solid #2C3947;border-radius:10px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">{{ confirmTitle }}</div>
+        <div style="font-size:13px;color:#98A6B5;line-height:1.5;margin-bottom:16px;white-space:pre-wrap">{{ confirmBody }}</div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button onClick="{{ confirmCancel }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer">Cancelar</button>
+          <button onClick="{{ confirmOk }}" style="border:0;background: {{ confirmColor }};color:#061014;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">{{ confirmLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ searchOpen }}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-modal="true" onClick="{{ closeSearch }}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;z-index:50">
+      <div onClick="{{ stop }}" style="width:560px;background:#161E27;border:1px solid #2C3947;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+        <input autoFocus="{{ true }}" value="{{ searchText }}" onChange="{{ onSearchText }}" onKeyDown="{{ onSearchKey }}" placeholder="Buscar ativo, oportunidade, contato, experimento…" aria-label="Busca global" style="width:100%;box-sizing:border-box;background:transparent;border:0;border-bottom:1px solid #2C3947;color:#E6EDF3;padding:14px 16px;font-size:15px">
+        <div style="max-height:360px;overflow-y:auto">
+          <sc-for list="{{ searchResults }}" as="r" hint-placeholder-count="4">
+            <button onClick="{{ r.go }}" style="display:flex;justify-content:space-between;width:100%;text-align:left;padding:10px 16px;border:0;border-bottom:1px solid #1F2A36;background: {{ r.bg }};color:#E6EDF3;cursor:pointer;font-size:13px" style-hover="background:#1F2A36"><span>{{ r.label }}</span><span style="font-size:11px;color:#74828F;text-transform:uppercase;letter-spacing:.06em">{{ r.kind }}</span></button>
+          </sc-for>
+          <sc-if value="{{ searchEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:16px;color:#74828F;font-size:13px">Nenhum resultado no universo monitorado desta organização.</div></sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#161E27;border:1px solid {{ toastColor }};color:#E6EDF3;border-radius:8px;padding:10px 16px;font-size:13px;z-index:60;box-shadow:0 12px 32px rgba(0,0,0,.5);max-width:560px">{{ toastText }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Proprietário&quot;,&quot;options&quot;:[&quot;Proprietário&quot;,&quot;Administrador&quot;,&quot;Gestor&quot;,&quot;Analista&quot;,&quot;Operador&quot;,&quot;Visualizador&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Demonstração&quot;},&quot;showSideStages&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Oportunidades&quot;},&quot;rankingPublic&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Gamificação&quot;}}">
+class Component extends DCLogic {
+  state = { route: "dashboard", params: {}, orgId: "alfa", role: "Proprietário", collapsed: false, assistantOpen: false, notifOpen: false, userOpen: false, searchOpen: false, searchText: "", searchIdx: 0, askText: "", assistantLog: [], confirm: null, toast: null, data: null, ready: false, filters: {}, oppView: "lista", carteiraTab: "posicoes", labForm: "", contactForm: { name: "", company: "", email: "" }, chatText: "", selAgent: null, selChat: null, riskPreview: null, taskForm: "", dealForm: "", history: [] };
+  async componentDidMount() {
+    this.D = await import("./hunter-data.js");
+    this.S = await import("./hunter-assistant.js");
+    const saved = this.load();
+    this.setState({ data: saved || this.freshData(), ready: true, ...(this.loadUi()) });
+    this._key = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); this.setState({ searchOpen: true, searchText: "" }); } if (e.key === "Escape") this.setState({ searchOpen: false, notifOpen: false, userOpen: false, confirm: null }); };
+    window.addEventListener("keydown", this._key);
+  }
+  componentWillUnmount() { window.removeEventListener("keydown", this._key); }
+  freshData() { return JSON.parse(JSON.stringify(this.D.ORGS)); }
+  load() { try { const s = localStorage.getItem("hunter.demo.v2"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+  loadUi() { try { return JSON.parse(localStorage.getItem("hunter.ui.v2") || "{}"); } catch (e) { return {}; } }
+  persist(data) { try { localStorage.setItem("hunter.demo.v2", JSON.stringify(data)); } catch (e) {} }
+  persistUi() { try { const { route, params, orgId, role, collapsed, oppView, carteiraTab } = this.state; localStorage.setItem("hunter.ui.v2", JSON.stringify({ route, params, orgId, role, collapsed, oppView, carteiraTab })); } catch (e) {} }
+  componentDidUpdate() { const s = this.state, p = this._last || {}; if (s.data && p.data !== s.data) this.persist(s.data); if (["route", "orgId", "role", "collapsed", "params", "oppView", "carteiraTab"].some((k) => p[k] !== s[k])) this.persistUi(); this._last = { data: s.data, route: s.route, orgId: s.orgId, role: s.role, collapsed: s.collapsed, params: s.params, oppView: s.oppView, carteiraTab: s.carteiraTab }; }
+  org() { return this.state.data[this.state.orgId]; }
+  mutate(fn) { const data = JSON.parse(JSON.stringify(this.state.data)); fn(data[this.state.orgId], data); this.setState({ data }); }
+  go(route, params = {}) { return () => this.setState({ route, params, notifOpen: false, userOpen: false, searchOpen: false, selAgent: params.agent || null, history: [...this.state.history.slice(-20), { route: this.state.route, params: this.state.params }] }); }
+  toast(text, color = "#22D3EE") { clearTimeout(this._t); this.setState({ toast: { text, color } }); this._t = setTimeout(() => this.setState({ toast: null }), 3800); }
+  confirm(title, body, label, onOk, color = "#22D3EE") { this.setState({ confirm: { title, body, label, onOk, color } }); }
+  can(perm) { return this.D.can(this.state.role, perm); }
+  event(org, kind, text, ref) { org.events.unshift({ at: new Date().toISOString(), kind, text, ref }); }
+  renderVals() {
+    const s = this.state;
+    if (!s.ready) return { loading: true, ready: false, is: {}, sidebarWidth: "240px", expanded: true, navGroups: [], role: "", orgId: "alfa" };
+    const D = this.D, org = this.org();
+    const pf = D.computePortfolio(org);
+    const expanded = !s.collapsed;
+    const NAV = [
+      { label: "Visão geral", items: [["dashboard", "Dashboard", "◈"]] },
+      { label: "Inteligência de mercado", items: [["mercados", "Mercados", "≋"], ["oportunidades", "Oportunidades", "◎"], ["agentes", "Agentes", "⬡"], ["meme", "Meme Radar", "◌"]] },
+      { label: "Operação e carteira", items: [["carteira", "Carteira", "▣"], ["risco", "Risk Engine", "⛨"], ["ambientes", "Ambientes", "⫶"]] },
+      { label: "Pesquisa e laboratório", items: [["lab", "Lab", "⚗"]] },
+      { label: "CRM e colaboração", items: [["contatos", "Contatos", "◉"], ["funil", "Funil comercial", "⋙"], ["tarefas", "Tarefas", "☐"], ["chat", "Chat compartilhado", "◧"], ["whatsapp", "WhatsApp", "◍"], ["suporte", "Suporte interno", "◭"]] },
+      { label: "Administração", items: [["organizacao", "Organização e usuários", "⬢"], ["assinatura", "Plano e assinatura", "▤"], ["gamificacao", "Metas e conquistas", "△"], ["sistema", "Sistema", "⌗"], ["configuracoes", "Configurações", "⚙"]] },
+    ];
+    const badges = { oportunidades: org.opps.filter((o) => ["detectada", "analise", "validada", "risco"].includes(o.stage)).length, carteira: org.positions.length, tarefas: org.crm.tasks.filter((t) => !t.done).length, chat: org.crm.chats.filter((c) => c.status !== "resolvido").length };
+    const parentOf = { ativo: "mercados", oportunidade: "oportunidades", experimento: "lab", perfil: "configuracoes" };
+    const cur = parentOf[s.route] || s.route;
+    const navGroups = NAV.map((g) => ({ label: g.label, items: g.items.map(([r, label, glyph]) => { const active = cur === r; return { label, glyph, go: this.go(r), current: active ? "page" : undefined, bar: active ? "#22D3EE" : "transparent", bg: active ? "#161E27" : "transparent", color: active ? "#E6EDF3" : "#B6C2CE", iconColor: active ? "#22D3EE" : "#74828F", showBadge: expanded && !!badges[r], badge: String(badges[r] || "") }; }) }));
+    const anyWorkerDown = D.AGENTS.some((a) => a.state === "pausado") || D.MARKETS.some((m) => m.quality !== "ok");
+    const notifications = org.events.slice(0, 6).map((e) => ({ text: e.text, when: D.fmtDT(e.at), dot: e.kind === "risco" ? "#F5A524" : e.kind === "execucao" ? "#22C55E" : e.kind === "agente" ? "#EF4444" : "#22D3EE", go: this.refGo(e.ref) }));
+    const roleOptions = D.ROLES.map((r) => ({ label: r, check: r === s.role ? "✓" : "", bg: r === s.role ? "#0A2A33" : "transparent", pick: () => { this.setState({ role: r, userOpen: false }); this.toast(`Papel demonstrativo: ${r}. As restrições reais são da API.`); } }));
+    const user = org.members.find((m) => m.role === s.role) || org.members[0];
+    const q = s.searchText.trim().toLowerCase();
+    let searchResults = [];
+    if (s.searchOpen) {
+      const all = [
+        ...D.MARKETS.map((m) => ({ label: `${m.sym} · ${m.ex}`, kind: "ativo", go: this.go("ativo", { sym: m.sym }) })),
+        ...org.opps.map((o) => ({ label: `${o.id} · ${o.sym} · ${D.STAGE_LABEL[o.stage]}`, kind: "oportunidade", go: this.go("oportunidade", { id: o.id }) })),
+        ...org.crm.contacts.map((c) => ({ label: `${c.name} · ${c.company}`, kind: "contato", go: this.go("contatos", { id: c.id }) })),
+        ...org.experiments.map((x) => ({ label: `${x.id} · ${x.hypothesis}`, kind: "experimento", go: this.go("lab", { id: x.id }) })),
+        ...NAV.flatMap((g) => g.items.map(([r, l]) => ({ label: l, kind: "tela", go: this.go(r) }))),
+      ];
+      searchResults = (q ? all.filter((r) => r.label.toLowerCase().includes(q)) : all.slice(0, 8)).slice(0, 12).map((r, i) => ({ ...r, bg: i === s.searchIdx ? "#1F2A36" : "transparent" }));
+    }
+    const suggestions = ["Por que a última oportunidade foi rejeitada?", "Quais agentes estão sem dados?", "Como está a exposição da carteira?", "O que mudou desde a última sessão?", "Quais experimentos precisam de revisão?"];
+    const ctx = { s, org, pf, D, C: this, role: s.role, props: this.props, tick: this._tick = (this._tick || 0) + 1 };
+    const group = { dashboard: "dashboard", mercados: "mercados", ativo: "mercados", oportunidades: "oportunidades", oportunidade: "oportunidades", agentes: "agentes", meme: "admin", carteira: "carteira", risco: "carteira", ambientes: "carteira", lab: "lab", contatos: "crm", funil: "crm", tarefas: "crm", chat: "crm", whatsapp: "crm", suporte: "crm", organizacao: "admin", assinatura: "admin", gamificacao: "admin", sistema: "admin", configuracoes: "admin" }[s.route] || "dashboard";
+    const is = { [group]: true };
+    return {
+      sidebarWidth: expanded ? "240px" : "64px", expanded, sidebarGlyph: expanded ? "«" : "»", toggleSidebar: () => this.setState({ collapsed: !s.collapsed }), navGroups,
+      orgId: s.orgId, onOrgChange: (e) => { this.setState({ orgId: e.target.value, route: "dashboard", params: {}, assistantLog: [] }); this.toast(`Organização: ${this.state.data[e.target.value].name}`); },
+      openSearch: () => this.setState({ searchOpen: true, searchText: "", searchIdx: 0 }), closeSearch: () => this.setState({ searchOpen: false }), stop: (e) => e.stopPropagation(), searchOpen: s.searchOpen, searchText: s.searchText, onSearchText: (e) => this.setState({ searchText: e.target.value, searchIdx: 0 }), searchResults, searchEmpty: s.searchOpen && searchResults.length === 0,
+      onSearchKey: (e) => { if (e.key === "ArrowDown") { e.preventDefault(); this.setState({ searchIdx: Math.min(searchResults.length - 1, s.searchIdx + 1) }); } if (e.key === "ArrowUp") { e.preventDefault(); this.setState({ searchIdx: Math.max(0, s.searchIdx - 1) }); } if (e.key === "Enter" && searchResults[s.searchIdx]) searchResults[s.searchIdx].go(); },
+      openQuick: () => this.setState({ route: "tarefas", params: { novo: true } }), goSistema: this.go("sistema"), goRisco: this.go("risco"), goPerfil: this.go("configuracoes"),
+      servicesDot: anyWorkerDown ? "#F5A524" : "#22C55E", servicesTitle: anyWorkerDown ? "Serviços degradados: 1 agente pausado, 2 fontes com atraso" : "Serviços operacionais",
+      notifOpen: s.notifOpen, toggleNotif: () => this.setState({ notifOpen: !s.notifOpen, userOpen: false }), notifications, notifCount: String(Math.min(9, org.events.filter((e) => e.kind === "risco" || e.kind === "agente").length)),
+      assistantOpen: s.assistantOpen, toggleAssistant: () => this.setState({ assistantOpen: !s.assistantOpen }), assistantBg: s.assistantOpen ? "#0A2A33" : "transparent",
+      assistantSuggestions: suggestions.map((t) => ({ text: t, ask: () => this.ask(t) })), assistantLog: s.assistantLog.map((m) => ({ ...m, hasRefs: m.refs.length > 0, refs: m.refs.map((r) => ({ label: r, go: this.refGo(r) })) })),
+      askText: s.askText, onAskText: (e) => this.setState({ askText: e.target.value }), askSubmit: (e) => { e.preventDefault(); if (s.askText.trim()) this.ask(s.askText.trim()); },
+      userOpen: s.userOpen, toggleUser: () => this.setState({ userOpen: !s.userOpen, notifOpen: false }), userInitials: user.name.split(" ").map((w) => w[0]).slice(0, 2).join(""), userName: user.name, userEmail: user.email, role: s.role, roleOptions,
+      killBanner: org.killSwitch !== "ATIVO", pausedBanner: org.paused && org.killSwitch === "ATIVO",
+      routeLabel: s.route, ready: true, loading: false, is, ctx,
+      confirmOpen: !!s.confirm, confirmTitle: s.confirm?.title, confirmBody: s.confirm?.body, confirmLabel: s.confirm?.label, confirmColor: s.confirm?.color, confirmCancel: () => this.setState({ confirm: null }), confirmOk: () => { const c = s.confirm; this.setState({ confirm: null }); c.onOk(); },
+      toastOpen: !!s.toast, toastText: s.toast?.text, toastColor: s.toast?.color,
+    };
+  }
+  refGo(ref) { if (!ref) return () => {}; if (ref.startsWith("OP-")) return this.go("oportunidade", { id: ref }); if (ref.startsWith("P-")) return this.go("carteira", {}); if (ref.startsWith("EXP-")) return this.go("lab", { id: ref }); if (/^[a-z]+$/.test(ref)) return this.go("agentes", { agent: ref }); return () => {}; }
+  ask(q) { const a = this.S.answer({ q, org: this.org(), pf: this.D.computePortfolio(this.org()), D: this.D }); this.setState({ assistantLog: [...this.state.assistantLog, { q, a: a.text, refs: a.refs }], askText: "", assistantOpen: true }); }
+}
+</script>
+</body>
+</html>

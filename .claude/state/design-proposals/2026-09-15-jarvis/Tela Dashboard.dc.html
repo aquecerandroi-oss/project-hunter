@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:20px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#E6EDF3">
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+    <div>
+      <h1 style="margin:0;font-size:20px;font-weight:600">Visão geral · {{ orgName }}</h1>
+      <div style="font-size:12px;color:#98A6B5;margin-top:4px">Consultado em {{ asOf }} · Brasília · Fonte: demonstração · Ambiente: paper</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:12px;border:1px solid #1F2A36;background:#10161D"><span style="width:8px;height:8px;border-radius:50%;background: {{ hunterDot }}"></span>{{ hunterState }}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:12px;border:1px solid #1F2A36;background:#10161D"><span style="width:8px;height:8px;border-radius:50%;background: {{ ksDot }}"></span>Kill switch {{ ks }}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:12px;border:1px solid #1F2A36;background:#10161D">{{ agentsSummary }}</span>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="8">
+      <button onClick="{{ k.go }}" style="text-align:left;background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:14px 16px;cursor:pointer;color:#E6EDF3;display:flex;flex-direction:column;gap:6px;min-width:0" style-hover="border-color:#2C3947;background:#121A22">
+        <span style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">{{ k.label }}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.1;white-space:nowrap;color: {{ k.color }}">{{ k.value }}</span>
+        <span style="font-size:12px;color:#74828F;font-family:'JetBrains Mono',monospace">{{ k.sub }}</span>
+      </button>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Curva de patrimônio · paper</h2>
+        <span style="font-size:11px;color:#74828F">Pontos = abertura + cada encerramento + marcação atual. Shadow e backtest não entram nesta curva.</span>
+      </div>
+      <svg viewBox="0 0 600 180" preserveAspectRatio="none" style="width:100%;height:180px;margin-top:12px;display:block" aria-label="Curva de patrimônio">
+        <line x1="0" y1="90" x2="600" y2="90" stroke="#1F2A36" stroke-dasharray="4 4"></line>
+        <polyline points="{{ curvePts }}" fill="none" stroke="#22D3EE" stroke-width="2" vector-effect="non-scaling-stroke"></polyline>
+        <polygon points="{{ curveArea }}" fill="rgba(34,211,238,.08)"></polygon>
+      </svg>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#74828F;font-family:'JetBrains Mono',monospace;margin-top:4px"><span>Abertura {{ initialUSDT }}</span><span>Pico {{ peak }}</span><span>Agora {{ equity }}</span></div>
+    </section>
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+      <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Exposição por ativo</h2>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+        <sc-for list="{{ exposure }}" as="e" hint-placeholder-count="2">
+          <button onClick="{{ e.go }}" style="display:flex;flex-direction:column;gap:4px;background:transparent;border:0;padding:0;cursor:pointer;color:#E6EDF3;text-align:left">
+            <span style="display:flex;justify-content:space-between;font-size:13px"><span style="font-family:'JetBrains Mono',monospace">{{ e.sym }}</span><span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ e.pct }} · {{ e.value }}</span></span>
+            <span style="height:6px;background:#161E27;border-radius:3px;overflow:hidden;display:block"><span style="display:block;height:100%;background:#22D3EE;width: {{ e.bar }}"></span></span>
+          </button>
+        </sc-for>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#74828F;border-top:1px solid #1F2A36;padding-top:8px"><span>Total {{ exposureTotal }} de 40% permitido</span><span>Máx. por moeda 10%</span></div>
+        <sc-if value="{{ noPositions }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#98A6B5">Nenhuma posição aberta. Exposição 0%.</div></sc-if>
+      </div>
+    </section>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Oportunidades prioritárias</h2><button onClick="{{ goOpps }}" style="border:0;background:transparent;color:#22D3EE;font-size:12px;cursor:pointer">Ver funil</button></div>
+      <div style="display:flex;flex-direction:column;margin-top:8px">
+        <sc-for list="{{ topOpps }}" as="o" hint-placeholder-count="3">
+          <button onClick="{{ o.go }}" style="display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 0;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;font-size:13px" style-hover="background:#121A22">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:20px;width:36px;color: {{ o.scoreColor }}">{{ o.score }}</span>
+            <span style="min-width:0"><span style="font-family:'JetBrains Mono',monospace">{{ o.sym }}</span> <span style="color:#98A6B5">· {{ o.strategy }}</span><span style="display:block;font-size:11px;color:#74828F">{{ o.id }} · detectada {{ o.when }}</span></span>
+            <span style="font-size:11px;padding:2px 8px;border-radius:10px;background: {{ o.bg }};color: {{ o.fg }};white-space:nowrap">{{ o.stage }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Operações recentes</h2><button onClick="{{ goHist }}" style="border:0;background:transparent;color:#22D3EE;font-size:12px;cursor:pointer">Histórico</button></div>
+      <div style="display:flex;flex-direction:column;margin-top:8px">
+        <sc-for list="{{ recentOps }}" as="t" hint-placeholder-count="4">
+          <button onClick="{{ t.go }}" style="display:grid;grid-template-columns:1fr auto;gap:10px;padding:8px 0;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;font-size:13px" style-hover="background:#121A22">
+            <span style="min-width:0"><span style="font-family:'JetBrains Mono',monospace">{{ t.sym }}</span> <span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#161E27;color:#98A6B5">{{ t.kind }}</span><span style="display:block;font-size:11px;color:#74828F">{{ t.detail }}</span></span>
+            <span style="font-family:'JetBrains Mono',monospace;text-align:right;color: {{ t.color }}">{{ t.pnl }}<span style="display:block;font-size:11px;color:#74828F">{{ t.pct }}</span></span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+      <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Linha do tempo do sistema</h2>
+      <div style="display:flex;flex-direction:column;margin-top:8px;max-height:300px;overflow-y:auto">
+        <sc-for list="{{ timeline }}" as="e" hint-placeholder-count="6">
+          <button onClick="{{ e.go }}" style="display:grid;grid-template-columns:44px 8px 1fr;gap:10px;align-items:start;padding:7px 0;border:0;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;font-size:13px" style-hover="background:#121A22">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#74828F;padding-top:2px">{{ e.time }}</span>
+            <span style="width:8px;height:8px;border-radius:50%;margin-top:5px;background: {{ e.dot }}"></span>
+            <span style="line-height:1.4">{{ e.text }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+
+  <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Agentes e fontes de dados</h2><button onClick="{{ goAgents }}" style="border:0;background:transparent;color:#22D3EE;font-size:12px;cursor:pointer">Central de agentes</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:12px">
+      <sc-for list="{{ agents }}" as="a" hint-placeholder-count="6">
+        <button onClick="{{ a.go }}" style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid #1F2A36;border-radius:6px;background:#0B0F14;color:#E6EDF3;cursor:pointer;text-align:left" style-hover="border-color:#2C3947">
+          <span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background: {{ a.dot }}"></span>{{ a.name }}</span>
+          <span style="font-size:11px;color:#98A6B5">{{ a.state }} · {{ a.last }}</span>
+        </button>
+      </sc-for>
+      <sc-for list="{{ sources }}" as="f" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px dashed #1F2A36;border-radius:6px;background:transparent">
+          <span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background: {{ f.dot }}"></span>{{ f.name }}</span>
+          <span style="font-size:11px;color:#98A6B5">{{ f.state }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <div style="font-size:12px;color:#74828F;line-height:1.6;border-top:1px solid #1F2A36;padding-top:12px">
+    <strong style="color:#98A6B5">Critérios e custos.</strong> Patrimônio = saldo disponível + valor de mercado das posições. PnL realizado vem de operações encerradas (líquido de taxas); PnL não realizado é a marcação das posições abertas ao último preço e pode reverter. Custos simulados: taxa taker 0,10% por perna e slippage estimado de 5 bps; ordens paper seguem regras de preenchimento, não o preço observado. Conversão BRL↔USDT pela referência {{ fx }} (Binance spot, ticker) registrada na abertura. Risco planejado é a distância até a invalidação — não é garantia de perda máxima.
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ctx&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const ctx = this.props.ctx; if (!ctx) return {};
+    const { org, pf, D, C } = ctx;
+    const go = (r, p) => C.go(r, p);
+    const posColor = (v) => (v > 0 ? "#22C55E" : v < 0 ? "#EF4444" : "#E6EDF3");
+    const analyzing = org.opps.filter((o) => ["detectada", "analise", "validada", "risco"].includes(o.stage));
+    const approved = org.opps.filter((o) => o.riskStatus === "aprovado").length, rejected = org.opps.filter((o) => o.riskStatus === "rejeitado").length;
+    const kpis = [
+      { label: "Patrimônio (paper)", value: D.fmtUSDT(pf.equity), sub: `≈ ${D.fmtBRL(pf.equity * D.LIMITS.fxBRLUSDT)} · abertura ${D.fmtUSDT(pf.initialUSDT, 0)}`, go: go("carteira"), color: "#E6EDF3" },
+      { label: "Saldo disponível", value: D.fmtUSDT(pf.cash), sub: `alocado ${D.fmtUSDT(pf.allocated)}`, go: go("carteira"), color: "#E6EDF3" },
+      { label: "PnL realizado", value: D.fmtSigned(pf.realized) + " USDT", sub: `${org.trades.length} operações encerradas · taxas ${D.fmtUSDT(pf.feesTotal)}`, go: go("carteira", { tab: "historico" }), color: posColor(pf.realized) },
+      { label: "PnL não realizado", value: D.fmtSigned(pf.unrealized) + " USDT", sub: "marcação das posições abertas", go: go("carteira", { tab: "posicoes" }), color: posColor(pf.unrealized) },
+      { label: "Resultado líquido total", value: D.fmtSigned(pf.totalPnl) + " USDT", sub: D.fmtPct((pf.totalPnl / pf.initialUSDT) * 100, 2) + " sobre a abertura", go: go("carteira"), color: posColor(pf.totalPnl) },
+      { label: "Drawdown atual / máx.", value: D.fmtPct(pf.drawdown * 100, 2), sub: `máximo no período ${D.fmtPct(pf.maxDD * 100, 2)}`, go: go("risco"), color: pf.drawdown < -0.02 ? "#F5A524" : "#E6EDF3" },
+      { label: "Exposição total", value: D.fmtPct(pf.exposure * 100), sub: "limite 40% · máx. 10% por moeda", go: go("carteira"), color: pf.exposure > 0.35 ? "#F5A524" : "#E6EDF3" },
+      { label: "Risco planejado agregado", value: D.fmtPct(pf.riskAgg * 100, 2), sub: "limite 1,00% · 0,25% por operação", go: go("risco"), color: pf.riskAgg > 0.009 ? "#F5A524" : "#E6EDF3" },
+      { label: "Posições abertas", value: `${pf.positionsCount} / 5`, sub: "operações spot · sem alavancagem", go: go("carteira", { tab: "posicoes" }), color: "#E6EDF3" },
+      { label: "Oportunidades em análise", value: String(analyzing.length), sub: `${org.opps.filter((o) => o.stage === "shadow").length} em shadow`, go: go("oportunidades", { stage: "ativas" }), color: "#22D3EE" },
+      { label: "Sinais aprovados / rejeitados", value: `${approved} / ${rejected}`, sub: "pelo Risk Engine, todo o período", go: go("risco"), color: "#E6EDF3" },
+    ];
+    const c = pf.curve, min = Math.min(...c), max = Math.max(...c), span = max - min || 1;
+    const pts = c.map((v, i) => `${(i / (c.length - 1)) * 600},${170 - ((v - min) / span) * 150}`);
+    const stageStyle = { detectada: ["#161E27", "#98A6B5"], analise: ["#0F1F33", "#60A5FA"], validada: ["#0A2A33", "#22D3EE"], risco: ["#2E1F06", "#F5A524"], aprovada: ["#0E2A1A", "#22C55E"], posicao: ["#0E2A1A", "#22C55E"], encerrada: ["#161E27", "#98A6B5"], rejeitada: ["#2A0E0E", "#EF4444"], expirada: ["#161E27", "#74828F"], shadow: ["#0F1F33", "#60A5FA"] };
+    const topOpps = [...analyzing].sort((a, b) => b.score - a.score).slice(0, 5).map((o) => ({ ...o, stage: D.STAGE_LABEL[o.stage], bg: stageStyle[o.stage][0], fg: stageStyle[o.stage][1], when: D.fmtAgo(o.detected, Date.now()), scoreColor: o.score >= 70 ? "#22D3EE" : "#E6EDF3", go: go("oportunidade", { id: o.id }) }));
+    const recentOps = [
+      ...pf.posRows.map((p) => ({ sym: p.sym, kind: "Aberta", detail: `${D.fmtNum(p.qty, 4)} @ ${D.fmtPrice(p.entry)} · ${D.fmtAgo(p.openedAt, Date.now())}`, pnl: D.fmtSigned(p.unreal), pct: D.fmtPct(p.unrealPct), color: posColor(p.unreal), go: go("carteira", { tab: "posicoes" }), at: p.openedAt })),
+      ...org.trades.map((t) => { const pnl = (t.exit - t.entry) * t.qty - t.fees; return { sym: t.sym, kind: t.reason, detail: `${D.fmtPrice(t.entry)} → ${D.fmtPrice(t.exit)} · ${D.fmtDT(t.closedAt)}`, pnl: D.fmtSigned(pnl), pct: D.fmtPct((pnl / (t.entry * t.qty)) * 100), color: posColor(pnl), go: go("carteira", { tab: "historico" }), at: t.closedAt }; }),
+    ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5);
+    const dotFor = { sinal: "#22D3EE", oportunidade: "#60A5FA", execucao: "#22C55E", risco: "#F5A524", agente: "#EF4444", crm: "#98A6B5", lab: "#98A6B5", admin: "#98A6B5" };
+    const timeline = org.events.slice(0, 12).map((e) => ({ time: D.fmtTime(e.at), text: e.text, dot: dotFor[e.kind] || "#98A6B5", go: C.refGo(e.ref) }));
+    const aDot = { conectado: "#22C55E", simulado: "#60A5FA", pausado: "#F5A524", "não implementado": "#74828F" };
+    const agents = D.AGENTS.map((a) => ({ name: a.name, state: a.state, last: a.last ? D.fmtAgo(a.last) : "sem atividade", dot: aDot[a.state], go: go("agentes", { agent: a.id }) }));
+    const sources = [
+      { name: "Binance spot", state: "conectado · demonstração · atualizado há 6 s", dot: "#22C55E" },
+      { name: "Bybit spot", state: "livro sem dados há 3 h · ticker ok", dot: "#F5A524" },
+      { name: "Câmbio USDT/BRL", state: `referência ${D.fmtNum(D.LIMITS.fxBRLUSDT)} · Binance ticker`, dot: "#22C55E" },
+    ];
+    const con = D.AGENTS.filter((a) => a.state === "conectado").length;
+    return {
+      orgName: org.name, asOf: D.fmtDT(new Date().toISOString()), hunterDot: org.killSwitch === "ATIVO" && !org.paused ? "#22C55E" : "#F5A524", hunterState: org.killSwitch !== "ATIVO" ? "Hunter: entradas bloqueadas" : org.paused ? "Hunter: em pausa" : "Hunter: monitorando e operando (paper)", ksDot: org.killSwitch === "ATIVO" ? "#22C55E" : "#EF4444", ks: org.killSwitch,
+      agentsSummary: `${con} agentes conectados · ${D.AGENTS.filter((a) => a.state === "simulado").length} simulados · ${D.AGENTS.filter((a) => a.state === "pausado").length} pausado`,
+      kpis, curvePts: pts.join(" "), curveArea: `0,170 ${pts.join(" ")} 600,170`, initialUSDT: D.fmtUSDT(pf.initialUSDT, 0), peak: D.fmtUSDT(pf.peak, 0), equity: D.fmtUSDT(pf.equity, 0),
+      exposure: pf.posRows.map((p) => ({ sym: p.sym, pct: D.fmtPct((p.value / pf.equity) * 100), value: D.fmtUSDT(p.value, 0), bar: `${Math.min(100, (p.value / pf.equity) * 1000)}%`, go: go("ativo", { sym: p.sym }) })), exposureTotal: D.fmtPct(pf.exposure * 100), noPositions: pf.posRows.length === 0,
+      topOpps, goOpps: go("oportunidades"), recentOps, goHist: go("carteira", { tab: "historico" }), timeline, agents, sources, goAgents: go("agentes"), fx: D.fmtNum(D.LIMITS.fxBRLUSDT),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:16px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#E6EDF3">
+  <div><h1 style="margin:0;font-size:20px;font-weight:600">Central de agentes</h1><div style="font-size:12px;color:#98A6B5;margin-top:4px">{{ summary }} · Nenhum agente envia ordens: toda entrada passa pelo Risk Engine.</div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+    <sc-for list="{{ agents }}" as="a" hint-placeholder-count="6">
+      <button onClick="{{ a.select }}" aria-pressed="{{ a.selected }}" style="text-align:left;background:#10161D;border:1px solid {{ a.border }};border-radius:8px;padding:14px 16px;color:#E6EDF3;cursor:pointer;display:flex;flex-direction:column;gap:8px" style-hover="border-color:#2C3947">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background: {{ a.dot }}"></span>{{ a.name }}</span><span style="font-size:11px;padding:2px 8px;border-radius:10px;background: {{ a.sBg }};color: {{ a.sFg }}">{{ a.state }}</span></div>
+        <div style="font-size:12px;color:#98A6B5;line-height:1.5">{{ a.desc }}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px;color:#74828F;font-family:'JetBrains Mono',monospace"><span>última atividade</span><span style="text-align:right;color:#E6EDF3">{{ a.last }}</span><span>mercados</span><span style="text-align:right;color:#E6EDF3">{{ a.marketsCount }}</span><span>sinais recentes</span><span style="text-align:right;color:#E6EDF3">{{ a.signals }}</span><span>latência / dados</span><span style="text-align:right;color: {{ a.latColor }}">{{ a.latency }}</span></div>
+      </button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+    <section style="background:#10161D;border:1px solid #22D3EE;border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline"><h2 style="margin:0;font-size:16px;font-weight:600">{{ sel.name }} <span style="font-size:12px;font-weight:400;color:#98A6B5">· {{ sel.state }}</span></h2><span style="font-size:12px;color:#74828F">{{ sel.note }}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+        <div><h3 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Mercados acompanhados</h3><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ sel.markets }}" as="m" hint-placeholder-count="3"><button onClick="{{ m.go }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:12px;padding:3px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer" style-hover="border-color:#22D3EE">{{ m.sym }}</button></sc-for><sc-if value="{{ sel.noMarkets }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:#98A6B5">Nenhum — agente não implementado.</span></sc-if></div></div>
+        <div><h3 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Sinais recentes e justificativas</h3><div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ sel.signals }}" as="sg" hint-placeholder-count="2"><button onClick="{{ sg.go }}" style="display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid #1F2A36;background:#0B0F14;border-radius:6px;padding:8px 10px;color:#E6EDF3;cursor:pointer;font-size:13px"><span><span style="font-family:'JetBrains Mono',monospace">{{ sg.id }}</span> · {{ sg.sym }} · score {{ sg.score }} · {{ sg.stage }}</span><span style="font-size:12px;color:#98A6B5">{{ sg.why }}</span></button></sc-for><sc-if value="{{ sel.noSignals }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:#98A6B5">Nenhum sinal registrado. Não há análise inventada para este agente.</span></sc-if></div></div>
+        <div><h3 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Concordâncias e divergências</h3><div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ sel.agree }}" as="g" hint-placeholder-count="2"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;border-bottom:1px solid #1F2A36;padding:6px 0"><span>{{ g.other }}</span><span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ g.text }}</span></div></sc-for></div>
+          <h3 style="margin:14px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Falhas, latência e disponibilidade</h3><div style="font-size:13px;line-height:1.6;color: {{ sel.healthColor }}">{{ sel.health }}</div></div>
+      </div>
+    </section>
+  </sc-if>
+  <div style="font-size:12px;color:#74828F;line-height:1.6">Estados: <strong style="color:#22C55E">conectado</strong> recebe dados reais do pipeline; <strong style="color:#60A5FA">simulado</strong> gera sinais por regras sobre dados capturados (demonstração); <strong style="color:#F5A524">pausado</strong> parou por falha de dados; <strong style="color:#98A6B5">não implementado</strong> não produz nada. O agente Derivatives fornece contexto e não habilita derivativos.</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ctx&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const ctx = this.props.ctx; if (!ctx) return {};
+    const { org, D, C, s } = ctx;
+    const go = (r, p) => C.go(r, p);
+    const selId = s.selAgent;
+    const st = { conectado: ["#0E2A1A", "#22C55E"], simulado: ["#0F1F33", "#60A5FA"], pausado: ["#2E1F06", "#F5A524"], "não implementado": ["#161E27", "#98A6B5"] };
+    const sigs = (a) => org.opps.filter((o) => o.agents.includes(a.id));
+    const agents = D.AGENTS.map((a) => ({ name: a.name, desc: a.desc, state: a.state, dot: st[a.state][1], sBg: st[a.state][0], sFg: st[a.state][1], last: a.last ? D.fmtAgo(a.last) : "—", marketsCount: String(a.markets.length), signals: String(sigs(a).length), latency: a.state === "conectado" ? `${a.latencyMs} ms · ok` : a.state === "pausado" ? "sem dados" : a.state === "simulado" ? "n/a · demonstração" : "—", latColor: a.state === "pausado" ? "#F5A524" : "#E6EDF3", selected: selId === a.id, border: selId === a.id ? "#22D3EE" : "#1F2A36", select: () => C.setState({ selAgent: selId === a.id ? null : a.id }) }));
+    let sel = {}; const a = D.AGENTS.find((x) => x.id === selId);
+    if (a) {
+      const mine = sigs(a);
+      const others = D.AGENTS.filter((x) => x.id !== a.id && x.state !== "não implementado").map((x) => { const both = mine.filter((o) => o.agents.includes(x.id)).length; const shared = a.markets.filter((m) => x.markets.includes(m)).length; return { other: x.name, text: shared ? `${both} concordância${both === 1 ? "" : "s"} · ${shared - both} divergência${shared - both === 1 ? "" : "s"} em ${shared} mercados comuns` : "sem mercados em comum" }; });
+      sel = { name: a.name, state: a.state, note: a.state === "simulado" ? "Sinais deste agente são demonstrativos" : a.state === "conectado" ? `Última atividade ${D.fmtAgo(a.last)}` : a.state === "pausado" ? `Pausado ${D.fmtAgo(a.last)}` : "Planejado para a Fase 2", markets: a.markets.map((m) => ({ sym: m, go: go("ativo", { sym: m }) })), noMarkets: a.markets.length === 0,
+        signals: mine.map((o) => ({ id: o.id, sym: o.sym, score: String(o.score), stage: D.STAGE_LABEL[o.stage], why: o.evidence[0] || "", go: go("oportunidade", { id: o.id }) })), noSignals: mine.length === 0, agree: others,
+        health: a.state === "conectado" ? `Latência média ${a.latencyMs} ms; dados completos; nenhuma falha nas últimas 24 h.` : a.state === "pausado" ? "Feed do livro da Bybit sem dados há 3 h. Agente pausado automaticamente para não produzir sinais com dados incompletos. Chamado S-31 aberto." : a.state === "simulado" ? "Não há latência real: os sinais são derivados por regras sobre dados capturados e marcados como demonstração." : "Nenhum componente em execução.", healthColor: a.state === "pausado" ? "#F5A524" : "#E6EDF3" };
+    }
+    const cnt = (x) => D.AGENTS.filter((g) => g.state === x).length;
+    return { summary: `${cnt("conectado")} conectados · ${cnt("simulado")} simulados · ${cnt("pausado")} pausado · ${cnt("não implementado")} não implementado`, agents, hasSel: !!a, sel };
+  }
+}
+</script>
+</body>
+</html>

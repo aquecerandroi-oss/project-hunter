@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:16px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#E6EDF3">
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+    <div><h1 style="margin:0;font-size:20px;font-weight:600">Lab · pesquisa quantitativa</h1><div style="font-size:12px;color:#98A6B5;margin-top:4px">Hipóteses → experimentos → comparação → conclusão → documentação. Nada aqui é carteira: todo sinal do Lab nasce como pesquisa.</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button onClick="{{ exportAll }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">Exportar Markdown</button><span title="Integração com Obsidian não confirmada nesta demonstração" style="border:1px dashed #2C3947;color:#74828F;border-radius:6px;padding:7px 12px;font-size:12px">Obsidian: não conectado</span></div>
+  </div>
+
+  <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px">
+    <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Nova hipótese</h2>
+    <form onSubmit="{{ addHyp }}" style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:10px">
+      <input value="{{ hyp }}" onChange="{{ onHyp }}" placeholder="Ex.: Breakout 20p com filtro de volume z>3 reduz falsos rompimentos em pares líquidos" aria-label="Hipótese" style="background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px;min-width:0">
+      <select value="{{ hypEnv }}" onChange="{{ onHypEnv }}" aria-label="Ambiente" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px"><option value="backtest">Backtest</option><option value="shadow">Shadow</option></select>
+      <button type="submit" style="border:0;background:#22D3EE;color:#061014;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Criar experimento</button>
+    </form>
+    <sc-if value="{{ noPerm }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#F5A524;margin-top:8px">Papel {{ role }} só visualiza o Lab; criar experimentos exige Analista ou superior.</div></sc-if>
+  </section>
+
+  <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow-x:auto">
+    <div style="min-width:900px;display:grid;grid-template-columns:70px 2fr 1fr 90px 1fr 80px 110px 110px 110px;gap:8px;padding:0 12px;height:36px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;border-bottom:1px solid #1F2A36"><span>Id</span><span>Hipótese</span><span>Estratégia</span><span>Ambiente</span><span>Período</span><span style="text-align:right">Ops.</span><span style="text-align:right">Dentro</span><span style="text-align:right">Fora</span><span>Veredito</span></div>
+    <sc-for list="{{ rows }}" as="x" hint-placeholder-count="4">
+      <button onClick="{{ x.select }}" aria-pressed="{{ x.selected }}" style="min-width:900px;display:grid;grid-template-columns:70px 2fr 1fr 90px 1fr 80px 110px 110px 110px;gap:8px;padding:0 12px;height:44px;align-items:center;font-size:13px;border:0;border-bottom:1px solid #1F2A36;background: {{ x.bg }};color:#E6EDF3;cursor:pointer;text-align:left;width:100%" style-hover="background:#121A22">
+        <span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ x.id }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ x.hypothesis }}</span><span style="font-size:12px;color:#98A6B5">{{ x.strategy }}</span><span style="font-size:11px"><span style="padding:2px 8px;border-radius:10px;background:#161E27;color:#98A6B5">{{ x.env }}</span></span><span style="font-size:11px;color:#98A6B5;font-family:'JetBrains Mono',monospace">{{ x.period }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace">{{ x.trades }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;color: {{ x.inColor }}">{{ x.inRet }}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;color: {{ x.outColor }}">{{ x.outRet }}</span><span style="font-size:11px"><span style="padding:2px 8px;border-radius:10px;background: {{ x.vBg }};color: {{ x.vFg }}">{{ x.verdict }}</span></span>
+      </button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+    <section style="background:#10161D;border:1px solid #22D3EE;border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:flex-start">
+        <div><div style="font-size:11px;color:#98A6B5;font-family:'JetBrains Mono',monospace">{{ sel.id }} · {{ sel.status }}</div><h2 style="margin:4px 0 0;font-size:16px;font-weight:600;line-height:1.4">{{ sel.hypothesis }}</h2></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <sc-if value="{{ sel.canRun }}" hint-placeholder-val="{{ false }}"><button onClick="{{ sel.run }}" style="border:0;background:#22D3EE;color:#061014;border-radius:6px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer">Carregar demonstração identificada</button></sc-if>
+          <sc-if value="{{ sel.canConclude }}" hint-placeholder-val="{{ false }}"><button onClick="{{ sel.conclude }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">Registrar conclusão</button></sc-if>
+          <button onClick="{{ sel.exportOne }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">Exportar .md</button>
+          <button onClick="{{ sel.compare }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">{{ sel.compareLabel }}</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+        <sc-for list="{{ sel.meta }}" as="m" hint-placeholder-count="5"><div style="background:#0B0F14;border:1px solid #1F2A36;border-radius:6px;padding:10px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F">{{ m.label }}</div><div style="font-size:13px;margin-top:4px">{{ m.value }}</div></div></sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+        <sc-for list="{{ sel.samples }}" as="sm" hint-placeholder-count="2">
+          <div style="border:1px solid #1F2A36;border-radius:6px;padding:12px"><div style="font-size:12px;font-weight:600;color: {{ sm.color }}">{{ sm.title }}</div><sc-if value="{{ sm.has }}" hint-placeholder-val="{{ true }}"><div style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:13px;margin-top:8px"><span style="color:#98A6B5">Retorno líquido</span><span style="font-family:'JetBrains Mono',monospace;text-align:right;color: {{ sm.retColor }}">{{ sm.ret }}</span><span style="color:#98A6B5">Drawdown máximo</span><span style="font-family:'JetBrains Mono',monospace;text-align:right;color:#EF4444">{{ sm.dd }}</span><span style="color:#98A6B5">Taxa de acerto</span><span style="font-family:'JetBrains Mono',monospace;text-align:right">{{ sm.hit }}</span></div></sc-if><sc-if value="{{ sm.none }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#98A6B5;margin-top:8px">{{ sm.noneText }}</div></sc-if></div>
+        </sc-for>
+        <div style="border:1px solid #1F2A36;border-radius:6px;padding:12px"><div style="font-size:12px;font-weight:600;color:#F5A524">Limitações</div><div style="font-size:13px;line-height:1.5;margin-top:8px">{{ sel.limits }}</div><div style="font-size:12px;color:#74828F;margin-top:8px">Veredito: <strong style="color: {{ sel.vColor }}">{{ sel.verdict }}</strong>. Resultados pontuais não são promessa de rentabilidade.</div></div>
+      </div>
+      <sc-if value="{{ sel.comparing }}" hint-placeholder-val="{{ false }}">
+        <div style="border-top:1px solid #1F2A36;padding-top:12px"><h3 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Comparação fora da amostra</h3>
+          <div style="display:grid;grid-template-columns:70px 1fr 90px 90px 90px 90px;gap:8px;font-size:12px;color:#74828F;text-transform:uppercase;letter-spacing:.06em;padding:4px 0"><span>Id</span><span>Estratégia</span><span style="text-align:right">Ops.</span><span style="text-align:right">Retorno</span><span style="text-align:right">DD</span><span style="text-align:right">Acerto</span></div>
+          <sc-for list="{{ sel.compareRows }}" as="c" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:70px 1fr 90px 90px 90px 90px;gap:8px;font-size:13px;padding:6px 0;border-top:1px solid #1F2A36;font-family:'JetBrains Mono',monospace"><span style="color:#98A6B5">{{ c.id }}</span><span style="font-family:'IBM Plex Sans',sans-serif">{{ c.strategy }}</span><span style="text-align:right">{{ c.trades }}</span><span style="text-align:right;color: {{ c.color }}">{{ c.ret }}</span><span style="text-align:right;color:#EF4444">{{ c.dd }}</span><span style="text-align:right">{{ c.hit }}</span></div></sc-for>
+        </div>
+      </sc-if>
+    </section>
+  </sc-if>
+  <div style="font-size:12px;color:#74828F;line-height:1.6">Régua de maturidade: 100 resultados e 30 dias antes de qualquer veredito de validação. Backtest e shadow não entram na curva paper. A exportação em Markdown inclui decisões, parâmetros, custos e limitações; a sincronização com o Obsidian só é afirmada quando a integração confirmar.</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ctx&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  state = { hyp: "", hypEnv: "backtest", comparing: false };
+  md(x, D) {
+    const smp = (t, v) => (v ? `| ${t} | ${D.fmtPct(v.ret, 1)} | ${D.fmtPct(v.dd, 1)} | ${v.hit}% |` : `| ${t} | — | — | — |`);
+    return `# ${x.id} — ${x.hypothesis}\n\n- Estratégia: ${x.strategy}\n- Ambiente: ${x.env}\n- Período: ${x.period}\n- Universo: ${x.universe}\n- Operações: ${x.trades}\n- Custos considerados: ${x.costs}\n- Status: ${x.status}\n- Veredito: ${x.verdict}\n\n| Amostra | Retorno líquido | Drawdown máx. | Acerto |\n|---|---|---|---|\n${smp("Dentro", x.inSample)}\n${smp("Fora", x.outSample)}\n\n## Limitações\n${x.limits}\n\n_Fonte: demonstração · exportado em ${D.fmtDT(new Date().toISOString())} (Brasília)_\n`;
+  }
+  download(name, text) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown" })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+  renderVals() {
+    const ctx = this.props.ctx; if (!ctx) return {};
+    const { org, D, C, s } = ctx;
+    const canEdit = C.can("editar_lab");
+    const selId = s.params.id;
+    const vSt = { validado: ["#0E2A1A", "#22C55E"], inconclusivo: ["#2E1F06", "#F5A524"], insuficiente: ["#161E27", "#98A6B5"], reprovado: ["#2A0E0E", "#EF4444"], "sem resultado": ["#161E27", "#74828F"] };
+    const col = (v) => (v > 0 ? "#22C55E" : v < 0 ? "#EF4444" : "#E6EDF3");
+    const rows = org.experiments.map((x) => { const v = x.verdict || "sem resultado"; return { id: x.id, hypothesis: x.hypothesis, strategy: x.strategy, env: x.env, period: x.period, trades: String(x.trades), inRet: x.inSample ? D.fmtPct(x.inSample.ret, 1) : "—", inColor: x.inSample ? col(x.inSample.ret) : "#74828F", outRet: x.outSample ? D.fmtPct(x.outSample.ret, 1) : "—", outColor: x.outSample ? col(x.outSample.ret) : "#74828F", verdict: v, vBg: vSt[v][0], vFg: vSt[v][1], selected: selId === x.id, bg: selId === x.id ? "#121A22" : "transparent", select: () => C.setState({ params: { id: selId === x.id ? undefined : x.id } }) }; });
+    const x = org.experiments.find((e) => e.id === selId);
+    let sel = {};
+    if (x) {
+      const v = x.verdict || "sem resultado";
+      const sample = (title, sm, noneText) => ({ title, color: "#98A6B5", has: !!sm, none: !sm, noneText, ret: sm ? D.fmtPct(sm.ret, 1) : "", retColor: sm ? col(sm.ret) : "", dd: sm ? D.fmtPct(sm.dd, 1) : "", hit: sm ? `${sm.hit}%` : "" });
+      const others = org.experiments.filter((e) => e.id !== x.id && e.outSample);
+      sel = {
+        id: x.id, status: x.status, hypothesis: x.hypothesis, verdict: v, vColor: vSt[v][1], limits: x.limits || "Sem resultado ainda — nenhuma conclusão pode ser tirada.",
+        meta: [{ label: "Estratégia", value: x.strategy }, { label: "Ambiente", value: x.env }, { label: "Período", value: x.period }, { label: "Universo", value: x.universe }, { label: "Operações", value: String(x.trades) }, { label: "Custos", value: x.costs }],
+        samples: [sample("Dentro da amostra", x.inSample, x.env === "shadow" ? "Shadow não tem amostra de ajuste: tudo é fora da amostra." : "Ainda não executado."), sample("Fora da amostra", x.outSample, "Ainda não executado.")],
+        canRun: x.status === "rascunho" && canEdit, run: () => C.confirm("Carregar demonstração identificada?", "Não há motor de backtest conectado nesta demonstração. Serão carregados resultados fictícios, rotulados como demonstração, para exercitar o fluxo de comparação e conclusão.", "Carregar demonstração", () => C.mutate((g) => { const e = g.experiments.find((q) => q.id === x.id); e.status = "em andamento (demonstração)"; e.trades = 64; e.period = "01/07/2026 – 31/08/2026 (demonstração)"; e.universe = "8 pares USDT (vol > 50 mi)"; e.inSample = x.env === "backtest" ? { ret: 3.1, dd: -4.2, hit: 45 } : null; e.outSample = { ret: 0.9, dd: -3.6, hit: 43 }; e.verdict = "insuficiente"; e.limits = "64 operações — abaixo da régua de 100. Dados de demonstração; não extrapolar."; C.event(g, "lab", `${x.id}: resultados de demonstração carregados (64 operações, fora da amostra +0,9%)`, x.id); })),
+        canConclude: x.status !== "concluído" && canEdit, conclude: () => C.confirm("Registrar conclusão", `Veredito atual: ${v}. A conclusão fica registrada com data e papel (${s.role}); o experimento passa a "concluído". Não altera nenhuma estratégia ativa.`, "Registrar", () => C.mutate((g) => { const e = g.experiments.find((q) => q.id === x.id); e.status = "concluído"; C.event(g, "lab", `${x.id} concluído por ${s.role}: veredito ${v}`, x.id); })),
+        exportOne: () => { this.download(`${x.id}.md`, this.md(x, D)); C.toast("Markdown gerado localmente. Não há confirmação de sincronização com o Obsidian."); },
+        compare: () => this.setState({ comparing: !this.state.comparing }), compareLabel: this.state.comparing ? "Ocultar comparação" : "Comparar fora da amostra", comparing: this.state.comparing,
+        compareRows: [x, ...others].filter((e) => e.outSample).map((e) => ({ id: e.id, strategy: e.strategy, trades: String(e.trades), ret: D.fmtPct(e.outSample.ret, 1), color: col(e.outSample.ret), dd: D.fmtPct(e.outSample.dd, 1), hit: `${e.outSample.hit}%` })),
+      };
+    }
+    return {
+      rows, hasSel: !!x, sel, role: s.role, noPerm: !canEdit,
+      hyp: this.state.hyp, onHyp: (e) => this.setState({ hyp: e.target.value }), hypEnv: this.state.hypEnv, onHypEnv: (e) => this.setState({ hypEnv: e.target.value }),
+      addHyp: (e) => { e.preventDefault(); if (!canEdit) return C.toast(`Papel ${s.role} não pode criar experimentos.`, "#EF4444"); const t = this.state.hyp.trim(); if (t.length < 12) return C.toast("Descreva a hipótese com pelo menos 12 caracteres.", "#F5A524"); const id = "EXP-" + (10 + org.experiments.length); C.mutate((g) => { g.experiments.unshift({ id, hypothesis: t, strategy: "a definir", env: this.state.hypEnv, period: "—", universe: "—", trades: 0, costs: "taxa 0,10% + slippage 5 bps", inSample: null, outSample: null, verdict: "", limits: "", status: "rascunho" }); C.event(g, "lab", `${id} criado por ${s.role}: ${t}`, id); }); this.setState({ hyp: "" }); C.setState({ params: { id } }); C.toast(`${id} criado como rascunho.`, "#22C55E"); },
+      exportAll: () => { this.download(`hunter-lab-${org.id}.md`, `# Lab — ${org.name}\n\n` + org.experiments.map((e) => this.md(e, D)).join("\n---\n\n") + `\n## Decisões de risco registradas\n\n` + org.opps.filter((o) => o.riskLog).map((o) => `- ${D.fmtDT(o.riskLog.at)} · ${o.id} ${o.sym}: ${o.riskLog.result} — ${o.riskLog.reason}`).join("\n") + "\n"); C.toast("Exportação Markdown gerada (experimentos + decisões). Obsidian não conectado."); },
+    };
+  }
+}
+</script>
+</body>
+</html>

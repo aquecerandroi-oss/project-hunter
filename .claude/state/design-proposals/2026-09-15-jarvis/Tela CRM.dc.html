@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:16px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#E6EDF3">
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+    <div><h1 style="margin:0;font-size:20px;font-weight:600">{{ title }}</h1><div style="font-size:12px;color:#98A6B5;margin-top:4px">{{ subtitle }}</div></div>
+    <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:#161E27;color:#98A6B5">CRM · separado de ativos e operações · dados demonstrativos</span>
+  </div>
+
+  <sc-if value="{{ isContatos }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:12px">
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <div style="display:flex;gap:8px"><input value="{{ q }}" onChange="{{ onQ }}" placeholder="Buscar por nome, empresa, e-mail ou tag" aria-label="Buscar contato" style="flex:1;background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px"><button onClick="{{ importDemo }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap">Importar (demonstração)</button></div>
+        <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden">
+          <sc-for list="{{ contacts }}" as="c" hint-placeholder-count="3">
+            <button onClick="{{ c.select }}" style="display:grid;grid-template-columns:36px 1.4fr 1fr 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:0;border-bottom:1px solid #1F2A36;background: {{ c.bg }};color:#E6EDF3;cursor:pointer;text-align:left;width:100%;font-size:13px" style-hover="background:#121A22">
+              <span style="width:32px;height:32px;border-radius:50%;background:#0A2A33;color:#22D3EE;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:12px">{{ c.initials }}</span>
+              <span style="min-width:0"><span style="font-weight:500">{{ c.name }}</span><span style="display:block;font-size:12px;color:#98A6B5">{{ c.company }}</span></span>
+              <span style="font-size:12px;color:#98A6B5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.email }}</span>
+              <span style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ c.tags }}" as="t" hint-placeholder-count="1"><span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#161E27;color:#98A6B5">{{ t.name }}</span></sc-for></span>
+              <span style="font-size:11px;color:#74828F;white-space:nowrap">{{ c.owner }} · {{ c.updated }}</span>
+            </button>
+          </sc-for>
+          <sc-if value="{{ noContacts }}" hint-placeholder-val="{{ false }}"><div style="padding:20px;font-size:13px;color:#98A6B5">Nenhum contato corresponde à busca.</div></sc-if>
+        </div>
+        <sc-if value="{{ hasContact }}" hint-placeholder-val="{{ false }}">
+          <section style="background:#10161D;border:1px solid #22D3EE;border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><div style="font-size:16px;font-weight:600">{{ ct.name }}</div><div style="font-size:12px;color:#98A6B5">{{ ct.company }} · {{ ct.email }} · {{ ct.phone }} · responsável {{ ct.owner }}</div></div><div style="display:flex;gap:8px"><button onClick="{{ ct.newDeal }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer">Criar negócio</button><button onClick="{{ ct.newChat }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer">Iniciar conversa</button><button onClick="{{ ct.newTask }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer">Agendar tarefa</button></div></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;font-size:13px">
+              <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;margin-bottom:6px">Negócios</div><sc-for list="{{ ct.deals }}" as="d" hint-placeholder-count="1"><div style="padding:4px 0;border-bottom:1px solid #1F2A36">{{ d.title }} <span style="color:#98A6B5">· {{ d.stage }} · {{ d.value }}</span></div></sc-for><sc-if value="{{ ct.noDeals }}" hint-placeholder-val="{{ false }}"><div style="color:#98A6B5">Nenhum negócio.</div></sc-if></div>
+              <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;margin-bottom:6px">Tarefas</div><sc-for list="{{ ct.tasks }}" as="t" hint-placeholder-count="1"><div style="padding:4px 0;border-bottom:1px solid #1F2A36">{{ t.title }} <span style="color:#98A6B5">· {{ t.due }}</span></div></sc-for><sc-if value="{{ ct.noTasks }}" hint-placeholder-val="{{ false }}"><div style="color:#98A6B5">Nenhuma tarefa.</div></sc-if></div>
+              <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;margin-bottom:6px">Histórico</div><sc-for list="{{ ct.history }}" as="h" hint-placeholder-count="2"><div style="padding:4px 0;border-bottom:1px solid #1F2A36;font-size:12px"><span style="font-family:'JetBrains Mono',monospace;color:#74828F">{{ h.at }}</span> {{ h.text }}</div></sc-for></div>
+            </div>
+          </section>
+        </sc-if>
+      </div>
+      <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;align-self:start">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Novo contato</h2>
+        <form onSubmit="{{ addContact }}" style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <input value="{{ f.name }}" onChange="{{ onF.name }}" placeholder="Nome completo" aria-label="Nome" required="{{ true }}" style="background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px">
+          <input value="{{ f.company }}" onChange="{{ onF.company }}" placeholder="Empresa" aria-label="Empresa" style="background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px">
+          <input value="{{ f.email }}" onChange="{{ onF.email }}" placeholder="E-mail" type="email" aria-label="E-mail" style="background:#0B0F14;border:1px solid {{ emailBorder }};color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px">
+          <input value="{{ f.tags }}" onChange="{{ onF.tags }}" placeholder="Tags separadas por vírgula" aria-label="Tags" style="background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px">
+          <select value="{{ f.owner }}" onChange="{{ onF.owner }}" aria-label="Responsável" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px"><sc-for list="{{ members }}" as="m" hint-placeholder-count="2"><option value="{{ m.name }}">{{ m.name }}</option></sc-for></select>
+          <sc-if value="{{ dupWarn }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#F5A524">Possível duplicidade: já existe contato com este e-mail. Salvar mesmo assim cria um registro separado.</div></sc-if>
+          <button type="submit" style="border:0;background:#22D3EE;color:#061014;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">Salvar contato</button>
+          <div style="font-size:11px;color:#74828F">Campos personalizados e importação com validação estão disponíveis em modo demonstrativo.</div>
+        </form>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isFunil }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><sc-for list="{{ dealKpis }}" as="k" hint-placeholder-count="3"><div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:10px 14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F">{{ k.label }}</div><div style="font-family:'JetBrains Mono',monospace;font-size:18px;margin-top:2px">{{ k.value }}</div></div></sc-for><span style="font-size:12px;color:#74828F;margin-left:auto">Receita comercial da plataforma — não se confunde com o desempenho da carteira virtual.</span></div>
+    <form onSubmit="{{ addDeal }}" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px"><input value="{{ dealTitle }}" onChange="{{ onDealTitle }}" placeholder="Novo negócio (título)" aria-label="Título do negócio" style="background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px;min-width:0"><select value="{{ dealContact }}" onChange="{{ onDealContact }}" aria-label="Contato" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px"><sc-for list="{{ contactOpts }}" as="c" hint-placeholder-count="2"><option value="{{ c.id }}">{{ c.name }}</option></sc-for></select><input value="{{ dealValue }}" onChange="{{ onDealValue }}" placeholder="Valor (R$)" inputMode="numeric" aria-label="Valor" style="background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px;min-width:0"><button type="submit" style="border:0;background:#22D3EE;color:#061014;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Criar</button></form>
+    <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;align-items:flex-start">
+      <sc-for list="{{ dealCols }}" as="col" hint-placeholder-count="6">
+        <div style="width:220px;flex-shrink:0;background:#10161D;border:1px solid #1F2A36;border-radius:8px;display:flex;flex-direction:column">
+          <div style="padding:10px 12px;border-bottom:1px solid #1F2A36;display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:600;color: {{ col.color }}">{{ col.label }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#74828F">{{ col.total }}</span></div>
+          <div style="padding:8px;display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ col.cards }}" as="d" hint-placeholder-count="1">
+              <div style="background:#0B0F14;border:1px solid #1F2A36;border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px;font-size:13px"><div style="font-weight:500;line-height:1.3">{{ d.title }}</div><div style="font-size:12px;color:#98A6B5">{{ d.contact }}</div><div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-family:'JetBrains Mono',monospace">{{ d.value }}</span><span style="color:#74828F">{{ d.close }}</span></div><select value="{{ d.stage }}" onChange="{{ d.move }}" aria-label="Mover etapa" style="background:#10161D;border:1px solid #2C3947;color:#98A6B5;border-radius:4px;padding:4px 6px;font-size:11px"><sc-for list="{{ d.opts }}" as="o" hint-placeholder-count="2"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select><sc-if value="{{ d.lost }}" hint-placeholder-val="{{ false }}"><div style="font-size:11px;color:#EF4444">Motivo: {{ d.lostReason }}</div></sc-if></div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isTarefas }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div role="tablist" style="display:inline-flex;border:1px solid #2C3947;border-radius:6px;overflow:hidden"><button onClick="{{ setTaskList }}" aria-selected="{{ taskListOn }}" style="border:0;padding:7px 12px;font-size:13px;cursor:pointer;background: {{ tlBg }};color: {{ tlFg }}">Lista</button><button onClick="{{ setTaskCal }}" aria-selected="{{ taskCalOn }}" style="border:0;padding:7px 12px;font-size:13px;cursor:pointer;background: {{ tcBg }};color: {{ tcFg }}">Calendário</button></div>
+      <form onSubmit="{{ addTask }}" style="display:flex;gap:8px;flex:1;min-width:280px"><input value="{{ taskTitle }}" onChange="{{ onTaskTitle }}" placeholder="Nova tarefa" aria-label="Nova tarefa" style="flex:1;background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px;min-width:0"><select value="{{ taskPrio }}" onChange="{{ onTaskPrio }}" aria-label="Prioridade" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px"><option value="alta">Alta</option><option value="média">Média</option><option value="baixa">Baixa</option></select><input value="{{ taskLink }}" onChange="{{ onTaskLink }}" placeholder="Vínculo (OP-1049, D-1, EXP-08…)" aria-label="Vínculo" style="width:190px;background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px"><button type="submit" style="border:0;background:#22D3EE;color:#061014;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">Adicionar</button></form>
+    </div>
+    <sc-if value="{{ taskListOn }}" hint-placeholder-val="{{ true }}">
+      <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden">
+        <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:28px 1fr 90px 110px 120px 130px;gap:12px;align-items:center;padding:0 12px;height:44px;border-bottom:1px solid #1F2A36;font-size:13px">
+            <input type="checkbox" checked="{{ t.done }}" onChange="{{ t.toggle }}" aria-label="Concluir tarefa" style="width:16px;height:16px;accent-color:#22D3EE">
+            <span style="text-decoration: {{ t.deco }};color: {{ t.color }}">{{ t.title }}</span>
+            <span style="font-size:11px"><span style="padding:2px 8px;border-radius:10px;background: {{ t.pBg }};color: {{ t.pFg }}">{{ t.priority }}</span></span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color: {{ t.dueColor }}">{{ t.due }}</span>
+            <span style="font-size:12px;color:#98A6B5">{{ t.owner }}</span>
+            <button onClick="{{ t.goLink }}" style="border:0;background:transparent;color:#22D3EE;font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer;text-align:left;padding:0">{{ t.link }}</button>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ taskCalOn }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">
+        <sc-for list="{{ calDays }}" as="d" hint-placeholder-count="14"><div style="background:#10161D;border:1px solid {{ d.border }};border-radius:6px;padding:8px;min-height:90px"><div style="font-size:11px;font-family:'JetBrains Mono',monospace;color: {{ d.color }}">{{ d.label }}</div><sc-for list="{{ d.items }}" as="t" hint-placeholder-count="0"><div style="font-size:11px;margin-top:4px;padding:3px 6px;border-radius:4px;background: {{ t.pBg }};color: {{ t.pFg }};line-height:1.3">{{ t.title }}</div></sc-for></div></sc-for>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ isChat }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px;min-height:420px">
+      <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:10px 12px;border-bottom:1px solid #1F2A36;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F">Conversas e filas</div>
+        <sc-for list="{{ chats }}" as="c" hint-placeholder-count="2"><button onClick="{{ c.select }}" style="display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid #1F2A36;background: {{ c.bg }};color:#E6EDF3;cursor:pointer;font-size:13px" style-hover="background:#121A22"><span style="display:flex;justify-content:space-between"><span style="font-weight:500">{{ c.name }}</span><span style="font-size:11px;padding:1px 6px;border-radius:8px;background: {{ c.sBg }};color: {{ c.sFg }}">{{ c.status }}</span></span><span style="font-size:12px;color:#98A6B5">{{ c.queue }} · {{ c.assigned }}</span><span style="font-size:12px;color:#74828F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.last }}</span></button></sc-for>
+        <sc-if value="{{ noChats }}" hint-placeholder-val="{{ false }}"><div style="padding:16px;font-size:13px;color:#98A6B5">Nenhuma conversa nesta organização.</div></sc-if>
+      </div>
+      <sc-if value="{{ hasChat }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;display:flex;flex-direction:column;min-width:0">
+          <div style="padding:10px 12px;border-bottom:1px solid #1F2A36;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center"><div><div style="font-size:13px;font-weight:600">{{ ch.name }}</div><div style="font-size:12px;color:#98A6B5">{{ ch.company }} · fila {{ ch.queue }} · {{ ch.assigned }}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button onClick="{{ ch.assign }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Assumir</button><select onChange="{{ ch.transfer }}" value="" aria-label="Transferir" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:5px 8px;font-size:12px"><option value="">Transferir para…</option><sc-for list="{{ members }}" as="m" hint-placeholder-count="2"><option value="{{ m.name }}">{{ m.name }}</option></sc-for></select><button onClick="{{ ch.resolve }}" style="border:1px solid #22C55E;background:transparent;color:#22C55E;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Resolver</button></div></div>
+          <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ ch.msgs }}" as="m" hint-placeholder-count="3"><div style="align-self: {{ m.align }};max-width:75%;background: {{ m.bg }};border:1px solid {{ m.border }};color:#E6EDF3;border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.4"><div style="font-size:11px;color:#74828F;margin-bottom:2px">{{ m.who }} · {{ m.at }}</div>{{ m.text }}</div></sc-for>
+          </div>
+          <div style="padding:8px 12px;border-top:1px solid #1F2A36;display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ quickReplies }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.use }}" style="border:1px solid #2C3947;background:transparent;color:#98A6B5;border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer" style-hover="color:#22D3EE;border-color:#22D3EE">{{ r.text }}</button></sc-for></div>
+          <form onSubmit="{{ ch.send }}" style="padding:8px 12px 12px;display:flex;gap:8px"><select value="{{ msgKind }}" onChange="{{ onMsgKind }}" aria-label="Tipo" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px;font-size:12px"><option value="me">Resposta</option><option value="note">Nota interna</option></select><input value="{{ msgText }}" onChange="{{ onMsgText }}" placeholder="Escreva…" aria-label="Mensagem" style="flex:1;background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px;min-width:0"><button type="submit" style="border:0;background:#22D3EE;color:#061014;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">Enviar</button></form>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noChatSel }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;justify-content:center;color:#74828F;font-size:13px;border:1px dashed #2C3947;border-radius:8px">Selecione uma conversa.</div></sc-if>
+    </div>
+    <div style="font-size:12px;color:#74828F">Mensagens recebidas nunca autorizam operações ou mudanças sensíveis. Notas internas não são enviadas ao contato.</div>
+  </sc-if>
+
+  <sc-if value="{{ isWhats }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+      <sc-for list="{{ wa }}" as="w" hint-placeholder-count="2"><section style="background:#10161D;border:1px solid {{ w.border }};border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;font-weight:600">{{ w.name }}</span><span style="font-size:11px;padding:2px 8px;border-radius:10px;background: {{ w.sBg }};color: {{ w.sFg }}">{{ w.status }}</span></div><div style="font-size:12px;color:#98A6B5;font-family:'JetBrains Mono',monospace">{{ w.number }}</div><div style="font-size:12px"><span style="padding:2px 8px;border-radius:10px;background: {{ w.tBg }};color: {{ w.tFg }}">{{ w.type }}</span></div><sc-if value="{{ w.unofficial }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#F5A524;line-height:1.4">Conector não oficial: sujeito a bloqueio pela operadora e sem garantia de entrega. Use apenas para notificações operacionais não críticas.</div></sc-if><div style="font-size:12px;color:#74828F">responsável {{ w.owner }} · templates: 3 · eventos 24 h: {{ w.events }}</div><div style="display:flex;gap:6px"><button onClick="{{ w.test }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Enviar teste (demonstração)</button><button onClick="{{ w.cfg }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Configurações</button></div></section></sc-for>
+      <sc-if value="{{ noWa }}" hint-placeholder-val="{{ false }}"><div style="padding:20px;font-size:13px;color:#98A6B5;border:1px dashed #2C3947;border-radius:8px">Nenhuma instância de WhatsApp nesta organização. A criação exige credenciais no backend — não solicitadas aqui.</div></sc-if>
+    </div>
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px"><h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Notificações operacionais configuráveis</h2><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><sc-for list="{{ notifRules }}" as="n" hint-placeholder-count="4"><label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid #1F2A36"><span>{{ n.label }}<span style="display:block;font-size:12px;color:#74828F">{{ n.desc }}</span></span><input type="checkbox" checked="{{ n.on }}" onChange="{{ n.toggle }}" style="width:16px;height:16px;accent-color:#22D3EE"></label></sc-for></div></section>
+  </sc-if>
+
+  <sc-if value="{{ isSuporte }}" hint-placeholder-val="{{ false }}">
+    <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden">
+      <div style="display:grid;grid-template-columns:70px 1fr 120px 90px 120px 120px 130px;gap:12px;padding:0 12px;height:36px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;border-bottom:1px solid #1F2A36"><span>Id</span><span>Chamado</span><span>Categoria</span><span>Prioridade</span><span>Responsável</span><span>Status</span><span>Aberto</span></div>
+      <sc-for list="{{ tickets }}" as="t" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:70px 1fr 120px 90px 120px 120px 130px;gap:12px;padding:0 12px;height:44px;align-items:center;font-size:13px;border-bottom:1px solid #1F2A36"><span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ t.id }}</span><span>{{ t.title }}</span><span style="font-size:12px;color:#98A6B5">{{ t.category }}</span><span style="font-size:11px"><span style="padding:2px 8px;border-radius:10px;background: {{ t.pBg }};color: {{ t.pFg }}">{{ t.priority }}</span></span><span style="font-size:12px;color:#98A6B5">{{ t.owner }}</span><select value="{{ t.status }}" onChange="{{ t.setStatus }}" aria-label="Status" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:4px;padding:4px 6px;font-size:12px"><option value="aberto">aberto</option><option value="em andamento">em andamento</option><option value="resolvido">resolvido</option></select><span style="font-size:12px;color:#74828F;font-family:'JetBrains Mono',monospace">{{ t.at }}</span></div></sc-for>
+      <sc-if value="{{ noTickets }}" hint-placeholder-val="{{ false }}"><div style="padding:20px;font-size:13px;color:#98A6B5">Nenhum chamado interno aberto.</div></sc-if>
+    </div>
+    <form onSubmit="{{ addTicket }}" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px"><input value="{{ ticketTitle }}" onChange="{{ onTicketTitle }}" placeholder="Novo chamado interno" aria-label="Título do chamado" style="background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px;min-width:0"><select value="{{ ticketCat }}" onChange="{{ onTicketCat }}" aria-label="Categoria" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px"><option>Integração</option><option>Lab</option><option>Carteira</option><option>Acesso</option><option>Outro</option></select><select value="{{ ticketPrio }}" onChange="{{ onTicketPrio }}" aria-label="Prioridade" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:8px 10px;font-size:13px"><option value="alta">Alta</option><option value="média">Média</option><option value="baixa">Baixa</option></select><button type="submit" style="border:0;background:#22D3EE;color:#061014;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">Abrir chamado</button></form>
+    <div style="font-size:12px;color:#74828F">Suporte interno da equipe — separado do atendimento a clientes (Chat compartilhado).</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ctx&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  state = { q: "", selContact: null, f: { name: "", company: "", email: "", tags: "", owner: "" }, dealTitle: "", dealContact: "", dealValue: "", taskTitle: "", taskPrio: "média", taskLink: "", taskView: "lista", selChat: null, msgText: "", msgKind: "me", ticketTitle: "", ticketCat: "Integração", ticketPrio: "média", notif: { risco: true, kill: true, execucao: false, resumo: true } };
+  renderVals() {
+    const ctx = this.props.ctx; if (!ctx) return {};
+    const { org, D, C, s } = ctx; const st = this.state; const crm = org.crm;
+    const canEdit = C.can("crm_editar");
+    const deny = () => C.toast(`Papel ${s.role} não pode editar o CRM.`, "#EF4444");
+    const go = (r, p) => C.go(r, p);
+    const now = Date.now();
+    const titles = { contatos: ["Contatos", `${crm.contacts.length} contatos · cadastro, tags, responsáveis, duplicidades e histórico`], funil: ["Funil comercial", "Negócios, etapas, valores, previsão de fechamento e motivos de perda"], tarefas: ["Tarefas", "Lista e calendário · vínculos com contatos, negócios, ativos, oportunidades ou experimentos"], chat: ["Chat compartilhado", "Conversas, filas, atribuição, transferência, notas internas e resolução"], whatsapp: ["WhatsApp", "Instâncias, status, responsáveis, templates e eventos — API oficial vs. conector não oficial"], suporte: ["Suporte interno", "Chamados da equipe com categoria, prioridade, responsável e histórico"] };
+    const [title, subtitle] = titles[s.route] || titles.contatos;
+    const prio = { alta: ["#2A0E0E", "#EF4444"], média: ["#2E1F06", "#F5A524"], baixa: ["#161E27", "#98A6B5"] };
+    const contactName = (id) => (crm.contacts.find((c) => c.id === id) || {}).name || "—";
+    // contatos
+    const q = st.q.toLowerCase();
+    const selC = s.params.id || st.selContact;
+    const contacts = crm.contacts.filter((c) => !q || [c.name, c.company, c.email, ...(c.tags || [])].join(" ").toLowerCase().includes(q)).map((c) => ({ ...c, initials: c.name.split(" ").map((w) => w[0]).slice(0, 2).join(""), tags: (c.tags || []).map((t) => ({ name: t })), updated: D.fmtAgo(c.updated, now), bg: selC === c.id ? "#121A22" : "transparent", select: () => { this.setState({ selContact: selC === c.id ? null : c.id }); if (s.params.id) C.setState({ params: {} }); } }));
+    const cc = crm.contacts.find((c) => c.id === selC);
+    let ct = {};
+    if (cc) {
+      const deals = crm.deals.filter((d) => d.contact === cc.id), tasks = crm.tasks.filter((t) => t.link === cc.id || deals.some((d) => d.id === t.link));
+      const stageL = { qualificacao: "Qualificação", proposta: "Proposta", negociacao: "Negociação", ganho: "Ganho", perdido: "Perdido" };
+      ct = { ...cc, deals: deals.map((d) => ({ title: d.title, stage: stageL[d.stage], value: D.fmtBRL(d.value) })), noDeals: !deals.length, tasks: tasks.map((t) => ({ title: t.title, due: t.due })), noTasks: !tasks.length,
+        history: org.events.filter((e) => e.kind === "crm" && e.text.includes(cc.name)).map((e) => ({ at: D.fmtDT(e.at), text: e.text })),
+        newDeal: () => { this.setState({ dealContact: cc.id }); C.setState({ route: "funil", params: {} }); }, newChat: () => { if (!canEdit) return deny(); C.mutate((g) => { const id = "CH-" + (g.crm.chats.length + 1); g.crm.chats.unshift({ id, contact: cc.id, queue: "Comercial", assigned: null, status: "fila", msgs: [{ from: "note", text: `Conversa iniciada por ${s.role} (simulada).`, at: new Date().toISOString() }] }); C.event(g, "crm", `Conversa iniciada com ${cc.name}`, ""); this.setState({ selChat: id }); }); C.setState({ route: "chat", params: {} }); }, newTask: () => { this.setState({ taskLink: cc.id, taskTitle: `Retornar contato: ${cc.name}` }); C.setState({ route: "tarefas", params: {} }); } };
+    }
+    const emailDup = st.f.email && crm.contacts.some((c) => c.email.toLowerCase() === st.f.email.toLowerCase());
+    const onF = Object.fromEntries(["name", "company", "email", "tags", "owner"].map((k) => [k, (e) => this.setState({ f: { ...st.f, [k]: e.target.value } })]));
+    // funil
+    const dealStages = [["qualificacao", "Qualificação", "#98A6B5"], ["proposta", "Proposta", "#60A5FA"], ["negociacao", "Negociação", "#22D3EE"], ["ganho", "Ganho", "#22C55E"], ["perdido", "Perdido", "#EF4444"]];
+    const dealCols = dealStages.map(([id, label, color]) => { const cards = crm.deals.filter((d) => d.stage === id); return { label, color, total: D.fmtBRL(cards.reduce((a, d) => a + d.value, 0)), cards: cards.map((d) => ({ title: d.title, contact: contactName(d.contact), value: D.fmtBRL(d.value), close: d.close, stage: d.stage, lost: d.stage === "perdido", lostReason: d.lostReason || "não informado", opts: dealStages.map(([i, l]) => ({ id: i, label: l })), move: (e) => { if (!canEdit) { deny(); this.forceUpdate(); return; } const to = e.target.value; const finish = (reason) => C.mutate((g) => { const x = g.crm.deals.find((y) => y.id === d.id); x.stage = to; if (reason) x.lostReason = reason; C.event(g, "crm", `Negócio "${d.title}" (${contactName(d.contact)}) → ${dealStages.find((z) => z[0] === to)[1]}`, ""); }); if (to === "perdido") C.confirm("Marcar como perdido", "Informe o motivo de perda (será registrado): preço, timing, concorrente ou sem resposta. Nesta demonstração o motivo é 'preço'.", "Registrar perda", () => finish("preço"), "#EF4444"); else finish(); if (to === "ganho") C.toast("Negócio ganho — indicadores comerciais atualizados.", "#22C55E"); } })) }; });
+    const open = crm.deals.filter((d) => !["ganho", "perdido"].includes(d.stage));
+    const dealKpis = [{ label: "Pipeline aberto", value: D.fmtBRL(open.reduce((a, d) => a + d.value, 0)) }, { label: "Negócios abertos", value: String(open.length) }, { label: "Ganhos", value: D.fmtBRL(crm.deals.filter((d) => d.stage === "ganho").reduce((a, d) => a + d.value, 0)) }, { label: "Taxa de conversão", value: crm.deals.filter((d) => ["ganho", "perdido"].includes(d.stage)).length ? D.fmtNum((crm.deals.filter((d) => d.stage === "ganho").length / crm.deals.filter((d) => ["ganho", "perdido"].includes(d.stage)).length) * 100, 0) + "%" : "—" }];
+    // tarefas
+    const parse = (d) => { const [dd, mm, yy] = d.split("/"); return new Date(`${yy}-${mm}-${dd}T12:00:00-03:00`); };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const tasks = [...crm.tasks].sort((a, b) => Number(a.done) - Number(b.done) || parse(a.due) - parse(b.due)).map((t) => ({ ...t, deco: t.done ? "line-through" : "none", color: t.done ? "#74828F" : "#E6EDF3", pBg: prio[t.priority][0], pFg: prio[t.priority][1], dueColor: !t.done && parse(t.due) < today ? "#EF4444" : "#98A6B5", link: t.link || "—", goLink: C.refGo(t.link) || (() => {}), toggle: () => { if (!canEdit) return deny(); C.mutate((g) => { const x = g.crm.tasks.find((y) => y.id === t.id); x.done = !x.done; if (x.done) C.event(g, "crm", `Tarefa concluída: ${x.title}`, x.link); }); } }));
+    const calDays = Array.from({ length: 14 }, (_, i) => { const d = new Date(today); d.setDate(d.getDate() + i - 2); const key = d.toLocaleDateString("pt-BR"); const items = crm.tasks.filter((t) => t.due === key && !t.done).map((t) => ({ title: t.title, pBg: prio[t.priority][0], pFg: prio[t.priority][1] })); const isToday = i === 2; return { label: d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }), items, border: isToday ? "#22D3EE" : "#1F2A36", color: isToday ? "#22D3EE" : "#74828F" }; });
+    // chat
+    const sSt = { aberto: ["#0A2A33", "#22D3EE"], fila: ["#2E1F06", "#F5A524"], resolvido: ["#0E2A1A", "#22C55E"] };
+    const selChatId = st.selChat || (crm.chats[0] || {}).id;
+    const chats = crm.chats.map((c) => ({ name: contactName(c.contact), status: c.status, sBg: sSt[c.status][0], sFg: sSt[c.status][1], queue: c.queue, assigned: c.assigned || "não atribuída", last: (c.msgs[c.msgs.length - 1] || {}).text || "", bg: selChatId === c.id ? "#121A22" : "transparent", select: () => this.setState({ selChat: c.id }) }));
+    const chObj = crm.chats.find((c) => c.id === selChatId); let ch = {};
+    if (chObj) {
+      const contact = crm.contacts.find((c) => c.id === chObj.contact) || {};
+      const upd = (fn, text) => C.mutate((g) => { const x = g.crm.chats.find((y) => y.id === chObj.id); fn(x); if (text) C.event(g, "crm", text, ""); });
+      const me = org.members.find((m) => m.role === s.role) || org.members[0];
+      ch = { name: contact.name || "—", company: contact.company || "", queue: chObj.queue, assigned: chObj.assigned ? `atribuída a ${chObj.assigned}` : "não atribuída",
+        msgs: chObj.msgs.map((m) => ({ text: m.text, at: D.fmtTime(m.at), who: m.from === "them" ? contact.name : m.from === "note" ? "Nota interna" : chObj.assigned || "Equipe", align: m.from === "them" ? "flex-start" : "flex-end", bg: m.from === "them" ? "#161E27" : m.from === "note" ? "#2E1F06" : "#0A2A33", border: m.from === "note" ? "#F5A524" : "#1F2A36" })),
+        assign: () => { if (!canEdit) return deny(); upd((x) => { x.assigned = me.name; x.status = "aberto"; }, `Conversa com ${contact.name} assumida por ${me.name}`); }, transfer: (e) => { if (!e.target.value) return; if (!canEdit) return deny(); upd((x) => { x.assigned = e.target.value; }, `Conversa com ${contact.name} transferida para ${e.target.value}`); }, resolve: () => { if (!canEdit) return deny(); C.confirm("Resolver atendimento?", "A conversa sai da fila e fica no histórico do contato.", "Resolver", () => upd((x) => { x.status = "resolvido"; }, `Atendimento de ${contact.name} resolvido`)); },
+        send: (e) => { e.preventDefault(); if (!canEdit) return deny(); const t = st.msgText.trim(); if (!t) return; upd((x) => { x.msgs.push({ from: st.msgKind, text: t, at: new Date().toISOString() }); if (x.status === "fila") { x.status = "aberto"; x.assigned = x.assigned || me.name; } }); this.setState({ msgText: "" }); } };
+    }
+    // whatsapp
+    const wSt = { conectado: ["#0E2A1A", "#22C55E"], instável: ["#2E1F06", "#F5A524"], desconectado: ["#2A0E0E", "#EF4444"] };
+    const wa = crm.whatsapp.map((w) => { const un = w.type.includes("não oficial"); return { ...w, sBg: wSt[w.status][0], sFg: wSt[w.status][1], unofficial: un, border: un ? "#F5A524" : "#1F2A36", tBg: un ? "#2E1F06" : "#0E2A1A", tFg: un ? "#F5A524" : "#22C55E", events: un ? "12 (3 falhas)" : "48", test: () => C.toast(`Envio de teste simulado pela instância "${w.name}". Nenhuma mensagem real foi enviada.`), cfg: () => C.toast("Configurações demonstrativas — credenciais ficam no backend e não são pedidas aqui.") }; });
+    const notifRules = [["risco", "Rejeições do Risk Engine", "quando uma oportunidade é bloqueada"], ["kill", "Kill switch e pausa", "acionamento e reativação"], ["execucao", "Execuções paper", "entradas e encerramentos"], ["resumo", "Resumo diário", "patrimônio, exposição e agentes às 18h"]].map(([k, label, desc]) => ({ label, desc, on: st.notif[k], toggle: () => this.setState({ notif: { ...st.notif, [k]: !st.notif[k] } }) }));
+    // suporte
+    const tickets = crm.tickets.map((t) => ({ ...t, pBg: prio[t.priority][0], pFg: prio[t.priority][1], at: D.fmtDT(t.at), setStatus: (e) => { const v = e.target.value; C.mutate((g) => { const x = g.crm.tickets.find((y) => y.id === t.id); x.status = v; C.event(g, "crm", `Chamado ${t.id} → ${v}`, ""); }); } }));
+    const members = org.members.map((m) => ({ name: m.name }));
+    const tog = (on) => ({ bg: on ? "#0A2A33" : "transparent", fg: on ? "#22D3EE" : "#E6EDF3" });
+    const tl = tog(st.taskView === "lista"), tc = tog(st.taskView === "calendario");
+    return {
+      title, subtitle, isContatos: s.route === "contatos", isFunil: s.route === "funil", isTarefas: s.route === "tarefas", isChat: s.route === "chat", isWhats: s.route === "whatsapp", isSuporte: s.route === "suporte", members,
+      q: st.q, onQ: (e) => this.setState({ q: e.target.value }), contacts, noContacts: !contacts.length, hasContact: !!cc, ct, f: st.f, onF, emailBorder: emailDup ? "#F5A524" : "#2C3947", dupWarn: emailDup,
+      importDemo: () => { if (!canEdit) return deny(); C.confirm("Importar contatos de demonstração", "3 linhas serão validadas: 1 válida, 1 com e-mail inválido (rejeitada) e 1 duplicada (mesclada com o registro existente).", "Importar", () => { C.mutate((g) => { g.crm.contacts.push({ id: "C-" + Date.now(), name: "Paulo Henrique Souza", company: "PHS Investimentos", email: "paulo@phs.com.br", phone: "+55 41 99555-1010", tags: ["importado"], owner: g.members[0].name, updated: new Date().toISOString() }); C.event(g, "crm", "Importação demonstrativa: 1 contato criado, 1 rejeitado (e-mail inválido), 1 mesclado (duplicado)", ""); }); C.toast("Importação concluída: 1 criado · 1 rejeitado · 1 mesclado.", "#22C55E"); }); },
+      addContact: (e) => { e.preventDefault(); if (!canEdit) return deny(); const f = st.f; if (!f.name.trim()) return C.toast("Nome é obrigatório.", "#F5A524"); if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return C.toast("E-mail inválido.", "#F5A524"); const id = "C-" + Date.now(); C.mutate((g) => { g.crm.contacts.unshift({ id, name: f.name.trim(), company: f.company.trim(), email: f.email.trim(), phone: "", tags: f.tags.split(",").map((t) => t.trim()).filter(Boolean), owner: f.owner || g.members[0].name, updated: new Date().toISOString() }); C.event(g, "crm", `Contato ${f.name.trim()} cadastrado por ${s.role}`, ""); }); this.setState({ f: { name: "", company: "", email: "", tags: "", owner: "" }, selContact: id }); C.toast("Contato salvo.", "#22C55E"); },
+      dealKpis, dealCols, contactOpts: crm.contacts.map((c) => ({ id: c.id, name: c.name })), dealTitle: st.dealTitle, onDealTitle: (e) => this.setState({ dealTitle: e.target.value }), dealContact: st.dealContact || (crm.contacts[0] || {}).id, onDealContact: (e) => this.setState({ dealContact: e.target.value }), dealValue: st.dealValue, onDealValue: (e) => this.setState({ dealValue: e.target.value }),
+      addDeal: (e) => { e.preventDefault(); if (!canEdit) return deny(); const t = st.dealTitle.trim(), v = Number(String(st.dealValue).replace(/\./g, "").replace(",", ".")); if (!t) return C.toast("Título é obrigatório.", "#F5A524"); if (!(v >= 0)) return C.toast("Valor inválido.", "#F5A524"); const cid = st.dealContact || (crm.contacts[0] || {}).id; C.mutate((g) => { g.crm.deals.unshift({ id: "D-" + Date.now(), title: t, contact: cid, value: v, stage: "qualificacao", owner: g.members[0].name, close: new Date(Date.now() + 30 * 864e5).toLocaleDateString("pt-BR") }); C.event(g, "crm", `Negócio "${t}" criado para ${contactName(cid)}`, ""); }); this.setState({ dealTitle: "", dealValue: "" }); C.toast("Negócio criado em Qualificação.", "#22C55E"); },
+      taskListOn: st.taskView === "lista", taskCalOn: st.taskView === "calendario", setTaskList: () => this.setState({ taskView: "lista" }), setTaskCal: () => this.setState({ taskView: "calendario" }), tlBg: tl.bg, tlFg: tl.fg, tcBg: tc.bg, tcFg: tc.fg, tasks, calDays,
+      taskTitle: st.taskTitle, onTaskTitle: (e) => this.setState({ taskTitle: e.target.value }), taskPrio: st.taskPrio, onTaskPrio: (e) => this.setState({ taskPrio: e.target.value }), taskLink: st.taskLink, onTaskLink: (e) => this.setState({ taskLink: e.target.value }),
+      addTask: (e) => { e.preventDefault(); if (!canEdit) return deny(); const t = st.taskTitle.trim(); if (!t) return C.toast("Descreva a tarefa.", "#F5A524"); C.mutate((g) => { g.crm.tasks.unshift({ id: "K-" + Date.now(), title: t, due: new Date(Date.now() + 2 * 864e5).toLocaleDateString("pt-BR"), priority: st.taskPrio, owner: (g.members.find((m) => m.role === s.role) || g.members[0]).name, link: st.taskLink.trim(), done: false }); C.event(g, "crm", `Tarefa criada: ${t}`, st.taskLink.trim()); }); this.setState({ taskTitle: "", taskLink: "" }); C.toast("Tarefa criada (prazo: 2 dias).", "#22C55E"); },
+      chats, noChats: !chats.length, hasChat: !!chObj, noChatSel: !chObj && chats.length > 0, ch, msgText: st.msgText, onMsgText: (e) => this.setState({ msgText: e.target.value }), msgKind: st.msgKind, onMsgKind: (e) => this.setState({ msgKind: e.target.value }),
+      quickReplies: ["Obrigado pelo contato! Já estou verificando.", "O Hunter opera apenas em ambiente paper; nenhuma ordem real é enviada.", "Envio o relatório do Shadow Lab ainda hoje."].map((t) => ({ text: t.slice(0, 38) + (t.length > 38 ? "…" : ""), use: () => this.setState({ msgText: t, msgKind: "me" }) })),
+      wa, noWa: !wa.length, notifRules, tickets, noTickets: !tickets.length, ticketTitle: st.ticketTitle, onTicketTitle: (e) => this.setState({ ticketTitle: e.target.value }), ticketCat: st.ticketCat, onTicketCat: (e) => this.setState({ ticketCat: e.target.value }), ticketPrio: st.ticketPrio, onTicketPrio: (e) => this.setState({ ticketPrio: e.target.value }),
+      addTicket: (e) => { e.preventDefault(); const t = st.ticketTitle.trim(); if (!t) return C.toast("Descreva o chamado.", "#F5A524"); C.mutate((g) => { g.crm.tickets.unshift({ id: "S-" + (40 + g.crm.tickets.length), title: t, category: st.ticketCat, priority: st.ticketPrio, owner: g.members[0].name, status: "aberto", at: new Date().toISOString() }); C.event(g, "crm", `Chamado interno aberto: ${t}`, ""); }); this.setState({ ticketTitle: "" }); C.toast("Chamado aberto.", "#22C55E"); },
+    };
+  }
+}
+</script>
+</body>
+</html>

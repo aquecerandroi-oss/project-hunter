@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:16px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#E6EDF3">
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+      <div><h1 style="margin:0;font-size:20px;font-weight:600">Oportunidades de mercado</h1><div style="font-size:12px;color:#98A6B5;margin-top:4px">Funil operacional — separado do funil comercial do CRM · {{ activeCount }} ativas · {{ shadowCount }} em shadow</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <sc-if value="{{ hasSymFilter }}" hint-placeholder-val="{{ false }}"><button onClick="{{ clearSym }}" style="border:1px solid #22D3EE;background:#0A2A33;color:#22D3EE;border-radius:12px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace">{{ symFilter }} ✕</button></sc-if>
+        <select value="{{ stageFilter }}" onChange="{{ onStage }}" aria-label="Etapa" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:7px 10px;font-size:13px">
+          <option value="">Todas as etapas</option><option value="ativas">Ativas (detectada → aprovada)</option><option value="posicao">Em posição</option><option value="encerrada">Encerradas</option><option value="rejeitada">Rejeitadas</option><option value="expirada">Expiradas</option><option value="shadow">Shadow</option>
+        </select>
+        <select value="{{ agentFilter }}" onChange="{{ onAgent }}" aria-label="Agente" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:7px 10px;font-size:13px">
+          <option value="">Todos os agentes</option><sc-for list="{{ agentOpts }}" as="a" hint-placeholder-count="5"><option value="{{ a.id }}">{{ a.name }}</option></sc-for>
+        </select>
+        <div role="tablist" style="display:inline-flex;border:1px solid #2C3947;border-radius:6px;overflow:hidden">
+          <button role="tab" aria-selected="{{ isLista }}" onClick="{{ setLista }}" style="border:0;padding:7px 12px;font-size:13px;cursor:pointer;background: {{ listaBg }};color: {{ listaFg }}">Lista</button>
+          <button role="tab" aria-selected="{{ isKanban }}" onClick="{{ setKanban }}" style="border:0;padding:7px 12px;font-size:13px;cursor:pointer;background: {{ kanbanBg }};color: {{ kanbanFg }}">Kanban</button>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ isLista }}" hint-placeholder-val="{{ true }}">
+      <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:90px 110px 1.4fr 1.4fr 64px 1fr 1fr 1fr;gap:8px;padding:0 12px;height:36px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;border-bottom:1px solid #1F2A36"><span>Id</span><span>Ativo</span><span>Estratégia</span><span>Agentes</span><span style="text-align:right">Score</span><span>Detecção</span><span>Risco</span><span>Etapa</span></div>
+        <sc-for list="{{ rows }}" as="o" hint-placeholder-count="8">
+          <button onClick="{{ o.go }}" style="display:grid;grid-template-columns:90px 110px 1.4fr 1.4fr 64px 1fr 1fr 1fr;gap:8px;padding:0 12px;height:40px;align-items:center;font-size:13px;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;width:100%" style-hover="background:#121A22">
+            <span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ o.id }}</span><span style="font-family:'JetBrains Mono',monospace">{{ o.sym }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ o.strategy }}</span><span style="font-size:12px;color:#98A6B5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ o.agents }}</span>
+            <span style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:16px;color: {{ o.scoreColor }}">{{ o.score }}</span><span style="font-size:12px;color:#98A6B5;font-family:'JetBrains Mono',monospace">{{ o.when }}</span>
+            <span style="font-size:11px"><span style="padding:2px 8px;border-radius:10px;background: {{ o.rBg }};color: {{ o.rFg }}">{{ o.risk }}</span></span>
+            <span style="font-size:11px"><span style="padding:2px 8px;border-radius:10px;background: {{ o.bg }};color: {{ o.fg }}">{{ o.stage }}</span></span>
+          </button>
+        </sc-for>
+        <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><div style="padding:24px;font-size:13px;color:#98A6B5">Nenhuma oportunidade com estes filtros.</div></sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isKanban }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;align-items:flex-start">
+        <sc-for list="{{ columns }}" as="col" hint-placeholder-count="7">
+          <div style="width:230px;flex-shrink:0;background:#10161D;border:1px solid {{ col.border }};border-radius:8px;display:flex;flex-direction:column;max-height:70vh">
+            <div style="padding:10px 12px;border-bottom:1px solid #1F2A36;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:600;color: {{ col.color }}">{{ col.label }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#74828F">{{ col.count }}</span></div>
+            <div style="padding:8px;display:flex;flex-direction:column;gap:8px;overflow-y:auto">
+              <sc-for list="{{ col.cards }}" as="o" hint-placeholder-count="1">
+                <div style="background:#0B0F14;border:1px solid #1F2A36;border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px">
+                  <button onClick="{{ o.go }}" style="border:0;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;padding:0;display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:13px">{{ o.sym }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:16px;color: {{ o.scoreColor }}">{{ o.score }}</span></button>
+                  <div style="font-size:12px;color:#98A6B5">{{ o.strategy }}</div>
+                  <div style="font-size:11px;color:#74828F;font-family:'JetBrains Mono',monospace">{{ o.id }} · {{ o.when }}</div>
+                  <select value="{{ o.stageId }}" onChange="{{ o.move }}" aria-label="Mover etapa" style="background:#10161D;border:1px solid #2C3947;color:#98A6B5;border-radius:4px;padding:4px 6px;font-size:11px;width:100%">
+                    <sc-for list="{{ o.moveOpts }}" as="m" hint-placeholder-count="3"><option value="{{ m.id }}">{{ m.label }}</option></sc-for>
+                  </select>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size:12px;color:#74828F">Mover um cartão só reorganiza a análise. As etapas "Avaliada pelo risco", "Aprovada" e "Em posição" só são alcançadas pelo Risk Engine — nunca por arrastar ou selecionar. O seletor em cada cartão é a alternativa ao arrastar.</div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px">
+      <div>
+        <button onClick="{{ back }}" style="border:0;background:transparent;color:#22D3EE;font-size:12px;cursor:pointer;padding:0">← Oportunidades</button>
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:4px">
+          <h1 style="margin:0;font-size:20px;font-weight:600"><span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ d.id }}</span> · <button onClick="{{ d.goSym }}" style="border:0;background:transparent;color:#E6EDF3;font:inherit;font-family:'JetBrains Mono',monospace;cursor:pointer;padding:0;text-decoration:underline dotted #2C3947">{{ d.sym }}</button></h1>
+          <span style="font-size:11px;padding:2px 8px;border-radius:10px;background: {{ d.bg }};color: {{ d.fg }}">{{ d.stage }}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#161E27;color:#98A6B5">ambiente: {{ d.env }}</span>
+          <span style="font-size:12px;color:#74828F">{{ d.strategy }} · {{ d.direction }} · detectada {{ d.detected }}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <sc-if value="{{ d.canSendRisk }}" hint-placeholder-val="{{ false }}"><button onClick="{{ d.sendRisk }}" style="border:0;background:#22D3EE;color:#061014;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">Enviar ao Risk Engine</button></sc-if>
+        <sc-if value="{{ d.showWhyNoRisk }}" hint-placeholder-val="{{ false }}"><span title="{{ d.whyNoRisk }}" style="border:1px dashed #2C3947;color:#74828F;border-radius:6px;padding:8px 14px;font-size:12px">Risk Engine indisponível: {{ d.whyNoRisk }}</span></sc-if>
+        <sc-if value="{{ d.canAdvance }}" hint-placeholder-val="{{ false }}"><button onClick="{{ d.advance }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer">{{ d.advanceLabel }}</button></sc-if>
+        <sc-if value="{{ d.canShadow }}" hint-placeholder-val="{{ false }}"><button onClick="{{ d.toShadow }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer">Encaminhar para shadow</button></sc-if>
+        <sc-if value="{{ d.hasPosition }}" hint-placeholder-val="{{ false }}"><button onClick="{{ d.goPos }}" style="border:1px solid #22D3EE;background:transparent;color:#22D3EE;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer">Ver posição</button></sc-if>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:4px;flex-wrap:wrap">
+      <sc-for list="{{ d.steps }}" as="st" hint-placeholder-count="7">
+        <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:12px;font-size:12px;background: {{ st.bg }};color: {{ st.color }};border:1px solid {{ st.border }}"><span style="font-family:'JetBrains Mono',monospace;font-size:11px">{{ st.n }}</span>{{ st.label }}</div>
+      </sc-for>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+      <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Opportunity Score</h2>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:28px;color:#22D3EE">{{ d.score }}</span><span style="font-size:13px;color:#98A6B5">de 100</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+          <sc-for list="{{ d.parts }}" as="p" hint-placeholder-count="4">
+            <div><div style="display:flex;justify-content:space-between;font-size:12px"><span>{{ p.label }}</span><span style="font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ p.value }} / {{ p.max }}</span></div><div style="height:6px;background:#161E27;border-radius:3px;margin-top:4px;overflow:hidden"><div style="height:100%;background:#22D3EE;width: {{ p.bar }}"></div></div></div>
+          </sc-for>
+        </div>
+        <p style="font-size:12px;color:#74828F;line-height:1.5;margin:12px 0 0">Composição fixa: anomalia (30), contexto de regime (20), liquidez (25), assimetria entrada/invalidação/alvo (25). É uma ordenação de prioridade — <strong style="color:#98A6B5">não</strong> é probabilidade comprovada de lucro.</p>
+      </section>
+      <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Evidências</h2>
+        <ul style="margin:10px 0 0;padding-left:18px;font-size:13px;line-height:1.7;color:#E6EDF3"><sc-for list="{{ d.evidence }}" as="e" hint-placeholder-count="3"><li>{{ e.text }}</li></sc-for></ul>
+        <h2 style="margin:16px 0 0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Agentes que contribuíram</h2>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+          <sc-for list="{{ d.agents }}" as="a" hint-placeholder-count="2">
+            <button onClick="{{ a.go }}" style="display:flex;justify-content:space-between;gap:8px;border:1px solid #1F2A36;background:#0B0F14;border-radius:6px;padding:8px 10px;color:#E6EDF3;cursor:pointer;text-align:left;font-size:13px"><span style="display:flex;gap:8px;align-items:center"><span style="width:8px;height:8px;border-radius:50%;background: {{ a.dot }}"></span>{{ a.name }}</span><span style="font-size:11px;color:#74828F">{{ a.state }} · {{ a.stance }}</span></button>
+          </sc-for>
+        </div>
+      </section>
+      <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Plano de entrada</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;font-size:13px">
+          <div style="color:#98A6B5">Entrada</div><div style="font-family:'JetBrains Mono',monospace;text-align:right">{{ d.entry }}</div>
+          <div style="color:#98A6B5">Invalidação (stop)</div><div style="font-family:'JetBrains Mono',monospace;text-align:right;color:#EF4444">{{ d.invalidation }}</div>
+          <div style="color:#98A6B5">Alvo</div><div style="font-family:'JetBrains Mono',monospace;text-align:right;color:#22C55E">{{ d.target }}</div>
+          <div style="color:#98A6B5">Distância até invalidação</div><div style="font-family:'JetBrains Mono',monospace;text-align:right">{{ d.stopDist }}</div>
+          <div style="color:#98A6B5">Risco planejado (0,25%)</div><div style="font-family:'JetBrains Mono',monospace;text-align:right">{{ d.riskUSDT }}</div>
+          <div style="color:#98A6B5">Tamanho resultante</div><div style="font-family:'JetBrains Mono',monospace;text-align:right">{{ d.sizing }}</div>
+          <div style="color:#98A6B5">Custos estimados</div><div style="font-family:'JetBrains Mono',monospace;text-align:right">{{ d.costs }}</div>
+        </div>
+        <p style="font-size:12px;color:#74828F;line-height:1.5;margin:12px 0 0">Tamanho = risco planejado ÷ distância até a invalidação. Risco planejado não é garantia de perda máxima (gaps e slippage podem excedê-lo).</p>
+      </section>
+    </div>
+
+    <section style="background:#10161D;border:1px solid {{ d.riskBorder }};border-radius:8px;padding:16px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline"><h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Risk Engine · {{ d.riskTitle }}</h2><span style="font-size:11px;color:#74828F;font-family:'JetBrains Mono',monospace">{{ d.riskAt }}</span></div>
+      <sc-if value="{{ d.hasRiskLog }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr auto auto auto;gap:6px 16px;font-size:13px;align-items:center">
+          <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F">Verificação</span><span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;text-align:right">Valor</span><span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;text-align:right">Limite</span><span></span>
+          <sc-for list="{{ d.checks }}" as="c" hint-placeholder-count="6">
+            <span>{{ c.name }}</span><span style="font-family:'JetBrains Mono',monospace;text-align:right">{{ c.value }}</span><span style="font-family:'JetBrains Mono',monospace;text-align:right;color:#98A6B5">{{ c.limit }}</span><span style="font-family:'JetBrains Mono',monospace;color: {{ c.color }}">{{ c.mark }}</span>
+          </sc-for>
+        </div>
+        <p style="margin:12px 0 0;font-size:13px;line-height:1.5;color: {{ d.riskReasonColor }}">{{ d.riskReason }}</p>
+      </sc-if>
+      <sc-if value="{{ d.noRiskLog }}" hint-placeholder-val="{{ false }}"><p style="margin:10px 0 0;font-size:13px;color:#98A6B5">Ainda não avaliada. O Risk Engine verifica, em conjunto: kill switch/pausa, volume 24h ≥ 50 mi USDT, qualidade dos dados, spread, exposição total ≤ 40%, exposição por moeda ≤ 10%, risco agregado ≤ 1%, até 5 posições e invalidação definida.</p></sc-if>
+    </section>
+
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px">
+      <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Registros desta oportunidade</h2>
+      <div style="display:flex;flex-direction:column;margin-top:6px">
+        <sc-for list="{{ d.log }}" as="e" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:auto 1fr;gap:12px;padding:7px 0;border-bottom:1px solid #1F2A36;font-size:13px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#74828F">{{ e.time }}</span><span>{{ e.text }}</span></div></sc-for>
+        <sc-if value="{{ d.noLog }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#98A6B5;padding-top:6px">Nenhum registro além da detecção.</div></sc-if>
+      </div>
+    </section>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ctx&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  state = { agentFilter: "" };
+  renderVals() {
+    const ctx = this.props.ctx; if (!ctx) return {};
+    const { org, pf, D, C, s } = ctx;
+    const go = (r, p) => C.go(r, p);
+    const now = Date.now();
+    const stageStyle = { detectada: ["#161E27", "#98A6B5"], analise: ["#0F1F33", "#60A5FA"], validada: ["#0A2A33", "#22D3EE"], risco: ["#2E1F06", "#F5A524"], aprovada: ["#0E2A1A", "#22C55E"], posicao: ["#0E2A1A", "#22C55E"], encerrada: ["#161E27", "#98A6B5"], rejeitada: ["#2A0E0E", "#EF4444"], expirada: ["#161E27", "#74828F"], shadow: ["#0F1F33", "#60A5FA"] };
+    const riskStyle = { pendente: ["#161E27", "#98A6B5", "pendente"], aprovado: ["#0E2A1A", "#22C55E", "aprovado"], rejeitado: ["#2A0E0E", "#EF4444", "rejeitado"] };
+    const ACTIVE = ["detectada", "analise", "validada", "risco", "aprovada"];
+    const isDetail = s.route === "oportunidade";
+    const stageFilter = s.params.stage || "", symFilter = s.params.sym || "";
+    const agentName = (id) => (D.AGENTS.find((a) => a.id === id) || {}).name || id;
+    let list = org.opps.filter((o) => (!symFilter || o.sym === symFilter) && (!this.state.agentFilter || o.agents.includes(this.state.agentFilter)) && (!stageFilter || (stageFilter === "ativas" ? ACTIVE.includes(o.stage) : o.stage === stageFilter)));
+    list = [...list].sort((a, b) => b.detected.localeCompare(a.detected));
+    const row = (o) => ({ id: o.id, sym: o.sym, strategy: o.strategy, agents: o.agents.map(agentName).join(", "), score: String(o.score), scoreColor: o.score >= 70 ? "#22D3EE" : "#E6EDF3", when: D.fmtAgo(o.detected, now), stage: D.STAGE_LABEL[o.stage], stageId: o.stage, bg: stageStyle[o.stage][0], fg: stageStyle[o.stage][1], risk: riskStyle[o.riskStatus][2], rBg: riskStyle[o.riskStatus][0], rFg: riskStyle[o.riskStatus][1], go: go("oportunidade", { id: o.id }) });
+    const manual = ["detectada", "analise", "validada"];
+    const moveOptsFor = (o) => [...D.STAGES, ...D.SIDE_STAGES].map((st) => ({ id: st.id, label: st.label }));
+    const move = (o) => (e) => {
+      const to = e.target.value; if (to === o.stage) return;
+      if (["risco", "aprovada", "posicao", "encerrada"].includes(to)) { C.toast("Essa etapa só é alcançada pelo Risk Engine e pela execução paper — não por mover o cartão.", "#F5A524"); this.forceUpdate(); return; }
+      if (!manual.includes(o.stage) && o.stage !== "shadow") { C.toast(`${D.STAGE_LABEL[o.stage]} não pode ser movida manualmente.`, "#F5A524"); this.forceUpdate(); return; }
+      if (!C.can("editar_lab") && !C.can("operar_paper")) { C.toast(`Papel ${s.role} não pode reclassificar oportunidades.`, "#EF4444"); this.forceUpdate(); return; }
+      C.mutate((g) => { const x = g.opps.find((q) => q.id === o.id); x.stage = to; if (to === "shadow") x.env = "shadow"; C.event(g, "oportunidade", `${o.id} ${o.sym} movida manualmente para ${D.STAGE_LABEL[to]} (${s.role})`, o.id); });
+    };
+    const columns = [...D.STAGES, ...(ctx.props.showSideStages === false ? [] : D.SIDE_STAGES)].map((st) => { const cards = org.opps.filter((o) => o.stage === st.id && (!symFilter || o.sym === symFilter)).map((o) => ({ ...row(o), move: move(o), moveOpts: moveOptsFor(o) })); return { label: st.label, count: String(cards.length), cards, color: stageStyle[st.id][1], border: ["risco", "aprovada", "posicao"].includes(st.id) ? "#2C3947" : "#1F2A36" }; });
+    const view = s.oppView;
+    let d = {};
+    if (isDetail) {
+      const o = org.opps.find((x) => x.id === s.params.id) || org.opps[0];
+      const m = D.marketOf(o.sym);
+      const pre = o.entry && o.invalidation ? D.riskEngine(org, o) : null;
+      const canOp = C.can("operar_paper");
+      const blocked = org.killSwitch !== "ATIVO" || org.paused;
+      const canSendRisk = o.stage === "validada" && canOp && !blocked;
+      const whyNoRisk = o.stage !== "validada" ? "" : !canOp ? `papel ${s.role} não opera paper` : blocked ? (org.killSwitch !== "ATIVO" ? "kill switch bloqueado" : "pausa operacional") : "";
+      const sendRisk = () => {
+        const res = D.riskEngine(org, o);
+        const body = `${res.checks.map((c) => `${c.ok ? "✓" : "✕"} ${c.name}: ${c.value} (limite ${c.limit})`).join("\n")}\n\n${res.ok ? `Tamanho: ${D.fmtNum(res.qty, 4)} ${o.sym.replace("USDT", "")} ≈ ${D.fmtUSDT(res.notional)}. Uma ordem paper a mercado será simulada com taxa 0,10% e slippage 5 bps.` : res.reason}`;
+        C.confirm(res.ok ? "Risk Engine aprovou — executar paper?" : "Risk Engine rejeitou", body, res.ok ? "Executar paper" : "Registrar rejeição", () => {
+          C.mutate((g) => {
+            const x = g.opps.find((q) => q.id === o.id);
+            x.riskLog = { at: new Date().toISOString(), result: res.ok ? "aprovado" : "rejeitado", checks: res.checks, reason: res.reason };
+            if (res.ok) {
+              x.riskStatus = "aprovado"; x.stage = "posicao";
+              const qty = Math.round(res.qty * 10000) / 10000, fill = o.entry * (1 + D.LIMITS.slippageBps / 10000), fees = qty * fill * D.LIMITS.feeRate;
+              const pid = "P-" + (400 + g.positions.length + g.trades.length);
+              g.positions.push({ id: pid, opp: o.id, sym: o.sym, qty, entry: fill, stop: o.invalidation, target: o.target, openedAt: new Date().toISOString(), fees, env: "paper" });
+              g.orders.push({ id: "O-" + (9100 + g.orders.length), pos: pid, sym: o.sym, type: "Stop a mercado", purpose: "Stop", price: o.invalidation, qty, status: "Pendente", at: new Date().toISOString() });
+              if (o.target) g.orders.push({ id: "O-" + (9101 + g.orders.length), pos: pid, sym: o.sym, type: "Limite", purpose: "Alvo", price: o.target, qty, status: "Pendente", at: new Date().toISOString() });
+              C.event(g, "execucao", `Ordem de entrada ${o.sym} preenchida a ${D.fmtPrice(fill)} (slippage 0,05%, taxa ${D.fmtUSDT(fees)}) — posição ${pid}`, pid);
+              C.event(g, "risco", `Risk Engine aprovou ${o.id}: ${res.checks.length} verificações ok`, o.id);
+            } else {
+              x.riskStatus = "rejeitado";
+              const onlyEligibility = res.failed.every((c) => ["Volume 24h elegível", "Qualidade dos dados"].includes(c.name));
+              x.stage = onlyEligibility ? "shadow" : "rejeitada"; if (onlyEligibility) x.env = "shadow";
+              C.event(g, "risco", `Risk Engine rejeitou ${o.id} ${o.sym}: ${res.failed.map((c) => c.name).join(", ")}${onlyEligibility ? ". Encaminhado para shadow" : ""}`, o.id);
+            }
+          });
+          C.toast(res.ok ? "Operação paper executada. Carteira, dashboard e histórico atualizados." : "Rejeição registrada na oportunidade e nos registros.", res.ok ? "#22C55E" : "#F5A524");
+        }, res.ok ? "#22D3EE" : "#F5A524");
+      };
+      const nextManual = { detectada: "analise", analise: "validada" }[o.stage];
+      const advance = () => { if (!C.can("editar_lab") && !canOp) return C.toast(`Papel ${s.role} não pode avançar a análise.`, "#EF4444"); C.mutate((g) => { const x = g.opps.find((q) => q.id === o.id); x.stage = nextManual; C.event(g, "oportunidade", `${o.id} ${o.sym} → ${D.STAGE_LABEL[nextManual]} (${s.role})`, o.id); }); };
+      const toShadow = () => C.confirm("Encaminhar para shadow", "O sinal continua acompanhado sem movimentar a carteira paper. Nenhuma ordem é criada.", "Encaminhar", () => C.mutate((g) => { const x = g.opps.find((q) => q.id === o.id); x.stage = "shadow"; x.env = "shadow"; C.event(g, "oportunidade", `${o.id} ${o.sym} encaminhada para shadow (${s.role})`, o.id); }));
+      const stepsAll = D.STAGES.map((st, i) => ({ id: st.id, label: st.label, n: String(i + 1) }));
+      const reached = D.STAGES.findIndex((st) => st.id === o.stage);
+      const side = D.SIDE_STAGES.find((st) => st.id === o.stage);
+      const steps = stepsAll.map((st, i) => { const done = reached >= 0 && i <= reached; const cur = i === reached; return { ...st, bg: cur ? "#0A2A33" : done ? "#161E27" : "transparent", color: cur ? "#22D3EE" : done ? "#E6EDF3" : "#74828F", border: cur ? "#22D3EE" : "#1F2A36" }; });
+      if (side) steps.push({ label: side.label, n: "•", bg: stageStyle[o.stage][0], color: stageStyle[o.stage][1], border: stageStyle[o.stage][1] });
+      const parts = [["anomalia", "Anomalia", 30], ["contexto", "Contexto de regime", 20], ["liquidez", "Liquidez", 25], ["assimetria", "Assimetria", 25]].map(([k, label, max]) => ({ label, value: String(o.scoreParts[k]), max: String(max), bar: `${(o.scoreParts[k] / max) * 100}%` }));
+      const aDot = { conectado: "#22C55E", simulado: "#60A5FA", pausado: "#F5A524", "não implementado": "#74828F" };
+      const agents = o.agents.map((id, i) => { const a = D.AGENTS.find((x) => x.id === id); return { name: a.name, state: a.state, dot: aDot[a.state], stance: i === 0 ? "originou o sinal" : a.id === "derivatives" ? "contexto" : "concordou", go: go("agentes", { agent: id }) }; });
+      const dist = o.entry && o.invalidation ? ((o.entry - o.invalidation) / o.entry) * 100 : null;
+      const log = org.events.filter((e) => e.ref === o.id || (org.positions.find((p) => p.opp === o.id) || {}).id === e.ref).map((e) => ({ time: D.fmtDT(e.at), text: e.text }));
+      const rl = o.riskLog;
+      d = {
+        id: o.id, sym: o.sym, goSym: go("ativo", { sym: o.sym }), stage: D.STAGE_LABEL[o.stage], bg: stageStyle[o.stage][0], fg: stageStyle[o.stage][1], env: o.env, strategy: o.strategy, direction: o.direction, detected: D.fmtDT(o.detected),
+        canSendRisk, sendRisk, showWhyNoRisk: !!whyNoRisk, whyNoRisk, canAdvance: !!nextManual, advance, advanceLabel: nextManual ? `Avançar para ${D.STAGE_LABEL[nextManual]}` : "", canShadow: ["detectada", "analise", "validada"].includes(o.stage), toShadow, hasPosition: o.stage === "posicao", goPos: go("carteira", { tab: "posicoes" }),
+        steps, score: String(o.score), parts, evidence: o.evidence.map((t) => ({ text: t })), agents,
+        entry: o.entry ? D.fmtPrice(o.entry) : "—", invalidation: o.invalidation ? D.fmtPrice(o.invalidation) : "—", target: o.target ? D.fmtPrice(o.target) : "—", stopDist: dist != null ? D.fmtNum(dist, 2) + "%" : "—", riskUSDT: pre ? D.fmtUSDT(pre.riskUSDT) : "—", sizing: pre ? `${D.fmtNum(pre.qty, 4)} ≈ ${D.fmtUSDT(pre.notional)}` : "—", costs: pre ? `taxa ${D.fmtUSDT(pre.notional * D.LIMITS.feeRate)} + slippage ${D.fmtUSDT(pre.notional * D.LIMITS.slippageBps / 10000)}` : "—",
+        hasRiskLog: !!rl, noRiskLog: !rl, riskTitle: rl ? (rl.result === "aprovado" ? "aprovado" : "rejeitado") : "não avaliada", riskAt: rl ? D.fmtDT(rl.at) : "", riskBorder: rl ? (rl.result === "aprovado" ? "#22C55E" : "#EF4444") : "#1F2A36",
+        checks: rl ? rl.checks.map((c) => ({ ...c, mark: c.ok ? "✓ ok" : "✕ falhou", color: c.ok ? "#22C55E" : "#EF4444" })) : [], riskReason: rl ? rl.reason : "", riskReasonColor: rl && rl.result === "aprovado" ? "#22C55E" : "#F5A524",
+        log, noLog: log.length === 0,
+      };
+    }
+    return {
+      isList: !isDetail, isDetail, activeCount: String(org.opps.filter((o) => ACTIVE.includes(o.stage)).length), shadowCount: String(org.opps.filter((o) => o.stage === "shadow").length),
+      hasSymFilter: !!symFilter, symFilter, clearSym: go("oportunidades", { ...s.params, sym: undefined }), stageFilter, onStage: (e) => C.setState({ params: { ...s.params, stage: e.target.value } }),
+      agentFilter: this.state.agentFilter, onAgent: (e) => this.setState({ agentFilter: e.target.value }), agentOpts: D.AGENTS.filter((a) => a.state !== "não implementado").map((a) => ({ id: a.id, name: a.name })),
+      isLista: view !== "kanban", isKanban: view === "kanban", setLista: () => C.setState({ oppView: "lista" }), setKanban: () => C.setState({ oppView: "kanban" }), listaBg: view !== "kanban" ? "#0A2A33" : "transparent", listaFg: view !== "kanban" ? "#22D3EE" : "#E6EDF3", kanbanBg: view === "kanban" ? "#0A2A33" : "transparent", kanbanFg: view === "kanban" ? "#22D3EE" : "#E6EDF3",
+      rows: list.map(row), empty: list.length === 0, columns, back: go("oportunidades"), d,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:16px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#E6EDF3">
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+      <div><h1 style="margin:0;font-size:20px;font-weight:600">Mercados</h1><div style="font-size:12px;color:#98A6B5;margin-top:4px">{{ count }} pares monitorados · Binance e Bybit (spot) · Fonte: demonstração · Consultado em {{ asOf }}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Buscar par (ex.: SOL)" aria-label="Buscar par" style="background:#0B0F14;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:7px 10px;font-size:13px;width:180px">
+        <select value="{{ ex }}" onChange="{{ onEx }}" aria-label="Exchange" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:7px 10px;font-size:13px"><option value="">Todas as exchanges</option><option value="Binance">Binance</option><option value="Bybit">Bybit</option></select>
+        <select value="{{ qual }}" onChange="{{ onQual }}" aria-label="Qualidade dos dados" style="background:#10161D;border:1px solid #2C3947;color:#E6EDF3;border-radius:6px;padding:7px 10px;font-size:13px"><option value="">Qualquer qualidade</option><option value="ok">Só atualizados</option><option value="bad">Só com problema</option></select>
+        <button onClick="{{ toggleFav }}" aria-pressed="{{ favOnly }}" style="border:1px solid {{ favBorder }};background: {{ favBg }};color: {{ favFg }};border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">★ Favoritos</button>
+        <button onClick="{{ toggleElig }}" aria-pressed="{{ eligOnly }}" style="border:1px solid {{ eligBorder }};background: {{ eligBg }};color: {{ eligFg }};border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">Elegíveis (vol ≥ 50 mi)</button>
+      </div>
+    </div>
+    <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;overflow-x:auto">
+      <div style="min-width:960px;white-space:nowrap;display:grid;grid-template-columns:28px minmax(120px,1.4fr) 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1.3fr;gap:8px;padding:0 12px;height:36px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F;border-bottom:1px solid #1F2A36">
+        <span></span><span>Par · exchange</span><span style="text-align:right">Preço</span><span style="text-align:right">24h</span><span style="text-align:right">Volume 24h</span><span data-hide-narrow="1" style="text-align:right">Volat.</span><span data-hide-narrow="1" style="text-align:right">Spread</span><span style="text-align:right">Anomalias</span><span>Liquidez</span><span>Atualização</span>
+      </div>
+      <sc-for list="{{ rows }}" as="m" hint-placeholder-count="10">
+        <div role="row" style="min-width:960px;white-space:nowrap;display:grid;grid-template-columns:28px minmax(120px,1.4fr) 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1.3fr;gap:8px;padding:0 12px;height:40px;align-items:center;font-size:13px;border-bottom:1px solid #1F2A36;font-variant-numeric:tabular-nums" style-hover="background:#121A22">
+          <button onClick="{{ m.fav }}" aria-label="Favoritar" style="border:0;background:transparent;color: {{ m.favColor }};cursor:pointer;font-size:14px;padding:0">★</button>
+          <button onClick="{{ m.go }}" style="border:0;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;padding:0;font-family:'JetBrains Mono',monospace;font-size:13px;display:flex;gap:8px;align-items:baseline"><span>{{ m.sym }}</span><span style="font-size:11px;color:#74828F">{{ m.ex }}</span></button>
+          <span style="text-align:right;font-family:'JetBrains Mono',monospace;color:#E6EDF3">{{ m.price }}</span>
+          <span style="text-align:right;font-family:'JetBrains Mono',monospace;color: {{ m.chgColor }}">{{ m.chg }}</span>
+          <span style="text-align:right;font-family:'JetBrains Mono',monospace;color: {{ m.volColor }}">{{ m.vol }}</span>
+          <span data-hide-narrow="1" style="text-align:right;font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ m.volat }}</span>
+          <span data-hide-narrow="1" style="text-align:right;font-family:'JetBrains Mono',monospace;color:#98A6B5">{{ m.spread }}</span>
+          <span style="text-align:right;font-family:'JetBrains Mono',monospace;color: {{ m.anomColor }}">{{ m.anomalies }}</span>
+          <span style="font-size:12px;color:#98A6B5">{{ m.liq }}</span>
+          <span style="font-size:11px;display:inline-flex;align-items:center;gap:6px"><span style="padding:1px 6px;border-radius:8px;background: {{ m.qBg }};color: {{ m.qFg }}">{{ m.qLabel }}</span><span style="color:#74828F;font-family:'JetBrains Mono',monospace">{{ m.updated }}</span></span>
+        </div>
+      </sc-for>
+      <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><div style="padding:24px;font-size:13px;color:#98A6B5">Nenhum par corresponde aos filtros. Nada foi removido do monitoramento.</div></sc-if>
+    </div>
+    <div style="font-size:12px;color:#74828F;line-height:1.6">Volume 24h em USDT, apurado pela soma das últimas 24 velas de 1 h da própria exchange (demonstração). Pares abaixo de 50 mi USDT ficam em observação ou shadow — nunca operam paper. "Atrasado" e "gap" indicam dado antigo ou faltante: não é atualização ao vivo.</div>
+  </sc-if>
+
+  <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px">
+      <div>
+        <button onClick="{{ back }}" style="border:0;background:transparent;color:#22D3EE;font-size:12px;cursor:pointer;padding:0">← Mercados</button>
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:4px">
+          <h1 style="margin:0;font-size:20px;font-weight:600;font-family:'JetBrains Mono',monospace">{{ d.sym }}</h1>
+          <span style="font-size:12px;color:#74828F">{{ d.ex }} · spot</span>
+          <span style="font-size:11px;padding:1px 6px;border-radius:8px;background: {{ d.qBg }};color: {{ d.qFg }}">{{ d.qLabel }} · {{ d.updated }}</span>
+          <span style="font-size:11px;padding:1px 6px;border-radius:8px;background: {{ d.eligBg }};color: {{ d.eligFg }}">{{ d.elig }}</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-top:8px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:28px;font-variant-numeric:tabular-nums">{{ d.price }}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:16px;color: {{ d.chgColor }}">{{ d.chg }}</span>
+          <span style="font-size:12px;color:#74828F">regime: {{ d.regime }}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px"><button onClick="{{ d.fav }}" style="border:1px solid #2C3947;background:transparent;color: {{ d.favColor }};border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">★ {{ d.favLabel }}</button><button onClick="{{ d.goOpps }}" style="border:1px solid #2C3947;background:transparent;color:#E6EDF3;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">Oportunidades deste par</button></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+      <sc-for list="{{ d.metrics }}" as="k" hint-placeholder-count="6">
+        <div style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:12px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#74828F">{{ k.label }}</div><div style="font-family:'JetBrains Mono',monospace;font-size:16px;margin-top:4px;color: {{ k.color }}">{{ k.value }}</div><div style="font-size:11px;color:#74828F;margin-top:2px">{{ k.sub }}</div></div>
+      </sc-for>
+    </div>
+    <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Gráfico · velas 1 h</h2><span style="font-size:11px;color:#F5A524">Integração de gráfico (lightweight-charts) do produto não conectada nesta demonstração</span></div>
+      <div style="margin-top:12px;height:220px;border-radius:6px;border:1px dashed #2C3947;background:repeating-linear-gradient(135deg,#0B0F14 0 10px,#10161D 10px 20px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:#74828F;text-align:center;padding:12px">gráfico de velas {{ d.sym }} · 1 h · com marcas de sinais e entradas/saídas paper</div>
+    </section>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+      <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Sinais identificados</h2>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <sc-for list="{{ d.signals }}" as="sg" hint-placeholder-count="2">
+            <button onClick="{{ sg.go }}" style="display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid #1F2A36;background:#0B0F14;border-radius:6px;padding:10px;color:#E6EDF3;cursor:pointer" style-hover="border-color:#2C3947"><span style="font-size:13px;font-weight:500;display:flex;gap:8px;align-items:center"><span style="width:8px;height:8px;border-radius:50%;background: {{ sg.dot }}"></span>{{ sg.agent }} <span style="font-size:11px;color:#74828F;font-weight:400">{{ sg.state }}</span></span><span style="font-size:12px;color:#98A6B5">{{ sg.text }}</span></button>
+          </sc-for>
+          <sc-if value="{{ d.noSignals }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#98A6B5">Nenhum agente sinalizou este par no período.</div></sc-if>
+        </div>
+      </section>
+      <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Oportunidades relacionadas</h2>
+        <div style="display:flex;flex-direction:column;margin-top:6px">
+          <sc-for list="{{ d.opps }}" as="o" hint-placeholder-count="2">
+            <button onClick="{{ o.go }}" style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;font-size:13px"><span><span style="font-family:'JetBrains Mono',monospace">{{ o.id }}</span> · {{ o.strategy }}<span style="display:block;font-size:11px;color:#74828F">score {{ o.score }} · {{ o.when }}</span></span><span style="font-size:11px;padding:2px 8px;border-radius:10px;background: {{ o.bg }};color: {{ o.fg }}">{{ o.stage }}</span></button>
+          </sc-for>
+          <sc-if value="{{ d.noOpps }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#98A6B5;padding-top:6px">Nenhuma oportunidade registrada para este par.</div></sc-if>
+        </div>
+      </section>
+      <section style="background:#10161D;border:1px solid #1F2A36;border-radius:8px;padding:16px;min-width:0">
+        <h2 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#98A6B5;font-weight:500">Posições e histórico de decisões</h2>
+        <div style="display:flex;flex-direction:column;margin-top:6px">
+          <sc-for list="{{ d.positions }}" as="p" hint-placeholder-count="1">
+            <button onClick="{{ p.go }}" style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;font-size:13px"><span>Posição aberta · {{ p.qty }} @ {{ p.entry }}<span style="display:block;font-size:11px;color:#74828F">stop {{ p.stop }} · alvo {{ p.target }}</span></span><span style="font-family:'JetBrains Mono',monospace;color: {{ p.color }}">{{ p.pnl }}</span></button>
+          </sc-for>
+          <sc-for list="{{ d.decisions }}" as="e" hint-placeholder-count="3">
+            <button onClick="{{ e.go }}" style="display:grid;grid-template-columns:auto 1fr;gap:10px;padding:8px 0;border:0;border-bottom:1px solid #1F2A36;background:transparent;color:#E6EDF3;cursor:pointer;text-align:left;font-size:13px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#74828F">{{ e.time }}</span><span style="line-height:1.4">{{ e.text }}</span></button>
+          </sc-for>
+          <sc-if value="{{ d.noDecisions }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#98A6B5;padding-top:6px">Sem decisões registradas para este par.</div></sc-if>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ctx&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  state = { q: "", ex: "", qual: "", favOnly: false, eligOnly: false };
+  renderVals() {
+    const ctx = this.props.ctx; if (!ctx) return {};
+    const { org, pf, D, C, s } = ctx;
+    const go = (r, p) => C.go(r, p);
+    const isDetail = s.route === "ativo";
+    const qStyle = { ok: ["#0E2A1A", "#22C55E", "ok"], atrasado: ["#2E1F06", "#F5A524", "atrasado"], gap: ["#2A0E0E", "#EF4444", "gap"] };
+    const stageStyle = { detectada: ["#161E27", "#98A6B5"], analise: ["#0F1F33", "#60A5FA"], validada: ["#0A2A33", "#22D3EE"], risco: ["#2E1F06", "#F5A524"], aprovada: ["#0E2A1A", "#22C55E"], posicao: ["#0E2A1A", "#22C55E"], encerrada: ["#161E27", "#98A6B5"], rejeitada: ["#2A0E0E", "#EF4444"], expirada: ["#161E27", "#74828F"], shadow: ["#0F1F33", "#60A5FA"] };
+    const fav = (sym) => () => { C.mutate((o) => { const i = o.watchlist.indexOf(sym); if (i >= 0) o.watchlist.splice(i, 1); else o.watchlist.push(sym); }); };
+    const chgColor = (v) => (v > 0 ? "#22C55E" : v < 0 ? "#EF4444" : "#98A6B5");
+    const now = Date.now();
+    const st = this.state, q = st.q.trim().toUpperCase();
+    let list = D.MARKETS.filter((m) => (!q || m.sym.includes(q)) && (!st.ex || m.ex === st.ex) && (!st.qual || (st.qual === "ok" ? m.quality === "ok" : m.quality !== "ok")) && (!st.favOnly || org.watchlist.includes(m.sym)) && (!st.eligOnly || m.vol >= D.LIMITS.minVolume24hUSDT));
+    const rows = list.map((m) => ({ sym: m.sym, ex: m.ex, price: D.fmtPrice(m.price), chg: D.fmtPct(m.chg, 2), chgColor: chgColor(m.chg), vol: D.fmtVol(m.vol), volColor: m.vol >= D.LIMITS.minVolume24hUSDT ? "#E6EDF3" : "#F5A524", volat: D.fmtNum(m.volat, 1) + "%", spread: D.fmtNum(m.spread, 1) + " bps", anomalies: String(m.anomalies), anomColor: m.anomalies >= 2 ? "#F5A524" : "#98A6B5", liq: m.liq, qBg: qStyle[m.quality][0], qFg: qStyle[m.quality][1], qLabel: qStyle[m.quality][2], updated: D.fmtAgo(m.updated), favColor: org.watchlist.includes(m.sym) ? "#22D3EE" : "#2C3947", fav: fav(m.sym), go: go("ativo", { sym: m.sym }) }));
+    const tog = (on) => ({ border: on ? "#22D3EE" : "#2C3947", bg: on ? "#0A2A33" : "transparent", fg: on ? "#22D3EE" : "#E6EDF3" });
+    const fT = tog(st.favOnly), eT = tog(st.eligOnly);
+    let d = {};
+    if (isDetail) {
+      const m = D.MARKETS.find((x) => x.sym === s.params.sym) || D.MARKETS[0];
+      const elig = m.vol >= D.LIMITS.minVolume24hUSDT;
+      const opps = org.opps.filter((o) => o.sym === m.sym);
+      const agents = D.AGENTS.filter((a) => a.markets.includes(m.sym));
+      const aDot = { conectado: "#22C55E", simulado: "#60A5FA", pausado: "#F5A524", "não implementado": "#74828F" };
+      const signals = agents.map((a) => { const o = opps.find((x) => x.agents.includes(a.id)); return { agent: a.name, state: a.state, dot: aDot[a.state], text: o ? o.evidence.find((e) => true) : `Acompanha ${m.sym}; sem sinal ativo no período.`, go: go("agentes", { agent: a.id }) }; });
+      const ids = new Set([...opps.map((o) => o.id), ...org.positions.filter((p) => p.sym === m.sym).map((p) => p.id)]);
+      const decisions = org.events.filter((e) => ids.has(e.ref)).map((e) => ({ time: D.fmtTime(e.at), text: e.text, go: C.refGo(e.ref) }));
+      d = {
+        sym: m.sym, ex: m.ex, price: D.fmtPrice(m.price), chg: D.fmtPct(m.chg, 2), chgColor: chgColor(m.chg), regime: m.regime, qBg: qStyle[m.quality][0], qFg: qStyle[m.quality][1], qLabel: qStyle[m.quality][2], updated: D.fmtAgo(m.updated),
+        eligBg: elig ? "#0E2A1A" : "#2E1F06", eligFg: elig ? "#22C55E" : "#F5A524", elig: elig ? "elegível para paper" : "só observação/shadow (volume < 50 mi)",
+        fav: fav(m.sym), favColor: org.watchlist.includes(m.sym) ? "#22D3EE" : "#E6EDF3", favLabel: org.watchlist.includes(m.sym) ? "Na lista de observação" : "Adicionar à observação", goOpps: go("oportunidades", { sym: m.sym }),
+        metrics: [
+          { label: "Volume 24h", value: D.fmtVol(m.vol) + " USDT", sub: "soma de 24 velas 1 h", color: elig ? "#E6EDF3" : "#F5A524" },
+          { label: "Liquidez", value: m.liq, sub: "profundidade do livro ±1%", color: "#E6EDF3" },
+          { label: "Volatilidade", value: D.fmtNum(m.volat, 1) + "%", sub: "desvio 24 h, retornos 1 h", color: "#E6EDF3" },
+          { label: "Spread", value: D.fmtNum(m.spread, 1) + " bps", sub: "limite p/ paper 8 bps", color: m.spread > 8 ? "#F5A524" : "#E6EDF3" },
+          { label: "Anomalias 24 h", value: String(m.anomalies), sub: "detectores do scanner", color: m.anomalies >= 2 ? "#F5A524" : "#E6EDF3" },
+          { label: "Última atualização", value: D.fmtAgo(m.updated), sub: D.fmtDT(m.updated), color: m.quality === "ok" ? "#E6EDF3" : "#F5A524" },
+        ],
+        signals, noSignals: signals.length === 0,
+        opps: opps.map((o) => ({ id: o.id, strategy: o.strategy, score: String(o.score), when: D.fmtAgo(o.detected, now), stage: D.STAGE_LABEL[o.stage], bg: stageStyle[o.stage][0], fg: stageStyle[o.stage][1], go: go("oportunidade", { id: o.id }) })), noOpps: opps.length === 0,
+        positions: pf.posRows.filter((p) => p.sym === m.sym).map((p) => ({ qty: D.fmtNum(p.qty, 4), entry: D.fmtPrice(p.entry), stop: D.fmtPrice(p.stop), target: D.fmtPrice(p.target), pnl: D.fmtSigned(p.unreal) + " USDT", color: chgColor(p.unreal), go: go("carteira", { tab: "posicoes" }) })),
+        decisions, noDecisions: decisions.length === 0,
+      };
+    }
+    return {
+      isList: !isDetail, isDetail, count: String(D.MARKETS.length), asOf: D.fmtDT(new Date().toISOString()), rows, empty: rows.length === 0,
+      q: st.q, onQ: (e) => this.setState({ q: e.target.value }), ex: st.ex, onEx: (e) => this.setState({ ex: e.target.value }), qual: st.qual, onQual: (e) => this.setState({ qual: e.target.value }),
+      favOnly: st.favOnly, toggleFav: () => this.setState({ favOnly: !st.favOnly }), favBorder: fT.border, favBg: fT.bg, favFg: fT.fg,
+      eligOnly: st.eligOnly, toggleElig: () => this.setState({ eligOnly: !st.eligOnly }), eligBorder: eT.border, eligBg: eT.bg, eligFg: eT.fg,
+      back: go("mercados"), d,
+    };
+  }
+}
+</script>
+</body>
+</html>
