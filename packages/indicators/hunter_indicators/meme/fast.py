@@ -27,6 +27,11 @@ Every ``None`` has a name (``window_reason`` / ``progress_reason`` /
 ``too_few_points`` (no photo at least 60 s before the newest one — the window
 is not a minute yet), ``out_of_range`` (a slope the column cannot hold),
 ``denominator_unknown``, ``no_holders_reader``, ``too_few_readings``.
+
+T4.27: ``mcap_executable_sol`` rides beside ``mcap_sol`` — the newest
+photo's theoretical cap, capped at its real SOL for a Mayhem coin
+(:mod:`hunter_indicators.meme.executable`); the delta and the slope stay on
+the theoretical series, labelled as such.
 """
 
 from __future__ import annotations
@@ -39,6 +44,7 @@ from typing import Final
 
 from hunter_core.domain.enums import FeatureCategory
 from hunter_indicators.features.definitions import FeatureDefinition
+from hunter_indicators.meme.executable import executable_market_cap_sol, is_mayhem_curve
 from hunter_indicators.meme.lines import LinePoint, log_slope
 
 __all__ = [
@@ -134,7 +140,8 @@ FAST_DEFINITIONS: Final[tuple[FeatureDefinition, ...]] = (
     ),
 )
 """Registered as features are (key, version, params, description, inputs):
-a different window is a different version, never an edit."""
+a different window is a different version, never an edit. ``mcap_executable_sol``
+(T4.27) is registered in :mod:`hunter_indicators.meme.executable`."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +152,10 @@ class FastPoint:
     received_at: datetime
     mcap_sol: Decimal | None
     real_token_reserves: Decimal | None = None
+    real_sol_reserves: Decimal | None = None
+    mayhem_enabled: bool | None = None
+    """T4.27: the photo's real SOL and the chain's Mayhem bit — what caps
+    ``mcap_executable_sol``; ``None`` = the row did not carry them."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +181,9 @@ class FastFeatures:
     progress_delta_60s: Decimal | None
     progress_rising: bool | None
     progress_reason: str | None
+    mcap_executable_sol: Decimal | None = None
+    """T4.27: ``mcap_sol`` capped at the newest photo's real SOL for a Mayhem
+    coin (``mayhem_state`` of the token may say so when the photo did not)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,16 +215,34 @@ def _progress(point: FastPoint, initial: Decimal | None) -> Decimal | None:
     return (Decimal(1) - point.real_token_reserves / initial).quantize(_FRACTION, ROUND_HALF_EVEN)
 
 
+def _executable(point: FastPoint, mayhem_state: str | None) -> Decimal | None:
+    """T4.27: the newest photo's cap at its real SOL, quantized like ``mcap_sol``."""
+    value = executable_market_cap_sol(
+        point.mcap_sol,
+        point.real_sol_reserves,
+        mayhem=is_mayhem_curve(point.mayhem_enabled, mayhem_state),
+    )
+    return None if value is None else value.quantize(_MONEY, ROUND_HALF_EVEN)
+
+
 def compute_fast(
-    points: Sequence[FastPoint], *, as_of: datetime, initial_real_token_reserves: Decimal | None
+    points: Sequence[FastPoint],
+    *,
+    as_of: datetime,
+    initial_real_token_reserves: Decimal | None,
+    mayhem_state: str | None = None,
 ) -> FastFeatures:
-    """Fold the series known at ``as_of``. Total: every input yields a row."""
+    """Fold the series known at ``as_of``. Total: every input yields a row.
+
+    ``mayhem_state`` (T4.27) is the token's agent state, the second witness of
+    a Mayhem coin when the newest photo did not carry the chain's bit."""
     window = usable_fast_points(points, as_of=as_of)
     if not window:
         return FastFeatures(None, 0, None, None, None, NO_SNAPSHOT, None, None, None, NO_SNAPSHOT)
     newest = window[-1]
     assert newest.mcap_sol is not None
     mcap = newest.mcap_sol.quantize(_MONEY, ROUND_HALF_EVEN)
+    executable = _executable(newest, mayhem_state)
     progress = _progress(newest, initial_real_token_reserves)
     progress_reason = None if progress is not None else DENOMINATOR_UNKNOWN
     cutoff = newest.observed_at - timedelta(seconds=DELTA_S)
@@ -227,6 +259,7 @@ def compute_fast(
             None,
             None,
             progress_reason or TOO_FEW_POINTS,
+            mcap_executable_sol=executable,
         )
     reference = references[-1]
     assert reference.mcap_sol is not None
@@ -260,6 +293,7 @@ def compute_fast(
         progress_delta_60s=progress_delta,
         progress_rising=rising,
         progress_reason=progress_reason,
+        mcap_executable_sol=executable,
     )
 
 

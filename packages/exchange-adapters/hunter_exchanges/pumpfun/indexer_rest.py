@@ -204,6 +204,7 @@ def parse_risk_snapshot(
         if isinstance(payload.get("isMayhemMode"), bool)
         else None,
         mayhem_state=_opt_text(payload.get("mayhemState")),
+        twitter_reuse_count=_opt_int(payload.get("twitterReuseCount"), "twitterReuseCount"),
         raw=json.loads(json.dumps(payload, default=str)),
         observed_at=received_at,
         received_at=received_at,

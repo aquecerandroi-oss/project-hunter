@@ -50,6 +50,7 @@ from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.creator_watch import spawn_creator_watch
 from hunter_meme_worker.discovery import run_discovery
+from hunter_meme_worker.events import spawn_events_match
 from hunter_meme_worker.fast_lane import fast_once
 from hunter_meme_worker.graduation import GlobalParamsStore
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
@@ -64,6 +65,7 @@ from hunter_meme_worker.wiring import (
     build_sources,
     build_swap_api,
     build_trades,
+    close_clients,
     heartbeat_once,
     risk_once,
     run_board,
@@ -300,6 +302,7 @@ async def run_meme(runtime: WorkerRuntime) -> None:
             )
             if config.creator_watch_enabled:
                 spawn_creator_watch(group, config, ctx)
+            spawn_events_match(group, ctx)
             group.create_task(
                 forever("retention", config.retention_cycle_s, prune_once, ctx),
                 name="meme-retention",
@@ -332,19 +335,6 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                     forever("lab", config.lab_cycle_s, lab_once, lab), name="meme-lab"
                 )
     finally:
-        await _close(ctx, boards)
+        await close_clients(ctx, boards)
         if lab is not None and isinstance(lab.quotes, PumpFunRestClient):
             await lab.quotes.aclose()
-
-
-async def _close(ctx: RadarContext, boards: dict[str, TrenchesWsClient]) -> None:
-    """Close whatever the clients own. Best effort: shutdown must not raise."""
-    clients: list[object] = [ctx.events, ctx.curves, ctx.chain, ctx.wallets, *boards.values()]
-    for client in clients:
-        closer = getattr(client, "aclose", None)
-        if closer is None:
-            continue
-        try:
-            await closer()
-        except Exception:  # a socket that will not close is not a shutdown failure
-            logger.warning("meme_client_close_failed", client=type(client).__name__)

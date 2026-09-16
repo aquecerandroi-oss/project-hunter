@@ -10,13 +10,10 @@ reason, no row with both.
 
 **Non-anticipation is a property of the producer, stated here so the schema
 reader knows what a number means**: a value in a row with ``end_time = T`` was
-computed only from observations with ``received_at <= T`` — a trade whose
-block time is inside the minute but which reached us after ``T`` is *not* in
-``buys_1m``; it is in no minute, and the tape's per-minute count is therefore
-"what was known at T", never "what happened by T". The Lab reads a closed
-minute one minute later, so the gap between the two is exactly the source's
-delivery lag (``meme_curve_snapshots.received_at − observed_at`` and the
-``swap-api`` pull cadence), declared in ``docs/PIPELINE.md`` §1e.
+computed only from observations with ``received_at <= T`` — a trade inside the
+minute that reached us after ``T`` is in *no* minute; the count is "what was
+known at T", never "what happened by T". The Lab reads a closed minute one
+minute later; the gap is the source's delivery lag (``docs/PIPELINE.md`` §1e).
 """
 
 from __future__ import annotations
@@ -32,21 +29,16 @@ from hunter_core.db.models._common import PERCENT
 
 RATIO = Numeric(18, 8)
 SLOPE = Numeric(12, 6)
-"""A slope — a growth fraction per minute or SOL per minute (``0026``): six
-decimals like a fraction, six integer digits because a market cap in SOL can
-move whole units per minute."""
-"""A ratio is neither money (``NUMERIC(28,10)``) nor a presentation fraction
-(``NUMERIC(9,6)``) — the same slot ``market_betas.beta`` occupies (§18.6). A
-buy/sell ratio with no sells is not representable as a number, so it is NULL with
-a reason (``no_sells``), never an infinity squeezed into a scale."""
+"""``SLOPE``: a growth fraction per minute or SOL per minute (``0026``) — six
+decimals, six integer digits. ``RATIO``: neither money nor a presentation
+fraction, the slot ``market_betas.beta`` occupies (§18.6); a buy/sell ratio with
+no sells is NULL with a reason (``no_sells``), never an infinity in a scale."""
 
 FEATURES_VERSION_V1 = "meme_features_v1"
-"""The frozen protocol of ``meme_features_1m``: which inputs, which formula, which
-reasons. Changing any of them is a new version — a different row by the primary
-key — never an edit of a minute some hypothesis may already have been cut by.
-``0023`` adds columns to the same version: a ``NULL`` with a reason in the old
-rows and a number in the new ones is the same protocol reading the same minute
-with more sources, not a different formula for a number that already existed."""
+"""The frozen protocol: inputs, formula, reasons. Changing any is a new version
+— a different row by the primary key — never an edit. ``0023`` adds columns to
+the same version: a NULL with a reason in an old row and a number in a new one
+is the same protocol with more sources, not a new formula."""
 
 
 class MemeFeatures1m(Base):
@@ -189,6 +181,12 @@ class MemeFeatures1m(Base):
             "AND (tape_source IS NULL OR buys_1m IS NOT NULL)",
             name="tape_source_is_consistent",
         ),
+        # 0042 (T4.27) — capped by the theoretical, never alone; NULL before the revision.
+        CheckConstraint(
+            "mcap_executable_sol IS NULL "
+            "OR (mcap_sol IS NOT NULL AND mcap_executable_sol <= mcap_sol)",
+            name="executable_mcap_within_theoretical",
+        ),
         {"postgresql_partition_by": "RANGE (end_time)"},
     )
 
@@ -221,25 +219,22 @@ class MemeFeatures1m(Base):
     stay inside the CHECK. Two absences with two causes get two reasons."""
 
     mcap_sol: Mapped[Decimal | None]
-    """Carried from the snapshot this row was derived from — a *copy of a
-    generated value*, on purpose: the minute's row must keep saying what the
-    market cap was at that minute even after retention drops the snapshot."""
+    """Carried from the snapshot this row was derived from — a *copy of a generated
+    value*, on purpose: the minute must keep its market cap after retention drops
+    the snapshot. Theoretical (marginal price × supply); see ``mcap_executable_sol``."""
 
     curve_reason: Mapped[str | None] = mapped_column(Text)
     """Why there is no market cap: ``not_polled`` | ``rate_limited`` |
-    ``insufficient_coverage``. Non-null exactly when the minute saw **no curve
-    observation at all** — which is also when ``coverage`` is zero and a row in
-    ``meme_ingest_gaps`` names the same window."""
+    ``insufficient_coverage`` — non-null exactly when the minute saw **no curve
+    observation** (``coverage`` zero, a ``meme_ingest_gaps`` row names the window)."""
 
     unique_buyers: Mapped[int | None] = mapped_column(Integer)
     unique_buyers_reason: Mapped[str | None] = mapped_column(Text)
     buy_sell_ratio: Mapped[Decimal | None] = mapped_column(RATIO)
     buy_sell_ratio_reason: Mapped[str | None] = mapped_column(Text)
-    """Counts, not notional — declared here because the two are different numbers
-    and the column name alone does not say which (T4-MEME-RADAR.md §5). Filled
-    since T4.2c from the ``swap-api`` tape of the minute (distinct buyers
-    excluding the creator; buys/sells count ratio, ``no_sells`` when nothing was
-    sold); ``no_trade_feed`` before the first pull of a mint."""
+    """Counts, not notional (T4-MEME-RADAR.md §5). Since T4.2c from the ``swap-api``
+    tape of the minute (distinct buyers excluding the creator; buys/sells count
+    ratio, ``no_sells`` when nothing was sold); ``no_trade_feed`` before the first pull."""
 
     top10_share: Mapped[Decimal | None] = mapped_column(PERCENT)
     top10_share_reason: Mapped[str | None] = mapped_column(Text)
@@ -347,4 +342,9 @@ class MemeFeatures1m(Base):
     end_time``) or ``activity_1m`` (the batch route's ``1m`` window ending at
     ``tape_as_of`` ≤ 60 s before the close, only when the per-mint tape did not
     cover; buyers count the creator, who sold is unknown). ``NULL`` before ``0032``."""
+    mcap_executable_sol: Mapped[Decimal | None]
+    """``0042`` (T4.27): ``mcap_sol`` **capped at the photo's real SOL** for a Mayhem
+    coin, equal to it otherwise (``hunter_indicators.meme.executable``) — ``mcap_sol``
+    stays theoretical and on a Mayhem coin reads the agent's virtual SOL (KAT, 15/09:
+    1 981 SOL, 5 holders). NULL with ``mcap_sol`` and on rows folded before ``0042``."""
     computed_at: Mapped[datetime] = mapped_column(server_default=func.now())

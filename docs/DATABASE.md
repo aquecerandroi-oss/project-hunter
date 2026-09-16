@@ -7112,3 +7112,138 @@ lesson_repeat_dumper` mede R das apostas fechadas do dia com `creator_prior_dump
 como só `flow_v2/5`/`operator/5` filtram por esse motivo (e o fazem antes da aposta nascer), o conjunto de apostas
 fechadas de qualquer dia já é "os conjuntos que não filtram"; renderizado dentro de §6.14 (`prereg_section`), a
 comparação que julga o braço, não como décima lição numerada.
+
+## 52. A identidade social de cada moeda, e o evento que pode dar bum — M4 (`0041_meme_social`)
+
+**Por quê (Everton, 16/09/2026 01:1x BRT: "análise sempre acima de gráfico, acima de tendências; mas as meme
+coins você vai mais por notícia — assim que uma moeda pode dar bum, que nem a do Trump"):** o caso $TRUMP
+(17/01/2025) foi decidido por identidade e verificação, não por curva ou fluxo — e o funil de EXP-M1–M7 descartava
+a identidade social que o próprio pump.fun já entrega por moeda (`docs/PUMPFUN.md` §1.3: `twitter?`, `website?`,
+`telegram?`, `description`, `metadata_uri`; §3.1: `twitterReuseCount` do indexador). O plantão mediu (M-P17) que um
+`twitter` apontando para um **post** ≤ 10 min antes da criação se associa às células lentas, e (M-P33) que clones
+reutilizam o mesmo handle.
+
+### 52.1 Onze colunas em `meme_tokens`, nove escritas uma vez, duas mutáveis
+
+```
+twitter, telegram, website text          -- NULL = não observado; não vazio quando presente
+description text                        -- ≤ 2 000 chars, truncado com marcador pelo coletor
+twitter_kind text                       -- profile | post | community | other; NULL ⟺ twitter é NULL
+twitter_post_id bigint                  -- snowflake; presente ⟺ twitter_kind = 'post'
+twitter_post_at timestamptz             -- decodificado do snowflake uma vez: (id >> 22) + 1288834974657 ms
+social_observed_at timestamptz          -- quando os sete campos acima foram lidos
+social_source text                      -- pumpfun_rest | indexer_rest | metadata_uri; par bicondicional com o acima
+twitter_reuse_count integer             -- MUTÁVEL, como mayhem_state: o indexador reconta clones após a descoberta
+twitter_reuse_observed_at timestamptz   -- par do contador acima
+```
+
+As nove primeiras (todas menos as duas de reuso) entram em `WRITE_ONCE_COLUMNS_0041`
+(`ddl/meme_social.py`) e se somam à lista de `0024` no gatilho `meme_tokens_identity_is_written_once` — a
+mesma regra de "a primeira observação vence, nunca uma reescrita" que todo o resto de `meme_tokens` já
+segue. O contador de reuso fica de fora pelo mesmo argumento que mantém `mayhem_mode`/`mayhem_state`
+mutáveis: um clone pode começar a reutilizar um handle muito depois de esta moeda ter sido descoberta, e
+a leitura mais nova tem de vencer (`repo.py`: `COALESCE(excluded.<c>, meme_tokens.<c>)`, o padrão de
+`mayhem_mode`).
+
+**A coleta não abre uma chamada nova.** O laço de curva já lê `/coins/{mint}` (T4.1/T4.2); a partir desta
+revisão `normalize.parse_curve_state_rest` também extrai `twitter`/`website`/`telegram`/`description`/
+`metadata_uri` (para a coluna `uri`, já existente desde `0021`) do mesmo payload, classifica o link
+(`hunter_exchanges.pumpfun.social.classify_twitter_url` — pura, sem I/O) e trunca a descrição
+(`truncate_description`, ≤ 2 000 chars com marcador `"… [truncated]"`). O laço de risco (`/in-memory-coin`,
+T4.2c) já lê 65 campos por mint com aposta aberta ou no board `graduating`; a partir desta revisão também
+extrai `twitterReuseCount`. O `GET metadata_uri` (IPFS) opcional, para quando a REST vem vazia, **não foi
+implementado nesta revisão** — declarado, não escondido: é o único item do brief marcado "opcionalmente"
+que ficou de fora, por orçamento de tarefa.
+
+### 52.2 `meme_events` — o evento antes de a moeda existir
+
+Global, sem RLS (§1.1), a forma de `meme_tokens`. `id`, `observed_at`, `source` (`plantao` | `baha` |
+`indexer_boost` | `dexscreener_profile` | `manual`), `kind` (`public_figure_launch` | `exchange_listing` |
+`viral_post` | `brand_launch` | `narrative` | `incident`), `title`, `url`, `mint` (nullable — FK para
+`meme_tokens`, o evento geralmente **precede** a moeda), `symbol_hint`, `handle_hint`, `confidence`
+(`confirmed` | `reported` | `rumor`), `notes` jsonb, `recorded_by`, `created_at`, `matched_at`
+(bicondicional com `mint`: `(mint IS NULL) = (matched_at IS NULL)`). Índices: `ix_meme_events_observed_at`,
+`ix_meme_events_unmatched` (parcial, `mint IS NULL` — o scan do job de casamento) e `ix_meme_events_mint`
+(parcial, `mint IS NOT NULL`). `hunter_app` tem `SELECT`; `hunter_worker` tem `SELECT`/`INSERT`/`UPDATE`
+(escreve eventos automatizados no futuro e preenche `mint`/`matched_at`); a escrita manual de hoje é o
+script auditado `infra/scripts/meme_event.py add` (a conexão do owner, como `meme_rule_set.py`).
+
+`meme_proposals` ganha `event_id` (FK para `meme_events`, nullable) — preenchido pelo job de casamento
+quando uma proposta nasce para um mint que um evento já nomeou.
+
+### 52.3 O casamento evento ↔ moeda — bounded nos dois lados
+
+Um job por minuto (`hunter_meme_worker.events.events_match_once`, sempre ligado enquanto o radar está,
+sem switch próprio — a consulta é barata e já vem guardada por savepoint) liga eventos sem `mint`
+(observados nos últimos 65 min — cinco além dos 60 do brief, para não perder um evento na borda de um
+tick) a `meme_tokens` criados nos 60 minutos **seguintes**, por `handle_hint` (`twitter ILIKE '%'||handle||'%'`)
+ou `symbol_hint` (`symbol = hint`). Um handle compartilhado por várias moedas (M-P33, os "irmãos") liga ao
+mais **antigo** criado dentro da janela (`row_number() OVER (PARTITION BY event ORDER BY created_at)`), as
+demais ficam para o próximo tick reconsiderar — nunca automaticamente, uma correção é humana. A leitura
+roda numa savepoint com `statement_timeout` de 5 s (a regra pós-incidente da T4.24b: toda consulta por
+tick é bounded e degrada para "não lido" em vez de matar o laço).
+
+**O plano, medido a 150 007 linhas em `meme_tokens`** (`test_events_persistence.py::
+test_explain_the_matching_query_uses_the_created_at_index_at_100k_rows`, dados sintéticos espalhados por
+~156 dias para que a janela de 60 min seja uma fatia, nunca uma varredura):
+
+```
+Update on meme_events
+  ->  Nested Loop
+        ->  Subquery Scan on c (rn = 1)
+              ->  WindowAgg (row_number() <= 1)
+                    ->  Sort (e.id, t.created_at)
+                          ->  Nested Loop
+                                ->  Index Scan using ix_meme_events_unmatched on meme_events e
+                                      Index Cond: (observed_at >= …)
+                                ->  Index Scan using ix_meme_tokens_created_at on meme_tokens t
+                                      Index Cond: (created_at BETWEEN e.observed_at AND e.observed_at + 60min)
+                                      Filter: (handle/symbol match)
+        ->  Index Scan using pk_meme_events on meme_events
+```
+
+Nenhum `Seq Scan` em `meme_tokens`: o laço externo é o índice parcial de `meme_events` (a tabela é
+minúscula — poucas linhas por dia, humanas ou do plantão) e o interno é o índice de `created_at` que já
+existia desde `0021`, sem coluna nova. Toda proposta aberta para o mint recém-casado recebe `event_id`
+na mesma passada (`link_proposals`, idempotente por `event_id IS NULL`).
+
+### 52.4 O portão de identidade e o portão de evento — transversais, como o pedigree
+
+Duas features cruzadas, no mesmo molde de `hunter_indicators.meme.pedigree`: aplicadas ao lado do portão
+de cada conjunto, nunca dentro do `EntryGate` congelado.
+
+- `hunter_indicators.meme.identity.IdentityFeatures` — `has_twitter`, `twitter_kind`,
+  `twitter_post_age_s` (criação − hora do post), `twitter_reuse_count`, `has_website`, `has_telegram`,
+  `description_len`; `evaluate_identity_gate(require_twitter=…)` recusa `no_twitter` só quando o conjunto
+  liga o parâmetro (padrão `false` em todo conjunto congelado).
+- `hunter_indicators.meme.event_gate.EventFeatures` — `kind`, `confidence`, `title`, `source`,
+  `observed_at`; `evaluate_event_gate(require_event=…)` recusa `no_event` a menos que o evento casado seja
+  `confirmed` **e** um de `public_figure_launch`/`exchange_listing`/`brand_launch`.
+
+O bloco `reasons` de cada um só aparece quando o próprio conjunto liga o parâmetro correspondente
+(`spec.require_twitter`/`spec.require_event`) — a mesma regra que já vale para o bloco de linha e o de
+hype: um conjunto que não faz a pergunta não altera a decomposição congelada de outro (a invariante que
+`test_exp_m1_reasons_do_not_change_and_its_gate_still_takes_the_pedigree` já cobrava). As duas leituras
+vêm do mesmo `JOIN`/`LEFT JOIN LATERAL` que `lab_repo.py`/`lab_repo_fast.py` já fazem para o resto da
+identidade — nenhuma consulta nova por linha julgada.
+
+### 52.5 `event_v0/1` — o conjunto que só compra ligado a um evento
+
+Semeado pela mesma migração, `research_only`, `EXP-M8`, previsão `descartar`
+([[05-EXPERIMENTS/EXP-M8-evento-que-pode-dar-bum]]): `require_event: true`, E2 (`pedigree_exclusions`),
+`dev_share ≤ 10 %` (desconhecido recusa), `snipers ≤ 25` (largo de propósito — o bum atrai sniper, não é
+o que desqualifica aqui), sem piso de fluxo (`require_positive_flow: false` — o fluxo vem depois do
+anúncio); 0,05 SOL; saídas moonshot (alvo 10×, trailing 50 % armado após 3×, 7 200 s, `exit_on_migration =
+false`). `max_participation_pct = 20` é número desta revisão, não do brief: a checagem de participação do
+gate (`rules._participation_refusals`) é incondicional para todo conjunto, então um teto teve de ser
+escolhido — 20 % é generoso ao lado do 1 % da EXP-M1, declarado em vez de escondido. Não toca o `operator`
+ativo (não é um braço da mesa).
+
+### 52.6 O que fica para a camada 3 (o plantão)
+
+A lane 2 do plantão passa a abrir com "eventos que podem dar bum nas próximas horas" e a registrar cada
+um com `meme_event.py add`; o post-mortem semanal (houve moeda? em quanto tempo? o Lab viu? qual foi o
+máximo em 1 h/24 h?) alimenta a régua da EXP-M8. **Rótulos web pendentes** (fora desta tarefa —
+`apps/web/components/meme/labels.ts`): `twitter_kind` (`profile` → "perfil", `post` → "post", `community`
+→ "comunidade", `other` → "outro"), `event.kind` (os seis valores) e `event.confidence` (`confirmed` →
+"confirmado", `reported` → "reportado", `rumor` → "rumor").

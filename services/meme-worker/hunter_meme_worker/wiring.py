@@ -281,3 +281,18 @@ async def heartbeat_once(ctx: RadarContext, write: HeartbeatWriter) -> None:
         await write(fields)
     except Exception:  # a heartbeat that cannot be written must not stop the radar
         logger.warning("meme_radar_heartbeat_write_failed")
+
+
+async def close_clients(ctx: RadarContext, boards: dict[str, TrenchesWsClient]) -> None:
+    """Close whatever the clients own. Best effort: shutdown must not raise.
+    Moved out of ``main.py`` (T4.26) to make room for the events-match task
+    under the same 350-line budget."""
+    clients: list[object] = [ctx.events, ctx.curves, ctx.chain, ctx.wallets, *boards.values()]
+    for client in clients:
+        closer = getattr(client, "aclose", None)
+        if closer is None:
+            continue
+        try:
+            await closer()
+        except Exception:  # a socket that will not close is not a shutdown failure
+            logger.warning("meme_client_close_failed", client=type(client).__name__)

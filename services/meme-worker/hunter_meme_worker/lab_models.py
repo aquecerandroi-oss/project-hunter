@@ -127,6 +127,8 @@ def _gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> Ent
             params.get("creator_unknown_allowed_if_dev_measured", False)
         ),
         progress_or_mcap_rising=bool(params.get("progress_or_mcap_rising", False)),
+        # T4.27: on unless the set says ``false`` — no arm wants Mayhem today.
+        exclude_mayhem=bool_or(params.get("exclude_mayhem"), True),
     )
 
 
@@ -191,6 +193,16 @@ class RuleSetSpec:
     """T4.24 (EXP-M6, braço 2): refuse ``creator_prior_dump_count >= 1`` beside
     ``pedigree_exclusions``; off by default in every frozen set — only
     ``flow_v2/5``/``operator/5`` (``0039``) turn it on."""
+    require_twitter: bool = False
+    """T4.26 (EXP-M8): refuse ``no_twitter`` when the mint carries none; off
+    by default in every frozen set."""
+    require_event: bool = False
+    declares_mayhem: bool = False
+    """T4.27: the set spells ``exclude_mayhem`` out in its params — only then the
+    proposal's decomposition carries the ``mayhem`` block (a frozen set reads as frozen)."""
+    """T4.26 (EXP-M8): refuse ``no_event`` unless the matched ``meme_events``
+    row is ``confirmed`` and a public-figure/exchange/brand launch; off by
+    default everywhere except ``event_v0/1``."""
     ttl_s: int | None = None
     """T4.19: how long this set's proposals wait for the desk (``operator/3``:
     180 s, a buy by hand); ``None`` = the loop's ``lab_proposal_ttl_s``."""
@@ -251,6 +263,9 @@ class RuleSetSpec:
             clock=_clock_of(params.get("clock")),
             pedigree_exclusions=bool_or(params.get("pedigree_exclusions"), True),
             pedigree_repeat_dumper=bool_or(params.get("pedigree_repeat_dumper"), False),
+            require_twitter=bool_or(params.get("require_twitter"), False),
+            require_event=bool_or(params.get("require_event"), False),
+            declares_mayhem="exclude_mayhem" in params,
             ttl_s=None if params.get("ttl_s") is None else int(params["ttl_s"]),
         )
 
@@ -305,6 +320,9 @@ class BetState:
     PumpSwap pool's trades (T4.11, ``0029``)."""
     mark_stale_s: int | None = None
     """Seconds between the tick and the last pool trade it could see."""
+    is_mayhem: bool | None = None
+    """T4.27: ``meme_tokens.mayhem_enabled`` read with the bet — the mark of a
+    Mayhem coin is capped at the photo's real SOL (``Snapshot.sell_cap_sol``)."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -57,6 +57,10 @@ _GATE_ROWS = text(
     "       prev.curve_progress_pct AS progress_prev, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
     "       t.symbol, "
+    "       t.twitter, t.twitter_kind, t.twitter_post_at, t.twitter_reuse_count, "
+    "       t.website, t.telegram, t.description, "
+    "       ev.kind AS event_kind, ev.title AS event_title, ev.source AS event_source, "
+    "       ev.confidence AS event_confidence, ev.observed_at AS event_observed_at, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
     "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol "
     "FROM meme_features_1m f "
@@ -66,6 +70,8 @@ _GATE_ROWS = text(
     "LEFT JOIN meme_features_1m prev ON prev.mint = f.mint "
     "  AND prev.features_version = f.features_version "
     "  AND prev.end_time = f.end_time - interval '1 minute' "
+    "LEFT JOIN LATERAL (SELECT e.kind, e.title, e.source, e.confidence, e.observed_at "
+    "  FROM meme_events e WHERE e.mint = t.mint ORDER BY e.observed_at LIMIT 1) ev ON true "
     "WHERE f.end_time = :minute AND f.features_version = :version"
 )
 """T4.16: the minute before it (``prev``) is what "holders rising" and
@@ -194,6 +200,19 @@ async def load_gate_rows(
                 holders_reason=_trend_reason(r["holders"], r["holders_prev"], r["holders_reason"]),
                 progress_rising=_rising(r["curve_progress_pct"], r["progress_prev"]),
                 symbol=None if r["symbol"] is None else str(r["symbol"]),
+                # T4.26: the social identity and the matched event, same join.
+                twitter=r["twitter"],
+                twitter_kind=r["twitter_kind"],
+                twitter_post_at=r["twitter_post_at"],
+                twitter_reuse_count=r["twitter_reuse_count"],
+                website=r["website"],
+                telegram=r["telegram"],
+                description=r["description"],
+                event_kind=r["event_kind"],
+                event_title=r["event_title"],
+                event_source=r["event_source"],
+                event_confidence=r["event_confidence"],
+                event_observed_at=r["event_observed_at"],
             )
         )
     return out

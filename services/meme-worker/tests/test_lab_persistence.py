@@ -115,6 +115,8 @@ def _token(mint: str, *, created_at: datetime) -> TokenRow:
         # is refused by ``ck_meme_tokens_a_denominator_names_its_source``.
         progress_denominator_source="observed_virgin",
         total_supply=Decimal(1_000_000_000),
+        # T4.27: the chain said standard; an unobserved flag is refused by name.
+        mayhem_enabled=False,
     )
 
 

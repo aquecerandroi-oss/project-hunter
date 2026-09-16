@@ -40,10 +40,13 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0040_meme_tokens_creator_index"
-"""``0039`` (T4.24) lands on ``0038`` (T4.2h-b); bumped here so the shared
-fixtures agree with the repository's actual chain rather than either task's
-private assumption."""
+HEAD_REVISION = "0042_meme_executable_mcap"
+"""``0042`` (T4.27) lands on ``0041`` (T4.26), which lands on ``0040`` (T4.24b);
+bumped here so the shared fixtures agree with the repository's actual chain
+rather than either task's private assumption."""
+SOCIAL_REVISION = "0041_meme_social"
+"""Where the ``0041`` tests stage now that ``0042`` sits on top (T4.27): ``"-1"``
+stopped meaning 0041 the day 0042 landed, exactly as every revision before."""
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran.
 ``0033`` (T4.19) sits on ``0032_meme_activity`` (T4.2g), which sits on
@@ -115,6 +118,8 @@ CREATOR_WATCH_LIVE_REVISION = "0038_meme_creator_watch_live"
 """Where the ``0038`` tests stage now that ``0039`` sits on top (T4.24) —
 ``0039`` retires ``operator/4``, so every earlier revision's "the desk did not
 move" assertion must pin itself to its own revision from here on."""
+CREATOR_INDEX_REVISION = "0040_meme_tokens_creator_index"
+"""Where the ``0040`` tests stage now that ``0041`` sits on top (T4.26)."""
 
 
 class _staged_at:
@@ -7568,6 +7573,556 @@ def test_0040_adds_the_creator_index_and_reverses(upgraded: str) -> None:
     command.downgrade(config, CREATOR_REPEAT_REVISION)
     try:
         assert asyncio.run(_scalars(upgraded, _CREATOR_INDEX, {})) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0041_meme_social — the social identity, and the event that may pump it (T4.26)
+# ---------------------------------------------------------------------------
+
+_EVENT_V0_RULE_SET = "01994d00-6c1a-7000-8000-000000000012"
+
+_CLEAN_0041: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_events WHERE title LIKE 'T4.26 test%'", {}),
+    _RETENTION_MARKER,
+    ("DELETE FROM meme_tokens WHERE mint LIKE 'S41_%'", {}),
+)
+
+
+def test_0041_adds_the_social_columns_with_their_checks(upgraded: str) -> None:
+    frozen = cast("tuple[tuple[str, str], ...]", migration_ddl("meme_social").SOCIAL_COLUMNS_0041)
+    names = ", ".join(f"'{column}'" for column, _kind in frozen)
+    for relation in ("meme_tokens", "meme_radar_features_v1"):
+        present = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT column_name FROM information_schema.columns "  # noqa: S608
+                f"WHERE table_name = '{relation}' AND column_name IN ({names})",
+                {},
+            )
+        )
+        assert set(present) == {column for column, _kind in frozen}, relation
+    command.check(alembic_config(upgraded))
+
+
+def test_0041_writes_the_identity_once_and_the_reuse_count_stays_mutable(upgraded: str) -> None:
+    """Nine columns lock like every other identity column; the indexer's reuse
+    count is mutable, the ``mayhem_state`` argument (clones keep appearing)."""
+    asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "S41_ONCE"})]))
+    update = "UPDATE meme_tokens SET {} WHERE mint = :mint"
+    try:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        update.format(
+                            "twitter = 'x.com/CoachPatNFT/status/2098618936124375364', "
+                            "twitter_kind = 'post', twitter_post_id = 2098618936124375364, "
+                            "twitter_post_at = '2026-09-12T00:45:19Z', "
+                            "social_observed_at = now(), social_source = 'pumpfun_rest'"
+                        ),
+                        {"mint": "S41_ONCE"},
+                    )
+                ],
+            )
+        )
+        with pytest.raises(DBAPIError, match="twitter is written once"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [(update.format("twitter = 'x.com/someone_else'"), {"mint": "S41_ONCE"})],
+                )
+            )
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        update.format("twitter_reuse_count = 1, twitter_reuse_observed_at = now()"),
+                        {"mint": "S41_ONCE"},
+                    )
+                ],
+            )
+        )
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        update.format("twitter_reuse_count = 4, twitter_reuse_observed_at = now()"),
+                        {"mint": "S41_ONCE"},
+                    )
+                ],
+            )
+        )
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT twitter_reuse_count::text FROM meme_tokens WHERE mint = :mint",
+                {"mint": "S41_ONCE"},
+            )
+        ) == ["4"]
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0041)))
+
+
+def test_0041_checks_refuse_a_malformed_social_read(upgraded: str) -> None:
+    asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "S41_CHECK"})]))
+    try:
+        for statement, constraint in (
+            ("UPDATE meme_tokens SET twitter_kind = 'profile'", "a_twitter_link_names_its_kind"),
+            (
+                "UPDATE meme_tokens SET twitter = 'x.com/a', twitter_kind = 'blog'",
+                "twitter_kind_is_a_known_label",
+            ),
+            (
+                "UPDATE meme_tokens SET twitter = 'x.com/a', twitter_kind = 'post'",
+                "a_post_link_names_its_id",
+            ),
+            (
+                "UPDATE meme_tokens SET twitter = 'x.com/a', twitter_kind = 'post', "
+                "twitter_post_id = 1",
+                "a_post_id_names_its_time",
+            ),
+            (
+                "UPDATE meme_tokens SET social_observed_at = now()",
+                "a_social_read_names_its_source",
+            ),
+            (
+                "UPDATE meme_tokens SET social_observed_at = now(), social_source = 'blog'",
+                "social_source_is_a_known_label",
+            ),
+            ("UPDATE meme_tokens SET description = repeat('a', 2001)", "description_is_bounded"),
+            (
+                "UPDATE meme_tokens SET twitter = '', twitter_kind = 'other'",
+                "social_identity_is_not_empty",
+            ),
+        ):
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(
+                    _write(upgraded, [(f"{statement} WHERE mint = :mint", {"mint": "S41_CHECK"})])
+                )
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0041)))
+
+
+def test_0041_seeds_event_v0_as_research_only_and_does_not_touch_the_desk(upgraded: str) -> None:
+    seeded = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+            "|| status || ':' || (params ->> 'require_event') "
+            "FROM meme_rule_sets WHERE id = :id",
+            {"id": _EVENT_V0_RULE_SET},
+        )
+    )
+    assert seeded == ["event_v0/1:research_only:EXP-M8:active:true"]
+    assert len(asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {}))) == 1, (
+        "event_v0 seeds no operator row; the desk's single active set is untouched"
+    )
+    command.check(alembic_config(upgraded))
+
+
+def test_0041_creates_meme_events_with_its_grants_and_fk(upgraded: str) -> None:
+    columns = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'meme_events' ORDER BY column_name",
+            {},
+        )
+    )
+    assert set(columns) == {
+        "id",
+        "observed_at",
+        "source",
+        "kind",
+        "title",
+        "url",
+        "mint",
+        "symbol_hint",
+        "handle_hint",
+        "confidence",
+        "notes",
+        "recorded_by",
+        "created_at",
+        "matched_at",
+    }
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_events")) == {"SELECT"}
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_events")) == {
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+    }
+    event_id_present = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'meme_proposals' AND column_name = 'event_id'",
+            {},
+        )
+    )
+    assert event_id_present == ["event_id"]
+    command.check(alembic_config(upgraded))
+
+
+def test_0041_an_event_can_be_matched_to_a_mint_it_named(upgraded: str) -> None:
+    event_id = "00000000-0000-4000-8000-000000002001"
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_TOKEN, {"mint": "S41_EVT"}),
+                (
+                    "INSERT INTO meme_events (id, observed_at, source, kind, title, "
+                    "handle_hint, confidence, recorded_by) VALUES "
+                    "(:id, now(), 'manual', 'public_figure_launch', 'T4.26 test event', "
+                    "'coachpat', 'confirmed', 'test')",
+                    {"id": event_id},
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="a_match_says_when"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            "UPDATE meme_events SET mint = :mint WHERE id = :id",
+                            {"mint": "S41_EVT", "id": event_id},
+                        )
+                    ],
+                )
+            )
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE meme_events SET mint = :mint, matched_at = now() WHERE id = :id",
+                        {"mint": "S41_EVT", "id": event_id},
+                    )
+                ],
+            )
+        )
+        assert asyncio.run(
+            _scalars(upgraded, "SELECT mint FROM meme_events WHERE id = :id", {"id": event_id})
+        ) == ["S41_EVT"]
+    finally:
+        asyncio.run(
+            _write(upgraded, [("DELETE FROM meme_events WHERE id = :id", {"id": event_id})])
+        )
+        asyncio.run(_write(upgraded, list(_CLEAN_0041)))
+
+
+def test_0041_refuses_a_downgrade_while_a_social_read_exists(upgraded: str) -> None:
+    # T4.27: staged at 0041 since 0042 sits on top (``"-1"`` would reverse 0042).
+    with _staged_at(upgraded, SOCIAL_REVISION) as config:
+        _refuses_a_downgrade_while_a_social_read_exists(upgraded, config)
+    command.check(alembic_config(upgraded))
+
+
+def _refuses_a_downgrade_while_a_social_read_exists(upgraded: str, config: Config) -> None:
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_TOKEN, {"mint": "S41_GUARD"}),
+                (
+                    "UPDATE meme_tokens SET social_observed_at = now(), "
+                    "social_source = 'pumpfun_rest' WHERE mint = :mint",
+                    {"mint": "S41_GUARD"},
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="carry a social read"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == SOCIAL_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0041)))
+
+
+def test_0041_refuses_a_downgrade_while_an_event_exists(upgraded: str) -> None:
+    # T4.27: staged at 0041 since 0042 sits on top (``"-1"`` would reverse 0042).
+    with _staged_at(upgraded, SOCIAL_REVISION) as config:
+        _refuses_a_downgrade_while_an_event_exists(upgraded, config)
+    command.check(alembic_config(upgraded))
+
+
+def _refuses_a_downgrade_while_an_event_exists(upgraded: str, config: Config) -> None:
+    event_id = "00000000-0000-4000-8000-000000002002"
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "INSERT INTO meme_events (id, observed_at, source, kind, title, "
+                    "confidence, recorded_by) VALUES "
+                    "(:id, now(), 'manual', 'incident', 'T4.26 test event guard', "
+                    "'rumor', 'test')",
+                    {"id": event_id},
+                )
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="meme_events rows exist"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == SOCIAL_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(
+            _write(upgraded, [("DELETE FROM meme_events WHERE id = :id", {"id": event_id})])
+        )
+
+
+def test_0041_refuses_a_downgrade_while_a_proposal_references_event_v0(upgraded: str) -> None:
+    # T4.27: staged at 0041 since 0042 sits on top (``"-1"`` would reverse 0042).
+    with _staged_at(upgraded, SOCIAL_REVISION) as config:
+        _refuses_a_downgrade_while_a_proposal_references_event_v0(upgraded, config)
+    command.check(alembic_config(upgraded))
+
+
+def _refuses_a_downgrade_while_a_proposal_references_event_v0(
+    upgraded: str, config: Config
+) -> None:
+    proposal = "00000000-0000-4000-8000-000000002003"
+    asyncio.run(_write(upgraded, [(_A_PROPOSAL, {"id": proposal, "rule_set": _EVENT_V0_RULE_SET})]))
+    try:
+        with pytest.raises(DBAPIError, match="reference the seeded event_v0/1"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == SOCIAL_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(
+            _write(upgraded, [("DELETE FROM meme_proposals WHERE id = :id", {"id": proposal})])
+        )
+
+
+def test_0041_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    config = alembic_config(upgraded)
+    command.downgrade(config, CREATOR_INDEX_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == CREATOR_INDEX_REVISION
+        assert not asyncio.run(_relation_exists(upgraded, "meme_events"))
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM information_schema.columns "
+                "WHERE table_name IN ('meme_tokens', 'meme_radar_features_v1') "
+                "AND column_name = 'twitter'",
+                {},
+            )
+        ) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id = :id",
+                {"id": _EVENT_V0_RULE_SET},
+            )
+        ) == ["0"]
+        asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "S41_BACK"})]))
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE meme_tokens SET rest_complete_seen_at = now() WHERE mint = :mint",
+                        {"mint": "S41_BACK"},
+                    )
+                ],
+            )
+        )
+        with pytest.raises(DBAPIError, match="rest_complete_seen_at is written once"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            "UPDATE meme_tokens SET rest_complete_seen_at = "
+                            "now() + interval '1 minute' WHERE mint = :mint",
+                            {"mint": "S41_BACK"},
+                        )
+                    ],
+                )
+            )
+    finally:
+        asyncio.run(
+            _write(
+                upgraded,
+                [_RETENTION_MARKER, ("DELETE FROM meme_tokens WHERE mint = 'S41_BACK'", {})],
+            )
+        )
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0042_meme_executable_mcap — the Mayhem agent's virtual SOL is not price (T4.27)
+# ---------------------------------------------------------------------------
+
+_EXECUTABLE_COLUMNS = (
+    "SELECT table_name || ':' || column_name || ':' || data_type || ':' "
+    "|| coalesce(numeric_precision::text, '-') || ',' || coalesce(numeric_scale::text, '-') "
+    "FROM information_schema.columns WHERE column_name = 'mcap_executable_sol' "
+    "AND table_name IN ('meme_features_1m', 'meme_features_15s') ORDER BY table_name"
+)
+_EXECUTABLE_CHECKS = (
+    "SELECT conrelid::regclass::text FROM pg_constraint "
+    "WHERE conname LIKE 'ck_meme_features_%executable_mcap_within_theoretical' "
+    "AND conrelid::regclass::text IN ('meme_features_1m', 'meme_features_15s') ORDER BY 1"
+)
+"""The parents only: every monthly partition inherits the CHECK under the same name."""
+_A_CAPPED_V3_ROW = (
+    "INSERT INTO meme_features_1m (end_time, mint, features_version, coverage, "  # noqa: S608
+    f"  {_REASON_COLUMNS}, mcap_sol, mcap_executable_sol) VALUES "
+    "('2026-10-05T12:00:00Z', :mint, 'meme_features_v3', 1, 'not_polled', :curve_reason, "
+    "  'no_trade_feed', 'no_trade_feed', 'no_holders_reader', 'no_trade_feed', "
+    "  'no_holders_reader', 'no_holders_reader', 'no_holders_reader', 'no_trade_feed', "
+    "  'no_trade_feed', CAST(:mcap AS numeric), CAST(:executable AS numeric))"
+)
+_A_CAPPED_15S_ROW = (
+    "INSERT INTO meme_features_15s (as_of, mint, features_version, snapshots_120s, mcap_sol, "
+    "  mcap_executable_sol, snapshot_observed_at, snapshot_source, window_reason, "
+    "  progress_reason, holders_reason, tape_reason, creator_net_seller_reason, "
+    "  dev_share_reason, snipers_reason) VALUES "
+    "('2026-10-05T12:00:00Z', :mint, 'meme_features_15s_v1', 1, CAST(:mcap AS numeric), "
+    "  CAST(:executable AS numeric), CAST(:photo_at AS timestamptz), :photo_source, "
+    "  'too_few_points', 'too_few_points', 'no_holders_reader', 'no_trade_feed', "
+    "  'no_trade_feed', 'no_holders_reader', 'no_holders_reader')"
+)
+_PHOTO: dict[str, object] = {
+    "photo_at": datetime(2026, 10, 5, 11, 59, 50, tzinfo=UTC),
+    "photo_source": "solana_rpc",
+}
+_NO_PHOTO: dict[str, object] = {"photo_at": None, "photo_source": None}
+_CLEAN_0042: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_features_1m WHERE mint LIKE 'X42_%'", {}),
+    ("DELETE FROM meme_features_15s WHERE mint LIKE 'X42_%'", {}),
+)
+
+
+def test_0042_adds_the_executable_cap_to_both_series_with_its_check(
+    upgraded: str,
+) -> None:
+    assert asyncio.run(_scalars(upgraded, _EXECUTABLE_COLUMNS, {})) == [
+        "meme_features_15s:mcap_executable_sol:numeric:28,10",
+        "meme_features_1m:mcap_executable_sol:numeric:28,10",
+    ]
+    assert asyncio.run(_scalars(upgraded, _EXECUTABLE_CHECKS, {})) == [
+        "meme_features_15s",
+        "meme_features_1m",
+    ]
+    command.check(alembic_config(upgraded))
+
+
+def test_0042_the_cap_never_exceeds_the_theoretical_and_never_exists_alone(
+    upgraded: str,
+) -> None:
+    """KAT's minute: 1 981 SOL theoretical, 2 SOL executable — legal; 3 000
+    executable over 1 981 — refused; an executable value on a minute with no
+    market cap (``curve_reason`` set) — refused; an old-style row with the cap
+    NULL — legal, whatever ``mcap_sol`` says."""
+    try:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        _A_CAPPED_V3_ROW,
+                        {
+                            "mint": "X42_KAT",
+                            "curve_reason": None,
+                            "mcap": "1981",
+                            "executable": "2",
+                        },
+                    ),
+                    (
+                        _A_CAPPED_15S_ROW,
+                        {"mint": "X42_KAT", "mcap": "1981", "executable": "1981", **_PHOTO},
+                    ),
+                    (
+                        _A_CAPPED_V3_ROW,
+                        {
+                            "mint": "X42_OLD",
+                            "curve_reason": None,
+                            "mcap": "35.94",
+                            "executable": None,
+                        },
+                    ),
+                ],
+            )
+        )
+        refused: list[tuple[str, dict[str, object]]] = [
+            (
+                _A_CAPPED_V3_ROW,
+                {"mint": "X42_BAD", "curve_reason": None, "mcap": "1981", "executable": "3000"},
+            ),
+            (
+                _A_CAPPED_V3_ROW,
+                {"mint": "X42_BAD", "curve_reason": "not_polled", "mcap": None, "executable": "2"},
+            ),
+            (
+                _A_CAPPED_15S_ROW,
+                {"mint": "X42_BAD", "mcap": "1981", "executable": "3000", **_PHOTO},
+            ),
+            (
+                _A_CAPPED_15S_ROW,
+                {"mint": "X42_BAD", "mcap": None, "executable": "2", **_NO_PHOTO},
+            ),
+        ]
+        for statement, params in refused:
+            with pytest.raises(DBAPIError, match="executable_mcap_within_theoretical"):
+                asyncio.run(_write(upgraded, [(statement, params)]))
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT mint || ':' || coalesce(mcap_executable_sol::text, 'null') "
+                "FROM meme_features_1m WHERE mint LIKE 'X42_%' ORDER BY mint",
+                {},
+            )
+        ) == ["X42_KAT:2.0000000000", "X42_OLD:null"]
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0042)))
+
+
+def test_0042_refuses_a_downgrade_while_a_row_carries_the_cap(upgraded: str) -> None:
+    """§17.7: a labelled Mayhem peak is evidence — count, name, stop."""
+    config = alembic_config(upgraded)
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    _A_CAPPED_V3_ROW,
+                    {"mint": "X42_GUARD", "curve_reason": None, "mcap": "1981", "executable": "2"},
+                )
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="carry an executable market cap"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0042)))
+    command.check(config)
+
+
+def test_0042_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    config = alembic_config(upgraded)
+    command.downgrade(config, SOCIAL_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == SOCIAL_REVISION
+        assert asyncio.run(_scalars(upgraded, _EXECUTABLE_COLUMNS, {})) == []
+        assert asyncio.run(_scalars(upgraded, _EXECUTABLE_CHECKS, {})) == []
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION

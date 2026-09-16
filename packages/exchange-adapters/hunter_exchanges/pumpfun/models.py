@@ -154,11 +154,31 @@ class NormalizedCurveState(_ReceivedAtMixin):
     mayhem_mode: str | None = None
     slot: int | None = None
     commitment: str | None = None
+    uri: str | None = None
+    """``metadata_uri`` — off-chain JSON pointer (T4.26): the REST read fills
+    this when the WS ``create`` event was missed, never overwriting a value
+    already known (``meme_tokens.uri`` is write-once)."""
+    twitter: str | None = None
+    website: str | None = None
+    telegram: str | None = None
+    description: str | None = None
+    """Truncated by the caller (``normalize.py``) before this model is built,
+    never here — a model is a shape, not a policy."""
+    twitter_kind: str | None = None
+    """``profile`` | ``post`` | ``community`` | ``other`` — ``None`` exactly
+    when ``twitter`` is (``hunter_exchanges.pumpfun.social.classify_twitter_url``)."""
+    twitter_post_id: int | None = None
+    twitter_post_at: datetime | None = None
 
     @field_validator("observed_at", mode="after")
     @classmethod
     def _observed_at_is_utc(cls, v: datetime) -> datetime:
         return ensure_utc(v)
+
+    @field_validator("twitter_post_at", mode="after")
+    @classmethod
+    def _twitter_post_at_is_utc(cls, v: datetime | None) -> datetime | None:
+        return None if v is None else ensure_utc(v)
 
 
 class NormalizedMemeTrade(_ReceivedAtMixin):

@@ -111,6 +111,12 @@ class MemeFeatures15s(Base):
             "AND (tape_source IS NULL OR buys_60s IS NOT NULL)",
             name="tape_source_is_consistent",
         ),
+        # 0042 (T4.27) — like ``meme_features_1m``: capped by the theoretical, never alone.
+        CheckConstraint(
+            "mcap_executable_sol IS NULL "
+            "OR (mcap_sol IS NOT NULL AND mcap_executable_sol <= mcap_sol)",
+            name="executable_mcap_within_theoretical",
+        ),
         {"postgresql_partition_by": "RANGE (as_of)"},
     )
 
@@ -174,6 +180,10 @@ class MemeFeatures15s(Base):
     window ending at ``tape_as_of``, the newest reading received by ``as_of``
     and at most 60 s old — a window that ended up to a minute before the
     instant, named so the gate knows it). ``NULL`` without a tape."""
+    mcap_executable_sol: Mapped[Decimal | None]
+    """``0042`` (T4.27): the newest photo's ``mcap_sol`` capped at its real SOL
+    for a Mayhem coin, equal to it otherwise (``meme_features_1m`` says the
+    rest). ``mcap_delta_60s``/``mcap_slope_60s`` stay on the theoretical series."""
     computed_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 

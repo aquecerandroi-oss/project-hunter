@@ -54,6 +54,7 @@ FEATURES = EntryFeatures(
     creator_net_seller=False,
     curve_volume_1m_sol=Decimal(10),
     intended_size_sol=Decimal("0.4"),
+    is_mayhem=False,  # T4.27: a standard coin says so; unknown refuses by name
 )
 RULES = ExitRules(
     key="teste_saida",

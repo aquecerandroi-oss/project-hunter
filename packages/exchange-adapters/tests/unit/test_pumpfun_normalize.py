@@ -30,6 +30,33 @@ def test_rest_preserves_mayhem_and_units() -> None:
     assert state.observed_at == state.received_at
 
 
+def test_rest_reads_the_identity_once_from_the_same_payload() -> None:
+    """T4.26: no second call — the description and the metadata uri the fixture
+    already carries, with the twitter link absent (``None`` link -> ``None`` kind)."""
+    raw = coin()
+    state = parse_curve_state_rest(raw)
+    assert state.description == "lets go up to the flowwww"
+    assert state.uri == "https://ipfs.io/ipfs/QmTz5YyX9hFNCcX7T1t3ZUNNdo2dx4YhNU1CpmfUFXkWba"
+    assert state.twitter is None
+    assert state.twitter_kind is None
+    assert state.twitter_post_id is None
+
+
+def test_rest_classifies_a_post_link_and_truncates_a_long_description() -> None:
+    raw = coin()
+    raw["twitter"] = "https://x.com/CoachPatNFT/status/2098618936124375364"
+    raw["website"] = "https://coachpat.example"
+    raw["telegram"] = "t.me/coachpat"
+    raw["description"] = "a" * 2500
+    state = parse_curve_state_rest(raw)
+    assert state.twitter_kind == "post"
+    assert state.twitter_post_id == 2098618936124375364
+    assert state.website == "https://coachpat.example"
+    assert state.telegram == "t.me/coachpat"
+    assert len(state.description or "") == 2000
+    assert (state.description or "").endswith("truncated]")
+
+
 def test_creation_has_observation_and_mayhem() -> None:
     raw = json.loads((FIXTURES / "pumpportal_ws_capture_raw.jsonl").read_text().splitlines()[4])
     event = parse_new_token(raw)

@@ -30,7 +30,8 @@ LOOKBACK_S = WINDOW_S + 60
 any photo received by ``as_of``; reading them would be reading for nothing."""
 
 _POINTS = text(
-    "SELECT mint, observed_at, received_at, source, mcap_sol, real_token_reserves "
+    "SELECT mint, observed_at, received_at, source, mcap_sol, real_token_reserves, "
+    "       real_sol_reserves, mayhem_enabled "
     "FROM meme_curve_snapshots "
     "WHERE mint = ANY(:mints) AND observed_at > :start AND received_at <= :as_of "
     "ORDER BY mint, observed_at, received_at"
@@ -77,6 +78,8 @@ async def load_fast_points(
                 received_at=r["received_at"],
                 mcap_sol=r["mcap_sol"],
                 real_token_reserves=r["real_token_reserves"],
+                real_sol_reserves=r["real_sol_reserves"],
+                mayhem_enabled=r["mayhem_enabled"],
             ),
             str(r["source"]),
         )

@@ -22,6 +22,12 @@ T4.23 (EXP-M5 arms 3/4, the closing of 13/09): ``min_snipers`` and
 ``min_top10_share`` sit beside the existing ceilings as bands — either bound
 alone is a legal gate, and an unknown input still refuses once by its own
 name whether the gate asks a floor, a ceiling or both.
+
+T4.27: ``exclude_mayhem`` (on by default) refuses ``mayhem_curve`` — the
+coin's curve is moved by the agent's virtual SOL, not by buyers
+(:mod:`hunter_indicators.meme.executable`) — and ``mayhem_unknown`` when no
+photo has said the bit yet. Fail closed: a flag nobody read is not "not
+Mayhem". An arm that wants Mayhem on purpose says ``exclude_mayhem: false``.
 """
 
 from __future__ import annotations
@@ -34,7 +40,23 @@ from hunter_core.strategies.numeric import CONTEXT
 if TYPE_CHECKING:
     from hunter_indicators.meme.rules import EntryFeatures, EntryGate
 
-__all__ = ["creator_refusals", "flow_refusals", "hype_refusals", "line_refusals"]
+__all__ = [
+    "creator_refusals",
+    "flow_refusals",
+    "hype_refusals",
+    "line_refusals",
+    "mayhem_refusals",
+]
+
+
+def mayhem_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    """T4.27: a known Mayhem coin is ``mayhem_curve``; a flag nobody observed
+    is ``mayhem_unknown``; a set that wants Mayhem turns the criterion off."""
+    if not gate.exclude_mayhem:
+        return []
+    if features.is_mayhem is None:
+        return ["mayhem_unknown"]
+    return ["mayhem_curve"] if features.is_mayhem else []
 
 
 def _dev_share_vouches(features: EntryFeatures, gate: EntryGate) -> bool:

@@ -30,6 +30,16 @@ Three rules this module exists to enforce:
 Precision: every division runs under ``hunter_core.strategies.numeric.CONTEXT``
 (28 digits, ROUND_HALF_EVEN) so a frozen rule set does not change value because
 some other library moved the ambient decimal context.
+
+4. **A sale never takes out more SOL than the curve holds** (T4.27). On a
+   Mayhem coin the agent pushes the *virtual* SOL reserve without paying real
+   SOL in (``set_mayhem_virtual_params``, ``docs/PUMPFUN-ONCHAIN.md`` §1.3:
+   KAT went 23,9 → 1 977 SOL of virtual reserve in 60 s with 5 holders), so
+   ``S*q/(T + q)`` can quote a sale the curve's vault could not pay.
+   :func:`quote_sell` takes the vault (``real_sol_reserves``) as an optional
+   ceiling on the gross proceeds and :func:`sell_all_value_sol` is the mark
+   with that ceiling — the caller says when the ceiling applies (a Mayhem coin
+   still on the curve; a completed curve's SOL has left for the pool).
 """
 
 from __future__ import annotations
@@ -58,6 +68,7 @@ __all__ = [
     "quote_sell",
     "reserves_after_buy",
     "reserves_after_sell",
+    "sell_all_value_sol",
     "sell_proceeds",
     "tokens_for_sol",
 ]
@@ -244,6 +255,9 @@ class SellQuote:
     average_price_sol: Decimal
     reserves_after: CurveReserves
     marginal_price_after_sol: Decimal
+    real_sol_cap_applied: bool = False
+    """T4.27: the formula quoted more than the curve's real SOL and the gross
+    proceeds were cut to that vault — the sale is priced by what can leave."""
 
 
 def quote_buy(reserves: CurveReserves, budget_sol: Decimal, fee_pct: Decimal) -> BuyQuote:
@@ -266,12 +280,40 @@ def quote_buy(reserves: CurveReserves, budget_sol: Decimal, fee_pct: Decimal) ->
         )
 
 
-def quote_sell(reserves: CurveReserves, tokens: Decimal, fee_pct: Decimal) -> SellQuote:
-    """Price a sell of ``tokens`` against ``reserves`` at ``fee_pct``."""
+def quote_sell(
+    reserves: CurveReserves,
+    tokens: Decimal,
+    fee_pct: Decimal,
+    *,
+    real_sol_reserves: Decimal | None = None,
+) -> SellQuote:
+    """Price a sell of ``tokens`` against ``reserves`` at ``fee_pct``.
+
+    ``real_sol_reserves`` (T4.27) is the ceiling on the **gross** proceeds — the
+    SOL actually sitting in the curve, which is all a sale can take out; the fee
+    is then charged on what leaves. ``None`` = no ceiling, the pre-T4.27 quote.
+    On a standard curve the ceiling never binds (the vault *is* what every buyer
+    paid in, and our tokens are a part of that); on a Mayhem coin it does.
+    """
     proceeds = sell_proceeds(reserves, tokens)
+    capped = False
+    if real_sol_reserves is not None:
+        if real_sol_reserves < 0:
+            raise ValueError("real_sol_reserves cannot be negative")
+        if proceeds > real_sol_reserves:
+            proceeds, capped = real_sol_reserves, True
     fee = fee_amount(proceeds, fee_pct)
-    after = reserves_after_sell(reserves, tokens)
     with localcontext(CONTEXT):
+        after = replace(
+            reserves,
+            virtual_sol_reserves=reserves.virtual_sol_reserves - proceeds,
+            virtual_token_reserves=reserves.virtual_token_reserves + tokens,
+            real_token_reserves=(
+                None
+                if reserves.real_token_reserves is None
+                else reserves.real_token_reserves + tokens
+            ),
+        )
         net = proceeds - fee
         return SellQuote(
             tokens=tokens,
@@ -281,4 +323,18 @@ def quote_sell(reserves: CurveReserves, tokens: Decimal, fee_pct: Decimal) -> Se
             average_price_sol=net / tokens,
             reserves_after=after,
             marginal_price_after_sol=marginal_price_sol(after),
+            real_sol_cap_applied=capped,
         )
+
+
+def sell_all_value_sol(
+    reserves: CurveReserves,
+    tokens_held: Decimal,
+    fee_pct: Decimal,
+    *,
+    real_sol_reserves: Decimal | None = None,
+) -> Decimal:
+    """The mark of a position: SOL a sale of **everything** held would net now,
+    fee included and never more than the curve's real SOL (T4.27) — the
+    executable value, not the marginal price times the quantity."""
+    return quote_sell(reserves, tokens_held, fee_pct, real_sol_reserves=real_sol_reserves).net_sol

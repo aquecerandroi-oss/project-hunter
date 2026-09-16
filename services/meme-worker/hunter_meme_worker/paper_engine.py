@@ -18,7 +18,12 @@ rather than a silent default:
    zero — ``docs/RISK_ENGINE_MEME.md`` §5's "the plausible outcome of a buy on
    a curve is −100 %" written as arithmetic, never as a fabricated fill.
 3. **The mark is what a full sell would net now, fees included** (§6) — the
-   ``mark_sol`` on the row and the number every exit rule reads.
+   ``mark_sol`` on the row and the number every exit rule reads — **and never
+   more than the SOL the curve holds** (T4.27): on a Mayhem coin the agent
+   inflates the virtual reserve without paying SOL in, so the formula quotes a
+   sale the vault could not pay; ``Snapshot.sell_cap_sol`` hands
+   ``quote_sell`` the photo's ``real_sol_reserves`` as the ceiling and the
+   row says when it bound (``exit.real_sol_cap_applied``, ``exit.mark_basis``).
 
 The arithmetic is ``hunter_indicators.meme.curve`` and the exit precedence is
 ``hunter_indicators.meme.rules.evaluate_exit`` (rug signal, creator dump, the
@@ -50,6 +55,8 @@ from hunter_meme_worker.paper_fill import (
 __all__ = [
     "EXIT_REASONS",
     "FILL_REFUSALS",
+    "MARK_BASIS_CURVE",
+    "MARK_BASIS_REAL_SOL",
     "FillVerdict",
     "Mark",
     "close_bet",
@@ -96,17 +103,33 @@ both mean "the curve stopped being the venue" (``exit.trigger`` keeps which).
 at or below ``dead_mark_pct`` of the cost — the market gone, named as such."""
 
 
+MARK_BASIS_CURVE = "curve"
+MARK_BASIS_REAL_SOL = "real_sol_reserves"
+"""``exit.mark_basis`` (T4.27): the formula priced the sale, or the vault did."""
+
+
 @dataclass(frozen=True, slots=True)
 class Mark:
     mark_sol: Decimal
     high_water_x: Decimal
+    real_sol_cap_applied: bool = False
 
 
 def mark_bet(bet: BetState, snapshot: Snapshot) -> Mark:
     """The honest mark and the high water it may raise, never lower."""
+    quote = quote_sell(
+        snapshot.reserves,
+        bet.tokens,
+        bet.fee_pct,
+        real_sol_reserves=snapshot.sell_cap_sol(bet.is_mayhem),
+    )
     with localcontext(CONTEXT):
-        mark = quote_sell(snapshot.reserves, bet.tokens, bet.fee_pct).net_sol - bet.priority_fee_sol
-        return Mark(mark_sol=mark, high_water_x=max(bet.high_water_x, mark / bet.sol_spent))
+        mark = quote.net_sol - bet.priority_fee_sol
+        return Mark(
+            mark_sol=mark,
+            high_water_x=max(bet.high_water_x, mark / bet.sol_spent),
+            real_sol_cap_applied=quote.real_sol_cap_applied,
+        )
 
 
 def decide_exit(
@@ -185,7 +208,12 @@ def close_bet(
     intent_snapshot_at: datetime | None,
 ) -> BetExit:
     """Sell everything against ``snapshot`` — the one after the rule fired."""
-    quote = quote_sell(snapshot.reserves, bet.tokens, bet.fee_pct)
+    quote = quote_sell(
+        snapshot.reserves,
+        bet.tokens,
+        bet.fee_pct,
+        real_sol_reserves=snapshot.sell_cap_sol(bet.is_mayhem),
+    )
     with localcontext(CONTEXT):
         received = quote.net_sol - bet.priority_fee_sol
         pnl = received - bet.sol_spent
@@ -197,6 +225,8 @@ def close_bet(
         if intent_snapshot_at is None
         else intent_snapshot_at.isoformat(),
         "curve_proceeds_sol": money_str(quote.curve_proceeds_sol),
+        "real_sol_cap_applied": quote.real_sol_cap_applied,
+        "mark_basis": MARK_BASIS_REAL_SOL if quote.real_sol_cap_applied else MARK_BASIS_CURVE,
         "fee_sol": money_str(quote.fee_sol),
         "priority_fee_sol": money_str(bet.priority_fee_sol),
         "sol_received": money_str(received),

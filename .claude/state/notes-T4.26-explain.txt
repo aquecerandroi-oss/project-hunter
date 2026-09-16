@@ -1,0 +1,18 @@
+rows=150010
+Update on meme_events  (cost=968.07..976.71 rows=1 width=86)
+  ->  Nested Loop  (cost=968.07..976.71 rows=1 width=86)
+        ->  Subquery Scan on c  (cost=967.92..968.48 rows=1 width=88)
+              Filter: (c.rn = 1)
+              ->  WindowAgg  (cost=967.92..968.26 rows=17 width=48)
+                    Run Condition: (row_number() OVER (?) <= 1)
+                    ->  Sort  (cost=967.92..967.97 rows=17 width=40)
+                          Sort Key: e.id, t.created_at
+                          ->  Nested Loop  (cost=0.57..967.58 rows=17 width=40)
+                                ->  Index Scan using ix_meme_events_unmatched on meme_events e  (cost=0.14..8.16 rows=1 width=88)
+                                      Index Cond: (observed_at >= '2026-01-01 00:00:00+00'::timestamp with time zone)
+                                      Filter: ((handle_hint IS NOT NULL) OR (symbol_hint IS NOT NULL))
+                                ->  Index Scan using ix_meme_tokens_created_at on meme_tokens t  (cost=0.42..959.24 rows=17 width=62)
+                                      Index Cond: ((created_at >= e.observed_at) AND (created_at <= (e.observed_at + '01:00:00'::interval)) AND (created_at IS NOT NULL))
+                                      Filter: (((e.handle_hint IS NOT NULL) AND (twitter IS NOT NULL) AND (twitter ~~* (('%'::text || e.handle_hint) || '%'::text))) OR ((e.symbol_hint IS NOT NULL) AND (symbol IS NOT NULL) AND (symbol = e.symbol_hint)))
+        ->  Index Scan using pk_meme_events on meme_events  (cost=0.14..8.16 rows=1 width=22)
+              Index Cond: (id = c.event_id)

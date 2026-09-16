@@ -35,6 +35,9 @@ from typing import Any
 from hunter_core.domain.types import uuid7
 from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.curve import marginal_price_sol, quote_buy
+from hunter_indicators.meme.event_gate import evaluate_event_gate
+from hunter_indicators.meme.executable import is_mayhem_curve
+from hunter_indicators.meme.identity import evaluate_identity_gate
 from hunter_indicators.meme.pedigree import (
     PEDIGREE_V1,
     PedigreeFeatures,
@@ -43,8 +46,10 @@ from hunter_indicators.meme.pedigree import (
 )
 from hunter_indicators.meme.rules import EntryFeatures, evaluate_entry
 from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot, money_str, optional_money_str
+from hunter_meme_worker.proposals_identity import event_features_of, identity_features_of
 from hunter_meme_worker.proposals_plan import manual_plan, ticker_of
 from hunter_meme_worker.proposals_reasons import gate_reasons
+from hunter_meme_worker.proposals_row import GateRow
 
 __all__ = [
     "SERIES_15S",
@@ -64,60 +69,6 @@ REFUSAL_NO_SNAPSHOT_FOR_QUOTE = "no_snapshot_for_quote"
 SERIES_15S = "meme_features_15s_v1"
 """The series a 15-second row names in ``reasons[0]`` (T4.16): the desk can
 tell a proposal judged per photo from one judged per closed minute."""
-
-
-@dataclass(frozen=True, slots=True)
-class GateRow:
-    """One ``meme_features_1m`` row joined with its token and its snapshot."""
-
-    mint: str
-    end_time: datetime
-    created_at: datetime | None
-    curve_progress_pct: Decimal | None
-    """A fraction, as T4.2 stores it; ``None`` with ``progress_reason``."""
-    progress_reason: str | None
-    mcap_sol: Decimal | None
-    creator_sold: bool | None
-    curve_volume_1m_sol: Decimal | None
-    """No producer today (``no_trade_feed``); the column is here so the day a
-    trade feed lands the gate needs no change."""
-    completed_at: datetime | None
-    migrated_at: datetime | None
-    snapshot: Snapshot | None
-    """The snapshot the minute was folded from (``snapshot_observed_at``)."""
-    higher_lows: bool | None = None
-    breakout_15m: bool | None = None
-    distance_to_support_pct: Decimal | None = None
-    line_reason: str | None = None
-    hype_score: Decimal | None = None
-    hype_reason: str | None = None
-    dev_share: Decimal | None = None
-    dev_share_reason: str | None = None
-    snipers: int | None = None
-    """T4.10 (``0026``): the line and the hype of the minute — read by the
-    EXP-M2/EXP-M3 gates, ignored by a gate that does not ask."""
-    net_sol_flow_1m: Decimal | None = None
-    mcap_delta_60s: Decimal | None = None
-    buys_1m: int | None = None
-    sells_1m: int | None = None
-    unique_buyers_1m: int | None = None
-    tape_reason: str | None = None
-    holders_rising: bool | None = None
-    holders_reason: str | None = None
-    progress_rising: bool | None = None
-    holders: int | None = None
-    holders_prev: int | None = None
-    top10_share: Decimal | None = None
-    top10_reason: str | None = None
-    """T4.21: the two holders readings behind ``holders_rising`` (arm 2's floor and 'not falling')."""
-    """T4.16: the flow of the minute (or of the last 60 s on the 15-second
-    series) and the two trends — read by the EXP-M5 gate."""
-    series: str | None = None
-    """``None`` for a closed minute of ``meme_features_1m``; ``SERIES_15S`` for
-    a row of the 15-second series, where ``end_time`` is the instant judged."""
-    symbol: str | None = None
-    """T4.19: the token's ticker, named in the operator's ``manual_plan``;
-    ``None`` (identity never came) reads as the mint abbreviated."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,6 +148,7 @@ def entry_features_of(
         holders_prev=row.holders_prev,
         top10_share=row.top10_share,
         top10_reason=row.top10_reason,
+        is_mayhem=is_mayhem_curve(row.mayhem_enabled, row.mayhem_state),
     )
 
 
@@ -275,6 +227,10 @@ def evaluate_gate(
                 excluded = evaluate_pedigree(lineage, PEDIGREE_V1)
                 if spec.pedigree_repeat_dumper:
                     excluded += evaluate_repeat_dumper(lineage)
+        identity = identity_features_of(row)
+        excluded += evaluate_identity_gate(identity, require_twitter=spec.require_twitter)
+        event = event_features_of(row)
+        excluded += evaluate_event_gate(event, require_event=spec.require_event)
         features = entry_features_of(row, spec)
         decision = evaluate_entry(features, spec.gate)
         if excluded or not decision.allowed:
@@ -299,6 +255,8 @@ def evaluate_gate(
                     pedigree=lineage,
                     pedigree_gate=PEDIGREE_V1 if lineage is not None else None,
                     series=row.series,
+                    identity=identity,
+                    event=event,
                 ),
                 suggested=suggested,
                 now=now,

@@ -60,6 +60,7 @@ def _features(**overrides: Any) -> EntryFeatures:
         "unique_buyers_1m": 12,
         "holders_rising": True,
         "progress_rising": True,
+        "is_mayhem": False,  # T4.27: a standard coin says so
     }
     base.update(overrides)
     return EntryFeatures(**base)

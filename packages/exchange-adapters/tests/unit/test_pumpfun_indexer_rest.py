@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 import pytest
 
+from hunter_core.domain.types import utcnow
 from hunter_exchanges.base import MalformedMessage, RateLimited
 from hunter_exchanges.pumpfun.indexer_rest import (
     REQUEST_CAPACITY,
@@ -68,6 +69,16 @@ async def test_the_risk_read_keeps_the_raw_object_and_extracts_fractions() -> No
     assert snapshot.is_mayhem is False and snapshot.mayhem_state is None
     assert len(snapshot.raw) == 65 and snapshot.raw["mint"] == raw["mint"]
     assert snapshot.source == "indexer_rest:/in-memory-coin"
+    assert snapshot.twitter_reuse_count == raw["twitterReuseCount"] == 0
+
+
+def test_a_reused_twitter_handle_is_counted() -> None:
+    """T4.26 (M-P33's clone signal): a positive ``twitterReuseCount`` from the
+    same 65-field payload, no new request."""
+    raw: dict[str, Any] = json.loads(_bytes("indexer_in_memory_coin_raw.json"), parse_float=Decimal)
+    raw["twitterReuseCount"] = 4
+    snapshot = parse_risk_snapshot(raw, received_at=utcnow())
+    assert snapshot.twitter_reuse_count == 4
 
 
 def test_a_risk_body_with_a_bad_holders_count_is_malformed() -> None:

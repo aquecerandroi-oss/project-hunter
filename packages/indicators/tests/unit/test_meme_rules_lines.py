@@ -61,6 +61,7 @@ OK = EntryFeatures(
     creator_net_seller=False,
     curve_volume_1m_sol=Decimal(10),
     intended_size_sol=Decimal("0.4"),
+    is_mayhem=False,
     higher_lows=True,
     breakout_15m=True,
     distance_to_support_pct=Decimal("0.1"),

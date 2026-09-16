@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_EVEN, Decimal
 
+from hunter_indicators.meme.executable import executable_market_cap_sol, is_mayhem_curve
 from hunter_indicators.meme.lines import LinePoint
 from hunter_meme_worker.features_lines import BoardStanding, hype_columns, line_columns
 from hunter_meme_worker.features_tape import (
@@ -104,6 +105,10 @@ class CurveObservation:
     real_token_reserves: Decimal
     mcap_sol: Decimal | None
     complete: bool
+    real_sol_reserves: Decimal | None = None
+    mayhem_enabled: bool | None = None
+    """T4.27: the vault and the chain's Mayhem bit of the same photo — what
+    ``mcap_executable_sol`` is capped by; ``None`` = the photo did not say."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +120,9 @@ class MinuteInputs:
     created_at: datetime | None
     initial_real_token_reserves: Decimal | None
     snapshot: CurveObservation | None
+    mayhem_state: str | None = None
+    """T4.27: the token's agent state (``tracker``), the second witness of a
+    Mayhem coin when the minute's photo came from the REST mirror."""
     absence_reason: str = NOT_POLLED
     """Why there is no snapshot, when there is none: ``not_polled`` (the budget
     did not reach this mint), ``rate_limited`` (the endpoint refused),
@@ -193,6 +201,9 @@ class FeatureRow:
     tape_source: str | None = None
     tape_window_s: int | None = None
     tape_as_of: datetime | None = None
+    mcap_executable_sol: Decimal | None = None
+    """0042 (T4.27): ``mcap_sol`` capped at the photo's real SOL for a Mayhem
+    coin, equal to it otherwise; NULL with ``mcap_sol`` (same ``curve_reason``)."""
 
 
 def curve_progress_pct(
@@ -281,10 +292,20 @@ def build_row(inputs: MinuteInputs, *, features_version: str = FEATURES_VERSION)
             snapshot.real_token_reserves, inputs.initial_real_token_reserves
         )
         mcap = snapshot.mcap_sol
+        executable = executable_market_cap_sol(
+            mcap,
+            snapshot.real_sol_reserves,
+            mayhem=is_mayhem_curve(snapshot.mayhem_enabled, inputs.mayhem_state),
+        )
         curve = {
             "curve_progress_pct": progress,
             "progress_reason": None if progress is not None else DENOMINATOR_UNKNOWN,
             "mcap_sol": None if mcap is None else mcap.quantize(_MONEY, rounding=ROUND_HALF_EVEN),
+            "mcap_executable_sol": (
+                None
+                if executable is None
+                else executable.quantize(_MONEY, rounding=ROUND_HALF_EVEN)
+            ),
             # A snapshot whose market cap is NULL is a curve the generated column
             # could not price (a zero virtual reserve, §15.8): the observation
             # happened, the number does not exist, and ``insufficient_coverage``

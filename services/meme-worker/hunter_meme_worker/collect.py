@@ -127,6 +127,8 @@ async def persist_reading(
             real_token_reserves=state.real_token_reserves,
             mcap_sol=state.market_cap_sol,
             complete=state.complete,
+            real_sol_reserves=state.real_sol_reserves,
+            mayhem_enabled=state.mayhem_enabled,
         ),
     )
     if ctx.sources is not None:

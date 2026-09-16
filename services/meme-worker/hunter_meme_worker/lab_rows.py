@@ -75,4 +75,6 @@ def snapshot_from_row(row: Mapping[Any, Any]) -> Snapshot:
         total_supply=row["total_supply"],
         complete=bool(row["complete"]),
         mcap_sol=row.get("snapshot_mcap_sol", row.get("mcap_sol")),
+        # T4.27: the photo's own bit when the query selected it; absent = unknown.
+        mayhem_enabled=row.get("snapshot_mayhem_enabled", row.get("mayhem_enabled")),
     )

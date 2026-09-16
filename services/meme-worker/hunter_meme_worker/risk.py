@@ -93,7 +93,8 @@ class RiskReader:
                 continue
             async with role_session(session_factory, db_role=WORKER_ROLE) as session:
                 await insert_risk_snapshot(session, snapshot)
-                if snapshot.graduated_at is not None:
+                # T4.26: every read teaches the reuse count, not only a graduation.
+                if snapshot.graduated_at is not None or snapshot.twitter_reuse_count is not None:
                     await upsert_token(session, _pool_row(snapshot))
             self._readings.setdefault(mint, deque(maxlen=HISTORY)).append(
                 HoldersObservation(
@@ -121,9 +122,14 @@ class RiskReader:
 
 def _pool_row(snapshot: NormalizedRiskSnapshot) -> TokenRow:
     """The risk read's ``graduationDate`` is the indexer's ``gd`` too (T4.2d):
-    the pool signal, with this read as its source, once."""
+    the pool signal, with this read as its source, once. T4.26: the same read
+    also carries ``twitterReuseCount`` — mutable, like ``mayhem_state``; this
+    row is now built whenever *either* signal is present, so
+    ``pool_created_source`` must not be set without ``pool_created_at`` (the
+    CHECK ``a_pool_names_its_source`` — ``ddl/meme_graduation.py``)."""
     signals = CompletionSignals(
-        pool_created_at=snapshot.graduated_at, pool_created_source=snapshot.source
+        pool_created_at=snapshot.graduated_at,
+        pool_created_source=snapshot.source if snapshot.graduated_at is not None else None,
     )
     return TokenRow(
         mint=snapshot.mint,
@@ -133,4 +139,8 @@ def _pool_row(snapshot: NormalizedRiskSnapshot) -> TokenRow:
         pool_created_at=signals.pool_created_at,
         pool_created_source=signals.pool_created_source,
         completed_at=earliest_completion(signals),
+        twitter_reuse_count=snapshot.twitter_reuse_count,
+        twitter_reuse_observed_at=(
+            snapshot.received_at if snapshot.twitter_reuse_count is not None else None
+        ),
     )

@@ -44,6 +44,7 @@ _LAB_ROW = text(
     "       f.higher_lows, f.breakout_15m, f.distance_to_support_pct, f.line_reason, "
     "       f.hype_score, f.hype_reason, f.dev_share, f.dev_share_reason, f.snipers, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
+    "       t.mayhem_enabled, t.mayhem_state, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
     "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol "
     "FROM meme_features_1m f "
@@ -90,6 +91,9 @@ def gate_row_from(r: Mapping[Any, Any]) -> GateRow:
         dev_share=r["dev_share"],
         dev_share_reason=r["dev_share_reason"],
         snipers=r["snipers"],
+        # T4.27: the token's flag, so the verdict says ``mayhem_curve`` where the Lab would.
+        mayhem_enabled=r.get("mayhem_enabled"),
+        mayhem_state=r.get("mayhem_state"),
     )
 
 

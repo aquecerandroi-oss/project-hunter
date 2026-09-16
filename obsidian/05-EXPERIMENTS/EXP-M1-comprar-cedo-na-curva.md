@@ -1,6 +1,6 @@
 ---
 tags: [experimento, meme, pumpfun, curva, paper, pre-registro, m4]
-updated: 2026-09-12
+updated: 2026-09-16
 status: pre-registrado
 owner: quant-engineer
 exp: EXP-M1
@@ -228,6 +228,19 @@ na marcação imediata) confirmada nas entradas. **P5** (< 100 em 30 dias) — n
 fluxo e holders — [[EXP-M5-fluxo-e-holders]] (`flow_v2/1`, relógio de 15 s) — com as exclusões de pedigree
 ([[EXP-M6-exclusoes-de-pedigree]]) na frente. A página fica; a hipótese "comprar cedo na curva e vender em ROI
 alto" **sem critério de demanda** está falseada dentro do que um dia permite dizer.
+
+### Avaliação 2026-09-16 (T4.27, 02:3x BRT) — Mayhem excluído desde 16/09 (T4.27)
+
+**Fato medido (banco da VPS, 3 dias, `2026-09-16-t427-picos-sao-mayhem.sql`):** todos os 95 picos de `mcap_sol` ≥ 500 SOL
+foram moedas Mayhem — o agente empurra a reserva *virtual* de SOL sem SOL entrar (KAT: 23,9 → 1 977 SOL em 60 s, 5 holders).
+**O que muda nesta página, sem tocar no protocolo congelado:** (1) o portão deste experimento recusa moeda Mayhem por padrão
+(`exclude_mayhem: true` gravado nos `params` dos conjuntos vivos por `meme_rule_set.py --set-param exclude_mayhem=true --all-active
+--apply`, auditado em `system_events`; recusas `mayhem_curve` / `mayhem_unknown`); (2) a marca de papel de qualquer aposta em Mayhem
+passa a ser limitada ao SOL real da curva (`RISK_ENGINE_MEME.md` §6) e as fechadas antes disso viram `indeterminate` com motivo
+`mayhem_virtual_sol` (`meme_reclassify_mayhem.py`, dry-run por padrão); (3) `mcap_executable_sol` nasce ao lado do `mcap_sol` nas duas
+séries (`0042`). **Leitura para o veredito:** toda aposta desta página em moeda Mayhem fechada antes de 16/09 sai do placar medido —
+o número de apostas medidas pode cair; nenhum limiar foi mexido. Braço que quiser Mayhem de propósito diz `exclude_mayhem: false`
+(nenhum hoje). Detalhe em [[11-KNOWLEDGE/KB-0098-quantos-bums-reais-ha-por-dia-e-quanto-tempo-temos|KB-0098]] §5.
 
 ## Variantes tentadas
 

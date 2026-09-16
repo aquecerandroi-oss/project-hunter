@@ -41,6 +41,12 @@ def snapshot_row(state: NormalizedCurveState) -> SnapshotRow:
     )
 
 
+_SOCIAL_SOURCE = "pumpfun_rest"
+"""Only this REST endpoint's parser reads ``twitter``/``website``/``telegram``/
+``description`` at all (``normalize.parse_curve_state_rest``); the RPC reading
+never attempted to, so it must not claim a social observation it never made."""
+
+
 def token_row_from_curve(
     state: NormalizedCurveState, *, params: GlobalParams | None = None
 ) -> TokenRow:
@@ -49,6 +55,7 @@ def token_row_from_curve(
     and the reducer's ``completed_at`` for this photo (``graduation.py``)."""
     denominator = denominator_for(state, params)
     signals = curve_signals(state, params)
+    social_read = state.source == _SOCIAL_SOURCE
     return TokenRow(
         mint=state.mint,
         first_seen_source=state.source,
@@ -63,6 +70,19 @@ def token_row_from_curve(
         rest_complete_seen_at=signals.rest_complete_seen_at,
         curve_filled_seen_at=signals.curve_filled_seen_at,
         completed_at=earliest_completion(signals),
+        # T4.26: the identity the same REST read already carried — never a
+        # second call. ``uri`` (metadata_uri) fills a mint the WS ``create``
+        # event missed; the RPC reading never attempted any of these.
+        uri=state.uri,
+        twitter=state.twitter,
+        website=state.website,
+        telegram=state.telegram,
+        description=state.description,
+        twitter_kind=state.twitter_kind,
+        twitter_post_id=state.twitter_post_id,
+        twitter_post_at=state.twitter_post_at,
+        social_observed_at=state.observed_at if social_read else None,
+        social_source=state.source if social_read else None,
     )
 
 

@@ -25,26 +25,18 @@ exception, an unknown ``dev_share`` **with a reason** may pass — and a
 not ask a question does not refuse over it, so EXP-M1's frozen gate reads
 exactly as it did.
 
-T4.16 adds the criteria of EXP-M5 (the flow and the holders: net SOL flow —
-or, on the 15-second series, the 60 s market-cap delta — positive, a floor on
-distinct buyers, a ceiling on ``sells / buys``, holders and progress **rising**
-over two consecutive readings), off by default like the others. The optional
-criteria themselves live in :mod:`hunter_indicators.meme.rules_criteria`
-(the 350-line budget); this module keeps the gate, the features and the
-precedence of evaluation.
+T4.16 adds the criteria of EXP-M5 (the flow and the holders), T4.21 the four
+switches of its second arm and T4.23 the two floors of arms 3/4 — each off by
+default, each documented where it lives: the optional criteria are in
+:mod:`hunter_indicators.meme.rules_criteria` and the threshold validation in
+:mod:`hunter_indicators.meme.rules_validation` (the 350-line budget); this
+module keeps the gate, the features and the precedence of evaluation.
 
-T4.21 adds the four switches of the E1 gate's second arm (EXP-M5 arm 2,
-``fluxo_e_holders/2``): a floor on the holders count, "not falling" in place
-of "rising", an unknown creator vouched for by a measured ``dev_share``, and
-the 60 s market-cap delta as an alternative to progress rising — off by
-default, so arm 1 reads exactly as it was frozen.
-
-T4.23 adds two more floors, each beside an existing ceiling and off by
-default: ``min_snipers`` (arm 3) and ``min_top10_share`` (arm 4) — the
-closing of 13/09 measured both bands paying, against the E1 pre-registration
-(``snipers <= 2``); both are registered ``descartar``, measured beside arms
-1 and 2. Threshold validation now lives in
-:mod:`hunter_indicators.meme.rules_validation` (the 350-line budget).
+T4.27 adds ``exclude_mayhem`` — **on by default, in every set**: a Mayhem
+coin's curve is moved by the agent's virtual SOL, not by demand, so its
+``mcap_delta_60s``/``progress_rising`` are not the market speaking
+(:mod:`hunter_indicators.meme.executable`). Refuses ``mayhem_curve`` when the
+coin is known Mayhem and ``mayhem_unknown`` when the flag was not observed.
 """
 
 from __future__ import annotations
@@ -74,6 +66,7 @@ from hunter_indicators.meme.rules_criteria import (
     flow_refusals,
     hype_refusals,
     line_refusals,
+    mayhem_refusals,
 )
 from hunter_indicators.meme.rules_validation import validate_entry_gate
 
@@ -121,6 +114,7 @@ GATE_INPUTS: Final = (
     "meme_features_15s.progress_delta_60s",
     "meme_features_15s.holders",
     "meme_features_15s.holders_prev",
+    "meme_tokens.mayhem_enabled",
 )
 
 
@@ -177,6 +171,9 @@ class EntryGate:
     ``dev_share`` was measured and is within ``max_dev_share`` (a known net
     seller never passes); ``mcap_delta_60s > 0`` stands in for progress rising
     (``progress_not_rising`` only when neither)."""
+    exclude_mayhem: bool = True
+    """T4.27: refuse a Mayhem coin (``mayhem_curve``) and an unobserved flag
+    (``mayhem_unknown``). On in every set; ``False`` is an arm's explicit word."""
     inputs: tuple[str, ...] = GATE_INPUTS
 
     def __post_init__(self) -> None:
@@ -221,6 +218,7 @@ class EntryGate:
                 self.creator_unknown_allowed_if_dev_measured or None
             ),
             "progress_or_mcap_rising": self.progress_or_mcap_rising or None,
+            "exclude_mayhem": None if self.exclude_mayhem else False,
         }
         parameters.update({k: str(v) for k, v in optional.items() if v is not None})
         return parameters
@@ -267,6 +265,9 @@ class EntryFeatures:
     holders: int | None = None
     holders_prev: int | None = None
     """T4.21: the two holders readings behind ``holders_rising`` (floor, "not falling")."""
+    is_mayhem: bool | None = None
+    """T4.27: the chain's ``is_mayhem_mode`` bit (or the site's agent state,
+    ``executable.is_mayhem_curve``); ``None`` = not observed, refused by name."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,6 +332,7 @@ def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
         refusals.append("curve_complete")
     if features.migrated:
         refusals.append("already_migrated")
+    refusals.extend(mayhem_refusals(features, gate))
     refusals.extend(_age_refusals(features, gate))
     refusals.extend(_progress_refusals(features, gate))
     refusals.extend(creator_refusals(features, gate))

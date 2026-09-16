@@ -116,6 +116,7 @@ async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]
                     created_at=tracked.created_at,
                     initial_real_token_reserves=tracked.initial_real_token_reserves,
                     snapshot=observations.get(tracked.mint),
+                    mayhem_state=tracked.mayhem_state,
                     absence_reason=absences.get(tracked.mint, NOT_POLLED),
                     holders=holders_for(_readings(ctx, tracked.mint), end_time=boundary),
                     tape=minute,  # type: ignore[arg-type]

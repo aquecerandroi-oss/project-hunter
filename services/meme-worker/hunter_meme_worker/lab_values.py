@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 from hunter_indicators.meme.curve import CurveReserves
+from hunter_indicators.meme.executable import sell_cap_sol
 
 __all__ = [
     "INDETERMINATE",
@@ -76,6 +77,17 @@ class Snapshot:
     total_supply: Decimal
     complete: bool
     mcap_sol: Decimal | None = None
+    mayhem_enabled: bool | None = None
+    """T4.27: the chain's ``is_mayhem_mode`` bit on this photo (``None`` on the
+    REST mirror, which never says it)."""
+
+    def sell_cap_sol(self, is_mayhem: bool | None = None) -> Decimal | None:
+        """T4.27: the ceiling of a mark against this photo — its real SOL, unless
+        the coin is known standard (the photo's bit first, then the token's
+        ``is_mayhem``) or the curve is complete (its SOL is on the pool now)."""
+        mayhem = self.mayhem_enabled if self.mayhem_enabled is not None else is_mayhem
+        complete = self.complete or self.reserves.complete
+        return sell_cap_sol(self.real_sol_reserves, mayhem=mayhem, complete=complete)
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -87,6 +99,7 @@ class Snapshot:
             "real_token_reserves": optional_money_str(self.reserves.real_token_reserves),
             "complete": self.complete,
             "mcap_sol": optional_money_str(self.mcap_sol),
+            "mayhem_enabled": self.mayhem_enabled,
         }
 
 

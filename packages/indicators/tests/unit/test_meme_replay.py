@@ -125,6 +125,7 @@ def _snapshot(
         creator_net_seller=creator_net_seller,
         rug_suspected=rug,
         migrated=migrated,
+        mayhem_enabled=False,  # T4.27: a standard coin says so
     )
 
 
@@ -280,6 +281,7 @@ def test_an_unknown_rug_signal_travels_into_the_outcome() -> None:
                 creator_net_seller=snapshot.creator_net_seller,
                 rug_suspected=None,
                 migrated=snapshot.migrated,
+                mayhem_enabled=snapshot.mayhem_enabled,
             )
             for snapshot in CANONICAL.snapshots
         ),
@@ -408,6 +410,12 @@ def test_the_real_capture_of_a_launch_cannot_be_traded_and_says_why() -> None:
     assert result.outcomes == ()
     assert len(result.skipped) == 7
     assert {s.reason for s in result.skipped} == {"never_allowed"}
+    # T4.27: a capture that never said the Mayhem bit is refused by that name too.
     assert {s.refusals for s in result.skipped} == {
-        ("progress_unknown", "creator_net_seller_unknown", "curve_volume_1m_unknown")
+        (
+            "mayhem_unknown",
+            "progress_unknown",
+            "creator_net_seller_unknown",
+            "curve_volume_1m_unknown",
+        )
     }

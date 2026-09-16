@@ -1,6 +1,6 @@
 ---
 tags: [experimento, meme, pumpfun, curva, pool, pumpswap, paper, pre-registro, moonshot, cauda, m4]
-updated: 2026-09-12
+updated: 2026-09-16
 status: pre-registrado
 owner: quant-engineer
 exp: EXP-M4
@@ -174,6 +174,19 @@ Escrita por `infra/scripts/meme_close_day.py --day 2026-09-14` em 2026-09-15 00:
 - **Acumulado até 2026-09-14 23:59 BRT**: n = 23, dias distintos = 3, R médio -0.3404, IC 95 % por blocos de dia [-0.4378, -0.1603], alvo em 0 % das saídas, `dead`/`time_stop` em 34.8 %, leave-top-out (R somado sem a melhor) -8.3984.
 - **A previsão congelada dizia:** «P3 — expectância: braço 1 entre −0,90 e −0,30 R (ponto −0,60 R); braço 2 pior que o braço 1 em ≥ 0,10 R. Veredito previsto: `descartar` (H0).»
 - **Veredito:** régua não atingida (n 23/100, dias 3/30) — `result` da frontmatter não muda; quem escreve `validada`/`reprovada` é o orquestrador, com a régua completa (2 de 3 janelas, controle, censura).
+
+### Avaliação 2026-09-16 (T4.27, 02:3x BRT) — Mayhem excluído desde 16/09 (T4.27)
+
+**Fato medido (banco da VPS, 3 dias, `2026-09-16-t427-picos-sao-mayhem.sql`):** todos os 95 picos de `mcap_sol` ≥ 500 SOL
+foram moedas Mayhem — o agente empurra a reserva *virtual* de SOL sem SOL entrar (KAT: 23,9 → 1 977 SOL em 60 s, 5 holders).
+**O que muda nesta página, sem tocar no protocolo congelado:** (1) o portão deste experimento recusa moeda Mayhem por padrão
+(`exclude_mayhem: true` gravado nos `params` dos conjuntos vivos por `meme_rule_set.py --set-param exclude_mayhem=true --all-active
+--apply`, auditado em `system_events`; recusas `mayhem_curve` / `mayhem_unknown`); (2) a marca de papel de qualquer aposta em Mayhem
+passa a ser limitada ao SOL real da curva (`RISK_ENGINE_MEME.md` §6) e as fechadas antes disso viram `indeterminate` com motivo
+`mayhem_virtual_sol` (`meme_reclassify_mayhem.py`, dry-run por padrão); (3) `mcap_executable_sol` nasce ao lado do `mcap_sol` nas duas
+séries (`0042`). **Leitura para o veredito:** toda aposta desta página em moeda Mayhem fechada antes de 16/09 sai do placar medido —
+o número de apostas medidas pode cair; nenhum limiar foi mexido. Braço que quiser Mayhem de propósito diz `exclude_mayhem: false`
+(nenhum hoje). Detalhe em [[11-KNOWLEDGE/KB-0098-quantos-bums-reais-ha-por-dia-e-quanto-tempo-temos|KB-0098]] §5.
 
 ## Variantes tentadas
 

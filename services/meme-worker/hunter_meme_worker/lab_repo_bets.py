@@ -49,8 +49,10 @@ __all__ = [
 
 _SNAPSHOT_COLUMNS = (
     "observed_at, mint, source, virtual_sol_reserves, virtual_token_reserves, "
-    "real_sol_reserves, real_token_reserves, total_supply, complete, mcap_sol"
+    "real_sol_reserves, real_token_reserves, total_supply, complete, mcap_sol, mayhem_enabled"
 )
+"""``mayhem_enabled`` (T4.27): the photo's own bit, so a mark against a chain
+photo of a Mayhem coin is capped even before the token row learned the flag."""
 _FIRST_SNAPSHOT_AFTER = text(
     f"SELECT {_SNAPSHOT_COLUMNS} FROM meme_curve_snapshots "  # noqa: S608
     "WHERE mint = :mint AND observed_at > :after ORDER BY observed_at, source LIMIT 1"
@@ -106,7 +108,7 @@ _OPEN_BETS = text(
     "SELECT b.id, b.proposal_id, b.rule_set_id, b.mint, b.entry_at, b.entry, b.initial_risk_sol, "
     "       b.params, b.high_water_x, b.mark_sol, b.mark_at, b.exit_intent, "
     "       b.leg, b.parent_bet_id, b.mark_source, b.mark_stale_s, b.creator_sold_seen_at, "
-    "       t.migrated_at, t.completed_at, t.total_supply, t.creator, "
+    "       t.migrated_at, t.completed_at, t.total_supply, t.creator, t.mayhem_enabled, "
     "       CASE WHEN b.creator_sold_seen_at IS NOT NULL THEN true ELSE "
     "         (SELECT f.creator_sold FROM meme_features_1m f WHERE f.mint = b.mint "
     "            AND f.creator_sold IS NOT NULL ORDER BY f.end_time DESC LIMIT 1) END AS creator_sold "
@@ -230,6 +232,7 @@ async def load_open_bets(session: AsyncSession) -> list[OpenBet]:
             parent_bet_id=None if r["parent_bet_id"] is None else str(r["parent_bet_id"]),
             mark_source=str(r["mark_source"] or MARK_CURVE),
             mark_stale_s=None if r["mark_stale_s"] is None else int(r["mark_stale_s"]),
+            is_mayhem=r["mayhem_enabled"],
         )
         out.append(
             OpenBet(

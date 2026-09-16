@@ -47,6 +47,21 @@ class TokenRow:
     pool_created_source: str | None = None
     migrated_at: datetime | None = None
     migrated_pool: str | None = None
+    # --- T4.26: the social identity pump.fun already carries ------------------
+    twitter: str | None = None
+    telegram: str | None = None
+    website: str | None = None
+    description: str | None = None
+    twitter_kind: str | None = None
+    twitter_post_id: int | None = None
+    twitter_post_at: datetime | None = None
+    social_observed_at: datetime | None = None
+    social_source: str | None = None
+    """Written once, together (``ddl/meme_social.py``); ``None`` = not read yet."""
+    twitter_reuse_count: int | None = None
+    twitter_reuse_observed_at: datetime | None = None
+    """Mutable, like ``mayhem_state``: the indexer's count keeps moving after
+    discovery (clones reusing the same handle)."""
 
 
 @dataclass(frozen=True, slots=True)

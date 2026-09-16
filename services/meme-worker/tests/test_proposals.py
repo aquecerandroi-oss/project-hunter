@@ -75,6 +75,7 @@ def _row(**overrides: Any) -> GateRow:
         "completed_at": None,
         "migrated_at": None,
         "snapshot": _snapshot(-20),
+        "mayhem_enabled": False,  # T4.27: the chain said standard
     }
     base.update(overrides)
     return GateRow(**base)

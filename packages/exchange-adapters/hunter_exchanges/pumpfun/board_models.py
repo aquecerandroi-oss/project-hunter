@@ -148,6 +148,10 @@ class NormalizedRiskSnapshot(ReceivedAtMixin):
     graduated_at: datetime | None = None
     is_mayhem: bool | None = None
     mayhem_state: str | None = None
+    twitter_reuse_count: int | None = None
+    """T4.26: ``twitterReuseCount`` — how many coins the indexer has seen reuse
+    this mint's ``twitter`` handle (M-P33's clone signal, upstream). Mutable
+    by nature: clones keep appearing after this mint was discovered."""
     raw: dict[str, Any]
     source: str = RISK_SOURCE
 

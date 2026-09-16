@@ -53,13 +53,13 @@ from hunter_meme_worker.lab_repo import (
     expire_proposals,
     insert_proposals,
     load_active_rule_sets,
-    load_gate_rows,
     open_mints_for,
     pending_commands,
 )
 from hunter_meme_worker.lab_repo_bets import count_indeterminate
 from hunter_meme_worker.lab_repo_fast import pedigree_for
 from hunter_meme_worker.lab_repo_lines import open_probes_for, scaled_parent_ids
+from hunter_meme_worker.lab_repo_mayhem import load_gate_rows_with_mayhem
 from hunter_meme_worker.lab_ticks import record_tick
 from hunter_meme_worker.proposals import evaluate_gate
 from hunter_meme_worker.proposals_scale import REFUSAL_SCALE_GATE_INACTIVE, evaluate_scale
@@ -235,7 +235,7 @@ async def _gate_step(
     minute_specs = [spec for spec in specs if spec.clock == "1m"]
     for minute in minutes:
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-            rows = await load_gate_rows(
+            rows = await load_gate_rows_with_mayhem(  # T4.27: the flag rides with the row
                 session, minute=minute, features_version=ctx.config.features_version
             )
             # T4.16 (EXP-M6): the pedigree of the minute's mints, read once.

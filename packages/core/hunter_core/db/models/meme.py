@@ -39,12 +39,13 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import CheckConstraint, Index, Integer, Text, func, text
+from sqlalchemy import BigInteger, CheckConstraint, Index, Integer, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hunter_core.db.base import Base, UUIDPrimaryKeyMixin
 from hunter_core.db.models._common import JSONB_EMPTY
+from hunter_core.db.models.meme_social_checks import SOCIAL_CHECKS_0041
 
 MAYHEM_STATES = ("active", "paused", "completed", "unknown")
 """The four the screener's own bundle maps (A4.1b §4: the ``ended`` tab reads
@@ -136,6 +137,7 @@ class MemeToken(Base):
             "('observed_virgin', 'global_params', 'mayhem_state')",
             name="denominator_source_is_a_known_label",
         ),
+        *SOCIAL_CHECKS_0041,
     )
 
     mint: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -254,6 +256,45 @@ class MemeToken(Base):
     """The newest observation of this mint. Feeds the radar's staleness column."""
 
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # --- 0041: the social identity pump.fun already carries (T4.26) -------------
+    twitter: Mapped[str | None] = mapped_column(Text)
+    telegram: Mapped[str | None] = mapped_column(Text)
+    website: Mapped[str | None] = mapped_column(Text)
+    """Written once, from the first REST/indexer read that carried a value —
+    the same "richer observation wins, never a rewrite" rule as every other
+    identity column (module docstring)."""
+
+    description: Mapped[str | None] = mapped_column(Text)
+    """Truncated to :data:`~.meme_social_checks.DESCRIPTION_MAX_CHARS` with a
+    marker (``hunter_exchanges.pumpfun.social.truncate_description``) before
+    it ever reaches this column — the CHECK is the backstop, not the truncator."""
+
+    twitter_kind: Mapped[str | None] = mapped_column(Text)
+    """``profile`` | ``post`` | ``community`` | ``other`` (:data:`~.meme_social_checks.TWITTER_KINDS`),
+    ``NULL`` exactly when ``twitter`` is (CHECK). M-P17's classification: a link
+    to a specific **post** made shortly before creation is the plantão's
+    strongest signal that this coin is "news", not noise."""
+
+    twitter_post_id: Mapped[int | None] = mapped_column(BigInteger)
+    """The post's snowflake id, present exactly when ``twitter_kind = 'post'``."""
+
+    twitter_post_at: Mapped[datetime | None]
+    """Decoded from the snowflake (``(id >> 22) + 1288834974657`` ms, X's own
+    epoch) — never re-derived later, so a clock that drifts cannot rewrite it."""
+
+    twitter_reuse_count: Mapped[int | None] = mapped_column(Integer)
+    twitter_reuse_observed_at: Mapped[datetime | None]
+    """The indexer's ``twitterReuseCount`` (``/in-memory-coin``) and when it was
+    read — **mutable**, unlike every column above: clones keep reusing the same
+    handle after this mint was discovered, so the newest reading wins, exactly
+    like ``mayhem_state``."""
+
+    social_observed_at: Mapped[datetime | None]
+    social_source: Mapped[str | None] = mapped_column(Text)
+    """``pumpfun_rest`` | ``indexer_rest`` | ``metadata_uri`` — where the identity
+    columns above (not the reuse count) were first read. Biconditional with
+    ``social_observed_at`` (CHECK); written once, together with them."""
 
 
 class MemeIngestGap(Base, UUIDPrimaryKeyMixin):

@@ -53,6 +53,9 @@ class FastInputs:
     tape: TapeMinute | None = None
     """``tape_for(..., end_time=as_of)``, or ``None`` when the tape was not pulled."""
     tape_absence_reason: str = NO_TRADE_FEED
+    mayhem_state: str | None = None
+    """T4.27: the token's agent state (``tracker``) — a Mayhem coin's second
+    witness when the newest photo did not carry the chain's bit."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +99,9 @@ class Fast15sRow:
     """``0032`` (T4.2g): the per-mint tape (``swap_api_trades``, window ending
     at ``as_of``) or the batch route's ``1m`` window (``activity_1m``, ending
     at ``tape_as_of`` ≤ ``as_of``); ``NULL`` together without a tape."""
+    mcap_executable_sol: Decimal | None = None
+    """``0042`` (T4.27): ``mcap_sol`` capped at the newest photo's real SOL for
+    a Mayhem coin, equal to it otherwise; ``NULL`` with ``mcap_sol``."""
 
 
 def _age_s(as_of: datetime, created_at: datetime | None) -> int | None:
@@ -112,6 +118,7 @@ def build_fast_row(
         inputs.points,
         as_of=inputs.as_of,
         initial_real_token_reserves=inputs.initial_real_token_reserves,
+        mayhem_state=inputs.mayhem_state,
     )
     trend = holders_trend(
         [
@@ -164,6 +171,7 @@ def build_fast_row(
         tape_source=None if tape is None or tape.as_of is None else tape.source,
         tape_window_s=None if tape is None or tape.as_of is None else tape.window_s,
         tape_as_of=None if tape is None else tape.as_of,
+        mcap_executable_sol=fast.mcap_executable_sol,
     )
 
 

@@ -345,6 +345,24 @@ que ele decide é quantidade e roteamento, não permissão.
 "market cap". Preço marginal × quantidade é o número que faz um paper trade parecer lucrativo e um
 resgate real sair 30 % abaixo. O mesmo vale para o `equity_sol` (§10).
 
+**E nunca mais do que o SOL real na curva (T4.27).** Numa moeda Mayhem o agente empurra a reserva
+*virtual* de SOL sem pagar SOL de verdade (`set_mayhem_virtual_params`, `docs/PUMPFUN-ONCHAIN.md`
+§1.3): KAT (15/09 17:37 BRT) foi de 23,9 para 1 977 SOL de `virtual_sol_reserves` em 60 s com 5
+holders e `real_token_reserves` caindo só 7 %. A fórmula da curva (`S·q/(T+q)`) cotava uma venda que o
+cofre não tinha como pagar. Desde a T4.27 a marca e a venda de papel são
+`sell_all_value_sol(reserves, tokens, fee, real_sol_reserves=…)` (`hunter_indicators.meme.curve`): o
+**bruto** da venda é limitado ao `real_sol_reserves` da mesma fotografia e a taxa incide sobre o que
+sai. O teto vale para toda moeda que não seja **sabidamente** padrão e ainda esteja na curva
+(`Snapshot.sell_cap_sol`: a foto da cadeia diz o bit `is_mayhem_mode`; senão o `mayhem_enabled` do
+token; desconhecido mantém o teto, que numa curva padrão nunca prende — o cofre é o que os compradores
+pagaram); numa curva **completa** não há teto (o SOL foi para a pool e a marca honesta é a fita, T4.11).
+A linha diz quando o teto prendeu: `exit.real_sol_cap_applied` e `exit.mark_basis`
+(`curve` | `real_sol_reserves`). As apostas fechadas em Mayhem antes disso são reclassificadas
+`indeterminate` com motivo `mayhem_virtual_sol` (`infra/scripts/meme_reclassify_mayhem.py`, auditado,
+dry-run por padrão) — o fechamento diário já as deixa fora. **O real herda a regra:** um executor nunca
+precifica uma saída acima do SOL real da curva; o `mcap_sol` das séries continua **teórico** (rótulo)
+e `mcap_executable_sol` nasce ao lado (`0042`, `T4-MEME-RADAR.md` §4).
+
 **A saída na migração passou a ser parâmetro do conjunto (T4.11, `exit_on_migration`).** Os conjuntos
 congelados (`meme_paper_v0`, `trendline_v0`, `hype_probe_v0`) mantêm `true` e continuam vendendo na
 conclusão/migração da curva. `moonshot_v0/1`, `moonshot_v0/2` e `operator/2` usam `false`: a posição

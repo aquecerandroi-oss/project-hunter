@@ -47,7 +47,9 @@ def _fixture(name: str) -> NormalizedCurveState:
     return normalize.parse_curve_state_rest(raw)
 
 
-def _state(*, real_sol: str, real_token: str, complete: bool = False) -> NormalizedCurveState:
+def _state(
+    *, real_sol: str, real_token: str, complete: bool = False, source: str = "pumpfun_rest"
+) -> NormalizedCurveState:
     return NormalizedCurveState(
         mint="MINT",
         virtual_sol_reserves=Decimal("30"),
@@ -57,9 +59,15 @@ def _state(*, real_sol: str, real_token: str, complete: bool = False) -> Normali
         total_supply=Decimal("1000000000"),
         complete=complete,
         market_cap_sol=Decimal("27.96"),
-        source="pumpfun_rest",
+        source=source,
         observed_at=T0,
         received_at=T0,
+        twitter="x.com/CoachPatNFT/status/2098618936124375364",
+        twitter_kind="post",
+        twitter_post_id=2098618936124375364,
+        twitter_post_at=T0,
+        website="https://example.com",
+        description="lets go",
     )
 
 
@@ -114,6 +122,29 @@ def test_a_filled_curve_with_sol_in_it_is_completed_at_the_photo() -> None:
     )
     assert row.rest_complete_seen_at == T0 and row.curve_filled_seen_at == T0
     assert row.completed_at == T0
+
+
+def test_a_rest_read_teaches_the_row_the_social_identity_once() -> None:
+    row = token_row_from_curve(_state(real_sol="0", real_token="793100000"), params=None)
+    assert row.twitter == "x.com/CoachPatNFT/status/2098618936124375364"
+    assert row.twitter_kind == "post" and row.twitter_post_id == 2098618936124375364
+    assert row.twitter_post_at == T0
+    assert row.website == "https://example.com" and row.description == "lets go"
+    assert row.social_observed_at == T0 and row.social_source == "pumpfun_rest"
+
+
+def test_an_rpc_read_never_claims_a_social_observation_it_never_made() -> None:
+    """T4.26: the RPC parser never populates the social fields, but even if a
+    caller built a state that had them, ``social_observed_at``/``social_source``
+    stay ``None`` for any source other than ``pumpfun_rest`` — an RPC read
+    never looked."""
+    row = token_row_from_curve(
+        _state(real_sol="0", real_token="793100000", source="solana_rpc"), params=None
+    )
+    assert row.social_observed_at is None and row.social_source is None
+    assert row.twitter == "x.com/CoachPatNFT/status/2098618936124375364", (
+        "the field itself still passes through; only the write-once stamp is withheld"
+    )
 
 
 def test_the_tracker_learns_the_denominator_the_row_learned() -> None:

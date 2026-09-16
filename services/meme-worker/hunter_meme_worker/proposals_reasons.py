@@ -19,6 +19,8 @@ from hunter_indicators.meme.rules import EntryFeatures, participation_pct
 from hunter_meme_worker.lab_models import RuleSetSpec, money_str, optional_money_str
 
 if TYPE_CHECKING:
+    from hunter_indicators.meme.event_gate import EventFeatures
+    from hunter_indicators.meme.identity import IdentityFeatures
     from hunter_indicators.meme.pedigree import PedigreeFeatures, PedigreeGate
 
 __all__ = ["gate_reasons"]
@@ -31,6 +33,8 @@ def gate_reasons(
     pedigree: PedigreeFeatures | None = None,
     pedigree_gate: PedigreeGate | None = None,
     series: str | None = None,
+    identity: IdentityFeatures | None = None,
+    event: EventFeatures | None = None,
 ) -> list[dict[str, Any]]:
     """Which rule fired and the value of every feature it read — the decomposition."""
     gate = spec.gate
@@ -119,6 +123,41 @@ def gate_reasons(
                 # is, regardless of whether this set applies the exclusion.
                 "creator_prior_dump_count": pedigree.creator_prior_dump_count,
                 "creator_prior_dead_count": pedigree.creator_prior_dead_count,
+            }
+        )
+    # T4.26 (EXP-M8): like every other optional criterion, the block is
+    # recorded only when the set actually asks the question — a set that does
+    # not read ``require_twitter``/``require_event`` keeps its frozen
+    # decomposition exactly as it was (EXP-M1's own invariant).
+    if identity is not None and spec.require_twitter:
+        reasons.append(
+            {
+                "feature": "identity",
+                "has_twitter": identity.has_twitter,
+                "twitter_kind": identity.twitter_kind,
+                "twitter_post_age_s": identity.twitter_post_age_s,
+                "twitter_reuse_count": identity.twitter_reuse_count,
+                "has_website": identity.has_website,
+                "has_telegram": identity.has_telegram,
+                "description_len": identity.description_len,
+            }
+        )
+    # T4.27: Mayhem is excluded by default, but a frozen set's decomposition must read
+    # exactly as the day it was frozen (EXP-M1's invariant) — the block appears only when
+    # the set spells ``exclude_mayhem`` out in its params.
+    if spec.declares_mayhem:
+        reasons.append(
+            {"feature": "mayhem", "is_mayhem": features.is_mayhem, "excluded": gate.exclude_mayhem}
+        )
+    if event is not None and spec.require_event:
+        reasons.append(
+            {
+                "feature": "event",
+                "kind": event.kind,
+                "confidence": event.confidence,
+                "title": event.title,
+                "source": event.source,
+                "observed_at": None if event.observed_at is None else event.observed_at.isoformat(),
             }
         )
     return reasons

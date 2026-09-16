@@ -85,6 +85,17 @@ _IDENTITY_COLUMNS = (
     "pool_created_source",
     "migrated_at",
     "migrated_pool",
+    # T4.26 (``0041``): nine of the eleven social columns — written once,
+    # together (``WRITE_ONCE_COLUMNS_0041``, ``ddl/meme_social.py``).
+    "twitter",
+    "telegram",
+    "website",
+    "description",
+    "twitter_kind",
+    "twitter_post_id",
+    "twitter_post_at",
+    "social_observed_at",
+    "social_source",
 )
 """Filled once; ``COALESCE(meme_tokens.<c>, excluded.<c>)`` keeps the first answer.
 The same list the database freezes in ``ddl/meme_graduation.py``
@@ -100,6 +111,11 @@ _ALL_TOKEN_COLUMNS = (
     "last_seen_at",
     "completed_at",
     *_IDENTITY_COLUMNS,
+    # T4.26: the two reuse-count columns are mutable (like ``mayhem_state``),
+    # so they are inserted here but updated by their own COALESCE below, not
+    # by the write-once loop over ``_IDENTITY_COLUMNS``.
+    "twitter_reuse_count",
+    "twitter_reuse_observed_at",
 )
 
 _UPSERT_TOKEN = text(
@@ -126,6 +142,12 @@ _UPSERT_TOKEN = text(
     # between two sources. The conflict is reported by the caller, not written.
     + ", mayhem_state = CASE WHEN COALESCE(meme_tokens.mayhem_enabled, excluded.mayhem_enabled)"
     " IS FALSE THEN NULL ELSE COALESCE(excluded.mayhem_state, meme_tokens.mayhem_state) END"
+    # T4.26: the indexer's reuse count is mutable too — a clone can start
+    # reusing a handle long after this mint was discovered, so the newest
+    # observation (when one arrived) wins, exactly like mayhem_mode.
+    + ", twitter_reuse_count = COALESCE(excluded.twitter_reuse_count, meme_tokens.twitter_reuse_count)"
+    + ", twitter_reuse_observed_at = COALESCE(excluded.twitter_reuse_observed_at, "
+    "meme_tokens.twitter_reuse_observed_at)"
     + ", last_seen_at = GREATEST(meme_tokens.last_seen_at, excluded.last_seen_at)"
     + ", updated_at = now()"
 )
@@ -160,6 +182,7 @@ _FEATURE_COLUMNS = (
     "curve_progress_pct",
     "progress_reason",
     "mcap_sol",
+    "mcap_executable_sol",
     "curve_reason",
     "unique_buyers",
     "unique_buyers_reason",

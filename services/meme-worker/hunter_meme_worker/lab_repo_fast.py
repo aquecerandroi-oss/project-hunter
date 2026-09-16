@@ -36,13 +36,20 @@ _FAST_ROWS = text(
     "       f.net_sol_flow_60s, f.curve_volume_60s_sol, f.tape_reason, f.creator_net_seller, "
     "       f.dev_share, f.dev_share_reason, f.snipers, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
-    "       t.symbol, "
+    "       t.symbol, t.mayhem_enabled, t.mayhem_state, "
+    "       t.twitter, t.twitter_kind, t.twitter_post_at, t.twitter_reuse_count, "
+    "       t.website, t.telegram, t.description, "
+    "       ev.kind AS event_kind, ev.title AS event_title, ev.source AS event_source, "
+    "       ev.confidence AS event_confidence, ev.observed_at AS event_observed_at, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
-    "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol "
+    "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol, "
+    "       s.mayhem_enabled AS snapshot_mayhem_enabled "
     "FROM meme_features_15s f "
     "JOIN meme_tokens t ON t.mint = f.mint "
     "LEFT JOIN meme_curve_snapshots s ON s.mint = f.mint "
     "  AND s.observed_at = f.snapshot_observed_at AND s.source = f.snapshot_source "
+    "LEFT JOIN LATERAL (SELECT e.kind, e.title, e.source, e.confidence, e.observed_at "
+    "  FROM meme_events e WHERE e.mint = t.mint ORDER BY e.observed_at LIMIT 1) ev ON true "
     "WHERE f.as_of > :since AND f.as_of <= :until AND f.features_version = :version "
     "ORDER BY f.as_of, f.mint"
 )
@@ -168,6 +175,27 @@ async def load_fast_gate_rows(
                 progress_rising=r["progress_rising"],
                 series=SERIES_15S,
                 symbol=None if r["symbol"] is None else str(r["symbol"]),
+                # T4.27: the token's bit, else the photo's own (a chain read
+                # says it before the token row learns it); the state as a witness.
+                mayhem_enabled=(
+                    r["snapshot_mayhem_enabled"]
+                    if r["mayhem_enabled"] is None
+                    else r["mayhem_enabled"]
+                ),
+                mayhem_state=r["mayhem_state"],
+                # T4.26: the social identity and the matched event, same join.
+                twitter=r["twitter"],
+                twitter_kind=r["twitter_kind"],
+                twitter_post_at=r["twitter_post_at"],
+                twitter_reuse_count=r["twitter_reuse_count"],
+                website=r["website"],
+                telegram=r["telegram"],
+                description=r["description"],
+                event_kind=r["event_kind"],
+                event_title=r["event_title"],
+                event_source=r["event_source"],
+                event_confidence=r["event_confidence"],
+                event_observed_at=r["event_observed_at"],
             )
         )
     return out

@@ -138,6 +138,7 @@ async def fold_fast(
                     readings=_readings(ctx, t.mint),
                     tape=minute,
                     tape_absence_reason=absence,
+                    mayhem_state=t.mayhem_state,
                 ),
                 features_version=ctx.config.features_15s_version,
             )

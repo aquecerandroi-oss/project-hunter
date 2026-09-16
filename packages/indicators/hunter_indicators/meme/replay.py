@@ -80,6 +80,7 @@ def entry_features(
         intended_size_sol=size_sol,
         curve_complete=snapshot.reserves.complete,
         migrated=snapshot.migrated,
+        is_mayhem=snapshot.mayhem_enabled,
     )
 
 

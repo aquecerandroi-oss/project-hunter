@@ -49,6 +49,12 @@ class CurveSnapshot:
     creator_net_seller: bool | None = None
     rug_suspected: bool | None = None
     migrated: bool = False
+    mayhem_enabled: bool | None = None
+    """T4.27: the chain's Mayhem bit as the row carried it; ``None`` = not observed,
+    which the default gate refuses (``mayhem_unknown``) — a replay over rows that
+    never said the bit is a replay that cannot tell demand from the agent."""
+    real_sol_reserves: Decimal | None = None
+    """T4.27: the vault, the ceiling of the mark on a Mayhem coin."""
 
     def __post_init__(self) -> None:
         require_utc(self.observed_at, "observed_at")
@@ -74,6 +80,8 @@ def snapshot_from_mapping(row: Mapping[str, Any]) -> CurveSnapshot:
         creator_net_seller=_optional_bool(row.get("creator_net_seller")),
         rug_suspected=_optional_bool(row.get("rug_suspected")),
         migrated=bool(row.get("migrated", False)),
+        mayhem_enabled=_optional_bool(row.get("mayhem_enabled")),
+        real_sol_reserves=_optional_decimal(row.get("real_sol_reserves")),
     )
 
 

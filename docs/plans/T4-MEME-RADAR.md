@@ -137,6 +137,22 @@ no momento da migração, nunca hardcodar um percentual único.
   nunca o valor que se conseguiria realmente extrair vendendo tudo de uma vez (a curva tem
   slippage embutido — vender uma fração grande do supply move o preço na própria curva, o mesmo
   problema de "profundidade" que motivou o §0).
+- **E numa moeda Mayhem nem sequer é demanda (T4.27, medido no banco da VPS, 3 dias até 16/09):**
+  todos os 95 "picos" de `mcap_sol` ≥ 500 SOL foram moedas Mayhem, 76 com progresso < 20 %. O agente
+  empurra a reserva **virtual** de SOL da curva sem SOL real entrar (`set_mayhem_virtual_params`,
+  `PUMPFUN-ONCHAIN.md` §1.3) — KAT foi de 23,9 para 1 977 SOL virtuais em 60 s com 5 holders e leu
+  1 981 SOL "de mcap". Por isso as duas séries de features carregam, ao lado do teórico (que continua
+  gravado como `mcap_sol`, **rótulo: teórico; em Mayhem, SOL virtual do agente**), o
+  **`mcap_executable_sol`** (`0042_meme_executable_mcap`, `hunter_indicators.meme.executable`):
+  `min(mcap_sol, real_sol_reserves)` para moeda Mayhem — o SOL real na curva é o teto do que **todos os
+  holders juntos** poderiam tirar dela — e `= mcap_sol` para moeda padrão (a reserva virtual acima dos
+  30 SOL de lançamento *é* o SOL real: um `buy` sobe as duas pelo mesmo tanto, §1.2 do on-chain). Não
+  é preço: é um teto. `mayhem` é o bit `is_mayhem_mode` da fotografia da cadeia, ou o `mayhem_state` do
+  site (`active`/`paused`/`completed`, que só moeda Mayhem tem); sem testemunha o valor fica igual ao
+  teórico. Consequências: o portão recusa Mayhem por padrão (`exclude_mayhem`, `mayhem_curve` /
+  `mayhem_unknown`), a marca de papel é limitada ao SOL real (`RISK_ENGINE_MEME.md` §6) e todo estudo
+  de "bum" ordena por **`real_sol_reserves`**, nunca por `mcap_sol`
+  (`infra/scripts/sql/research/2026-09-16-t427-bum-real.sql`, KB-0098).
 
 ## 5. Modelo de dados proposto (Postgres)
 

@@ -23,6 +23,7 @@ from hunter_exchanges.pumpfun.models import (
     NormalizedMemeMigration,
     NormalizedMemeTokenCreated,
 )
+from hunter_exchanges.pumpfun.social import classify_twitter_url, truncate_description
 
 
 class UnsupportedQuote(MalformedMessage):
@@ -208,6 +209,7 @@ def parse_curve_state_rest(raw: dict[str, Any]) -> NormalizedCurveState:
     virtual_token = raw_subunits_to_tokens(int(raw["virtual_token_reserves"]))
     total_supply = raw_subunits_to_tokens(int(raw["total_supply"]))
     now = utcnow()
+    social = _social_fields(raw)
     return NormalizedCurveState(
         mint=str(raw["mint"]),
         virtual_sol_reserves=virtual_sol,
@@ -223,7 +225,27 @@ def parse_curve_state_rest(raw: dict[str, Any]) -> NormalizedCurveState:
         mayhem_state=_optional_text(raw.get("mayhem_state", mayhem.get("state"))),
         mayhem_mode=_optional_text(raw.get("mayhem_mode", mayhem.get("mode"))),
         received_at=now,
+        **social,
     )
+
+
+def _social_fields(raw: dict[str, Any]) -> dict[str, Any]:
+    """The identity T4.26 reads from the same ``/coins/{mint}`` payload
+    (``docs/PUMPFUN.md`` §1.3): ``twitter``/``website``/``telegram``/
+    ``description``/``metadata_uri``, classified and bounded once, at this
+    boundary — never re-derived by a consumer."""
+    twitter = _optional_text(raw.get("twitter"))
+    link = classify_twitter_url(twitter)
+    return {
+        "uri": _optional_text(raw.get("metadata_uri")),
+        "twitter": twitter,
+        "website": _optional_text(raw.get("website")),
+        "telegram": _optional_text(raw.get("telegram")),
+        "description": truncate_description(_optional_text(raw.get("description"))),
+        "twitter_kind": None if twitter is None else link.kind,
+        "twitter_post_id": link.post_id,
+        "twitter_post_at": link.post_at,
+    }
 
 
 def curve_state_from_rpc_account(mint: str, account: BondingCurveAccount) -> NormalizedCurveState:
