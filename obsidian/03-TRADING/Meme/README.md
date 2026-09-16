@@ -89,3 +89,7 @@ depende de switch explícito do Everton (`ENABLE_MEME_LIVE_TRADING`) depois do f
 [[02-MARKET/Meme/README|Meme (Mercado)]] · [[09-OPERATIONS/Diario-Meme/README|Diário Meme]] ·
 [[11-KNOWLEDGE/README-meme|Meme (Conhecimento)]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[03-TRADING/Meme/Terminal-do-pumpfun|Terminal do pump.fun]] ·
 `docs/plans/T4-MEME-RADAR.md` · `docs/plans/T4-MEME-RADAR-UI.md`
+
+## Operações traçadas
+
+Um gráfico por aposta fechada, uma página por conjunto: [[03-TRADING/Meme/Apostas-tracadas/README|Operações traçadas (meme)]] — desenhadas por `meme_render_bets.py` (`docs/PIPELINE.md` §9c).
