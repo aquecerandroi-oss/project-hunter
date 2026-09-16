@@ -61,7 +61,7 @@ from hunter_meme_executor.heartbeat import heartbeat_fields
 from hunter_meme_executor.journal_db import PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
-from hunter_meme_executor.repo import TokenContext, open_positions
+from hunter_meme_executor.repo import RISK_SNAPSHOT_MAX_AGE_S, TokenContext, open_positions
 from hunter_risk_meme import limits_from_env
 
 if TYPE_CHECKING:
@@ -360,12 +360,43 @@ async def _plant_proposal(
     return proposal_id
 
 
+async def _plant_risk_snapshot(
+    engine: AsyncEngine, *, observed_at: datetime, mint: str = MINT, bundled_share: str = "0.05"
+) -> None:
+    """The rug read (``/in-memory-coin``, ``0023``) the worker's risk reader writes.
+
+    T4.28g made it a **precondition** of stage 1: without a measured
+    ``bundled_share`` inside ``RISK_SNAPSHOT_MAX_AGE_S`` the robot no longer opens
+    the proposal at all (skip ``risk_snapshot_pending``), because opening it only
+    burned the row on a ``bundled_share_unmeasurable`` a minute before the answer
+    landed (measured 16/09/2026: median +103 s)."""
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO meme_risk_snapshots "
+                "  (observed_at, mint, received_at, source, bundled_share, raw) "
+                "VALUES (:t, :mint, :t, 'pumpfun_rest', :share, '{}'::jsonb) "
+                "ON CONFLICT (observed_at, mint) DO NOTHING"
+            ),
+            {"t": observed_at, "mint": mint, "share": Decimal(bundled_share)},
+        )
+
+
 async def _plant_operator_proposal(
-    engine: AsyncEngine, *, proposed_at: datetime, size_sol: str = "0.01", ttl_s: int = 180
+    engine: AsyncEngine,
+    *,
+    proposed_at: datetime,
+    size_sol: str = "0.01",
+    ttl_s: int = 180,
+    risk_snapshot: bool = True,
 ) -> str:
     """What the radar's gate writes for the desk (T4.19): a ``proposed`` row under
-    the **active** ``operator`` set, ``mode = 'paper'``, nobody has decided."""
+    the **active** ``operator`` set, ``mode = 'paper'``, nobody has decided —
+    together with the rug read stage 1 now waits for (``risk_snapshot=False``
+    plants the proposal without it, which is T4.28g's skip)."""
     proposal_id = str(uuid4())
+    if risk_snapshot:
+        await _plant_risk_snapshot(engine, observed_at=proposed_at - timedelta(seconds=20))
     async with engine.begin() as connection:
         rule_set = await connection.scalar(
             text(
@@ -961,7 +992,8 @@ async def test_token_context_reads_the_real_schema_and_the_bundled_share_from_th
     from hunter_meme_executor.repo import token_context
 
     now = datetime.now(UTC)
-    await _plant_operator_proposal(db_engine, proposed_at=now)  # plants the token row too
+    # ``risk_snapshot=False``: this test is about the read being absent first.
+    await _plant_operator_proposal(db_engine, proposed_at=now, risk_snapshot=False)
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
         context = await token_context(session, MINT)
     assert context.created_at is not None and context.bundled_share is None
@@ -1180,6 +1212,63 @@ async def test_stage_1_does_not_reopen_a_mint_it_just_had_refused(
     later = now + timedelta(seconds=121)
     assert await auto_approve_once(armed.ctx, now=later) == []  # the row is older than 60 s now
     assert armed.ctx.state.auto_skipped == {"too_old": 1}, "not cooling any more"
+
+
+async def test_stage_1_waits_for_the_rug_read_instead_of_burning_the_proposal(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.28g — the measured 103 s, closed from the executor's side.
+
+    Before: the desk files the row, the robot opens it 3–10 s later, the admission
+    refuses ``bundled_share_unmeasurable``, the proposal is ``rejected`` (gone for
+    the human's click too) and a ``refused`` order is written — all for a number
+    that landed a minute and a half afterwards (13 of 16 real orders on 16/09/2026).
+
+    After: with no measured ``bundled_share`` for the mint, nothing is opened, the
+    row stays ``proposed``, no order exists, and the heartbeat says
+    ``risk_snapshot_pending``. When the worker's read lands, the same row is opened
+    and admitted on the next tick — **the check itself never moved**."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    waiting = await _plant_operator_proposal(
+        db_engine, proposed_at=datetime.now(UTC), risk_snapshot=False
+    )
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, waiting))["status"] == "proposed", "still the human's"
+    assert armed.ctx.state.auto_skipped == {"risk_snapshot_pending": 1}
+    assert armed.ctx.state.auto_approved == 0 and armed.ctx.state.auto_rejected == 0
+    assert (
+        await _rows(db_engine, "SELECT id FROM meme_live_orders WHERE proposal_id = :p", p=waiting)
+        == []
+    ), "no order is written while the input is missing"
+    assert armed.rpc.sent == []
+    hb = await heartbeat_fields(armed.ctx)
+    assert json.loads(hb["auto_skipped"])["risk_snapshot_pending"] == 1
+
+    await _plant_risk_snapshot(db_engine, observed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    opened = await _proposal(db_engine, waiting)
+    assert opened["status"] == "approved" and opened["mode"] == "live"
+    assert opened["decided_by"] == AUTO_STAGE1_DECIDED_BY
+    assert len(armed.rpc.sent) == 1
+
+
+async def test_a_stale_rug_read_is_not_a_rug_read(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """§8: stale is absent. A read older than ``RISK_SNAPSHOT_MAX_AGE_S`` is exactly
+    what ``token_context`` would drop, so waiting on it (instead of opening and
+    being refused) is the same decision, one step earlier."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    stale = await _plant_operator_proposal(
+        db_engine, proposed_at=datetime.now(UTC), risk_snapshot=False
+    )
+    await _plant_risk_snapshot(
+        db_engine, observed_at=datetime.now(UTC) - timedelta(seconds=RISK_SNAPSHOT_MAX_AGE_S + 60)
+    )
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, stale))["status"] == "proposed"
+    assert armed.ctx.state.auto_skipped == {"risk_snapshot_pending": 1}
+    assert armed.rpc.sent == []
 
 
 async def test_stage_1_leaves_an_old_proposal_and_a_click_proposal_alone(

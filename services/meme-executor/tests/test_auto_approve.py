@@ -38,6 +38,12 @@ from hunter_meme_executor.refusal_cooldown import (
     cooling_mints_of,
     refusal_window_start,
 )
+from hunter_meme_executor.repo import RISK_SNAPSHOT_MAX_AGE_S
+from hunter_meme_executor.risk_snapshot import (
+    SNAPSHOT_MAX_AGE_S,
+    mints_with_snapshot,
+    risk_snapshot_sql,
+)
 from hunter_meme_executor.scope import scope_use
 from hunter_risk_meme.checks import REFUSAL_NAMES
 
@@ -247,6 +253,90 @@ class TestRefusalCooldown:
         plan = _plan([_proposal(), other], cooling_mints=frozenset({self.MINT}))
         assert [p.id for p in plan.picks] == [other.id]
         assert plan.skipped == {"recently_refused": 1}
+
+
+class TestRiskSnapshotPending:
+    """T4.28g — the robot waits for the rug read instead of burning the proposal.
+
+    Measured 16/09/2026 (R5): 13 of the day's 16 real orders were refused
+    ``bundled_share_unmeasurable``, and the mint's ``meme_risk_snapshots`` row
+    landed a median **103 s after** the decision. Opening the proposal then is
+    strictly worse than not opening it: the row is ``rejected`` by the robot (gone
+    for the human's click too), one RPC curve read and one ``refused`` order are
+    written, and the coin becomes unbuyable for a number that arrives seconds
+    later. Nothing here loosens check 11 — an unmeasured ``bundled_share`` still
+    refuses; the proposal simply is not opened until the input exists."""
+
+    MINT = "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump"
+
+    def test_a_mint_without_a_fresh_risk_snapshot_is_not_opened_yet(self) -> None:
+        plan = _plan([_proposal()], snapshot_mints=frozenset())
+        assert plan.picks == ()
+        assert plan.skipped == {"risk_snapshot_pending": 1}
+
+    def test_the_same_mint_with_a_snapshot_is_opened(self) -> None:
+        plan = _plan([_proposal()], snapshot_mints=frozenset({self.MINT}))
+        assert [p.mint for p in plan.picks] == [self.MINT]
+        assert plan.skipped == {}
+
+    def test_a_pending_mint_does_not_hide_a_measured_one(self) -> None:
+        """The skip costs the tick nothing: the next candidate is still opened."""
+        other = _proposal(
+            id="01994d00-6c1a-7000-8000-000000000102",
+            mint="2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump",
+        )
+        plan = _plan([_proposal(), other], snapshot_mints=frozenset({other.mint}))
+        assert [p.id for p in plan.picks] == [other.id]
+        assert plan.skipped == {"risk_snapshot_pending": 1}
+
+    def test_the_skip_is_off_when_the_caller_did_not_measure(self) -> None:
+        """``None`` is "not measured", not "measured empty" — the planner then
+        behaves exactly as it did before T4.28g (open, and let the admission
+        refuse by name). ``auto_approve_once`` always measures."""
+        assert _plan([_proposal()]).picks != ()
+        assert _plan([_proposal()], snapshot_mints=None).picks != ()
+
+    def test_a_proposal_too_old_is_the_humans_not_a_pending_snapshot(self) -> None:
+        """``too_old`` wins the ordering, so the two names never collide: past
+        ``AUTO_APPROVE_MAX_AGE_S`` the row is left to the click, snapshot or not.
+        That is also why the skip needs no age condition of its own — anything
+        reaching it is younger than 60 s."""
+        plan = _plan([_proposal(age_s=90)], snapshot_mints=frozenset())
+        assert plan.picks == () and plan.skipped == {"too_old": 1}
+
+    def test_a_busy_or_cooling_mint_still_wins_the_ordering(self) -> None:
+        """Waiting on a read a mint does not need would hide the real reason."""
+        busy = _plan([_proposal()], snapshot_mints=frozenset(), busy_mints=frozenset({self.MINT}))
+        assert busy.skipped == {"mint_busy": 1}
+        cooling = _plan(
+            [_proposal()], snapshot_mints=frozenset(), cooling_mints=frozenset({self.MINT})
+        )
+        assert cooling.skipped == {"recently_refused": 1}
+
+    def test_the_freshness_window_is_the_admissions_own(self) -> None:
+        """One home for the 600 s: the planner waits for exactly the row
+        ``repo.token_context`` would accept, never a different one."""
+        assert SNAPSHOT_MAX_AGE_S == RISK_SNAPSHOT_MAX_AGE_S == 600
+
+    def test_only_a_measured_bundled_share_counts_as_a_snapshot(self) -> None:
+        """A ``/in-memory-coin`` read that answered without ``bundledSharePct`` is
+        not the input check 11 needs; waiting for another one is right, and
+        ``mints_with_snapshot`` must not report it as measured."""
+        sql = risk_snapshot_sql()
+        assert "bundled_share IS NOT NULL" in sql
+        assert "observed_at >= :since" in sql
+        assert "mint = ANY(:mints)" in sql
+
+    @pytest.mark.asyncio
+    async def test_no_candidates_means_no_query(self) -> None:
+        """A tick with nothing to open must not touch a partitioned table."""
+
+        class Forbidden:
+            async def execute(self, *args: Any, **kwargs: Any) -> Any:
+                raise AssertionError("no candidates must not query meme_risk_snapshots")
+
+        measured = await mints_with_snapshot(Forbidden(), frozenset(), now=NOW)  # type: ignore[arg-type]
+        assert measured == frozenset()
 
 
 class TestScope:

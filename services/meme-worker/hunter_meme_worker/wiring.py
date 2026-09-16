@@ -257,9 +257,13 @@ async def risk_once(ctx: RadarContext) -> None:
     candidates = set(ctx.state.open_bets)
     if ctx.boards is not None:
         candidates |= {mint for mint in ctx.boards.listed_on("graduating") if mint in ctx.tracker}
-    # T4.28b: the desk's pending proposals — the executor's real admission needs the
-    # rug-risk read (bundled/top-10/dev) or it refuses by name; one read per mint per
-    # 5 min, the same budget rule as every other candidate here.
+    # T4.28b/T4.28g: the mints a real buy decision is pending on — the desk's operator
+    # proposals still ``proposed`` **or already ``approved`` by stage 1**, plus any mint
+    # with a live buy before its fill (``repo_tape.pending_operator_mints``, one bounded
+    # query). The executor's real admission needs the rug-risk read (bundled/top-10/dev)
+    # or it refuses by name; a mint appearing here for the first time is read on **this**
+    # tick — ``RiskReader.due`` only defers a mint it has already read (T4.28g), so the
+    # 1 read/mint/5 min ceiling never postpones a first look.
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         candidates |= await pending_operator_mints(session, now=now)
     report = await ctx.risk.read_once(ctx.session_factory, candidates, now=now)

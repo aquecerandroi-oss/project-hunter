@@ -27,6 +27,10 @@ Brakes that exist only in this mode, all named in the heartbeat:
   T4.28f): a mint the admission refused for a reason that cannot change in the
   next couple of minutes is not re-opened while the cooldown runs — skip
   ``recently_refused``, the reasons and the query in ``refusal_cooldown.py``;
+- ``risk_snapshot_pending`` (T4.28g): the mint has no measured ``bundled_share``
+  inside ``RISK_SNAPSHOT_MAX_AGE_S`` yet, so the proposal is left ``proposed``
+  rather than opened and refused ``bundled_share_unmeasurable`` a minute before
+  the answer lands — ``risk_snapshot.py``;
 - any admission refusal of an auto-opened proposal writes the ``refused`` order
   **and** marks the proposal ``rejected`` with the reason (``entries._refuse``
   → :func:`reject_auto_proposal`), so the desk shows why.
@@ -52,9 +56,11 @@ from hunter_core.execution.meme.approval import (
     size_cap_refusal,
 )
 from hunter_core.logging import get_logger
+from hunter_meme_executor.auto_counters import auto_approved_last_hour, auto_refused_last_hour
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
 from hunter_meme_executor.repo import open_positions, pending_attempts
+from hunter_meme_executor.risk_snapshot import mints_with_snapshot
 from hunter_meme_executor.scope import read_scope_use, requested_sol_of
 
 if TYPE_CHECKING:
@@ -93,24 +99,6 @@ _OPERATOR_PROPOSED = text(
     "  AND p.expires_at > :now AND p.proposed_at >= :since "
     "ORDER BY p.proposed_at, p.id"
 )
-_APPROVED_LAST_HOUR = text(
-    "SELECT count(*) FROM meme_proposals "
-    "WHERE decided_by = :by AND decided_at >= :since AND status <> 'rejected'"
-)
-"""What the hourly cap counts: proposals the robot opened **and the admission
-let through**. An auto-opened proposal the admission refused is ``rejected`` in
-the same transaction as its ``refused`` order (:func:`reject_if_auto`) and does
-not spend the budget — T4.28e, 16/09/2026: four refusals of one mint in 80 s
-had eaten 4 of the 5 slots of the hour before a single lamport moved, and the
-owner said he does not want the robot rate-limited by its own refusals. The
-money brakes are the scope (``max_trades``, ``max_total_sol``) and the
-admission; the hourly cap only bounds *fills*."""
-_REFUSED_LAST_HOUR = text(
-    "SELECT o.reason, count(*) AS n FROM meme_live_orders o "
-    "JOIN meme_proposals p ON p.id = o.proposal_id "
-    "WHERE p.decided_by = :by AND o.side = 'buy' AND o.status = 'refused' "
-    "  AND o.received_at >= :since GROUP BY o.reason"
-)
 _REJECT = text(
     "UPDATE meme_proposals SET status = 'rejected', "
     "  decision = coalesce(decision, '{}'::jsonb) || CAST(:note AS jsonb) "
@@ -148,6 +136,7 @@ def plan_auto_approvals(
     max_age_s: float = AUTO_APPROVE_MAX_AGE_S,
     busy_mints: frozenset[str] = frozenset(),
     cooling_mints: frozenset[str] = frozenset(),
+    snapshot_mints: frozenset[str] | None = None,
 ) -> AutoPlan:
     """Pure: which ``proposed`` rows become live this tick, and why the rest do not.
 
@@ -155,9 +144,17 @@ def plan_auto_approvals(
     a buy in flight on that mint — the admission would refuse ``duplicate_position``)
     · ``recently_refused`` (T4.28f: the admission refused this mint for a reason
     that needs more than a tick to change — ``refusal_cooldown``) ·
-    ``suggested_incomplete`` · ``exceeds_max_sol_per_bet`` (the click's rule) ·
-    ``hourly_cap`` · ``tick_cap`` · ``mint_repeated``. Candidates are visited in the
-    order given (oldest first)."""
+    ``risk_snapshot_pending`` (T4.28g: the rug read check 11 needs has not landed
+    for this mint yet — ``risk_snapshot``) · ``suggested_incomplete`` ·
+    ``exceeds_max_sol_per_bet`` (the click's rule) · ``hourly_cap`` · ``tick_cap`` ·
+    ``mint_repeated``. Candidates are visited in the order given (oldest first).
+
+    ``snapshot_mints`` is the subset of candidate mints with a fresh, measured
+    ``bundled_share``; ``None`` means the caller did not measure and the skip does
+    not run — the pre-T4.28g behaviour (open, and let the admission refuse by name).
+    ``auto_approve_once`` always measures. The skip needs no age condition of its
+    own: ``too_old`` is evaluated first, so anything reaching it is younger than
+    :data:`AUTO_APPROVE_MAX_AGE_S` and an older row is the human's either way."""
     picks: list[OperatorProposal] = []
     skipped: Counter[str] = Counter()
     mints: set[str] = set()
@@ -174,6 +171,9 @@ def plan_auto_approvals(
             continue
         if candidate.mint in cooling_mints:
             skipped["recently_refused"] += 1
+            continue
+        if snapshot_mints is not None and candidate.mint not in snapshot_mints:
+            skipped["risk_snapshot_pending"] += 1
             continue
         size = requested_sol_of(candidate.suggested)
         if size <= 0:
@@ -230,24 +230,6 @@ async def operator_proposals(
     ]
 
 
-async def auto_approved_last_hour(session: AsyncSession, *, now: datetime) -> int:
-    since = now - timedelta(hours=1)
-    return int(
-        (
-            await session.execute(
-                _APPROVED_LAST_HOUR, {"by": AUTO_STAGE1_DECIDED_BY, "since": since}
-            )
-        ).scalar()
-        or 0
-    )
-
-
-async def auto_refused_last_hour(session: AsyncSession, *, now: datetime) -> dict[str, int]:
-    since = now - timedelta(hours=1)
-    rows = await session.execute(_REFUSED_LAST_HOUR, {"by": AUTO_STAGE1_DECIDED_BY, "since": since})
-    return {str(r[0]): int(r[1]) for r in rows}
-
-
 async def reject_auto_proposal(
     session: AsyncSession, proposal_id: str, *, reason: str, now: datetime
 ) -> bool:
@@ -295,6 +277,8 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
         cooling = await refusal_cooling_mints(
             session, now=now, cooldown_s=cfg.auto_approve_refusal_cooldown_s
         )
+        # T4.28g: of this tick's mints, the ones whose rug read already landed.
+        measured = await mints_with_snapshot(session, {c.mint for c in candidates}, now=now)
 
     def skip(reason: str, count: int = 1) -> None:
         state.auto_skipped[reason] = state.auto_skipped.get(reason, 0) + count
@@ -318,6 +302,7 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
         max_per_hour=cfg.auto_approve_max_per_hour,
         busy_mints=frozenset(busy),
         cooling_mints=cooling,
+        snapshot_mints=measured,
     )
     for reason, count in plan.skipped.items():
         skip(reason, count)

@@ -289,6 +289,18 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
   abre em `token_age_min_s`, 30 s), `curve_state_stale`, `volume_unavailable`, `marks_incomplete`,
   `wallet_over_max_sol`. A carência **atrasa**, não proíbe: passada a janela o mesmo mint volta a ser
   elegível, e ela nunca deixa uma ordem existir — só deixa de abrir proposta.
+- **Espera pela leitura de risco** (`risk_snapshot_pending`, T4.28g): antes de abrir a proposta o robô
+  exige que `meme_risk_snapshots` já tenha um `bundled_share` **medido** do mint dentro de
+  `RISK_SNAPSHOT_MAX_AGE_S` (600 s — a mesma janela que a admissão aceita). Sem ele **nada é aberto**:
+  a linha fica `proposed` para o humano e para o tique seguinte, nenhuma ordem é escrita e o
+  heartbeat mostra o nome em `auto_skipped`. Medido em 16/09/2026 (R5): a leitura chegava numa
+  **mediana de 103 s depois** da decisão, então abrir antes só queimava a proposta (`rejected` pelo
+  robô, portanto perdida também para o clique) numa recusa `bundled_share_unmeasurable` que o próprio
+  minuto seguinte desfaria. **Nenhum limite mudou e o check 11 continua recusando o não medido** — só
+  a proposta deixa de ser aberta cedo demais. Do outro lado, o `RiskReader` do worker passou a cobrir
+  as propostas `operator` em `proposed` **e** `approved` e os mints com ordem live antes do fill (10
+  min, `repo_tape.pending_operator_mints`), e a primeira leitura de um mint nunca é adiada pelo teto
+  de 1 leitura/mint/5 min.
 - **Quem liga:** só o Everton, no `.env` da VPS; o guardião de padrões recusa a flag ligada em arquivo
   rastreado (`infra/scripts/forbidden_patterns.sh`). **Desligar:** a flag em `false` + `update`, ou o
   kill switch (que também pára as aprovações automáticas). **O estágio 2 continua exigindo clique.**
@@ -335,6 +347,22 @@ gratuitos do PumpPortal (`subscribeNewToken`, `subscribeMigration`) os checks 10
 existe não vira zero" funcionando. O caminho para sair desse estado é dado (feed pago de trades, ou
 decodificador on-chain próprio), e é decisão do Everton (§14, pergunta 6), não um afrouxamento do
 check.
+
+**A ordem causal, corrigida em T4.28g — e o que continua aberto.** Medido em 16/09/2026 (R5,
+`obsidian/03-TRADING/Meme/Estudo-2026-09-16-admissao-real-o-que-recusa.md`): 13 das 16 ordens reais
+do dia foram recusadas `bundled_share_unmeasurable` com a linha de `meme_risk_snapshots` chegando
+numa **mediana de 103 s depois** da decisão — o executor perguntava antes de o coletor ter motivo
+para ter perguntado. Duas mudanças fecham isso **sem tocar em check nenhum**: o leitor de risco
+cobre as propostas que a mesa abriu (§3.5) e o robô **espera** a leitura em vez de queimar a
+proposta. **O que não foi fechado:** `creator_flow_unknown` (7 das 16 ordens). A ideia de derivá-lo
+da cadeia no instante da decisão — ler a ATA do criador e comparar com a alocação inicial dele —
+**não é implementável honestamente hoje**: não existe coluna com a alocação do criador na criação
+(`meme_tokens` não a tem; o `dev_share` de `meme_features_*`/`meme_risk_snapshots` é o
+`devHoldingsPercent` do indexador, uma foto **corrente** cuja primeira amostra chega +114 a +419 s
+depois da criação). Usá-la como base faria um criador que largou tudo aos 20 s da moeda ser lido
+como "segura ≥ inicial" e **passar** o check 10 — exatamente o dump que o check existe para barrar.
+Enquanto a alocação inicial não for persistida na criação (ou a fita cobrir o mint desde o minuto
+zero), `creator_net_sol` continua `None` e o check recusa por nome.
 
 **O que muda em relação ao SPOT, e por quê:** não existe `book_depth` nem `spread` — não há livro
 (T4-MEME-RADAR §0). O papel deles é feito por **dois** checks que a curva permite fazer melhor: o

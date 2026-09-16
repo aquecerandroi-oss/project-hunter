@@ -1,10 +1,19 @@
 """The rug-risk reader: ``GET /in-memory-coin/{mint}`` for the mints that matter,
 at most once per mint per ``min_interval_s`` (5 min by the brief).
 
-Who matters: mints with an **open paper bet** (the Lab is marking them) and
-mints on the site's ``graduating`` board (the ones about to leave the curve).
-Nothing else — the read is undocumented and this project spends it where a
-wrong number would cost the most.
+Who matters: mints with an **open paper bet** (the Lab is marking them), mints on
+the site's ``graduating`` board (the ones about to leave the curve) and — since
+T4.28b/T4.28g — the mints a **real** buy decision is pending on
+(``repo_tape.pending_operator_mints``: an operator proposal still ``proposed`` or
+already ``approved`` by stage 1, or a live buy before its fill). Nothing else —
+the read is undocumented and this project spends it where a wrong number would
+cost the most.
+
+**A mint's first read is never deferred** (T4.28g): :meth:`RiskReader.due` defers
+only a mint it has already read, so the ceiling above throttles refreshes, never
+the first look at a coin the executor is about to judge. That ordering is the
+whole fix — measured 16/09/2026, the ``meme_risk_snapshots`` row of a mint landed
+a median 103 s *after* the admission that needed it.
 
 Every read lands raw in ``meme_risk_snapshots`` and, like a board entry, as a
 :class:`HoldersObservation` the fold may use for the minute it was **received**
@@ -63,6 +72,9 @@ class RiskReader:
         return list(self._readings.get(mint, ()))
 
     def due(self, candidates: set[str], now: datetime) -> list[str]:
+        """Who is read this tick. ``mint not in self.last_read`` comes **first**: a
+        mint seen for the first time is due now, whatever the interval says, and no
+        per-tick cap can push it behind a coin read 30 s ago (T4.28g)."""
         return sorted(
             mint
             for mint in candidates

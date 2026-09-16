@@ -6562,6 +6562,17 @@ chaves de idempotência da §9.4 são fatos do schema:** `uq_meme_live_orders_on
 não nulo) — um evento de stream reentregue encontra a linha, nunca cria outra. Índices
 `(status, received_at)`, `(proposal_id, side)`.
 
+**Quem mais lê esta tabela por tique, e com que plano (T4.28g).** Duas consultas novas entraram no
+laço de 10/60 s, as duas com janela e as duas em cima de índices que já existiam — nenhuma migração:
+
+| consulta | predicado | índice usado |
+|---|---|---|
+| `hunter_meme_worker.repo_tape.pending_operator_mints` (radar, 60 s) — 3 ramos `UNION` | `p.status = 'proposed'`/`'approved'` **+** `p.proposed_at >= now−600 s`; e `o.status IN ('admitted','simulated','submitted_unconfirmed') AND o.received_at >= now−600 s` | `ix_meme_proposals_status_proposed_at` (2×) e `ix_meme_live_orders_status_received_at` (1×), depois PK de `meme_proposals` |
+| `hunter_meme_executor.risk_snapshot.mints_with_snapshot` (executor, por tique de entradas) | `mint = ANY(:mints)` (os candidatos do tique, poucos) **+** `bundled_share IS NOT NULL` **+** `observed_at >= now−600 s` | poda de partição por `observed_at` (`meme_risk_snapshots` é RANGE nela) e `ix_meme_risk_snapshots_mint_observed` |
+
+Em ambas a coluna líder do índice entra por igualdade e a janela cai na segunda — nenhuma cresce com
+o tamanho da tabela. `mints_with_snapshot` **não roda** quando o tique não tem candidato.
+
 ### 40.3 As posições — `meme_live_positions`
 
 Derivadas das compras confirmadas, **uma por proposta** (`uq_meme_live_positions_proposal_id`),

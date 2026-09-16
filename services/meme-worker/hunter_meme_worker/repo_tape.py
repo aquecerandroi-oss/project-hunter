@@ -31,7 +31,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from sqlalchemy import text
 
@@ -184,26 +184,91 @@ async def open_bet_mints(session: AsyncSession) -> frozenset[str]:
     return frozenset(str(m) for m in (await session.execute(_OPEN_BETS)).scalars().all())
 
 
-_PENDING_OPERATOR = text(
-    "SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets r ON r.id = p.rule_set_id "
-    "WHERE r.kind = 'operator' AND r.status = 'active' AND p.status = 'proposed' "
-    "  AND p.expires_at > :now"
+PENDING_PROPOSAL_STATUSES: Final[tuple[str, ...]] = ("proposed", "approved")
+"""T4.28g — the two states of an operator proposal a real buy decision is pending on.
+
+``proposed`` is T4.28b's original set: a row waiting on a click or on stage 1.
+``approved`` is what was missing, and it is the measured finding (R5, 16/09/2026):
+the stage-1 executor moves the row out of ``proposed`` 3–10 s after the desk files
+it (``hunter_core.execution.meme.approval.DECIDE_PROPOSAL``), so from the reader's
+next 60 s tick the mint was already gone from the candidate set — 13 of the day's 16
+real orders were refused ``bundled_share_unmeasurable``, the mint's
+``meme_risk_snapshots`` row landing a median 103 s **after** the decision. There is
+no ``suggested`` status to add: ``docs/RISK_ENGINE_MEME.md`` §3.5 names the decision
+*payload*, not a row state, and ``PROPOSAL_STATUSES`` has no such label."""
+
+LIVE_ORDER_PENDING_STATUSES: Final[tuple[str, ...]] = (
+    "admitted",
+    "simulated",
+    "submitted_unconfirmed",
 )
+"""A real buy before its fill — money in flight, which owes its mint a fresh rug
+read for the exit side too. A settled row (``confirmed``/``refused``/``failed``) is
+not a decision waiting on anything."""
+
+PENDING_LOOKBACK_S: Final[int] = 600
+"""The window every branch below carries (the post-incident rule: a per-tick query
+is bounded and index-friendly or it is not merged). Ten minutes is over three times
+the ``operator`` set's 180 s TTL and past any pre-fill order's life, so nothing in
+flight is missed and the scan cannot grow with the table."""
+
+
+def pending_mints_sql() -> str:
+    """The text of :data:`_PENDING_MINTS`, built from the constants above so the
+    statuses have exactly one home (``refusal_cooldown.py``'s discipline).
+
+    Three ``UNION`` branches, each an equality on a leading index column plus the
+    window on the second: ``ix_meme_proposals_status_proposed_at``
+    (``status``, ``proposed_at``) twice and ``ix_meme_live_orders_status_received_at``
+    (``status``, ``received_at``) once; the mint of a live order is a primary-key
+    lookup on ``meme_proposals``.
+
+    The only interpolated values are the module-level literal constants above —
+    never an argument, never a row (``S608`` is silenced for that reason, the same
+    way ``creator_watch.py`` silences it for its table names). The two timestamps
+    are bound parameters, as they must be."""
+    proposals = [
+        "SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets r ON r.id = p.rule_set_id "  # noqa: S608
+        "WHERE r.kind = 'operator' AND r.status = 'active' "
+        f"AND p.status = '{status}' AND p.proposed_at >= :since"
+        # A ``proposed`` row past its deadline is dead to the desk and to the robot
+        # (``proposal_state_refusal``); an ``approved`` one is already being worked on.
+        + (" AND p.expires_at > :now" if status == "proposed" else "")
+        for status in PENDING_PROPOSAL_STATUSES
+    ]
+    states = ", ".join(f"'{status}'" for status in LIVE_ORDER_PENDING_STATUSES)
+    orders = (
+        "SELECT p.mint FROM meme_live_orders o JOIN meme_proposals p ON p.id = o.proposal_id "  # noqa: S608
+        f"WHERE o.side = 'buy' AND o.status IN ({states}) AND o.received_at >= :since"
+    )
+    return " UNION ".join([*proposals, orders])
+
+
+_PENDING_MINTS = text(pending_mints_sql())
 
 
 async def pending_operator_mints(session: AsyncSession, *, now: datetime) -> frozenset[str]:
-    """T4.28b: the desk's live proposals waiting on a decision (a click or the
-    stage-1 executor). The rug-risk reader (``bundled_share``, top-10, dev) must
-    reach them **before** the executor judges them: the real admission refuses
-    ``bundled_share_unmeasurable`` by doctrine, so a candidate the reader never
-    saw can never be bought — the auto-approve mode would refuse everything."""
-    rows = (await session.execute(_PENDING_OPERATOR, {"now": now})).scalars().all()
-    return frozenset(str(m) for m in rows)
+    """T4.28b/T4.28g: the mints a real buy decision is pending on — the desk's
+    operator proposals still ``proposed`` or already ``approved`` by stage 1, plus
+    every mint carrying a live buy order before its fill, all inside
+    :data:`PENDING_LOOKBACK_S`.
+
+    The rug-risk reader (``bundled_share``, top-10, dev) must reach them **before**
+    the executor judges them: the real admission refuses ``bundled_share_unmeasurable``
+    by doctrine, so a candidate the reader never saw can never be bought. This
+    loosens no check — it makes an input exist in time."""
+    rows = await session.execute(
+        _PENDING_MINTS, {"now": now, "since": now - timedelta(seconds=PENDING_LOOKBACK_S)}
+    )
+    return frozenset(str(m) for m in rows.scalars().all())
 
 
 __all__ = [
     "CURVE_PROGRAM",
     "CURVE_TOKEN_DECIMALS",
+    "LIVE_ORDER_PENDING_STATUSES",
+    "PENDING_LOOKBACK_S",
+    "PENDING_PROPOSAL_STATUSES",
     "POOL_PROGRAM",
     "PROGRAMS",
     "SWAP_API_SOURCE",
@@ -212,6 +277,7 @@ __all__ = [
     "insert_trades",
     "load_tape",
     "open_bet_mints",
+    "pending_mints_sql",
     "pending_operator_mints",
     "trade_rows",
 ]
