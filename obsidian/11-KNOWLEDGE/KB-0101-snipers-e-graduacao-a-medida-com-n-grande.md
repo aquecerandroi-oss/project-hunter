@@ -87,3 +87,16 @@ universo). Acima de 21 o ganho e ruido (as ICs de 11, 16 e 21 se sobrepoem); aba
 
 ## Ligacoes
 [[11-KNOWLEDGE/KB-0098-quantos-bums-reais-ha-por-dia-e-quanto-tempo-temos|KB-0098]] · [[05-EXPERIMENTS/EXP-M5-fluxo-e-holders|EXP-M5]] (bracos 3/4 ja mexem em snipers) · [[05-EXPERIMENTS/EXP-M7-organica-lenta|EXP-M7]] (`snipers <= 2` — previsao de que nao propoe nada; esta nota explica por que) · `docs/DATABASE.md` §43.2
+
+## Errata 16/09 — desfecho refeito sem as nascidas cheias (append-only; nada acima foi editado)
+
+O desfecho desta nota ("encheu" = `completed_at` OU `migrated_at`) inclui moedas que **nascem cheias** (KB-0103/KB-0104).
+Refeito em [[11-KNOWLEDGE/KB-0106-snipers-e-graduacao-organica|KB-0106]] com `organica` = graduou, `completed_at − created_at > 60 s`
+e ao menos uma foto de 15 s com progresso < 0,9. **O veredito não muda:** a escada do §2 continua monotônica nos 5 dias
+(0,12 / 0,74 / 2,64 / 4,15 / 6,33 %), o teto ≤ 10 continua perdendo 64,6 % das vencedoras da janela (RR 4,46) e o piso 21
+continua no topo (2,841 %). **Muda três coisas:** (a) a faixa `desconhecido` era 96 % forja e cai de 10,5 % para 0,46 %;
+(b) na janela do executor a limpeza é quase um no-op (131 → 130) porque exigir progresso 0,02–0,50 na 1.ª foto já exclui a
+nascida cheia por construção; (c) a frase "> 60 ainda subindo" **não se sustenta** — na janela é platô, com inversão de faixa
+em 4 dos 5 dias; ali manda a corcova de R em 31–60 do KB-0102.
+
+→ [[11-KNOWLEDGE/KB-0106-snipers-e-graduacao-organica|KB-0106]] · `infra/scripts/sql/research/2026-09-16-r15-q0{1,2}-*.sql`
