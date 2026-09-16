@@ -20,6 +20,23 @@ per-method window (10/10 s, T4.2f) is respected by the client's spacing.
 The heartbeat says ``fast_lane_mints``, ``fast_lane_reads_60s``,
 ``fast_lane_calls_60s``, ``fast_lane_cycle_s``.
 
+**Pinned mints keep the clock past 300 s (T4.33).** KB-0113 (16/09) measured
+that ``young_mints`` dropped a mint at ``age_s = 300`` even with an open paper
+bet, a live position or a proposal waiting on a decision: 91 % of the 132
+entries of 15/09 lost their 15 s series there, median last photo at 292 s —
+the instrument blinking, not the coin dying. :attr:`MintTracker.pinned`
+(T4.16b) already names that exact set for the tracker's own cap and window;
+:func:`young_mints` reuses it — an in-memory ``frozenset`` membership check,
+**no new query** — to admit a pinned mint up to
+``fast_lane_pinned_max_age_s`` (1 800 s) instead of 300. The set is small by
+construction (KB-0113 §3: ~83 mints/day, the ceiling of what a day's bets and
+proposals can pin at once), so the fast lane's own batching absorbs it: one
+``getMultipleAccounts`` already covers 100 mints, so the pinned tail costs at
+most one more call per read in the worst case — ≤ 2 extra calls a minute,
+inside the budget above. Cost measured: +2 % of ``meme_features_15s``
+rows/day (~5 MB). The heartbeat says ``fast_lane_pinned_mints`` — how many of
+``fast_lane_mints`` are there only because they are pinned.
+
 **What a refusal teaches** is what it teaches the minute loop
 (``chain.py``): ``unsupported_quote`` drops the mint, ``curve_emptied`` marks
 it finished, the rest leaves the instant without a chain photo — and the
@@ -69,19 +86,38 @@ class FastReport:
     failed: bool = False
 
 
-def young_mints(tracker: MintTracker, now: datetime, *, max_age_s: int) -> list[TrackedMint]:
+def young_mints(
+    tracker: MintTracker,
+    now: datetime,
+    *,
+    max_age_s: int,
+    pinned_max_age_s: int | None = None,
+) -> list[TrackedMint]:
     """Tracked mints with a **known** creation time younger than ``max_age_s``,
     still on the curve, quoted in SOL — newest first. A mint whose age is
-    unknown is not young; it is unknown, and the minute loop reads it."""
+    unknown is not young; it is unknown, and the minute loop reads it.
+
+    A **pinned** mint (:attr:`MintTracker.pinned` — an open paper bet, an open
+    live position or a proposal awaiting a decision, T4.16b) is admitted up to
+    ``pinned_max_age_s`` instead of ``max_age_s`` (T4.33): KB-0113 measured 91 %
+    of the 15 s series of 15/09 ending at the unconditional 300 s cutoff, open
+    bet or not — the cutoff was the market's own instrument blinking, not the
+    coin dying. ``pinned_max_age_s = None`` (the default) keeps every mint,
+    pinned or not, on the same ``max_age_s`` — the pre-T4.33 behaviour every
+    other caller still gets."""
     limit = timedelta(seconds=max_age_s)
-    return [
-        t
-        for t in tracker.snapshot()
-        if t.created_at is not None
-        and not t.quote_unsupported
-        and not t.finished
-        and timedelta(0) <= now - t.created_at < limit
-    ]
+    pinned_limit = limit if pinned_max_age_s is None else timedelta(seconds=pinned_max_age_s)
+    pinned = tracker.pinned
+    out: list[TrackedMint] = []
+    for t in tracker.snapshot():
+        if t.created_at is None or t.quote_unsupported or t.finished:
+            continue
+        age = now - t.created_at
+        if age < timedelta(0):
+            continue
+        if age < (pinned_limit if t.mint in pinned else limit):
+            out.append(t)
+    return out
 
 
 def _readings(ctx: RadarContext, mint: str) -> list[HoldersObservation]:
@@ -153,9 +189,14 @@ async def fast_once(ctx: RadarContext) -> FastReport:
     """One read of the young subset from the chain, then one row per mint."""
     started = time.monotonic()
     now = utcnow()
-    tracked = young_mints(ctx.tracker, now, max_age_s=ctx.config.fast_lane_max_age_s)
+    tracked = young_mints(
+        ctx.tracker,
+        now,
+        max_age_s=ctx.config.fast_lane_max_age_s,
+        pinned_max_age_s=ctx.config.fast_lane_pinned_max_age_s,
+    )
     if not tracked:
-        _record(ctx, now, mints=0, read=0, calls=0, started=started)
+        _record(ctx, now, mints=0, read=0, calls=0, pinned=0, started=started)
         return FastReport(mints=0, read=0, calls=0, rows=0, duration_s=_elapsed(started))
     try:
         batch = await ctx.chain.get_curve_states([t.mint for t in tracked])
@@ -168,6 +209,7 @@ async def fast_once(ctx: RadarContext) -> FastReport:
         return FastReport(
             mints=len(tracked), read=0, calls=0, rows=0, duration_s=_elapsed(started), failed=True
         )
+    pinned = sum(1 for t in tracked if t.mint in ctx.tracker.pinned)
     for mint, state in batch.states.items():
         if ctx.tracker.get(mint) is None:
             continue
@@ -192,10 +234,23 @@ async def fast_once(ctx: RadarContext) -> FastReport:
         )
     as_of = utcnow()
     rows = await fold_fast(
-        ctx, young_mints(ctx.tracker, as_of, max_age_s=ctx.config.fast_lane_max_age_s), as_of=as_of
+        ctx,
+        young_mints(
+            ctx.tracker,
+            as_of,
+            max_age_s=ctx.config.fast_lane_max_age_s,
+            pinned_max_age_s=ctx.config.fast_lane_pinned_max_age_s,
+        ),
+        as_of=as_of,
     )
     _record(
-        ctx, now, mints=len(tracked), read=len(batch.states), calls=batch.calls, started=started
+        ctx,
+        now,
+        mints=len(tracked),
+        read=len(batch.states),
+        calls=batch.calls,
+        pinned=pinned,
+        started=started,
     )
     return FastReport(
         mints=len(tracked),
@@ -207,11 +262,18 @@ async def fast_once(ctx: RadarContext) -> FastReport:
 
 
 def _record(
-    ctx: RadarContext, at: datetime, *, mints: int, read: int, calls: int, started: float
+    ctx: RadarContext,
+    at: datetime,
+    *,
+    mints: int,
+    read: int,
+    calls: int,
+    pinned: int,
+    started: float,
 ) -> None:
     if ctx.sources is not None:
         ctx.sources.record_fast_cycle(
-            at, mints=mints, read=read, calls=calls, duration_s=_elapsed(started)
+            at, mints=mints, read=read, calls=calls, pinned=pinned, duration_s=_elapsed(started)
         )
 
 

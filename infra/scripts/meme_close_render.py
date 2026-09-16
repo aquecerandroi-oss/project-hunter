@@ -88,6 +88,20 @@ def _lesson(index: int, lesson: Lesson) -> list[str]:
     return lines
 
 
+def _indeterminate_line(inputs: CloseInputs) -> str:
+    breakdown = ", ".join(
+        f"`{reason}` {count}"
+        for reason, count in sorted(
+            inputs.indeterminate_by_reason.items(), key=lambda kv: (-kv[1], kv[0])
+        )
+    )
+    detail = f" ({breakdown})" if breakdown else ""
+    return (
+        f"Apostas fechadas do dia: n = {len(inputs.bets)} medidas; indeterminadas (fora de todas "
+        f"as somas — T4.16): {inputs.indeterminate}{detail}."
+    )
+
+
 def render_lessons_section(inputs: CloseInputs) -> str:
     """The body that replaces the archivist's stub under ``## 6.``."""
     generated = brt(inputs.generated_at, "%Y-%m-%d %H:%M")
@@ -96,9 +110,7 @@ def render_lessons_section(inputs: CloseInputs) -> str:
         "Régua: cada lição traz n, IC 95 % por blocos de hora (bootstrap por blocos, semente 20260912, "
         "2 000 reamostragens); n < 30 = insuficiente; uma lição só vira linha `M-L` na fila quando o "
         "contraste passa a régua (n ≥ 30, ≥ 3 blocos, células ≥ 10, IC fora de zero); nenhuma vira "
-        f"regra viva sem pré-registro (KB-0092). Apostas fechadas do dia: n = {len(inputs.bets)} "
-        f"medidas; indeterminadas (sem fotografia, fora de todas as somas — T4.16): "
-        f"{inputs.indeterminate}.",
+        f"regra viva sem pré-registro (KB-0092). {_indeterminate_line(inputs)}",
         "",
     ]
     for index, lesson in enumerate(inputs.lessons, start=1):

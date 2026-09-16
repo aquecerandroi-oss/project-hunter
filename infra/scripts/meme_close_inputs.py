@@ -4,7 +4,7 @@ dataclasses plus the two formatting helpers every renderer shares."""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -83,6 +83,9 @@ class CloseInputs:
     indeterminate: int = 0
     """T4.15b: closes of the day with ``outcome_quality = indeterminate`` — outside
     every sum above, counted here so the day says how often the instrument blinked."""
+    indeterminate_by_reason: Mapping[str, int] = field(default_factory=dict[str, int])
+    """The same count, split by ``outcome_quality_reason`` (T4.33: ``rug_no_snapshot``
+    and ``series_ended`` are different failures of the instrument, not the same one)."""
     repeat_dumper: Lesson | None = None
     """T4.24 (EXP-M6, braço 2): the R comparison that judges
     ``pedigree_repeat_dumper`` — outside :attr:`lessons`'s fixed nine,

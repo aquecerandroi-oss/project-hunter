@@ -30,12 +30,23 @@ if [ -n "$DAY" ]; then args=(--day "$DAY" --apply); fi
 stamp="$(date -u +%Y%m%d-%H%M)"
 log="$OUT/run-$stamp.log"
 set +e
+# T4.33: label a `time_stop` on the series' last existing bar as
+# `indeterminate`/`series_ended` **before** the close reads the day, so its
+# text (§6, `meme_render_bets.py` notes) counts it apart from the start —
+# a DB write via `DATABASE_URL_MIGRATIONS`, no vault file touched.
+reclassify_args=(--apply)
+if [ -n "$DAY" ]; then reclassify_args=(--day "$DAY" --apply); fi
+docker compose --env-file .env -p hunter \
+  -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml \
+  run --rm ops python infra/scripts/meme_reclassify_series_ended.py "${reclassify_args[@]}" \
+  >> "$log" 2>&1
+echo "meme_reclassify_series_ended exit=$? (rótulo, não trava o fechamento — ver $log)" >> "$log"
 docker compose --env-file .env -p hunter \
   -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml \
   run --rm --user "$(id -u):$(id -g)" \
   -v "$OUT/obsidian:/app/obsidian" \
   -v "$OUT/state:/app/.claude/state" \
-  ops python infra/scripts/meme_close_day.py "${args[@]}" > "$log" 2>&1
+  ops python infra/scripts/meme_close_day.py "${args[@]}" >> "$log" 2>&1
 rc=$?
 set -e
 

@@ -64,6 +64,30 @@ def test_only_young_mints_with_a_known_birth_are_read_by_the_fast_lane() -> None
     ]
 
 
+def test_a_pinned_mint_follows_the_fast_lane_past_300s_up_to_its_own_ceiling() -> None:
+    """T4.33 (KB-0113): an unpinned mint still leaves at ``max_age_s`` (300 s);
+    a **pinned** one (open bet, live position or pending proposal —
+    ``tracker.pin``) is admitted up to ``pinned_max_age_s`` (1 800 s) instead,
+    and leaves once it crosses that ceiling too."""
+    tracker = MintTracker(window_minutes=1440, cap=200)
+    for t in (
+        _tracked("unpinned_old", age_s=301),
+        _tracked("pinned_old", age_s=301),
+        _tracked("pinned_within_ceiling", age_s=1799),
+        _tracked("pinned_past_ceiling", age_s=1801),
+    ):
+        tracker.observe(t)
+    tracker.pin(["pinned_old", "pinned_within_ceiling", "pinned_past_ceiling"])
+
+    unpinned_only = young_mints(tracker, NOW, max_age_s=300)
+    assert [t.mint for t in unpinned_only] == [], "no pinned_max_age_s: everyone obeys max_age_s"
+
+    with_pin = young_mints(tracker, NOW, max_age_s=300, pinned_max_age_s=1800)
+    assert [t.mint for t in with_pin] == ["pinned_old", "pinned_within_ceiling"]
+    assert "unpinned_old" not in [t.mint for t in with_pin], "unpinned still leaves at 300 s"
+    assert "pinned_past_ceiling" not in [t.mint for t in with_pin], "even a pin has a ceiling"
+
+
 async def test_the_fast_lane_reads_the_young_subset_through_the_same_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -139,11 +163,42 @@ def test_the_sources_state_records_the_fast_cycle_as_rolling_counters() -> None:
     sources = SourcesState()
     at = datetime(2026, 9, 12, 18, 0, tzinfo=UTC)
     sources.record_fast_cycle(at, mints=7, read=6, calls=2, duration_s=0.41)
-    sources.record_fast_cycle(at + timedelta(seconds=15), mints=8, read=8, calls=2, duration_s=0.39)
+    sources.record_fast_cycle(
+        at + timedelta(seconds=15), mints=8, read=8, calls=2, duration_s=0.39, pinned=3
+    )
     fields = sources.heartbeat_fields(at + timedelta(seconds=20), tracked=100)
     assert (fields["fast_lane_mints"], fields["fast_lane_cycle_s"]) == ("8", "0.39")
     assert (fields["fast_lane_reads_60s"], fields["fast_lane_calls_60s"]) == ("14", "4")
+    assert fields["fast_lane_pinned_mints"] == "3", "T4.33: how many of the lane are there by pin"
     assert (
         sources.heartbeat_fields(at + timedelta(seconds=70), tracked=100)["fast_lane_reads_60s"]
         == "8"
     )
+
+
+async def test_the_heartbeat_counts_the_pinned_mints_the_fast_lane_is_following(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.33: a pinned mint past ``fast_lane_max_age_s`` shows up in
+    ``fast_lane_pinned_mints``, not just in ``fast_lane_mints``."""
+    _patch(monkeypatch)
+    monkeypatch.setattr("hunter_meme_worker.fast_lane.utcnow", lambda: NOW)
+    kinds = _kinds()
+    young = kinds["midlife"][:2]
+    tracked = [_tracked(m, age_s=90) for m in young]
+    ctx = _context(FakeChain(), [], tracked=tracked)
+    ctx.tracker.pin([young[0]])
+    ctx = dataclasses.replace(
+        ctx, config=MemeConfig(fast_lane_max_age_s=300, fast_lane_pinned_max_age_s=1800)
+    )
+
+    async def fake_fold(
+        ctx_: RadarContext, tracked_: list[TrackedMint], *, as_of: datetime
+    ) -> list[Any]:
+        return [object()] * len(tracked_)
+
+    monkeypatch.setattr(fast_lane, "fold_fast", fake_fold)
+    await fast_once(ctx)
+    assert ctx.sources is not None
+    fields = ctx.sources.heartbeat_fields(NOW, tracked=len(tracked))
+    assert fields["fast_lane_mints"] == "2" and fields["fast_lane_pinned_mints"] == "1"

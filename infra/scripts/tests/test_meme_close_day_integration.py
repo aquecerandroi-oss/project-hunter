@@ -28,7 +28,7 @@ from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from alembic import command
@@ -224,15 +224,13 @@ async def _plant_day(url: str) -> None:
             )
 
 
-async def _plant_gate_minute(url: str, mint: str) -> None:
-    """One folded ``meme_features_1m`` row on the last closed minute before ``NOW``,
-    so the real gate has something to refuse (``creator_net_seller_unknown``)."""
+async def _plant_minute_row(url: str, mint: str, end_time: datetime) -> None:
+    """One folded ``meme_features_1m`` row, priced (``mcap_sol`` not null)."""
     from hunter_meme_worker.features import CurveObservation, MinuteInputs, build_row
     from hunter_meme_worker.repo import insert_features
 
-    closed = NOW.replace(second=0, microsecond=0) - timedelta(minutes=1)
     observation = CurveObservation(
-        observed_at=closed - timedelta(seconds=20),
+        observed_at=end_time - timedelta(seconds=20),
         source="pumpfun_rest",
         real_token_reserves=Decimal("666100000"),
         mcap_sol=Decimal("35.94"),
@@ -241,8 +239,8 @@ async def _plant_gate_minute(url: str, mint: str) -> None:
     row = build_row(
         MinuteInputs(
             mint=mint,
-            end_time=closed,
-            created_at=closed - timedelta(seconds=120),
+            end_time=end_time,
+            created_at=end_time - timedelta(hours=1),
             initial_real_token_reserves=Decimal("793100000"),
             snapshot=observation,
         )
@@ -253,6 +251,52 @@ async def _plant_gate_minute(url: str, mint: str) -> None:
             await insert_features(session, [row])
     finally:
         await engine.dispose()
+
+
+async def _plant_gate_minute(url: str, mint: str) -> None:
+    """One folded ``meme_features_1m`` row on the last closed minute before ``NOW``,
+    so the real gate has something to refuse (``creator_net_seller_unknown``)."""
+    await _plant_minute_row(url, mint, NOW.replace(second=0, microsecond=0) - timedelta(minutes=1))
+
+
+async def _plant_time_stop_bet(url: str, mint: str, *, exit_at: datetime) -> UUID:
+    """One closed ``time_stop`` bet priced at ``exit_at`` — the row a
+    ``series_ended`` reclassification (T4.33) may or may not touch."""
+    bet_id, proposal_id = uuid4(), uuid4()
+    async with _owner(url) as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO meme_proposals (id, mint, rule_set_id, origin, status, proposed_at, "
+                "  expires_at, quote, reasons, suggested, decision, decided_by, decided_at) "
+                "VALUES (:id, :mint, :rule_set, 'operator', 'approved', :proposed_at, :expires_at, "
+                "  '{}'::jsonb, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb, 'rules', :proposed_at)"
+            ),
+            {
+                "id": str(proposal_id),
+                "mint": mint,
+                "rule_set": RESEARCH_ID,
+                "proposed_at": exit_at - timedelta(minutes=31),
+                "expires_at": exit_at - timedelta(minutes=29),
+            },
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, status, entry_at, "
+                "  entry, initial_risk_sol, params, exit_at, exit, pnl_sol, r_multiple) "
+                "VALUES (:id, :proposal_id, :rule_set, :mint, 'closed', :entry_at, "
+                '  \'{"sol_spent": "0.05", "tokens": "1000"}\'::jsonb, 0.05, \'{}\'::jsonb, '
+                '  :exit_at, \'{"reason": "time_stop"}\'::jsonb, -0.017, -0.34)'
+            ),
+            {
+                "id": str(bet_id),
+                "proposal_id": str(proposal_id),
+                "rule_set": RESEARCH_ID,
+                "mint": mint,
+                "entry_at": exit_at - timedelta(minutes=30),
+                "exit_at": exit_at,
+            },
+        )
+    return bet_id
 
 
 async def _tick(url: str) -> Any:
@@ -401,3 +445,70 @@ def test_apply_closes_the_day_into_a_copy_of_the_vault_that_lints_clean_and_refu
     finally:
         get_settings.cache_clear()
     assert refused.value.code == 2
+
+
+def test_series_ended_labels_a_time_stop_closed_on_the_series_last_bar(close_db_url: str) -> None:
+    """T4.33 (KB-0113 §2): a ``time_stop`` close with no ``meme_features_1m``
+    price more than 90 s after ``exit_at`` (inside 35 min) is the series
+    ending, not a measured minute — the real interval arithmetic only a
+    database proves. A sibling bet with a later price stays ``measured``,
+    and a day filter outside the bet's entry finds nothing."""
+    exit_at = FIRST_ENTRY + timedelta(minutes=45)
+    ended = f"TS_ENDED_{uuid4().hex[:6]}"
+    alive = f"TS_ALIVE_{uuid4().hex[:6]}"
+    on_the_edge = f"TS_EDGE_{uuid4().hex[:6]}"
+    asyncio.run(_plant_time_stop_bet(close_db_url, ended, exit_at=exit_at))
+    asyncio.run(_plant_time_stop_bet(close_db_url, alive, exit_at=exit_at))
+    asyncio.run(_plant_minute_row(close_db_url, alive, exit_at + timedelta(minutes=5)))
+    asyncio.run(_plant_time_stop_bet(close_db_url, on_the_edge, exit_at=exit_at))
+    asyncio.run(_plant_minute_row(close_db_url, on_the_edge, exit_at + timedelta(seconds=80)))
+
+    module = _load_script("meme_reclassify_series_ended")
+    judged_at = exit_at + timedelta(minutes=40)  # the 35 min window has fully elapsed by here
+
+    async def _find(day: Any = None, as_of: datetime = judged_at) -> list[str]:
+        async with _owner(close_db_url) as connection:
+            found = await module.candidates(connection, day=day, ids=None, as_of=as_of)
+        return sorted(c.mint for c in found)
+
+    assert asyncio.run(_find(as_of=exit_at + timedelta(minutes=20))) == [], (
+        "the 35 min window has not elapsed yet: real time, not the query, must say so"
+    )
+    assert asyncio.run(_find()) == sorted([ended, on_the_edge]), (
+        "a price exactly at exit_at + 80s is still inside the 90s guard: not later than it"
+    )
+    tomorrow = (FIRST_ENTRY + timedelta(days=1)).date()
+    assert asyncio.run(_find(day=tomorrow)) == [], "a day filter outside the entry finds nothing"
+
+    async def _apply() -> tuple[int, str]:
+        async with _owner(close_db_url) as connection:
+            return await module.run(connection, day=None, ids=None, apply=True, as_of=judged_at)
+
+    code, report = asyncio.run(_apply())
+    assert code == 0 and "applied: 2 row(s)" in report and "series_ended" in report
+
+    rows = asyncio.run(
+        _as(
+            close_db_url,
+            "hunter_app",
+            "SELECT mint, outcome_quality, outcome_quality_reason FROM meme_paper_bets "
+            "WHERE mint = ANY(CAST(:mints AS text[])) ORDER BY mint",
+            mints=[ended, alive, on_the_edge],
+        )
+    )
+    by_mint = {r["mint"]: r for r in rows}
+    assert (by_mint[ended]["outcome_quality"], by_mint[ended]["outcome_quality_reason"]) == (
+        "indeterminate",
+        "series_ended",
+    )
+    assert (
+        by_mint[on_the_edge]["outcome_quality"],
+        by_mint[on_the_edge]["outcome_quality_reason"],
+    ) == ("indeterminate", "series_ended")
+    assert (by_mint[alive]["outcome_quality"], by_mint[alive]["outcome_quality_reason"]) == (
+        "measured",
+        None,
+    ), "a later priced minute means the series had not ended: stays measured"
+
+    # Re-run: idempotent, nothing left to reclassify.
+    assert asyncio.run(_find()) == []

@@ -65,6 +65,20 @@ def test_section_six_carries_every_lesson_with_n_ci_and_one_sentence_of_change()
     assert "00:10 BRT" in body
 
 
+def test_the_indeterminate_line_names_each_reason_apart() -> None:
+    """T4.33: ``series_ended`` (a ``time_stop`` priced on the series' last bar)
+    is a different failure of the instrument than ``rug_no_snapshot`` — the
+    diary must not fold the two into one number."""
+    inputs = close_inputs(
+        synthetic_bets(40),
+        indeterminate=3,
+        indeterminate_by_reason={"rug_no_snapshot": 2, "series_ended": 1},
+    )
+    body = render_lessons_section(inputs)
+    assert "indeterminadas (fora de todas as somas — T4.16): 3" in body
+    assert "`rug_no_snapshot` 2" in body and "`series_ended` 1" in body
+
+
 def test_below_thirty_the_section_says_insufficient_and_the_stub_is_replaced_once() -> None:
     body = render_lessons_section(close_inputs(synthetic_bets(21)))
     assert body.count("nada muda (n insuficiente: 21 < 30)") == 9

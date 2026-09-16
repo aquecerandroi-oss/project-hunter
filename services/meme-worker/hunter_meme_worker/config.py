@@ -127,6 +127,13 @@ class MemeConfig:
     ``getMultipleAccounts`` + ≤ 2 ``getBlockTime`` a read, four reads a
     minute — inside the public RPC's 100 req/10 s and its 10/10 s per method."""
 
+    fast_lane_pinned_max_age_s: int = 1800
+    """``MEME_FAST_LANE_PINNED_MAX_AGE_S`` (T4.33, ``fast_lane.young_mints``): a
+    **pinned** mint (open bet, live position or pending proposal —
+    ``tracker.pinned``) stays past ``fast_lane_max_age_s`` up to this age —
+    KB-0113 measured the unconditional 300 s cutoff ending 91 % of the day's
+    15 s series regardless of an open bet."""
+
     features_15s_version: str = "meme_features_15s_v1"
 
     lab_proposal_ttl_s: int = 120
@@ -312,6 +319,7 @@ def load_config(settings: Settings) -> MemeConfig:
         creator_watch_enabled=_bool_env("MEME_CREATOR_WATCH_ENABLED", default=True),
         creator_watch_cycle_s=float(max(5, _int_env("MEME_CREATOR_WATCH_CYCLE_S", 15))),
         rest_mayhem_refresh_s=max(60, _int_env("MEME_REST_MAYHEM_REFRESH_S", 300)),
+        fast_lane_pinned_max_age_s=max(0, _int_env("MEME_FAST_LANE_PINNED_MAX_AGE_S", 1800)),
         watch_wallets=_wallets_env("MEME_WATCH_WALLETS"),
     )
 

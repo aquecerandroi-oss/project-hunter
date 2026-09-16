@@ -483,7 +483,7 @@ def test_the_notes_are_idempotent_and_never_rewrite_another_day(
     # dividem o mesmo embed em vez de repetir a imagem.
     assert "**Melhor · Pior**" in first and "**Mais recente**" in first
     assert "| 02:02:35 | WIF |" in first
-    assert "rug_no_snapshot (indeterminada)" in first
+    assert "rug_no_snapshot (indeterminada: no_snapshot_in_window)" in first
 
     notes_mod.write_notes(bets)
     assert page.read_text(encoding="utf-8") == first, "a segunda passagem não muda um byte"

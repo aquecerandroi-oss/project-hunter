@@ -88,7 +88,7 @@ def _table(bets: Sequence[Bet], note: Path) -> list[str]:
             if png.exists()
             else "(gráfico não desenhado ainda)"
         )
-        quality = "" if bet.measured else " (indeterminada)"
+        quality = "" if bet.measured else f" (indeterminada: {bet.outcome_quality_reason})"
         head.append(
             f"| {bet.entry_brt:%H:%M:%S} | {bet.ticker} | `{bet.mint[:10]}…` | {bet.r_text} "
             f"| {bet.exit_reason}{quality} | {link} |"

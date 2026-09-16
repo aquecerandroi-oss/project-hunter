@@ -70,7 +70,7 @@ O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) —
 | `meme_curve_snapshots` | mensal | `MEME_RETENTION_DAYS` (90 d) | idem |
 | `meme_features_1m` | mensal | idem | idem |
 | `meme_trades` | mensal | idem | idem |
-| `meme_features_15s` | mensal | **7 d** (T4.16, `0030`: a série de 15 s das moedas jovens — em partições mensais o mês cai quando o seu fim tem mais de 7 dias) | idem |
+| `meme_features_15s` | mensal | **7 d** (T4.16, `0030`: a série de 15 s das moedas jovens — em partições mensais o mês cai quando o seu fim tem mais de 7 dias) | idem — T4.33: uma moeda **fixada** (aposta/posição/proposta) segue na via rápida até 1 800 s (`MEME_FAST_LANE_PINNED_MAX_AGE_S`), não só 300 s; +2 % de linhas/dia medido, ~83 mints/dia |
 | `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `analytics-worker` diário, DELETE em lotes (M5) |
 | `shadow_outbox` | — | idem, enquanto a fila existir (§17.5 a absorve) | idem |
 
@@ -6751,7 +6751,7 @@ pré-registros: `obsidian/05-EXPERIMENTS/EXP-M5-fluxo-e-holders.md`, `EXP-M6-exc
 | coluna | tipo | definição |
 |---|---|---|
 | `outcome_quality` | `text NOT NULL DEFAULT 'measured'` ∈ {`measured`, `indeterminate`} | `measured`: o simulador precificou o fecho numa observação; `indeterminate`: o fecho não pôde ser precificado — `rug_no_snapshot`, sem fotografia para vender em 3 min. Em 12/09 foram 5 dos −7,67 R do dia, com a moeda valendo a entrada 30 min depois: o instrumento piscou, o mercado não falou |
-| `outcome_quality_reason` | `text` | o motivo: `no_snapshot_in_window` quando o laço fecha; o texto do `--reason` do operador quando o script reclassifica |
+| `outcome_quality_reason` | `text` | o motivo: `no_snapshot_in_window` quando o laço fecha (`rug_no_snapshot`); `series_ended` (T4.33, nome fixo) quando um `time_stop` `measured` não tem nenhuma linha de `meme_features_1m` precificada mais de 90 s depois do `exit_at` dentro dos 35 min seguintes — o script `infra/scripts/meme_reclassify_series_ended.py` grava; o texto do `--reason` do operador quando `meme_reclassify_indeterminate.py` reclassifica à mão |
 | `outcome_quality_at` | `timestamptz` | quando a qualidade foi atribuída (o fecho, ou o `now()` do script) |
 
 CHECKs: `outcome_quality_is_a_known_label`; `an_indeterminate_bet_is_closed` (= `outcome_quality = 'measured'
@@ -6764,7 +6764,9 @@ API (`/meme/tests`: `wins`/`losses`/`pnl`/`r` só medidas + `indeterminate` à p
 o artefato travaria o Lab) e o fechamento diário (T4.15 deve ler a coluna). **Sem backfill, por desenho**: o
 laço grava `indeterminate` nos fechos novos; os passados só pelo script auditado
 `infra/scripts/meme_reclassify_indeterminate.py` (dry-run por padrão; `--apply --reason "…"` grava o motivo em
-cada linha e uma linha em `system_events`; recusa por nome `reason_required`/`not_a_candidate`).
+cada linha e uma linha em `system_events`; recusa por nome `reason_required`/`not_a_candidate`). O `series_ended`
+de T4.33 é o mesmo padrão auditado (`meme_reclassify_series_ended.py`, dry-run por padrão, `--day`/`--bet-id`
+reaplicam sobre dias já fechados) — sem `--reason` de operador porque o critério é a query, não um julgamento.
 
 ### 43.2 A série de 15 s — `meme_features_15s` (`meme_features_15s_v1`)
 
@@ -7281,3 +7283,67 @@ máximo em 1 h/24 h?) alimenta a régua da EXP-M8. **Rótulos web pendentes** (f
 → "comunidade", `other` → "outro"), `event.kind` (os seis valores), `event.confidence` (`confirmed` →
 "confirmado", `reported` → "reportado", `rumor` → "rumor") e, desde a T4.26b, `match_kind` (`buy` →
 "compra", `avoid` → "evitar").
+
+## 53. E2-b: a moeda que nasce cheia e o maior comprador — M5 (`0044_meme_gate_e2b_arm`)
+
+**O que a `0044` faz:** semeia **um** conjunto de pesquisa, `flow_v2/6` (`…0013`, `research_only`,
+`exp_ref EXP-M9`, relógio de 15 s) = a porta calibrada da mesa de 16/09 mais `pedigree_e2b: true`.
+Nada é aposentado, `flow_v2/5` continua ativo (a comparação é o ponto) e a mesa (`operator/5`) **não**
+recebe o critério: E2-b é papel. Tudo em `ddl/meme_gate_e2b_arm.py`; o downgrade recusa enquanto uma
+proposta ou uma aposta referenciar o conjunto (§17.7).
+
+**A medida que motivou** ([[11-KNOWLEDGE/KB-0103-clones-fundo-com-preco-forjado-assinatura-e-custo|KB-0103]],
+[[11-KNOWLEDGE/KB-0105-e2b-replicacao-12-13-09-e-efeito-em-R|KB-0105]]): moeda "forjada" = a curva encheu
+≤ 60 s do mint **ou** uma única carteira pagou ≥ 35 % do SOL comprado na subida — 92–100 % de recall a um
+custo de 2,0–11,4 % das graduações orgânicas, contra 35–54 % de recall a 30–51 % de custo da E2 v1.
+
+### 53.1 De onde vem a fatia do maior comprador (e por que não havia coluna)
+
+Nenhuma das duas séries de features carrega o dado: `meme_features_15s` conta `unique_buyers_60s` mas
+**nunca diz quem** comprou (a rota de atividade por lote, §44, é anônima por construção), e `top10_share`
+(só em `meme_features_1m`, leitor de holders) é fatia de **oferta detida**, não de SOL pago. A única fonte
+de SOL por carteira é a nossa própria fita, `meme_trades` (§35): `trader`, `side`, `sol_lamports`,
+`block_time` — exatamente o que o SQL de pesquisa `2026-09-16-r13-q04-apostas-medidas-e-e2b.sql` lê. A
+cobertura é parcial por construção (21–25 % das graduadas naqueles dias): sem fita, o critério recusa
+`e2b_top_buyer_unknown` **por nome**, e a fração dessa recusa é uma das cinco previsões da EXP-M9.
+
+### 53.2 A consulta nova por tick, e os limites que ela carrega
+
+`hunter_meme_worker.lab_repo_e2b.e2b_for` roda **uma vez por tick**, e só quando algum conjunto do laço
+liga `pedigree_e2b` (`lineage_for`, o mesmo lugar onde o pedigree da E2 v1 é lido). Ela soma a fita por
+par **(mint, instante julgado)**, nunca "até agora":
+
+- `unnest(:mints, :as_ofs)` traz os pares do tick; o `JOIN` em `meme_trades` usa
+  `ix_meme_trades_mint_block_time` (`mint`, `block_time`) — um range scan por par, e os mints julgados
+  têm minutos de vida;
+- `block_time >= :floor AND block_time <= :ceiling`, com `:floor = min(as_of) − 24 h` e
+  `:ceiling = max(as_of)`, são os limites **absolutos** que deixam o planejador podar as partições mensais
+  de `meme_trades` (§15.2) em vez de abrir todas — o conjunto rastreado é de moedas criadas nas últimas
+  24 h, então o piso nunca corta fita útil, e o teto por linha (`block_time <= j.as_of`) é correlacionado
+  e não poda nada sozinho (medido: sem o `:ceiling` o plano abre também as partições futuras vazias);
+- `block_time >= created_at − 60 s` é o limite por moeda (uma compra do mesmo bloco pode vir carimbada um
+  triz antes da criação — o mesmo `lead` do SQL de pesquisa) e `block_time <= as_of` é a
+  **não-antecipação**: numa lane de 15 s o tick pode carregar linhas com até `lab_fast_backlog_s` de
+  atraso, e somar até o relógio do tick deixaria uma linha velha ler negócios que ainda não existiam;
+- `completed_at` só conta quando `completed_at <= as_of` — uma curva que enche depois não é "nasceu
+  cheia", e lê-la seria antecipação;
+- `SET LOCAL statement_timeout = 8000` dentro de um savepoint, como `pedigree_for` desde a T4.24b: a
+  leitura que falha devolve vazio e o tick segue recusando `e2b_top_buyer_unknown` — nunca derruba o laço.
+
+**O plano, medido a 200 026 linhas em `meme_trades` e 130 pares julgados** (`test_lab_e2b_persistence.py::
+test_explain_the_e2b_read_uses_the_mint_block_time_index_at_200k_trades`; plano completo em
+`.claude/state/notes-T4.31-explain.txt`, gerado pelo próprio teste): `Nested Loop` sobre os 130 pares com
+`Index Scan using meme_trades_2026_09_mint_block_time_idx` (~7 linhas por par), uma única partição aberta,
+nenhum `Seq Scan` em `meme_trades`. O lado de `meme_tokens` aparece como `Seq Scan` **nesta fixture**
+(2 006 linhas); em produção, com ~150 k linhas, o `mint = ANY(...)` de 130 valores é busca pela PK.
+
+### 53.3 O critério, registrado como um portão
+
+`hunter_indicators.meme.pedigree_e2b` (`pedigree_e2b/1`): `e2b_top_buyer_share_max` 0,35 (inclusivo — a
+medida lê `>= 0,35`), `e2b_min_buyers` 10, `e2b_born_full_s` 60, com `inputs` declarados. Mover um limiar
+é **versão nova**, nunca edição (a disciplina de `exclusoes_de_pedigree`). Recusas: `e2b_born_full`,
+`e2b_top_buyer_share` e `e2b_top_buyer_unknown`. A guarda dos 10 compradores existe porque a fatia do
+maior comprador aos ~2 min é alta por construção (mediana 0,428 com 21 compradores em 12/09): sem ela a
+regra recusaria por **juventude**, não por vício. O bloco `reasons` (`feature: "pedigree_e2b"`) só aparece
+para o conjunto que liga o parâmetro, como identidade e evento (§52.4), e carrega as duas pernas, a fita
+lida e os três limiares.

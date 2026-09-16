@@ -1,7 +1,8 @@
-"""The two audited operator scripts of T4.16 — ``meme_reclassify_indeterminate.py``
-and ``meme_rule_set.py`` — against a fake connection: dry-run writes nothing,
-``--apply`` needs a reason, every refusal is named, the UPDATE carries exactly
-the guards the docstrings promise, and the audit row is written on apply.
+"""The audited operator scripts of T4.16/T4.33 — ``meme_reclassify_indeterminate.py``,
+``meme_reclassify_series_ended.py`` and ``meme_rule_set.py`` — against a fake
+connection: dry-run writes nothing, ``--apply`` needs a reason (where one is a
+judgement call), every refusal is named, the UPDATE carries exactly the guards
+the docstrings promise, and the audit row is written on apply.
 
 No database: the connection records the statements it receives and answers
 canned rows. Run: ``uv run pytest infra/scripts/tests/test_meme_ops_scripts.py -q``
@@ -12,7 +13,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
@@ -139,6 +140,65 @@ async def test_reclassify_with_nothing_to_do_exits_zero_and_writes_nothing() -> 
     script = _load("meme_reclassify_indeterminate")
     conn = FakeConn([])
     code, report = await script.run(conn, day=None, ids=None, apply=True, reason="x" * 20)
+    assert code == 0 and "nothing to do" in report and conn.writes() == []
+
+
+# ---- meme_reclassify_series_ended (T4.33) -----------------------------------------
+
+
+def _time_stop_candidate(bet: uuid.UUID) -> dict[str, Any]:
+    return {
+        "id": bet,
+        "mint": "DOJO111111111111111111111111111111111111111",
+        "rule_set": "meme_operator_v3/1",
+        "entry_at": ENTRY,
+        "exit_at": ENTRY + timedelta(minutes=30),
+        "pnl_sol": Decimal("-0.017"),
+    }
+
+
+async def test_series_ended_dry_run_lists_the_candidates_and_writes_nothing() -> None:
+    script = _load("meme_reclassify_series_ended")
+    conn = FakeConn([_time_stop_candidate(BET_A), _time_stop_candidate(BET_B)])
+    as_of = ENTRY + timedelta(hours=1)
+    code, report = await script.run(conn, day=None, ids=None, apply=False, as_of=as_of)
+    assert code == 0 and "2 candidate(s)" in report and "dry-run" in report
+    assert conn.writes() == []
+    select, params = conn.statements[0]
+    assert "exit ->> 'reason' = 'time_stop'" in select and "outcome_quality = 'measured'" in select
+    assert "NOT EXISTS" in select and "interval '90 seconds'" in select
+    assert "interval '35 minutes'" in select and ":as_of" in select and "now()" not in select
+    assert params == {"day": None, "ids": None, "as_of": as_of}
+
+
+async def test_series_ended_refuses_a_non_candidate_by_name() -> None:
+    script = _load("meme_reclassify_series_ended")
+    conn = FakeConn([_time_stop_candidate(BET_A)])
+    with pytest.raises(script.Refused, match="not_a_candidate") as refused:
+        await script.run(conn, day=None, ids=[BET_A, BET_B], apply=True)
+    assert str(BET_B) in str(refused.value) and conn.writes() == []
+
+
+async def test_series_ended_apply_writes_the_fixed_reason_and_leaves_an_audit_row() -> None:
+    script = _load("meme_reclassify_series_ended")
+    conn = FakeConn([_time_stop_candidate(BET_A), _time_stop_candidate(BET_B)])
+    code, report = await script.run(conn, day=None, ids=None, apply=True)
+    assert code == 0 and "applied: 2 row(s)" in report and "series_ended" in report
+    update, params = next((s, p) for s, p in conn.statements if s.lstrip().startswith("UPDATE"))
+    assert "outcome_quality = 'indeterminate'" in update
+    assert "outcome_quality_at = now()" in update and "pnl_sol" not in update
+    assert "exit ->> 'reason' = 'time_stop' AND outcome_quality = 'measured'" in update
+    assert params == {"ids": [BET_A, BET_B], "reason": script.SERIES_ENDED}
+    _, audit_params = next((s, p) for s, p in conn.statements if "system_events" in s)
+    assert audit_params["component"] == "meme_reclassify_series_ended"
+    assert audit_params["event"] == "reclassified"
+    assert "series_ended" in audit_params["message"] and str(BET_A) in audit_params["message"]
+
+
+async def test_series_ended_with_nothing_to_do_exits_zero_and_writes_nothing() -> None:
+    script = _load("meme_reclassify_series_ended")
+    conn = FakeConn([])
+    code, report = await script.run(conn, day=None, ids=None, apply=True)
     assert code == 0 and "nothing to do" in report and conn.writes() == []
 
 

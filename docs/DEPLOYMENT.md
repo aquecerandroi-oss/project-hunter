@@ -717,6 +717,22 @@ printf '%s\n' \
 sudo chmod 644 /etc/cron.d/hunter-meme-close
 ```
 
+**O rótulo de `series_ended` (T4.33) roda antes do fechamento, dentro do próprio cron.**
+`meme_close_nightly.sh` chama `infra/scripts/meme_reclassify_series_ended.py --day <dia> --apply`
+(o mesmo padrão auditado do `meme_reclassify_indeterminate.py`, uma escrita no banco por
+`DATABASE_URL_MIGRATIONS`, nenhum arquivo do vault tocado) **antes** de `meme_close_day.py`: um
+`time_stop` fechado sobre a última barra existente da série (nenhuma linha de `meme_features_1m`
+precificada mais de 90 s depois do `exit_at` dentro dos 35 min seguintes) vira
+`outcome_quality = indeterminate` / `outcome_quality_reason = series_ended` (nome fixo — o gêmeo
+mecânico do `no_snapshot_in_window` do laço), para que a seção 6 do diário e os gráficos/notas de
+`meme_render_bets.py` (abaixo) já contem o motivo à parte desde a primeira geração. Rodar à mão,
+para conferir antes do cron (dry-run por padrão; troca `--day` pelo dia a olhar):
+
+```bash
+ssh hunter-vps "cd /opt/project-hunter && ./compose.sh ops python \
+  infra/scripts/meme_reclassify_series_ended.py --day $(TZ=America/Sao_Paulo date -d yesterday +%F)"
+```
+
 **A rotina da manhã (orquestrador, do clone local):** puxar o patch e aplicá-lo na raiz do
 repositório, depois commitar por pathspec só o que ele tocou (diário meme do dia, páginas EXP-M*,
 INBOX, README da pasta, `lote-meme-<dia+1>.md`):

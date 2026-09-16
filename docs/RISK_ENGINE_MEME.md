@@ -882,6 +882,24 @@ Nada de "preenchido ao último preço visto".
     série/clone de ticker) não muda. `flow_v2/5` e `operator/5` (`0039`) ligam o filtro — a mesa passa a usá-lo,
     `operator/4` aposentado; `flow_v2/1`/`flow_v2/2` continuam medidos ao lado, previsão `descartar`.
 
+15. **A via rápida segue a moeda fixada além dos 300 s, e `time_stop` sem foto depois vira
+    `series_ended` (T4.33, KB-0113).** Medido em 15/09: `fast_lane.young_mints` largava toda moeda aos
+    300 s de vida, aposta aberta ou não — 91 % das séries de 15 s pararam exatamente aí (última foto
+    aos 292 s medianos), e 8 das 11 saídas `time_stop` do dia fecharam numa foto de até 32 min de
+    idade, sem nenhuma observação posterior — o fecho **foi** precificado, mas o rótulo dizia
+    `measured` de um instante que não existia mais. Duas mudanças, independentes:
+    - `young_mints` agora admite o conjunto **fixado** (`tracker.pinned` — aposta de papel aberta,
+      posição real aberta ou proposta pendente, T4.16b) até `MEME_FAST_LANE_PINNED_MAX_AGE_S`
+      (1 800 s por padrão), em vez do teto de 300 s que vale para as demais moedas; sem query nova
+      (o pin já é conhecido em memória pelo rastreador), custo medido +2 % de linhas/dia.
+    - O fechamento diário (`infra/scripts/meme_reclassify_series_ended.py`, o mesmo padrão auditado
+      do `meme_reclassify_indeterminate.py`) reclassifica um `time_stop` `measured` como
+      `outcome_quality = indeterminate` com `outcome_quality_reason = 'series_ended'` (nome fixo,
+      não frase — o gêmeo mecânico do `no_snapshot_in_window` do laço) quando `meme_features_1m` não
+      tem nenhuma linha precificada mais de 90 s depois do `exit_at` dentro dos 35 min seguintes.
+      A linha mantém seus números; a soma continua excluindo-a, agora por um motivo que se nomeia.
+      Dry-run por padrão; `--day`/`--bet-id` reaplicam sobre dias já fechados.
+
 ## 11. VM1–VM9 — as nove verificações do motor meme
 
 Equivalente das V1–V9 da T3.9 (`.claude/state/spec-T3.9-verificacoes.md`,

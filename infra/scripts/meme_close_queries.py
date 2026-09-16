@@ -76,12 +76,15 @@ _CLOSED_BETS = text(
     "ORDER BY b.entry_at, b.id"
 )
 """T4.15b: only **measured** closes feed the lessons — an ``indeterminate`` close
-(``rug_no_snapshot`` with no photo, T4.16) keeps its −1 R on the row but says
-nothing about the market; it is counted apart (``_INDETERMINATE``)."""
+(``rug_no_snapshot`` with no photo, T4.16; ``series_ended`` for a ``time_stop``
+priced on the series' last existing bar, T4.33) keeps its −1 R on the row but
+says nothing about the market; it is counted apart, by reason (``_INDETERMINATE``)."""
 _INDETERMINATE = text(
-    "SELECT count(*) AS n FROM meme_paper_bets b "
+    "SELECT coalesce(b.outcome_quality_reason, 'desconhecido') AS reason, count(*) AS n "
+    "FROM meme_paper_bets b "
     "WHERE b.status = 'closed' AND b.outcome_quality = 'indeterminate' "
-    "  AND b.entry_at >= :day_start AND b.entry_at < :day_end"
+    "  AND b.entry_at >= :day_start AND b.entry_at < :day_end "
+    "GROUP BY b.outcome_quality_reason"
 )
 _ACTIVE_SETS = text(
     "SELECT name || '/' || version AS rule_set, exp_ref, kind FROM meme_rule_sets "
@@ -284,9 +287,9 @@ async def gather_close(
             coverage_row = (await session.execute(_COVERAGE, window)).mappings().one()
             ticks = await _rows(session, _TICKS, window)
             operator = _operator(await _rows(session, _OPERATOR, window))
-            indeterminate = int(
-                (await session.execute(_INDETERMINATE, window)).mappings().one()["n"]
-            )
+            indeterminate_by_reason = {
+                str(r["reason"]): int(r["n"]) for r in await _rows(session, _INDETERMINATE, window)
+            }
     finally:
         await engine.dispose()
     return CloseInputs(
@@ -300,6 +303,7 @@ async def gather_close(
         reals=real_observed,
         all_time=all_time,
         predictions=predictions,
-        indeterminate=indeterminate,
+        indeterminate=sum(indeterminate_by_reason.values()),
+        indeterminate_by_reason=indeterminate_by_reason,
         repeat_dumper=lesson_repeat_dumper(bets),
     )

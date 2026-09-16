@@ -65,10 +65,9 @@ class SourcesState:
     trenches_patches_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     new_board_entries_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
     new_board_non_pump_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
-    """The declared blindness (T4.2d, item 3): listings on the site's ``new``
-    board in the last hour, and how many of them run on a program other than
-    ``pump`` — coins ``subscribeNewToken`` never announces and this radar never
-    tracks, by construction (8/50 were ``raydium_launchpad`` at 05:51 BRT)."""
+    """The declared blindness (T4.2d, item 3): listings on the site's ``new`` board
+    in the last hour, and how many run on a program other than ``pump`` — coins
+    ``subscribeNewToken`` never announces (8/50 were ``raydium_launchpad`` at 05:51 BRT)."""
     last_snapshot_observed_at: datetime | None = None
     last_snapshot_received_at: datetime | None = None
     fold_minute: datetime | None = None
@@ -90,10 +89,9 @@ class SourcesState:
     activity_dark_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     activity_skipped_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     """The batch loop (T4.2g, ``activity.py``): the last cycle's duration, coins
-    asked and covered by a ``1m`` reading, coins the route filled ``1m`` for,
-    the age of the SOL/USD quote used, batch calls in the minute, coins left
-    dark (``1m`` null in a cycle nobody's was filled) and cycles skipped
-    (the edge's block) in the minute."""
+    asked and covered by a ``1m`` reading, coins the route filled ``1m`` for, the
+    age of the SOL/USD quote used, batch calls in the minute, coins left dark
+    (``1m`` null in a cycle nobody's was filled) and cycles skipped (edge block)."""
     tape_cycle_s: float | None = None
     tape_planned: int | None = None
     tape_tracked_mints: int | None = None
@@ -128,6 +126,7 @@ class SourcesState:
     fast_lane_cycle_s: float | None = None
     fast_lane_reads_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     fast_lane_calls_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    fast_lane_pinned_mints: int | None = None
     tracked_pinned: int | None = None
     tracked_capped_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     """T4.16b: how many of the tracked set are pinned right now (an open paper
@@ -227,12 +226,13 @@ class SourcesState:
         self.swap_api_blocked_until = blocked_until
 
     def record_fast_cycle(
-        self, at: datetime, *, mints: int, read: int, calls: int, duration_s: float
+        self, at: datetime, *, mints: int, read: int, calls: int, duration_s: float, pinned: int = 0
     ) -> None:
         self.fast_lane_mints = mints
         self.fast_lane_cycle_s = duration_s
         self.fast_lane_reads_60s.add(at, read)
         self.fast_lane_calls_60s.add(at, calls)
+        self.fast_lane_pinned_mints = pinned
 
     def record_tracker_prune(self, at: datetime, *, pinned: int, capped: int) -> None:
         """T4.16b: the poll loop's own ``tracker.prune`` — a gauge (how many
@@ -337,6 +337,7 @@ class SourcesState:
             "fast_lane_cycle_s": self.fast_lane_cycle_s,
             "fast_lane_reads_60s": self.fast_lane_reads_60s.total(now),
             "fast_lane_calls_60s": self.fast_lane_calls_60s.total(now),
+            "fast_lane_pinned_mints": self.fast_lane_pinned_mints,
             # T4.16b: the pinned set the tracker's cap and window may not touch.
             "tracked_pinned": self.tracked_pinned,
             "tracked_capped_60s": self.tracked_capped_60s.total(now),
