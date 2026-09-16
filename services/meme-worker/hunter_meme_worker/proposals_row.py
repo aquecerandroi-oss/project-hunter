@@ -87,7 +87,9 @@ class GateRow:
     event_source: str | None = None
     event_confidence: str | None = None
     event_observed_at: datetime | None = None
-    """The earliest ``meme_events`` row matched to this mint (``0041``,
+    event_match_kind: str | None = None
+    """T4.26b: ``"buy"``/``"avoid"``, from ``meme_event_matches``. The earliest
+    ``meme_events`` row matched to this mint (``0041``,
     ``events.py``'s per-minute job), if any — ``None`` for the overwhelming
     majority of rows judged."""
 

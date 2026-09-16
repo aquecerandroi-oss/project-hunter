@@ -313,6 +313,13 @@ Todos os checks avaliáveis são registrados em `decision.checks[]` como
 `{name, state, value, limit, input_ts, message}`, **mesmo depois do primeiro reprovado** — igual à
 §3 do contrato SPOT. `state ∈ passed | failed | unavailable`, e `unavailable` **reprova**.
 
+> **Não confundir com o portão de evento do Lab.** A tabela abaixo é a admissão on-chain
+> (`hunter_risk_meme`, este documento). O portão de pesquisa `event_v0/1`
+> (`hunter_indicators.meme.event_gate`, EXP-M8) é anterior a ela, na proposta, e tem suas próprias
+> recusas — `no_event` e, desde a T4.26b, `event_avoid` (um evento cujo `notes->>'action' = 'avoid'`
+> casou esse mint: o casamento em si já é um aviso, nunca um sinal de compra). Documentado em
+> `docs/DATABASE.md` §52.3–52.4, não nesta tabela.
+
 | # | Check | Reprova quando | Nome da recusa |
 |---|---|---|---|
 | 1 | `kill_switch` | efetivo ∈ {TRADING_DISABLED, EMERGENCY}, ou trava diária latched | `kill_switch_blocked`, `daily_loss_cap_latched` |

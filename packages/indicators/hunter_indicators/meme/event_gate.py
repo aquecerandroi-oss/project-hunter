@@ -13,9 +13,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Final
 
-__all__ = ["ALLOWED_EVENT_KINDS", "NO_EVENT", "EventFeatures", "evaluate_event_gate"]
+__all__ = ["ALLOWED_EVENT_KINDS", "EVENT_AVOID", "NO_EVENT", "EventFeatures", "evaluate_event_gate"]
 
 NO_EVENT: Final = "no_event"
+EVENT_AVOID: Final = "event_avoid"
 
 ALLOWED_EVENT_KINDS: Final = ("public_figure_launch", "exchange_listing", "brand_launch")
 """EXP-M8's own three: the announcement kinds the $TRUMP case's shape names —
@@ -35,14 +36,21 @@ class EventFeatures:
     title: str | None = None
     source: str | None = None
     observed_at: datetime | None = None
+    match_kind: str | None = None
+    """T4.26b: ``"avoid"`` when the matched event itself is a warning (a clone
+    viveiro, KB-0100 event 8) — ``None``/``"buy"`` otherwise."""
 
 
 def evaluate_event_gate(features: EventFeatures, *, require_event: bool) -> tuple[str, ...]:
-    """Off by default. On, refuses :data:`NO_EVENT` unless the matched event is
-    ``confirmed`` and one of :data:`ALLOWED_EVENT_KINDS` — a ``rumor`` or a
+    """Off by default. On, refuses :data:`EVENT_AVOID` outright — an event
+    that named this mint as a warning is never a buy signal, whatever its
+    kind or confidence — then :data:`NO_EVENT` unless the matched event is
+    ``confirmed`` and one of :data:`ALLOWED_EVENT_KINDS`: a ``rumor`` or a
     ``reported`` mirror is not enough, and neither is a ``viral_post``."""
     if not require_event:
         return ()
+    if features.match_kind == "avoid":
+        return (EVENT_AVOID,)
     if features.confidence == "confirmed" and features.kind in ALLOWED_EVENT_KINDS:
         return ()
     return (NO_EVENT,)

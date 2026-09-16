@@ -110,6 +110,23 @@ Prometer detecção de "próximo $TRUMP" — isto é pesquisa sobre uma cauda ra
 dinheiro real antes da régua. Ajustar o portão de evento (quais `kind`/`confidence` contam) olhando os
 primeiros casos (KB-0092). Tratar `reported`/`rumor` como `confirmed` para aumentar a amostra.
 
+## Addendum — 16/09/2026 (T4.26b, KB-0100)
+
+A medição de hoje ([[11-KNOWLEDGE/KB-0100-evento-move-moeda-primeira-medida-16-09]]) achou o buraco
+estrutural na seção "Casamento evento ↔ moeda" acima: a janela "para frente, 60 min" só existe se o
+evento for registrado **antes** da moeda nascer, e o plantão registra **depois** do fato (latência
+mediana medida hoje: 172,8 min). Dos 8 eventos do dia, ARC tinha 60 moedas candidatas pela própria regra
+do job e casou zero; o único casamento real ligou um evento de "aviso" (clones "fundo/instituição") a
+um clone novo, sem nada impedir esse casamento de virar sinal de compra.
+
+Correção (não muda P1–P5 acima, que continuam congeladas): o job agora varre 72 h para trás
+(`MEME_EVENT_MATCH_WINDOW_H`) com 30 min de folga retroativa por moeda (`MEME_EVENT_MATCH_GRACE_MIN`),
+casamento passa a ser **um-para-muitos** (`meme_event_matches`, não mais o `mint` único de `meme_events`),
+e um evento com `notes->>'action' = 'avoid'` marca toda moeda que nomeia como `avoid` — o portão de
+evento recusa `event_avoid` incondicionalmente, mesmo que o `kind`/`confidence` do evento passassem.
+Backfill dos 8 eventos de hoje: `infra/scripts/meme_event.py rematch --hours 72 --apply` depois do
+deploy. Detalhe completo: `docs/DATABASE.md` §52.3, `.claude/state/notes-T4.26b.md`.
+
 ## Avaliação
 _(append-only; o fechamento diário acrescenta uma seção datada por dia com aposta fechada)_
 
@@ -118,7 +135,12 @@ _(append-only; o fechamento diário acrescenta uma seção datada por dia com ap
 `infra/migrations/versions/0041_meme_social.py`, `infra/migrations/ddl/{meme_social,meme_social_checks,meme_events}.py` ·
 `packages/core/hunter_core/db/models/{meme,meme_events,meme_social_checks}.py` ·
 `packages/exchange-adapters/hunter_exchanges/pumpfun/{social,normalize,models,board_models,indexer_rest}.py` ·
-`packages/indicators/hunter_indicators/meme/{identity,event_gate}.py` ·
-`services/meme-worker/hunter_meme_worker/{events,events_repo,proposals,proposals_identity,proposals_reasons,proposals_row,lab_models,lab_repo,lab_repo_fast}.py` ·
-`infra/scripts/meme_event.py` · `docs/DATABASE.md` §52 · `docs/PUMPFUN.md` §1.3/§3.1 ·
-[[00-INBOX/Hipoteses-do-plantao|M-P17, M-P33]] · `.claude/state/notes-T4.26.md`.
+`packages/indicators/hunter_indicators/meme/{identity,event_gate,event_match}.py` ·
+`services/meme-worker/hunter_meme_worker/{events,events_repo,events_config,proposals,proposals_identity,proposals_reasons,proposals_row,lab_models,lab_repo,lab_repo_fast}.py` ·
+`infra/scripts/{meme_event,meme_event_rematch}.py` ·
+`infra/migrations/versions/0043_meme_events_scan_cursor.py`,
+`infra/migrations/ddl/meme_event_matches.py` ·
+`docs/DATABASE.md` §52 · `docs/RISK_ENGINE_MEME.md` §4 · `docs/PUMPFUN.md` §1.3/§3.1 ·
+[[00-INBOX/Hipoteses-do-plantao|M-P17, M-P33]] ·
+[[11-KNOWLEDGE/KB-0100-evento-move-moeda-primeira-medida-16-09]] ·
+`.claude/state/notes-T4.26.md`, `.claude/state/notes-T4.26b.md`.

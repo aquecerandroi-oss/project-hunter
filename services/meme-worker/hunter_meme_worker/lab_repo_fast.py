@@ -28,8 +28,16 @@ if TYPE_CHECKING:
 
 __all__ = ["load_fast_gate_rows", "pedigree_for"]
 
+_EVENT_MATCH_LATERAL = (
+    "SELECT e.kind, e.title, e.source, e.confidence, e.observed_at, m.match_kind "
+    "FROM meme_event_matches m JOIN meme_events e ON e.id = m.event_id "
+    "WHERE m.mint = t.mint ORDER BY (m.match_kind = 'avoid') DESC, m.matched_at ASC LIMIT 1"
+)
+"""T4.26b: see ``lab_repo.py``'s own copy of this join — duplicated rather than
+imported, the existing convention between these two modules."""
+
 _FAST_ROWS = text(
-    "SELECT f.as_of, f.mint, f.snapshot_observed_at, f.snapshot_source, f.mcap_sol, "
+    "SELECT f.as_of, f.mint, f.snapshot_observed_at, f.snapshot_source, f.mcap_sol, "  # noqa: S608
     "       f.mcap_delta_60s, f.curve_progress_pct, f.progress_reason, f.progress_rising, "
     "       f.holders, f.holders_prev, f.holders_rising, f.holders_reason, "
     "       f.buys_60s, f.sells_60s, f.unique_buyers_60s, "
@@ -41,6 +49,7 @@ _FAST_ROWS = text(
     "       t.website, t.telegram, t.description, "
     "       ev.kind AS event_kind, ev.title AS event_title, ev.source AS event_source, "
     "       ev.confidence AS event_confidence, ev.observed_at AS event_observed_at, "
+    "       ev.match_kind AS event_match_kind, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
     "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol, "
     "       s.mayhem_enabled AS snapshot_mayhem_enabled "
@@ -48,8 +57,7 @@ _FAST_ROWS = text(
     "JOIN meme_tokens t ON t.mint = f.mint "
     "LEFT JOIN meme_curve_snapshots s ON s.mint = f.mint "
     "  AND s.observed_at = f.snapshot_observed_at AND s.source = f.snapshot_source "
-    "LEFT JOIN LATERAL (SELECT e.kind, e.title, e.source, e.confidence, e.observed_at "
-    "  FROM meme_events e WHERE e.mint = t.mint ORDER BY e.observed_at LIMIT 1) ev ON true "
+    f"LEFT JOIN LATERAL ({_EVENT_MATCH_LATERAL}) ev ON true "
     "WHERE f.as_of > :since AND f.as_of <= :until AND f.features_version = :version "
     "ORDER BY f.as_of, f.mint"
 )
@@ -196,6 +204,7 @@ async def load_fast_gate_rows(
                 event_source=r["event_source"],
                 event_confidence=r["event_confidence"],
                 event_observed_at=r["event_observed_at"],
+                event_match_kind=r["event_match_kind"],
             )
         )
     return out

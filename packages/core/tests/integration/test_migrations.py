@@ -40,10 +40,13 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0042_meme_executable_mcap"
-"""``0042`` (T4.27) lands on ``0041`` (T4.26), which lands on ``0040`` (T4.24b);
-bumped here so the shared fixtures agree with the repository's actual chain
-rather than either task's private assumption."""
+HEAD_REVISION = "0043_meme_events_scan_cursor"
+"""``0043`` (T4.26b) lands on ``0042`` (T4.27), which lands on ``0041`` (T4.26),
+which lands on ``0040`` (T4.24b); bumped here so the shared fixtures agree
+with the repository's actual chain rather than any one task's private
+assumption."""
+EXECUTABLE_MCAP_REVISION = "0042_meme_executable_mcap"
+"""Where the ``0042`` tests stage now that ``0043`` sits on top (T4.26b)."""
 SOCIAL_REVISION = "0041_meme_social"
 """Where the ``0041`` tests stage now that ``0042`` sits on top (T4.27): ``"-1"``
 stopped meaning 0041 the day 0042 landed, exactly as every revision before."""
@@ -8095,25 +8098,33 @@ def test_0042_the_cap_never_exceeds_the_theoretical_and_never_exists_alone(
 
 def test_0042_refuses_a_downgrade_while_a_row_carries_the_cap(upgraded: str) -> None:
     """§17.7: a labelled Mayhem peak is evidence — count, name, stop."""
-    config = alembic_config(upgraded)
-    asyncio.run(
-        _write(
-            upgraded,
-            [
-                (
-                    _A_CAPPED_V3_ROW,
-                    {"mint": "X42_GUARD", "curve_reason": None, "mcap": "1981", "executable": "2"},
-                )
-            ],
+    # T4.26b: staged at 0042 since 0043 sits on top (``"-1"`` would reverse 0043).
+    with _staged_at(upgraded, EXECUTABLE_MCAP_REVISION) as config:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        _A_CAPPED_V3_ROW,
+                        {
+                            "mint": "X42_GUARD",
+                            "curve_reason": None,
+                            "mcap": "1981",
+                            "executable": "2",
+                        },
+                    )
+                ],
+            )
         )
-    )
-    try:
-        with pytest.raises(DBAPIError, match="carry an executable market cap"):
-            command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
-    finally:
-        asyncio.run(_write(upgraded, list(_CLEAN_0042)))
-    command.check(config)
+        try:
+            with pytest.raises(DBAPIError, match="carry an executable market cap"):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == EXECUTABLE_MCAP_REVISION, (
+                "the downgrade must not commit"
+            )
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0042)))
+    command.check(alembic_config(upgraded))
 
 
 def test_0042_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
@@ -8123,6 +8134,202 @@ def test_0042_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
         assert asyncio.run(_revision(upgraded)) == SOCIAL_REVISION
         assert asyncio.run(_scalars(upgraded, _EXECUTABLE_COLUMNS, {})) == []
         assert asyncio.run(_scalars(upgraded, _EXECUTABLE_CHECKS, {})) == []
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0043_meme_events_scan_cursor — an event may now name many coins (T4.26b)
+# ---------------------------------------------------------------------------
+
+_CLEAN_0043: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_event_matches WHERE mint LIKE 'X43_%'", {}),
+    ("DELETE FROM meme_events WHERE title LIKE 'T4.26b test%'", {}),
+    _RETENTION_MARKER,
+    ("DELETE FROM meme_tokens WHERE mint LIKE 'X43_%'", {}),
+)
+
+
+async def _write_returning(url: str, sql: str, params: dict[str, object]) -> list[str]:
+    """Like ``_write``, but for a single ``RETURNING`` statement whose result
+    must be read back — committed, unlike ``_scalars``' bare connection."""
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            result = await connection.execute(text(sql), params)
+            return [row[0] for row in result]
+    finally:
+        await engine.dispose()
+
+
+def _insert_test_event(event_id: str) -> tuple[str, dict[str, object]]:
+    return (
+        "INSERT INTO meme_events (id, observed_at, source, kind, title, symbol_hint, "
+        "confidence, recorded_by) VALUES (:id, now(), 'manual', 'incident', "
+        "'T4.26b test event', 'X43', 'rumor', 'test')",
+        {"id": event_id},
+    )
+
+
+def test_0043_adds_the_scan_cursor_column(upgraded: str) -> None:
+    present = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'meme_events' AND column_name = 'last_scanned_created_at'",
+            {},
+        )
+    )
+    assert present == ["last_scanned_created_at"]
+    command.check(alembic_config(upgraded))
+
+
+def test_0043_creates_meme_event_matches_with_its_grants_and_fks(upgraded: str) -> None:
+    columns = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'meme_event_matches' ORDER BY column_name",
+            {},
+        )
+    )
+    assert set(columns) == {"event_id", "mint", "match_kind", "matched_at"}
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_event_matches")) == {
+        "SELECT"
+    }
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_event_matches")) == {
+        "SELECT",
+        "INSERT",
+    }
+    command.check(alembic_config(upgraded))
+
+
+def test_0043_a_pair_matched_once_stays_matched(upgraded: str) -> None:
+    """T4.26b's own idempotency rule: ``ON CONFLICT (event_id, mint) DO
+    NOTHING`` — a second insert of the same pair changes nothing, and a
+    different ``match_kind`` on the retry does not overwrite the first."""
+    event_id = "00000000-0000-4000-8000-000000004301"
+    asyncio.run(
+        _write(
+            upgraded,
+            [(_A_TOKEN, {"mint": "X43_PAIR"}), _insert_test_event(event_id)],
+        )
+    )
+    try:
+        insert = (
+            "INSERT INTO meme_event_matches (event_id, mint, match_kind) "
+            "VALUES (:event_id, :mint, :match_kind) "
+            "ON CONFLICT (event_id, mint) DO NOTHING RETURNING mint"
+        )
+        first = asyncio.run(
+            _write_returning(
+                upgraded, insert, {"event_id": event_id, "mint": "X43_PAIR", "match_kind": "buy"}
+            )
+        )
+        assert first == ["X43_PAIR"]
+        second = asyncio.run(
+            _write_returning(
+                upgraded,
+                insert,
+                {"event_id": event_id, "mint": "X43_PAIR", "match_kind": "avoid"},
+            )
+        )
+        assert second == [], "the pair is already matched; the retry inserts nothing"
+        stored = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT match_kind FROM meme_event_matches WHERE event_id = :id AND mint = :mint",
+                {"id": event_id, "mint": "X43_PAIR"},
+            )
+        )
+        assert stored == ["buy"], "the first match_kind wins, never overwritten"
+    finally:
+        asyncio.run(
+            _write(upgraded, [("DELETE FROM meme_events WHERE id = :id", {"id": event_id})])
+        )
+        asyncio.run(_write(upgraded, list(_CLEAN_0043)))
+
+
+def test_0043_check_refuses_an_unknown_match_kind(upgraded: str) -> None:
+    event_id = "00000000-0000-4000-8000-000000004302"
+    asyncio.run(
+        _write(
+            upgraded,
+            [(_A_TOKEN, {"mint": "X43_BAD"}), _insert_test_event(event_id)],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="match_kind_is_a_known_label"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            "INSERT INTO meme_event_matches (event_id, mint, match_kind) "
+                            "VALUES (:id, :mint, 'sell')",
+                            {"id": event_id, "mint": "X43_BAD"},
+                        )
+                    ],
+                )
+            )
+    finally:
+        asyncio.run(
+            _write(upgraded, [("DELETE FROM meme_events WHERE id = :id", {"id": event_id})])
+        )
+        asyncio.run(_write(upgraded, list(_CLEAN_0043)))
+
+
+def test_0043_refuses_a_downgrade_while_a_match_exists(upgraded: str) -> None:
+    config = alembic_config(upgraded)
+    event_id = "00000000-0000-4000-8000-000000004303"
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_TOKEN, {"mint": "X43_GUARD"}),
+                _insert_test_event(event_id),
+                (
+                    "INSERT INTO meme_event_matches (event_id, mint, match_kind) "
+                    "VALUES (:id, :mint, 'buy')",
+                    {"id": event_id, "mint": "X43_GUARD"},
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="coin an event named cannot be forgotten"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(
+            _write(
+                upgraded,
+                [("DELETE FROM meme_event_matches WHERE event_id = :id", {"id": event_id})],
+            )
+        )
+        asyncio.run(
+            _write(upgraded, [("DELETE FROM meme_events WHERE id = :id", {"id": event_id})])
+        )
+        asyncio.run(_write(upgraded, list(_CLEAN_0043)))
+    command.check(config)
+
+
+def test_0043_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    config = alembic_config(upgraded)
+    command.downgrade(config, EXECUTABLE_MCAP_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == EXECUTABLE_MCAP_REVISION
+        assert not asyncio.run(_relation_exists(upgraded, "meme_event_matches"))
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM information_schema.columns "
+                "WHERE table_name = 'meme_events' AND column_name = 'last_scanned_created_at'",
+                {},
+            )
+        ) == ["0"]
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION

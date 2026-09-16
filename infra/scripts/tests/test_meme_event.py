@@ -9,6 +9,7 @@ canned id for the ``RETURNING``. Run: ``uv run pytest infra/scripts/tests/test_m
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -74,6 +75,9 @@ BASE = {
     "observed_at": datetime(2026, 9, 16, 1, 0, tzinfo=UTC),
     "notes": None,
     "recorded_by": "sexta-feira",
+    "tickers": None,
+    "keywords": None,
+    "action": None,
 }
 
 
@@ -106,6 +110,7 @@ async def test_apply_inserts_and_leaves_an_audit_row() -> None:
         ("kind", "rumor_only", "kind_unknown"),
         ("confidence", "sure", "confidence_unknown"),
         ("source", "twitter_dm", "source_unknown"),
+        ("action", "sell", "action_unknown"),
         ("recorded_by", None, "recorded_by_required"),
         ("recorded_by", "  ", "recorded_by_required"),
     ],
@@ -137,3 +142,32 @@ async def test_no_handle_writes_no_handle_hint() -> None:
     await script.run(conn, apply=True, **overrides)
     _, params = conn.statements[0]
     assert params["handle_hint"] is None and params["symbol_hint"] == "BUM"
+
+
+async def test_tickers_keywords_and_action_merge_into_notes() -> None:
+    script = _load("meme_event")
+    conn = FakeConn()
+    overrides = {
+        **BASE,
+        "tickers": "ARC, $ARCH ,ARCC",
+        "keywords": "circle, mainnet",
+        "action": "avoid",
+    }
+    await script.run(conn, apply=True, **overrides)
+    _, params = conn.statements[0]
+    notes = json.loads(params["notes"])
+    assert notes == {
+        "tickers": ["ARC", "$ARCH", "ARCC"],
+        "keywords": ["circle", "mainnet"],
+        "action": "avoid",
+    }
+
+
+async def test_tickers_and_keywords_merge_on_top_of_hand_written_notes() -> None:
+    script = _load("meme_event")
+    conn = FakeConn()
+    overrides = {**BASE, "notes": '{"custom": true}', "tickers": "ARC"}
+    await script.run(conn, apply=True, **overrides)
+    _, params = conn.statements[0]
+    notes = json.loads(params["notes"])
+    assert notes == {"custom": True, "tickers": ["ARC"]}

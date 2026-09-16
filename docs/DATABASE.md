@@ -7187,52 +7187,54 @@ que ficou de fora, por orçamento de tarefa.
 Global, sem RLS (§1.1), a forma de `meme_tokens`. `id`, `observed_at`, `source` (`plantao` | `baha` |
 `indexer_boost` | `dexscreener_profile` | `manual`), `kind` (`public_figure_launch` | `exchange_listing` |
 `viral_post` | `brand_launch` | `narrative` | `incident`), `title`, `url`, `mint` (nullable — FK para
-`meme_tokens`, o evento geralmente **precede** a moeda), `symbol_hint`, `handle_hint`, `confidence`
+`meme_tokens`, legado desde a T4.26b, ver 52.3), `symbol_hint`, `handle_hint`, `confidence`
 (`confirmed` | `reported` | `rumor`), `notes` jsonb, `recorded_by`, `created_at`, `matched_at`
-(bicondicional com `mint`: `(mint IS NULL) = (matched_at IS NULL)`). Índices: `ix_meme_events_observed_at`,
-`ix_meme_events_unmatched` (parcial, `mint IS NULL` — o scan do job de casamento) e `ix_meme_events_mint`
-(parcial, `mint IS NOT NULL`). `hunter_app` tem `SELECT`; `hunter_worker` tem `SELECT`/`INSERT`/`UPDATE`
-(escreve eventos automatizados no futuro e preenche `mint`/`matched_at`); a escrita manual de hoje é o
-script auditado `infra/scripts/meme_event.py add` (a conexão do owner, como `meme_rule_set.py`).
+(legado, biconditional com `mint`: `(mint IS NULL) = (matched_at IS NULL)`), `last_scanned_created_at`
+(T4.26b, `0043`: o cursor por evento do job de casamento — `NULL` até o primeiro tick). Índices:
+`ix_meme_events_observed_at`, `ix_meme_events_unmatched` (parcial, `mint IS NULL` — hoje sem uso pelo
+job, mantido por compatibilidade) e `ix_meme_events_mint` (parcial, `mint IS NOT NULL`). `hunter_app` tem
+`SELECT`; `hunter_worker` tem `SELECT`/`INSERT`/`UPDATE`; a escrita manual de hoje é o script auditado
+`infra/scripts/meme_event.py add` (a conexão do owner, como `meme_rule_set.py`).
 
 `meme_proposals` ganha `event_id` (FK para `meme_events`, nullable) — preenchido pelo job de casamento
-quando uma proposta nasce para um mint que um evento já nomeou.
+quando uma proposta nasce para um mint que um evento já nomeou (`buy` ou `avoid`, 52.3).
 
-### 52.3 O casamento evento ↔ moeda — bounded nos dois lados
+### 52.3 `meme_event_matches` — um evento pode nomear várias moedas (T4.26b, `0043`)
 
-Um job por minuto (`hunter_meme_worker.events.events_match_once`, sempre ligado enquanto o radar está,
-sem switch próprio — a consulta é barata e já vem guardada por savepoint) liga eventos sem `mint`
-(observados nos últimos 65 min — cinco além dos 60 do brief, para não perder um evento na borda de um
-tick) a `meme_tokens` criados nos 60 minutos **seguintes**, por `handle_hint` (`twitter ILIKE '%'||handle||'%'`)
-ou `symbol_hint` (`symbol = hint`). Um handle compartilhado por várias moedas (M-P33, os "irmãos") liga ao
-mais **antigo** criado dentro da janela (`row_number() OVER (PARTITION BY event ORDER BY created_at)`), as
-demais ficam para o próximo tick reconsiderar — nunca automaticamente, uma correção é humana. A leitura
-roda numa savepoint com `statement_timeout` de 5 s (a regra pós-incidente da T4.24b: toda consulta por
-tick é bounded e degrada para "não lido" em vez de matar o laço).
+**O que a medição de 16/09 (KB-0100) achou.** O job de `0041` só varria eventos com `observed_at` nos
+últimos 65 min contra moedas criadas nos 60 min **seguintes** — e o plantão registra depois do fato
+(latência mediana medida naquele dia: 172,8 min). Resultado: 8 eventos registrados, ARC com 60 moedas
+candidatas pela própria regra do job e **zero** casamentos; 874 propostas, 0 com `event_id`. O único
+casamento do dia ligou um evento de "aviso" a um clone novo — o oposto do que o gate deveria fazer com um
+aviso.
+
+**A correção.** `hunter_meme_worker.events_repo.match_events_once` varre todo evento com `observed_at`
+dentro de `MEME_EVENT_MATCH_WINDOW_H` horas (padrão 72) e lê `meme_tokens` criados desde
+`GREATEST(last_scanned_created_at, observed_at − MEME_EVENT_MATCH_GRACE_MIN minutos)` (padrão 30 min de
+folga retroativa) até agora — uma única consulta por tick, com piso no menor cursor entre os eventos
+ativos (`ix_meme_tokens_created_at`, sem coluna nova). O cruzamento evento × moeda roda em Python
+(`hunter_indicators.meme.event_match`, puro): símbolo (maiúsculo, `$` removido) na lista de tickers do
+evento (`symbol_hint` **e** `notes->'tickers'`), **ou** nome batendo um regex de fronteira de palavra dos
+tickers/`notes->'keywords'`, **ou** handle do twitter igual ao `handle_hint`. Cada par `(event_id, mint)`
+casado uma vez fica casado — `meme_event_matches` grava com `ON CONFLICT DO NOTHING`, nunca reescreve
+`match_kind`. O cursor avança para "agora" a cada tick, casando ou não, para nunca reler a mesma fatia.
+
+`match_kind` é `buy` (padrão) ou `avoid` quando `notes->>'action' = 'avoid'` — o evento 8 do KB-0100 (o
+viveiro de clones "fundo/instituição") é exatamente esse caso: marca **todas** as moedas que nomeia como
+aviso, nunca como sinal de compra. `infra/scripts/meme_event.py add --tickers/--keywords/--action` escreve
+essas três chaves em `notes`; `--notes` continua aceito como JSON livre.
+
+Backfill: `infra/scripts/meme_event.py rematch --hours 72 [--apply]` roda a mesma regra por fora do laço
+(dry-run por padrão, audita em `system_events` no apply) — o jeito de casar os 8 eventos de hoje depois do
+deploy, sem esperar o relógio.
 
 **O plano, medido a 150 007 linhas em `meme_tokens`** (`test_events_persistence.py::
-test_explain_the_matching_query_uses_the_created_at_index_at_100k_rows`, dados sintéticos espalhados por
-~156 dias para que a janela de 60 min seja uma fatia, nunca uma varredura):
-
-```
-Update on meme_events
-  ->  Nested Loop
-        ->  Subquery Scan on c (rn = 1)
-              ->  WindowAgg (row_number() <= 1)
-                    ->  Sort (e.id, t.created_at)
-                          ->  Nested Loop
-                                ->  Index Scan using ix_meme_events_unmatched on meme_events e
-                                      Index Cond: (observed_at >= …)
-                                ->  Index Scan using ix_meme_tokens_created_at on meme_tokens t
-                                      Index Cond: (created_at BETWEEN e.observed_at AND e.observed_at + 60min)
-                                      Filter: (handle/symbol match)
-        ->  Index Scan using pk_meme_events on meme_events
-```
-
-Nenhum `Seq Scan` em `meme_tokens`: o laço externo é o índice parcial de `meme_events` (a tabela é
-minúscula — poucas linhas por dia, humanas ou do plantão) e o interno é o índice de `created_at` que já
-existia desde `0021`, sem coluna nova. Toda proposta aberta para o mint recém-casado recebe `event_id`
-na mesma passada (`link_proposals`, idempotente por `event_id IS NULL`).
+test_explain_the_candidate_scan_uses_the_created_at_index_at_100k_rows`; plano completo em
+`.claude/state/notes-T4.26b-explain.txt`, gerado pelo próprio teste): a leitura de candidatas usa `Index Scan using
+ix_meme_tokens_created_at`, nunca `Seq Scan` — o piso (`created_at > :floor`) faz o mesmo trabalho que a
+condição `BETWEEN` fazia na versão de `0041`, só que agora bounded pelo cursor em vez de por uma janela
+fixa de 60 min. Toda proposta aberta para o mint recém-casado recebe `event_id` na mesma passada
+(`link_proposals`, idempotente por `event_id IS NULL`), casado `buy` ou `avoid`.
 
 ### 52.4 O portão de identidade e o portão de evento — transversais, como o pedigree
 
@@ -7244,15 +7246,19 @@ de cada conjunto, nunca dentro do `EntryGate` congelado.
   `description_len`; `evaluate_identity_gate(require_twitter=…)` recusa `no_twitter` só quando o conjunto
   liga o parâmetro (padrão `false` em todo conjunto congelado).
 - `hunter_indicators.meme.event_gate.EventFeatures` — `kind`, `confidence`, `title`, `source`,
-  `observed_at`; `evaluate_event_gate(require_event=…)` recusa `no_event` a menos que o evento casado seja
-  `confirmed` **e** um de `public_figure_launch`/`exchange_listing`/`brand_launch`.
+  `observed_at`, `match_kind` (T4.26b). `evaluate_event_gate(require_event=…)` recusa `event_avoid`
+  incondicionalmente quando `match_kind = "avoid"` (o casamento em si já é um aviso, não importa
+  `kind`/`confidence`), senão `no_event` a menos que o evento casado seja `confirmed` **e** um de
+  `public_figure_launch`/`exchange_listing`/`brand_launch`.
 
 O bloco `reasons` de cada um só aparece quando o próprio conjunto liga o parâmetro correspondente
 (`spec.require_twitter`/`spec.require_event`) — a mesma regra que já vale para o bloco de linha e o de
 hype: um conjunto que não faz a pergunta não altera a decomposição congelada de outro (a invariante que
 `test_exp_m1_reasons_do_not_change_and_its_gate_still_takes_the_pedigree` já cobrava). As duas leituras
 vêm do mesmo `JOIN`/`LEFT JOIN LATERAL` que `lab_repo.py`/`lab_repo_fast.py` já fazem para o resto da
-identidade — nenhuma consulta nova por linha julgada.
+identidade — a partir de `0043` o `LATERAL` lê `meme_event_matches` (join com `meme_events`), preferindo
+um match `avoid` sobre qualquer `buy` quando os dois existem para o mesmo mint — nenhuma consulta nova por
+linha julgada.
 
 ### 52.5 `event_v0/1` — o conjunto que só compra ligado a um evento
 
@@ -7272,5 +7278,6 @@ A lane 2 do plantão passa a abrir com "eventos que podem dar bum nas próximas 
 um com `meme_event.py add`; o post-mortem semanal (houve moeda? em quanto tempo? o Lab viu? qual foi o
 máximo em 1 h/24 h?) alimenta a régua da EXP-M8. **Rótulos web pendentes** (fora desta tarefa —
 `apps/web/components/meme/labels.ts`): `twitter_kind` (`profile` → "perfil", `post` → "post", `community`
-→ "comunidade", `other` → "outro"), `event.kind` (os seis valores) e `event.confidence` (`confirmed` →
-"confirmado", `reported` → "reportado", `rumor` → "rumor").
+→ "comunidade", `other` → "outro"), `event.kind` (os seis valores), `event.confidence` (`confirmed` →
+"confirmado", `reported` → "reportado", `rumor` → "rumor") e, desde a T4.26b, `match_kind` (`buy` →
+"compra", `avoid` → "evitar").

@@ -158,6 +158,7 @@ def gate_reasons(
                 "title": event.title,
                 "source": event.source,
                 "observed_at": None if event.observed_at is None else event.observed_at.isoformat(),
+                "match_kind": event.match_kind,
             }
         )
     return reasons

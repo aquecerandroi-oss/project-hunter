@@ -118,6 +118,23 @@ def test_require_event_gates_on_kind_and_confidence(
         assert outcome.refusals == {"no_event": 1}
 
 
+def test_require_event_refuses_event_avoid_even_when_confirmed_and_allowed() -> None:
+    """T4.26b: an ``avoid``-kind match outranks kind/confidence entirely — the
+    same row that would otherwise pass ``test_require_event_gates_on_kind_and_
+    confidence`` above is refused once the match itself is a warning."""
+    spec = _spec_with(require_event=True)
+    row = _fast_row(
+        event_kind="public_figure_launch",
+        event_confidence="confirmed",
+        event_match_kind="avoid",
+    )
+    outcome = evaluate_gate(
+        spec, [row], now=NOW, ttl_s=120, already_open=frozenset(), pedigree={MINT: CLEAN}
+    )
+    assert outcome.drafts == []
+    assert outcome.refusals == {"event_avoid": 1}
+
+
 def test_params_default_params_still_have_no_identity_or_event_switch() -> None:
     """``PARAMS`` (EXP-M1's own) reads exactly as before this task started."""
     assert "require_twitter" not in PARAMS and "require_event" not in PARAMS

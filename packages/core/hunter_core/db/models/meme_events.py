@@ -105,7 +105,16 @@ class MemeEvent(Base, UUIDPrimaryKeyMixin):
 
     created_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
     matched_at: Mapped[datetime | None]
-    """When the per-minute job (or a human) set ``mint`` — biconditional with it."""
+    """When the per-minute job (or a human) set ``mint`` — biconditional with it.
+    Legacy (0041): the job no longer writes this pair (T4.26b, ``meme_event_matches``
+    is now the complete ledger); kept for any row a human already matched by hand."""
+
+    last_scanned_created_at: Mapped[datetime | None]
+    """T4.26b (``0043``): the per-event cursor — the matching job reads only
+    ``meme_tokens`` created after this instant, then advances it to ``now()``
+    whether or not the tick found a match, so a re-run never rescans the same
+    coins. ``NULL`` means "never scanned"; the job then starts at
+    ``observed_at`` minus its own backward grace."""
 
 
 __all__ = ["EVENT_CONFIDENCES", "EVENT_KINDS", "EVENT_SOURCES", "MemeEvent"]

@@ -44,4 +44,5 @@ def event_features_of(row: GateRow) -> EventFeatures:
         title=row.event_title,
         source=row.event_source,
         observed_at=row.event_observed_at,
+        match_kind=row.event_match_kind,
     )
