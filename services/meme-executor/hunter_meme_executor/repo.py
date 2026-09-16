@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
-from hunter_core.domain.types import uuid7
+from hunter_core.domain.types import utcnow, uuid7
 from hunter_meme_executor.repo_positions import (
     OpenPosition,
     close_position,
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = [
+    "RISK_SNAPSHOT_MAX_AGE_S",
     "Candidate",
     "OpenPosition",
     "OrderRow",
@@ -114,9 +115,22 @@ _TOKEN = text(
     "FROM meme_tokens WHERE mint = :mint"
 )
 _FEATURES = text(
-    "SELECT end_time, curve_volume_1m_sol, creator_sold, top10_share, bundled_share "
+    "SELECT end_time, curve_volume_1m_sol, creator_sold, top10_share "
     "FROM meme_features_1m WHERE mint = :mint ORDER BY end_time DESC LIMIT 1"
 )
+_RISK = text(
+    "SELECT bundled_share, observed_at FROM meme_risk_snapshots "
+    "WHERE mint = :mint AND bundled_share IS NOT NULL AND observed_at >= :since "
+    "ORDER BY observed_at DESC LIMIT 1"
+)
+"""``bundled_share`` lives on ``meme_risk_snapshots`` (the ``/in-memory-coin`` read,
+``0023``), never on ``meme_features_1m`` — the T4.14 query named the wrong table and
+the first live candidate would have raised ``UndefinedColumn`` (T4.28 finding). The
+newest measured value inside :data:`RISK_SNAPSHOT_MAX_AGE_S`; older or absent is
+``None`` and the engine refuses ``bundled_share_unmeasurable`` (§8: stale is absent)."""
+RISK_SNAPSHOT_MAX_AGE_S = 600
+"""Two of the reader's ``risk_min_interval_s`` (300 s, one read per mint per five
+minutes): a value older than the reader could have refreshed twice is not an input."""
 _INSERT_ORDER = text(
     "INSERT INTO meme_live_orders (id, proposal_id, side, client_order_id, attempt, intent, "
     "  admission, status, reason, received_at, admitted_at, updated_at) "
@@ -186,9 +200,13 @@ async def live_candidates(
     ]
 
 
-async def token_context(session: AsyncSession, mint: str) -> TokenContext:
+async def token_context(
+    session: AsyncSession, mint: str, *, now: datetime | None = None
+) -> TokenContext:
     token = (await session.execute(_TOKEN, {"mint": mint})).mappings().first()
     features = (await session.execute(_FEATURES, {"mint": mint})).mappings().first()
+    since = (now or utcnow()) - timedelta(seconds=RISK_SNAPSHOT_MAX_AGE_S)
+    risk = (await session.execute(_RISK, {"mint": mint, "since": since})).mappings().first()
     initial = None if token is None else token["initial_real_token_reserves"]
     return TokenContext(
         created_at=None if token is None else token["created_at"],
@@ -200,7 +218,7 @@ async def token_context(session: AsyncSession, mint: str) -> TokenContext:
         features_end_time=None if features is None else features["end_time"],
         creator_sold=None if features is None else features["creator_sold"],
         top10_share=None if features is None else _decimal(features["top10_share"]),
-        bundled_share=None if features is None else _decimal(features["bundled_share"]),
+        bundled_share=None if risk is None else _decimal(risk["bundled_share"]),
     )
 
 

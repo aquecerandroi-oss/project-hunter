@@ -39,13 +39,13 @@ from hunter_meme_executor.admission import (
     proposal_from,
     wallet_from,
 )
+from hunter_meme_executor.auto_approve import auto_approve_once, reject_if_auto
 from hunter_meme_executor.build import BuiltTrade, FillRecord, build_buy, decode_fills, fee_bps
 from hunter_meme_executor.chain import CurveRead, TokenAccountRead, WalletRead
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.repo import (
     Candidate,
-    count_live_buys,
     insert_order,
     insert_position,
     live_candidates,
@@ -56,6 +56,7 @@ from hunter_meme_executor.repo import (
     refuse_admitted_order,
     token_context,
 )
+from hunter_meme_executor.scope import ScopeUse, read_scope_use, requested_sol_of
 
 __all__ = ["entries_once", "handle_candidate"]
 
@@ -97,6 +98,7 @@ async def _refuse(
             admission=admission,
             now=now,
         )
+        await reject_if_auto(ctx, session, candidate, reason, now=now)
     ctx.state.entries_refused += 1
     ctx.state.last_refusal = reason
     logger.warning(
@@ -127,16 +129,16 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     if ctx.state.program_divergence is not None:  # T4.8b: never sign against an unknown program
         await _refuse(ctx, candidate, "program_upgraded", {"detail": ctx.state.program_divergence})
         return
-    if cfg.small_test_max_trades is not None:
+    scope: ScopeUse | None = None
+    small = mode.gates.small_test if mode.gates is not None else None
+    if small is not None:
+        # The written scope is two counters against the ledger (trades sent, SOL
+        # taken) and a clamp: the last buy never overshoots ``max_total_sol``.
+        requested = requested_sol_of(candidate.decision)
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-            done = await count_live_buys(session)
-        if done >= cfg.small_test_max_trades:
-            await _refuse(
-                ctx,
-                candidate,
-                "small_test_scope_exhausted",
-                {"max_trades": cfg.small_test_max_trades},
-            )
+            scope = await read_scope_use(session, small, requested_sol=requested)
+        if scope.exhausted is not None:
+            await _refuse(ctx, candidate, "small_test_scope_exhausted", scope.as_json())
             return
     pubkey = ctx.signer.pubkey
     try:
@@ -169,7 +171,11 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     fees = fee_bps(global_account)
     inputs = AdmissionInputs(
         proposal=proposal_from(
-            candidate, wallet_id=pubkey, limits=cfg.limits, priority_fee_sol=cfg.priority_fee_sol
+            candidate,
+            wallet_id=pubkey,
+            limits=cfg.limits,
+            priority_fee_sol=cfg.priority_fee_sol,
+            requested_cap_sol=None if scope is None else scope.requested_cap_sol,
         ),
         wallet=wallet_from(
             wallet_id=pubkey,
@@ -190,6 +196,8 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     if decision.checks and any(c.refusal == "daily_loss_cap_reached" for c in decision.checks):
         await ctx.kill.latch("daily_loss_cap_reached")
     admission = decision.to_jsonable()
+    if scope is not None:
+        admission["small_test"] = scope.as_json()
     if not decision.approved or decision.sizing is None:
         await _refuse(ctx, candidate, decision.first_refusal or "refused", admission)
         return
@@ -236,7 +244,9 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     if ctx.kill.blocks_entries:
         reason = "kill_switch_blocked_before_signing"
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-            await refuse_admitted_order(session, key, reason=reason, now=utcnow())
+            refused_at = utcnow()
+            await refuse_admitted_order(session, key, reason=reason, now=refused_at)
+            await reject_if_auto(ctx, session, candidate, reason, now=refused_at)
         ctx.state.entries_refused += 1
         ctx.state.last_refusal = reason
         logger.warning(
@@ -320,6 +330,9 @@ async def entries_once(ctx: ExecutorContext) -> None:
     now = utcnow()
     ctx.state.last_entries_tick_at = now
     await ctx.kill.refresh()
+    # T4.28 stage 1: what the robot opens now is a live candidate of this same
+    # tick — it goes through the admission below like any click would.
+    await auto_approve_once(ctx, now=now)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         candidates = await live_candidates(session, now=now)
     for candidate in candidates:

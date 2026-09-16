@@ -12,6 +12,10 @@
 3. Any of those absent ⇒ :class:`MemeLiveTradingRefused` with the reason
    (``gates_file_missing``, ``policy_missing``, ``rpc_url_missing``,
    ``secret_key_missing``, …) and the process does not exist.
+4. ``MEME_LIVE_AUTO_APPROVE`` (T4.28, stage 1) is read only after 1–2 and only
+   with a written small test in the gates: on without one ⇒
+   ``auto_approve_needs_small_test``, before the key; on without the live flag
+   ⇒ ignored (an inert executor opens nothing).
 """
 
 from __future__ import annotations
@@ -29,10 +33,11 @@ from hunter_core.execution.meme.signer import MemeSigner, boot_meme_execution
 from hunter_exchanges.pumpfun.tx_rpc import MAINNET_PUBLIC_RPC_URL
 from hunter_risk_meme import MEME_PAPER_V0, MemeLimits, MemePolicyMissing, limits_from_env
 
-__all__ = ["INSTANCE", "ROLE", "ExecutorConfig", "boot"]
+__all__ = ["ENV_AUTO_APPROVE", "INSTANCE", "ROLE", "ExecutorConfig", "boot"]
 
 ROLE = "meme"
 INSTANCE = "executor"
+ENV_AUTO_APPROVE = "MEME_LIVE_AUTO_APPROVE"
 """``hb:meme:executor`` — the brief's key. A fixed instance: one wallet, one
 signer, one process (two would race the same signing locks by design)."""
 
@@ -60,6 +65,13 @@ class ExecutorConfig:
     compute_unit_limit: int = 400_000
     compute_unit_price_micro_lamports: int = 10_000
     small_test_max_trades: int | None = None
+    small_test_max_total_sol: Decimal | None = None
+    auto_approve: bool = False
+    """T4.28 stage 1 — ``MEME_LIVE_AUTO_APPROVE``: the executor opens the desk's
+    ``operator`` proposal as live without the click. Read only with the live flag
+    on **and** a written small test in the gates (``auto_approve_needs_small_test``
+    otherwise); inert without the live flag."""
+    auto_approve_max_per_hour: int = 5
 
     @property
     def priority_fee_sol(self) -> Decimal:
@@ -133,6 +145,15 @@ def boot(
         )
     if mode.live and cluster == "mainnet" and "devnet" in rpc_url:
         raise MemeLiveTradingRefused("rpc_url_cluster_mismatch", "devnet URL with cluster=mainnet")
+    small = mode.gates.small_test if mode.gates is not None else None
+    auto_approve = parse_flag(env.get(ENV_AUTO_APPROVE)) and mode.live
+    if auto_approve and small is None:
+        # Stage 1 exists only inside a scope the owner wrote; without one the flag
+        # is a contradiction, refused before the key is read.
+        raise MemeLiveTradingRefused(
+            "auto_approve_needs_small_test",
+            f"{ENV_AUTO_APPROVE} is on but meme_gates.json has no small_test_authorization",
+        )
     mode, signer = boot_meme_execution(env, today=today)
     kill_file = (env.get("MEME_KILL_FILE") or "").strip() or None
     config = ExecutorConfig(
@@ -151,11 +172,10 @@ def boot(
         compute_unit_price_micro_lamports=_int(
             env, "MEME_COMPUTE_UNIT_PRICE_MICRO_LAMPORTS", 10_000
         ),
-        small_test_max_trades=(
-            mode.gates.small_test.max_trades
-            if mode.gates is not None and mode.gates.small_test is not None
-            else None
-        ),
+        small_test_max_trades=None if small is None else small.max_trades,
+        small_test_max_total_sol=None if small is None else small.max_total_sol,
+        auto_approve=auto_approve,
+        auto_approve_max_per_hour=max(0, _int(env, "MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR", 5)),
     )
     return config, mode, signer
 

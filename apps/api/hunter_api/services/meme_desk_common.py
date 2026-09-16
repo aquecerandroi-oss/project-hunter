@@ -19,12 +19,13 @@ from fastapi import status
 from hunter_api.errors import HunterError
 from hunter_api.schemas.meme_desk import CommandOut, ProposalOut
 from hunter_api.services.meme_desk_idempotency import ReplayRecord, key_hash
-from hunter_api.services.meme_desk_out import (
-    build_command_out,
-    build_desk_row_out,
-    decimal_or_none,
-)
+from hunter_api.services.meme_desk_out import build_command_out, build_desk_row_out
 from hunter_core.audit import AuditEvent, get_audit_sink
+from hunter_core.execution.meme.approval import (
+    live_mode_refusal,
+    max_sol_per_bet_of,
+    size_cap_refusal,
+)
 
 if TYPE_CHECKING:
     from hunter_api.auth.rbac import OrgContext
@@ -143,9 +144,11 @@ def enforce_max_sol_per_bet(rule_set: RuleSetRow | None, size_sol: Decimal) -> N
     """Contract §Rotas: 422 ``exceeds_max_sol_per_bet`` when the decided size
     is above the set's own ceiling. A set with no ceiling in ``params`` is not
     a ceiling of zero — nothing is refused for it here; the loop applies the
-    rest of the set's ceilings on fill."""
-    cap = decimal_or_none(rule_set.params.get("max_sol_per_bet")) if rule_set else None
-    if cap is not None and size_sol > cap:
+    rest of the set's ceilings on fill. The rule is the shared one
+    (``hunter_core.execution.meme.approval``, T4.28) — the executor's stage-1
+    auto-approval applies exactly it."""
+    cap = max_sol_per_bet_of(rule_set.params) if rule_set else None
+    if size_cap_refusal(cap, size_sol) is not None:
         raise DeskRefusedError(
             f"size_sol {size_sol} exceeds the rule set's max_sol_per_bet {cap} "
             "(reason: exceeds_max_sol_per_bet)"
@@ -158,7 +161,7 @@ def enforce_live_mode(body: DeskParamsIn, *, live_enabled: bool) -> str:
     without it the refusal is named, 422 ``meme_live_disabled``. Returns the mode
     to persist. The API never signs: the executor admits the row again with its
     own flag and the §12 gates."""
-    if body.mode == "live" and not live_enabled:
+    if live_mode_refusal(body.mode, live_enabled=live_enabled) is not None:
         raise DeskRefusedError(
             "mode 'live' needs ENABLE_MEME_LIVE_TRADING on the API (reason: meme_live_disabled)"
         )

@@ -65,14 +65,24 @@ def _decimal(value: Any, default: Decimal | None = None) -> Decimal | None:
 
 
 def proposal_from(
-    candidate: Candidate, *, wallet_id: str, limits: MemeLimits, priority_fee_sol: Decimal
+    candidate: Candidate,
+    *,
+    wallet_id: str,
+    limits: MemeLimits,
+    priority_fee_sol: Decimal,
+    requested_cap_sol: Decimal | None = None,
 ) -> MemeEntryProposal:
+    """``requested_cap_sol`` (T4.28) is what the written scope still allows: the
+    request is clamped to it so ``max_total_sol`` is never overshot by the last buy."""
     decision = candidate.decision
+    requested = _decimal(decision.get("size_sol"), _ZERO) or _ZERO
+    if requested_cap_sol is not None:
+        requested = min(requested, requested_cap_sol)
     return MemeEntryProposal(
         proposal_id=candidate.id,
         wallet_id=wallet_id,
         mint=candidate.mint,
-        requested_sol=_decimal(decision.get("size_sol"), _ZERO) or _ZERO,
+        requested_sol=requested,
         max_slippage_pct=limits.max_slippage_pct,
         priority_fee_sol=priority_fee_sol,
         mode="live",

@@ -18,8 +18,8 @@ import json
 import random
 import threading
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass, field, replace
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -34,8 +34,9 @@ from sqlalchemy.exc import ProgrammingError
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import KillSwitchState
+from hunter_core.execution.meme.approval import AUTO_STAGE1_DECIDED_BY
 from hunter_core.execution.meme.base58 import b58encode
-from hunter_core.execution.meme.gates import MemeExecutionMode
+from hunter_core.execution.meme.gates import MemeExecutionMode, MemeGates, SmallTestAuthorization
 from hunter_core.execution.meme.journal import SigningLocked
 from hunter_core.execution.meme.signer import ENV_SECRET_KEY, MemeSigner
 from hunter_exchanges.pumpfun.decode import BondingCurveAccount
@@ -46,6 +47,7 @@ from hunter_meme_executor.config import ExecutorConfig
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.entries import entries_once
 from hunter_meme_executor.exits import exits_once
+from hunter_meme_executor.heartbeat import heartbeat_fields
 from hunter_meme_executor.journal_db import PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.repo import TokenContext, open_positions
@@ -197,14 +199,43 @@ class Harness:
     redis: FakeRedis
 
 
+def _small_test(max_total_sol: str = "0.25", max_trades: int = 5) -> SmallTestAuthorization:
+    return SmallTestAuthorization(
+        authorized_by="everton",
+        max_sol_per_trade=Decimal("0.05"),
+        max_total_sol=Decimal(max_total_sol),
+        max_trades=max_trades,
+        expires_at=date(2026, 9, 18),
+        decision_note="obsidian/06-DECISIONS/2026-09-12-teste-pequeno-meme-real.md",
+    )
+
+
+def _gates_with(small_test: SmallTestAuthorization) -> MemeGates:
+    day = date(2026, 9, 12)
+    return MemeGates(
+        engineering_date=day,
+        engineering_evidence="notes-T4.14",
+        evidence_date=day,
+        evidence_evidence="EXP-M1 open",
+        owner_date=day,
+        signed_by="everton",
+        signed_at=day,
+        valid_until=date(2026, 10, 12),
+        small_test=small_test,
+    )
+
+
 def _context(
     session_factory: async_sessionmaker[AsyncSession],
     signer: MemeSigner,
     redis: FakeRedis,
     *,
     live: bool = True,
+    auto: SmallTestAuthorization | None = None,
+    allow_send: bool = True,
 ) -> Harness:
-    rpc = FakeRpc()
+    """``auto`` (T4.28) arms stage 1: the written scope in the gates and the flag on."""
+    rpc = FakeRpc(allow_send=allow_send)
     chain = FakeChain(rpc, MINT, CREATOR)
     config = ExecutorConfig(
         live=live,
@@ -213,6 +244,9 @@ def _context(
         limits=limits_from_env(POLICY),
         system_kill_switch=KillSwitchState.ACTIVE,
         kill_file=None,
+        auto_approve=auto is not None,
+        small_test_max_trades=None if auto is None else auto.max_trades,
+        small_test_max_total_sol=None if auto is None else auto.max_total_sol,
     )
     loop = asyncio.get_running_loop()
     written: list[dict[str, str]] = []
@@ -222,7 +256,7 @@ def _context(
 
     ctx = ExecutorContext(
         config=config,
-        mode=MemeExecutionMode(live=live, gates=None),
+        mode=MemeExecutionMode(live=live, gates=None if auto is None else _gates_with(auto)),
         signer=signer,
         session_factory=session_factory,
         chain=chain,
@@ -275,6 +309,57 @@ async def _plant_proposal(
     return proposal_id
 
 
+async def _plant_operator_proposal(
+    engine: AsyncEngine, *, proposed_at: datetime, size_sol: str = "0.01", ttl_s: int = 180
+) -> str:
+    """What the radar's gate writes for the desk (T4.19): a ``proposed`` row under
+    the **active** ``operator`` set, ``mode = 'paper'``, nobody has decided."""
+    proposal_id = str(uuid4())
+    async with engine.begin() as connection:
+        rule_set = await connection.scalar(
+            text(
+                "SELECT id FROM meme_rule_sets WHERE kind = 'operator' AND status = 'active' "
+                "ORDER BY version DESC LIMIT 1"
+            )
+        )
+        assert rule_set is not None, "head must seed exactly one active operator set"
+        await connection.execute(
+            text(
+                "INSERT INTO meme_tokens (mint, first_seen_source, first_seen_at, last_seen_at, created_at, "
+                "  creator, initial_real_token_reserves, progress_denominator_source, total_supply) "
+                "VALUES (:mint, 'pumpportal_ws', :t, :t, :t, :creator, 793100000, 'observed_virgin', 1000000000) "
+                "ON CONFLICT (mint) DO NOTHING"
+            ),
+            {"mint": MINT, "t": proposed_at - timedelta(seconds=120), "creator": CREATOR},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO meme_proposals (id, mint, rule_set_id, origin, status, proposed_at, expires_at, "
+                "  features_end_time, quote, reasons, suggested, decision, decided_by, decided_at, mode) "
+                "VALUES (:id, :mint, :rs, 'rules', 'proposed', :proposed, :expires, :fet, '{}', "
+                "  '[]', CAST(:suggested AS jsonb), NULL, NULL, NULL, 'paper')"
+            ),
+            {
+                "id": proposal_id,
+                "mint": MINT,
+                "rs": rule_set,
+                "proposed": proposed_at,
+                "expires": proposed_at + timedelta(seconds=ttl_s),
+                "fet": proposed_at - timedelta(seconds=15),
+                "suggested": json.dumps(
+                    {
+                        "size_sol": size_sol,
+                        "target_x": "3",
+                        "trailing_pct": "35",
+                        "max_hold_s": 1800,
+                        "manual_plan": "Comprar 0,01 SOL de X ate ...",
+                    }
+                ),
+            },
+        )
+    return proposal_id
+
+
 async def _rows(engine: AsyncEngine, sql: str, **params: Any) -> list[dict[str, Any]]:
     async with engine.connect() as connection:
         return [dict(r) for r in (await connection.execute(text(sql), params)).mappings()]
@@ -300,7 +385,13 @@ async def harness(
     async with db_engine.begin() as connection:
         await connection.execute(text("DELETE FROM meme_live_positions"))
         await connection.execute(text("DELETE FROM meme_live_orders"))
-        await connection.execute(text("DELETE FROM meme_proposals WHERE mode = 'live'"))
+        await connection.execute(
+            text(
+                "DELETE FROM meme_proposals WHERE mode = 'live' "
+                "OR (status = 'proposed' AND mint = :mint)"
+            ),
+            {"mint": MINT},
+        )
         await connection.execute(
             text(
                 "UPDATE meme_live_kill_switch SET state = 'ACTIVE', reason = NULL, latched_at = NULL, "
@@ -655,3 +746,266 @@ async def test_the_daily_latch_can_bite_again_after_the_owner_released_it(
         "SELECT released_at, released_by FROM meme_live_kill_switch WHERE scope = 'wallet'",
     )
     assert row[0]["released_at"] is None and row[0]["released_by"] is None
+
+
+async def test_token_context_reads_the_real_schema_and_the_bundled_share_from_the_risk_read(
+    db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.28 finding: ``bundled_share`` is a column of ``meme_risk_snapshots`` (the
+    ``/in-memory-coin`` read, ``0023``), never of ``meme_features_1m`` — the T4.14
+    query named it on the wrong table and every test monkeypatched ``token_context``,
+    so the first live candidate on the VPS would have raised ``UndefinedColumn`` and
+    taken the entry loop down. Read here with no fake: absent ⇒ ``None`` (the engine
+    refuses ``bundled_share_unmeasurable``), present and fresh ⇒ the value."""
+    from hunter_meme_executor.repo import token_context
+
+    now = datetime.now(UTC)
+    await _plant_operator_proposal(db_engine, proposed_at=now)  # plants the token row too
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        context = await token_context(session, MINT)
+    assert context.created_at is not None and context.bundled_share is None
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO meme_risk_snapshots (observed_at, mint, received_at, source, bundled_share, raw) "
+                "VALUES (:t, :mint, :t, 'pumpfun_rest', 0.123456, '{}'::jsonb)"
+            ),
+            {"t": now - timedelta(seconds=30), "mint": MINT},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO meme_risk_snapshots (observed_at, mint, received_at, source, bundled_share, raw) "
+                "VALUES (:t, :mint, :t, 'pumpfun_rest', 0.9, '{}'::jsonb)"
+            ),
+            {"t": now - timedelta(hours=2), "mint": MINT},
+        )
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        fresh = await token_context(session, MINT)
+    assert fresh.bundled_share == Decimal("0.123456"), "the newest read, not the stale one"
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text("DELETE FROM meme_risk_snapshots WHERE mint = :mint AND observed_at >= :t"),
+            {"mint": MINT, "t": now - timedelta(minutes=5)},
+        )
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        stale = await token_context(session, MINT)
+    assert stale.bundled_share is None, "a two-hour-old read is not an input (§8)"
+
+
+# ---------------------------------------------------------------- T4.28 stage 1
+
+
+async def _proposal(engine: AsyncEngine, proposal_id: str) -> dict[str, Any]:
+    return (
+        await _rows(
+            engine,
+            "SELECT status, mode, decided_by, decided_at, decision FROM meme_proposals WHERE id = :p",
+            p=proposal_id,
+        )
+    )[0]
+
+
+async def test_stage_1_opens_the_operator_proposal_as_live_admits_it_and_buys(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The whole path without the click: ``proposed``/``paper`` → the executor's own
+    approval (the click's statement, ``decided_by = executor:auto_stage1``,
+    ``decision = suggested``) → the unchanged admission → simulate → sign → the
+    fake send → confirmed order → open position — in one tick. A second tick
+    writes nothing (idempotent on the proposal)."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    proposal_id = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    proposal = await _proposal(db_engine, proposal_id)
+    assert proposal["status"] == "approved" and proposal["mode"] == "live"
+    assert proposal["decided_by"] == AUTO_STAGE1_DECIDED_BY
+    assert proposal["decision"]["size_sol"] == "0.01"
+    assert proposal["decision"]["manual_plan"].startswith("Comprar")
+    assert proposal["decision"]["note"].startswith("auto_stage1")
+    orders = await _rows(
+        db_engine, "SELECT * FROM meme_live_orders WHERE proposal_id = :p", p=proposal_id
+    )
+    assert len(orders) == 1 and orders[0]["status"] == "confirmed", orders
+    assert orders[0]["admission"]["approved"] is True
+    assert orders[0]["admission"]["small_test"]["trades_done"] == 0
+    assert orders[0]["admission"]["small_test"]["requested_clamped"] is False
+    assert len(armed.rpc.sent) == 1
+    positions = await _rows(
+        db_engine, "SELECT * FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+    )
+    assert len(positions) == 1 and positions[0]["status"] == "open"
+    assert positions[0]["params"]["decided_by"] == AUTO_STAGE1_DECIDED_BY
+    assert armed.ctx.state.auto_approved == 1 and armed.ctx.state.auto_rejected == 0
+    await entries_once(armed.ctx)
+    assert len(armed.rpc.sent) == 1
+    assert armed.ctx.state.auto_approved == 1
+    hb = await heartbeat_fields(armed.ctx)
+    assert hb["auto_approve"] == "true" and hb["auto_approved_1h"] == "1"
+    assert hb["small_test_trades_done"] == "1"
+    assert Decimal(hb["small_test_used_sol"]) == Decimal(
+        orders[0]["fill"]["buy_total_lamports"]
+    ) / (Decimal(10**9))
+
+
+async def test_stage_1_rejects_by_name_what_its_own_admission_refuses(
+    harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(d): the robot opened it, the 25 checks refused it (here: ``bundled_share``
+    not measured) — the ``refused`` order is written **and** the proposal is
+    ``rejected`` with the reason, ``decided_by`` still the robot's."""
+    import hunter_meme_executor.entries as entries_module
+
+    async def unmeasured(_session: AsyncSession, _mint: str) -> TokenContext:
+        full = _full_token_context(datetime.now(UTC))
+        return replace(full, bundled_share=None)
+
+    monkeypatch.setattr(entries_module, "token_context", unmeasured)
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    proposal_id = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    proposal = await _proposal(db_engine, proposal_id)
+    assert proposal["status"] == "rejected" and proposal["mode"] == "live"
+    assert proposal["decided_by"] == AUTO_STAGE1_DECIDED_BY
+    assert proposal["decision"]["auto_refusal"] == "bundled_share_unmeasurable"
+    assert "bundled_share_unmeasurable" in proposal["decision"]["note"]
+    orders = await _rows(
+        db_engine,
+        "SELECT status, reason FROM meme_live_orders WHERE proposal_id = :p",
+        p=proposal_id,
+    )
+    assert orders == [{"status": "refused", "reason": "bundled_share_unmeasurable"}]
+    assert armed.rpc.sent == []
+    assert armed.ctx.state.auto_rejected == 1
+    hb = await heartbeat_fields(armed.ctx)
+    assert json.loads(hb["auto_refused_1h"]) == {"bundled_share_unmeasurable": 1}
+
+
+async def test_stage_1_leaves_an_old_proposal_and_a_click_proposal_alone(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """Older than 60 s the robot does not decide (the human still has until the
+    set's 180 s); and with the flag off nothing ``proposed`` is ever touched."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    old = await _plant_operator_proposal(
+        db_engine, proposed_at=datetime.now(UTC) - timedelta(seconds=61)
+    )
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, old))["status"] == "proposed"
+    assert armed.ctx.state.auto_skipped == {"too_old": 1}
+    assert (
+        await _rows(db_engine, "SELECT id FROM meme_live_orders WHERE proposal_id = :p", p=old)
+        == []
+    )
+    fresh = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(harness.ctx)  # the click-only executor: auto_approve is False
+    assert (await _proposal(db_engine, fresh))["status"] == "proposed"
+    assert harness.rpc.sent == [] and harness.ctx.state.auto_approved == 0
+
+
+async def test_stage_1_closes_the_tap_on_the_scope_sol_ceiling(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The recorded fill took ~1.0035 SOL from the payer (T4.8's real buy), so after
+    one buy a 0,25 SOL scope is spent: the robot stops opening proposals
+    (``scope_exhausted:max_total_sol``) and a click's live approval is refused
+    ``small_test_scope_exhausted`` by the SOL counter, never sent."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    first = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, first))["status"] == "approved"
+    assert len(armed.rpc.sent) == 1
+    second = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, second))["status"] == "proposed"
+    assert armed.ctx.state.auto_skipped == {"scope_exhausted:max_total_sol": 1}
+    assert len(armed.rpc.sent) == 1
+    clicked = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    orders = await _rows(
+        db_engine,
+        "SELECT status, reason, admission FROM meme_live_orders WHERE proposal_id = :p",
+        p=clicked,
+    )
+    assert orders[0]["status"] == "refused" and orders[0]["reason"] == "small_test_scope_exhausted"
+    assert orders[0]["admission"]["exhausted"] == "max_total_sol"
+    assert orders[0]["admission"]["trades_done"] == 1
+    assert len(armed.rpc.sent) == 1
+    hb = await heartbeat_fields(armed.ctx)
+    assert hb["small_test_exhausted"] == "max_total_sol"
+    assert hb["small_test_remaining_sol"] == "0"
+
+
+async def test_stage_1_clamps_the_last_buy_to_what_the_scope_has_left(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """With ~1.0035 SOL already taken and a 1,01 SOL scope, a 0,01 request is
+    admitted for the remainder (~0,0065) — the scope is a ceiling, not a target.
+    The first position is closed by hand in between: the SOL counter is the
+    ledger of **buys sent**, not of positions still open (those the daily cap and
+    ``duplicate_position`` already refuse — the engine's job, not the scope's)."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test("1.01"))
+    first = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    used = (
+        await _rows(db_engine, "SELECT fill FROM meme_live_orders WHERE proposal_id = :p", p=first)
+    )[0]["fill"]["buy_total_lamports"]
+    remaining = Decimal("1.01") - Decimal(used) / Decimal(10**9)
+    assert Decimal("0") < remaining < Decimal("0.01"), remaining
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_positions SET status = 'closed', exit_at = now(), "
+                'exit = \'{"reason": "sold_by_hand"}\'::jsonb, pnl_sol = 0, r_multiple = 0 '
+                "WHERE proposal_id = :p"
+            ),
+            {"p": first},
+        )
+    second = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    order = (
+        await _rows(
+            db_engine,
+            "SELECT status, intent, admission FROM meme_live_orders WHERE proposal_id = :p",
+            p=second,
+        )
+    )[0]
+    assert order["status"] == "confirmed"
+    assert order["admission"]["small_test"]["requested_clamped"] is True
+    assert Decimal(order["admission"]["small_test"]["requested_cap_sol"]) == remaining
+    assert Decimal(order["intent"]["sol_final"]) <= remaining
+    assert order["admission"]["sizing"]["binding_constraint"] == "requested"
+
+
+async def test_stage_1_with_sending_disabled_opens_admits_simulates_and_sends_nothing(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The ``sigVerify=false`` proof shape (T4.8b/T4.8c): the whole stage-1 path up
+    to the simulation, then ``failed: meme_live_disabled`` before the key —
+    ``rpc.sent == []``, no signature, no position; the proposal stays
+    ``approved``/``live`` (a send refusal is not an admission refusal)."""
+    armed = _context(
+        db_session_factory, _signer(), harness.redis, auto=_small_test(), allow_send=False
+    )
+    proposal_id = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    proposal = await _proposal(db_engine, proposal_id)
+    assert proposal["status"] == "approved" and proposal["decided_by"] == AUTO_STAGE1_DECIDED_BY
+    orders = await _rows(
+        db_engine,
+        "SELECT status, reason, signatures, admission FROM meme_live_orders WHERE proposal_id = :p",
+        p=proposal_id,
+    )
+    assert len(orders) == 1
+    assert orders[0]["status"] == "failed" and orders[0]["reason"] == "meme_live_disabled"
+    assert orders[0]["admission"]["approved"] is True
+    assert orders[0]["signatures"] == []
+    assert armed.rpc.sent == []
+    assert (
+        await _rows(
+            db_engine, "SELECT id FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+        )
+        == []
+    )

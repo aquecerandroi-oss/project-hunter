@@ -800,6 +800,20 @@ Com o `.env` sem a flag, o mesmo comando sobe o executor **inerte**: `/ready` ve
 `hb:meme:executor` com `live_enabled=false`, toda proposta `live` recusada
 `meme_live_disabled` e gravada assim em `meme_live_orders`.
 
+**Modo sozinho — estágio 1 (T4.28, `docs/ACTIVATION.md` §9b item 9).** Uma segunda variável do
+`.env`, `MEME_LIVE_AUTO_APPROVE` (os dois composes a passam com default `false`; nunca escrita
+ligada em arquivo rastreado — o `forbidden_patterns.sh` recusa), faz o executor abrir a proposta
+`proposed` do conjunto `operator` como real sem o clique, com a mesma regra e a mesma escrita da
+mesa (`decided_by = executor:auto_stage1`). Só é lida com a flag live ligada **e** o
+`small_test_authorization` nos portões — ligada sem escopo escrito o boot recusa
+`auto_approve_needs_small_test`. Companheira opcional: `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR`
+(padrão 5). Conferir em `hb:meme:executor`: `auto_approve=true`, `auto_approved_1h`,
+`auto_refused_1h` (por motivo), `auto_skipped` (por motivo: `too_old`, `hourly_cap`, `tick_cap`,
+`scope_exhausted:*`, `kill_switch`…), `small_test_used_sol`/`small_test_trades_done`/
+`small_test_remaining_sol`. **Desligar:** `MEME_LIVE_AUTO_APPROVE=false` no `.env` +
+`MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update`, ou qualquer um dos três
+desligamentos abaixo — com o switch bloqueando o executor não abre proposta nenhuma.
+
 **Como desligar em 5 s — qualquer um dos três; o primeiro não precisa de deploy nem de Redis:**
 
 ```bash

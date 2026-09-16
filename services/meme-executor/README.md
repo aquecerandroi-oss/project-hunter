@@ -22,3 +22,14 @@ heartbeat (`program_idl_hash`, `program_last_deploy_slot`, `program_divergence`)
 switch o slot é relido (45 bytes); se mudou, toda entrada é recusada `program_upgraded` até a T4.8b ser
 refeita (`docs/PUMPFUN-ONCHAIN.md` §6c). Curvas com quote ≠ SOL são recusadas em `build.py`
 (`unsupported_quote`).
+
+Modo sozinho — estágio 1 (T4.28, `auto_approve.py` + `scope.py`): com `MEME_LIVE_AUTO_APPROVE`
+ligada (só lida com a flag live ligada **e** `small_test_authorization` nos portões; sem escopo o boot
+recusa `auto_approve_needs_small_test`) o laço de entradas abre, a cada tique, **uma** proposta
+`proposed` do conjunto `operator` ativo como proposta real — a mesma regra e a mesma `UPDATE` do
+clique (`hunter_core.execution.meme.approval`), `decided_by = executor:auto_stage1`, `decision =
+suggested` — e a admissão segue inalterada. Freios só deste modo: 1 por tique e por mint, `age > 60 s`
+fica para o humano, `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR` (5), kill switch/programa/escopo bloqueando
+⇒ passe vazio; recusa da admissão ⇒ ordem `refused` **e** proposta `rejected` com o motivo. O escopo
+fecha por `max_trades` e por `max_total_sol` (SOL real gasto) e clampa a última compra ao que sobra.
+Docs: `docs/RISK_ENGINE_MEME.md` §3.5, `docs/ACTIVATION.md` §9b item 9; notas `.claude/state/notes-T4.28.md`.

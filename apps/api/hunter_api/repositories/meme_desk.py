@@ -25,9 +25,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import and_, case, func, or_, select, update
+from sqlalchemy import and_, case, func, or_, select
 
 from hunter_api.repositories.meme_desk_marks import with_marks_0029
 from hunter_api.repositories.meme_desk_quality import with_quality_0030
@@ -60,9 +60,9 @@ from hunter_api.repositories.meme_tables import (
     meme_tokens,
 )
 from hunter_core.domain.types import ensure_utc
+from hunter_core.execution.meme.approval import ProposalDecision, decide_proposal
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine import CursorResult
     from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = ["OPERATOR_RULE_SET", "MemeDeskRepository"]
@@ -295,22 +295,22 @@ class MemeDeskRepository:
     ) -> bool:
         """``True`` when this call moved the row out of ``proposed``; ``False``
         when something else (another operator, the loop's ``expired`` stamp)
-        already had — the caller turns that into a 409, never a retry."""
-        result = cast(
-            "CursorResult[Any]",
-            await self.session.execute(
-                update(_p)
-                .where(_p.c.id == proposal_id, _p.c.status == "proposed")
-                .values(
-                    status=status,
-                    decision=decision,
-                    decided_by=decided_by,
-                    decided_at=decided_at,
-                    mode=mode,
-                )
+        already had — the caller turns that into a 409, never a retry. The
+        statement is the shared ``DECIDE_PROPOSAL`` (T4.28): the executor's
+        stage-1 auto-approval writes the very same row the click writes."""
+        if status not in ("approved", "rejected") or mode not in ("paper", "live"):
+            raise ValueError(f"not a desk decision: status={status!r} mode={mode!r}")
+        return await decide_proposal(
+            self.session,
+            ProposalDecision(
+                proposal_id=str(proposal_id),
+                status=status,
+                decision=decision,
+                decided_by=decided_by,
+                decided_at=decided_at,
+                mode=mode,
             ),
         )
-        return result.rowcount == 1
 
     async def insert_proposal(self, row: ProposalRow) -> None:
         await self.session.execute(

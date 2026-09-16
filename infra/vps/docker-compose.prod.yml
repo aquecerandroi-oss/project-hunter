@@ -414,6 +414,10 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
       MEME_KILL_FILE: /run/hunter/meme.kill
       MEME_AUTO_CLOSE_ON_EMERGENCY: ${MEME_AUTO_CLOSE_ON_EMERGENCY:-false}
+      # T4.28 estagio 1 ("liga sozinho"): so com a flag live ligada E o teste
+      # pequeno escrito nos portoes; default false, nunca "true" aqui (docs/ACTIVATION.md 9b.9).
+      MEME_LIVE_AUTO_APPROVE: ${MEME_LIVE_AUTO_APPROVE:-false}
+      MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR: ${MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR:-5}
       DB_POOL_SIZE: "2"
       DB_MAX_OVERFLOW: "2"
     volumes:

@@ -54,6 +54,7 @@ from hunter_api.services.meme_desk_idempotency import (
 )
 from hunter_api.services.meme_desk_out import build_manual_quote, decision_json
 from hunter_core.domain.types import uuid7
+from hunter_core.execution.meme.approval import proposal_state_refusal
 
 if TYPE_CHECKING:
     from hunter_api.auth.rbac import OrgContext
@@ -100,15 +101,15 @@ async def _decide(
     proposal = await repo.get_proposal(proposal_id)
     if proposal is None:
         raise ProposalNotFoundError
-    if proposal.status != "proposed":
-        raise ProposalStateConflictError(
-            proposal_id, reason="not_proposed", current=proposal.status
-        )
-    if new_status == "approved" and now >= proposal.expires_at:
-        # The loop stamps ``expired`` on its own tick; between the deadline
-        # and that tick the row still reads ``proposed``, and approving it
-        # would fill a window the contract closed at ``expires_at``.
-        raise ProposalStateConflictError(proposal_id, reason="expired", current=proposal.status)
+    # The state rule is the shared one (``hunter_core.execution.meme.approval``,
+    # T4.28): ``not_proposed`` for a row already decided; ``expired`` for an
+    # approval at or after the deadline (the loop stamps ``expired`` on its own
+    # tick; between the deadline and that tick the row still reads ``proposed``).
+    refusal = proposal_state_refusal(
+        proposal.status, proposal.expires_at, now, approving=new_status == "approved"
+    )
+    if refusal is not None:
+        raise ProposalStateConflictError(proposal_id, reason=refusal, current=proposal.status)
     mode = "paper"
     if isinstance(body, DeskParamsIn):
         enforce_max_sol_per_bet(await repo.get_rule_set(proposal.rule_set_id), body.size_sol)

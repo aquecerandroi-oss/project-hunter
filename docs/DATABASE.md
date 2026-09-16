@@ -6525,6 +6525,14 @@ lê `mode = 'live' AND status IN ('approved', 'filled', 'unfilled') AND decided_
 `meme_live_orders (side = 'buy')` para a proposta, e recusa por nome (`approval_expired`) o que for mais
 velho que `MEME_LIVE_APPROVAL_TTL_S` (30 s). `rejected` nunca executa.
 
+**T4.28 (sem migração — `decided_by` é texto livre):** no estágio 1 sem clique o executor (`hunter_worker`,
+que já tem `UPDATE` inteiro em `meme_proposals` desde a `0022`) escreve a **mesma** linha que o clique —
+`status = 'approved'`, `mode = 'live'`, `decision = suggested`, `decided_by = 'executor:auto_stage1'` —
+pela mesma `UPDATE … WHERE status = 'proposed'` (`hunter_core.execution.meme.approval.DECIDE_PROPOSAL`,
+compartilhada com a API). Quando a sua admissão recusa, a proposta vai a `rejected` (guardada por
+`status = 'approved' AND mode = 'live' AND decided_by = 'executor:auto_stage1'` — uma proposta que o laço
+de papel já preencheu em sombra não é tocada) com `decision.auto_refusal = <motivo>`.
+
 ### 40.2 As ordens — `meme_live_orders`
 
 Uma linha por **tentativa**: `client_order_id` único (`meme:{proposal_id}` a compra,

@@ -691,6 +691,11 @@ services:
       MEME_KILL_FILE: /run/hunter/meme.kill
       MEME_AUTO_CLOSE_ON_EMERGENCY: ${MEME_AUTO_CLOSE_ON_EMERGENCY:-false}
       MEME_LIVE_APPROVAL_TTL_S: ${MEME_LIVE_APPROVAL_TTL_S:-30}
+      # T4.28 stage 1 ("liga sozinho"): the executor opens the desk's operator
+      # proposal as live without the click, only with the live flag on AND a
+      # written small test in the gates. Defaults to false; never "true" here.
+      MEME_LIVE_AUTO_APPROVE: ${MEME_LIVE_AUTO_APPROVE:-false}
+      MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR: ${MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR:-5}
       # One loop, one transaction at a time, plus the journal's own writes from
       # the submitter's thread: 2 + 2 is headroom over what this process opens.
       DB_POOL_SIZE: "2"

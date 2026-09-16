@@ -145,6 +145,9 @@ def _register_health(runtime: WorkerRuntime, ctx: ExecutorContext) -> None:
     )
     runtime.status_details["kill_switch"] = lambda: ctx.kill.effective.value
     runtime.status_details["blocked_exits"] = lambda: str(len(ctx.state.blocked_exits))
+    runtime.status_details["auto_approve"] = lambda: (
+        "stage 1 (no click)" if ctx.config.auto_approve else "off (click required)"
+    )
 
 
 async def run_meme_executor(runtime: WorkerRuntime) -> None:
@@ -177,6 +180,9 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
         approval_ttl_s=config.approval_ttl_s,
         auto_close_on_emergency=config.auto_close_on_emergency,
         small_test=config.small_test_max_trades,
+        small_test_max_total_sol=str(config.small_test_max_total_sol),
+        auto_approve=config.auto_approve,
+        auto_approve_max_per_hour=config.auto_approve_max_per_hour,
     )
     try:
         async with asyncio.TaskGroup() as group:

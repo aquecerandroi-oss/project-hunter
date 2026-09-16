@@ -801,7 +801,8 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    (a carteira **dedicada**, criada por ele, com saldo ≤ `MEME_WALLET_MAX_SOL` — saldo
    acima recusa entradas, `wallet_over_max_sol`), `SOLANA_RPC_URL` (RPC próprio com
    chave), `MEME_GATES_FILE=/run/hunter/meme_gates.json`, e — só se quiser liquidação
-   automática em `EMERGENCY` (§14.4) — `MEME_AUTO_CLOSE_ON_EMERGENCY=true`.
+   automática em `EMERGENCY` (§14.4) — `MEME_AUTO_CLOSE_ON_EMERGENCY=true`; para o estágio 1
+   sem clique (item 9), `MEME_LIVE_AUTO_APPROVE` ligada.
 5. **Subir**: `MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update`;
    conferir `hb:meme:executor` (`live_enabled=true`, `gates`, `wallet_pubkey`, `policy`,
    `kill_switch=ACTIVE`) e `GET /api/v1/orgs/ever/meme/live` (`executor.status=alive`).
@@ -815,6 +816,27 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    `Idempotency-Key`); o executor vende na curva na passada seguinte, ao preço de então.
 8. **Desligar em 5 s**: `touch /opt/project-hunter/run/meme/meme.kill` (§3.7); a trava
    diária só sai pelo `UPDATE` dele.
+9. **Modo sozinho (estágio 1) — T4.28** (decisão dele de 16/09/2026 01:2x BRT, registrada em
+   `obsidian/06-DECISIONS/2026-09-12-teste-pequeno-meme-real.md`, "Estágio 1 — sozinho"): com
+   `MEME_LIVE_AUTO_APPROVE` ligada no `.env` da VPS, o executor abre **ele mesmo** a proposta
+   `proposed` do conjunto `operator` ativo como proposta real — exatamente o que o clique em
+   "Aprovar (REAL)" grava (`decided_by = executor:auto_stage1`, `decision = suggested`,
+   `mode = live`) — e a admissão segue **inalterada** (25 checks, sizing, escopo, kill switch relido
+   antes de assinar). Só é lida com `ENABLE_MEME_LIVE_TRADING` ligada **e** o `small_test_authorization`
+   nos portões (sem escopo escrito o boot recusa `auto_approve_needs_small_test`); o escopo do
+   estágio 1 é o de sempre — `max_sol_per_trade 0,05`, `max_total_sol 0,25`, `max_trades 5` — e agora o
+   `max_total_sol` também fecha a torneira (`small_test_scope_exhausted`, somando o SOL real que cada
+   compra confirmada tirou da carteira) e a última compra é **clampada** ao que sobra. Freios só deste
+   modo: 1 compra por tique e por mint, proposta com mais de 60 s fica para a mão dele,
+   `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR` (padrão 5), e toda recusa da admissão marca a proposta
+   `rejected` com o motivo (a mesa mostra por quê). O heartbeat `hb:meme:executor` publica
+   `auto_approve`, `auto_approved_1h`, `auto_refused_1h`, `auto_skipped`, `small_test_used_sol`,
+   `small_test_trades_done`, `small_test_remaining_sol`. **Desligar:** `MEME_LIVE_AUTO_APPROVE=false`
+   (ou apagar a linha) + `MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update` —
+   ou o kill switch do item 8, que também pára as aprovações automáticas na hora (o executor não abre
+   proposta com o switch bloqueando). **O estágio 2 (US$ 1 000/operação) continua exigindo o clique**
+   até nova decisão escrita. A validade do `meme_gates.json` tem de cobrir o estágio (hoje:
+   `small_test_authorization.expires_at` e `valid_until` ≥ 2026-09-18 — ele edita o arquivo).
 
 **O que não está pronto e ele precisa saber antes de ligar:** (a) venda **depois** da
 migração para a PumpSwap não existe — uma posição que migrar fica `open` com

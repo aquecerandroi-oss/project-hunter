@@ -5,19 +5,31 @@ Fields: the flag and the gates (dates, or the small-test scope), the wallet's
 prefix of it), orders by state, open positions, blocked exits, the last
 signature, the kill switch with its four sources, the day anchor and the loss
 so far. Written every ``heartbeat_s`` onto the hash the runtime keeps alive.
+T4.28 adds the stage-1 mode (``auto_approve``, ``auto_approved_1h``,
+``auto_refused_1h`` by reason, ``auto_skipped`` by reason) and the written
+scope's counters (``small_test_used_sol``, ``small_test_trades_done``,
+``small_test_remaining_sol``, ``small_test_exhausted``) — what the desk shows as
+"modo sozinho — estágio 1: n/5 compras, x/0,25 SOL".
 """
 
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
+from hunter_meme_executor.auto_approve import auto_approved_last_hour, auto_refused_last_hour
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.repo import open_positions, orders_by_state
+from hunter_meme_executor.scope import read_scope_use
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = ["heartbeat_fields", "heartbeat_once"]
 
@@ -49,11 +61,37 @@ def _gates(ctx: ExecutorContext) -> str:
     return json.dumps(payload)
 
 
+async def _auto_fields(
+    ctx: ExecutorContext, session: AsyncSession, now: datetime
+) -> dict[str, str]:
+    """T4.28: the stage-1 mode and the scope counters, read from the rows."""
+    cfg, state = ctx.config, ctx.state
+    small = ctx.mode.gates.small_test if ctx.mode.gates is not None else None
+    fields = {
+        "auto_approve": str(cfg.auto_approve).lower(),
+        "auto_approve_max_per_hour": str(cfg.auto_approve_max_per_hour),
+        "auto_approved_1h": str(await auto_approved_last_hour(session, now=now)),
+        "auto_refused_1h": json.dumps(await auto_refused_last_hour(session, now=now)),
+        "auto_skipped": json.dumps(state.auto_skipped),
+        "auto_rejected_total": str(state.auto_rejected),
+    }
+    if small is None:
+        return fields
+    scope = await read_scope_use(session, small, requested_sol=small.max_sol_per_trade)
+    fields["small_test_used_sol"] = str(scope.used_sol)
+    fields["small_test_trades_done"] = str(scope.trades_done)
+    fields["small_test_remaining_sol"] = str(scope.remaining_sol)
+    fields["small_test_exhausted"] = scope.exhausted or ""
+    return fields
+
+
 async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     cfg, state = ctx.config, ctx.state
+    now = utcnow()
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         by_state = await orders_by_state(session)
         positions = await open_positions(session)
+        auto = await _auto_fields(ctx, session, now)
     limits = cfg.limits
     anchor = ctx.kill.anchor
     marks = sum((p.mark_sol or Decimal(0) for p in positions), Decimal(0))
@@ -61,7 +99,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         None if state.wallet_lamports is None else Decimal(state.wallet_lamports) / LAMPORTS + marks
     )
     fields: dict[str, str] = {
-        "executor_ts": utcnow().isoformat(),
+        "executor_ts": now.isoformat(),
         "label": "REAL",
         "live_enabled": str(cfg.live).lower(),
         "cluster": cfg.cluster,
@@ -110,6 +148,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         if anchor is None or equity is None
         else str(max(Decimal(0), anchor.day_start_sol_equity - equity)),
     }
+    fields.update(auto)
     fields.update(ctx.kill.describe())
     return fields
 

@@ -145,6 +145,10 @@ scan_file() {
   # docker-compose uses -- the shell form alone let both through.
   report "$f" "ENABLE_LIVE_TRADING=true" 'ENABLE_(MEME_)?LIVE_TRADING[[:space:]]*[=:][[:space:]]*"?true' -i
 
+  # T4.28: the stage-1 "no click" flag of the meme executor is the owner's to
+  # flip in the VPS .env, never a tracked file -- same shapes as the live flag.
+  report "$f" "MEME_LIVE_AUTO_APPROVE=true" 'MEME_LIVE_AUTO_APPROVE[[:space:]]*[=:][[:space:]]*"?true' -i
+
   # T4.8 (docs/RISK_ENGINE_MEME.md section 3.3 / section 13 finding 3): a Solana
   # secret key has two export shapes, and neither may ever be *assigned* in a
   # tracked file. (1) base58 of the 64-byte keypair is 87-88 characters; the
@@ -244,6 +248,12 @@ run_self_test() {
   assert_hit "meme_flags.py" "ENABLE_LIVE_TRADING=true"
   printf 'environment:\n  ENABLE_LIVE_TRADING: "true"\n' > compose.yml
   assert_hit "compose.yml" "ENABLE_LIVE_TRADING=true"
+  printf 'MEME_LIVE_AUTO_APPROVE=true\n' > auto_flags.py
+  assert_hit "auto_flags.py" "MEME_LIVE_AUTO_APPROVE=true"
+  printf 'environment:\n  MEME_LIVE_AUTO_APPROVE: "true"\n' > auto_compose.yml
+  assert_hit "auto_compose.yml" "MEME_LIVE_AUTO_APPROVE=true"
+  printf 'environment:\n  MEME_LIVE_AUTO_APPROVE: ${MEME_LIVE_AUTO_APPROVE:-false}\n' > auto_default.yml
+  assert_no_hit "auto_default.yml"             # the substitution that defaults to false
 
   # T4.8: Solana secret-key shapes. The fixtures are synthetic (a repeated
   # pattern, an ascending integer sequence) -- never a real key.

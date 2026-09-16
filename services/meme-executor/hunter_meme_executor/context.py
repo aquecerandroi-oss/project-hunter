@@ -48,6 +48,12 @@ class ExecutorState:
     program_divergence: str | None = None
     """T4.8b: set when the chain's program identity differs from the fixtures' —
     every entry is refused ``program_upgraded`` while it is set."""
+    auto_approved: int = 0
+    """T4.28: proposals this process opened as live on its own (stage 1)."""
+    auto_rejected: int = 0
+    """T4.28: auto-opened proposals the admission then refused (marked ``rejected``)."""
+    auto_skipped: dict[str, int] = field(default_factory=lambda: dict[str, int]())
+    """T4.28: why a ``proposed`` row was left to the human, by name."""
 
 
 @dataclass(slots=True)

@@ -232,6 +232,42 @@ sistema"):
 > enable_meme_live_trading`) para uma coisa só: arquivar `meme_proposals.mode = 'live'` e mostrar
 > "Aprovar (REAL)" — ela nunca assina.
 
+### 3.5 A segunda flag — `MEME_LIVE_AUTO_APPROVE` (estágio 1 sem clique, T4.28)
+
+Decisão do Everton (16/09/2026 01:2x BRT, "liga sozinho no estágio 1"; registrada em
+`obsidian/06-DECISIONS/2026-09-12-teste-pequeno-meme-real.md`): dentro do escopo escrito do teste
+pequeno o robô compra e vende **sem** o clique em "Aprovar (REAL)". O desenho não move a decisão de
+dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesmos 25 checks da §4.
+
+- **O que a flag faz:** a cada tique de entradas o executor lê as propostas `proposed` do conjunto
+  `operator` ativo (`meme_rule_sets.kind = 'operator'`, `status = 'proposed'`, `expires_at > now()`,
+  `mode = 'paper'` — a proposta é uma só) e abre **uma** delas como proposta real exatamente como o
+  `POST …/approve` com `"mode": "live"` faria: a mesma regra e a mesma `UPDATE … WHERE status =
+  'proposed'` (`hunter_core.execution.meme.approval`, compartilhado com a API — reusado, não copiado),
+  `decided_by = 'executor:auto_stage1'`, `decision = suggested` (os números do próprio conjunto).
+  Daí em diante **nada muda**: admissão (§4), sizing (§5), contador do escopo, kill switch relido antes
+  de assinar (§7/§9.5). O laço de papel continua preenchendo a mesma proposta em sombra.
+- **Quando ela é lida:** só com `ENABLE_MEME_LIVE_TRADING` ligada **e** `small_test_authorization`
+  válido nos portões. Ligada sem escopo escrito ⇒ o boot recusa `auto_approve_needs_small_test` antes
+  de tocar a chave; ligada com a flag live desligada ⇒ ignorada (um executor inerte não abre nada).
+- **O escopo fecha pelas duas contas:** `max_trades` (compras enviadas) e, desde a T4.28, `max_total_sol`
+  (a soma do SOL **real** que cada compra confirmada tirou da carteira — `fill.buy_total_lamports`, o
+  delta do pagador; a reserva `max_sol_cost` enquanto uma está em voo). Qualquer uma atingida ⇒
+  `small_test_scope_exhausted`; antes disso o pedido é **clampado** ao que sobra
+  (`admission.small_test.requested_clamped`) — o teto é teto, a última compra nunca o ultrapassa.
+- **Freios que só existem neste modo** (todos nomeados no heartbeat, `auto_skipped`): no máximo 1
+  compra por tique e por mint; proposta com `age > 60 s` fica para o humano (a `operator` expira em
+  180 s para a mão; o robô decide na primeira passada ou não decide); `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR`
+  (padrão 5, contado das linhas — sobrevive a restart); kill switch bloqueando, programa divergente ou
+  escopo esgotado ⇒ o passe não abre proposta nenhuma; e **toda recusa da admissão** de uma proposta
+  aberta pelo robô grava a ordem `refused` **e** marca a proposta `rejected` com o motivo em
+  `decision.auto_refusal` (mesma transação) — a mesa mostra por quê.
+- **Quem liga:** só o Everton, no `.env` da VPS; o guardião de padrões recusa a flag ligada em arquivo
+  rastreado (`infra/scripts/forbidden_patterns.sh`). **Desligar:** a flag em `false` + `update`, ou o
+  kill switch (que também pára as aprovações automáticas). **O estágio 2 continua exigindo clique.**
+- Implementado em `services/meme-executor/hunter_meme_executor/{auto_approve,scope}.py`, testes
+  `tests/test_auto_approve.py` (unit) e `tests/test_live_persistence.py::test_stage_1_*` (Postgres).
+
 ## 4. Checks de admissão de uma compra na curva
 
 Todos os checks avaliáveis são registrados em `decision.checks[]` como
@@ -782,6 +818,13 @@ data. O executor (`hunter_core.execution.meme.gates.load_gates`) valida o bloco 
 pelo `max_total_sol`) e em **contador** (`small_test_scope_exhausted` depois de `max_trades` compras
 enviadas). O heartbeat publica o escopo e a nota. Nada nisto afrouxa um check da §4: um teste pequeno
 com `bundled_share` não medido continua recusado `bundled_share_unmeasurable`.
+
+**Estágio 1 sem clique (T4.28, §3.5).** Dentro dessa variante o dono pode, também por escrito, dispensar
+o clique por proposta: `MEME_LIVE_AUTO_APPROVE` faz o executor abrir a proposta `operator` como real
+com a **mesma** regra e a **mesma** escrita da mesa (`decided_by = executor:auto_stage1`), e o escopo
+passa a fechar também por `max_total_sol` (SOL real gasto). O que a flag **não** faz: afrouxar um check,
+mudar o sizing, aprovar fora do escopo escrito (sem `small_test_authorization` o boot recusa
+`auto_approve_needs_small_test`), ou valer para o estágio 2 — esse continua exigindo o clique.
 
 **A declaração honesta sobre "hoje":** dos três portões, hoje existe **zero**. O que existe é o
 adapter público (T4.1), o mapa on-chain (T4.0d) e este contrato. "Operar hoje" = papel + radar.

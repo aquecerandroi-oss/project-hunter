@@ -2,7 +2,7 @@
 tags: [decisao, meme, pumpfun, execucao, dinheiro-real, teste-pequeno, m4]
 titulo: Dinheiro real no executor de memecoins — autorização, escopo do teste pequeno, tetos e o que continua fora
 data: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-16
 owner: sexta-feira
 origem: Everton, 2026-09-12, 17:2x–17:4x BRT — "Autorização escrita — está autorizado"; "tem que fazer vários e vários testes e ir validando; lembrando que cria e morre rápido, e as mais promissoras é para fazer milhão"; "carteira própria do robô já está criada; máximo por SOL até 1000 dólares"
 status: decidido
@@ -56,6 +56,27 @@ Os cinco números de política do `.env` (só ele digita) para o **estágio 1** 
 - `holder_rewards` sempre 0 hoje e o piso de taxa é constante datada (decodificar `FeeConfig` depois — T4.8b).
 - O rastreador ainda pode expulsar uma moeda com aposta aberta (T4.16b em curso); o executor lê a curva por RPC na hora
   de vender e não depende do rastreador para sair.
+
+## Estágio 1 — sozinho (16/09)
+**Decisão do Everton (16/09/2026 01:2x BRT: "liga sozinho no estágio 1"; antes: "precisa estar pronto hoje",
+"o robô fazer os trades da memecoin"):** no estágio 1 o robô compra e vende **sem o clique** em "Aprovar (REAL)".
+Isto revoga, só para o estágio 1, a frase "cada compra real é aprovada por ele na mesa" do item 4 acima.
+
+- **Escopo inalterado:** `max_sol_per_trade` 0,05 SOL, `max_total_sol` 0,25, `max_trades` 5; validade estendida para
+  **2026-09-18** (ele edita o `meme_gates.json`: `small_test_authorization.expires_at` e `valid_until`). Tetos do
+  `.env`: `MEME_WALLET_MAX_SOL=0.30`, `MEME_MAX_SOL_PER_TRADE=0.05`, `MEME_DAILY_LOSS_CAP_SOL=0.15`,
+  `MEME_MAX_OPEN_POSITIONS=2`, `MEME_COOLDOWN_S=60`. **Risco máximo do estágio: 0,30 SOL** (o saldo da carteira).
+- **Como:** `MEME_LIVE_AUTO_APPROVE` ligada no `.env` da VPS (T4.28). O executor abre a proposta `proposed` do conjunto
+  `operator` ativo como proposta real com a mesma regra e a mesma escrita do clique (`decided_by =
+  executor:auto_stage1`, `decision = suggested`) e a admissão segue inalterada: 25 checks, sizing, escopo (agora
+  fechando também por `max_total_sol`, somando o SOL real gasto), kill switch relido antes de assinar. Freios só
+  deste modo: 1 compra por tique e por mint; proposta com mais de 60 s fica para a mão dele; no máximo 5 aprovações
+  automáticas por hora; toda recusa da admissão marca a proposta `rejected` com o motivo. A flag só é lida com a flag
+  live ligada e o escopo escrito nos portões; sem escopo o boot recusa (`auto_approve_needs_small_test`).
+- **Desligar:** `MEME_LIVE_AUTO_APPROVE=false` + `update`, ou `touch /opt/project-hunter/run/meme/meme.kill`.
+- **Estágio 2 (US$ 1 000/operação) continua exigindo o clique** até nova decisão escrita dele.
+
+Registro: `docs/RISK_ENGINE_MEME.md` §3.5, `docs/ACTIVATION.md` §9b item 9, `.claude/state/notes-T4.28.md`.
 
 ## O método que o Everton pediu e como ele se encaixa
 "Vários e vários testes, validando; cria e morre rápido; as promissoras são para fazer milhão." O laboratório de papel
