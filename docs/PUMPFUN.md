@@ -464,3 +464,131 @@ Nada aqui é orderbook: não há bid/ask, `depth`, `bookTicker`. O equivalente d
 o de `NormalizedTicker` é `market-activity` (janelas 5m/1h/6h/24h). `ts` = `timestamp` do bloco;
 `received_at` = hora local. Fixtures gravadas desta sessão (formas e respostas redigidas) estão em
 `.claude/state/notes-T4.0c.md` para os testes offline de um futuro adapter.
+
+## 8. PumpSwap (venda pós-migração) — T4.29a, 2026-09-16
+
+**Escopo: só `sell`.** Este projeto nunca compra na PumpSwap (`docs/RISK_ENGINE_MEME.md` §1) — o
+pacote `hunter_exchanges/pumpswap/` existe inteiramente para dar à posição que migrou uma porta de
+saída real, no lugar da recusa nomeada `pumpswap_sell_not_implemented` que existia até esta tarefa.
+
+### 8.1 Fonte da IDL, em ordem de atualidade
+
+1. **A conta de IDL Anchor do próprio programa on-chain** — `getAccountInfo` em
+   `5fLnXNNoZcZt9Qku6HARM3un3Ttm2cGsR7gN9Zp1R7h3` (derivada por
+   `createWithSeed(find_program_address([], pAMMBay...), "anchor:idl", pAMMBay...)`, a mesma receita
+   que T4.2e usou para o Mayhem), lida ao vivo em 16/09/2026 no slot 447585704, descomprimida
+   (discriminador de 8 bytes + autoridade de 32 + comprimento u32 + corpo zlib — formato padrão de
+   conta de IDL do Anchor) e salva em `tests/fixtures/pumpswap/t429a_idl_pump_amm_onchain.json`,
+   **sha256 `e16ac8008908911575241a25cad33bed8d2da2153f0d726790065fd467b90ff4`**.
+2. **`pump-fun/pump-public-docs` no GitHub, `idl/pump_amm.json`**, commit `main` no momento da leitura
+   (`81091419e4457566469d4e2a27f64ed84d42419c`, 16/09/2026), sha256
+   `2091433899b07d003d98118ae6cd3c628960fd393b40710b6e15bce6d0e7f2d1` — **está à frente** da conta
+   on-chain (tem `boost_authority`/`boost_enabled` em `GlobalConfig`,
+   `creator_fee_configurable`/`max_configurable_creator_fee_bps`, e em `Pool` tem
+   `virtual_quote_reserves`/`creator_fee_bps`/`can_edit_creator_fee`/`is_holder_reward`), o mesmo
+   padrão de "IDL do GitHub correu na frente da conta on-chain" que T4.8/T4.8c já achou para o
+   programa Pump. O adaptador decodifica pela **conta on-chain** (é o que as transações reais checam
+   hoje), com o mesmo mecanismo de layout curto/estendido de `hunter_exchanges.pumpfun.decode` para
+   `BondingCurve`.
+
+Também consultado, sem chave, sem alterar a cadeia: o repositório da versão mais antiga
+`9c82f61cb711b044a17f770ab8ce9f9bdf78f333` (sha256 `6b5c7ec4e5ef9742fa99dc57b0d75b1031b379bba02a7e1b3c5a4cad68d77e56`)
+para confirmar que o `GlobalConfig`/`Pool`/`sell` já existiam nesse formato antes.
+
+### 8.2 Descoberta do pool sem RPC, verificada contra 3 mints migrados reais
+
+O pool canônico de um mint migrado é derivado, nunca precisa de uma leitura extra para "achá-lo":
+`pool_authority = PDA(["pool-authority", mint], PUMP_PROGRAM_ID)` (semente lida da própria IDL do
+programa Pump, instrução `migrate`/`migrate_v2`, `pool_authority`); `pool = PDA(["pool", u16_le(0),
+pool_authority, mint, WSOL_MINT], PUMPSWAP_PROGRAM_ID)` — índice `0` porque a migração sempre cria o
+pool canônico. Verificado ao vivo, 16/09/2026, contra 3 mints migrados recentes obtidos de
+`frontend-api-v3.pump.fun /coins?complete=true` (fonte pública, sem chave):
+
+| mint | pool derivado | `pool_address` da REST | bate |
+|---|---|---|---|
+| `9tiUg9bDHpEgE3rQU8kmdMJMvMfwM81ph6WuyTapump` | `2KJ15ekBMtR2FW2esGeJrptrYLx6V9v5KEeuD8imKEz6` | idem | sim |
+| `DHcQCSZ2U8QTjNWWwyuqfJbBTLCZyvtFkSeYhEYGpump` (Mayhem) | `8EpQ5ihpebcsns3DdEDoiu1WXu4GJZY9o9kSjbXAgArE` | idem | sim |
+| `5RFwNs16ShCeSNQY9Kf5iR5esbEMsnYm7PbWGQAwpump` | `F5MkE4Yf73TkeSKLv3Mr3yrGJpFg3g7sspaCosVYyxaQ` | idem (também a fixture `frontend_api_v3_coin_graduated_raw.json` do pacote `pumpfun`) | sim |
+
+As 3 contas `Pool` lidas (`tests/fixtures/pumpswap/t429a_rpc_pools_raw.json`, slot 447585957) têm
+**301 bytes** cada — os 245 bytes que a IDL on-chain declara mais os 26 bytes dos 4 campos que só o
+IDL do GitHub `main` já nomeia (`virtual_quote_reserves` i128 + `creator_fee_bps` u64 +
+`can_edit_creator_fee`/`is_holder_reward` bool), mais 30 bytes reservados/não interpretados —
+`decode.py` lê os dois layouts sem adivinhar.
+
+**Correção a `docs/PUMPFUN-ONCHAIN.md` §2.2:** essa seção, lendo um exemplo estático, dizia "hoje
+`virtual_quote_reserves=0` em todo pool". Duas das três contas lidas ao vivo nesta tarefa têm
+`virtual_quote_reserves` **não-zero** (17 584 505 289 e 17 584 505 291 lamports; só o pool Mayhem das
+três leu 0) — o campo não é adormecido, e `quote.py` nunca assume que é zero
+(`effective_quote_reserves = pool_quote_token_account.amount + Pool.virtual_quote_reserves`).
+
+**Achado extra, não previsto no brief:** o lado *base* de pelo menos um pool real
+(`F5MkE4Yf73TkeSKLv3Mr3yrGJpFg3g7sspaCosVYyxaQ`) é um mint **Token-2022**, não o programa de token
+clássico — `pumpswap_exit.py` lê o dono real da conta do mint a cada venda em vez de presumir o
+token clássico.
+
+### 8.3 Fórmula da cotação de venda
+
+Produto constante, no mesmo molde da bonding curve (`hunter_exchanges.pumpfun.quote.sell_proceeds`):
+
+```
+efetivo_quote = pool_quote_token_account.amount + Pool.virtual_quote_reserves
+bruto = floor(base_amount_in × efetivo_quote / (pool_base_token_account.amount + base_amount_in))
+taxa_lp = ceil(bruto × lp_fee_bps / 10_000)
+taxa_protocolo = ceil(bruto × protocol_fee_bps / 10_000)
+taxa_criador = ceil(bruto × coin_creator_fee_bps / 10_000)
+líquido = bruto − taxa_lp − taxa_protocolo − taxa_criador
+```
+
+As três taxas em basis points vêm de `GlobalConfig` (`lp_fee_basis_points`,
+`protocol_fee_basis_points`, `coin_creator_fee_basis_points`), **lidas ao vivo a cada venda, nunca uma
+constante** — no pool `F5Mk…`, 20 + 5 + 5 = 30 bps. **Não confirmado contra um fill real da PumpSwap**
+(nenhuma carteira com posição migrada nesta tarefa): a forma do produto constante é a documentada
+(`PUMP_SWAP_README.md`), mas o arredondamento exato do programa não foi verificado byte a byte como
+foi feito para a bonding curve em T4.8 (duas transações reais). Exemplo por extenso, com os números
+do pool `F5Mk…` no slot 447586178, em `hunter_exchanges/pumpswap/quote.py`.
+
+### 8.4 A instrução `sell` e o unwrap de WSOL
+
+21 contas na ordem exata da IDL, discriminador `33e685a4017f83ad` — **idêntico** ao `sell` legado da
+bonding curve (discriminadores Anchor são `sha256("global:<nome>")[:8]`, então dois programas com uma
+instrução de mesmo nome colidem; só o `program_id` da instrução diferencia, o mesmo achado que
+`docs/PUMPFUN-ONCHAIN.md` §2.3 já tinha para o `buy`). Args: `base_amount_in: u64,
+min_quote_amount_out: u64`. **O lado quote de todo pool é SOL empacotado (WSOL), nunca SOL nativo**:
+a venda credita a ATA de WSOL do usuário, então o executor sempre acrescenta `CreateIdempotent` (se a
+ATA não existir) antes e `CloseAccount` (o "unwrap") depois — o padrão oficial `@solana/spl-token` de
+embrulhar/desembrulhar, nunca deixando WSOL parado na carteira.
+
+### 8.5 O que o executor mudou
+
+`services/meme-executor/hunter_meme_executor/pumpswap_exit.py` (novo): uma posição `migrated` é lida
+pelo `ChainReader.pool()` (novo em `chain.py`); sem pool, `pumpswap_pool_not_found` (recusa nomeada,
+nunca um retry silencioso); com pool, `pumpswap_build.build_pumpswap_sell` monta e
+`verify_pumpswap_sell_message` verifica byte a byte (mesma disciplina §9.1 do `verify.py` da curva),
+`simulateTransaction` sempre antes de assinar, o mesmo `MemeSubmitter`/journal/idempotência/kill
+switch do caminho da curva. A confirmação de um fill tenta decodificar um `SellEvent` real
+(`hunter_exchanges/pumpswap/sell_event.py`, disciplina idêntica a `trade_event.py`) e, quando não há
+um para decodificar, usa o delta de saldo SOL do pagador (que já reflete o unwrap) — nunca um número
+inventado.
+
+### 8.6 O que está provado e o que não está
+
+**Provado, offline, com dados reais:** decodificação de `GlobalConfig` e `Pool` contra 3 pools reais
+lidos ao vivo; derivação do pool canônico sem RPC extra, verificada contra os mesmos 3 mints;
+montagem da instrução `sell` com contas na ordem da IDL; round-trip completo
+construir→serializar→verificar da mensagem (incluindo o unwrap de WSOL); todas as PDAs auxiliares
+(`event_authority`, `fee_config` — a entrada própria da PumpSwap no programa Pump Fees, confirmada
+viva —, `coin_creator_vault_*`) verificadas contra endereços reais.
+
+**Não provado:** nenhuma venda foi simulada na mainnet (`simulateTransaction`) nem enviada — esta
+tarefa não tem uma carteira com uma posição migrada de verdade para simular contra (ao contrário de
+T4.8/T4.8b/T4.8c, que sempre acharam uma carteira real na cadeia para impersonar via
+`sigVerify=false`; a tentativa aqui esbarrou no rate limit de `getTokenLargestAccounts` — o mesmo
+que T4.8b/T4.8c já documentaram — e o comprador achado via `getSignaturesForAddress` do pool não
+tinha saldo do token no momento da leitura). O que o dono deve rodar na VPS para fechar essa lacuna,
+com RPC próprio e a carteira real: um script `--simulate-only` (no mesmo molde de
+`.claude/state/tmp/t48c_simulate.py`) que: lê uma posição `migrated` real da tabela
+`meme_live_positions`, chama `ChainReader.pool(mint)`, monta a venda com `pumpswap_build
+.build_pumpswap_sell` e chama `rpc.simulate_transaction(..., sig_verify=False)` — sem nunca chamar
+`send_transaction`. Também não confirmados: o arredondamento exato do produto constante contra um
+fill real, e o layout do `SellEvent` (inferido da IDL, nunca decodificado de uma transação real).

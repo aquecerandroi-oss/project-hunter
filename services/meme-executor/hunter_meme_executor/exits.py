@@ -9,10 +9,13 @@ the curve — or say by name why it cannot.
   owner-enabled ``emergency_auto_close``, the creator dump (the sale **seen on
   the chain** by the radar's 15 s watch, ``creator_sold_seen_at`` of ``0038``, or
   the minute tape's ``creator_sold``), the venue leaving, target, trailing, time stop.
-- **After ``complete = true`` the curve refuses trades** and the only exit is the
-  PumpSwap pool, which T4.8 did not build: the intent is recorded as
-  ``blocked:pumpswap_sell_not_implemented``, the position stays ``open`` with its
-  last honest mark and the heartbeat carries it as a blocked exit — never sold quietly.
+- **After ``complete = true`` the curve refuses trades.** A migrated position
+  (``position.migrated`` or ``meme_tokens.migrated_at``) is routed to
+  ``pumpswap_exit.handle_migrated_position`` (T4.29a: builds and sends a real
+  PumpSwap ``sell``); a curve marked ``complete`` but not yet seen as migrated
+  stays ``blocked:curve_complete_awaiting_migration`` until it is. A migrated
+  mint whose canonical pool cannot be found is ``blocked:pumpswap_pool_not_found``
+  — never sold quietly, never silently retried into the old blanket refusal.
 - **A ``submitted_unconfirmed`` sell is reconciled before any new one** (VM5); a
   ``failed`` one is retried with backoff under a new ``:exit:{n}`` key, never re-signed.
 """
@@ -22,7 +25,6 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import KillSwitchState
@@ -39,7 +41,9 @@ from hunter_exchanges.pumpfun.quote import quote_sell
 from hunter_meme_executor.build import FillRecord, build_sell, decode_fills, fee_bps, reserves_of
 from hunter_meme_executor.chain import CurveRead
 from hunter_meme_executor.context import ExecutorContext
+from hunter_meme_executor.exit_common import BACKOFF_S, mark_blocked
 from hunter_meme_executor.journal_db import WORKER_ROLE
+from hunter_meme_executor.pumpswap_exit import handle_migrated_position
 from hunter_meme_executor.repo import (
     OpenPosition,
     close_position,
@@ -57,7 +61,6 @@ __all__ = ["exits_once", "manage_position"]
 
 logger = get_logger(__name__)
 LAMPORTS = Decimal(1_000_000_000)
-BACKOFF_S = (2, 4, 8, 16, 32, 60)
 
 
 def _params(position: OpenPosition, ctx: ExecutorContext) -> ExitParams:
@@ -85,23 +88,6 @@ def _mark(ctx: ExecutorContext, read: CurveRead, tokens: int) -> Decimal | None:
         return Decimal(0)
     net = Decimal(quote.net_proceeds) / LAMPORTS - ctx.config.limits.network_fee_sol
     return max(Decimal(0), net)
-
-
-async def _blocked(
-    ctx: ExecutorContext, position: OpenPosition, reason: str, block: str, now: datetime
-) -> None:
-    intent: dict[str, Any] = {"reason": reason, "decided_at": now.isoformat(), "blocked": block}
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await set_exit_intent(session, position.id, intent, now=now)
-    ctx.state.blocked_exits[position.id] = block
-    ctx.state.exits_blocked += 1
-    logger.warning(
-        "meme_live_exit_blocked",
-        position_id=position.id,
-        mint=position.mint,
-        reason=reason,
-        blocked=block,
-    )
 
 
 def _retry_due(position: OpenPosition, now: datetime) -> bool:
@@ -168,14 +154,11 @@ async def manage_position(ctx: ExecutorContext, position: OpenPosition, *, now: 
     )
     if reason is None:
         return
-    if migrated or complete or read is None:
-        await _blocked(
-            ctx,
-            position,
-            reason,
-            "pumpswap_sell_not_implemented" if migrated else "curve_complete_awaiting_migration",
-            now,
-        )
+    if migrated:
+        await handle_migrated_position(ctx, position, reason, now)
+        return
+    if complete or read is None:
+        await mark_blocked(ctx, position, reason, "curve_complete_awaiting_migration", now)
         return
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         latest = await latest_sell_order(session, position.proposal_id)
@@ -212,7 +195,7 @@ async def _sell(
         return
     tokens = min(position.tokens, account.amount)
     if tokens <= 0:
-        await _blocked(ctx, position, reason, "reconciliation_mismatch:no_tokens_on_chain", now)
+        await mark_blocked(ctx, position, reason, "reconciliation_mismatch:no_tokens_on_chain", now)
         return
     try:
         built = build_sell(
@@ -227,7 +210,7 @@ async def _sell(
             compute_unit_price_micro_lamports=cfg.compute_unit_price_micro_lamports,
         )
     except Exception as exc:
-        await _blocked(ctx, position, reason, f"build_failed:{type(exc).__name__}", now)
+        await mark_blocked(ctx, position, reason, f"build_failed:{type(exc).__name__}", now)
         return
     key = order_key(position.proposal_id, side="sell", attempt=attempt)
     intent = built.intent_json()

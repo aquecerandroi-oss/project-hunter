@@ -41,9 +41,18 @@ from hunter_core.execution.meme.journal import SigningLocked
 from hunter_core.execution.meme.signer import ENV_SECRET_KEY, MemeSigner
 from hunter_exchanges.pumpfun.decode import BondingCurveAccount
 from hunter_exchanges.pumpfun.global_state import decode_global_account
+from hunter_exchanges.pumpfun.solana_codec import TOKEN_PROGRAM_ID
+from hunter_exchanges.pumpfun.tx_rpc import AccountSnapshot
+from hunter_exchanges.pumpswap.decode import decode_global_config, decode_pool_account
 from hunter_meme_executor.auto_approve import auto_approve_once
 from hunter_meme_executor.build import decode_fills
-from hunter_meme_executor.chain import ChainReader, CurveRead, TokenAccountRead, WalletRead
+from hunter_meme_executor.chain import (
+    ChainReader,
+    CurveRead,
+    PoolRead,
+    TokenAccountRead,
+    WalletRead,
+)
 from hunter_meme_executor.config import ExecutorConfig
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.entries import entries_once
@@ -61,6 +70,9 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 FIXTURES = Path(__file__).resolve().parents[3] / "packages/exchange-adapters/tests/fixtures/pumpfun"
+PUMPSWAP_FIXTURES = (
+    Path(__file__).resolve().parents[3] / "packages/exchange-adapters/tests/fixtures/pumpswap"
+)
 OPERATOR_RULE_SET = "01994d00-6c1a-7000-8000-000000000002"
 TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 POLICY = {
@@ -109,6 +121,18 @@ class FakeRpc:
     def get_block_height(self, **_: Any) -> int:
         return 100
 
+    def get_account(self, address: str, **_: Any) -> Any:
+        """Only the mint-account lookup ``pumpswap_exit._sell`` makes before a
+        PumpSwap sell (T4.29a) — every mint in these tests is classic SPL."""
+        return AccountSnapshot(
+            address=address,
+            owner=TOKEN_PROGRAM_ID,
+            data_base64="",
+            lamports=0,
+            slot=1,
+            executable=False,
+        )
+
     def close(self) -> None:
         return None
 
@@ -123,6 +147,9 @@ class FakeChain(ChainReader):
         self.lamports = 300_000_000
         self.tokens_on_chain = 0
         self.complete = False
+        self.migrated = False
+        self.pool_read: PoolRead | None = None
+        self._pumpswap_config: Any = None
 
     @property
     def rpc(self) -> Any:  # type: ignore[override]
@@ -131,7 +158,29 @@ class FakeChain(ChainReader):
     def global_account(self) -> Any:
         return self._global_account_decoded
 
+    def pumpswap_global_config(self) -> Any:
+        """T4.29a: fees read live, never hardcoded — fixture is a real
+        ``GlobalConfig`` read on mainnet (``t429a_rpc_globalconfig_tokens_raw.json``)."""
+        if self._pumpswap_config is None:
+            raw = json.loads(
+                (PUMPSWAP_FIXTURES / "t429a_rpc_globalconfig_tokens_raw.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            value = raw["result"]["value"][0]
+            self._pumpswap_config = decode_global_config(value["data"][0], owner=value["owner"])
+        return self._pumpswap_config
+
+    def pool(self, mint: str) -> PoolRead | None:
+        """``None`` unless the scenario planted one (``pumpswap_pool_not_found``
+        otherwise) — real pool bytes when it did (T4.29a)."""
+        return self.pool_read
+
     def curve(self, mint: str) -> CurveRead | None:
+        if self.migrated:
+            # A migrated curve is emptied; the exit loop routes on
+            # ``position.migrated`` alone, never on this read (T4.29a).
+            return None
         account = BondingCurveAccount(
             virtual_token_reserves=900_000_000_000_000,
             virtual_sol_reserves=36_400_000_000,
@@ -561,6 +610,98 @@ async def test_a_restarted_executor_rebuilds_the_position_and_sells_it_on_sell_n
     assert closed[0]["status"] == "closed" and closed[0]["exit"]["reason"] == "sell_now"
     assert closed[0]["pnl_sol"] is not None and closed[0]["r_multiple"] is not None
     assert len(restarted.rpc.sent) == 1
+
+
+async def test_a_migrated_position_sells_on_pumpswap(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.29a: the exit door ``exits.py`` used to refuse by name
+    (``pumpswap_sell_not_implemented``) is real. ``position.migrated = true``
+    (``decide_exit`` returns ``"migrated"`` on sight, ``hunter_risk_meme
+    .exits``) routes to ``pumpswap_exit.handle_migrated_position``, which
+    reads the real F5Mk pool fixture (T4.29a, mint
+    ``5RFwNs16ShCeSNQY9Kf5iR5esbEMsnYm7PbWGQAwpump``), builds and "sends"
+    (``FakeRpc``) a PumpSwap ``sell``, and closes the position on a fill
+    priced from the payer's balance delta (no real ``SellEvent`` — none
+    exists to decode; ``.claude/state/notes-T4.29a.md`` "not proven")."""
+    proposal_id = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(harness.ctx)
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text("UPDATE meme_live_positions SET migrated = true WHERE proposal_id = :p"),
+            {"p": proposal_id},
+        )
+    restarted = _context(db_session_factory, _signer(), harness.redis)
+    restarted.chain.tokens_on_chain = 10**9
+    restarted.chain.migrated = True
+    pools = json.loads((PUMPSWAP_FIXTURES / "t429a_rpc_pools_raw.json").read_text(encoding="utf-8"))
+    pool_value = pools["result"]["value"][2]  # F5Mk, the pumpfun package's own graduated fixture
+    pool = decode_pool_account(pool_value["data"][0], owner=pool_value["owner"])
+    restarted.chain.pool_read = PoolRead(
+        address="F5MkE4Yf73TkeSKLv3Mr3yrGJpFg3g7sspaCosVYyxaQ",
+        pool=pool,
+        base_token_amount=964_405_811_222_437,
+        quote_token_amount=751_101_815,
+        slot=447586178,
+        observed_at=datetime.now(UTC),
+    )
+    # A landed PumpSwap sell: no decodable SellEvent (none recorded — nothing
+    # to fabricate), priced on the payer's own balance delta, matching this
+    # exact pool's worked example (quote.py's docstring: net 18 953 lamports).
+    restarted.rpc.transaction = {
+        "slot": 447586200,
+        "blockTime": int(datetime.now(UTC).timestamp()),
+        "meta": {
+            "err": None,
+            "fee": 5000,
+            "preBalances": [100_000_000, 0],
+            "postBalances": [100_018_953, 0],
+            "innerInstructions": [],
+        },
+        "transaction": {"signatures": ["placeholder"], "message": {"accountKeys": []}},
+    }
+    await exits_once(restarted.ctx)
+    sells = await _rows(
+        db_engine,
+        "SELECT * FROM meme_live_orders WHERE proposal_id = :p AND side = 'sell'",
+        p=proposal_id,
+    )
+    assert len(sells) == 1 and sells[0]["status"] == "confirmed", sells
+    assert sells[0]["intent"]["venue"] == "pumpswap"
+    closed = await _rows(
+        db_engine, "SELECT * FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+    )
+    assert closed[0]["status"] == "closed" and closed[0]["exit"]["reason"] == "migrated"
+    assert closed[0]["exit"]["venue"] == "pumpswap"
+    assert closed[0]["exit"]["sell_net_lamports"] == 18_953
+    assert len(restarted.rpc.sent) == 1
+
+
+async def test_a_migrated_position_without_a_pool_is_blocked_by_name(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The named refusal T4.29a adds: a migrated mint whose canonical pool
+    cannot be found (not yet indexed, wrong derivation, RPC lag) stays
+    ``open`` with ``blocked: pumpswap_pool_not_found`` — never silently
+    retried into the pre-T4.29a blanket refusal."""
+    proposal_id = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(harness.ctx)
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text("UPDATE meme_live_positions SET migrated = true WHERE proposal_id = :p"),
+            {"p": proposal_id},
+        )
+    restarted = _context(db_session_factory, _signer(), harness.redis)
+    restarted.chain.tokens_on_chain = 10**9
+    restarted.chain.migrated = True
+    restarted.chain.pool_read = None
+    await exits_once(restarted.ctx)
+    rows = await _rows(
+        db_engine, "SELECT * FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+    )
+    assert rows[0]["status"] == "open"
+    assert rows[0]["exit_intent"]["blocked"] == "pumpswap_pool_not_found"
+    assert len(restarted.rpc.sent) == 0
 
 
 async def test_a_creator_sale_seen_on_the_chain_sells_the_real_position(

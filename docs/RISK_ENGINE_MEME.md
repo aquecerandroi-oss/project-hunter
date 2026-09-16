@@ -76,6 +76,18 @@ no pool canônico do PumpSwap depois da migração. Mais nada.
 
 Endereços e instruções conforme `docs/PUMPFUN-ONCHAIN.md` §0/§1.3/§2.3.
 
+**Status da venda na PumpSwap (T4.29a, 2026-09-16): implementada e verificada offline —
+não simulada na mainnet real.** `hunter_exchanges.pumpswap` decodifica `GlobalConfig`/`Pool` pela
+IDL on-chain do próprio programa (lida ao vivo, sha256 em `decode.py`), deriva o pool canônico de um
+mint migrado sem RPC (confirmado contra 3 pools reais), cota a venda por produto constante com as
+taxas lidas de `GlobalConfig` (nunca fixas) e monta a instrução `sell` (21 contas, ordem da IDL) mais
+o unwrap de WSOL. O executor (`pumpswap_exit.py`) roteia toda posição `migrated` para esse caminho, com
+o mesmo verificador/simulação/journal/kill-switch da curva; `pumpswap_pool_not_found` substitui
+`pumpswap_sell_not_implemented` quando o pool ainda não existe. **O que não está provado:** nenhuma
+venda real foi simulada na mainnet (nenhuma carteira com posição migrada disponível nesta tarefa) nem
+enviada; `docs/PUMPFUN.md` §"PumpSwap (venda pós-migração)" e `.claude/state/notes-T4.29a.md` têm o
+detalhe completo, incluindo o comando `--simulate-only` que o dono deve rodar na VPS.
+
 **Proibições, cada uma com o nome da recusa:**
 
 | Proibido | Recusa | Por quê |

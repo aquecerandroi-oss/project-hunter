@@ -24,8 +24,16 @@ from hunter_exchanges.pumpfun.global_state import (
 from hunter_exchanges.pumpfun.solana_codec import associated_token_address
 from hunter_exchanges.pumpfun.tx import bonding_curve_address
 from hunter_exchanges.pumpfun.tx_rpc import SolanaTxRpcClient
+from hunter_exchanges.pumpswap.decode import (
+    GLOBAL_CONFIG_ADDRESS,
+    GlobalConfig,
+    Pool,
+    decode_global_config,
+    decode_pool_account,
+)
+from hunter_exchanges.pumpswap.pdas import pool_address
 
-__all__ = ["ChainReader", "CurveRead", "TokenAccountRead", "WalletRead"]
+__all__ = ["ChainReader", "CurveRead", "PoolRead", "TokenAccountRead", "WalletRead"]
 
 _GLOBAL_TTL_S = 60.0
 
@@ -55,11 +63,25 @@ class TokenAccountRead:
     amount: int
 
 
+@dataclass(frozen=True, slots=True)
+class PoolRead:
+    """A migrated mint's canonical PumpSwap pool, read fresh (T4.29a) — never
+    cached: reserves move every trade, same discipline as :class:`CurveRead`."""
+
+    address: str
+    pool: Pool
+    base_token_amount: int
+    quote_token_amount: int
+    slot: int
+    observed_at: datetime
+
+
 class ChainReader:
     def __init__(self, rpc: SolanaTxRpcClient, *, commitment: str = "confirmed") -> None:
         self._rpc = rpc
         self._commitment = commitment
         self._global: tuple[float, GlobalAccount] | None = None
+        self._pumpswap_config: tuple[float, GlobalConfig] | None = None
 
     @property
     def rpc(self) -> SolanaTxRpcClient:
@@ -119,3 +141,49 @@ class ChainReader:
 
     def blockhash(self) -> tuple[str, int]:
         return self._rpc.get_latest_blockhash(commitment=self._commitment)
+
+    def pumpswap_global_config(self) -> GlobalConfig:
+        """Cached the same way ``global_account`` is (fees change on the
+        order of months, never hardcoded — T4.29a)."""
+        cached = self._pumpswap_config
+        if cached is not None and time.monotonic() - cached[0] < _GLOBAL_TTL_S:
+            return cached[1]
+        snapshot = self._rpc.get_account(GLOBAL_CONFIG_ADDRESS, commitment=self._commitment)
+        if snapshot is None:
+            raise RuntimeError("PumpSwap GlobalConfig account not found on this cluster")
+        decoded = decode_global_config(snapshot.data_base64, owner=snapshot.owner)
+        self._pumpswap_config = (time.monotonic(), decoded)
+        return decoded
+
+    def pool(self, mint: str) -> PoolRead | None:
+        """The migrated mint's canonical PumpSwap pool now, or ``None`` when
+        it does not exist yet (``pumpswap_pool_not_found``, T4.29a)."""
+        address = pool_address(mint)
+        snapshot = self._rpc.get_account(address, commitment=self._commitment)
+        if snapshot is None:
+            return None
+        pool = decode_pool_account(snapshot.data_base64, owner=snapshot.owner)
+        base_result = cast(
+            dict[str, Any],
+            self._rpc.call(
+                "getTokenAccountBalance",
+                [pool.pool_base_token_account, {"commitment": self._commitment}],
+            ),
+        )
+        quote_result = cast(
+            dict[str, Any],
+            self._rpc.call(
+                "getTokenAccountBalance",
+                [pool.pool_quote_token_account, {"commitment": self._commitment}],
+            ),
+        )
+        base_amount = int(str(cast(dict[str, Any], base_result["value"])["amount"]))
+        quote_amount = int(str(cast(dict[str, Any], quote_result["value"])["amount"]))
+        return PoolRead(
+            address=address,
+            pool=pool,
+            base_token_amount=base_amount,
+            quote_token_amount=quote_amount,
+            slot=snapshot.slot,
+            observed_at=datetime.now(UTC),
+        )

@@ -49,10 +49,13 @@ Os cinco números de política do `.env` (só ele digita) para o **estágio 1** 
 5. Desligar em 5 s: `touch /opt/project-hunter/run/meme/meme.kill`.
 
 ## O que continua fora (ele sabe antes de ligar)
-- Venda **depois** da migração para a PumpSwap não existe: uma posição que migrar fica `open` com
-  `blocked: pumpswap_sell_not_implemented` e sai só pelo site, à mão. Com `max_hold_s` curto o `time_stop` vende antes.
-  **No estágio 2 isto pesa:** uma promissora que gradua com US$ 1 000 dentro só sai pelo Terminal — construir a venda na
-  PumpSwap (T4.18) antes do estágio 2 é a recomendação.
+- **Venda na PumpSwap: implementada em 16/09/2026 (T4.29a), ainda não simulada na mainnet real.**
+  `pumpswap_sell_not_implemented` deixou de existir: uma posição que migrar agora vende de verdade no
+  pool canônico da PumpSwap (decode/quote/instrução verificados offline contra 3 pools reais e o
+  `GlobalConfig` lido ao vivo — `.claude/state/notes-T4.29a.md`), pelo mesmo caminho de
+  verificação/simulação/journal/kill-switch da curva. Falta a prova que só a VPS com carteira e RPC
+  próprio pode dar: nenhuma venda foi simulada (`simulateTransaction`) nem enviada na mainnet real
+  ainda — `pumpswap_pool_not_found` é a única recusa nomeada que resta (pool ainda não indexado).
 - `holder_rewards` sempre 0 hoje e o piso de taxa é constante datada (decodificar `FeeConfig` depois — T4.8b).
 - O rastreador ainda pode expulsar uma moeda com aposta aberta (T4.16b em curso); o executor lê a curva por RPC na hora
   de vender e não depende do rastreador para sair.
