@@ -41,6 +41,8 @@ from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from sqlalchemy.exc import IntegrityError
+
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
@@ -112,9 +114,22 @@ async def persist_reading(
     if ctx.params is not None:
         created_at = tracked.created_at if tracked else None
         params = await ctx.params.resolve(created_at, now=state.received_at)
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await insert_snapshot(session, snapshot_row(state))
-        await upsert_token(session, token_row_from_curve(state, params=params))
+    try:
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            await insert_snapshot(session, snapshot_row(state))
+            await upsert_token(session, token_row_from_curve(state, params=params))
+    except IntegrityError as exc:
+        # T4.26b: a row the schema refuses costs one reading, never the loop — the
+        # discovery loop learned this on 12/09 (empty ``uri``); the poll loop learned
+        # it on 16/09 twice (blank ``twitter`` → deploys efbefd1 and e9913f0 restarted
+        # 19 times). Named, counted, and the reading still feeds the tracker below.
+        logger.warning(
+            "meme_token_upsert_rejected",
+            mint=state.mint,
+            source=state.source,
+            error=str(exc.orig)[:200] if exc.orig is not None else str(exc)[:200],
+        )
+        meme_polls_total.labels(source=state.source, outcome="row_rejected").inc()
     ctx.tracker.observe(tracked_from_curve(state, tracked, params))
     ctx.tracker.mark_polled(
         state.mint, state.observed_at, mcap_sol=state.market_cap_sol, source=state.source

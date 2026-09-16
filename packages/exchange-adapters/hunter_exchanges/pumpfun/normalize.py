@@ -171,6 +171,14 @@ def _optional_text(value: Any) -> str | None:
     return value
 
 
+def _blank_is_none(value: str | None) -> str | None:
+    """``""``/whitespace → ``None``: a blank social field is not observed (T4.26b)."""
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped if stripped else None
+
+
 def parse_curve_state_rest(raw: dict[str, Any]) -> NormalizedCurveState:
     """``frontend-api-v3.pump.fun`` ``/coins/...`` entry -> :class:`NormalizedCurveState`.
 
@@ -234,14 +242,18 @@ def _social_fields(raw: dict[str, Any]) -> dict[str, Any]:
     (``docs/PUMPFUN.md`` §1.3): ``twitter``/``website``/``telegram``/
     ``description``/``metadata_uri``, classified and bounded once, at this
     boundary — never re-derived by a consumer."""
-    twitter = _optional_text(raw.get("twitter"))
+    # T4.26b: the site sends ``""`` when the creator left a field blank — that is
+    # "not observed", never an identity; the CHECKs on ``meme_tokens`` refuse the
+    # empty string and pair ``twitter`` with ``twitter_kind`` (both NULL or both set),
+    # so the blank has to die here, at the source, not at the write boundary.
+    twitter = _blank_is_none(_optional_text(raw.get("twitter")))
     link = classify_twitter_url(twitter)
     return {
-        "uri": _optional_text(raw.get("metadata_uri")),
+        "uri": _blank_is_none(_optional_text(raw.get("metadata_uri"))),
         "twitter": twitter,
-        "website": _optional_text(raw.get("website")),
-        "telegram": _optional_text(raw.get("telegram")),
-        "description": truncate_description(_optional_text(raw.get("description"))),
+        "website": _blank_is_none(_optional_text(raw.get("website"))),
+        "telegram": _blank_is_none(_optional_text(raw.get("telegram"))),
+        "description": truncate_description(_blank_is_none(_optional_text(raw.get("description")))),
         "twitter_kind": None if twitter is None else link.kind,
         "twitter_post_id": link.post_id,
         "twitter_post_at": link.post_at,
