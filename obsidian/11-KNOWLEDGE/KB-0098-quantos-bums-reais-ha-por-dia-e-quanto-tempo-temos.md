@@ -111,3 +111,35 @@ quando o arquivo liberar. Os gráficos da T4.25 continuam desenhando `mcap_sol`;
 
 Ligações: `docs/RISK_ENGINE_MEME.md` §6 · `docs/plans/T4-MEME-RADAR.md` §4 · `.claude/state/notes-T4.27.md` ·
 [[11-KNOWLEDGE/KB-0095-pump-fun-rotulos-observados-do-site-da-rest-e-os-limites-on-chain|KB-0095]] (os rótulos `active`/`paused`/`completed` que servem de segunda testemunha).
+
+## Errata 16/09 — graduações nascidas cheias (append-only; nada acima foi editado)
+
+**O que está errado nas §2 e §6:** o contador "graduou" (`completed_at IS NOT NULL`) inclui moedas que **nascem cheias** —
+a curva enche no mesmo minuto do mint, sem compradores (KB-0103). Medido em 12–16/09 na população **não-Mayhem**, que é a
+desta nota: **73,7 % / 74,4 % / 75,7 % / 69,4 % / 77,9 %** das graduadas caem só na perna `completed_at − created_at ≤ 60 s`
+(IC 95 % ±3,3 pp); somando a perna "nunca teve foto de 15 s com progresso < 0,9 antes de encher", **73,1 % a 95,8 %**.
+(Os 55,4 % da KB-0103 são a média com Mayhem junto, e as Mayhem quase nunca nascem cheias: 2,1 %.)
+
+**Taxas-base corrigidas (13–15/09, 52 146 moedas não-Mayhem; detalhe e SQL em KB-0104):**
+
+| Medida desta nota | Publicado aqui | **Sem as nascidas cheias** |
+|---|---|---|
+| Passaram de 10 SOL reais | 16,5–16,7 % | **14,2 %** |
+| Passaram de 30 SOL reais | 6,4–6,45 % | **3,96 %** |
+| **Graduaram** | **3,9 %** (~670/dia) | **0,83 %** (~145/dia) |
+| Mediana de tempo até 30 SOL | ~1 min (0,61–0,70) | ~1 min (0,86–1,25) |
+| Célula lenta (30 SOL após ≥ 3 min) | 552 em 3 d (~184/dia) | **inalterada** (613 de 614 em 13–15/09) |
+| Graduação da célula lenta | 18,7 % | **19,6 %** (inalterada) |
+| **Célula lenta ÷ base** | **5×** | **~23×** |
+
+**Leitura:** a §3 desta nota ("a célula lenta gradua 5× a média") estava **certa na direção e conservadora demais na
+magnitude** — a célula lenta é o único número que sai intacto, porque quem cruza 30 SOL com ≥ 3 min de vida foi visto
+subindo. O que caiu foi o **denominador**. Também: **não usar `max(real_sol_reserves) ≥ 85` como "encheu"** (a foto de
+curva quase só lê ≥ 85 nas que já nasceram cheias); "encheu" é `completed_at`, com o aviso de que ele é carimbo de
+observação (KB-0103 §5), não tempo on-chain.
+
+**Não muda:** a cadência de ~7 propostas/hora da KB-0099 (é contagem de candidatos da porta no replay de 15 s) nem o limiar
+de 53,1 % da T4.29b (aritmética da curva); ver KB-0104 §3. **Fica pendente:** a KB-0101, cujo desfecho é "graduou".
+
+→ [[11-KNOWLEDGE/KB-0104-taxas-base-sem-as-nascidas-cheias|KB-0104]] ·
+`infra/scripts/sql/research/2026-09-16-r12-q0{1,2,3,4}-*.sql`
