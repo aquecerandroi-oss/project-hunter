@@ -93,3 +93,11 @@ depende de switch explícito do Everton (`ENABLE_MEME_LIVE_TRADING`) depois do f
 ## Operações traçadas
 
 Um gráfico por aposta fechada, uma página por conjunto: [[03-TRADING/Meme/Apostas-tracadas/README|Operações traçadas (meme)]] — desenhadas por `meme_render_bets.py` (`docs/PIPELINE.md` §9c).
+
+## Candidatas do radar (rodadas de pesquisa)
+
+Uma página por rodada: o que estava dentro da janela do executor naquele instante, o que a porta de
+encanamento produziria e o pedigree dos criadores. Não é pré-registro nem recomendação — é leitura do
+banco com hora e SQL anexados.
+
+- [[03-TRADING/Meme/Candidatas/2026-09-16-16h|2026-09-16 — R1 (14:47–15:47 BRT)]]
