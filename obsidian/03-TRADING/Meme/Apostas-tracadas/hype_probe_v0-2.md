@@ -2,7 +2,7 @@
 tags: [operacoes, meme, pumpfun, graficos, m4]
 status: em-andamento
 owner: quant-engineer
-updated: 2026-09-15
+updated: 2026-09-16
 rule_set: hype_probe_v0/2
 kind: research_only
 exp: EXP-M5
@@ -68,3 +68,30 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 | 14:28:22 | PHANTOM | `7TBsLxMbhD…` | -0.0765 | time_stop | [1428-PHANTOM--0.08.png](../../../attachments/meme/2026-09-15/hype_probe_v0-2/1428-PHANTOM--0.08.png) |
 | 14:42:17 | CAPS | `B795sDDSw9…` | -0.4771 | time_stop | [1442-CAPS--0.48.png](../../../attachments/meme/2026-09-15/hype_probe_v0-2/1442-CAPS--0.48.png) |
 | 17:40:27 | FLYHIGH | `9w3XgArZLR…` | -0.4705 | trailing | [1740-FLYHIGH--0.47.png](../../../attachments/meme/2026-09-15/hype_probe_v0-2/1740-FLYHIGH--0.47.png) |
+
+## Dia 2026-09-16
+
+8 aposta(s) fechada(s) — 8 medida(s), 0 indeterminada(s). Soma de R das medidas: **-0.0461**.
+
+**Melhor** — DATBOI · 03:28:35 BRT · +1.2189 R · saída por `migrated`.
+
+![DATBOI hype_probe_v0/2 16/09 03:28](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0328-DATBOI-%2B1.22.png)
+
+**Pior** — STABILITY · 00:34:12 BRT · -0.8663 R · saída por `max_loss`.
+
+![STABILITY hype_probe_v0/2 16/09 00:34](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0034-STABILITY--0.87.png)
+
+**Mais recente** — SORT · 14:06:01 BRT · -0.0918 R · saída por `time_stop`.
+
+![SORT hype_probe_v0/2 16/09 14:06](../../../attachments/meme/2026-09-16/hype_probe_v0-2/1406-SORT--0.09.png)
+
+| hora (BRT) | símbolo | mint | R | saída | gráfico |
+|---|---|---|---|---|---|
+| 00:34:12 | STABILITY | `xgJXYDEWaM…` | -0.8663 | max_loss | [0034-STABILITY--0.87.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0034-STABILITY--0.87.png) |
+| 00:36:17 | STABILITY | `xgJXYDEWaM…` | -0.0417 | time_stop | [0036-STABILITY--0.04.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0036-STABILITY--0.04.png) |
+| 03:28:35 | DATBOI | `6jcGTKroM1…` | +1.2189 | migrated | [0328-DATBOI-+1.22.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0328-DATBOI-%2B1.22.png) |
+| 05:09:09 | KITE | `56KcQzfmDW…` | +0.4658 | migrated | [0509-KITE-+0.47.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0509-KITE-%2B0.47.png) |
+| 07:01:09 | POLKADOT | `Un18N8fpCb…` | -0.0348 | time_stop | [0701-POLKADOT--0.03.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0701-POLKADOT--0.03.png) |
+| 08:00:06 | KLING | `YNsgprpQRL…` | -0.0405 | trailing | [0800-KLING--0.04.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0800-KLING--0.04.png) |
+| 08:13:12 | SOLDIERS | `A2SmpwJBVM…` | -0.6556 | max_loss | [0813-SOLDIERS--0.66.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0813-SOLDIERS--0.66.png) |
+| 14:06:01 | SORT | `7uwn4TV124…` | -0.0918 | time_stop | [1406-SORT--0.09.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/1406-SORT--0.09.png) |
