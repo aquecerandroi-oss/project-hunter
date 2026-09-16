@@ -7,7 +7,7 @@ lido_em: 2026-09-16
 evidencia: medição própria (SQL em infra/scripts/sql/research/2026-09-16-t427-{picos-sao-mayhem,bum-real-sem-mayhem}.sql; 49 853 moedas não-Mayhem, 3 dias)
 hipotese_testavel: sim
 astra: não consultada nesta nota (orquestrador, 16/09 02:3x BRT)
-confiança: alta (medição própria, 3 dias, 49 853 moedas)
+confiança: alta
 owner: sexta-feira
 updated: 2026-09-16
 status: vivo
