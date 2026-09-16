@@ -47,6 +47,9 @@ which lands on ``0041`` (T4.26), which lands on ``0040`` (T4.24b); bumped here
 so the shared fixtures agree with the repository's actual chain rather than any
 one task's private assumption."""
 EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
+E2B_ARM_REVISION = "0044_meme_gate_e2b_arm"
+"""Where the ``0044`` tests stage now that ``0046``/``0047`` sit on top (T4.44):
+``"-1"`` stopped meaning 0044 the day 0046 landed, exactly as every revision before."""
 """Where the ``0043`` tests stage now that ``0044`` sits on top (T4.31): ``"-1"``
 stopped meaning 0043 the day 0044 landed, exactly as every revision before."""
 EXECUTABLE_MCAP_REVISION = "0042_meme_executable_mcap"
@@ -4492,9 +4495,11 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     # retired (+2 = 12); ``0039`` retires operator/4 for flow_v2/5 + operator/5
     # (+1 = 13). Bumped by every migration that changes the count, on purpose: it is
     # the one place a seed or a retirement the round trip forgot would be noticed.
+    # ``0041`` seeds event_v0/1, nothing retired (+1 = 14); ``0044`` seeds flow_v2/6,
+    # nothing retired (+1 = 15) — T4.44.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["13"]
+    ) == ["15"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",
@@ -7758,6 +7763,7 @@ def test_0041_creates_meme_events_with_its_grants_and_fk(upgraded: str) -> None:
         "recorded_by",
         "created_at",
         "matched_at",
+        "last_scanned_created_at",  # 0043 (T4.26b): the per-event scan cursor
     }
     assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_events")) == {"SELECT"}
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_events")) == {
@@ -8419,8 +8425,13 @@ def test_0044_refuses_a_downgrade_while_a_proposal_or_a_bet_references_the_arm(
     upgraded: str,
 ) -> None:
     """§17.7: a proposal or a bet under ``flow_v2/6`` is evidence — count,
-    name, stop. At the head, so ``"-1"`` is this revision."""
-    config = alembic_config(upgraded)
+    name, stop. Staged at ``0044`` since ``0046``/``0047`` sit on top (T4.44)."""
+    with _staged_at(upgraded, E2B_ARM_REVISION) as config:
+        _refusal_of_0044(upgraded, config)
+    command.check(alembic_config(upgraded))
+
+
+def _refusal_of_0044(upgraded: str, config: Config) -> None:
     proposal = "00000000-0000-4000-8000-000000004401"
     bet = "00000000-0000-4000-8000-000000004402"
     guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
@@ -8449,12 +8460,11 @@ def test_0044_refuses_a_downgrade_while_a_proposal_or_a_bet_references_the_arm(
         try:
             with pytest.raises(DBAPIError, match=message):
                 command.downgrade(config, "-1")
-            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
+            assert asyncio.run(_revision(upgraded)) == E2B_ARM_REVISION, (
                 "the downgrade must not commit"
             )
         finally:
             asyncio.run(_write(upgraded, list(_CLEAN_0044)))
-    command.check(config)
 
 
 def test_0044_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
