@@ -30,7 +30,7 @@ from hunter_meme_worker.config import MemeConfig
 from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.fast_lane import fold_fast
 from hunter_meme_worker.features import NO_TRADE_FEED
-from hunter_meme_worker.features_tape import ACTIVITY_1M, SWAP_API_TRADES
+from hunter_meme_worker.features_tape import ACTIVITY_1M
 from hunter_meme_worker.fold import fold_minute
 from hunter_meme_worker.repo_tape import TradeRow, insert_trades
 from hunter_meme_worker.sources import SourcesState
@@ -227,9 +227,12 @@ async def test_the_batch_feeds_both_series_with_its_provenance_and_never_before_
     assert from_batch["creator_net_seller"] is None
     assert from_batch["creator_net_seller_reason"] == NO_TRADE_FEED, "the batch never says who"
     from_tape = features[MINTS["tape"]]
-    assert (from_tape["tape_source"], from_tape["tape_as_of"]) == (SWAP_API_TRADES, MINUTE)
-    assert from_tape["sells_1m"] == 1 and from_tape["creator_net_seller"] is True, (
-        "the per-mint tape wins over the batch's stated zero, and knows the creator"
+    assert (from_tape["tape_source"], from_tape["tape_as_of"]) == (ACTIVITY_1M, STAMP), (
+        "T4.41 (KB-0116): the batch wins even with a stated zero — the per-mint tape's "
+        "own minute agreed with the chain in sign only 34,9 % of the time"
+    )
+    assert from_tape["sells_1m"] == 0 and from_tape["creator_net_seller"] is True, (
+        "the batch's numbers, the per-mint tape's creator — only meme_trades says who"
     )
     both = features[MINTS["both"]]
     assert both["tape_source"] == ACTIVITY_1M and both["tape_as_of"] == STAMP, (
@@ -240,7 +243,9 @@ async def test_the_batch_feeds_both_series_with_its_provenance_and_never_before_
     assert late_row["tape_reason"] == NO_TRADE_FEED, "its only reading came after the close"
     assert ctx.sources is not None
     fields = ctx.sources.heartbeat_fields(MINUTE, tracked=4)
-    assert fields["tape_coverage_pct"] == "75.0" and fields["tape_activity_pct"] == "50.0"
+    assert fields["tape_coverage_pct"] == "75.0" and fields["tape_activity_pct"] == "75.0", (
+        "T4.41: three of the four rows now carry the batch's numbers, not two"
+    )
     # The 15-second row at the close carries the same provenance.
     tracked = [t for t in ctx.tracker.snapshot() if t.mint == MINTS["batch"]]
     fast = await fold_fast(ctx, tracked, as_of=MINUTE)

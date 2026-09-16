@@ -35,6 +35,7 @@ from hunter_meme_worker.features_tape import (
     holders_for,
     tape_for,
 )
+from hunter_meme_worker.features_tape_sources import choose_tape
 from hunter_meme_worker.metrics import meme_features_rows_total, meme_gaps_total
 from hunter_meme_worker.repo import GapRow, insert_features, record_gap
 from hunter_meme_worker.repo_boards import insert_board_minutes
@@ -71,17 +72,19 @@ def _tape_inputs(
         return None, "unsupported_quote"
     if ctx.trades is None:
         return None, "no_trade_feed"
-    minute = tape_for(
+    own = tape_for(
         tape.get(tracked.mint, []),
         end_time=boundary,
         creator=tracked.creator,
         covered_since=ctx.trades.coverage_for(tracked.mint, boundary),
     )
     absence = ctx.trades.absence_reason(tracked.mint, at=boundary)
-    if minute is None:
-        # T4.2g: the batch route's 1m window, when the per-mint tape did not cover.
-        return batch_minute(ctx, tracked.mint, at=boundary, absence=absence)
-    return minute, absence
+    # T4.41 (KB-0116): the batch's 1m window **first** — it tracks the chain
+    # (sign 85,7 %, median ratio 1,00); the per-mint tape only when the batch
+    # did not cover this mint this minute, and always for the creator columns.
+    batch, absence = batch_minute(ctx, tracked.mint, at=boundary, absence=absence)
+    choice = choose_tape(batch=batch, tape=own, absence=absence)
+    return choice.minute, choice.absence
 
 
 async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]:

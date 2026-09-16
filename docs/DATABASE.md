@@ -6911,7 +6911,7 @@ linha dobrada do lote diz `unique_buyers` **com** o criador e `creator_sold`/`cr
 `no_trade_feed` quando nem a fita por mint cobriu o mint — o lote não diz quem negociou; a porta `flow_v2/1`
 continua recusando por nome o que não sabe.
 
-**A precedência (T4.41, `features_tape.choose_tape`).** Até a T4.41 a ordem era a inversa: a fita por mint
+**A precedência (T4.41, `features_tape_sources.choose_tape`).** Até a T4.41 a ordem era a inversa: a fita por mint
 primeiro, o lote só quando ela faltasse. A KB-0116 (16/09) mediu o custo disso contra o Δ `real_sol_reserves`
 da cadeia, minuto a minuto: `activity_1m` acerta o **sinal em 85,7 %** dos pares (razão mediana **1,00**,
 correlação 0,835, n = 6 688), `swap_api_trades` em **34,9 %** (razão mediana **0,00**, n = 1 820 — o puxador
@@ -6920,7 +6920,7 @@ traz uma página por minuto e o fold atribuía o minuto inteiro a ela). Agora **
 cobriu o mint naquele minuto, e **sempre** empresta `creator_sold`/`creator_net_seller` à linha do lote (só
 `meme_trades` diz *quem* negociou). `tape_source` continua dizendo qual foi.
 
-**A terceira fonte do fluxo, ainda não persistida.** Quando nenhuma das duas cobre, `features_tape.chain_flow`
+**A terceira fonte do fluxo, ainda não persistida.** Quando nenhuma das duas cobre, `features_tape_sources.chain_flow`
 calcula o fluxo como Δ `real_sol_reserves` entre duas fotos de curva dos últimos ~60 s (cadência medida: 12 s,
 p90 18 s) — rótulo `chain_delta`, com `buys`/`sells`/`unique_buyers` **desconhecidos** (`buyers_unknown` na
 porta: um Δ de reservas não conta pessoas nem pernas). Escrevê-lo exige migração: o CHECK

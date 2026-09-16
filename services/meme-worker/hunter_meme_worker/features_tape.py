@@ -39,11 +39,13 @@ quote young enough to turn it into SOL (``0032``): the tape columns stay
 ``NULL`` with this reason rather than carry a guessed conversion."""
 SWAP_API_TRADES = "swap_api_trades"
 ACTIVITY_1M = "activity_1m"
-"""``tape_source`` (``0032``): the per-mint tape folded over the minute, or
-the batch route's ``1m`` window ending at ``tape_as_of``."""
+"""``tape_source`` (``0032``): the batch route's ``1m`` window ending at
+``tape_as_of`` - **the preferred one since the T4.41** - or the per-mint tape
+folded over the minute, used only when the batch did not cover that mint in
+that minute (``features_tape_sources.choose_tape``)."""
 
 _FRACTION = Decimal("0.000001")
-_MONEY = Decimal("0.0000000001")
+MONEY_QUANTUM = Decimal("0.0000000001")
 _RATIO = Decimal("0.00000001")
 LAMPORTS_PER_SOL = Decimal(1_000_000_000)
 
@@ -137,8 +139,8 @@ def activity_minute(reading: ActivityReading) -> TapeMinute | None:
     ``no_sol_quote``."""
     if reading.sol_usd is None or reading.sol_usd <= 0:
         return None
-    bought = (reading.buy_volume_usd / reading.sol_usd).quantize(_MONEY, ROUND_HALF_EVEN)
-    sold = (reading.sell_volume_usd / reading.sol_usd).quantize(_MONEY, ROUND_HALF_EVEN)
+    bought = (reading.buy_volume_usd / reading.sol_usd).quantize(MONEY_QUANTUM, ROUND_HALF_EVEN)
+    sold = (reading.sell_volume_usd / reading.sol_usd).quantize(MONEY_QUANTUM, ROUND_HALF_EVEN)
     return TapeMinute(
         buys=reading.buys,
         sells=reading.sells,
@@ -188,8 +190,8 @@ def tape_for(
     buyers = {t.trader for t in minute if t.side == "buy" and t.trader != creator}
     inflow = sum((t.sol_lamports for t in minute if t.side == "buy"), 0)
     outflow = sum((t.sol_lamports for t in minute if t.side == "sell"), 0)
-    volume = (Decimal(inflow + outflow) / LAMPORTS_PER_SOL).quantize(_MONEY, ROUND_HALF_EVEN)
-    net = (Decimal(inflow - outflow) / LAMPORTS_PER_SOL).quantize(_MONEY, ROUND_HALF_EVEN)
+    volume = (Decimal(inflow + outflow) / LAMPORTS_PER_SOL).quantize(MONEY_QUANTUM, ROUND_HALF_EVEN)
+    net = (Decimal(inflow - outflow) / LAMPORTS_PER_SOL).quantize(MONEY_QUANTUM, ROUND_HALF_EVEN)
     creator_sold: bool | None = None
     creator_net_seller: bool | None = None
     if creator is not None:

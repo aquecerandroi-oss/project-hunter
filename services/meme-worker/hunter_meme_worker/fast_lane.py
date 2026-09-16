@@ -71,9 +71,9 @@ from hunter_meme_worker.features_fast import Fast15sRow, FastInputs, build_fast_
 from hunter_meme_worker.features_tape import (
     HoldersObservation,
     TapeTrade,
-    choose_tape,
     tape_for,
 )
+from hunter_meme_worker.features_tape_sources import choose_tape
 from hunter_meme_worker.metrics import meme_polls_total, meme_rows_total
 from hunter_meme_worker.repo_fast import insert_fast_rows, load_fast_points
 from hunter_meme_worker.repo_tape import load_tape
