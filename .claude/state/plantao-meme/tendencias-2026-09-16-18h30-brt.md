@@ -1,0 +1,186 @@
+# Plantão meme — o que mudou desde 16:4x BRT (16/09/2026, corrida "18h30")
+
+Medido 16/09/2026 **17:19–17:23 BRT (20:19–20:23 UTC, `date -u` conferido)** — o arquivo chama-se "18h30" por ordem
+de despacho, mas o relógio real da medição é **17:2x BRT**; o intervalo desde a corrida anterior (16:38–16:42 BRT) é de
+**~40 min**. Só `curl`/`urllib` em APIs públicas, sem navegador e sem WebSearch. **baha.com e X não foram lidos**:
+todo "post"/"anúncio" abaixo é `reported`/`rumor`. Não repete os extratos anteriores: só o delta.
+SOL = US$ 98,1 (pump.fun `sol-price`, 20:19 UTC).
+
+## Fontes desta corrida
+
+| fonte | URL | resultado |
+|---|---|---|
+| DexScreener boosts / profiles | `token-boosts/top/v1`, `token-profiles/latest/v1` | 200 · 11 + 15 Solana |
+| DexScreener pares | `tokens/v1/solana/{mints}` em **14 + 1 lotes de ≤ 10** (135 mints: 20 do extrato anterior + boosts/perfis + 100 do pump.fun top/ao vivo; + 10 de acompanhamento) | 200 × 15, 121 tokens com par |
+| DexScreener busca | `latest/dex/search?q=` 24 termos (paid, usepaid, x money, xmoney, xcat, xdoge, x coin, zcat, zec, monero, revolut, privacy, wofi, wotf, trailcam, casinu, token2049, elon, argus, fed, seeker, stonklana, fair, usdf) + 20 de 2.ª leva (ily, there is no meme, luv, southwest, hyped, dono, manlet, launchoor, anypad, pad, xceo, inutility, useless, …) | 200 × 44 |
+| pump.fun | `coins?sort=market_cap` (50), `coins/currently-live` (50), `coins?sort=created_timestamp` (50), `coins/{mint}` ×8, `sol-price` | 200 |
+| CoinGecko trending | `search/trending` | 200 (15 moedas) |
+| RSS CoinDesk (com `-L`) / Cointelegraph / Decrypt / The Block | — | 200; **2 itens novos** desde 19:42 UTC |
+
+## 1. O que mudou nas narrativas (16:4x → 17:2x BRT)
+
+### N1 — Família X*/X Money: `XCat` **ruggou**, `XDOGE` ficou com tudo, nasceu a 3.ª geração (`XCEO`)
+
+| símbolo | mint | 16:4x BRT | **17:2x BRT (agora)** | leitura |
+|---|---|---|---|---|
+| `PAID` | `98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump` | 8,6 M · 920 k/h · −4 % 1 h | mcap **8,51 M** · 1 h **822 k** · 24 h 56,3 M · **−12 % 1 h** · 3 096 c × 2 511 v/h | esfriando mais rápido (−12 %/h); volume ainda real (r0,15) |
+| `PAIDLON` | `AowPHdsFTZNTa7JDGFUCRpyGa4niTS9GBG26CNWtpump` | 1,35 M · 316 k · +184 % | **1,47 M** · 279 k · **+56 % 1 h** · 8 019 c × 2 181 v · boost 100 | segunda perna ainda de pé; ritmo de compra 3,7:1 |
+| `PAIDDOGE` | `52qkNpgTHcjuDYhKVcg6rJS4uYYtJHpDRcJoSdKqpump` | 509 k · 711 k/h · +21 % | **572 k** · 483 k/h · −1 % 1 h · 6 683 c × 4 150 v · boost 500 | topo plano; giro caiu 1/3 |
+| **`XCat`** | `GFFVbGwi4g5YaJ6V1iLUrVQvgpZ5eM5NRWwS3uuVpump` | 195 k · 500 k na 1.ª h · +174 % | **US$ 2 k · liq 2 k · −98,7 % 1 h** · 540 k/h **de saída** · 13 968 c × 9 620 v | **rug** ~40 min depois de aparecer como #4 do top-8 — o "site + handle" não protegeu |
+| **`XDOGE`** | `7ecXbJWyEoieJtGiGuq5yDmkrWogo6wAzZHVteg2pump` | 228 k · 446 k na 1.ª h · +192 % | **300–329 k** · **1,04 M/h** · 24 h 1,16 M · **+183 % a +210 % 1 h** · 13 5xx c × 4 9xx v · site `xdogecoin.site` + X `@xdogecoinsol` | ficou com o fluxo do `XCat`: 2.º maior volume real da Solana na hora; r0,3 |
+| `X` "X Coin" | `4XcoQqV6kY46Zcofew9yGoYhy7znTuz4cnAUFcytpump` | 30 k · 60 k em 8 min · +1 004 % | **3 k** (curva) · 116 k/h · +2 % 1 h · 722 c × 830 v | não saiu da curva; 5 outros `X` (`E9paxi…`, `GU6CWb…`, `Et2FKg…`, `38nnrU…`, `Dp7ZUP…`) todos a US$ 3 k |
+| **`XCEO`** "Floki X CEO" (novo) | `AfMYNK2xf6rGVwf7w4iR5e8MnX4JiYGrx5THdg9Dpump` | — | criado **17:02:59 BRT** · graduou · mcap **108–141 k** · **236–256 k na 1.ª meia hora** · +53 a +98 % · **4 565–5 127 c × 630–777 v** (6–7 compras por venda) · site `flokixceo.lol` + X `@flokiceo_sol` · descrição: "Parody … NOT Elon or X Corp … But I am the X CEO" · perfil DexScreener | **3.ª geração**: não é produto (UsePaid) nem marca (X Money), é o **personagem** ("X CEO"); clone anterior `XCEO` `9gaKHk…` (16:05 BRT) morto |
+| `ELON` "Elon Coin" | `GY9mZfyPpxXxBXBxS2hB2XjhP3kfUsywTvgveozxpump` | 1,31 M · 172 k/h · −13 % | 1,30 M · 137 k/h · **−19,5 % 1 h** · 24 h 15,2 M | continua caindo; registro |
+| `musepaid`, `XPAID`, `XMONEY` (todos) | `BAGDQY…`, `2qmjxX…`, 17 pares | mortos | `musepaid` 2 k (50 k/h de saída, −95 %); `XPAID` 372/h; `xmoney` **0 pares com > 1 k/h** | confirmado: `PAID*`/`XMONEY` mortos, `X*` com personagem vivo |
+
+**Leitura:** em 40 min a leva `X*` das 16:08–16:30 BRT se resolveu: **um vencedor** (`XDOGE`, 1,04 M/h, +200 %), **um rug**
+(`XCat`, −98,7 %, com site e handle) e um que não saiu da curva (`X`). A ordem de nascimento não previu: o 1.º (`XCat`)
+morreu, o 2.º ganhou. O que nasce agora já é 3.ª geração (`XCEO`, "o personagem"), com a maior razão compra/venda
+da hora (6–7:1) e mcap ainda pequeno. Atualiza o evento 13 (não é evento novo).
+
+### N2 — **NOVO** — Produto "taxa para streamer": `HYPED` (usehyped.app) fez US$ 6,35 M em 1 h e `DONO` (dono.you) nasceu 30 min depois
+
+| símbolo | mint | criado (BRT) | mcap | vol 1 h | c/v 1 h | social | leitura |
+|---|---|---|---|---|---|---|---|
+| **`HYPED`** "Hyped" (mãe) | `G2KDX81e31T6pZbkrJLPKAXqKcd8VoE3UEp83rRtpump` | **16:21:51** (graduou) | **324 k** · liq 56 k | **6,35 M** (24 h 6,41 M) | **37 056 c × 36 277 v** | X `@UseHypedApp` · site `usehyped.app` | maior volume/h da Solana nesta medição — **20× o mcap** (r0,05): giro de bot/sniper, não demanda; +572 % 1 h, +731 % 6 h |
+| `HYPED` clones | `GTTdSd…` (16:32, Meteora, **liq US$ 36**), `8Qx8av…` (16:36), `Hh4QQE…` (16:56, Meteora), `Er2bB8…` (17:07) | 16:32–17:07 | 39–101 k | **1,48 M · 1,35 M · 1,38 M · 868 k** | 5–7 k c × 3 k v | sem social | 20 pares `HYPED` em < 1 h, 14 com > 1 k/h — os clones sem site somam mais "volume" que a mãe; `GTTd…` com liq de US$ 36 e 1,48 M/h é fantasma |
+| **`Hyped`** (2.ª mint oficial?) | `22sGuG5aT5Wac2zxkiADSsHdTfEVt4rFn3EzYdiLpump` | **16:50:10** (graduou) | **297–319 k** · liq 45 k | **455–495 k** | **9 500 c × 1 738 v** | mesmo X `@UseHypedApp` + site; descrição: "Direct token fees to livestreams through Streamlabs. Pair any pump fun token to a streamer to start sending them donations." | criador diferente (`FdK5Q1…` vs `EnDiSy…`) com o mesmo handle: ou relançamento ou clone com social copiado; +528 % 1 h; 5,5 compras por venda |
+| **`DONO`** "dono" | `9HB7uiNQeWTGG1tkuGaMQLhdt9Lg6vmJ4vtLJc1Wpump` | **16:53:29** (graduou) | **52–86 k** | **593–618 k** | 4 730–4 947 c × 4 395–4 547 v | X `@donodotyou` · site `dono.you` · "Launch a coin. Gift fees to your favourite streamers." | **mesma tese** (taxa do token → streamer) 32 min depois do `HYPED`; c/v ≈ 1 = já vendendo; 25 pares `DONO` em < 30 min, 3 clones Meteora diretos (`95FEph…`, `57CeEM…`, `4BhXvt…`) **−100 %** |
+| `DONO` clone | `63bRB7qzqp4aYQWv27zbB87ATX2tqLo39aYSi846DSng` | 16:58 | 21 k · liq 0 | 453 k | 2 696 c × 1 065 v | sem social | volume sem liquidez: fantasma |
+
+**Leitura:** é a narrativa de **produto** da hora — não meme, mas app ("use*.app", como `UsePaid`) que promete rotear
+taxas de token para streamers (Streamlabs). Estrutura idêntica à de ontem com `PAID`: mãe com site+handle, enxame de
+clones em < 1 h, os clones com "volume" maior que a mãe e liquidez de US$ 0–40. Diferença: `PAID` (15/09) subiu para
+8–10 M de mcap; `HYPED` tem 324 k com 6,35 M/h — o giro é 20× o valor, o que, pela régua da KB-0103 (concentração e
+velocidade), aponta para sniper/bot e não para demanda. **Evento novo 16.**
+
+### N3 — **NOVO** — Rajada viral "there is no meme, ily" / `LUV`: 28 clones `ILY` em 6 min (17:15–17:21 BRT)
+
+| símbolo | mint | criado (BRT) | mcap | vol 1 h | c/v | social / origem | leitura |
+|---|---|---|---|---|---|---|---|
+| **`LUV`** | `LUV9GB51PNZNRyzzyYK3rtqFfvDvWtRiXZ34wVq2HrX` (endereço-vaidade) | **17:05** · **Raydium direto** (sem curva) | **265–274 k** · liq 234 k | **655 k** (467 k + 195 k em 2 pares) | 4 691 c × 4 135 v | sem social | nasceu 10 min **antes** da rajada `ILY`; −28 % 1 h; liq alta para a idade (lançamento com caixa) |
+| **`ILY`** "there is no meme, ily" | `6LDU8HoZ3oAJ2hxvYADh8boWmEZV3sfyUb5TyC5Rpump` | **17:18:54** · **encheu a curva no mesmo minuto** (`complete=true` na criação; mcap 45 k → 58 k) | 58 k | — (par PumpSwap 17:20; 1 742 c × 1 383 v) | — | X `@thedevrrrrrrr` status `2100318510761324762` | **forjada pela régua KB-0103** (encheu ≤ 60 s); post não lido |
+| `ily` "there is no meme i luv you" | `9tr7cj1XSEztEFK5zZpivjhKS1s1eWK4sN1PWqcKpump` | 17:15:01 (curva) | 3 k | 14 k | 570 c × 612 v | X `@grok12_john` status `2100317431130403110` · site aponta para `x.ai/news/grok-build-memory` (âncora "/dream") | o "site" é a nota da xAI sobre memória/`/dream` do Grok — a frase pode vir de uma saída do Grok; **não confirmado** |
+| `ILY`/`ily`/`luv` (outros) | 28 pares `ily`, 20 "there is no meme", 21 `luv` — **todos criados < 3 h**, 25+ entre 17:15 e 17:21 BRT | 17:15–17:21 | 3–16 k | 0–1 k | — | — | 12 dos 50 mais novos do pump.fun (janela de 79 s, 20:18:33–20:19:52 UTC) são `ILY`; ainda `Spirit`/`SAR` "Southwest Airlines" (ticker real `LUV`) ×2 e `Cinnamon The Fugitive Capybara` ×2 na mesma janela |
+
+**Leitura:** rajada de clones-de-frase (28 em 6 min), com um `LUV` de caixa alta 10 min antes e um `ILY` que encheu a
+curva no minuto (forjada). O gatilho (post/frase; possível ligação com Southwest `$LUV` ou com o Grok) **não foi lido**.
+Padrão "Trail Cams" das 16:10 BRT (5 clones → mortos em 1 h) escalado 5×. **Evento novo 17** (`viral_post`, `rumor`).
+
+### N4 — Viveiro "fundo/instituição": nada mudou no top-50, mas ganhou dois clones novos e uma forja fora da família
+
+| símbolo | mint | 16:4x | **17:2x** | leitura |
+|---|---|---|---|---|
+| `WOFI` `YuEF…` | `YuEFCTBvg8WgiZrgTS59fZMSKmXtSeVGS2qV6m4pump` | 643 M nominal · 1,04 M em 6 min | **674 M nominal** · liq 2,16 M · **1,09 M/h** · **2 240 c × 72 v** · #2 do top-50 | viveiro (31 compras por venda) |
+| `WOFI` `Fxnc…` | `Fxnc2ieCdBJsHT4DRsQ13rV1mBEZ8uEmDz2gx7Npump` | rug −100 % | 2 k · **857 k/h de saída** | consumado |
+| `WOFI` `Cf7n…` | `Cf7ng2…pump` | 411 M · 890 k | 436–438 M · 146 k/h · +17 % · 4 357 c × 1 616 v | de pé |
+| **`WOFI`** (novo, 8.º) | `6AUUVNHE8et7kswzpcqV75rLgLABQDUegWJqQHPBUmrS` | — | **17:07 BRT** · **Raydium direto** · 25 M nominal · **liq 10 k** · 89 k/h · 699 c × 617 v | clone fora do pump.fun — mesma fábrica, outro canal |
+| **`MANLET`** (novo) | `5zWpGv4stDyPAeRTU6jPq45r7NzGRLMJ8RzBhP71pump` | — | **17:00:26 BRT** · "launched on StonkFun" · **24,7–24,9 M nominal** · liq 413 k · 201 k/h · **2 903–2 976 c × 54–57 v** · +60 650 % · já **#31 do top-50** | **viveiro** (a assinatura "2 900 compras × 55 vendas/h" da KB-0103) com nome de meme antigo (`MANLET` `HxQhDG…` de 08/2025 é outro token, 653 k, vivo) |
+| **`FM`** "Fomo Market" | `tHrxWrwCRGSPJk9zzxxXcWsfnU1Kg6fCaJGPiYdpump` | — | **17:19 BRT** · `complete=true` na criação · 40–84 k · 86 k/h · 707 c × 787 v · "Prediction markets for FOMO" | encheu ≤ 60 s → forjada (KB-0103); irmã `5D3iJx…` a 3 k |
+| `WOTF` `8MUc…` / `8EoR…` | — | 32,9 M · 207 k/h / 9,4 M | 33,9–34,1 M · **27 k/h** · +4 % / 9,6 M · 7 k/h | saída acabou; flat |
+| `FAIR`, `USDF` `B6Jt…`, `NTDA`, `ECTF`, `ELON` `eqUv…` | — | 7–8 k/h | 7–11 k/h · +1 a +7 % · 2 700 c × ≤ 60 v | idem |
+
+Top-50 por mcap da pump.fun às 17:2x BRT: `WOTF` ×6, `WOFI` ×5, `NTDA` ×4, `ECTF` ×2, `DANGR` ×2, `USDF` ×2 — **21 de 50, igual às 16:4x**
+(+ `MANLET` e `COINISM`, `TNT`, `USWR`, `USGR` do mesmo molde). Atualiza o evento 11; **não é evento novo**.
+
+### N5 — ZEC / privacidade: `ZCAT` **saiu** do trending; `ZEC` caiu para #2; Monero/Revolut **não gerou nada**
+- CoinGecko trending agora: **#1 `ARGUS`** (+660 % 24 h, mcap 21,5 M — era 24,1 M; rank 808), #2 `ZEC` (+14,1 %, vol 2,06 B), #3 `TRUMP`,
+  **#4 `DRV` Derive (+35,9 %, novo)**, #5 `PENGU`, #6 `PONS` (−10,8 %), #8 `LIT` Lighter (+8,6 %, novo), **#14 `STONK` (−7,8 %, novo)**, **#15 `USELESS` (+6,0 %, novo)**.
+  `ZCAT` **não está mais** entre os 15 (era #13).
+- `ZCAT` Solana (`HcRLc9…`): par principal migrou para Meteora — 394 k/h lá + 120 k Raydium, **−8,5 % 1 h**, mcap 99–100 M; sem clone com volume.
+- ZEC embrulhado (`A7bdiY…`): 637 k/h Meteora, −2 % — estável. `monero`: só wrappers/`XMR` velhos (14–40 k/h). **`REVOLUT`** `G3vz7B…` criado 16:15 BRT: **US$ 0**.
+  `privacy`: 5 pares, US$ 0. A notícia Revolut/Monero (16:07 BRT) **não virou moeda em 75 min** — rebaixar de "vigilância" para "registro".
+- `ARGUS`: **0 pares Solana** (2 h 20 após a previsão de clone). `arc` AI Rig Complex 73 M no top-50, sem mexer.
+
+### N6 — Animais / cassino / posts pequenos
+| símbolo | mint | 16:4x | **17:2x** | leitura |
+|---|---|---|---|---|
+| `casinu` | `2eMoMqs194VxPHSWtCCzkBGqwCUbD4ZcqhecoGuh4tTp` | 247 k · 272 k/h · +77 % | **202–205 k** (−17 % em 40 min) · 364–369 k/h · +48 % 1 h (trailing) · 3 600 c × 1 842 v · boost 500 | pico da 2.ª perna foi ~16:45; clone `casinu` `GLNuiT…` (17:18, Meteora DBC) 41 k |
+| **`INUTILITY`** "A useless inu" (novo) | `FkDqBb1Vz6iZH9aSD5RBV5ctPQGrF2Ye6NVJ4sXncYMF` | — | **16:16 BRT** · **Raydium direto** · mcap **176–202 k** · **337–346 k/h** · +107 a +132 % · 1 942–2 159 c × 1 726–1 852 v · X `@inutilitystonk` · perfil DexScreener | paródia de `USELESS` (trending #15, 232 M, +6 %); 27 pares `INUTILITY` em 3 h, 3 clones Meteora −100 % |
+| `CATE` | `Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump` | 364 k/h | **490 k/h** · +6,8 % 1 h · 74,7 M · 24 h 6,06 M | maior orgânico do dia segue subindo |
+| `TRAILCAM` ×2 | `9CPbee…`, `6CRDK6…` | 122–138 k na 1.ª h | **44 k/h · mcap 14 k** / **0** | morrendo em 70 min, como previsto |
+| `SEEKER` | `Hp1HufH5vfQH17pFgKuvHypyKt38sR3JYrkEx5dpkBQR` | 106 k · +104 % | 83 k · +81 % (trailing) · 39 k/h | esfriou |
+| `STONKLANA` | `DFNnZi7mLegSKFhipUa964Z1DdLRKmggTr1vUhtwH6Bi` | 107 k · +182 % | 103 k · +1 % · 52 k/h · 3 clones FluxBeam com liq 1,2 M "nominal" e 0 vendas | flat; clones forjados |
+| `CUBE` | `5aQEno…pump` | 8 k · −16 % | 5 k · **−41 %** · 80 k/h | morta |
+| `pad` ×2, `LAUNCHOOR` ×3, `ANYPAD` ×5 | `C3vm7X…` (post `@ddddddd8a`), `C4Dtzu…` (post `@Thedev1738`), `HvWSk5…` (post `@Devilantesol`), `anyp35…` (site anypad.net) | — | 16:52–17:07 BRT · 6–40 k · 90–179 k/h · `pad` `C3vm` **−85 %**, `ANYPAD` `anyp35` −92,5 % no par PumpSwap | micro-cluster "launchpad" de posts pequenos: 4 nomes, 10+ pares, tudo < 50 k — ruído |
+| `SSTR` | `DyFEUxWB1b96Fj65z5cKe52sxtEat5dteevX7oaFM9XP` | — | 17:07 BRT · Raydium · 314 k/h · **−80 %** · post `@dv3333333` | nasceu e morreu em 15 min |
+
+### N7 — Política / macro / TOKEN2049: continua zero
+`FED`/`Fed` ×2 criados **17:17 BRT** (`5Ng8zE…`, `2JXBZD…`) após a alta de 25 bp: US$ 61–295. `token2049` 1 par, US$ 0. `WARSH`: nada. Sem mudança.
+
+## 2. Top 8 Solana por volume real na última hora (17:2x BRT; excluídos rugs em saída e viveiros)
+
+`r` = mcap ÷ vol 24 h. Fora: `WOFI` `YuEF…` 1,09 M/h (viveiro, 31 c/v), `WOFI` `Fxnc…` 857 k (saída), `XCat` 540 k (saída, −98,7 %),
+clones `HYPED` sem site (`GTTd…` 1,48 M com liq US$ 36, `Hh4Q…` 1,38 M, `8Qx8…` 1,35 M, `Er2b…` 868 k) e clone `DONO` `63bRB7…` 453 k (liq 0).
+
+| # | símbolo | mint | idade | mcap | vol 1 h | c/v 1 h | narrativa | marca |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `HYPED` | `G2KDX81e31T6pZbkrJLPKAXqKcd8VoE3UEp83rRtpump` | 1,0 h | US$ 324 k | **6,35 M** | 37 056/36 277 | produto: taxa → streamer (usehyped.app) | **suspeito**: r0,05, giro 20× o mcap, c/v = 1 → bot/sniper; site + X |
+| 2 | `XDOGE` | `7ecXbJWyEoieJtGiGuq5yDmkrWogo6wAzZHVteg2pump` | 1,1 h | 300–329 k | **1,04 M** | 13 566/4 898 | X Money 2.ª geração (vencedor) | real (r0,3); site + X; +200 % 1 h |
+| 3 | `PAID` | `98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump` | 25 h | 8,51 M | **822 k** | 3 096/2 511 | UsePaid (mãe) | real (r0,15); −12 % 1 h; graduada (fora da mesa, T4.18) |
+| 4 | `LUV` | `LUV9GB51PNZNRyzzyYK3rtqFfvDvWtRiXZ34wVq2HrX` | 0,3 h | 265 k | **655 k** | 4 691/4 135 | frase viral "ily"/`LUV` | Raydium direto, liq 234 k, sem social — origem não lida; −28 % 1 h |
+| 5 | `ZEC` (embrulhado) | `A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS` | 334 d | — | **637 k** | 322/774 | privacidade / ZEC #2 | não é meme; termômetro |
+| 6 | `DONO` | `9HB7uiNQeWTGG1tkuGaMQLhdt9Lg6vmJ4vtLJc1Wpump` | 0,5 h | 52–86 k | **593–618 k** | 4 730/4 395 | produto: taxa → streamer (dono.you) | real mas c/v = 1 e mcap caindo; site + X |
+| 7 | `Hyped` (2.ª mint) | `22sGuG5aT5Wac2zxkiADSsHdTfEVt4rFn3EzYdiLpump` | 0,5 h | 297–319 k | **455–495 k** | 9 500/1 738 | idem `HYPED` | mesmo handle, outro criador; 5,5 c/v; +528 % |
+| 8 | `CATE` | `Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump` | 52 d | 74,7 M | **490 k** | 702/1 024 | animal | real (r12); referência |
+
+Logo abaixo: `PAIDDOGE` 483 k (−1 %), `casinu` 369 k (+48 % trailing, mcap −17 %), `INUTILITY` 337–346 k (+107 %), `PAIDLON` 279 k
+(+56 %), `XCEO` 236–256 k (+53–98 %, 6–7 c/v), `MANLET` 201 k (viveiro), `pad` 177 k (−85 %), `ELON` 137 k (−19 %), `ZCAT` 120 k Raydium + 394 k Meteora (−8,5 %).
+**Quatro dos oito são produto "taxa para streamer" ou X Money** — a concentração de tema continua, mas o tema trocou de "pagamento pelo X" para "app que paga streamer".
+
+## 3. Notícias das últimas 2 h (18:20–20:23 UTC) e agenda de hoje à noite / amanhã (BRT)
+
+| hora (BRT) | fonte | item | meme em 24 h? |
+|---|---|---|---|
+| **17:02** | The Block | **BTC e ETH oscilam após alta unânime de 25 bp; Warsh mira a inflação** (novo) | não — `FED` ×2 criados 17:17 BRT com US$ 61–295 |
+| **16:43** | Decrypt | **Powell/Warsh: "Trump só está meio certo sobre a economia"** após a alta (novo) | não |
+| 16:25 / 16:19 | Cointelegraph | resumo do dia; guia da FCA (já nas 16:4x) | não |
+| 16:07 | CoinDesk | Revolut/Monero US$ 3 M (já registrado, evento 15) | **falhou em 75 min**: `REVOLUT` US$ 0, `privacy` US$ 0 |
+| 15:53 / 15:15 | Decrypt | Bitcoin Core; Fed +25 bp (já registrados) | não |
+
+CoinDesk sem item novo depois de 19:07 UTC; Cointelegraph depois de 19:25; The Block: 20:02 é o único. **Nenhuma** notícia das
+quatro redações nas últimas 2 h tem gatilho de meme — o fluxo de 17:2x veio de **dois lançamentos de app** (`HYPED`, `DONO`) e de
+**uma frase viral** (`ILY`/`LUV`), não de redação. Trending CoinGecko: entradas novas `DRV` (#4, +36 %), `LIT` (#8), `STONK` (#14), `USELESS` (#15) —
+`USELESS` já tem paródia viva na Solana (`INUTILITY`, 337 k/h); `DRV`/`LIT`: 0 clones novos.
+
+**Agenda (BRT):** hoje **22:00** — TOKEN2049 Singapura dia 2 abre (fuso +8; anúncios madrugada/manhã BRT; 1 par `token2049`, US$ 0);
+17/09 **manhã** — ETHSpain Barcelona; 17/09 — EBC12 dia 2; 18/09 — triple witching EUA. Sem hora nova nas fontes headless.
+Cronograma dos claims da UsePaid segue não público; `usehyped.app`/`dono.you` sem data pública (sites não lidos).
+
+## 4. Três termos de vigilância (próximas 2 h)
+
+| termo | por quê (medido agora) |
+|---|---|
+| **`HYPED` / `usehyped` / `DONO` / "fees to streamers" / "Streamlabs" na descrição** | narrativa de produto nova (16:22 BRT): 6,35 M/h na mãe, 20 clones `HYPED` + 25 `DONO` em < 1 h, 4 clones a 0,9–1,5 M/h; vigiar se a mãe segura > 300 k de mcap com giro 20× (se sim, é bot sustentando; se não, colapsa como `XCat`) e se nasce um 3.º app do mesmo molde ("use*.app") |
+| **`X*` 3.ª geração: `XCEO` / "X CEO" / `XDOGE` (retenção)** | `XDOGE` ficou com o fluxo (1,04 M/h, +200 %); `XCat` ruggou com site+handle; `XCEO` nasceu 17:03 com 6–7 c/v — vigiar o vale do `XDOGE` (se < 150 k é o mesmo destino do `XCat`) e clones "CEO"/personagem |
+| **`ILY` / "there is no meme" / `LUV` / "Southwest"** | 28 clones em 6 min + `LUV` de caixa alta (655 k/h, liq 234 k) 10 min antes + 1 `ILY` forjada; gatilho não lido (post `@thedevrrrrrrr`/`@grok12_john`; possível Grok `/dream` ou Southwest `$LUV`); se a frase tiver dono, o vencedor aparece em < 1 h |
+
+**Rebaixado:** `ZCAT`/`ZEC`/`MONERO`/`REVOLUT` (ZCAT fora do trending, −8,5 %; Revolut US$ 0 em 75 min), `TRAILCAM` (morto), `casinu`
+(2.ª perna já virou, −17 % de mcap). **Não vigiar (medido):** `ARGUS` (0 pares, 2 h 20), `FED`, `TOKEN2049`, `WARSH`, `pad`/`LAUNCHOOR`/`ANYPAD` (< 50 k);
+`WOTF`/`WOFI`/`NTDA`/`ECTF`/`MANLET`/`FM` só como exclusão (KB-0103).
+
+## 5. Linhas `meme_event.py add` — só eventos NOVOS (16–17; dry-run; `--apply` na VPS; sem `--mint`, mint em `--notes`)
+
+Os eventos 13–15 (16:4x BRT) não se repetem; ganham nota: 13 → "XCat −98,7 % 17:2x; XDOGE 1,04 M/h vencedor; XCEO 3.ª geração 17:03";
+11 → "MANLET 17:00 e FM 17:19 forjadas; WOFI 6AUU Raydium 17:07"; 15 → "REVOLUT/privacy US$ 0 em 75 min; ZCAT fora do trending".
+
+```bash
+# 16. Produto "taxa para streamer": HYPED (usehyped.app, 16:22 BRT) US$ 6,35 M/h com giro 20x o mcap; DONO (dono.you) 32 min depois; 45 clones em < 1 h
+uv run python infra/scripts/meme_event.py add --kind narrative \
+  --title "Apps de taxa para streamer: HYPED (usehyped.app, 16:22 BRT) US$ 6,35 M na 1.a hora com 37 k compras x 36 k vendas e mcap 324 k; DONO (dono.you, 16:53) 618 k/h; 20 clones HYPED + 25 DONO em < 1 h, clones a 0,9-1,5 M/h sem liquidez" \
+  --url "https://www.usehyped.app/" --handle UseHypedApp --symbol HYPED \
+  --confidence rumor --source dexscreener_profile --observed-at 2026-09-16T20:21:00Z \
+  --notes '{"mints":{"HYPED":"G2KDX81e31T6pZbkrJLPKAXqKcd8VoE3UEp83rRtpump","Hyped_2":"22sGuG5aT5Wac2zxkiADSsHdTfEVt4rFn3EzYdiLpump","DONO":"9HB7uiNQeWTGG1tkuGaMQLhdt9Lg6vmJ4vtLJc1Wpump"},"clones":{"HYPED":["GTTdSdZo1cz1CCJnrQvzgwEGb8WgzX53mftzVz4xt1Jt","8Qx8avX36UWCvKgdWK5EeJn3PBhAZfgAouFQWV8apThd","Hh4QQE3GENHXzdgVEtiQh8KLS2BsJevfT7ZeQUFEdpby","Er2bB83sWg6jMoXhnEyvN2ChGa9RTbUFUqRM9Hj6ZvCb"],"DONO":["63bRB7qzqp4aYQWv27zbB87ATX2tqLo39aYSi846DSng"]},"vol1h_usd":{"HYPED":6350000,"Hyped_2":495000,"DONO":618000},"mcap_usd":{"HYPED":324000,"Hyped_2":297000,"DONO":62000},"buys_sells_1h":{"HYPED":"37056/36277","Hyped_2":"9500/1738","DONO":"4947/4547"},"handles":["UseHypedApp","donodotyou"],"pitch":"Direct token fees to livestreams through Streamlabs / Gift fees to your favourite streamers","turnover_to_mcap":19.6,"suspect":"giro 20x o mcap, c/v=1 -> bot/sniper (KB-0103)","parent_pattern":"evento 9 (UsePaid: app use*.app -> enxame)","sites_read":false}' --recorded-by sexta-feira
+
+# 17. Rajada viral "there is no meme, ily": 28 clones ILY em 6 min (17:15-17:21 BRT), LUV de caixa alta 10 min antes, 1 ILY encheu a curva no minuto (forjada)
+uv run python infra/scripts/meme_event.py add --kind viral_post \
+  --title "'there is no meme, ily': 28 clones ILY em 6 min (17:15-17:21 BRT), 12 dos 50 mais novos do pump.fun em 79 s; LUV (Raydium direto, liq 234 k) 655 k/h nasceu 17:05; ILY 6LDU encheu a curva no minuto; gatilho nao lido" \
+  --url "https://x.com/thedevrrrrrrr/status/2100318510761324762" --handle thedevrrrrrrr --symbol ILY \
+  --confidence rumor --source dexscreener_profile --observed-at 2026-09-16T20:22:00Z \
+  --notes '{"mints":{"LUV":"LUV9GB51PNZNRyzzyYK3rtqFfvDvWtRiXZ34wVq2HrX","ILY_forjada":"6LDU8HoZ3oAJ2hxvYADh8boWmEZV3sfyUb5TyC5Rpump","ily_grok":"9tr7cj1XSEztEFK5zZpivjhKS1s1eWK4sN1PWqcKpump"},"clones_ily_3h":28,"clones_luv_3h":19,"burst_window_brt":"17:15-17:21","newest50_share":"12/50 em 79 s","vol1h_usd":{"LUV":655000,"ily_grok":14000},"mcap_usd":{"LUV":265000,"ILY_forjada":58000},"other_handles":["grok12_john"],"other_links":["https://x.ai/news/grok-build-memory (ancora /dream)"],"co_burst":["Southwest Airlines (Spirit, SAR $LUV) x2","Cinnamon The Fugitive Capybara x2"],"post_read":false,"kb0103":"ILY 6LDU complete=true na criacao = forjada"}' --recorded-by sexta-feira
+```
+
+## Ligações
+`obsidian/02-MARKET/Eventos/2026-09-16-18h30-brt.md` (versão do vault) · `.claude/state/plantao-meme/tendencias-2026-09-16-17h-brt.md`
+(corrida anterior, 16:38–16:42 BRT) · `obsidian/11-KNOWLEDGE/KB-0100-*.md`, `KB-0103-*.md` · `obsidian/00-INBOX/Hipoteses-do-plantao.md` (M-P54) ·
+brutos em `%LOCALAPPDATA%\Temp\claude\p1830\` (não versionados)
