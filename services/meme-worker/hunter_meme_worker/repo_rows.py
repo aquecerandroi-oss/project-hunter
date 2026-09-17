@@ -6,15 +6,31 @@ them, so every caller still imports from there.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+NUL = "\x00"
+_REQUIRED_TEXT = frozenset({"mint", "first_seen_source"})
+
+
+def clean_text(value: str | None) -> str | None:
+    """T4.47: PostgreSQL ``text`` cannot hold ``\\x00``, and pump.fun does emit
+    it — ``"spaceX链游\\x00"`` arrived at 00:11:48Z on 17/09/2026 and every retry
+    of the same frame raised ``CharacterNotInRepertoireError`` until the whole
+    worker died (its 18th restart). The byte carries no meaning, so it is
+    dropped; a string that was *only* NULs becomes ``None`` ("not observed"),
+    the same answer ``discovery._identity`` gives an empty one."""
+    if value is None or NUL not in value:
+        return value
+    return value.replace(NUL, "") or None
+
 
 @dataclass(frozen=True, slots=True)
 class TokenRow:
-    """What one observation knows about a mint. Unknown stays ``None``."""
+    """What one observation knows about a mint. Unknown stays ``None``.
+    Every text field is NUL-free by construction (``clean_text``)."""
 
     mint: str
     first_seen_source: str
@@ -73,6 +89,18 @@ class TokenRow:
     """Mutable, like ``mayhem_state``: the indexer's count keeps moving after
     discovery (clones reusing the same handle)."""
 
+    def __post_init__(self) -> None:
+        # frozen + slots: the only door is object.__setattr__; ``mint`` and
+        # ``first_seen_source`` are required, so a NUL-only value there stays
+        # ``""`` and the schema refuses it loudly instead of writing NULL.
+        for f in fields(self):
+            value = getattr(self, f.name)
+            if isinstance(value, str) and NUL in value:
+                cleaned = clean_text(value)
+                if cleaned is None and f.name in _REQUIRED_TEXT:
+                    cleaned = ""
+                object.__setattr__(self, f.name, cleaned)
+
 
 @dataclass(frozen=True, slots=True)
 class SnapshotRow:
@@ -110,4 +138,4 @@ class GapRow:
     detail: dict[str, Any] | None = None
 
 
-__all__ = ["GapRow", "SnapshotRow", "TokenRow"]
+__all__ = ["GapRow", "SnapshotRow", "TokenRow", "clean_text"]
