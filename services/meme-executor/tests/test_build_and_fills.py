@@ -324,6 +324,15 @@ def test_a_partial_sell_never_closes_the_ata() -> None:
     assert cast(Any, verified).closes_user_ata is False
 
 
+def test_the_close_flag_is_off_unless_everton_sets_it() -> None:
+    """T4.46b: the real sell transaction only changes on his written flag."""
+    from hunter_meme_executor.exits import _close_ata_on_full_sell
+
+    assert _close_ata_on_full_sell({}) is False
+    assert _close_ata_on_full_sell({"MEME_CLOSE_ATA_ON_FULL_SELL": "1"}) is True
+    assert _close_ata_on_full_sell({"MEME_CLOSE_ATA_ON_FULL_SELL": "off"}) is False
+
+
 def test_a_full_sell_with_the_flag_off_never_closes_the_ata() -> None:
     """``MEME_CLOSE_ATA_ON_FULL_SELL=0`` (``close_ata_on_full_sell=False``) is an
     explicit opt-out — the executor never appends the close, flag or no balance."""
