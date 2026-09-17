@@ -132,3 +132,7 @@ pelo clique dele. Pré-requisitos inalterados: estágio 1 fecha 5 vendas reais; 
 Números sugeridos para o segundo `meme_gates.json`/`.env` (ele fixa): `max_sol_per_trade 0,25` · `MEME_WALLET_MAX_SOL 10` ·
 `MEME_MAX_OPEN_POSITIONS 5` · `MEME_DAILY_LOSS_CAP_SOL` a escolher · `MEME_LIVE_AUTO_APPROVE=false`. Tickets maiores só com compra
 na pool com liquidez medida — frente nova, não autorizada.
+
+## Adendo 17/09/2026 11:5x BRT — "deixa comprar moedas à vontade" (Everton, por escrito no chat)
+
+Depois do estágio 1 concluído (5/5 compras, −0,0449 SOL realizado; [[03-TRADING/Meme/Balanco-2026-09-17-estagio-1]]), o Everton decidiu retirar o limite de **número** de compras do teste pequeno. O que muda: só `scope.max_trades` (5 → 1000) no `meme_gates.json` da VPS, editado por ele (o arquivo é a assinatura dele; a Sexta-feira não o edita). O que **não** muda: 0,05 SOL por operação, 0,72 SOL de teto total, cap de perda diária 0,15 SOL, no máximo 2 posições abertas, `expires_at`/`valid_until` 2026-09-18 (vence amanhã; renovar é outra decisão dele), estágio 1 = modo sozinho. O robô relê o arquivo em até 10 s.
