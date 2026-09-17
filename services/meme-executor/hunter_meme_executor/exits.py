@@ -68,13 +68,11 @@ ENV_CLOSE_ATA_ON_FULL_SELL = "MEME_CLOSE_ATA_ON_FULL_SELL"
 
 
 def _close_ata_on_full_sell(env: Mapping[str, str]) -> bool:
-    """T4.46 — OFF by default: a full sell closes the mint's ATA and earns the
-    rent back (R43) only when Everton sets ``MEME_CLOSE_ATA_ON_FULL_SELL=1`` in
-    the VPS ``.env``. The review of 5bbae3ab (``.claude/state/review-T4.46.md``)
-    found the change safe but named the failure mode — a systematic close
-    error makes every full sell fail simulation and parks the position — and
-    the first mainnet full sell with a close is the only real test; a change
-    to the real sell transaction is his flag, not a default."""
+    """T4.46 — OFF by default: a full sell closes the mint's ATA (rent back,
+    R43) only when Everton sets ``MEME_CLOSE_ATA_ON_FULL_SELL=1`` in the VPS
+    ``.env``. Review of 5bbae3ab: safe, but a systematic close error would park
+    every position at simulation, and the first mainnet close is the only
+    real test — a change to the real sell transaction is his flag."""
     return parse_flag(env.get(ENV_CLOSE_ATA_ON_FULL_SELL), default=False)
 
 
