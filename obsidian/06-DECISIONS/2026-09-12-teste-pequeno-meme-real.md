@@ -136,3 +136,7 @@ na pool com liquidez medida — frente nova, não autorizada.
 ## Adendo 17/09/2026 11:5x BRT — "deixa comprar moedas à vontade" (Everton, por escrito no chat)
 
 Depois do estágio 1 concluído (5/5 compras, −0,0449 SOL realizado; [[03-TRADING/Meme/Balanco-2026-09-17-estagio-1]]), o Everton decidiu retirar o limite de **número** de compras do teste pequeno. O que muda: só `scope.max_trades` (5 → 1000) no `meme_gates.json` da VPS, editado por ele (o arquivo é a assinatura dele; a Sexta-feira não o edita). O que **não** muda: 0,05 SOL por operação, 0,72 SOL de teto total, cap de perda diária 0,15 SOL, no máximo 2 posições abertas, `expires_at`/`valid_until` 2026-09-18 (vence amanhã; renovar é outra decisão dele), estágio 1 = modo sozinho. O robô relê o arquivo em até 10 s.
+
+## Adendo 17/09/2026 13:5x BRT — "usa a outra moeda, não tem problema" / "quero deixar atualizado para usar outra moeda" (Everton, por escrito)
+
+A carteira do robô tem 21,33 USDC além do SOL. O Everton pede que o sistema use USDC como capital. Decisão de construção (Sexta-feira): **tesouraria do executor (T4.54)** — quando o SOL cai abaixo de um piso, o executor converte USDC → SOL pela Jupiter, com tetos (por troca, por dia, slippage, intervalo), verificação e simulação antes de assinar, linha auditada em `meme_treasury_swaps`. **Nasce desligada** (`MEME_TREASURY_ENABLED=false`); ligar é dele, no `.env`, depois da revisão de risco. Enquanto não liga, vale a conversão manual (Phantom/Jupiter) + `max_total_sol` no `meme_gates.json`.
