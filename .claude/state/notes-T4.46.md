@@ -91,3 +91,11 @@ uv run python infra/scripts/check_file_size.py --root .                      # 0
 uv run pytest packages/exchange-adapters/tests services/meme-executor/tests \
        -q -m "not live" -k "not persistence"                                 # 871 passed, 2 skipped
 ```
+
+## Pendências após a revisão (T4.46b, 16/09 22:5x BRT — ver `.claude/state/review-T4.46.md`)
+1. `fills.py:70` — o reembolso do aluguel entra no `payer_delta` e vira PnL quando a ATA já existia antes da compra (pó/venda parcial anterior): ~+0,0015 SOL de "lucro" falso (≈ 3 % num op de 0,05 SOL) contamina `r_multiple`. Rotular o reembolso e subtraí-lo do PnL.
+2. `pumpswap/tx.py:181` — o caminho migrado (PumpSwap) fecha só a ATA de WSOL; a ATA do mint base fica parada.
+3. Sem teste negativo para `token_instruction_not_close_account` e `close_account_not_a_sell` em `verify.py`.
+4. Sem fixture real de venda cheia com `CloseAccount`; a primeira em mainnet é o teste — por isso o padrão ficou DESLIGADO (`MEME_CLOSE_ATA_ON_FULL_SELL=1` é do Everton).
+5. `trade_event._event_payloads:254` tem o mesmo bug de chave `jsonParsed` de `wallet_fills` (sem risco hoje: produção pede `encoding: json`); reutilizar `_key()` de `wallet_fills.py:117`.
+6. A flag é lida de `os.environ` dentro de `_sell` (`exits.py:222`), fora do retrato de config → a mesa não a vê no heartbeat.
