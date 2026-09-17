@@ -58,12 +58,11 @@ from hunter_meme_worker.lab_repo import (
 )
 from hunter_meme_worker.lab_repo_bets import count_indeterminate
 from hunter_meme_worker.lab_repo_e2b import lineage_for
-from hunter_meme_worker.lab_repo_lines import open_probes_for, scaled_parent_ids
 from hunter_meme_worker.lab_repo_mayhem import load_gate_rows_with_mayhem
+from hunter_meme_worker.lab_scale_step import scale_step
 from hunter_meme_worker.lab_ticks import record_tick
 from hunter_meme_worker.lab_trail import RefusalTrailState
 from hunter_meme_worker.proposals import evaluate_gate
-from hunter_meme_worker.proposals_scale import REFUSAL_SCALE_GATE_INACTIVE, evaluate_scale
 
 __all__ = [
     "HEARTBEAT_PREFIX",
@@ -84,7 +83,6 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.models import NormalizedSolPrice
     from hunter_meme_worker.config import MemeConfig
     from hunter_meme_worker.context import ChainSource
-    from hunter_meme_worker.proposals import GateRow
     from hunter_meme_worker.tracker import MintTracker
 
 logger = get_logger(__name__)
@@ -153,6 +151,10 @@ class LabContext:
     point read of a mint's own curve before a pending exit is written off as
     ``indeterminate`` (``lab_point_read.py``) — the same budget accounting,
     because it is the same client instance."""
+    wake: Callable[[], Awaitable[None]] | None = None
+    """T4.52a: fires once per tick that commits a proposal (Redis pub/sub,
+    ``main._wake_publisher``) so the executor wakes instead of polling;
+    ``None`` is a safe no-op — a quiet Lab is still correct, just slower."""
 
     async def sol_usd(self, now: datetime) -> SolUsd | None:
         """The observed quote, at most ``lab_sol_usd_max_age_s`` old; ``None`` and
@@ -255,46 +257,9 @@ async def _gate_step(
                 refusals[spec.name].update(outcome.refusals)
                 rows_total += outcome.evaluated
                 proposals_total += await insert_proposals(session, outcome.drafts)
-            proposals_total += await _scale_step(ctx, session, specs, rows, refusals, now=now)
+            proposals_total += await scale_step(ctx, session, specs, rows, refusals, now=now)
         ctx.state.last_gate_minute = minute
     return rows_total, proposals_total, refusals
-
-
-async def _scale_step(
-    ctx: LabContext,
-    session: AsyncSession,
-    specs: list[RuleSetSpec],
-    rows: list[GateRow],
-    refusals: dict[str, Counter[str]],
-    *,
-    now: datetime,
-) -> int:
-    """T4.10: for every set that scales, the open probes not yet scaled are
-    judged by the line set's gate on this minute's rows (``proposals_scale``)."""
-    by_label = {spec.label: spec for spec in specs}
-    inserted = 0
-    for spec in specs:
-        if not spec.scales or spec.scale_gate is None:
-            continue
-        trend = by_label.get(spec.scale_gate)
-        if trend is None:
-            refusals[spec.name][REFUSAL_SCALE_GATE_INACTIVE] += 1
-            continue
-        probes = await open_probes_for(session, spec.id)
-        if not probes:
-            continue
-        outcome = evaluate_scale(
-            spec,
-            trend,
-            rows,
-            open_probes=probes,
-            already_scaled=await scaled_parent_ids(session, spec.id),
-            now=now,
-            ttl_s=ctx.config.lab_proposal_ttl_s,
-        )
-        refusals[spec.name].update(outcome.refusals)
-        inserted += await insert_proposals(session, outcome.drafts)
-    return inserted
 
 
 async def lab_tick(ctx: LabContext, *, now: datetime | None = None) -> TickReport:
@@ -309,6 +274,8 @@ async def lab_tick(ctx: LabContext, *, now: datetime | None = None) -> TickRepor
     minutes = closed_minutes(ctx.state, now, backlog=ctx.config.lab_gate_backlog_minutes)
     rows, proposals, refusals = await _gate_step(ctx, specs, minutes, now=now)
     fast_rows, fast_proposals = await fast_gate_step(ctx, specs, refusals, now=now)
+    if ctx.wake is not None and proposals + fast_proposals > 0:
+        await ctx.wake()  # T4.52a: both insert paths above have already committed
     ctx.state.refusals = {name: dict(counter) for name, counter in refusals.items()}
     fills = await fill_approved(
         ctx, {spec.id: spec for spec in specs}, now=now, day_start=day_start, day_end=day_end

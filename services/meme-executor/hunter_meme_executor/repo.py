@@ -73,6 +73,9 @@ class Candidate:
     decided_at: datetime
     decided_by: str
     status: str
+    proposed_at: datetime
+    """T4.52a: when the radar's row was created — ``received_at - proposed_at``
+    is the pickup lag R55 measured (``entries.py``, ``ctx.state.pickup_lags``)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +99,7 @@ class PendingAttempt:
 
 
 _CANDIDATES = text(
-    "SELECT p.id, p.mint, p.decision, p.decided_at, p.decided_by, p.status "
+    "SELECT p.id, p.mint, p.decision, p.decided_at, p.decided_by, p.status, p.proposed_at "
     "FROM meme_proposals p "
     "WHERE p.mode = 'live' AND p.status IN ('approved', 'filled', 'unfilled') "
     "  AND p.decided_at IS NOT NULL AND p.decided_at >= :since "
@@ -168,6 +171,7 @@ async def live_candidates(
             decided_at=r["decided_at"],
             decided_by=str(r["decided_by"]),
             status=str(r["status"]),
+            proposed_at=r["proposed_at"],
         )
         for r in rows
     ]

@@ -336,9 +336,14 @@ def _context(
 
 
 async def _plant_proposal(
-    engine: AsyncEngine, *, decided_at: datetime, size_sol: str = "0.01"
+    engine: AsyncEngine,
+    *,
+    decided_at: datetime,
+    size_sol: str = "0.01",
+    proposed_at: datetime | None = None,
 ) -> str:
     proposal_id = str(uuid4())
+    proposed_at = proposed_at or decided_at - timedelta(seconds=1)
     async with engine.begin() as connection:
         await connection.execute(
             text(
@@ -360,7 +365,7 @@ async def _plant_proposal(
                 "id": proposal_id,
                 "mint": MINT,
                 "rs": OPERATOR_RULE_SET,
-                "proposed": decided_at - timedelta(seconds=1),
+                "proposed": proposed_at,
                 "expires": decided_at + timedelta(seconds=120),
                 "decision": json.dumps(
                     {"size_sol": size_sol, "target_x": "2", "trailing_pct": "30", "max_hold_s": 900}
@@ -630,6 +635,30 @@ async def test_a_live_approval_becomes_a_confirmed_order_and_an_open_position(
             s=orders[0]["tx_signature"],
         )
     )[0]["n"] == 1
+
+
+async def test_pickup_lag_recorded_from_proposed_at_and_published_on_heartbeat(
+    harness: Harness, db_engine: AsyncEngine
+) -> None:
+    """T4.52a: ``entries_once`` samples ``received_at - proposed_at`` for every
+    candidate it sees for the first time; the heartbeat publishes p50/max of
+    that sample — the number R55 measured as "Proposal->Received" (4.8s
+    median before the wake-up in ``wake.py``)."""
+    now = datetime.now(UTC)
+    await _plant_proposal(db_engine, decided_at=now, proposed_at=now - timedelta(seconds=3))
+    await entries_once(harness.ctx)
+    assert len(harness.ctx.state.pickup_lags) == 1
+    lag = harness.ctx.state.pickup_lags[0]
+    assert 2.5 < lag < 4.0, lag
+    hb = await heartbeat_fields(harness.ctx)
+    assert float(hb["proposal_pickup_lag_s_p50"]) == pytest.approx(lag, abs=0.05)
+    assert float(hb["proposal_pickup_lag_s_max"]) == pytest.approx(lag, abs=0.05)
+
+
+async def test_pickup_lag_fields_are_empty_before_any_candidate_is_seen(harness: Harness) -> None:
+    hb = await heartbeat_fields(harness.ctx)
+    assert hb["proposal_pickup_lag_s_p50"] == ""
+    assert hb["proposal_pickup_lag_s_max"] == ""
 
 
 async def test_wallet_refresh_updates_the_heartbeat_with_no_candidate_at_all(

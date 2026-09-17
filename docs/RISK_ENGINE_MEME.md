@@ -716,6 +716,29 @@ assume:
 > seja, na moeda HR a taxa do criador é a mesma, só muda quem recebe; **não** é uma taxa a mais, e
 > `quote_sell` com 95 + 30 bps reproduz o evento ao lamport. O custo modelado continua correto.
 
+> **T4.52a (17/09/2026): a decisão de compra deixou de esperar o próximo tick do executor.**
+> R55 (`.claude/state/notes-R55.md`) mediu a latência real das 5 primeiras compras: 6,3 s mediana
+> porta a porta, com **4,8 s (76 %) gastos entre a proposta ser escrita e o `entries_once` a
+> enxergar** — o radar (`lab.py`, T4.2g) escreve `meme_proposals` no seu próprio tick e o executor só
+> a lia no ciclo seguinte do seu poll (`config.loop_s`). O executor agora acorda no instante em que a
+> proposta é gravada: o radar publica em `meme:proposals:wake` (Redis pub/sub,
+> `hunter_meme_worker.wake.wake_publisher`, chamado por `LabContext.wake` uma vez por tick que
+> gravou pelo menos uma proposta — tanto pela porta do minuto quanto pela pista rápida de 15 s,
+> T4.43) assim que a escrita comita; `hunter_meme_executor.wake.ProposalWakeListener` assina esse
+> canal e liga um
+> `asyncio.Event` que o loop de entradas espera com `config.loop_s` como **tempo limite, não mais
+> como único gatilho** (`main.forever(..., wake_event=...)`). **Não é `LISTEN`/`NOTIFY` do Postgres**
+> — `docs/SPEC_REVIEW.md` R7 proíbe no projeto inteiro porque toda conexão passa por um pooler em
+> modo transação, que uma sessão de `LISTEN` não sobrevive. Perder uma publicação (Redis caiu, rede
+> falhou) custa só o próximo tick do poll — nunca uma proposta, cuja única fonte de verdade continua
+> sendo a tabela; o listener reconecta sozinho com backoff exponencial com jitter. Nada do motor de
+> admissão, do kill switch, do sizing ou do simulador mudou — a proposta chega mais cedo ao mesmo
+> código. Medido nos testes deste pacote (Redis real via testcontainers): publicação → `asyncio.Event`
+> setado em bem menos de 200 ms (`test_wake_integration.py`). O heartbeat (`hb:meme:executor`) agora
+> publica `proposal_pickup_lag_s_p50`/`_max` (janela das últimas 200 propostas vistas) para que o
+> número de R55 seja relido depois do deploy. O tick de 15 s do próprio radar (fila do radar até a
+> proposta existir) não muda nesta tarefa — fica para T4.52b.
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |

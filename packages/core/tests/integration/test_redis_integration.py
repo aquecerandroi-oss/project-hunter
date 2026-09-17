@@ -15,7 +15,8 @@ import pytest
 from hunter_core.domain.types import utcnow
 from hunter_core.events import EventEnvelope, ack, consume, ensure_group, publish
 from hunter_core.events.produce import FIELD_NAME
-from hunter_core.redis import acquire_lock, keys
+from hunter_core.redis import keys
+from hunter_core.redis_lock import acquire_lock
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio

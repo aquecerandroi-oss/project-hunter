@@ -9,6 +9,7 @@ is off — a paper executor has nothing to sign with, by construction.
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -86,6 +87,12 @@ class ExecutorState:
     risk_read_attempts: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
     """When this process last **attempted** an on-demand read per mint - failures
     included, which the persisted row cannot bound. Pruned to its own window."""
+    pickup_lags: deque[float] = field(default_factory=lambda: deque(maxlen=200))
+    """T4.52a: ``received_at - proposal.proposed_at`` in seconds, one sample per
+    live candidate ``entries_once`` sees for the first time — exactly what R55
+    measured as "Proposal->Received". p50/max of this ride the heartbeat
+    (``proposal_pickup_lag_s_p50``/``_max``, ``heartbeat.py``) so the same
+    number can be re-read after the wake-up (``wake.py``) ships."""
 
 
 @dataclass(slots=True)
@@ -105,3 +112,9 @@ class ExecutorContext:
     to read a mint's rug numbers when the radar's row has not landed. ``None``
     disables the on-demand read entirely and restores the T4.28g behaviour
     (wait, and refuse by name); no other behaviour depends on it."""
+    wake_event: asyncio.Event = field(default_factory=asyncio.Event)
+    """T4.52a: set by ``wake.ProposalWakeListener`` on every ``meme:proposals:wake``
+    message; ``main.py`` hands this same event to the entries loop's ``forever(...,
+    wake_event=...)`` so a fresh proposal wakes it instead of waiting for
+    ``config.loop_s``. Never read directly by test code that does not also run
+    the listener — a stray ``set()`` is harmless (the next tick just runs early)."""

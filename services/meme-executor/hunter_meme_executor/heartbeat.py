@@ -15,6 +15,7 @@ scope's counters (``small_test_used_sol``, ``small_test_trades_done``,
 from __future__ import annotations
 
 import json
+import statistics
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -112,6 +113,19 @@ async def _auto_fields(
     return fields
 
 
+def _pickup_lag_fields(ctx: ExecutorContext) -> dict[str, str]:
+    """T4.52a: p50/max of ``ctx.state.pickup_lags`` — the number R55 measured
+    as "Proposal->Received" (4.8s p50 before the wake-up in ``wake.py``).
+    Empty until the entries loop has seen its first candidate."""
+    lags = ctx.state.pickup_lags
+    if not lags:
+        return {"proposal_pickup_lag_s_p50": "", "proposal_pickup_lag_s_max": ""}
+    return {
+        "proposal_pickup_lag_s_p50": f"{statistics.median(lags):.3f}",
+        "proposal_pickup_lag_s_max": f"{max(lags):.3f}",
+    }
+
+
 async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     cfg, state = ctx.config, ctx.state
     now = utcnow()
@@ -197,6 +211,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     fields.update(gates_fields(ctx))
     fields.update(auto)
     fields.update(ctx.kill.describe())
+    fields.update(_pickup_lag_fields(ctx))
     return fields
 
 

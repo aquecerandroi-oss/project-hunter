@@ -21,8 +21,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 if TYPE_CHECKING:
+    import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
     from testcontainers.community.postgres import PostgresContainer
+    from testcontainers.community.redis import RedisContainer
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MIGRATIONS_DIR = REPO_ROOT / "infra" / "migrations"
@@ -75,6 +77,38 @@ def postgres_container(docker_available: bool) -> Iterator[PostgresContainer]:
     with PostgresContainer("postgres:16-alpine", driver="asyncpg") as container:
         asyncio.run(_create_app_roles(container.get_connection_url(), container.username))
         yield container
+
+
+@pytest.fixture(scope="session")
+def redis_container(docker_available: bool) -> Iterator[RedisContainer]:
+    if not docker_available:
+        pytest.skip("Docker is not reachable; skipping Redis-backed integration tests")
+    from testcontainers.community.redis import RedisContainer
+
+    with RedisContainer("redis:7-alpine") as container:
+        yield container
+
+
+@pytest_asyncio.fixture
+async def redis_client(redis_container: RedisContainer) -> AsyncIterator[redis_asyncio.Redis]:
+    from typing import Any, cast
+
+    from pydantic import SecretStr
+
+    from hunter_core.redis import create_redis
+    from hunter_core.settings import Settings
+
+    host = redis_container.get_container_host_ip()
+    port = redis_container.get_exposed_port(6379)
+    settings = Settings(
+        redis_url=SecretStr(f"redis://{host}:{port}/0?socket_timeout=15&socket_connect_timeout=15")
+    )
+    client = create_redis(settings)
+    try:
+        await cast(Any, client).flushdb()
+        yield client
+    finally:
+        await client.aclose()
 
 
 def _alembic_config(url: str) -> Config:

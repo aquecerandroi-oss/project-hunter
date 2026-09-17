@@ -9,7 +9,8 @@ from pydantic import SecretStr
 from redis.backoff import ExponentialWithJitterBackoff
 from redis.retry import Retry
 
-from hunter_core.redis import acquire_lock, check_redis, create_redis, keys
+from hunter_core.redis import check_redis, create_redis, keys
+from hunter_core.redis_lock import acquire_lock
 from hunter_core.settings import Settings
 
 pytestmark = pytest.mark.unit
@@ -35,6 +36,7 @@ def test_key_builders_match_architecture_md_5_3() -> None:
         keys.processed("scanner-worker", date(2026, 9, 6))
         == "hunter:processed:scanner-worker:20260906"
     )
+    assert keys.meme_proposals_wake() == "meme:proposals:wake"
 
 
 def test_create_redis_raises_when_redis_url_missing() -> None:

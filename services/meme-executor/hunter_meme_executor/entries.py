@@ -334,4 +334,7 @@ async def entries_once(ctx: ExecutorContext) -> None:
         candidates = await live_candidates(session, now=now)
     for candidate in candidates:
         ctx.state.entries_seen += 1
+        # T4.52a: one sample per candidate, the first (and only, `live_candidates`
+        # never re-offers a proposal with an order row) tick that sees it.
+        ctx.state.pickup_lags.append((now - candidate.proposed_at).total_seconds())
         await handle_candidate(ctx, candidate, now=now)

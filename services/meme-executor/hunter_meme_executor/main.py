@@ -1,4 +1,5 @@
-"""``HUNTER_ROLE=meme_executor`` — boot refusals first, then five loops.
+"""``HUNTER_ROLE=meme_executor`` — boot refusals first, then five loops plus
+one listener.
 
 The shape of the meme-worker: a thin entrypoint, a ``WorkerRuntime`` for
 logging, Sentry, the heartbeat key and ``/health``·``/ready``·``/metrics``, and
@@ -17,6 +18,14 @@ or without events — and since T4.28d the gates file's mtime rides the same tic
 quiet desk with every position closed still has a balance no older than this
 tick), ``reconcile`` (30 s: every ``submitted_unconfirmed`` row is settled by
 ``getSignatureStatuses``, never re-sent), ``heartbeat`` (10 s).
+
+T4.52a: ``entries`` also wakes early on ``meme:proposals:wake`` (``wake.py``,
+``ProposalWakeListener``) — the radar publishes there right after its own
+proposal insert commits, so ``config.loop_s`` becomes a fallback instead of
+the only reason the loop runs. R55 measured the old poll-only path at 4.8s
+median / 7.5s p95 from insert to pickup (76% of the end-to-end decision
+latency); ``hb:meme:executor`` now also carries ``proposal_pickup_lag_s_p50``/
+``_max`` so the same number can be re-read after this ships.
 """
 
 from __future__ import annotations
@@ -46,6 +55,7 @@ from hunter_meme_executor.journal_db import WORKER_ROLE, PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
+from hunter_meme_executor.wake import ProposalWakeListener
 from hunter_meme_executor.wallet_refresh import wallet_refresh_once
 
 if TYPE_CHECKING:
@@ -57,9 +67,19 @@ logger = get_logger(__name__)
 
 
 async def forever[ContextT](
-    name: str, interval_s: float, step: Callable[[ContextT], Awaitable[object]], ctx: ContextT
+    name: str,
+    interval_s: float,
+    step: Callable[[ContextT], Awaitable[object]],
+    ctx: ContextT,
+    *,
+    wake_event: asyncio.Event | None = None,
 ) -> None:
-    """One step per cadence until cancelled; a failure is logged and re-raised."""
+    """One step per cadence until cancelled; a failure is logged and re-raised.
+
+    T4.52a: with ``wake_event`` given, the wait between steps ends early the
+    instant it is set (``wake.ProposalWakeListener``) — ``interval_s`` becomes
+    a fallback, not the only reason ``step`` runs again.
+    """
     while True:
         try:
             await step(ctx)
@@ -68,7 +88,14 @@ async def forever[ContextT](
         except Exception:
             logger.exception("meme_executor_loop_failed", loop=name)
             raise
-        await asyncio.sleep(interval_s)
+        if wake_event is None:
+            await asyncio.sleep(interval_s)
+            continue
+        try:
+            await asyncio.wait_for(wake_event.wait(), timeout=interval_s)
+        except TimeoutError:
+            pass
+        wake_event.clear()
 
 
 async def reconcile_once(ctx: ExecutorContext) -> None:
@@ -205,11 +232,14 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
         auto_approve=config.auto_approve,
         auto_approve_max_per_hour=config.auto_approve_max_per_hour,
     )
+    wake_listener = ProposalWakeListener(runtime.redis, ctx.wake_event)
     try:
         async with asyncio.TaskGroup() as group:
             group.create_task(
-                forever("entries", config.loop_s, entries_once, ctx), name="meme-entries"
+                forever("entries", config.loop_s, entries_once, ctx, wake_event=ctx.wake_event),
+                name="meme-entries",
             )
+            group.create_task(wake_listener.run(), name="meme-proposal-wake")
             group.create_task(forever("exits", config.mark_s, exits_once, ctx), name="meme-exits")
             group.create_task(
                 forever("kill_switch", config.kill_switch_poll_s, kill_switch_once, ctx),

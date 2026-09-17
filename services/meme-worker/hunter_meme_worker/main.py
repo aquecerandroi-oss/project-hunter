@@ -56,6 +56,7 @@ from hunter_meme_worker.graduation import GlobalParamsStore
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
 from hunter_meme_worker.mayhem import mayhem_once
 from hunter_meme_worker.tracker import MintTracker
+from hunter_meme_worker.wake import wake_publisher
 from hunter_meme_worker.wallets import build_wallets, wallets_once
 from hunter_meme_worker.warmup import warm_tracked_set
 from hunter_meme_worker.wiring import (
@@ -154,6 +155,7 @@ def build_lab_context(runtime: WorkerRuntime, config: MemeConfig, ctx: RadarCont
         heartbeat=_heartbeat_writer(runtime),
         tracker=ctx.tracker,
         chain=ctx.chain,
+        wake=wake_publisher(runtime),
     )
 
 
