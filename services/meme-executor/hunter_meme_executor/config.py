@@ -38,6 +38,7 @@ from hunter_core.execution.meme.gates import (
 )
 from hunter_core.execution.meme.signer import MemeSigner, boot_meme_execution
 from hunter_exchanges.pumpfun.tx_rpc import MAINNET_PUBLIC_RPC_URL
+from hunter_meme_executor.creator_flow import DEFAULT_SELL_TOLERANCE_PCT
 from hunter_risk_meme import MEME_PAPER_V0, MemeLimits, MemePolicyMissing, limits_from_env
 
 __all__ = [
@@ -92,6 +93,13 @@ class ExecutorConfig:
     admission refused for a reason that needs more than a tick to change
     (``auto_approve.DETERMINISTIC_REFUSALS``) is not re-opened by the robot. ``0``
     disables the skip (and the query with it)."""
+    risk_read_timeout_s: float = 1.5
+    """T4.45 - ``MEME_RISK_READ_TIMEOUT_S``: the hard deadline of the executor's
+    own ``/in-memory-coin`` read on the admission path. Past it the read is a
+    failure and the admission refuses by name, never waits."""
+    creator_sell_tolerance_pct: Decimal = Decimal("0.02")
+    """T4.45 - ``MEME_CREATOR_SELL_TOLERANCE_PCT``: how much of his recorded
+    allocation a creator may be missing before the chain read calls it a sale."""
     gates_file: str | None = None
     """T4.28d — the path the gates were read from, so the runtime can re-read it
     on an mtime change (``gates_reload``). ``None`` while the live flag is off."""
@@ -126,6 +134,25 @@ def _int(env: Mapping[str, str], name: str, default: int) -> int:
         return int(raw) if raw else default
     except ValueError:
         return default
+
+
+def _tolerance(env: Mapping[str, str]) -> Decimal:
+    """``MEME_CREATOR_SELL_TOLERANCE_PCT`` in ``[0, 1)``.
+
+    Unreadable or out of range falls back to the default instead of refusing the
+    boot: this is not policy of capital and not an authorization (the two
+    families of T4.28h), it is the dust margin of one inference, and its safe
+    value is the small one. A ``1`` would make every creator a holder, so the
+    range stops before it.
+    """
+    raw = (env.get("MEME_CREATOR_SELL_TOLERANCE_PCT") or "").strip()
+    if not raw:
+        return DEFAULT_SELL_TOLERANCE_PCT
+    try:
+        value = Decimal(raw)
+    except (ArithmeticError, ValueError):
+        return DEFAULT_SELL_TOLERANCE_PCT
+    return value if Decimal(0) <= value < Decimal(1) else DEFAULT_SELL_TOLERANCE_PCT
 
 
 def _cluster(env: Mapping[str, str]) -> Cluster:
@@ -236,6 +263,8 @@ def boot(
         auto_approve_refusal_cooldown_s=max(
             0.0, _float(env, "MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S", 120.0)
         ),
+        risk_read_timeout_s=max(0.1, _float(env, "MEME_RISK_READ_TIMEOUT_S", 1.5)),
+        creator_sell_tolerance_pct=_tolerance(env),
         gates_file=(env.get(ENV_GATES_FILE) or "").strip() or None if mode.live else None,
         env_limits=env_limits,
     )

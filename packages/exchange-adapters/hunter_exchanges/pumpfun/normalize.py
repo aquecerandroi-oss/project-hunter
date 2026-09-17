@@ -82,6 +82,16 @@ def _decimal(value: Any, field: str) -> Decimal:
         ) from exc
 
 
+def _optional_decimal(raw: dict[str, Any], field: str) -> Decimal | None:
+    """T4.45 - a number the frame may not carry. Absent is ``None``; present and
+    unreadable is :class:`MalformedMessage`, never a silent ``None``: the
+    executor reads ``None`` as "we never saw the creator's allocation" and would
+    treat a datum that *was* there as unknown."""
+    if field not in raw or raw[field] is None:
+        return None
+    return _decimal(raw[field], field)
+
+
 def _require(raw: dict[str, Any], fields: tuple[str, ...], kind: str) -> None:
     missing = [f for f in fields if f not in raw]
     if missing:
@@ -146,6 +156,14 @@ def parse_new_token(raw: dict[str, Any]) -> NormalizedMemeTokenCreated:
         initial_virtual_token_reserves=_decimal(
             raw["vTokensInBondingCurve"], "vTokensInBondingCurve"
         ),
+        # T4.45: the dev buy that happens inside the very ``create`` transaction
+        # - the only reading of the creator's allocation that is taken *at* the
+        # creation instant. Every other source (``devHoldingsPercent`` of the
+        # indexer, the tape) is a later photograph, and a later photograph of a
+        # creator who already dumped reads as "holds what he has", which is the
+        # dump check 10 exists to catch (T4.28g section 2.3).
+        creator_initial_tokens=_optional_decimal(raw, "initialBuy"),
+        creator_initial_sol=_optional_decimal(raw, "solAmount"),
         signature=str(raw["signature"]),
         pool=pool,
         received_at=now,

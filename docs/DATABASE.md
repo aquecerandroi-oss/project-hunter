@@ -5674,6 +5674,8 @@ meme_tokens                                  (global, não particionada)
   created_at, bonding_curve                  -- SEMPRE o PDA ["bonding-curve", mint] derivado (§55)
   bonding_curve_raw text NULL                -- só quando o frame discordou do PDA (0047, §55)
   initial_virtual_sol_reserves, initial_virtual_token_reserves NUMERIC(28,10)
+  creator_initial_tokens NUMERIC(28,10) NULL -- a compra do criador no proprio create, em TOKENS (0048, §56)
+  creator_initial_sol NUMERIC(28,10) NULL    -- quanto ela custou, em SOL (0048, §56)
   initial_real_token_reserves NUMERIC(28,10) -- o denominador do progresso
   total_supply NUMERIC(28,10), pool
   mayhem_enabled boolean NULL                -- NULL = desconhecido, nunca DEFAULT false
@@ -7529,3 +7531,55 @@ a uma linha durável: `hunter_meme_token_bonding_curve_replaced_total{mayhem_ena
 cardinalidade ilimitada) e um log `meme_token_bonding_curve_replaced` com o mint e os dois endereços, para
 um humano conferir uma moeda específica. Nada disparado quando o frame já concordava — o caso comum não
 gera ruído.
+
+## 56. A alocação do criador no instante da criação — M5 (`0048_meme_creator_initial_buy`)
+
+**O que a coluna resolve, medido.** Em 16/09/2026 a mesa real mandou 58 ordens e teve **0** fills; **27**
+foram recusadas `creator_flow_unknown` (`obsidian/03-TRADING/Meme/Balanco-2026-09-16-mesa-real.md`). O
+`creator_sold` do fold de 1 min fica não-nulo entre **+123 e +441 s** depois de a moeda existir (R5,
+`Estudo-2026-09-16-admissao-real-o-que-recusa.md`) e a entrada acontece entre 30 e 300 s: o executor
+perguntava ao banco algo que nenhuma linha podia responder ainda, e recusava — corretamente — pelo nome.
+
+**Por que só agora dá para derivar da cadeia.** A T4.28g §2.3 recusou derivar o fluxo por um motivo
+concreto: *nenhuma coluna guardava a alocação do criador na criação*. A única base candidata era o
+`devHoldingsPercent` do indexador — uma foto **corrente** cuja primeira amostra chega +114 a +419 s
+depois —, e com uma foto corrente como base um criador que largou tudo aos +20 s lê como "saldo ≥ base" e
+**passa** o check 10. Esta revisão grava a base no instante certo:
+
+| coluna | unidade | de onde vem |
+|---|---|---|
+| `creator_initial_tokens` | **tokens** (a mesma de `initial_real_token_reserves`) | `initialBuy` do frame `create` do PumpPortal |
+| `creator_initial_sol` | SOL | `solAmount` do mesmo frame |
+
+A unidade não é suposição: a aritmética do próprio frame fecha — `1 073 000 000 − initialBuy ==
+vTokensInBondingCurve`, ao último dígito, na captura ao vivo (`pumpportal_ws_capture_raw.jsonl`, linha 6,
+mint `HTEqdy7k…`: 30 877 830,227113 tokens por 0,888892813 SOL). Por isso o executor compara o saldo da
+ATA (subunidades, 6 casas) com esta coluna sem uma segunda convenção.
+
+**`0` é medido, `NULL` é não observado.** Um criador que não comprou nada na criação grava `0`; um frame
+que não trouxe o campo (ou um mint descoberto por `migrate`) fica `NULL`. A admissão só deriva fluxo com
+base **conhecida e `> 0`** — contra uma base `0`, "saldo ≥ base" é verdade vazia e responderia "não
+vendeu" sobre quem nunca teve o que vender.
+
+**Escrita única, pelo mesmo gatilho.** As duas colunas entram em
+`meme_tokens_identity_is_written_once` (`ddl/meme_creator_initial_buy.py`, lista de `0047` + 2). É a
+garantia de que uma leitura **corrente** posterior — um re-ingest, um script de reparo — nunca vira a base
+da comparação; sem ela o bug da foto velha voltaria por outra porta. `CHECK
+ck_meme_tokens_a_dev_buy_is_not_negative`: nenhuma das duas é negativa (um valor negativo é um frame que
+não entendemos, não um número pequeno). O par **não** é obrigado a vir junto: um frame mais magro pode
+trazer os tokens sem o SOL, e recusar essa linha perderia justamente o dado que a revisão existe para
+guardar.
+
+**Downgrade guardado (§17.7).** `refuse_a_downgrade_that_would_lose_the_creators_initial_buy` recusa
+enquanto qualquer linha carregar valor: o canal gratuito do PumpPortal não tem replay e a alternativa
+on-chain (`getTransaction` da assinatura de criação) é uma varredura paga de um slot que pode já ter saído
+da retenção do RPC. `packages/core/tests/integration/test_migration_0048.py` prova as duas pontas contra
+um Postgres real, mais a escrita única e o `NULL → valor` que ainda é permitido.
+
+**Sem backfill, e isso é decisão.** Para as moedas criadas antes desta revisão o dado **não é recuperável
+com honestidade**: `meme_trades` (fita do swap-api) começa a cobrir um mint uma mediana de ~100 s depois
+da criação — uma compra do dev que apareça *ali* é uma compra posterior, não a alocação da criação — e o
+REST `/coins/<mint>` só expõe o `devHoldingsPercent` corrente, exatamente a foto que esta revisão existe
+para substituir. Um script que escrevesse qualquer um dos dois nestas colunas fabricaria o falso "o criador
+ainda segura" que a T4.28g recusou. Moeda antiga fica `NULL` e continua recusando pelo nome
+(`creator_flow_unknown`).

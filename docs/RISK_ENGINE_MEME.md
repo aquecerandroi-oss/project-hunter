@@ -315,6 +315,18 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
   as propostas `operator` em `proposed` **e** `approved` e os mints com ordem live antes do fill (10
   min, `repo_tape.pending_operator_mints`), e a primeira leitura de um mint nunca é adiada pelo teto
   de 1 leitura/mint/5 min.
+- **A leitura de risco deixou de ser espera e virou leitura (T4.45).** Antes de abrir a proposta, se
+  `meme_risk_snapshots` não tem linha do mint dentro de `RISK_SNAPSHOT_MAX_AGE_S` (600 s) o **executor
+  lê o mesmo endpoint** que o `RiskReader` do worker lê (`GET /in-memory-coin/{mint}`, o mesmo cliente
+  do adaptador), persiste a linha pelo **mesmo escritor** (`hunter_core.db.meme_risk_snapshots`, só o
+  `source` muda: `indexer_rest:/in-memory-coin:executor_on_demand`), refaz o contexto e roda a admissão
+  com o dado fresco. **Limites:** prazo duro de 1,5 s (`MEME_RISK_READ_TIMEOUT_S`), no máximo **uma**
+  leitura por mint a cada 600 s (contando as que falharam — senão o laço de 1 s marteleria um endpoint
+  caído), e a leitura só é gasta no mint que o planejador **abriria** neste tique. **Falha ou prazo
+  estourado ⇒ o comportamento de antes**: `risk_snapshot_pending` continua sendo o nome do skip, a
+  proposta fica `proposed` para o humano e nenhuma ordem existe. Uma leitura que volta **sem**
+  `bundled_share` é gravada (é evidência) mas **não** conta como medida — o check 11 continua recusando
+  o não medido. No heartbeat: `risk_reads_on_demand` e `risk_reads_on_demand_failed`.
 - **Quem liga:** só o Everton, no `.env` da VPS; o guardião de padrões recusa a flag ligada em arquivo
   rastreado (`infra/scripts/forbidden_patterns.sh`). **Desligar:** a flag em `false` + `update`, ou o
   kill switch (que também pára as aprovações automáticas). **O estágio 2 continua exigindo clique.**
@@ -389,6 +401,29 @@ honesta enquanto isso, e ela é do dono:** não derivar o fluxo que não existe,
 `MEME_CREATOR_UNKNOWN_ALLOWED_IF_DEV_MEASURED`, desligada por padrão (§3.1). Isso **não** resolve o
 caso do criador que largou tudo antes da primeira medição: a foto é corrente, e por isso a permissão
 é uma decisão escrita e reversível, não o novo padrão.
+
+**O dado passou a existir no instante da decisão (T4.45, 16/09/2026).** O balanço do dia — 58 ordens
+reais, **0** fills, `creator_flow_unknown` em 27 e bundle ausente em 36 das 39 ordens na janela — não
+mediu limites errados: mediu **perguntas feitas antes de existir resposta**. Duas mudanças, nenhuma
+delas em check, limiar ou janela de frescor:
+
+1. **O executor lê o risco sozinho, sob demanda** (§3.5). Sem linha fresca em `meme_risk_snapshots`, ele
+   lê o mesmo `/in-memory-coin` com prazo de 1,5 s, grava pela mesma função do worker
+   (`source = indexer_rest:/in-memory-coin:executor_on_demand`) e reconstrói o contexto. Falha ⇒ o de
+   antes: `bundled_share` continua `None` e o check 11 recusa `bundled_share_unmeasurable`.
+2. **O fluxo do criador vem da cadeia contra a compra registrada do dev.** A `0048`
+   (`docs/DATABASE.md` §56) grava `creator_initial_tokens`/`creator_initial_sol` no instante do `create`
+   — a compra do dev que o próprio frame do PumpPortal traz (`initialBuy`/`solAmount`, em **tokens** e
+   SOL). Com `creator_sold` do fold ainda `NULL` **e** base conhecida `> 0`, a admissão lê a ATA do
+   criador (`confirmed`, prazo de 1,5 s) e conclui `creator_net_sol = −1` quando o saldo está abaixo de
+   `inicial × (1 − MEME_CREATOR_SELL_TOLERANCE_PCT)` (padrão 0,02), `+1` caso contrário, com
+   `creator_flow_source = 'chain_ata_vs_initial'` no JSON da admissão. **Isto é o que a T4.28g §2.3 dizia
+   faltar** — a base da criação — e por isso a derivação deixou de ser desonesta: um criador que largou
+   tudo aos 20 s agora lê `−1` (`creator_net_seller`), não `+1`. O que **não** mudou: `creator_sold`
+   conhecido sempre vence (fato de fita > inferência de saldo); base `NULL` ou `0` ⇒ nada é derivado e o
+   nome continua `creator_flow_unknown`; conta inexistente com base registrada é **dump**, não "não
+   medido" (é o oposto da regra do `creator_watch`, que não tem base contra o que comparar). A permissão
+   da T4.28h (§3.1) fica como está — ela deixa de ser necessária no caso comum, não é revogada.
 
 **O que muda em relação ao SPOT, e por quê:** não existe `book_depth` nem `spread` — não há livro
 (T4-MEME-RADAR §0). O papel deles é feito por **dois** checks que a curva permite fazer melhor: o

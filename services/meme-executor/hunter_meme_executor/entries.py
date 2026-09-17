@@ -32,13 +32,13 @@ from hunter_core.logging import get_logger
 from hunter_meme_executor.admission import (
     AdmissionInputs,
     admit,
-    context_from,
     creates_ata,
     curve_from,
     day_start_utc,
     proposal_from,
     wallet_from,
 )
+from hunter_meme_executor.admission_context import build_admission_context
 from hunter_meme_executor.auto_approve import auto_approve_once, reject_if_auto
 from hunter_meme_executor.build import BuiltTrade, FillRecord, build_buy, decode_fills, fee_bps
 from hunter_meme_executor.chain import CurveRead, TokenAccountRead, WalletRead
@@ -49,12 +49,8 @@ from hunter_meme_executor.repo import (
     insert_order,
     insert_position,
     live_candidates,
-    open_positions,
     order_key,
-    participation_used_sol,
-    pending_attempts,
     refuse_admitted_order,
-    token_context,
 )
 from hunter_meme_executor.scope import ScopeUse, read_scope_use, requested_sol_of
 
@@ -157,11 +153,11 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
         reads.wallet.lamports,
         reads.wallet.observed_at,
     )
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        token = await token_context(session, candidate.mint)
-        positions = await open_positions(session)
-        pending = await pending_attempts(session)
-        used = await participation_used_sol(session, candidate.mint, now=now)
+    # T4.45: the rows, plus the two reads that keep a row the radar has not
+    # written yet from becoming a refusal the market did not earn. Both fail
+    # closed - a read that fails leaves the same ``None`` the table had.
+    built = await build_admission_context(ctx, candidate.mint, reads.curve, now=now)
+    positions, pending = built.positions, built.pending
     marks = sum((p.mark_sol or Decimal(0) for p in positions), Decimal(0))
     await _ensure_anchor(ctx, now, Decimal(reads.wallet.lamports) / LAMPORTS + marks)
     anchor = ctx.kill.anchor
@@ -187,7 +183,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             limits=cfg.limits,
         ),
         curve=curve_from(reads.curve),
-        context=context_from(candidate.mint, token, participation_used_sol=used, now=now),
+        context=built.context,
         kill_switch=ctx.kill.inputs(),
         creates_ata=reads.creates_ata,
         curve_fee_pct=Decimal(fees.total) / Decimal(10_000),
@@ -196,6 +192,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     if decision.checks and any(c.refusal == "daily_loss_cap_reached" for c in decision.checks):
         await ctx.kill.latch("daily_loss_cap_reached")
     admission = decision.to_jsonable()
+    admission.update(built.extras)  # T4.45: what this admission read for itself
     if scope is not None:
         admission["small_test"] = scope.as_json()
     if not decision.approved or decision.sizing is None:

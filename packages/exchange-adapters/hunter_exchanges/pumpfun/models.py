@@ -91,6 +91,17 @@ class NormalizedMemeTokenCreated(_ReceivedAtMixin):
     correct PDA. Audit trail, never read to derive an address (T4.39)."""
     initial_virtual_sol_reserves: Decimal
     initial_virtual_token_reserves: Decimal
+    creator_initial_tokens: Decimal | None = None
+    """T4.45 - the creator's own buy in the ``create`` transaction, in **tokens**
+    (the frame's ``initialBuy``), the same unit as
+    ``meme_tokens.initial_real_token_reserves``. Verified against the live
+    capture: ``1 073 000 000 - initialBuy == vTokensInBondingCurve`` to the last
+    digit. ``0`` means *measured*: the dev bought nothing. ``None`` means the
+    frame did not carry it - never a zero, because "bought nothing" and "we did
+    not see" lead to opposite decisions on check 10."""
+    creator_initial_sol: Decimal | None = None
+    """What that buy cost, in SOL (``solAmount``). Kept beside the tokens for
+    audit; the admission compares balances in tokens."""
     signature: str
     """Solana tx signature — the dedupe key together with ``mint`` (ws.py)."""
     pool: str = "pump"

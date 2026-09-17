@@ -114,3 +114,42 @@ def test_a_migration_frame_is_the_pool_created_signal_and_therefore_a_completion
     assert row.pool_created_source == "pumpportal_ws"
     assert row.completed_at == row.migrated_at
     assert row.rest_complete_seen_at is None and row.graduated_board_seen_at is None
+
+
+def test_the_creators_own_buy_travels_from_the_frame_to_the_row() -> None:
+    """T4.45: the datum the executor needs at decision time has to survive the
+    two hops between the WS frame and ``meme_tokens`` — the adapter parses it and
+    the row carries it, in **tokens**."""
+    frame = dict(_first_pump_create())
+    frame["initialBuy"] = Decimal("30877830.227113")
+    frame["solAmount"] = Decimal("0.888892813")
+    row = token_row_from_event(normalize.parse_new_token(frame))
+    assert row.creator_initial_tokens == Decimal("30877830.227113")
+    assert row.creator_initial_sol == Decimal("0.888892813")
+
+
+def test_a_frame_without_the_dev_buy_leaves_the_row_unobserved() -> None:
+    """``None``, never ``0``: the upsert writes identity with ``COALESCE``, and a
+    zero written here would be *written once* as "the creator bought nothing" —
+    and then the admission would refuse to derive a flow for ever on a coin whose
+    frame simply did not carry the field."""
+    frame = dict(_first_pump_create())
+    frame.pop("initialBuy", None)
+    frame.pop("solAmount", None)
+    row = token_row_from_event(normalize.parse_new_token(frame))
+    assert row.creator_initial_tokens is None
+    assert row.creator_initial_sol is None
+
+
+def test_the_upsert_treats_the_creators_buy_as_write_once_identity() -> None:
+    """The column list the statement composes must contain both, in the
+    write-once half: a later observation (a re-ingest, a repair) may not rewrite
+    the creation instant's allocation — the database's trigger refuses it, and an
+    upsert that tried would abort a whole collector cycle."""
+    from hunter_meme_worker.repo_token_sql import IDENTITY_COLUMNS, UPSERT_TOKEN
+
+    assert "creator_initial_tokens" in IDENTITY_COLUMNS
+    assert "creator_initial_sol" in IDENTITY_COLUMNS
+    statement = str(UPSERT_TOKEN)
+    assert "creator_initial_tokens = COALESCE(meme_tokens.creator_initial_tokens" in statement
+    assert "creator_initial_sol = COALESCE(meme_tokens.creator_initial_sol" in statement

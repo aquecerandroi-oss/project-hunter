@@ -145,3 +145,74 @@ def test_creation_rejects_null_identity(field: str) -> None:
     raw[field] = None
     with pytest.raises(MalformedMessage):
         parse_new_token(raw)
+
+
+def _create_frame(line: int) -> dict[str, object]:
+    """One captured ``create`` frame, decoded the way ``ws.py`` decodes it
+    (``parse_float=Decimal`` — the WS sends reserves as JSON floats)."""
+    return json.loads(
+        (FIXTURES / "pumpportal_ws_capture_raw.jsonl").read_text().splitlines()[line - 1],
+        parse_float=Decimal,
+    )
+
+
+def test_the_create_frame_carries_the_creators_own_first_buy() -> None:
+    """T4.45: the dev buy at creation, from the frame that announces the coin.
+
+    Line 6 of the live capture (mint ``HTEqdy7k…``): ``initialBuy``
+    30 877 830,227113 and ``solAmount`` 0,888892813. The frame's own arithmetic
+    proves the **unit is tokens**, not sub-units: the stock curve starts at
+    1 073 000 000 virtual tokens and this frame reports
+    ``vTokensInBondingCurve`` = 1 042 122 169,772887 — exactly
+    ``1 073 000 000 − initialBuy``. That is the same unit
+    ``meme_tokens.initial_real_token_reserves`` already uses, so the executor
+    compares the creator's on-chain balance against it without a second
+    convention."""
+    raw = _create_frame(6)
+    event = parse_new_token(raw)
+    assert event.creator_initial_tokens == Decimal("30877830.227113")
+    assert event.creator_initial_sol == Decimal("0.888892813")
+    assert (
+        Decimal(1073000000) - (event.creator_initial_tokens or Decimal(0))
+        == raw["vTokensInBondingCurve"]
+    )
+
+
+def test_a_creator_who_bought_nothing_is_a_measured_zero_never_a_missing_value() -> None:
+    """Line 5: ``initialBuy`` 0 with ``solAmount`` 0 — the dev did not buy at
+    creation. Zero is **observed**, so it is stored as zero; the admission's own
+    rule (only ``> 0`` derives a flow) is what refuses to compare a balance
+    against nothing, and it lives there, not here."""
+    event = parse_new_token(_create_frame(5))
+    assert event.creator_initial_tokens == Decimal(0)
+    assert event.creator_initial_sol == Decimal(0)
+
+
+def test_a_create_frame_without_the_dev_buy_fields_leaves_both_none() -> None:
+    """Not every frame carries them (the thinner creation-flavoured frames of
+    ``is_new_token_message``). Absent is ``None`` — never a zero that would
+    later read as "the creator bought nothing"."""
+    raw = _create_frame(6)
+    del raw["initialBuy"]
+    del raw["solAmount"]
+    event = parse_new_token(raw)
+    assert event.creator_initial_tokens is None
+    assert event.creator_initial_sol is None
+
+
+@pytest.mark.parametrize("field", ["initialBuy", "solAmount"])
+def test_a_dev_buy_that_is_not_a_number_is_malformed_never_silently_dropped(field: str) -> None:
+    """A string where a number belongs is a frame this adapter does not
+    understand. Dropping it quietly would hand the executor a ``None`` that means
+    "unknown" for a coin whose datum was actually there and unreadable."""
+    raw = _create_frame(6)
+    raw[field] = "many"
+    with pytest.raises(MalformedMessage):
+        parse_new_token(raw)
+
+
+def test_a_negative_dev_buy_is_malformed() -> None:
+    raw = _create_frame(6)
+    raw["initialBuy"] = Decimal(-1)
+    with pytest.raises(MalformedMessage):
+        parse_new_token(raw)

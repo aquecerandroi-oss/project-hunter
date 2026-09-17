@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
+from hunter_core.db.meme_risk_snapshots import RISK_COLUMNS, insert_risk_snapshot
 from hunter_meme_worker.repo_tape import (
     TradeRow,
     insert_trades,
@@ -34,7 +35,7 @@ from hunter_meme_worker.repo_tape import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from hunter_exchanges.pumpfun.board_models import NormalizedBoardEntry, NormalizedRiskSnapshot
+    from hunter_exchanges.pumpfun.board_models import NormalizedBoardEntry
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,39 +223,12 @@ async def insert_board_minutes(session: AsyncSession, rows: Sequence[BoardMinute
     return len(rows)
 
 
-_RISK_COLUMNS = (
-    "observed_at",
-    "mint",
-    "received_at",
-    "source",
-    "program",
-    "platform",
-    "quote_mint",
-    "quote_asset",
-    "holders",
-    "top10_share",
-    "dev_share",
-    "snipers",
-    "sniper_share",
-    "bundled_share",
-    "progress_pct",
-    "graduated_at",
-    "is_mayhem",
-    "mayhem_state",
-)
-_INSERT_RISK = text(
-    f"INSERT INTO meme_risk_snapshots ({', '.join(_RISK_COLUMNS)}, raw) "  # noqa: S608
-    f"VALUES ({', '.join(':' + column for column in _RISK_COLUMNS)}, CAST(:raw AS jsonb)) "
-    "ON CONFLICT (observed_at, mint) DO NOTHING"
-)
-
-
-async def insert_risk_snapshot(session: AsyncSession, snapshot: NormalizedRiskSnapshot) -> None:
-    import json
-
-    values: dict[str, Any] = {column: getattr(snapshot, column) for column in _RISK_COLUMNS}
-    values["raw"] = json.dumps(snapshot.raw, default=str)
-    await session.execute(_INSERT_RISK, values)
+#: T4.45: the statement moved to ``hunter_core.db.meme_risk_snapshots`` when the
+#: executor gained a reason to write the same row (its own on-demand read of the
+#: same endpoint, ``docs/RISK_ENGINE_MEME.md`` §3.5). Re-exported here so every
+#: caller in this service keeps its import - one row shape, one INSERT, two
+#: writers.
+_RISK_COLUMNS = RISK_COLUMNS
 
 
 __all__ = [

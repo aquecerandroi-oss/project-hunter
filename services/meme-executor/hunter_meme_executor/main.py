@@ -30,6 +30,7 @@ from hunter_core.execution.meme.gates import MemeLiveTradingRefused
 from hunter_core.execution.meme.submit import MemeSubmitter, SubmitPolicy
 from hunter_core.logging import get_logger
 from hunter_core.redis import keys
+from hunter_exchanges.pumpfun.indexer_rest import AdvancedIndexerClient
 from hunter_exchanges.pumpfun.tx_rpc import SolanaTxRpcClient
 from hunter_meme_executor.build import decode_fills
 from hunter_meme_executor.chain import ChainReader
@@ -114,6 +115,11 @@ def build_context(
     session_factory = create_session_factory(runtime.engine)
     rpc = SolanaTxRpcClient(config.rpc_url, allow_send=config.live)
     key = keys.heartbeat(runtime.role, runtime.instance)
+    # T4.45: the same pump.fun indexer client the radar's ``RiskReader`` drives,
+    # used here **only** on the admission path and only when the radar's row has
+    # not landed - with its own 1,5 s deadline (``risk_read``). It signs nothing
+    # and reads no secret; a deployment that drops it falls back to waiting.
+    risk_client = AdvancedIndexerClient()
 
     async def write_fields(mapping: dict[str, str]) -> None:
         await runtime.redis.hset(key, mapping=mapping)  # type: ignore[reportUnknownMemberType]
@@ -133,6 +139,7 @@ def build_context(
         ),
         heartbeat=write_fields,
         loop=loop,
+        risk_client=risk_client,
     )
 
 
@@ -210,3 +217,5 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
             )
     finally:
         ctx.chain.rpc.close()
+        if isinstance(ctx.risk_client, AdvancedIndexerClient):
+            await ctx.risk_client.aclose()

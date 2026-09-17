@@ -175,6 +175,10 @@ class MemeToken(Base):
     tokens) — the normalize boundary of the T4.1 adapter converts once so no
     consumer reasons in lamports in one field and SOL in the next."""
 
+    creator_initial_tokens: Mapped[Decimal | None]
+    creator_initial_sol: Mapped[Decimal | None]
+    """``0048`` (T4.45, ``docs/DATABASE.md`` §56) — the creator's own buy at the
+    ``create`` instant: tokens (the unit of the denominator below) and SOL."""
     initial_real_token_reserves: Mapped[Decimal | None]
     """The **denominator of curve progress** (T4-MEME-RADAR.md §3, Astra's
     correction): ``1 - real_token_reserves / initial_real_token_reserves``.

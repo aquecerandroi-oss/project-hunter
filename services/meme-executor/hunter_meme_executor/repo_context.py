@@ -46,6 +46,12 @@ class TokenContext:
     creator_sold: bool | None
     top10_share: Decimal | None
     bundled_share: Decimal | None
+    creator_initial_tokens: Decimal | None = None
+    """T4.45 (``0048``): the creator's own buy at the create instant, in tokens -
+    the base :mod:`hunter_meme_executor.creator_flow` compares his on-chain
+    balance against. ``None`` on every coin created before ``0048`` and on every
+    mint whose ``create`` frame we never saw; ``0`` when he bought nothing."""
+    creator_initial_sol: Decimal | None = None
     dev_share: Decimal | None = None
     """T4.28h — the freshest **measured** dev share of either table, or ``None``."""
     dev_share_source: str | None = None
@@ -61,9 +67,13 @@ DEV_SHARE_MAX_AGE_S = RISK_SNAPSHOT_MAX_AGE_S
 the same way, so it is deliberately the *same* number, not a second dial."""
 
 _TOKEN = text(
-    "SELECT created_at, creator, initial_real_token_reserves, completed_at, migrated_at "
+    "SELECT created_at, creator, initial_real_token_reserves, completed_at, migrated_at, "
+    "  creator_initial_tokens, creator_initial_sol "
     "FROM meme_tokens WHERE mint = :mint"
 )
+"""``creator_initial_*`` (``0048``) ride the read that was already happening: the
+admission needs the creator and the age from this row anyway, so the chain-derived
+flow costs no extra query - only, when the tape is silent, one RPC call."""
 _FEATURES = text(
     "SELECT end_time, curve_volume_1m_sol, creator_sold, top10_share, dev_share, "
     "  holders_observed_at, holders_source "
@@ -138,6 +148,8 @@ async def token_context(
         creator_sold=None if features is None else features["creator_sold"],
         top10_share=None if features is None else _decimal(features["top10_share"]),
         bundled_share=None if risk is None else _decimal(risk["bundled_share"]),
+        creator_initial_tokens=None if token is None else _decimal(token["creator_initial_tokens"]),
+        creator_initial_sol=None if token is None else _decimal(token["creator_initial_sol"]),
         dev_share=dev_share,
         dev_share_source=dev_source,
         dev_share_observed_at=dev_at,

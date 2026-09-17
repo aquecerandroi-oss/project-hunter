@@ -161,6 +161,11 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         "entries_confirmed": str(state.entries_confirmed),
         "exits_confirmed": str(state.exits_confirmed),
         "rpc_errors": str(state.rpc_errors),
+        # T4.45: how often this process had to read the rug numbers itself
+        # because the radar's row had not landed, and how often that read gave
+        # nothing usable (the admission refused by name each of those times).
+        "risk_reads_on_demand": str(state.risk_reads_on_demand),
+        "risk_reads_on_demand_failed": str(state.risk_reads_on_demand_failed),
         "auto_close_on_emergency": str(cfg.auto_close_on_emergency).lower(),
         "program_idl_hash": state.program_idl_hash or "",
         "program_last_deploy_slot": ""

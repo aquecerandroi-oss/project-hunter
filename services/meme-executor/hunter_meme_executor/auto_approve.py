@@ -60,6 +60,7 @@ from hunter_meme_executor.auto_counters import auto_approved_last_hour, auto_ref
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
 from hunter_meme_executor.repo import open_positions, pending_attempts
+from hunter_meme_executor.risk_read import ensure_snapshots
 from hunter_meme_executor.risk_snapshot import mints_with_snapshot
 from hunter_meme_executor.scope import read_scope_use, requested_sol_of
 
@@ -295,15 +296,26 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
     if scope.exhausted is not None:
         skip(f"scope_exhausted:{scope.exhausted}", len(candidates))
         return []
-    plan = plan_auto_approvals(
-        candidates,
-        now=now,
-        approved_last_hour=approved_1h,
-        max_per_hour=cfg.auto_approve_max_per_hour,
-        busy_mints=frozenset(busy),
-        cooling_mints=cooling,
-        snapshot_mints=measured,
+
+    def plan_for(snapshot_mints: frozenset[str] | None) -> AutoPlan:
+        return plan_auto_approvals(
+            candidates,
+            now=now,
+            approved_last_hour=approved_1h,
+            max_per_hour=cfg.auto_approve_max_per_hour,
+            busy_mints=frozenset(busy),
+            cooling_mints=cooling,
+            snapshot_mints=snapshot_mints,
+        )
+
+    # T4.45: ask the planner who it *would* open with the read in hand, read for
+    # exactly those mints, then plan for real. The wait of T4.28g stays as the
+    # fallback - a mint whose read failed is still left ``proposed`` rather than
+    # opened and refused ``bundled_share_unmeasurable``.
+    measured = await ensure_snapshots(
+        ctx, [p.mint for p in plan_for(None).picks], measured, now=now
     )
+    plan = plan_for(measured)
     for reason, count in plan.skipped.items():
         skip(reason, count)
     opened: list[str] = []

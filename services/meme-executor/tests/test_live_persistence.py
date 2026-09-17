@@ -521,13 +521,17 @@ async def harness(
     db_session_factory: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncIterator[Harness]:
-    import hunter_meme_executor.entries as entries_module
+    import hunter_meme_executor.admission_context as admission_context_module
     import hunter_meme_executor.exits as exits_module
 
-    async def token_context(_session: AsyncSession, _mint: str) -> TokenContext:
-        return _full_token_context(datetime.now(UTC))
+    async def token_context(
+        _session: AsyncSession, _mint: str, *, now: datetime | None = None
+    ) -> TokenContext:
+        return _full_token_context(now or datetime.now(UTC))
 
-    monkeypatch.setattr(entries_module, "token_context", token_context)
+    # T4.45: the entry loop builds its context in ``admission_context`` now (the
+    # module that owns the two on-demand reads), so that is where the fake goes.
+    monkeypatch.setattr(admission_context_module, "token_context", token_context)
     monkeypatch.setattr(exits_module, "token_context", token_context)
     # Each test starts from an empty ledger and an unlatched switch (owner writes):
     # an unmarked open position left by another test would refuse ``marks_incomplete``
@@ -1102,12 +1106,17 @@ async def test_an_unknown_creator_is_admitted_only_when_the_owner_allowed_the_me
     30–300 s, R5 16/09/2026), same measured ``dev_share`` of 5 %: **off** the buy is
     refused ``creator_flow_unknown`` and no order is sent; **on** it is admitted, sent
     and confirmed, and the admission says which of the two passes it was."""
-    import hunter_meme_executor.entries as entries_module
+    import hunter_meme_executor.admission_context as admission_context_module
 
-    async def unknown_creator(_session: AsyncSession, _mint: str) -> TokenContext:
+    async def unknown_creator(
+        _session: AsyncSession, _mint: str, *, now: datetime | None = None
+    ) -> TokenContext:
+        # T4.45: ``creator_initial_tokens`` stays ``None`` here on purpose - this
+        # coin has no recorded allocation, so the chain derivation does not run
+        # and the case under test is still the owner's allowance, alone.
         return _full_token_context(datetime.now(UTC), creator_sold=None, dev_share=Decimal("0.05"))
 
-    monkeypatch.setattr(entries_module, "token_context", unknown_creator)
+    monkeypatch.setattr(admission_context_module, "token_context", unknown_creator)
 
     refused_id = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
     await entries_once(harness.ctx)
@@ -1224,13 +1233,18 @@ async def test_stage_1_rejects_by_name_what_its_own_admission_refuses(
     """(d): the robot opened it, the 25 checks refused it (here: ``bundled_share``
     not measured) — the ``refused`` order is written **and** the proposal is
     ``rejected`` with the reason, ``decided_by`` still the robot's."""
-    import hunter_meme_executor.entries as entries_module
+    import hunter_meme_executor.admission_context as admission_context_module
 
-    async def unmeasured(_session: AsyncSession, _mint: str) -> TokenContext:
+    async def unmeasured(
+        _session: AsyncSession, _mint: str, *, now: datetime | None = None
+    ) -> TokenContext:
         full = _full_token_context(datetime.now(UTC))
         return replace(full, bundled_share=None)
 
-    monkeypatch.setattr(entries_module, "token_context", unmeasured)
+    # T4.45: this context has no ``risk_client``, so the on-demand read cannot
+    # rescue the mint - which is the point: with the endpoint out of reach the
+    # refusal is exactly the one this test has always asserted.
+    monkeypatch.setattr(admission_context_module, "token_context", unmeasured)
     armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
     proposal_id = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
     await entries_once(armed.ctx)
@@ -1532,3 +1546,244 @@ async def test_stage_1_with_sending_disabled_opens_admits_simulates_and_sends_no
         )
         == []
     )
+
+
+class FakeIndexer:
+    """The pump.fun indexer, answering once — or refusing. No network."""
+
+    def __init__(self, *, answer: Any = None, raises: Exception | None = None) -> None:
+        self.answer, self.raises = answer, raises
+        self.calls: list[str] = []
+
+    async def get_risk_snapshot(self, mint: str) -> Any:
+        self.calls.append(mint)
+        if self.raises is not None:
+            raise self.raises
+        return self.answer
+
+
+DEV_BUY_TOKENS = Decimal("30877830.227113")
+"""A real ``initialBuy`` from the live capture (line 6, mint ``HTEqdy7k…``).
+
+The **same** number in every test that records it: ``creator_initial_tokens`` is
+write-once in the database, ``meme_tokens`` is not cleaned between tests, and the
+trigger refuses a second, different value - which is exactly the guarantee the
+admission leans on, so the tests live with it instead of dropping the row."""
+
+
+async def _record_the_dev_buy(engine: AsyncEngine) -> None:
+    """What ``0048`` stores at ingest, written here as the radar would."""
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_tokens SET creator_initial_tokens = :tokens, "
+                "  creator_initial_sol = 0.888892813 "
+                "WHERE mint = :mint AND creator_initial_tokens IS DISTINCT FROM :tokens"
+            ),
+            {"mint": MINT, "tokens": DEV_BUY_TOKENS},
+        )
+
+
+def _reading(mint: str, *, observed_at: datetime, bundled_share: str | None = "0.05") -> Any:
+    from hunter_exchanges.pumpfun.board_models import NormalizedRiskSnapshot
+
+    return NormalizedRiskSnapshot(
+        mint=mint,
+        bundled_share=None if bundled_share is None else Decimal(bundled_share),
+        dev_share=Decimal("0.04"),
+        top10_share=Decimal("0.18"),
+        holders=42,
+        raw={"mint": mint, "bundlerOwnedPercentageV2": 5},
+        observed_at=observed_at,
+        received_at=observed_at,
+    )
+
+
+async def test_the_executors_own_rug_read_lands_as_a_row_the_admission_then_reads(
+    harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """T4.45 Part A against the real schema.
+
+    The failure it removes, measured on 16/09/2026: 36 of the 39 in-window real
+    orders were refused ``bundled_share_unmeasurable`` while the radar's row for
+    the same mint landed a median 103 s **later**. Here the table is empty, the
+    executor reads the endpoint itself, and the row it writes is read back by the
+    very query the admission uses — same table, same freshness window, only the
+    ``source`` says who asked."""
+    from hunter_meme_executor.repo import token_context
+    from hunter_meme_executor.risk_read import ON_DEMAND_SOURCE, read_risk_snapshot_on_demand
+
+    now = datetime.now(UTC)
+    await _plant_operator_proposal(db_engine, proposed_at=now, risk_snapshot=False)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        before = await token_context(session, MINT, now=now)
+    assert before.bundled_share is None, "the precondition: nothing measured yet"
+
+    indexer = FakeIndexer(answer=_reading(MINT, observed_at=now))
+    ctx = replace(harness.ctx, risk_client=cast(Any, indexer))
+    assert await read_risk_snapshot_on_demand(ctx, MINT, now=now) is True
+    assert indexer.calls == [MINT]
+
+    rows = await _rows(
+        db_engine,
+        "SELECT source, bundled_share, dev_share, raw FROM meme_risk_snapshots WHERE mint = :mint",
+        mint=MINT,
+    )
+    assert len(rows) == 1
+    assert rows[0]["source"] == ON_DEMAND_SOURCE
+    assert rows[0]["bundled_share"] == Decimal("0.05")
+    assert rows[0]["raw"]["bundlerOwnedPercentageV2"] == 5, "the 65 raw fields are kept"
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        after = await token_context(session, MINT, now=now)
+    assert after.bundled_share == Decimal("0.05")
+    assert after.dev_share == Decimal("0.04"), "T4.28h's input rides the same row"
+    assert ctx.state.risk_reads_on_demand == 1
+
+
+async def test_a_failed_on_demand_read_writes_nothing_and_leaves_the_refusal_standing(
+    harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Never a pass on missing data: the endpoint refusing leaves the table
+    exactly as it was, so check 11 still refuses ``bundled_share_unmeasurable``."""
+    from hunter_meme_executor.repo import token_context
+    from hunter_meme_executor.risk_read import read_risk_snapshot_on_demand
+
+    now = datetime.now(UTC)
+    await _plant_operator_proposal(db_engine, proposed_at=now, risk_snapshot=False)
+    indexer = FakeIndexer(raises=RuntimeError("429"))
+    ctx = replace(harness.ctx, risk_client=cast(Any, indexer))
+    assert await read_risk_snapshot_on_demand(ctx, MINT, now=now) is False
+    assert (
+        await _rows(db_engine, "SELECT 1 FROM meme_risk_snapshots WHERE mint = :mint", mint=MINT)
+        == []
+    )
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        assert (await token_context(session, MINT, now=now)).bundled_share is None
+    assert ctx.state.risk_reads_on_demand_failed == 1
+
+
+async def test_token_context_reads_the_creators_recorded_allocation(
+    db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.45 Part B against the real schema (``0048``): the two columns the
+    chain-derived creator flow compares against are read from ``meme_tokens`` by
+    the query the admission already runs — no second round trip, and no fake of
+    the schema (the T4.14 lesson: ``bundled_share`` shipped on the wrong table
+    because only fakes had ever seen the query)."""
+    from hunter_meme_executor.creator_flow import needs_chain_creator_flow
+    from hunter_meme_executor.repo import token_context
+
+    now = datetime.now(UTC)
+    await _plant_operator_proposal(db_engine, proposed_at=now, risk_snapshot=False)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        unknown = await token_context(session, MINT, now=now)
+    assert unknown.creator_initial_tokens is None
+    assert not needs_chain_creator_flow(unknown), "no base, no derivation — the T4.28g rule"
+
+    await _record_the_dev_buy(db_engine)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        known = await token_context(session, MINT, now=now)
+    assert known.creator_initial_tokens == DEV_BUY_TOKENS
+    assert known.creator_initial_sol == Decimal("0.888892813")
+    assert known.creator_sold is None, "the fold has not spoken yet — the 16/09 case"
+    assert needs_chain_creator_flow(known)
+
+
+async def test_the_chain_answers_check_ten_when_the_fold_is_still_silent(
+    harness: Harness, db_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End to end on the admission path, with the real rows and the fake chain:
+    ``creator_sold`` NULL + a recorded allocation ⇒ the creator's balance decides,
+    and the order's ``admission`` JSON names where the answer came from.
+
+    Both directions are asserted, because a derivation that could only say "he
+    still holds" would be worse than no derivation at all."""
+    import hunter_meme_executor.admission_context as admission_context_module
+    from hunter_meme_executor.admission_context import build_admission_context
+    from hunter_meme_executor.repo import token_context
+
+    # The harness fakes the context for the scenarios that are not about it; this
+    # one **is** about the row, so the real query runs against the real schema.
+    monkeypatch.setattr(admission_context_module, "token_context", token_context)
+    now = datetime.now(UTC)
+    await _plant_operator_proposal(db_engine, proposed_at=now, risk_snapshot=True)
+    await _record_the_dev_buy(db_engine)
+    ctx = harness.ctx
+    curve = harness.chain.curve(MINT)
+    assert curve is not None
+
+    harness.chain.tokens_on_chain = int(DEV_BUY_TOKENS * 1_000_000)
+    holding = await build_admission_context(ctx, MINT, curve, now=now)
+    assert holding.context.creator_net_sol == Decimal(1)
+    assert holding.extras["creator_flow"]["source"] == "chain_ata_vs_initial"
+    assert holding.extras["creator_flow"]["balance_tokens"] == str(DEV_BUY_TOKENS)
+
+    harness.chain.tokens_on_chain = 10_000_000  # 10 tokens: he sold 99,99 %
+    dumped = await build_admission_context(ctx, MINT, curve, now=now)
+    assert dumped.context.creator_net_sol == Decimal(-1)
+    assert dumped.extras["creator_flow"]["net_sol"] == "-1"
+
+
+async def test_stage_1_reads_the_rug_numbers_itself_instead_of_waiting_a_tick(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.45 replaces T4.28g's *wait* with a *read* — end to end, in one tick.
+
+    Same starting position as ``test_stage_1_waits_for_the_rug_read_…``: an
+    ``operator`` proposal and an empty ``meme_risk_snapshots``. With the indexer
+    reachable the executor reads it on the spot, persists the row, and the same
+    tick opens and admits the proposal — instead of leaving it for a reader whose
+    row lands a median 103 s later, by which time the proposal is the human's
+    (60 s) or expired (180 s).
+
+    The endpoint is asked **once** for the mint: the read-first path spends the
+    call only on the proposal the planner would actually open."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    now = datetime.now(UTC)
+    indexer = FakeIndexer(answer=_reading(MINT, observed_at=now))
+    armed = replace(armed, ctx=replace(armed.ctx, risk_client=cast(Any, indexer)))
+    proposal_id = await _plant_operator_proposal(db_engine, proposed_at=now, risk_snapshot=False)
+
+    await entries_once(armed.ctx)
+
+    opened = await _proposal(db_engine, proposal_id)
+    assert opened["status"] == "approved" and opened["mode"] == "live"
+    assert opened["decided_by"] == AUTO_STAGE1_DECIDED_BY
+    assert armed.ctx.state.auto_skipped == {}, "nothing was waited on"
+    assert indexer.calls == [MINT], "one read for one proposal"
+    assert armed.ctx.state.risk_reads_on_demand == 1
+    assert len(armed.rpc.sent) == 1, "the admission ran on the number that just landed"
+    hb = await heartbeat_fields(armed.ctx)
+    assert hb["risk_reads_on_demand"] == "1" and hb["risk_reads_on_demand_failed"] == "0"
+
+
+async def test_stage_1_still_waits_when_its_own_read_fails(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The fallback T4.28g built stays exactly where it was: the read is a chance,
+    never a promise. With the endpoint refusing, the proposal is **not** opened —
+    no ``refused`` order, no ``rejected`` row, nothing sent — and the heartbeat
+    still names ``risk_snapshot_pending``. A pass on missing data is the one
+    outcome this task must never produce."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    now = datetime.now(UTC)
+    indexer = FakeIndexer(raises=RuntimeError("503"))
+    armed = replace(armed, ctx=replace(armed.ctx, risk_client=cast(Any, indexer)))
+    proposal_id = await _plant_operator_proposal(db_engine, proposed_at=now, risk_snapshot=False)
+
+    await entries_once(armed.ctx)
+
+    assert (await _proposal(db_engine, proposal_id))["status"] == "proposed", "still the human's"
+    assert armed.ctx.state.auto_skipped == {"risk_snapshot_pending": 1}
+    assert (
+        await _rows(
+            db_engine, "SELECT id FROM meme_live_orders WHERE proposal_id = :p", p=proposal_id
+        )
+        == []
+    )
+    assert armed.rpc.sent == []
+    assert armed.ctx.state.risk_reads_on_demand_failed == 1

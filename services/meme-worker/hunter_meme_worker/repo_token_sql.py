@@ -20,6 +20,11 @@ IDENTITY_COLUMNS = (
     "bonding_curve_raw",
     "initial_virtual_sol_reserves",
     "initial_virtual_token_reserves",
+    # T4.45 (``0048``): facts of the creation instant, so write-once like the
+    # reserves beside them - a later *current* reading of the dev's holdings
+    # must never become the base the admission compares against.
+    "creator_initial_tokens",
+    "creator_initial_sol",
     "initial_real_token_reserves",
     "progress_denominator_source",
     "total_supply",

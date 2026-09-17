@@ -91,6 +91,8 @@ def token_row_from_event(event: MemeEvent) -> TokenRow:
             bonding_curve_raw=event.bonding_curve_raw,
             initial_virtual_sol_reserves=event.initial_virtual_sol_reserves,
             initial_virtual_token_reserves=event.initial_virtual_token_reserves,
+            creator_initial_tokens=event.creator_initial_tokens,
+            creator_initial_sol=event.creator_initial_sol,
             pool=event.pool,
             mayhem_enabled=event.mayhem_enabled,
             mayhem_mode=event.mayhem_mode,

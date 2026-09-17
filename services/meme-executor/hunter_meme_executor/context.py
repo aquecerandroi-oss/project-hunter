@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from hunter_meme_executor.config import ExecutorConfig
     from hunter_meme_executor.journal_db import PostgresOrderJournal
     from hunter_meme_executor.kill_switch import KillSwitchReader
+    from hunter_meme_executor.risk_read import RiskSource
 
 HeartbeatWriter = "Callable[[dict[str, str]], Awaitable[None]]"
 
@@ -70,6 +71,17 @@ class ExecutorState:
     parses) or latches it."""
     gates_deferred_mtime_ns: int | None = None
     """The mtime the deferred failure was read at, for the log line."""
+    risk_reads_on_demand: int = 0
+    """T4.45: ``/in-memory-coin`` reads this process made itself because the
+    admission needed a rug number the radar had not written yet."""
+    risk_reads_on_demand_failed: int = 0
+    """Of those, the ones that answered nothing usable (timeout, HTTP error, or a
+    reading without ``bundled_share``). The admission refused by name each time -
+    this counter is how the desk sees the endpoint degrading instead of guessing
+    from a drop in entries."""
+    risk_read_attempts: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
+    """When this process last **attempted** an on-demand read per mint - failures
+    included, which the persisted row cannot bound. Pruned to its own window."""
 
 
 @dataclass(slots=True)
@@ -84,3 +96,8 @@ class ExecutorContext:
     heartbeat: Callable[[dict[str, str]], Awaitable[None]]
     loop: asyncio.AbstractEventLoop
     state: ExecutorState = field(default_factory=ExecutorState)
+    risk_client: RiskSource | None = None
+    """T4.45 - the pump.fun indexer client used **only** on the admission path,
+    to read a mint's rug numbers when the radar's row has not landed. ``None``
+    disables the on-demand read entirely and restores the T4.28g behaviour
+    (wait, and refuse by name); no other behaviour depends on it."""

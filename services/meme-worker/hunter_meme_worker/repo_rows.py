@@ -32,6 +32,12 @@ class TokenRow:
     ``None`` = the frame's value was already correct."""
     initial_virtual_sol_reserves: Decimal | None = None
     initial_virtual_token_reserves: Decimal | None = None
+    creator_initial_tokens: Decimal | None = None
+    """T4.45 (``0048``): the creator's own buy inside the ``create`` transaction,
+    in tokens - the base the executor compares his on-chain balance against.
+    ``None`` = the frame did not carry it; ``0`` = he bought nothing."""
+    creator_initial_sol: Decimal | None = None
+    """What that buy cost him, in SOL. Audit beside the tokens."""
     initial_real_token_reserves: Decimal | None = None
     progress_denominator_source: str | None = None
     """``observed_virgin`` | ``global_params`` beside the denominator; ``None``

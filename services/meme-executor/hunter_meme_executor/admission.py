@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 from hunter_exchanges.pumpfun.curve import TOKEN_SUBUNITS_PER_TOKEN
+from hunter_meme_executor.creator_flow import CreatorFlow
 from hunter_meme_executor.repo import (
     DEV_SHARE_MAX_AGE_S,
     Candidate,
@@ -54,7 +55,14 @@ if TYPE_CHECKING:
     from hunter_meme_executor.chain import CurveRead, TokenAccountRead, WalletRead
     from hunter_meme_executor.kill_switch import DayAnchor
 
-__all__ = ["AdmissionInputs", "admit", "day_start_utc", "proposal_from", "wallet_from"]
+__all__ = [
+    "AdmissionInputs",
+    "admit",
+    "creator_net_sol",
+    "day_start_utc",
+    "proposal_from",
+    "wallet_from",
+]
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 LAMPORTS = Decimal(1_000_000_000)
@@ -162,8 +170,28 @@ def dev_share_input(
     return token.dev_share, token.dev_share_source, stamp
 
 
+def creator_net_sol(token: TokenContext, flow: CreatorFlow | None) -> Decimal | None:
+    """T4.45 - which answer check 10 gets, and in which order.
+
+    The fold's ``creator_sold`` is a fact about **trades** and wins whenever it
+    exists; the chain-derived flow (:mod:`hunter_meme_executor.creator_flow`) is
+    an inference from a **balance** and only speaks into the silence the R5 study
+    measured (``creator_sold`` non-NULL +123 to +441 s after creation, entries at
+    30-300 s). Neither invented: with both absent this stays ``None`` and the
+    engine refuses ``creator_flow_unknown``, as it always has.
+    """
+    if token.creator_sold is not None:
+        return Decimal(-1) if token.creator_sold else Decimal(1)
+    return None if flow is None else flow.net_sol
+
+
 def context_from(
-    mint: str, token: TokenContext, *, participation_used_sol: Decimal, now: datetime
+    mint: str,
+    token: TokenContext,
+    *,
+    participation_used_sol: Decimal,
+    now: datetime,
+    creator_flow: CreatorFlow | None = None,
 ) -> MemeContext:
     volume_fresh = (
         token.features_end_time is not None
@@ -184,9 +212,7 @@ def context_from(
         bundled_share_pct=token.bundled_share,
         top10_share_pct=token.top10_share,
         holder_denominator_valid=None if token.top10_share is None else True,
-        creator_net_sol=None
-        if token.creator_sold is None
-        else (Decimal(-1) if token.creator_sold else Decimal(1)),
+        creator_net_sol=creator_net_sol(token, creator_flow),
         dev_share_pct=dev_share,
         dev_share_source=dev_source,
         dev_share_ts=dev_at,
