@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from hunter_core.domain.types import utcnow
 from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
 from hunter_meme_worker.lab_trail import (
     RefusalTrailState,
@@ -92,6 +93,8 @@ def test_should_prune_trail_today_is_false_once_already_run() -> None:
 
 
 async def test_maybe_prune_trail_skips_the_database_within_the_same_day() -> None:
-    today = date.today()  # noqa: DTZ011 - only compared to itself, no absolute meaning
+    today = (
+        utcnow().date()
+    )  # the code under test uses utcnow(); a local date is red 21–00 BRT (T4.45 F1)
     deleted, day = await maybe_prune_trail(object(), today, batch=500)  # type: ignore[arg-type]
     assert (deleted, day) == (0, today), "no session_factory call: it would crash if reached"

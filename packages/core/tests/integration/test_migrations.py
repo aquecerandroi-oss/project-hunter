@@ -40,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0047_meme_bonding_curve_raw"
+HEAD_REVISION = "0048_meme_creator_initial_buy"
 """``0047`` (T4.39) lands on ``0046`` (T4.35), which lands on ``0044`` (T4.31),
 which lands on ``0043`` (T4.26b), which lands on ``0042`` (T4.27),
 which lands on ``0041`` (T4.26), which lands on ``0040`` (T4.24b); bumped here

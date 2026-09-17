@@ -131,6 +131,11 @@ class MemeToken(Base):
             "(initial_real_token_reserves IS NULL) = (progress_denominator_source IS NULL)",
             name="a_denominator_names_its_source",
         ),
+        CheckConstraint(
+            "(creator_initial_tokens IS NULL OR creator_initial_tokens >= 0) "
+            "AND (creator_initial_sol IS NULL OR creator_initial_sol >= 0)",
+            name="a_dev_buy_is_not_negative",
+        ),
         # 0025 — ``mayhem_state`` joins the list (T4.2e).
         CheckConstraint(
             "progress_denominator_source IS NULL OR progress_denominator_source IN "
@@ -163,11 +168,7 @@ class MemeToken(Base):
 
     bonding_curve: Mapped[str | None] = mapped_column(Text)
     bonding_curve_raw: Mapped[str | None] = mapped_column(Text)
-    """``0047`` (T4.39): what the create frame *said* the curve was, kept only
-    when it differed from the PDA derived from the mint (Mayhem coins carry the
-    shared sol vault there — 13 615 rows on 16/09/2026); ``bonding_curve`` is
-    always the derived PDA since then. Write-once by trigger, repaired by
-    ``infra/scripts/meme_repair_bonding_curve.py``."""
+    """``0047`` (T4.39): the frame's curve key when ≠ derived PDA; write-once."""
 
     initial_virtual_sol_reserves: Mapped[Decimal | None]
     initial_virtual_token_reserves: Mapped[Decimal | None]
@@ -177,8 +178,7 @@ class MemeToken(Base):
 
     creator_initial_tokens: Mapped[Decimal | None]
     creator_initial_sol: Mapped[Decimal | None]
-    """``0048`` (T4.45, ``docs/DATABASE.md`` §56) — the creator's own buy at the
-    ``create`` instant: tokens (the unit of the denominator below) and SOL."""
+    """``0048`` (T4.45, DATABASE.md §56): the creator's buy at ``create`` (tokens, SOL)."""
     initial_real_token_reserves: Mapped[Decimal | None]
     """The **denominator of curve progress** (T4-MEME-RADAR.md §3, Astra's
     correction): ``1 - real_token_reserves / initial_real_token_reserves``.
