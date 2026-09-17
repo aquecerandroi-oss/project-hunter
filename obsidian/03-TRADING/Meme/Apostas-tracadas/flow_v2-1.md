@@ -2,7 +2,7 @@
 tags: [operacoes, meme, pumpfun, graficos, m4]
 status: em-andamento
 owner: quant-engineer
-updated: 2026-09-16
+updated: 2026-09-17
 rule_set: flow_v2/1
 kind: research_only
 exp: EXP-M5
@@ -85,3 +85,24 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 | 12:52:49 | GREMLIN | `Gn9U13zkBd…` | +1.3044 | migrated | [1252-GREMLIN-+1.30.png](../../../attachments/meme/2026-09-16/flow_v2-1/1252-GREMLIN-%2B1.30.png) |
 | 14:04:54 | SORT | `7uwn4TV124…` | -0.698 | max_loss | [1404-SORT--0.70.png](../../../attachments/meme/2026-09-16/flow_v2-1/1404-SORT--0.70.png) |
 | 15:12:10 | LPAD | `D4fi1cAWTZ…` | -0.7484 | max_loss | [1512-LPAD--0.75.png](../../../attachments/meme/2026-09-16/flow_v2-1/1512-LPAD--0.75.png) |
+
+## Dia 2026-09-17
+
+6 aposta(s) fechada(s) — 6 medida(s), 0 indeterminada(s). Soma de R das medidas: **+0.8639**.
+
+**Melhor · Mais recente** — MAYOR · 08:06:41 BRT · +0.6771 R · saída por `line_broken`.
+
+![MAYOR flow_v2/1 17/09 08:06](../../../attachments/meme/2026-09-17/flow_v2-1/0806-MAYOR-%2B0.68.png)
+
+**Pior** — CASHOUT · 05:08:09 BRT · -0.0446 R · saída por `line_broken`.
+
+![CASHOUT flow_v2/1 17/09 05:08](../../../attachments/meme/2026-09-17/flow_v2-1/0508-CASHOUT--0.04.png)
+
+| hora (BRT) | símbolo | mint | R | saída | gráfico |
+|---|---|---|---|---|---|
+| 05:08:09 | CASHOUT | `aN3JAry31T…` | -0.0446 | line_broken | [0508-CASHOUT--0.04.png](../../../attachments/meme/2026-09-17/flow_v2-1/0508-CASHOUT--0.04.png) |
+| 06:10:36 | クリック | `264rcCvjVi…` | -0.0346 | line_broken | [0610-クリック--0.03.png](../../../attachments/meme/2026-09-17/flow_v2-1/0610-%E3%82%AF%E3%83%AA%E3%83%83%E3%82%AF--0.03.png) |
+| 06:27:04 | LUP | `5uLSGFxeFb…` | +0.0168 | line_broken | [0627-LUP-+0.02.png](../../../attachments/meme/2026-09-17/flow_v2-1/0627-LUP-%2B0.02.png) |
+| 07:40:55 | VIRUS | `1m8HuLPhyw…` | -0.0154 | line_broken | [0740-VIRUS--0.02.png](../../../attachments/meme/2026-09-17/flow_v2-1/0740-VIRUS--0.02.png) |
+| 07:42:18 | VIRUS | `1m8HuLPhyw…` | +0.2645 | line_broken | [0742-VIRUS-+0.26.png](../../../attachments/meme/2026-09-17/flow_v2-1/0742-VIRUS-%2B0.26.png) |
+| 08:06:41 | MAYOR | `9XaVY3ugtS…` | +0.6771 | line_broken | [0806-MAYOR-+0.68.png](../../../attachments/meme/2026-09-17/flow_v2-1/0806-MAYOR-%2B0.68.png) |

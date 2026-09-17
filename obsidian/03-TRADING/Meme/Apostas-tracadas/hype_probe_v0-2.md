@@ -2,7 +2,7 @@
 tags: [operacoes, meme, pumpfun, graficos, m4]
 status: em-andamento
 owner: quant-engineer
-updated: 2026-09-16
+updated: 2026-09-17
 rule_set: hype_probe_v0/2
 kind: research_only
 exp: EXP-M5
@@ -71,7 +71,7 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 
 ## Dia 2026-09-16
 
-8 aposta(s) fechada(s) — 8 medida(s), 0 indeterminada(s). Soma de R das medidas: **-0.0461**.
+10 aposta(s) fechada(s) — 10 medida(s), 0 indeterminada(s). Soma de R das medidas: **-0.5689**.
 
 **Melhor** — DATBOI · 03:28:35 BRT · +1.2189 R · saída por `migrated`.
 
@@ -81,9 +81,9 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 
 ![STABILITY hype_probe_v0/2 16/09 00:34](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0034-STABILITY--0.87.png)
 
-**Mais recente** — SORT · 14:06:01 BRT · -0.0918 R · saída por `time_stop`.
+**Mais recente** — CART · 18:43:22 BRT · -0.0129 R · saída por `time_stop`.
 
-![SORT hype_probe_v0/2 16/09 14:06](../../../attachments/meme/2026-09-16/hype_probe_v0-2/1406-SORT--0.09.png)
+![CART hype_probe_v0/2 16/09 18:43](../../../attachments/meme/2026-09-16/hype_probe_v0-2/1843-CART--0.01.png)
 
 | hora (BRT) | símbolo | mint | R | saída | gráfico |
 |---|---|---|---|---|---|
@@ -95,3 +95,23 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 | 08:00:06 | KLING | `YNsgprpQRL…` | -0.0405 | trailing | [0800-KLING--0.04.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0800-KLING--0.04.png) |
 | 08:13:12 | SOLDIERS | `A2SmpwJBVM…` | -0.6556 | max_loss | [0813-SOLDIERS--0.66.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/0813-SOLDIERS--0.66.png) |
 | 14:06:01 | SORT | `7uwn4TV124…` | -0.0918 | time_stop | [1406-SORT--0.09.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/1406-SORT--0.09.png) |
+| 16:36:08 | RASMR | `4W6Mf2DkcK…` | -0.51 | max_loss | [1636-RASMR--0.51.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/1636-RASMR--0.51.png) |
+| 18:43:22 | CART | `365D4GYWGw…` | -0.0129 | time_stop | [1843-CART--0.01.png](../../../attachments/meme/2026-09-16/hype_probe_v0-2/1843-CART--0.01.png) |
+
+## Dia 2026-09-17
+
+3 aposta(s) fechada(s) — 3 medida(s), 0 indeterminada(s). Soma de R das medidas: **+1.8130**.
+
+**Melhor · Mais recente** — MAYOR · 08:07:12 BRT · +1.4143 R · saída por `migrated`.
+
+![MAYOR hype_probe_v0/2 17/09 08:07](../../../attachments/meme/2026-09-17/hype_probe_v0-2/0807-MAYOR-%2B1.41.png)
+
+**Pior** — ALLIN · 07:57:15 BRT · -0.0382 R · saída por `time_stop`.
+
+![ALLIN hype_probe_v0/2 17/09 07:57](../../../attachments/meme/2026-09-17/hype_probe_v0-2/0757-ALLIN--0.04.png)
+
+| hora (BRT) | símbolo | mint | R | saída | gráfico |
+|---|---|---|---|---|---|
+| 07:40:24 | VIRUS | `1m8HuLPhyw…` | +0.4368 | time_stop | [0740-VIRUS-+0.44.png](../../../attachments/meme/2026-09-17/hype_probe_v0-2/0740-VIRUS-%2B0.44.png) |
+| 07:57:15 | ALLIN | `FaszL4xMRE…` | -0.0382 | time_stop | [0757-ALLIN--0.04.png](../../../attachments/meme/2026-09-17/hype_probe_v0-2/0757-ALLIN--0.04.png) |
+| 08:07:12 | MAYOR | `9XaVY3ugtS…` | +1.4143 | migrated | [0807-MAYOR-+1.41.png](../../../attachments/meme/2026-09-17/hype_probe_v0-2/0807-MAYOR-%2B1.41.png) |

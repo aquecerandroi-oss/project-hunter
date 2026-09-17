@@ -2,7 +2,7 @@
 tags: [operacoes, meme, pumpfun, graficos, m4]
 status: em-andamento
 owner: quant-engineer
-updated: 2026-09-16
+updated: 2026-09-17
 rule_set: moonshot_v0/2
 kind: research_only
 exp: EXP-M4
@@ -83,29 +83,51 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 
 ## Dia 2026-09-16
 
-10 aposta(s) fechada(s) — 10 medida(s), 0 indeterminada(s). Soma de R das medidas: **+0.8324**.
+6 aposta(s) fechada(s) — 6 medida(s), 0 indeterminada(s). Soma de R das medidas: **+3.5996**.
 
 **Melhor** — KITE · 05:09:09 BRT · +4.4087 R · saída por `trailing`.
 
 ![KITE moonshot_v0/2 16/09 05:09](../../../attachments/meme/2026-09-16/moonshot_v0-2/0509-KITE-%2B4.41.png)
 
-**Pior** — STABILITY · 00:34:12 BRT · -0.8678 R · saída por `time_stop`.
+**Pior** — RASMR · 16:36:08 BRT · -0.7662 R · saída por `creator_dump`.
 
-![STABILITY moonshot_v0/2 16/09 00:34](../../../attachments/meme/2026-09-16/moonshot_v0-2/0034-STABILITY--0.87.png)
+![RASMR moonshot_v0/2 16/09 16:36](../../../attachments/meme/2026-09-16/moonshot_v0-2/1636-RASMR--0.77.png)
 
-**Mais recente** — INCEPT · 11:49:32 BRT · -0.6507 R · saída por `creator_dump`.
+**Mais recente** — CART · 18:43:22 BRT · -0.4248 R · saída por `creator_dump`.
 
-![INCEPT moonshot_v0/2 16/09 11:49](../../../attachments/meme/2026-09-16/moonshot_v0-2/1149-INCEPT--0.65.png)
+![CART moonshot_v0/2 16/09 18:43](../../../attachments/meme/2026-09-16/moonshot_v0-2/1843-CART--0.42.png)
 
 | hora (BRT) | símbolo | mint | R | saída | gráfico |
 |---|---|---|---|---|---|
-| 00:34:12 | STABILITY | `xgJXYDEWaM…` | -0.8678 | time_stop | [0034-STABILITY--0.87.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0034-STABILITY--0.87.png) |
-| 02:25:10 | ALICE | `GHNuFBxVwH…` | -0.867 | time_stop | [0225-ALICE--0.87.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0225-ALICE--0.87.png) |
 | 03:25:25 | DATBOI | `6jcGTKroM1…` | +1.2676 | trailing | [0325-DATBOI-+1.27.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0325-DATBOI-%2B1.27.png) |
 | 05:09:09 | KITE | `56KcQzfmDW…` | +4.4087 | trailing | [0509-KITE-+4.41.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0509-KITE-%2B4.41.png) |
-| 07:01:09 | POLKADOT | `Un18N8fpCb…` | -0.0355 | time_stop | [0701-POLKADOT--0.04.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0701-POLKADOT--0.04.png) |
-| 07:45:34 | SWISSC | `XtSLPWvMt4…` | -0.8579 | time_stop | [0745-SWISSC--0.86.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0745-SWISSC--0.86.png) |
-| 08:00:06 | KLING | `YNsgprpQRL…` | -0.8063 | time_stop | [0800-KLING--0.81.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0800-KLING--0.81.png) |
-| 08:13:12 | SOLDIERS | `A2SmpwJBVM…` | -0.7165 | time_stop | [0813-SOLDIERS--0.72.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0813-SOLDIERS--0.72.png) |
-| 08:31:14 | SYMMETRY | `KfPbK7bSmY…` | -0.0422 | time_stop | [0831-SYMMETRY--0.04.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/0831-SYMMETRY--0.04.png) |
 | 11:49:32 | INCEPT | `FHcHh1ELbW…` | -0.6507 | creator_dump | [1149-INCEPT--0.65.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/1149-INCEPT--0.65.png) |
+| 15:14:19 | LPAD | `D4fi1cAWTZ…` | -0.2351 | creator_dump | [1514-LPAD--0.24.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/1514-LPAD--0.24.png) |
+| 16:36:08 | RASMR | `4W6Mf2DkcK…` | -0.7662 | creator_dump | [1636-RASMR--0.77.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/1636-RASMR--0.77.png) |
+| 18:43:22 | CART | `365D4GYWGw…` | -0.4248 | creator_dump | [1843-CART--0.42.png](../../../attachments/meme/2026-09-16/moonshot_v0-2/1843-CART--0.42.png) |
+
+## Dia 2026-09-17
+
+7 aposta(s) fechada(s) — 7 medida(s), 0 indeterminada(s). Soma de R das medidas: **+0.6147**.
+
+**Melhor** — VIRUS · 07:40:24 BRT · +1.6097 R · saída por `time_stop`.
+
+![VIRUS moonshot_v0/2 17/09 07:40](../../../attachments/meme/2026-09-17/moonshot_v0-2/0740-VIRUS-%2B1.61.png)
+
+**Pior** — CASHOUT · 05:09:27 BRT · -0.8141 R · saída por `time_stop`.
+
+![CASHOUT moonshot_v0/2 17/09 05:09](../../../attachments/meme/2026-09-17/moonshot_v0-2/0509-CASHOUT--0.81.png)
+
+**Mais recente** — MAYOR · 08:07:12 BRT · -0.2957 R · saída por `time_stop`.
+
+![MAYOR moonshot_v0/2 17/09 08:07](../../../attachments/meme/2026-09-17/moonshot_v0-2/0807-MAYOR--0.30.png)
+
+| hora (BRT) | símbolo | mint | R | saída | gráfico |
+|---|---|---|---|---|---|
+| 00:47:24 | PÉPITO | `HK1fqfGv9s…` | -0.7066 | time_stop | [0047-PÉPITO--0.71.png](../../../attachments/meme/2026-09-17/moonshot_v0-2/0047-P%C3%89PITO--0.71.png) |
+| 04:56:30 | ANATROC | `2EvLSYHZhc…` | -0.0766 | creator_dump | [0456-ANATROC--0.08.png](../../../attachments/meme/2026-09-17/moonshot_v0-2/0456-ANATROC--0.08.png) |
+| 05:09:27 | CASHOUT | `aN3JAry31T…` | -0.8141 | time_stop | [0509-CASHOUT--0.81.png](../../../attachments/meme/2026-09-17/moonshot_v0-2/0509-CASHOUT--0.81.png) |
+| 07:34:45 | GATO | `717VW8LR4m…` | +0.9367 | trailing | [0734-GATO-+0.94.png](../../../attachments/meme/2026-09-17/moonshot_v0-2/0734-GATO-%2B0.94.png) |
+| 07:40:24 | VIRUS | `1m8HuLPhyw…` | +1.6097 | time_stop | [0740-VIRUS-+1.61.png](../../../attachments/meme/2026-09-17/moonshot_v0-2/0740-VIRUS-%2B1.61.png) |
+| 07:57:15 | ALLIN | `FaszL4xMRE…` | -0.0388 | time_stop | [0757-ALLIN--0.04.png](../../../attachments/meme/2026-09-17/moonshot_v0-2/0757-ALLIN--0.04.png) |
+| 08:07:12 | MAYOR | `9XaVY3ugtS…` | -0.2957 | time_stop | [0807-MAYOR--0.30.png](../../../attachments/meme/2026-09-17/moonshot_v0-2/0807-MAYOR--0.30.png) |

@@ -2,7 +2,7 @@
 tags: [operacoes, meme, pumpfun, graficos, m4]
 status: em-andamento
 owner: quant-engineer
-updated: 2026-09-16
+updated: 2026-09-17
 ---
 
 # Operações traçadas (meme) — índice
@@ -14,9 +14,12 @@ Uma página por conjunto de regras, um gráfico por aposta **fechada** (entrou, 
 - [[03-TRADING/Meme/Apostas-tracadas/flow_v2-2]]
 - [[03-TRADING/Meme/Apostas-tracadas/flow_v2-3]]
 - [[03-TRADING/Meme/Apostas-tracadas/flow_v2-5]]
+- [[03-TRADING/Meme/Apostas-tracadas/flow_v2-6]]
+- [[03-TRADING/Meme/Apostas-tracadas/flow_v2-7]]
 - [[03-TRADING/Meme/Apostas-tracadas/hype_probe_v0-2]]
 - [[03-TRADING/Meme/Apostas-tracadas/moonshot_v0-1]]
 - [[03-TRADING/Meme/Apostas-tracadas/moonshot_v0-2]]
+- [[03-TRADING/Meme/Apostas-tracadas/operator-5]]
 - [[03-TRADING/Meme/Apostas-tracadas/organic_v0-1]]
 
 As linhas destes gráficos são **features** calculadas pelo fold (`meme_features_v3`, `docs/DATABASE.md` §38.1), não desenho à mão: suporte pelos dois últimos fundos locais, máxima da janela anterior de 15 min, rompimento. Quem **lê** linha para decidir é o conjunto cujo portão a exige ([[EXP-M2-a-linha-manda]]); nos demais a linha é contexto.

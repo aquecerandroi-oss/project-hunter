@@ -2,7 +2,7 @@
 tags: [operacoes, meme, pumpfun, graficos, m4]
 status: em-andamento
 owner: quant-engineer
-updated: 2026-09-16
+updated: 2026-09-17
 rule_set: flow_v2/3
 kind: research_only
 exp: EXP-M5
@@ -57,7 +57,7 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 
 ## Dia 2026-09-16
 
-17 aposta(s) fechada(s) — 17 medida(s), 0 indeterminada(s). Soma de R das medidas: **-0.7742**.
+26 aposta(s) fechada(s) — 26 medida(s), 0 indeterminada(s). Soma de R das medidas: **-1.1583**.
 
 **Melhor** — LAUNCH · 00:18:37 BRT · +2.8961 R · saída por `target`.
 
@@ -67,9 +67,9 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 
 ![CHILLIN flow_v2/3 16/09 10:49](../../../attachments/meme/2026-09-16/flow_v2-3/1049-CHILLIN--0.88.png)
 
-**Mais recente** — RIZZLERS · 14:13:48 BRT · -0.8503 R · saída por `line_broken`.
+**Mais recente** — ERMDOG · 22:54:33 BRT · -0.3012 R · saída por `line_broken`.
 
-![RIZZLERS flow_v2/3 16/09 14:13](../../../attachments/meme/2026-09-16/flow_v2-3/1413-RIZZLERS--0.85.png)
+![ERMDOG flow_v2/3 16/09 22:54](../../../attachments/meme/2026-09-16/flow_v2-3/2254-ERMDOG--0.30.png)
 
 | hora (BRT) | símbolo | mint | R | saída | gráfico |
 |---|---|---|---|---|---|
@@ -90,3 +90,65 @@ Reproduzir: `docs/PIPELINE.md` §9c. Diário do dia: [[09-OPERATIONS/Diario-Meme
 | 13:45:01 | GPT6SOL | `9NPxe7cB8B…` | -0.1426 | line_broken | [1345-GPT6SOL--0.14.png](../../../attachments/meme/2026-09-16/flow_v2-3/1345-GPT6SOL--0.14.png) |
 | 14:08:24 | STEVE | `FLHSaTeXxo…` | +0.0885 | line_broken | [1408-STEVE-+0.09.png](../../../attachments/meme/2026-09-16/flow_v2-3/1408-STEVE-%2B0.09.png) |
 | 14:13:48 | RIZZLERS | `3T4AueQkix…` | -0.8503 | line_broken | [1413-RIZZLERS--0.85.png](../../../attachments/meme/2026-09-16/flow_v2-3/1413-RIZZLERS--0.85.png) |
+| 16:08:33 | MOONEY | `E2y5iF7aKn…` | -0.1489 | line_broken | [1608-MOONEY--0.15.png](../../../attachments/meme/2026-09-16/flow_v2-3/1608-MOONEY--0.15.png) |
+| 17:00:32 | MAXBIDDING | `6qHrLunMNU…` | -0.0451 | line_broken | [1700-MAXBIDDING--0.05.png](../../../attachments/meme/2026-09-16/flow_v2-3/1700-MAXBIDDING--0.05.png) |
+| 18:19:34 | FLYDRONES | `41tvJNWrNm…` | -0.3857 | line_broken | [1819-FLYDRONES--0.39.png](../../../attachments/meme/2026-09-16/flow_v2-3/1819-FLYDRONES--0.39.png) |
+| 19:19:07 | AAS | `DvKH9THR4R…` | -0.1031 | line_broken | [1919-AAS--0.10.png](../../../attachments/meme/2026-09-16/flow_v2-3/1919-AAS--0.10.png) |
+| 19:27:17 | LIQUI | `5gg7L1ifsj…` | -0.1543 | creator_dump | [1927-LIQUI--0.15.png](../../../attachments/meme/2026-09-16/flow_v2-3/1927-LIQUI--0.15.png) |
+| 20:22:54 | BPAD | `2M49EhYQeR…` | +0.2814 | trailing | [2022-BPAD-+0.28.png](../../../attachments/meme/2026-09-16/flow_v2-3/2022-BPAD-%2B0.28.png) |
+| 20:56:05 | SUPERCHIP | `kxLJv99HeP…` | +0.5316 | line_broken | [2056-SUPERCHIP-+0.53.png](../../../attachments/meme/2026-09-16/flow_v2-3/2056-SUPERCHIP-%2B0.53.png) |
+| 22:52:55 | ERMDOG | `6DuyEnK3wf…` | -0.0588 | line_broken | [2252-ERMDOG--0.06.png](../../../attachments/meme/2026-09-16/flow_v2-3/2252-ERMDOG--0.06.png) |
+| 22:54:33 | ERMDOG | `6DuyEnK3wf…` | -0.3012 | line_broken | [2254-ERMDOG--0.30.png](../../../attachments/meme/2026-09-16/flow_v2-3/2254-ERMDOG--0.30.png) |
+
+## Dia 2026-09-17
+
+34 aposta(s) fechada(s) — 34 medida(s), 0 indeterminada(s). Soma de R das medidas: **+0.5826**.
+
+**Melhor** — FLOCK · 03:28:28 BRT · +1.3343 R · saída por `line_broken`.
+
+![FLOCK flow_v2/3 17/09 03:28](../../../attachments/meme/2026-09-17/flow_v2-3/0328-FLOCK-%2B1.33.png)
+
+**Pior** — AIZEMPIG · 03:20:54 BRT · -0.6755 R · saída por `max_loss`.
+
+![AIZEMPIG flow_v2/3 17/09 03:20](../../../attachments/meme/2026-09-17/flow_v2-3/0320-AIZEMPIG--0.68.png)
+
+**Mais recente** — CUMMIES · 09:17:47 BRT · -0.2917 R · saída por `creator_dump`.
+
+![CUMMIES flow_v2/3 17/09 09:17](../../../attachments/meme/2026-09-17/flow_v2-3/0917-CUMMIES--0.29.png)
+
+| hora (BRT) | símbolo | mint | R | saída | gráfico |
+|---|---|---|---|---|---|
+| 01:07:01 | WISH | `4qpraJNwVi…` | -0.2723 | creator_dump | [0107-WISH--0.27.png](../../../attachments/meme/2026-09-17/flow_v2-3/0107-WISH--0.27.png) |
+| 01:41:11 | JACOB | `2aSiTzA3tS…` | -0.3498 | line_broken | [0141-JACOB--0.35.png](../../../attachments/meme/2026-09-17/flow_v2-3/0141-JACOB--0.35.png) |
+| 01:48:43 | MO | `GLZ4KoE61G…` | -0.4008 | line_broken | [0148-MO--0.40.png](../../../attachments/meme/2026-09-17/flow_v2-3/0148-MO--0.40.png) |
+| 01:56:05 | PETA | `3RMktUeuUM…` | -0.0982 | line_broken | [0156-PETA--0.10.png](../../../attachments/meme/2026-09-17/flow_v2-3/0156-PETA--0.10.png) |
+| 02:21:25 | STACK | `FX4W3xMLi4…` | +0.5964 | creator_dump | [0221-STACK-+0.60.png](../../../attachments/meme/2026-09-17/flow_v2-3/0221-STACK-%2B0.60.png) |
+| 02:36:17 | UNRWA | `45agCDaFCn…` | -0.103 | line_broken | [0236-UNRWA--0.10.png](../../../attachments/meme/2026-09-17/flow_v2-3/0236-UNRWA--0.10.png) |
+| 02:41:37 | STAND | `4azaSvHaCy…` | +0.0189 | line_broken | [0241-STAND-+0.02.png](../../../attachments/meme/2026-09-17/flow_v2-3/0241-STAND-%2B0.02.png) |
+| 02:43:29 | STAND | `4azaSvHaCy…` | -0.0374 | line_broken | [0243-STAND--0.04.png](../../../attachments/meme/2026-09-17/flow_v2-3/0243-STAND--0.04.png) |
+| 03:11:22 | BOB | `3jjcJMbwM6…` | +0.0456 | line_broken | [0311-BOB-+0.05.png](../../../attachments/meme/2026-09-17/flow_v2-3/0311-BOB-%2B0.05.png) |
+| 03:16:40 | GAMBLER | `C3bsd1nZXx…` | +0.1406 | line_broken | [0316-GAMBLER-+0.14.png](../../../attachments/meme/2026-09-17/flow_v2-3/0316-GAMBLER-%2B0.14.png) |
+| 03:20:54 | AIZEMPIG | `Ebzu4xwziA…` | -0.6755 | max_loss | [0320-AIZEMPIG--0.68.png](../../../attachments/meme/2026-09-17/flow_v2-3/0320-AIZEMPIG--0.68.png) |
+| 03:24:51 | ARCANE | `9pkehwnktJ…` | +0.024 | line_broken | [0324-ARCANE-+0.02.png](../../../attachments/meme/2026-09-17/flow_v2-3/0324-ARCANE-%2B0.02.png) |
+| 03:28:28 | FLOCK | `EuS3oJQ9xx…` | +1.3343 | line_broken | [0328-FLOCK-+1.33.png](../../../attachments/meme/2026-09-17/flow_v2-3/0328-FLOCK-%2B1.33.png) |
+| 04:35:12 | CORTANA | `HUbapm9ZHN…` | +0.0028 | line_broken | [0435-CORTANA-+0.00.png](../../../attachments/meme/2026-09-17/flow_v2-3/0435-CORTANA-%2B0.00.png) |
+| 04:37:17 | CORTANA | `HUbapm9ZHN…` | +0.659 | creator_dump | [0437-CORTANA-+0.66.png](../../../attachments/meme/2026-09-17/flow_v2-3/0437-CORTANA-%2B0.66.png) |
+| 04:44:21 | ALTLAYER | `6rziNWMPP8…` | -0.0378 | line_broken | [0444-ALTLAYER--0.04.png](../../../attachments/meme/2026-09-17/flow_v2-3/0444-ALTLAYER--0.04.png) |
+| 04:45:39 | ALTLAYER | `6rziNWMPP8…` | +0.1358 | line_broken | [0445-ALTLAYER-+0.14.png](../../../attachments/meme/2026-09-17/flow_v2-3/0445-ALTLAYER-%2B0.14.png) |
+| 04:57:18 | 401K | `kjcARRbT5r…` | +0.6341 | line_broken | [0457-401K-+0.63.png](../../../attachments/meme/2026-09-17/flow_v2-3/0457-401K-%2B0.63.png) |
+| 04:58:23 | ASPCAT | `86ViwEDh38…` | +0.6027 | creator_dump | [0458-ASPCAT-+0.60.png](../../../attachments/meme/2026-09-17/flow_v2-3/0458-ASPCAT-%2B0.60.png) |
+| 05:05:17 | INOSHISHI | `6thWBKZ9Ka…` | -0.6415 | max_loss | [0505-INOSHISHI--0.64.png](../../../attachments/meme/2026-09-17/flow_v2-3/0505-INOSHISHI--0.64.png) |
+| 05:38:37 | SPIKE | `Adhkq34cPu…` | -0.0348 | creator_dump | [0538-SPIKE--0.03.png](../../../attachments/meme/2026-09-17/flow_v2-3/0538-SPIKE--0.03.png) |
+| 05:45:29 | MERTCASH | `2apUMi97QM…` | -0.5945 | creator_dump | [0545-MERTCASH--0.59.png](../../../attachments/meme/2026-09-17/flow_v2-3/0545-MERTCASH--0.59.png) |
+| 05:49:40 | ELONMUSEK | `6c3aYhoNf4…` | -0.2305 | line_broken | [0549-ELONMUSEK--0.23.png](../../../attachments/meme/2026-09-17/flow_v2-3/0549-ELONMUSEK--0.23.png) |
+| 06:13:33 | BYZ | `8Rjh5N6fPo…` | -0.189 | line_broken | [0613-BYZ--0.19.png](../../../attachments/meme/2026-09-17/flow_v2-3/0613-BYZ--0.19.png) |
+| 06:19:40 | FRANK01 | `2TCHAJbLjx…` | -0.0367 | creator_dump | [0619-FRANK01--0.04.png](../../../attachments/meme/2026-09-17/flow_v2-3/0619-FRANK01--0.04.png) |
+| 06:28:41 | GIREUMEE | `mJkh4h759E…` | +0.1603 | line_broken | [0628-GIREUMEE-+0.16.png](../../../attachments/meme/2026-09-17/flow_v2-3/0628-GIREUMEE-%2B0.16.png) |
+| 07:08:33 | TESTES | `6YsoQWiqmK…` | -0.211 | line_broken | [0708-TESTES--0.21.png](../../../attachments/meme/2026-09-17/flow_v2-3/0708-TESTES--0.21.png) |
+| 07:20:19 | MELO | `EjamsQo99B…` | -0.0375 | creator_dump | [0720-MELO--0.04.png](../../../attachments/meme/2026-09-17/flow_v2-3/0720-MELO--0.04.png) |
+| 07:55:13 | FREEBOTS | `BWAGS7sWBC…` | -0.1156 | creator_dump | [0755-FREEBOTS--0.12.png](../../../attachments/meme/2026-09-17/flow_v2-3/0755-FREEBOTS--0.12.png) |
+| 08:35:17 | RINA | `CTCpMwvtFq…` | +0.0333 | creator_dump | [0835-RINA-+0.03.png](../../../attachments/meme/2026-09-17/flow_v2-3/0835-RINA-%2B0.03.png) |
+| 08:50:55 | MONKES | `DM82WtB7zT…` | +0.2394 | line_broken | [0850-MONKES-+0.24.png](../../../attachments/meme/2026-09-17/flow_v2-3/0850-MONKES-%2B0.24.png) |
+| 08:53:35 | 4CHAN | `27oqvy8Vmu…` | -0.0736 | line_broken | [0853-4CHAN--0.07.png](../../../attachments/meme/2026-09-17/flow_v2-3/0853-4CHAN--0.07.png) |
+| 09:01:18 | PAIDSEM | `EB2f6dyTDM…` | +0.3865 | line_broken | [0901-PAIDSEM-+0.39.png](../../../attachments/meme/2026-09-17/flow_v2-3/0901-PAIDSEM-%2B0.39.png) |
+| 09:17:47 | CUMMIES | `3NxcqafYo8…` | -0.2917 | creator_dump | [0917-CUMMIES--0.29.png](../../../attachments/meme/2026-09-17/flow_v2-3/0917-CUMMIES--0.29.png) |
