@@ -50,7 +50,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import select, true
 
 from hunter_core.db.models.market_data import Candle
 from hunter_core.db.models.markets import Exchange, Market
@@ -155,10 +155,24 @@ async def load_history_universe(
     """One query: the candidates of ``exchange`` (or of every venue) and, for
     each, the open time of its oldest final 1m candle.
 
-    A plain ``GROUP BY``/``MIN`` over a ``LEFT JOIN``, not a per-market
-    ``LATERAL ... LIMIT 1`` skip-scan: ~200 rows, read at most once an hour by
-    the shadow cache and once per pass by the breadth producer. The tradeoff is
-    named rather than silently accepted (T3.82's own words, kept).
+    A per-market ``LATERAL ... ORDER BY open_time LIMIT 1``, not a ``GROUP
+    BY``/``MIN`` over a ``LEFT JOIN`` (T4.50, reversing T3.82's own call). The
+    ``GROUP BY`` plan was measured on the VPS materializing every final 1m
+    candle of every candidate market -- 6.1M rows, ~1.98M buffer reads, 16s --
+    because a ``MIN`` aggregated after a join gets no help from the
+    ``(market_id, timeframe, open_time)`` primary key's order once the scan
+    is split across ``candles``' monthly partitions: Postgres has no
+    partitionwise aggregate for a ``GROUP BY`` on a key (``market_id``) that
+    is not the partition key. The ``LATERAL`` form asks the same index for one
+    row per market instead: cheap because the primary key already orders
+    each partition by ``(market_id, open_time)``, so ``LIMIT 1`` stops at the
+    first row that satisfies ``is_final`` (the oldest candle is final unless a
+    backfill is mid-flight, the one case this can still walk forward for).
+    Called once per pass by the ``breadth_5m``/dispersion producers -- which
+    turned out to mean once a *minute* each, not the "once an hour" this
+    docstring assumed when the tradeoff was last named; that frequency, not
+    just the per-call cost, is why the old plan starved the shared database
+    (``.claude/state/notes-T4.50.md``).
 
     ``clock`` is the ``as_of`` seam. The caller decides what instant membership
     is asked about -- the cache's load time for the shadow gate, the fold's cut
@@ -173,26 +187,30 @@ async def load_history_universe(
     ]
     if exchange is not None:
         conditions.append(Exchange.code == exchange)
+    first_candle = (
+        select(Candle.open_time.label("open_time"))
+        .where(
+            Candle.market_id == Market.id,
+            Candle.timeframe == Timeframe.M1,
+            Candle.is_final.is_(True),
+        )
+        .order_by(Candle.open_time.asc())
+        .limit(1)
+        .correlate(Market)
+        .lateral()
+    )
     rows = (
         await session.execute(
             select(
                 Market.id.label("market_id"),
                 Exchange.code.label("exchange"),
                 Market.symbol.label("symbol"),
-                func.min(Candle.open_time).label("first_candle_open_time"),
+                first_candle.c.open_time.label("first_candle_open_time"),
             )
             .select_from(Market)
             .join(Exchange, Exchange.id == Market.exchange_id)
-            .outerjoin(
-                Candle,
-                and_(
-                    Candle.market_id == Market.id,
-                    Candle.timeframe == Timeframe.M1,
-                    Candle.is_final.is_(True),
-                ),
-            )
+            .outerjoin(first_candle, true())
             .where(*conditions)
-            .group_by(Market.id, Exchange.code, Market.symbol)
             .order_by(Exchange.code, Market.symbol)
         )
     ).all()
