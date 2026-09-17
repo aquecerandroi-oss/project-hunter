@@ -4344,7 +4344,7 @@ def test_0022_seeds_the_two_rule_sets_the_contract_names(upgraded: str) -> None:
         _scalars(
             upgraded,
             "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') "
-            "|| ':' || status FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name",
+            "|| ':' || status FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name, version",
             dict(seeds),
         )
     )
@@ -4357,7 +4357,7 @@ def test_0022_seeds_the_two_rule_sets_the_contract_names(upgraded: str) -> None:
             upgraded,
             "SELECT (params ->> 'max_sol_per_bet') || '/' || (params ->> 'wallet_max_sol') || '/' "
             "|| (params ->> 'daily_loss_cap_sol') FROM meme_rule_sets WHERE id IN (:a, :b) "
-            "ORDER BY name",
+            "ORDER BY name, version",
             dict(seeds),
         )
     )
@@ -5193,7 +5193,7 @@ def test_0026_adds_the_columns_their_checks_and_seeds_the_two_arms(upgraded: str
             "|| coalesce(params ->> 'min_hype_score', '-') || ':' "
             "|| coalesce(params ->> 'exit_on_line_break', '-') || ':' "
             "|| (params ->> 'max_open_positions') "
-            "FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name",
+            "FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name, version",
             {"a": _TRENDLINE_RULE_SET, "b": _HYPE_PROBE_RULE_SET},
         )
     )
@@ -6210,7 +6210,7 @@ def test_0030_adds_outcome_quality_the_15s_series_and_seeds_the_flow_arms(upgrad
     assert asyncio.run(
         _scalars(
             upgraded,
-            "SELECT status FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name",
+            "SELECT status FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name, version",
             {"a": _RESEARCH_RULE_SET, "b": _HYPE_PROBE_1_RULE_SET},
         )
     ) == ["active", "active"], "0030 retires nothing: the audited --deprecate does"
@@ -6821,7 +6821,7 @@ def test_0034_seeds_the_second_arm_and_hands_the_desk_to_operator_4(upgraded: st
                 "|| (params ->> 'holders_rising_or_flat') || ':' "
                 "|| (params ->> 'creator_unknown_allowed_if_dev_measured') || ':' "
                 "|| (params ->> 'progress_or_mcap_rising') || ':' || coalesce(params ->> 'ttl_s', '-') "
-                "FROM meme_rule_sets WHERE id IN (:a, :o) ORDER BY name",
+                "FROM meme_rule_sets WHERE id IN (:a, :o) ORDER BY name, version",
                 {"a": _FLOW_V2_ARM2_RULE_SET, "o": _OPERATOR_4_RULE_SET},
             )
         )
@@ -6852,7 +6852,7 @@ def test_0034_seeds_the_second_arm_and_hands_the_desk_to_operator_4(upgraded: st
             _scalars(
                 upgraded,
                 "SELECT name || '/' || version || ':' || status FROM meme_rule_sets "
-                "WHERE id IN (:f1, :o3) ORDER BY name",
+                "WHERE id IN (:f1, :o3) ORDER BY name, version",
                 {"f1": _FLOW_V2_RULE_SET, "o3": _OPERATOR_3_RULE_SET},
             )
         )
@@ -7418,7 +7418,7 @@ def test_0039_seeds_the_repeat_dumper_arm_and_hands_the_desk_to_operator_5(upgra
             upgraded,
             "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
             "|| status || ':' || (params ->> 'pedigree_repeat_dumper') "
-            "FROM meme_rule_sets WHERE id IN (:a5, :o5) ORDER BY name",
+            "FROM meme_rule_sets WHERE id IN (:a5, :o5) ORDER BY name, version",
             {"a5": _FLOW_V2_ARM5_RULE_SET, "o5": _OPERATOR_5_RULE_SET},
         )
     )
@@ -7448,7 +7448,7 @@ def test_0039_seeds_the_repeat_dumper_arm_and_hands_the_desk_to_operator_5(upgra
         _scalars(
             upgraded,
             "SELECT name || '/' || version || ':' || status FROM meme_rule_sets "
-            "WHERE id IN (:f1, :a2, :o4) ORDER BY name",
+            "WHERE id IN (:f1, :a2, :o4) ORDER BY name, version",
             {"f1": _FLOW_V2_RULE_SET, "a2": _FLOW_V2_ARM2_RULE_SET, "o4": _OPERATOR_4_RULE_SET},
         )
     )
@@ -8412,7 +8412,7 @@ def test_0044_seeds_the_e2b_arm_without_touching_the_desk(upgraded: str) -> None
         _scalars(
             upgraded,
             "SELECT name || '/' || version || ':' || status FROM meme_rule_sets "
-            "WHERE id IN (:a5, :o5) ORDER BY name",
+            "WHERE id IN (:a5, :o5) ORDER BY name, version",
             {"a5": _FLOW_V2_ARM5_RULE_SET, "o5": _OPERATOR_5_RULE_SET},
         )
     )
