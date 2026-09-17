@@ -7632,3 +7632,31 @@ escrita antes delas — nas duas tabelas da `0046` (`meme_rule_set_param_history
 `DELETE` falharia como violação crua de FK em vez da frase que diz o que ia se perder.
 `packages/core/tests/integration/test_migration_0049.py` prova as duas pontas contra um Postgres real,
 mais o `alembic check` (esta revisão não muda schema: a comparação com os modelos tem de continuar vazia).
+
+## 58. O teto de 1,0 em vendas/compras, como braço — M5 (`0050_meme_gate_ratio10_arm`)
+
+**O que a `0050` faz:** semeia **um** conjunto de pesquisa, `flow_v2/8` (`…0015`, `research_only`,
+`exp_ref EXP-M14`, relógio de 15 s) = `flow_v2/6` (§53) com **um** número mexido, `max_sells_to_buys`
+`"0.6"` → `"1.0"`, e todo o resto byte a byte igual. Nenhuma mudança de schema, nada aposentado,
+`flow_v2/6` continua ativo (é o controle) e a mesa (`operator/5`) não é tocada. Tudo em
+`ddl/meme_gate_ratio10_arm.py`; a contagem de conjuntos ativos vai a 17.
+
+**Por que 1,0** (R48, 17/09/2026 01:51 BRT; R51): o teto vivo de 0,6 descarta 113 das 459 graduadas de
+24 h (24,6 %), a taxa de graduação abaixo de 0,6 é 4× menor (0,53 % contra 2,12 %) e o pico da taxa está
+no balde 1,0–1,5 (2,21 %). Tudo in-sample, um único dia, com `buy_sell_ratio` NULL em 340 das 459
+(KB-0092) — por isso a previsão registrada na EXP-M14 é `descartar`. Papel por construção, como na §57:
+o executor só abre proposta de `kind = 'operator'`.
+
+**Quatro desvios declarados (T4.49),** escritos também na página da EXP-M14: (1) a chave real é
+`max_sells_to_buys` (string), não o `max_sell_buy_ratio` que o pré-registro nomeia — esse é o nome da
+*coluna* `meme_features_1m.buy_sell_ratio`, e mexer nele semearia um parâmetro que ninguém lê; (2) o slug
+que a página previu (`0050_meme_gate_sells_buys_arm`) não é o que subiu; (3) a base é `flow_v2/6`, que
+carrega `pedigree_e2b: true`, então a leitura honesta é `flow_v2/8` **contra `flow_v2/6`**, nunca contra
+`operator/5`; (4) `gate_version` continua 3 (o conjunto de critérios não mudou, só um limiar). A
+"reentrada até 5 min" segue não sendo parâmetro: a porta é julgada a cada foto de 15 s.
+
+**Downgrade guardado (§17.7).** `refuse_a_downgrade_that_would_orphan_a_ratio10_row` recusa enquanto
+existir linha referenciando o conjunto em `meme_proposals`, `meme_paper_bets`,
+`meme_rule_set_param_history` e `meme_gate_refusals_by_mint`, como na `0049`.
+`packages/core/tests/integration/test_migration_0050.py` prova as duas pontas contra um Postgres real,
+mais o `alembic check` (esta revisão não muda schema: a comparação com os modelos tem de continuar vazia).

@@ -77,6 +77,48 @@ Conjunto: flow_v2/8, kind=research_only, exp_ref=EXP-M14, max_sell_buy_ratio 0.6
 Papel: executor so abre kind='operator', research_only nao alcanca dinheiro real
 Controle: flow_v2/6 (max_sell_buy_ratio 0.6) mesmo periodo
 
+## Braco semeado (T4.49)
+
+**Quando:** 2026-09-17, ~02:50 BRT (UTC-3), depois de R48 e R51 congeladas.
+
+**Migracao:** `0050_meme_gate_ratio10_arm` (sobre `0049_meme_gate_buyers25_arm`), toda a semente em
+`infra/migrations/ddl/meme_gate_ratio10_arm.py`. Sem mudanca de schema, nada aposentado.
+
+**Conjunto:** `flow_v2/8`, id `01994d00-6c1a-7000-8000-000000000015`, `kind=research_only`,
+`exp_ref=EXP-M14`, `status=active`, relogio de 15 s.
+
+**Parametros:** `flow_v2/6` inteiro com **um** valor mexido — `max_sells_to_buys` `"0.6"` para `"1.0"`.
+Tudo o mais byte a byte igual (holders >= 20, buyers >= 10, progress 5-50 %, dev <= 0,10, snipers 21-1000,
+`pedigree_e2b`, `exclude_mayhem`, participacao <= 1 %, fluxo > 0; saidas alvo 3x / trailing 35 % apos 1,5x /
+piso 50 % / 1800 s; size 0,05 SOL; fee 1,75 %). `test_migration_0050` prova a igualdade tirando a chave dos
+dois conjuntos.
+
+**Quatro desvios declarados** (tambem em `docs/DATABASE.md` § 58):
+
+1. A chave real e `max_sells_to_buys`, **string**, e nao o `max_sell_buy_ratio` que este pre-registro
+   nomeia — esse e o nome da coluna de feature (`meme_features_1m.buy_sell_ratio`). Mexer no nome da pagina
+   teria semeado um parametro que nenhum codigo le, isto e, um clone do controle com outro rotulo.
+2. O slug previsto aqui (`0050_meme_gate_sells_buys_arm`) nao e o que subiu: a revisao e
+   `0050_meme_gate_ratio10_arm`. Mesma `0050`, mesmo braco.
+3. A base e `flow_v2/6`, que carrega `pedigree_e2b: true` — que e exatamente o controle que este
+   pre-registro nomeia; a leitura honesta e `flow_v2/8` contra `flow_v2/6`, nunca contra `operator/5`.
+4. `gate_version` continua 3: o conjunto de criterios nao mudou, so um limiar, que os proprios `params`
+   carregam.
+
+A "reentrada ate 5 min" **nao** virou parametro: a porta e julgada a cada foto de 15 s dentro de 30-300 s,
+entao a moeda acima do teto numa barra e abaixo numa seguinte e proposta ali. Recusa definitiva exigiria
+chave nova, e nenhuma foi criada.
+
+**Papel por construcao:** o executor so abre proposta de `kind = 'operator'`
+(`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED`), logo `research_only` nunca alcanca dinheiro real.
+
+**Regra de decisao e prazo:** leitura UNICA quando **ambos** fecharem — >= 150 propostas de `flow_v2/8` **e**
+10 dias corridos, ou seja, nao antes de **2026-09-27 (BRT)**. Antes disso nenhum numero do braco decide nada.
+Veredito: descartar se qualquer gatilho da secao "Gatilhos de descarte" disparar (delta R <= -0,05 com IC
+<= +0,00 apos 150 propostas; ruina > 3 pp acima do controle; cadencia < 60 % do controle; R mediano pior que
+o controle). Previsao registrada continua `descartar`. Vida (dinheiro real) so pela regua do lab: >= 100
+apostas e 30 dias.
+
 ## Avaliacao
 
 (append-only; fechamento diario acrescenta secao datada)
