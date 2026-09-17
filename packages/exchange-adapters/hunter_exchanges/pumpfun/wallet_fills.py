@@ -30,8 +30,17 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal, cast
 
+from hunter_exchanges.pumpfun import rent as _rent
 from hunter_exchanges.pumpfun.decode import NATIVE_SOL_QUOTE_MINT, PUMP_PROGRAM_ID
 from hunter_exchanges.pumpfun.trade_event import TradeEvent, trade_events_from_transaction
+from hunter_exchanges.pumpfun.wallet_balance import (
+    CURVE_TOKEN_DECIMALS,
+    PUMPSWAP_PROGRAM_ID,
+    WSOL_MINT,
+    Side,
+    Venue,
+)
+from hunter_exchanges.pumpfun.wallet_balance import from_balances as _from_balances
 
 __all__ = [
     "CURVE_TOKEN_DECIMALS",
@@ -41,19 +50,15 @@ __all__ = [
     "Side",
     "Venue",
     "WalletFill",
+    "ata_close_refund_lamports",
+    "rent_funded_by",
+    "rent_labels",
     "wallet_fills_from_transaction",
 ]
 
-PUMPSWAP_PROGRAM_ID = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
-"""PumpSwap (Pump AMM), ``docs/PUMPFUN-ONCHAIN.md`` §0."""
-
-WSOL_MINT = "So11111111111111111111111111111111111111112"
-CURVE_TOKEN_DECIMALS = 6
 _RAW_KEYS = 40
 _RAW_LOG_LINES = 12
 
-Side = Literal["buy", "sell", "unknown"]
-Venue = Literal["curve", "pool"]
 Decode = Literal["trade_event", "balance_delta", "none"]
 
 
@@ -92,10 +97,12 @@ class WalletFill:
 
     @property
     def sol_received_lamports(self) -> int | None:
-        """A sell: what reached the wallet, lamport-exact."""
+        """A sell: what reached the wallet, lamport-exact — plus the ATA rent an
+        SPL Token ``CloseAccount`` refunded (T4.46: cash in, same as the leg)."""
         if self.side != "sell" or self.sol_lamports is None or self.fee_lamports is None:
             return None
-        return self.sol_lamports - self.fee_lamports
+        refund = self.raw.get("ata_rent_refund_lamports") or 0
+        return self.sol_lamports - self.fee_lamports + int(refund)
 
 
 def _obj(value: Any) -> dict[str, Any]:
@@ -106,6 +113,16 @@ def _seq(value: Any) -> list[Any]:
     return cast(list[Any], value) if isinstance(value, list) else []
 
 
+def _key(entry: Any) -> str:
+    """A ``jsonParsed`` account key is ``{"pubkey": ..., "signer": ..., ...}``;
+    ``json``/``base58`` hands the string itself. R43 §5: without this, every
+    key stringifies to a dict repr, no known program or wallet is ever found,
+    and every fill of a ``jsonParsed`` transaction silently becomes ``unknown``."""
+    if isinstance(entry, dict):
+        return str(cast(dict[str, Any], entry).get("pubkey", ""))
+    return str(entry)
+
+
 def _account_keys(tx: dict[str, Any]) -> list[str]:
     """Static keys then the loaded (lookup-table) ones — the order balances index."""
     meta = _obj(tx.get("meta"))
@@ -113,7 +130,7 @@ def _account_keys(tx: dict[str, Any]) -> list[str]:
     loaded = _obj(meta.get("loadedAddresses"))
     keys = _seq(message.get("accountKeys")) + _seq(loaded.get("writable"))
     keys += _seq(loaded.get("readonly"))
-    return [str(key) for key in keys]
+    return [_key(key) for key in keys]
 
 
 def _block_time(tx: dict[str, Any]) -> datetime | None:
@@ -123,42 +140,23 @@ def _block_time(tx: dict[str, Any]) -> datetime | None:
     return None
 
 
-def _token_deltas(meta: dict[str, Any], wallet: str) -> dict[str, tuple[int, int]]:
-    """``mint -> (delta in base units, decimals)`` for the wallet's own token accounts."""
-    pre: dict[str, tuple[int, int]] = {}
-    post: dict[str, tuple[int, int]] = {}
-    for label, into in (("preTokenBalances", pre), ("postTokenBalances", post)):
-        for entry_any in _seq(meta.get(label)):
-            entry = _obj(entry_any)
-            if entry.get("owner") != wallet:
-                continue
-            amount = _obj(entry.get("uiTokenAmount"))
-            try:
-                units = int(str(amount.get("amount", "0")))
-                decimals = int(amount.get("decimals", CURVE_TOKEN_DECIMALS))
-            except (TypeError, ValueError):
-                continue
-            mint = str(entry.get("mint", ""))
-            held, _ = into.get(mint, (0, decimals))
-            into[mint] = (held + units, decimals)
-    deltas: dict[str, tuple[int, int]] = {}
-    for mint in set(pre) | set(post):
-        before, decimals = pre.get(mint, (0, post.get(mint, (0, CURVE_TOKEN_DECIMALS))[1]))
-        after, _ = post.get(mint, (0, decimals))
-        if after != before:
-            deltas[mint] = (after - before, decimals)
-    return deltas
+def rent_funded_by(tx: dict[str, Any], wallet: str) -> dict[str, int]:
+    """``new account -> lamports`` the wallet funded (T4.46/R43) — the
+    accounting itself lives in :mod:`hunter_exchanges.pumpfun.rent`, to keep
+    this module inside the repo's file-size budget."""
+    return _rent.rent_funded_by(tx, _account_keys(tx), wallet)
 
 
-def _sol_change(meta: dict[str, Any], keys: list[str], wallet: str, fee: int) -> int | None:
-    """The wallet's lamport change with the network fee it paid added back."""
-    try:
-        index = keys.index(wallet)
-        pre = int(_seq(meta.get("preBalances"))[index])
-        post = int(_seq(meta.get("postBalances"))[index])
-    except (ValueError, IndexError, TypeError):
-        return None
-    return post - pre + fee
+def rent_labels(tx: dict[str, Any], wallet: str) -> tuple[int | None, int | None]:
+    """``(ata_rent_lamports, account_rent_lamports)`` — see :mod:`.rent`."""
+    return _rent.rent_labels(tx, _account_keys(tx), wallet)
+
+
+def ata_close_refund_lamports(tx: dict[str, Any], wallet: str) -> int | None:
+    """The ATA-rent refund of a full sell's ``CloseAccount`` — see :mod:`.rent`.
+    Public so the executor's ``FillRecord`` (``build.py``) reads the same rule
+    without duplicating it."""
+    return _rent.ata_close_refund(tx, _account_keys(tx), wallet)
 
 
 def _from_event(
@@ -170,6 +168,8 @@ def _from_event(
     slot: int,
     block_time: datetime | None,
     network_fee: int,
+    tx: dict[str, Any],
+    keys: list[str],
 ) -> WalletFill:
     raw: dict[str, Any] = {
         "decode": "trade_event",
@@ -195,6 +195,10 @@ def _from_event(
         "mayhem_mode": event.mayhem_mode,
         "timestamp": event.timestamp,
     }
+    if event.is_buy:
+        raw["ata_rent_lamports"], raw["account_rent_lamports"] = _rent.rent_labels(tx, keys, wallet)
+    else:
+        raw["ata_rent_refund_lamports"] = _rent.ata_close_refund(tx, keys, wallet)
     at = block_time or (
         datetime.fromtimestamp(event.timestamp, tz=UTC) if event.timestamp > 0 else None
     )
@@ -222,40 +226,6 @@ def _from_event(
         decode="trade_event",
         raw=raw,
     )
-
-
-def _from_balances(
-    tx: dict[str, Any], keys: list[str], *, wallet: str, network_fee: int
-) -> tuple[Side, Venue | None, str | None, int | None, Decimal | None, dict[str, Any]]:
-    """The balance-delta reading; ``side = 'unknown'`` names why it did not apply."""
-    meta = _obj(tx.get("meta"))
-    programs = [p for p in (PUMP_PROGRAM_ID, PUMPSWAP_PROGRAM_ID) if p in keys]
-    deltas = _token_deltas(meta, wallet)
-    sol_change = _sol_change(meta, keys, wallet, network_fee)
-    wsol = deltas.pop(WSOL_MINT, None)
-    if sol_change is not None and wsol is not None:
-        sol_change += wsol[0]
-    raw: dict[str, Any] = {
-        "decode": "balance_delta",
-        "programs": programs,
-        "sol_change_lamports": sol_change,
-        "network_fee_lamports": network_fee,
-        "token_deltas": {mint: units for mint, (units, _) in deltas.items()},
-    }
-    if PUMPSWAP_PROGRAM_ID not in programs:
-        reason = "no_trade_event_for_wallet" if PUMP_PROGRAM_ID in programs else "no_known_venue"
-        return "unknown", None, None, None, None, {**raw, "reason": reason}
-    if sol_change is None:
-        return "unknown", None, None, None, None, {**raw, "reason": "wallet_not_in_transaction"}
-    if len(deltas) != 1:
-        reason = "no_token_delta" if not deltas else "multiple_token_deltas"
-        return "unknown", None, None, None, None, {**raw, "reason": reason}
-    ((mint, (units, decimals)),) = deltas.items()
-    if (units > 0) == (sol_change < 0) and sol_change != 0:
-        side: Side = "buy" if units > 0 else "sell"
-        tokens = Decimal(abs(units)) / Decimal(10**decimals)
-        return side, "pool", mint, abs(sol_change), tokens, {**raw, "token_decimals": decimals}
-    return "unknown", None, mint, None, None, {**raw, "reason": "sol_leg_sign_mismatch"}
 
 
 def wallet_fills_from_transaction(
@@ -298,6 +268,8 @@ def wallet_fills_from_transaction(
                 slot=slot,
                 block_time=block_time,
                 network_fee=network_fee if not fills else 0,
+                tx=tx,
+                keys=keys,
             )
         )
     if fills:

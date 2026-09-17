@@ -29,6 +29,10 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Literal
 
+from hunter_exchanges.pumpfun.close_ata import (
+    CLOSE_ACCOUNT_DISCRIMINATOR,
+    build_close_ata_instruction,
+)
 from hunter_exchanges.pumpfun.decode import PUMP_PROGRAM_ID
 from hunter_exchanges.pumpfun.global_state import GlobalAccount
 from hunter_exchanges.pumpfun.pdas import bonding_curve_address, bonding_curve_v2_address
@@ -52,6 +56,7 @@ from hunter_exchanges.pumpfun.solana_codec import (
 __all__ = [
     "BUY_ACCOUNT_NAMES",
     "BUY_DISCRIMINATOR",
+    "CLOSE_ACCOUNT_DISCRIMINATOR",
     "PUMP_FEE_PROGRAM_ID",
     "SELL_ACCOUNT_NAMES",
     "SELL_CASHBACK_ACCOUNT_NAMES",
@@ -62,6 +67,7 @@ __all__ = [
     "bonding_curve_address",
     "bonding_curve_v2_address",
     "build_buy_instruction",
+    "build_close_ata_instruction",
     "build_sell_instruction",
     "build_trade_message",
     "create_ata_idempotent",
@@ -254,8 +260,7 @@ def build_sell_instruction(intent: TradeIntent, global_account: GlobalAccount) -
 
 
 def create_ata_idempotent(*, payer: str, owner: str, mint: str, token_program: str) -> Instruction:
-    """Associated-token ``CreateIdempotent`` (instruction 1): the buyer's token account
-    is created in the same transaction when missing, as the site does (``swap_build_probe4``)."""
+    """Associated-token ``CreateIdempotent``: the buyer's ATA, created if missing."""
     return Instruction(
         ASSOCIATED_TOKEN_PROGRAM_ID,
         (
@@ -289,11 +294,12 @@ def build_trade_message(
     compute_unit_limit: int,
     compute_unit_price_micro_lamports: int,
     create_user_ata: Instruction | None = None,
+    close_ata: Instruction | None = None,
     jito_tip: Instruction | None = None,
 ) -> Message:
-    """[cu limit, cu price, (create ATA), trade, (tip)] as a legacy message — the canonical
-    order the verifier rebuilds byte for byte. Both compute-budget values are mandatory:
-    a default would be a silent priority-fee policy (``RISK_ENGINE_MEME.md`` §3.1)."""
+    """[cu limit, cu price, (create ATA), trade, (close ATA), (tip)] — the order
+    the verifier rebuilds byte for byte. ``close_ata`` (T4.46) is a full sell's
+    rent refund, never present on a buy."""
     instructions = [
         set_compute_unit_limit(compute_unit_limit),
         set_compute_unit_price(compute_unit_price_micro_lamports),
@@ -301,6 +307,8 @@ def build_trade_message(
     if create_user_ata is not None:
         instructions.append(create_user_ata)
     instructions.append(trade)
+    if close_ata is not None:
+        instructions.append(close_ata)
     if jito_tip is not None:
         instructions.append(jito_tip)
     return compile_message(payer, instructions, recent_blockhash)

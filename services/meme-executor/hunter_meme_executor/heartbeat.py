@@ -160,6 +160,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         "entries_refused": str(state.entries_refused),
         "entries_confirmed": str(state.entries_confirmed),
         "exits_confirmed": str(state.exits_confirmed),
+        "ata_closed": str(state.ata_closed),
         "rpc_errors": str(state.rpc_errors),
         # T4.45: how often this process had to read the rug numbers itself
         # because the radar's row had not landed, and how often that read gave

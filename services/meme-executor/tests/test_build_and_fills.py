@@ -21,9 +21,19 @@ from hunter_exchanges.pumpfun.quote import (
     FeeBps,
     SellQuote,
 )
+from hunter_exchanges.pumpfun.solana_codec import (
+    AccountMeta,
+    Instruction,
+    associated_token_address,
+    serialize_message,
+)
 from hunter_exchanges.pumpfun.trade_event import LAYOUT_HOLDER_REWARDS, LAYOUT_PRE_HOLDER_REWARDS
-from hunter_exchanges.pumpfun.tx import bonding_curve_v2_address
-from hunter_exchanges.pumpfun.verify import UnverifiedTransaction
+from hunter_exchanges.pumpfun.tx import (
+    bonding_curve_v2_address,
+    build_sell_instruction,
+    build_trade_message,
+)
+from hunter_exchanges.pumpfun.verify import UnverifiedTransaction, verify_trade_message
 from hunter_meme_executor.build import build_buy, build_sell, decode_fills, fee_bps
 from hunter_meme_executor.chain import CurveRead
 
@@ -65,8 +75,10 @@ def _curve_read() -> CurveRead:
 def test_decode_fills_reads_the_event_the_network_fee_and_the_payers_real_delta() -> None:
     """The ledger's ``sol_spent`` is what the wallet **lost** (``pre − post`` of the fee
     payer), not the event arithmetic: this recorded buy went through the site's own
-    router, which took 13 430 340 lamports on top of the curve's fees — a path this
-    executor never builds, but exactly the kind of cost an event-only sum would hide."""
+    router, which took 11 916 500 lamports on top of the curve's fees and the wallet's
+    own ATA rent (T4.46/R43: 1 513 840, named and subtracted, not lumped into the
+    router's cut any more) — a path this executor never builds, but exactly the kind
+    of cost an event-only sum would hide."""
     (fill,) = decode_fills(_fixture("rpc_tx_buy_raw.json")["result"])
     assert fill.event.is_buy
     assert fill.network_fee_lamports > 0
@@ -74,12 +86,14 @@ def test_decode_fills_reads_the_event_the_network_fee_and_the_payers_real_delta(
     assert fill.payer_delta_lamports is not None and fill.payer_delta_lamports < 0
     assert fill.buy_total_lamports == -fill.payer_delta_lamports
     assert fill.buy_total_lamports - fill.event_buy_total_lamports == 13_430_340
+    assert fill.ata_rent_lamports == 1_513_840 and fill.account_rent_lamports is None
     payload = fill.as_json()
     assert payload["token_amount"] == fill.event.token_amount
     assert payload["signature"]
     assert payload["buy_total_lamports"] == 1_003_518_840
     assert payload["event_buy_total_lamports"] == 990_088_500
-    assert payload["unexplained_lamports"] == 13_430_340, "the router's cut, named"
+    assert payload["ata_rent_lamports"] == 1_513_840
+    assert payload["unexplained_lamports"] == 11_916_500, "the router's cut, rent named apart"
     assert payload["holder_rewards"] == 0 and payload["holder_rewards_basis_points"] == 0
     assert payload["event_layout"] == LAYOUT_PRE_HOLDER_REWARDS, "the fixture predates the field"
 
@@ -270,3 +284,114 @@ def test_a_sell_carries_min_sol_output_from_the_quote() -> None:
     assert isinstance(built.quote, SellQuote)
     assert built.intent.sol_limit == built.quote.min_sol_output
     assert built.verify(built.message) is not None
+
+
+# --------------------------------------------------------------- T4.46 (R43)
+
+
+def _sell_kwargs() -> dict[str, Any]:
+    return dict(
+        user=USER,
+        token_amount=1_000_000_000,
+        max_slippage_bps=100,
+        blockhash=BLOCKHASH,
+        last_valid_block_height=150,
+        compute_unit_limit=400_000,
+        compute_unit_price_micro_lamports=10_000,
+    )
+
+
+def test_a_full_sell_closes_the_ata_and_verifies() -> None:
+    """Selling exactly the wallet's whole on-chain balance appends ``CloseAccount``
+    (default on); the bound verifier accepts the extra instruction and reports it."""
+    built = build_sell(
+        _curve_read(), _global_account(), wallet_token_balance=1_000_000_000, **_sell_kwargs()
+    )
+    assert built.closes_ata is True
+    assert built.intent_json()["closes_ata"] is True
+    verified = built.verify(built.message)
+    assert cast(Any, verified).closes_user_ata is True
+
+
+def test_a_partial_sell_never_closes_the_ata() -> None:
+    """The wallet still holds more than this sell moves — ``CloseAccount`` on a
+    non-empty account would fail on-chain, so the builder never appends it."""
+    built = build_sell(
+        _curve_read(), _global_account(), wallet_token_balance=2_000_000_000, **_sell_kwargs()
+    )
+    assert built.closes_ata is False
+    verified = built.verify(built.message)
+    assert cast(Any, verified).closes_user_ata is False
+
+
+def test_a_full_sell_with_the_flag_off_never_closes_the_ata() -> None:
+    """``MEME_CLOSE_ATA_ON_FULL_SELL=0`` (``close_ata_on_full_sell=False``) is an
+    explicit opt-out — the executor never appends the close, flag or no balance."""
+    built = build_sell(
+        _curve_read(),
+        _global_account(),
+        wallet_token_balance=1_000_000_000,
+        close_ata_on_full_sell=False,
+        **_sell_kwargs(),
+    )
+    assert built.closes_ata is False
+
+
+def test_a_sell_without_a_known_balance_never_closes_the_ata() -> None:
+    """``wallet_token_balance=None`` (the caller could not read the chain) is not
+    a full sell by assumption — never a silent close."""
+    built = build_sell(_curve_read(), _global_account(), **_sell_kwargs())
+    assert built.closes_ata is False
+
+
+def test_a_close_account_to_someone_elses_wallet_is_refused() -> None:
+    """The verifier's own allowlist (T4.46): a ``CloseAccount`` whose refund or
+    authority is not the wallet is refused by name, never silently rebuilt away."""
+    built = build_sell(
+        _curve_read(), _global_account(), wallet_token_balance=1_000_000_000, **_sell_kwargs()
+    )
+    other = "6nAh8drzAYfFZuTFFRgwRdV8tNndFiX1E8NGRAGzSk5F"
+    ata = associated_token_address(
+        USER, built.intent.mint, token_program=built.intent.token_program
+    )
+    bad_close = Instruction(
+        built.intent.token_program,
+        (
+            AccountMeta(ata, False, True),
+            AccountMeta(other, False, True),
+            AccountMeta(USER, True, False),
+        ),
+        b"\x09",
+    )
+    message = build_trade_message(
+        build_sell_instruction(built.intent, _global_account()),
+        payer=USER,
+        recent_blockhash=BLOCKHASH,
+        compute_unit_limit=400_000,
+        compute_unit_price_micro_lamports=10_000,
+        close_ata=bad_close,
+    )
+    with pytest.raises(UnverifiedTransaction, match="close_account_destination_not_wallet"):
+        verify_trade_message(
+            serialize_message(message),
+            built.intent,
+            _global_account(),
+            built.caps,
+            expected_blockhash=BLOCKHASH,
+        )
+
+
+def test_decode_fills_names_the_rent_of_the_real_r43_buy_lamport_exact() -> None:
+    """R43: the wallet's ``system::createAccount`` for the ATA and the one-time
+    ``user_volume_accumulator`` PDA, named — ``unexplained_lamports`` goes from
+    2 860 040 to ``0`` on the transaction that made the finding necessary."""
+    (fill,) = decode_fills(_fixture("rpc_tx_r43_real_buy_json_raw.json"))
+    assert fill.event.is_buy
+    assert fill.buy_total_lamports == 52_659_524
+    assert fill.ata_rent_lamports == 1_513_840
+    assert fill.account_rent_lamports == 1_346_200
+    assert fill.unexplained_lamports == 0
+    payload = fill.as_json()
+    assert payload["ata_rent_lamports"] == 1_513_840
+    assert payload["account_rent_lamports"] == 1_346_200
+    assert payload["unexplained_lamports"] == 0

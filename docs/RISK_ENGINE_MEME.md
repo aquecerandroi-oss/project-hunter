@@ -219,7 +219,10 @@ motor um `dev_share` medido, **datado** e com ≤ 600 s (`DEV_SHARE_MAX_AGE_S`, 
 - **Reserva de aluguel.** SOL preso em rent de ATA não é caixa: `available_sol` desconta rent
   estimado e taxas (§5). A doc oficial cita, por exemplo, `0,0018444` SOL para criar
   `user_volume_accumulator` (T4.0d §6) — o número exato por conta vem do caminho de execução, nunca
-  de um palpite arredondado.
+  de um palpite arredondado. **T4.46 (R43):** o aluguel é parte de `sol_spent_lamports` da compra
+  (é caixa que saiu, rotulado à parte como `ata_rent_lamports`/`account_rent_lamports`) e volta ao
+  caixa quando a venda fecha a conta inteira (`ata_rent_refund_lamports`, `CloseAccount` na venda
+  cheia) — nunca em uma venda parcial, que deixaria a ATA aberta com saldo.
 
 ### 3.3 A chave — `SOLANA_WALLET_SECRET_KEY`
 

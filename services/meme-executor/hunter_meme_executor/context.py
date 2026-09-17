@@ -40,6 +40,10 @@ class ExecutorState:
     entries_confirmed: int = 0
     exits_confirmed: int = 0
     exits_blocked: int = 0
+    ata_closed: int = 0
+    """T4.46: full sells whose landed fill confirmed an SPL Token ``CloseAccount``
+    refund of the mint's ATA rent — the desk's count of rent actually recovered,
+    not merely attempted."""
     rpc_errors: int = 0
     wallet_lamports: int | None = None
     wallet_read_at: datetime | None = None

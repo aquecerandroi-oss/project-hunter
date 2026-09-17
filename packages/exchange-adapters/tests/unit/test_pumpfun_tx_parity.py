@@ -52,12 +52,15 @@ from hunter_exchanges.pumpfun.trade_event import (
 )
 from hunter_exchanges.pumpfun.tx import (
     BUY_ACCOUNT_NAMES,
+    CLOSE_ACCOUNT_DISCRIMINATOR,
     SELL_ACCOUNT_NAMES,
     SELL_CASHBACK_ACCOUNT_NAMES,
     TradeIntent,
     bonding_curve_v2_address,
     build_buy_instruction,
+    build_close_ata_instruction,
     build_sell_instruction,
+    build_trade_message,
     decode_trade_instruction,
     user_volume_accumulator_address,
 )
@@ -377,6 +380,52 @@ def test_recipients_must_come_from_global(global_account: GlobalAccount) -> None
         global_account,
     )
     assert ok.accounts[1].pubkey == global_account.reserved_fee_recipient
+
+
+def test_close_ata_instruction_is_a_close_account_of_the_users_own_ata() -> None:
+    """T4.46 (R43): the ATA-rent refund a full sell earns back — Token-2022
+    (the mint's own program), owner as both destination and signing authority,
+    mirroring ``hunter_exchanges.pumpswap.tx.build_close_wsol_instruction``."""
+    from hunter_exchanges.pumpfun.solana_codec import (
+        TOKEN_2022_PROGRAM_ID,
+        associated_token_address,
+    )
+
+    owner = "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd"
+    mint = "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump"
+    ix = build_close_ata_instruction(owner=owner, mint=mint, token_program=TOKEN_2022_PROGRAM_ID)
+    assert ix.program_id == TOKEN_2022_PROGRAM_ID
+    assert ix.data == CLOSE_ACCOUNT_DISCRIMINATOR == b"\x09"
+    ata = associated_token_address(owner, mint, token_program=TOKEN_2022_PROGRAM_ID)
+    assert [a.pubkey for a in ix.accounts] == [ata, owner, owner]
+    assert [a.is_writable for a in ix.accounts] == [True, True, False]
+    assert [a.is_signer for a in ix.accounts] == [False, False, True]
+
+
+def test_build_trade_message_places_close_ata_after_the_trade_before_the_tip() -> None:
+    from hunter_exchanges.pumpfun.solana_codec import (
+        TOKEN_2022_PROGRAM_ID,
+        Instruction,
+        decompile_message,
+    )
+
+    owner = "AsRQHoHxfBYqvxJZxK9RtJUnRZcCwUoh9KNpVxH6Jhnd"
+    mint = "5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump"
+    trade = Instruction(PUMP_PROGRAM_ID, (), b"trade")
+    close = build_close_ata_instruction(owner=owner, mint=mint, token_program=TOKEN_2022_PROGRAM_ID)
+    message = build_trade_message(
+        trade,
+        payer=owner,
+        recent_blockhash="11111111111111111111111111111111",
+        compute_unit_limit=400_000,
+        compute_unit_price_micro_lamports=1,
+        close_ata=close,
+    )
+    instructions = decompile_message(message)
+    assert len(instructions) == 4, "2 compute-budget + trade + close"
+    assert instructions[2].program_id == PUMP_PROGRAM_ID
+    assert instructions[3].data == CLOSE_ACCOUNT_DISCRIMINATOR
+    assert instructions[3].program_id == TOKEN_2022_PROGRAM_ID
 
 
 def test_sell_matches_a_real_sell_of_2026_09_15_second_deploy_byte_for_byte(

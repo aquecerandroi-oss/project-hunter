@@ -23,12 +23,15 @@ the curve — or say by name why it cannot.
 from __future__ import annotations
 
 import asyncio
+import os
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import KillSwitchState
 from hunter_core.domain.types import utcnow
+from hunter_core.execution.meme.gates import parse_flag
 from hunter_core.execution.meme.journal import SubmitState
 from hunter_core.execution.meme.submit import (
     ApprovedSubmission,
@@ -61,6 +64,13 @@ __all__ = ["exits_once", "manage_position"]
 
 logger = get_logger(__name__)
 LAMPORTS = Decimal(1_000_000_000)
+ENV_CLOSE_ATA_ON_FULL_SELL = "MEME_CLOSE_ATA_ON_FULL_SELL"
+
+
+def _close_ata_on_full_sell(env: Mapping[str, str]) -> bool:
+    """T4.46 — on by default: a full sell closes the mint's ATA and earns the
+    rent back (R43). ``MEME_CLOSE_ATA_ON_FULL_SELL=0/false/no/off`` disables it."""
+    return parse_flag(env.get(ENV_CLOSE_ATA_ON_FULL_SELL), default=True)
 
 
 def _params(position: OpenPosition, ctx: ExecutorContext) -> ExitParams:
@@ -208,6 +218,8 @@ async def _sell(
             last_valid_block_height=last_valid,
             compute_unit_limit=cfg.compute_unit_limit,
             compute_unit_price_micro_lamports=cfg.compute_unit_price_micro_lamports,
+            wallet_token_balance=account.amount,
+            close_ata_on_full_sell=_close_ata_on_full_sell(os.environ),
         )
     except Exception as exc:
         await mark_blocked(ctx, position, reason, f"build_failed:{type(exc).__name__}", now)
@@ -322,6 +334,8 @@ async def _close(
     if closed:
         ctx.state.exits_confirmed += 1
         ctx.state.blocked_exits.pop(position.id, None)
+        if (fill.ata_rent_refund_lamports or 0) > 0:
+            ctx.state.ata_closed += 1
 
 
 async def exits_once(ctx: ExecutorContext) -> None:

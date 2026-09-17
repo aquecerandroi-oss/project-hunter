@@ -314,11 +314,16 @@ vêm de `/global-params/{ts}` (§4.2) e do estado da `bonding_curve` on-chain.
 | **PumpSwap, pool canônico, quote SOL** — por market cap (preço × 1 bi de tokens) | 0–420 SOL: 0,300/0,930/0,020 = **1,250 %**; 420–1 470: 0,950/0,050/0,200 = 1,200 %; 1 470–2 460: 1,150 %; 2 460–3 440: 1,100 %; 3 440–4 420: 1,050 %; 4 420–9 820: 1,000 %; 9 820–14 740: 0,950 %; 14 740–19 650: 0,900 %; 19 650–24 560: 0,850 %; 24 560–29 470: 0,800 %; 29 470–34 380: 0,750 %; 34 380–39 300: 0,700 %; 39 300–44 210: 0,650 %; 44 210–49 120: 0,600 %; 49 120–54 030: 0,550 %; 54 030–58 940: 0,525 %; 58 940–63 860: 0,500 %; 63 860–68 770: 0,475 %; 68 770–73 681: 0,450 %; 73 681–78 590: 0,425 %; 78 590–83 500: 0,400 %; 83 500–88 400: 0,375 %; 88 400–93 330: 0,350 %; 93 330–98 240: 0,325 %; **≥ 98 240 SOL: 0,050/0,050/0,200 = 0,300 %** (criador/protocolo/LP; a partir da 2.ª faixa protocolo 0,05 % e LP 0,20 % fixos, só o criador decresce) |
 | PumpSwap, pool canônico, quote USDC | mesma escada em USDC: 0–59 000 USDC 1,250 %; 59 000–300 000 1,200 %; … ; ≥ 20 000 000 USDC 0,300 % (tabela completa em `notes-T4.0c.md` §5) |
 | PumpSwap, pools **não canônicos** | criador 0 % + protocolo 0,05 % + LP 0,25 % = 0,30 % |
+| **Aluguel da ATA do memecoin** (R43/T4.46, não documentado pela página) | **1 513 840 lamports** por moeda comprada — Token-2022, 170 bytes com `immutableOwner`, `createIdempotent` na própria compra; classic SPL seria 2 039 280 (165 bytes). Recuperável: T4.46 fecha a ATA (`CloseAccount`) quando a venda esvazia o saldo. |
+| **Aluguel do `user_volume_accumulator`** (R43, não documentado) | **1 346 200 lamports**, **uma vez por carteira** (PDA `["user_volume_accumulator", wallet]`), pago na primeira compra. Não recuperável sem derrubar o cashback (`close_user_volume_accumulator`, `docs/PUMPFUN-ONCHAIN.md`). |
 
 Notas da página: creator fee vale para coins presentes na curva/PumpSwap desde 13/05/2025; USDC
 como quote desde 21/05/2026; app móvel pode cobrar até +0,1 %; "The pump.fun platform may change
 these fees at any time, without notice." O `fee_basis_points: 95` de `/global-params` bate com o
-0,95 % de protocolo na curva.
+0,95 % de protocolo na curva. O aluguel das duas linhas acima **não é taxa do programa** — é rent
+do runtime da Solana, cobrado pela criação das contas, e a compra paga do próprio bolso do
+comprador junto com a curva (`sol_spent_lamports` inclui os dois; `wallet_fills`/`FillRecord`
+rotulam `ata_rent_lamports`/`account_rent_lamports` separado, T4.46).
 
 ### 4.2 Ciclo de vida como a pump.fun descreve (docs, 12/09/2026)
 

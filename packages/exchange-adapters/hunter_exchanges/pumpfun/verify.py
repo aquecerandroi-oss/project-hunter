@@ -6,7 +6,10 @@ builder (``tx.build_trade_message``) and compared byte for byte. Anything else i
 an :class:`UnverifiedTransaction` with a named reason:
 
 1. every program invoked is on the allowlist (§1 — pump, ComputeBudget, the
-   associated-token program for the buyer's own ATA, System only for a Jito tip);
+   associated-token program for the buyer's own ATA, System only for a Jito tip,
+   and — a sell only, T4.46 — the mint's own token program for a single
+   ``CloseAccount`` on the seller's own ATA, refund and authority both the
+   wallet);
 2. the only signer is our wallet, at index 0, and nothing else signs;
 3. no SOL leaves the wallet except through the pump instruction (curve, fee
    recipients from ``Global``) and, when the intent allows one, a tip to the
@@ -31,16 +34,21 @@ from hunter_exchanges.pumpfun.solana_codec import (
     ASSOCIATED_TOKEN_PROGRAM_ID,
     COMPUTE_BUDGET_PROGRAM_ID,
     SYSTEM_PROGRAM_ID,
+    TOKEN_2022_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
     Instruction,
     Message,
+    associated_token_address,
     decompile_message,
     deserialize_message,
     serialize_message,
 )
 from hunter_exchanges.pumpfun.tx import (
     BUY_DISCRIMINATOR,
+    CLOSE_ACCOUNT_DISCRIMINATOR,
     TradeIntent,
     build_buy_instruction,
+    build_close_ata_instruction,
     build_sell_instruction,
     build_trade_message,
     create_ata_idempotent,
@@ -79,6 +87,8 @@ class VerifiedTrade:
     compute_unit_price_micro_lamports: int
     jito_tip_lamports: int
     creates_user_ata: bool
+    closes_user_ata: bool = False
+    """T4.46 — a sell that emptied the wallet's ATA and closed it for the rent."""
 
 
 def _compute_budget(ix: Instruction) -> tuple[str, int]:
@@ -114,6 +124,23 @@ class _Seen:
     price: int | None = None
     tip: int = 0
     creates_ata: bool = False
+    closes_ata: bool = False
+
+
+def _close_ata(ix: Instruction, intent: TradeIntent) -> None:
+    """A sell's ``CloseAccount`` on the wallet's own ATA (T4.46) — never a buy,
+    never anyone else's account, never a transfer in disguise."""
+    if intent.side != "sell":
+        raise UnverifiedTransaction("close_account_not_a_sell")
+    if ix.program_id != intent.token_program:
+        raise UnverifiedTransaction("close_account_wrong_token_program")
+    if ix.data != CLOSE_ACCOUNT_DISCRIMINATOR:
+        raise UnverifiedTransaction("token_instruction_not_close_account")
+    ata = associated_token_address(intent.user, intent.mint, token_program=intent.token_program)
+    if len(ix.accounts) != 3 or ix.accounts[0].pubkey != ata:
+        raise UnverifiedTransaction("close_account_not_our_ata")
+    if ix.accounts[1].pubkey != intent.user or ix.accounts[2].pubkey != intent.user:
+        raise UnverifiedTransaction("close_account_destination_not_wallet")
 
 
 def _classify(
@@ -143,6 +170,11 @@ def _classify(
             if seen.tip:
                 raise UnverifiedTransaction("more_than_one_transfer")
             seen.tip = _system_transfer(ix, intent, caps)
+        elif ix.program_id in (TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID):
+            if seen.closes_ata:
+                raise UnverifiedTransaction("more_than_one_close_account_instruction")
+            _close_ata(ix, intent)
+            seen.closes_ata = True
         else:
             raise UnverifiedTransaction("program_not_allowed", ix.program_id)
     return seen
@@ -205,6 +237,13 @@ def verify_trade_message(
             if seen.creates_ata
             else None
         ),
+        close_ata=(
+            build_close_ata_instruction(
+                owner=intent.user, mint=intent.mint, token_program=intent.token_program
+            )
+            if seen.closes_ata
+            else None
+        ),
         jito_tip=(
             jito_tip_transfer(
                 payer=intent.user, tip_account=str(caps.jito_tip_account), lamports=seen.tip
@@ -222,6 +261,7 @@ def verify_trade_message(
         compute_unit_price_micro_lamports=seen.price,
         jito_tip_lamports=seen.tip,
         creates_user_ata=seen.creates_ata,
+        closes_user_ata=seen.closes_ata,
     )
 
 
