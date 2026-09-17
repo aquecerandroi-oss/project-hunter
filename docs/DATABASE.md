@@ -7312,7 +7312,9 @@ máximo em 1 h/24 h?) alimenta a régua da EXP-M8. **Rótulos web pendentes** (f
 `exp_ref EXP-M9`, relógio de 15 s) = a porta calibrada da mesa de 16/09 mais `pedigree_e2b: true`.
 Nada é aposentado, `flow_v2/5` continua ativo (a comparação é o ponto) e a mesa (`operator/5`) **não**
 recebe o critério: E2-b é papel. Tudo em `ddl/meme_gate_e2b_arm.py`; o downgrade recusa enquanto uma
-proposta ou uma aposta referenciar o conjunto (§17.7).
+proposta ou uma aposta referenciar o conjunto (§17.7). **Desde a `0049` (T4.48, §57), `flow_v2/6` é
+também o *controle* do braço `flow_v2/7`** (piso de 25 compradores únicos), que o clona com um único
+número mexido.
 
 **A medida que motivou** ([[11-KNOWLEDGE/KB-0103-clones-fundo-com-preco-forjado-assinatura-e-custo|KB-0103]],
 [[11-KNOWLEDGE/KB-0105-e2b-replicacao-12-13-09-e-efeito-em-R|KB-0105]]): moeda "forjada" = a curva encheu
@@ -7583,3 +7585,50 @@ REST `/coins/<mint>` só expõe o `devHoldingsPercent` corrente, exatamente a fo
 para substituir. Um script que escrevesse qualquer um dos dois nestas colunas fabricaria o falso "o criador
 ainda segura" que a T4.28g recusou. Moeda antiga fica `NULL` e continua recusando pelo nome
 (`creator_flow_unknown`).
+
+## 57. O piso de 25 compradores únicos, como braço — M5 (`0049_meme_gate_buyers25_arm`)
+
+**O que a `0049` faz:** semeia **um** conjunto de pesquisa, `flow_v2/7` (`…0014`, `research_only`,
+`exp_ref EXP-M10`, relógio de 15 s) = `flow_v2/6` (§53) com **um** número mexido, `min_unique_buyers`
+10 → 25, e todo o resto byte a byte igual. Nenhuma mudança de schema, nada aposentado, `flow_v2/6`
+continua ativo (é o controle) e a mesa (`operator/5`) não é tocada. Tudo em
+`ddl/meme_gate_buyers25_arm.py`.
+
+**Por que 25** ([[11-KNOWLEDGE/KB-0112-volume-do-minuto-participacao-e-r|KB-0112]] §4,
+[[11-KNOWLEDGE/KB-0114-compradores-unicos-o-piso-e-o-r|KB-0114]]): `unique_buyers` é a única das três
+variáveis do minuto com sinal de cauda (Spearman com R ≥ +2 = +0,153, p = 0,004); sobre 345 entradas em
+5 dias o piso 25 rende **+0,090 R** [+0,038; +0,201] contra o piso vivo de 10, é o único que sobrevive ao
+leave-one-day-out e ainda deixa 273 apostas em 5 dias — régua que fecha. Tudo in-sample (KB-0092), então a
+previsão registrada na EXP-M10 é `descartar`.
+
+**Papel por construção, não por flag.** `meme_rule_sets` não tem coluna "paper": quem separa é `kind`. O
+executor só abre proposta de conjunto da mesa —
+`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED` seleciona `WHERE rs.kind = 'operator' AND
+rs.status = 'active'` —, logo um `research_only` nunca chega a dinheiro real. O teste
+`test_only_an_operator_set_reaches_the_executor_so_a_research_arm_is_paper` lê essa linha do executor em
+vez de supô-la.
+
+**Dois desvios declarados (T4.48).**
+
+1. **A base carrega `pedigree_e2b: true`.** A página congelada da EXP-M10 descreve o braço como "clone
+   exato do conjunto vivo" e a tabela de critérios dela lista a E2 v1 (`creator_serial` / `symbol_clone`)
+   **sem** a perna E2-b. A base semeada é `flow_v2/6`, o conjunto de *pesquisa* mais próximo da porta
+   calibrada da mesa que existe no banco (`flow_v2/5` é anterior à calibragem de 16/09 e `operator/5` é o
+   da mesa, editado à mão). Consequência, escrita aqui e na própria EXP-M10: a leitura honesta do braço é
+   `flow_v2/7` **contra `flow_v2/6`** — os dois com E2-b —, nunca contra `operator/5`.
+2. **`gate_version` continua 3.** A `0034` e a `0044` subiram a versão do portão porque o **conjunto de
+   critérios** mudou (chave nova, critério desligado); aqui os critérios são os de `flow_v2/6` e só um
+   limiar anda, que os próprios `params` carregam. O campo é descritivo
+   (`hunter_meme_worker.lab_models._gate_from_params`): quem identifica o braço é `flow_v2/7`.
+
+A "reentrada" do pré-registro **não** é parâmetro: a porta já é julgada a cada foto de 15 s dentro da
+janela de 30–300 s, então a moeda que não faz 25 compradores numa barra e faz numa seguinte é proposta ali
+— recusar a moeda para sempre é que exigiria chave nova, e nenhuma foi criada.
+
+**Downgrade guardado (§17.7).** `refuse_a_downgrade_that_would_orphan_a_buyers25_row` recusa enquanto
+existir linha referenciando o conjunto em `meme_proposals`, `meme_paper_bets` e — diferente da `0044`,
+escrita antes delas — nas duas tabelas da `0046` (`meme_rule_set_param_history`,
+`meme_gate_refusals_by_mint`), que também têm chave estrangeira para `meme_rule_sets`: sem nomeá-las, o
+`DELETE` falharia como violação crua de FK em vez da frase que diz o que ia se perder.
+`packages/core/tests/integration/test_migration_0049.py` prova as duas pontas contra um Postgres real,
+mais o `alembic check` (esta revisão não muda schema: a comparação com os modelos tem de continuar vazia).

@@ -106,6 +106,46 @@ de ~60 dias para se provar); tirar `min_holders` "porque virou inerte" **neste**
 impedem atribuir o efeito — é braço futuro); ajustar o 25 olhando os primeiros dias; contar apostas em moeda Mayhem;
 ligar dinheiro real antes da régua.
 
+## Braço semeado (T4.48)
+
+**Quando:** 16/09/2026, noite (horário de Brasília, UTC−3) — o conjunto passou a existir no banco depois
+que esta página foi congelada, como manda o pré-registro.
+
+**Como:** migração `0049_meme_gate_buyers25_arm` (`down_revision = 0048_meme_creator_initial_buy`;
+`infra/migrations/ddl/meme_gate_buyers25_arm.py`). Semeia **um** conjunto:
+
+| campo | valor |
+|---|---|
+| `id` | `01994d00-6c1a-7000-8000-000000000014` |
+| `name/version` | `flow_v2` / `7` |
+| `kind` | `research_only` (**papel**) · `exp_ref` `EXP-M10` · `status` `active` |
+| parâmetro que muda | `min_unique_buyers` **10 → 25** |
+| base | `flow_v2/6` (`…0013`, migração `0044`) — todo o resto byte a byte igual (`size_sol` 0,05; alvo 3×; trailing 35 % após 1,5×; piso −50 %; 30 min; `max_participation_pct` 1 %; `min_holders` 20; `min_snipers` 21; `max_progress_pct` 50; `exclude_mayhem`; relógio 15 s) |
+
+**Papel, por construção:** o executor só abre proposta de conjunto `kind = 'operator'`
+(`hunter_meme_executor.auto_approve`: `WHERE rs.kind = 'operator' AND rs.status = 'active'`). Um conjunto
+`research_only` **não alcança dinheiro real** — não é promessa de configuração, é o `WHERE` da consulta.
+
+**Dois desvios em relação ao texto congelado acima, declarados (também em `docs/DATABASE.md` §57):**
+
+1. A base é `flow_v2/6`, que carrega `pedigree_e2b: true` (EXP-M9) — a tabela de critérios desta página
+   lista só a E2 v1. É o conjunto de **pesquisa** mais próximo da porta calibrada da mesa que existe no
+   banco (`flow_v2/5` é anterior à calibragem de 16/09; `operator/5` é o da mesa, editado à mão).
+   **Consequência para a leitura:** o controle desta EXP-M10 é `flow_v2/6`, não `operator/5` — os dois
+   braços carregam E2-b, e o Δ só é atribuível ao piso de compradores se a comparação for essa.
+2. `gate_version` continua **3** (a página diz "fluxo_e_holders v2", escrito antes da calibragem): o
+   conjunto de critérios não mudou, só um limiar, e o campo é descritivo — quem identifica o braço é
+   `flow_v2/7`.
+
+**O que confirma / o que refuta, e até quando.** Leitura única ao fim de **≥ 150 propostas de `flow_v2/7`
+E 10 dias corridos**, o que vier por último — ou seja, não antes de **26/09/2026** (BRT). Confirma (segue
+vivo no laboratório) se, contra `flow_v2/6` no mesmo período: Δ R médio **> 0** com IC 95 % por blocos de
+dia acima de +0,02, **e** taxa de cauda (R ≥ +2) acima da do controle em ≥ 1,5 pp, **e** cadência entre
+55 % e 85 % da do controle, **e** o Δ sobrevivendo ao leave-one-day-out. Refuta (`descartar`) qualquer um
+dos quatro gatilhos acima: Δ ≤ 0 com IC ≤ +0,02 depois de 150 propostas; cauda que não sobe (mecanismo
+falso, mesmo com a média agradando); cadência < 45 % da do controle; resultado que depende de um único
+dia. Sem espiar para decidir no meio; piso reprovado só volta com mecanismo novo.
+
 ## Avaliação
 _(append-only; o fechamento diário acrescenta uma seção datada por dia com aposta fechada)_
 

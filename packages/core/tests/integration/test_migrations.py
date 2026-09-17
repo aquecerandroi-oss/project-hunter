@@ -40,8 +40,9 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0048_meme_creator_initial_buy"
-"""``0047`` (T4.39) lands on ``0046`` (T4.35), which lands on ``0044`` (T4.31),
+HEAD_REVISION = "0049_meme_gate_buyers25_arm"
+"""``0049`` (T4.48) lands on ``0048`` (T4.45), which lands on ``0047`` (T4.39),
+which lands on ``0046`` (T4.35), which lands on ``0044`` (T4.31),
 which lands on ``0043`` (T4.26b), which lands on ``0042`` (T4.27),
 which lands on ``0041`` (T4.26), which lands on ``0040`` (T4.24b); bumped here
 so the shared fixtures agree with the repository's actual chain rather than any
@@ -4497,9 +4498,10 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     # the one place a seed or a retirement the round trip forgot would be noticed.
     # ``0041`` seeds event_v0/1, nothing retired (+1 = 14); ``0044`` seeds flow_v2/6,
     # nothing retired (+1 = 15) — T4.44.
+    # ``0049`` seeds flow_v2/7 (the floor of 25 buyers), nothing retired (+1 = 16) — T4.48.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["15"]
+    ) == ["16"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",

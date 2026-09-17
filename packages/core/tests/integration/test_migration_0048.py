@@ -275,14 +275,19 @@ def test_the_downgrade_refuses_while_an_allocation_is_recorded(upgraded: str) ->
 
     Sync, like every Alembic-driving test in this suite: ``env.py`` calls
     ``asyncio.run``, which raises inside a running loop."""
+    # T4.48: staged at ``0048`` first — ``0049_meme_gate_buyers25_arm`` sits on
+    # top, so ``"-1"`` from the head reverses *that* seed, not this revision.
+    config = alembic_config(upgraded)
+    command.downgrade(config, REVISION)
     asyncio.run(_seed_and_touch(upgraded, "t4045-guard", creator_initial_tokens=1000))
     try:
         with pytest.raises(Exception, match="not re-observable"):
-            command.downgrade(alembic_config(upgraded), "-1")
+            command.downgrade(config, "-1")
         assert asyncio.run(_revision_of(upgraded)) == REVISION
         assert asyncio.run(_columns_present(upgraded)) == set(COLUMNS)
     finally:
         asyncio.run(_purge_url(upgraded))
+        command.upgrade(config, "head")
 
 
 def test_the_downgrade_reverses_cleanly_when_nothing_was_observed(upgraded: str) -> None:
@@ -292,6 +297,9 @@ def test_the_downgrade_reverses_cleanly_when_nothing_was_observed(upgraded: str)
     operator thinks he only reversed one revision."""
     asyncio.run(_purge_url(upgraded))
     config = alembic_config(upgraded)
+    # T4.48: the same staging as the guard test above — ``"-1"`` stopped meaning
+    # ``0048`` the day ``0049`` landed on top.
+    command.downgrade(config, REVISION)
     command.downgrade(config, "-1")
     try:
         assert asyncio.run(_revision_of(upgraded)) == PREVIOUS
