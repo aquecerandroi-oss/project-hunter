@@ -97,6 +97,10 @@ class ExecutorConfig:
     """T4.45 - ``MEME_RISK_READ_TIMEOUT_S``: the hard deadline of the executor's
     own ``/in-memory-coin`` read on the admission path. Past it the read is a
     failure and the admission refuses by name, never waits."""
+    wallet_read_timeout_s: float = 1.5
+    """T4.51 - ``MEME_WALLET_REFRESH_TIMEOUT_S``: the hard deadline of the
+    kill-switch tick's own ``getBalance`` read (``wallet_refresh.py``). Past it
+    the read is a failure — the last known balance is kept, never zeroed."""
     creator_sell_tolerance_pct: Decimal = Decimal("0.02")
     """T4.45 - ``MEME_CREATOR_SELL_TOLERANCE_PCT``: how much of his recorded
     allocation a creator may be missing before the chain read calls it a sale."""
@@ -264,6 +268,7 @@ def boot(
             0.0, _float(env, "MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S", 120.0)
         ),
         risk_read_timeout_s=max(0.1, _float(env, "MEME_RISK_READ_TIMEOUT_S", 1.5)),
+        wallet_read_timeout_s=max(0.1, _float(env, "MEME_WALLET_REFRESH_TIMEOUT_S", 1.5)),
         creator_sell_tolerance_pct=_tolerance(env),
         gates_file=(env.get(ENV_GATES_FILE) or "").strip() or None if mode.live else None,
         env_limits=env_limits,

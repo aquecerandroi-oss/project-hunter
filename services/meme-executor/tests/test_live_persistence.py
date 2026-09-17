@@ -62,6 +62,7 @@ from hunter_meme_executor.journal_db import PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
 from hunter_meme_executor.repo import RISK_SNAPSHOT_MAX_AGE_S, TokenContext, open_positions
+from hunter_meme_executor.wallet_refresh import wallet_refresh_once
 from hunter_risk_meme import limits_from_env
 
 if TYPE_CHECKING:
@@ -629,6 +630,44 @@ async def test_a_live_approval_becomes_a_confirmed_order_and_an_open_position(
             s=orders[0]["tx_signature"],
         )
     )[0]["n"] == 1
+
+
+async def test_wallet_refresh_updates_the_heartbeat_with_no_candidate_at_all(
+    harness: Harness,
+) -> None:
+    """T4.51: the desk with every position closed and no candidate in sight still
+    gets a fresh balance — the defect's exact scenario (DOPEY sold, next order
+    hours away)."""
+    harness.chain.lamports = 672_509_616  # the chain's real answer (getBalance)
+    await wallet_refresh_once(harness.ctx)
+    hb = await heartbeat_fields(harness.ctx)
+    assert Decimal(hb["wallet_sol_balance"]) == Decimal("0.672509616")
+    assert Decimal(hb["equity_sol"]) == Decimal("0.672509616")
+    assert hb["daily_loss_sol"] == "", "no order ran yet, so no day anchor exists either"
+    assert Decimal(hb["wallet_balance_stale_s"]) < Decimal("2")
+
+
+async def test_a_failed_wallet_refresh_never_lowers_the_published_equity(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness.chain.lamports = 645_172_518
+    await wallet_refresh_once(harness.ctx)
+    stamp = harness.ctx.state.wallet_read_at
+    errors_before = harness.ctx.state.rpc_errors
+
+    def _boom(_pubkey: str) -> WalletRead:
+        raise RuntimeError("rpc down")
+
+    monkeypatch.setattr(harness.chain, "wallet", _boom)
+    harness.chain.lamports = 0  # a refresh that trusted this would drop equity to zero
+    await asyncio.sleep(0.05)
+    await wallet_refresh_once(harness.ctx)
+    assert harness.ctx.state.wallet_lamports == 645_172_518
+    assert harness.ctx.state.wallet_read_at == stamp
+    assert harness.ctx.state.rpc_errors == errors_before + 1
+    hb = await heartbeat_fields(harness.ctx)
+    assert Decimal(hb["wallet_sol_balance"]) == Decimal("0.645172518")
+    assert float(hb["wallet_balance_stale_s"]) >= 0.05
 
 
 async def test_a_restarted_executor_rebuilds_the_position_and_sells_it_on_sell_now(

@@ -13,8 +13,10 @@ and the first missing one ends the process with a named ``MemeLiveTradingRefused
 
 Loops: ``entries`` (1 s), ``exits`` (mark cadence), ``kill_switch`` (10 s, with
 or without events — and since T4.28d the gates file's mtime rides the same tick:
-``gates_reload``), ``reconcile`` (30 s: every ``submitted_unconfirmed`` row is
-settled by ``getSignatureStatuses``, never re-sent), ``heartbeat`` (10 s).
+``gates_reload``; since T4.51 so does the wallet balance: ``wallet_refresh``, so a
+quiet desk with every position closed still has a balance no older than this
+tick), ``reconcile`` (30 s: every ``submitted_unconfirmed`` row is settled by
+``getSignatureStatuses``, never re-sent), ``heartbeat`` (10 s).
 """
 
 from __future__ import annotations
@@ -44,6 +46,7 @@ from hunter_meme_executor.journal_db import WORKER_ROLE, PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
+from hunter_meme_executor.wallet_refresh import wallet_refresh_once
 
 if TYPE_CHECKING:
     from hunter_core.runtime import WorkerRuntime
@@ -101,6 +104,9 @@ async def kill_switch_once(ctx: ExecutorContext) -> None:
     # owner's bytes changed; invalid ⇒ latched, never a raise out of this loop.
     await gates_reload_once(ctx)
     await program_check_once(ctx)
+    # T4.51: the wallet balance rides this tick too — a quiet desk (every
+    # position closed) must not let ``hb:meme:executor`` age past 10 s.
+    await wallet_refresh_once(ctx)
 
 
 def build_context(

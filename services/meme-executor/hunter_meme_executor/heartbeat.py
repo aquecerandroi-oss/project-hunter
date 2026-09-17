@@ -135,6 +135,14 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         if state.wallet_lamports is None
         else str(Decimal(state.wallet_lamports) / LAMPORTS),
         "wallet_read_at": "" if state.wallet_read_at is None else state.wallet_read_at.isoformat(),
+        # T4.51: how old the published balance is — always shown, not only on a
+        # failed refresh, so a stalled ``wallet_refresh_once`` (or a process that
+        # predates it) is visible from the number itself, not inferred.
+        "wallet_balance_stale_s": (
+            ""
+            if state.wallet_read_at is None
+            else str((now - state.wallet_read_at).total_seconds())
+        ),
         "policy": json.dumps(
             {
                 "profile": limits.profile,
