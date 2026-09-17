@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import text
 
 from hunter_core.db.meme_risk_snapshots import RISK_COLUMNS, insert_risk_snapshot
+from hunter_meme_worker.repo_rows import clean_text
 from hunter_meme_worker.repo_tape import (
     TradeRow,
     insert_trades,
@@ -208,18 +209,32 @@ _INSERT_BOARD_MINUTE = text(
 )
 
 
-async def insert_board_minutes(session: AsyncSession, rows: Sequence[BoardMinuteRow]) -> int:
+def board_payload(rows: Sequence[BoardMinuteRow]) -> list[dict[str, Any]]:
+    """The bound parameters of one ``INSERT``, NUL-free (T4.47b): a graduated-board
+    frame named ``"…\\x00"`` killed the fold loop twice at 09:05/09:06Z on
+    17/09/2026 (T4.47 had covered ``meme_tokens`` only). ``text`` refuses
+    ``0x00`` and ``jsonb`` refuses ``\\u0000``, so both the columns and
+    ``extra`` are cleaned here, at the database boundary."""
     import json
 
-    if not rows:
-        return 0
     payload: list[dict[str, Any]] = []
     for row in rows:
-        values = asdict(row)
+        values = {
+            key: clean_text(value) if isinstance(value, str) else value
+            for key, value in asdict(row).items()
+        }
         extra = values.pop("extra")
-        values["extra"] = None if not extra else json.dumps(extra, default=str)
+        values["extra"] = (
+            None if not extra else json.dumps(extra, default=str).replace("\\u0000", "")
+        )
         payload.append(values)
-    await session.execute(_INSERT_BOARD_MINUTE, payload)
+    return payload
+
+
+async def insert_board_minutes(session: AsyncSession, rows: Sequence[BoardMinuteRow]) -> int:
+    if not rows:
+        return 0
+    await session.execute(_INSERT_BOARD_MINUTE, board_payload(rows))
     return len(rows)
 
 
@@ -235,6 +250,7 @@ __all__ = [
     "BoardMinuteRow",
     "TradeRow",
     "board_minute_row",
+    "board_payload",
     "insert_board_minutes",
     "insert_risk_snapshot",
     "insert_trades",
