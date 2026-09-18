@@ -1632,3 +1632,7 @@ carteira do Everton deixou de ser um número parado e passou a ter um processo q
 ## Fontes
 
 `git log --date=short --format='%h %ad %s'` (repositório `C:\dev\project-hunter`, capturado em 2026-09-05)
+
+## 2026-09-18 (plantão 20:45 BRT)
+- `c569ae7f` fix(meme-worker): T4.65 — `trailing_arm_x ≤ 1` lido como `None` (armado desde a entrada) no conjunto, na aposta e na decisão; `operator/5` escreveu `1.0` para dizer "sempre", o `ExitRules` recusou e o `meme-worker` entrou em laço de reinício às 23:24Z (ver [[Open Bugs]]). Precisa de deploy.
+- docs: incidente decomposto em [[Open Bugs]], [[Diario/2026-09-18]], `.claude/state/plantao.md` com os dois comandos de correção de dado para o Everton.

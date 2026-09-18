@@ -12,6 +12,53 @@ closed: ""
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## `meme-worker` em laço de reinício desde 23:24Z de 18/09 — `trailing_arm_x = 1.0` na `operator/5` derruba o Lab e, com ele, o radar da mesa real (plantão 18/09, 20:5x BRT)
+
+**HIGH (produção), medido às 23:46Z de 2026-09-18 na VPS.** `docker inspect hunter-meme-worker-1` →
+**84 reinícios**, o primeiro `meme_loop_failed` (`loop = lab`) às **23:24:33Z**, 255 ocorrências em 6 h
+de log. O contêiner sobe, o Lab dá um tique, a exceção escapa de `collect.forever`, o `TaskGroup` do
+`run_meme` cai inteiro e o Docker reinicia tudo ~15 s depois — **o portão de evento que abastece a mesa
+real cai junto a cada volta** (`hb:meme:radar.lab_last_tick_at` congelado em 23:24:06Z; propostas por
+hora: 23 às 22 h → 11 às 23 h; `meme_proposals.proposed_at`).
+
+- **Cadeia (do traceback real):** `lab_bets.py:252 _process_one` → `paper_engine.py:196 decide_exit_at`
+  → `lab_params.py:93 EffectiveParams.exit_rules()` → `hunter_indicators/meme/exits.py:130
+  ExitRules.__post_init__` → `ValueError: trailing_arm_multiple must be greater than 1 when set`.
+- **Causa:** às **22:47:23Z** a `operator/5` ganhou `trailing_arm_x = "1.0"` no lote "18/09 Everton:
+  pegar lucro e sair (R59: alvo +30 % ou trailing 20 % ou 5 min)" (`meme_rule_set_param_history`,
+  `exit_key` → `alvo_1_3x_trailing_20_sempre_tempo_5m`). "Sempre" foi escrito como `1.0`; o
+  `ExitRules` aceita `None` (= armado desde a entrada) **ou** `> 1`, e recusa `1.0`. A aposta de papel
+  `01a0b6d5-b8ee-782a-9d02-ee508754f4f0` (mint `GJggRu…pump`, aberta às 23:24:07Z, a primeira do
+  conjunto novo) carregou `params.trailing_arm_x = "1"` e, desde então, todo tique morre nela. Nenhuma
+  outra aposta aberta tem o valor (as `flow_v2/*` levam `1.5`, as `moonshot_v0/*` levam `3`).
+- **A mesa real não está parada:** `hunter-meme-executor-1` está `healthy` (2 h de pé), o tique de
+  saídas anda (23:46:25Z), 0 posições reais abertas, `daily_loss 0,1088 / 0,15`, 0 erros de RPC. O
+  executor não lê `trailing_arm_x`. O que ele perde é **alimentação**: propostas só chegam nos ~15 s
+  entre uma queda e outra.
+- **Dois defeitos, não um:** (1) o Lab converte um número do operador sem normalizar (`1.0` deveria
+  valer `None`, é a mesma matemática — o pico é ≥ 1× desde a primeira marca); (2) **uma aposta com
+  parâmetro inválido derruba o processo inteiro**, radar incluído — o mesmo desenho que a T4.62
+  corrigiu no executor ("reinício por laço, nunca do processo") não existe no `meme-worker`.
+- **Correção de código (T4.65, este plantão):** `lab_params.py`/`lab_models.py` normalizam
+  `trailing_arm_x ≤ 1 → None` ao ler o conjunto e a aposta (testes unitários); **commit `c569ae7f`** (59 testes-alvo e 408 do worker verdes, ruff/pyright limpos; segunda opinião da Astra:
+  APPROVE_WITH_NITS — ela lembra que o primeiro pico pode ficar abaixo de 1× depois dos custos, então
+  `≤ 1 → None` é convenção "sempre", não identidade; as leituras cruas que sobram são só de tela);
+  **precisa de `compose.sh update`** na VPS — e, uma vez implantado, a aposta com `"1"` passa a ler como
+  `None` sozinha, sem a correção de dado.
+  O item (2) fica aberto como **T4.65b** (isolar a falha de uma aposta: marcar `outcome_quality =
+  invalid_params`, seguir com as outras, nunca derrubar o `TaskGroup`).
+- **Correção de dado (só o Everton — o classificador negou ao plantão até o dry-run do
+  `compose.sh ops`):** dois comandos, na ordem, e o worker para de cair no tique seguinte, sem deploy:
+  ```
+  ssh hunter-vps 'cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/meme_rule_set.py --set-param trailing_arm_x=null --rule-set operator/5 --apply --reason "18/09 23:5xZ: trailing_arm_x=1.0 (22:47Z, trailing 20 % sempre) e recusado por ExitRules (> 1 ou null); null = armado desde a entrada, a intencao; meme-worker em laco de reinicio desde 23:24Z"'
+  ssh hunter-vps "docker exec hunter-postgres-1 psql -U hunter -d hunter -c \"UPDATE meme_paper_bets SET params = params - 'trailing_arm_x' WHERE id = '01a0b6d5-b8ee-782a-9d02-ee508754f4f0' AND params->>'trailing_arm_x' = '1'\""
+  ```
+  O primeiro passa pelo caminho auditado (`meme_rule_set_param_history` + `system_events`); o
+  segundo é a única aposta com o valor (`UPDATE 1` esperado) e o valor antigo fica registrado aqui.
+- **Efeito colateral a vigiar:** o fechamento diário (`hunter-meme-close`, 00:10 BRT = 03:10Z) vai
+  ler um Lab parado desde 23:24Z; as avaliações datadas de 18/09 saem com esse buraco declarado.
+- Ligações: [[Diario/2026-09-18]], [[03-TRADING/Meme/README]], `docs/plans/T4-MEME-RADAR.md`.
+
 ## Disco da VPS em 88 % — o banco cresce ~6 GB/dia e ninguém poda a outbox (plantão 18/09, 19:5x BRT)
 
 **HIGH (operação), medido às 22:46Z de 2026-09-18 na VPS.** `df -h /` = **306 G de 348 G (88 %)**;
