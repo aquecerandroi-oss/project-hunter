@@ -38,6 +38,7 @@ logger = get_logger(__name__)
 
 _BACKOFF_BASE_S = 0.25
 _BACKOFF_CAP_S = 5.0
+_MAX_BACKOFF_FAILURES = 20
 
 
 class _PubSubLike(Protocol):
@@ -68,13 +69,19 @@ class ProposalWakeListener:
         while True:
             try:
                 await self._listen_once()
-                failures = 0
+                # A clean return (the server sent ``unsubscribe``) is a failure
+                # too: without the pause below it re-subscribes in a hot loop
+                # (review T4.52a: 50 000 SUBSCRIBEs in 0.14 s).
             except asyncio.CancelledError:
                 raise
             except Exception:
                 logger.warning("meme_proposal_wake_listener_failed", failures=failures)
-                await asyncio.sleep(self._backoff.compute(failures))
-                failures += 1
+            # ``failures`` is capped: redis-py computes ``base * 2**failures``
+            # before the cap, and 2**1024 overflows a float — an OverflowError
+            # here would escape the except and take the whole TaskGroup (and the
+            # exits loop) down with it (review T4.52a).
+            await asyncio.sleep(self._backoff.compute(min(failures, _MAX_BACKOFF_FAILURES)))
+            failures += 1
 
     async def _listen_once(self) -> None:
         pubsub = self._redis.pubsub()
