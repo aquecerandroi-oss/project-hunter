@@ -140,6 +140,7 @@ async def build_admission_context(
             "bundled_share": "" if token.bundled_share is None else str(token.bundled_share),
         }
     flow: CreatorFlow | None = None
+    chain_read_failed = False
     memory = ctx.state.creator_sold_on_chain
     remembered = memory.seen_at(mint, now=now)
     # T4.56: a mint this process already saw dumped on chain is settled — no
@@ -149,10 +150,14 @@ async def build_admission_context(
             ctx, token, mint, token_program=curve.token_program, now=now
         )
         extras.update(creator_extras)
+        chain_read_failed = flow is None
         if flow is not None and flow.sold:
             memory.remember(mint, flow.observed_at)
     verdict = resolve_creator_flow(
-        tape_sold=token.creator_sold, flow=flow, remembered_at=remembered
+        tape_sold=token.creator_sold,
+        flow=flow,
+        remembered_at=remembered,
+        chain_read_failed=chain_read_failed,
     )
     extras["creator_verdict"] = verdict.as_json()
     return AdmissionContext(
@@ -163,6 +168,7 @@ async def build_admission_context(
             now=now,
             creator_flow=flow,
             creator_sold_remembered_at=remembered,
+            creator_chain_read_failed=chain_read_failed,
         ),
         positions=positions,
         pending=pending,

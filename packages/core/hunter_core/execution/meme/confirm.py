@@ -66,10 +66,33 @@ def poll_until_settled(
             return Settled("unconfirmed", "confirmation_timeout", stats)
         if resend is not None and interval > 0 and now >= next_resend and status is None:
             if _blockhash_expired(rpc, policy, last_valid_block_height):
-                return Settled("failed", "blockhash_expired_never_landed", stats)
+                # Review T4.55: the status above was read BEFORE the height; a
+                # transaction that landed on the very last valid block sits in
+                # that gap. Ask once more before calling it never landed — a
+                # wrong ``failed`` is never reconciled and leaves tokens in the
+                # wallet with no position and no stop.
+                return _expired_or_landed(rpc, signature, stats)
             _resend(rpc, resend, stats)
             next_resend = now + interval
         sleep(policy.poll_interval_s)
+
+
+def _expired_or_landed(rpc: TxRpc, signature: str, stats: ResendStats) -> Settled:
+    """The height passed ``last_valid``: re-read the status once. Landed wins;
+    an error is an error; unreadable stays ``unconfirmed`` so the reconcile
+    (which searches history) decides — never ``failed`` on a guess."""
+    try:
+        status = rpc.get_signature_statuses([signature])[0]
+    except Exception as exc:
+        reason = f"rpc_unreachable_during_confirmation:{type(exc).__name__}"
+        return Settled("unconfirmed", reason, stats)
+    if status is not None:
+        if status.get("err") is not None:
+            return Settled("failed", f"onchain_error:{status.get('err')}", stats)
+        if status.get("confirmationStatus") in LANDED:
+            return Settled("landed", "trade_event", stats)
+        return Settled("unconfirmed", "landed_below_commitment_at_expiry", stats)
+    return Settled("failed", "blockhash_expired_never_landed", stats)
 
 
 def _blockhash_expired(rpc: TxRpc, policy: SubmitPolicy, last_valid: int | None) -> bool:

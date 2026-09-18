@@ -191,7 +191,11 @@ class CreatorVerdict:
 
 
 def resolve_creator_flow(
-    *, tape_sold: bool | None, flow: CreatorFlow | None, remembered_at: datetime | None
+    *,
+    tape_sold: bool | None,
+    flow: CreatorFlow | None,
+    remembered_at: datetime | None,
+    chain_read_failed: bool = False,
 ) -> CreatorVerdict:
     """Pure. **Any source that saw the sale wins**; "did not sell" needs every
     present source to agree; with nothing present the answer stays unknown.
@@ -209,6 +213,12 @@ def resolve_creator_flow(
         decided = (Decimal(-1), MEMORY_FLOW_SOURCE)
     elif tape_sold:
         decided = (Decimal(-1), TAPE_FLOW_SOURCE)
+    elif tape_sold is False and chain_read_failed:
+        # Review T4.56: the tape said ``false`` but is the lagging source
+        # (COVER: 23 s late); the chain was asked and did not answer. That is
+        # unknown — refused ``creator_flow_unknown`` without cooldown, so the
+        # next tick asks again — never a pass on the stale word alone.
+        decided = (None, None)
     elif tape_sold is False:
         decided = (Decimal(1), TAPE_FLOW_SOURCE)
     elif flow is not None:

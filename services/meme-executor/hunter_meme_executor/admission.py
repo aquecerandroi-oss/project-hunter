@@ -171,7 +171,11 @@ def dev_share_input(
 
 
 def creator_net_sol(
-    token: TokenContext, flow: CreatorFlow | None, *, remembered_at: datetime | None = None
+    token: TokenContext,
+    flow: CreatorFlow | None,
+    *,
+    remembered_at: datetime | None = None,
+    chain_read_failed: bool = False,
 ) -> Decimal | None:
     """T4.45/T4.56 - which answer check 10 gets, and in which order.
 
@@ -183,7 +187,10 @@ def creator_net_sol(
     ``creator_flow_unknown``, as it always has.
     """
     return resolve_creator_flow(
-        tape_sold=token.creator_sold, flow=flow, remembered_at=remembered_at
+        tape_sold=token.creator_sold,
+        flow=flow,
+        remembered_at=remembered_at,
+        chain_read_failed=chain_read_failed,
     ).net_sol
 
 
@@ -195,6 +202,7 @@ def context_from(
     now: datetime,
     creator_flow: CreatorFlow | None = None,
     creator_sold_remembered_at: datetime | None = None,
+    creator_chain_read_failed: bool = False,
 ) -> MemeContext:
     volume_fresh = (
         token.features_end_time is not None
@@ -216,7 +224,10 @@ def context_from(
         top10_share_pct=token.top10_share,
         holder_denominator_valid=None if token.top10_share is None else True,
         creator_net_sol=creator_net_sol(
-            token, creator_flow, remembered_at=creator_sold_remembered_at
+            token,
+            creator_flow,
+            remembered_at=creator_sold_remembered_at,
+            chain_read_failed=creator_chain_read_failed,
         ),
         dev_share_pct=dev_share,
         dev_share_source=dev_source,

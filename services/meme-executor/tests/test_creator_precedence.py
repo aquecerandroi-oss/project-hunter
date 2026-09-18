@@ -380,17 +380,23 @@ class TestCoverEndToEnd:
         assert len(ctx.state.creator_sold_on_chain) == 0, "nothing to remember"
 
     @pytest.mark.asyncio
-    async def test_a_failed_read_leaves_the_tape_to_fill_in(self, rows: dict[str, Any]) -> None:
+    async def test_a_failed_read_with_a_stale_tape_false_is_unknown(
+        self, rows: dict[str, Any]
+    ) -> None:
+        """Review of T4.56: the tape's ``false`` is the lagging word (COVER: 23 s
+        late) and the chain was asked and did not answer. That is not a pass: the
+        engine refuses ``creator_flow_unknown`` (no cooldown) and the next tick
+        asks the chain again."""
         ctx = FakeContext()
         rows["token"] = _token(False)
         ctx.chain.balance_subunits = None
         built = await _build(ctx, now=T1)
-        assert built.context.creator_net_sol == Decimal(1)
+        assert built.context.creator_net_sol is None
         assert built.extras["creator_flow"] == {
             "source": CHAIN_FLOW_SOURCE,
             "read_failed": "ConnectionError",
         }
-        assert built.extras["creator_verdict"]["decided_by"] == TAPE_FLOW_SOURCE
+        assert built.extras["creator_verdict"]["decided_by"] == ""
         assert built.extras["creator_verdict"]["chain_net_sol"] == ""
 
     @pytest.mark.asyncio
