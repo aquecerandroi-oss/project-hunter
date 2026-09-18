@@ -872,6 +872,18 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    apagar a linha + `compose.sh update`. Um valor ilegível (`sim`, `maybe`) **recusa o boot** pelo
    nome da variável.
 
+9c-bis. **Alinhar a janela de progresso do executor com a mesa (T4.58) — decisão dele.** O check 9
+   (`curve_progress`) do executor tem a **última palavra** sobre a janela de progresso da curva e vem
+   de fábrica em **2 %–50 %** (`MEME_PAPER_V0`, `curve_progress_min_pct`/`max_pct`); o
+   `max_progress_pct` do portão `operator/5` da mesa **não consegue passar dele na prática** — em
+   18/09/2026 11:06 BRT, com o portão da mesa em 100 %, a primeira proposta (JAYCAT, 61,7 %) foi
+   recusada `progress_above_window` pelo executor. Para abrir a janela até a curva inteira, no
+   `.env` da VPS: `MEME_CURVE_PROGRESS_MAX_PCT=1.0` (e, se quiser, `MEME_CURVE_PROGRESS_MIN_PCT`,
+   padrão `0.02`; frações de 0 a 1) + `compose.sh update`. Ausentes ⇒ os padrões; ilegível, fora de
+   `[0, 1]` ou `min ≥ max` ⇒ o boot recusa pelo nome (`policy_missing`, com a janela na mensagem),
+   como as cinco. O heartbeat `hb:meme:executor` publica a janela vigente em
+   `policy.curve_progress_min_pct`/`curve_progress_max_pct`.
+
 9d. **Tesouraria — trocar USDC por SOL sozinho quando o gás fica baixo (T4.54), decisão dele
    de 17/09/2026** ("eu quero deixar atualizado para usar outra moeda"). Desligada por padrão.
    Para ligar, no `.env` da VPS: `MEME_TREASURY_ENABLED=true` (mais nada é obrigatório — os

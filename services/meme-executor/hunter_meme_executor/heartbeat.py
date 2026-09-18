@@ -32,7 +32,9 @@ from hunter_meme_executor.scope import read_scope_use
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["gates_fields", "heartbeat_fields", "heartbeat_once"]
+    from hunter_risk_meme import MemeLimits
+
+__all__ = ["gates_fields", "heartbeat_fields", "heartbeat_once", "policy_fields"]
 
 logger = get_logger(__name__)
 LAMPORTS = Decimal(1_000_000_000)
@@ -126,6 +128,26 @@ def _pickup_lag_fields(ctx: ExecutorContext) -> dict[str, str]:
     }
 
 
+def policy_fields(limits: MemeLimits) -> dict[str, object]:
+    """The ``policy`` blob: the five the owner writes, the check-10 allowance and
+    (T4.58) the curve-progress window this process admits with — published so the
+    desk can see that its ``max_progress_pct`` gate cannot exceed it in practice."""
+    return {
+        "profile": limits.profile,
+        "wallet_max_sol": str(limits.wallet_max_sol),
+        "max_sol_per_trade": str(limits.max_sol_per_trade),
+        "daily_loss_cap_sol": str(limits.daily_loss_cap_sol),
+        "max_open_positions": limits.max_open_positions,
+        "rug_cooldown_s": limits.rug_cooldown_s,
+        # T4.28h: an allowance on check 10 the owner turned on is a fact
+        # about how this process admits, so it is published, not implied.
+        "creator_unknown_allowed_if_dev_measured": limits.creator_unknown_allowed_if_dev_measured,
+        "creator_unknown_max_dev_share_pct": str(limits.creator_unknown_max_dev_share_pct),
+        "curve_progress_min_pct": str(limits.curve_progress_min_pct),
+        "curve_progress_max_pct": str(limits.curve_progress_max_pct),
+    }
+
+
 async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     cfg, state = ctx.config, ctx.state
     now = utcnow()
@@ -157,22 +179,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
             if state.wallet_read_at is None
             else str((now - state.wallet_read_at).total_seconds())
         ),
-        "policy": json.dumps(
-            {
-                "profile": limits.profile,
-                "wallet_max_sol": str(limits.wallet_max_sol),
-                "max_sol_per_trade": str(limits.max_sol_per_trade),
-                "daily_loss_cap_sol": str(limits.daily_loss_cap_sol),
-                "max_open_positions": limits.max_open_positions,
-                "rug_cooldown_s": limits.rug_cooldown_s,
-                # T4.28h: an allowance on check 10 the owner turned on is a fact
-                # about how this process admits, so it is published, not implied.
-                "creator_unknown_allowed_if_dev_measured": (
-                    limits.creator_unknown_allowed_if_dev_measured
-                ),
-                "creator_unknown_max_dev_share_pct": str(limits.creator_unknown_max_dev_share_pct),
-            }
-        ),
+        "policy": json.dumps(policy_fields(limits)),
         "orders_by_state": json.dumps(by_state),
         "positions_open": str(len(positions)),
         "blocked_exits": json.dumps(state.blocked_exits),
