@@ -29,7 +29,7 @@ from hunter_meme_worker.event_gate_config import GATE_SHADOW
 from hunter_meme_worker.event_gate_rows import EventReserves, build_event_row
 from hunter_meme_worker.lab_fast import _trail_row  # pyright: ignore[reportPrivateUsage]
 from hunter_meme_worker.lab_trail import write_refusal_trail
-from hunter_meme_worker.proposal_race import insert_proposals_reserved
+from hunter_meme_worker.proposal_race import insert_proposals_reserved, reserve_all
 from hunter_meme_worker.proposals import evaluate_gate
 from hunter_meme_worker.repo import record_gap
 from hunter_meme_worker.repo_rows import GapRow
@@ -174,6 +174,11 @@ def _record_shadow(
     ttl = rt.lab.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
     if not caches.shadow_recently_marked(spec.id, mint, now=now):
         rt.stats.record_shadow_proposals(len(outcome.drafts))
+        # Re-review 9d3c72a1: the latency must be observable in shadow, or
+        # there is nothing to demand (p50 < 1 s) before turning it on.
+        latency = _event_to_proposal_s(rt, mint, now)
+        if latency is not None:
+            rt.stats.latency_s.append(latency)
     caches.mark_shadow(mint, spec.id, now=now, ttl_s=ttl)
     logger.info(
         "meme_event_gate_would_propose",
@@ -267,6 +272,9 @@ async def evaluate_mint(rt: EventGateRuntime, mint: str, now: datetime) -> None:
         rt.pending_trail[mint] = trail_candidates
     if not to_insert:
         return  # F6: nothing to insert — never open a session for the trail alone
+    for spec, drafts in to_insert:  # re-review 9d3c72a1: reserve BEFORE the session await
+        ttl = rt.lab.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
+        reserve_all(caches, spec.id, drafts, now=now, ttl_s=ttl)
     proposed = False
     async with role_session(rt.lab.session_factory, db_role=WORKER_ROLE) as session:
         for spec, drafts in to_insert:

@@ -25,7 +25,27 @@ if TYPE_CHECKING:
     from hunter_meme_worker.event_gate_caches import EventGateCaches
     from hunter_meme_worker.proposals import ProposalDraft
 
-__all__ = ["insert_proposals_reserved"]
+__all__ = ["insert_proposals_reserved", "reserve_all"]
+
+
+def reserve_all(
+    caches: EventGateCaches | None,
+    rule_set_id: str,
+    drafts: Sequence[ProposalDraft],
+    *,
+    now: datetime,
+    ttl_s: int,
+) -> None:
+    """Re-review 9d3c72a1: reserve every draft of the batch *synchronously*,
+    before the caller's first ``await`` (a session open, an earlier draft's
+    insert). Until then the other lane only sees what is marked, so a batch
+    of two drafts left the second one open while the first one inserted.
+    ``insert_proposals_reserved`` re-marks (idempotent) and releases a draft
+    that inserted nothing, exactly as before."""
+    if caches is None:
+        return
+    for draft in drafts:
+        caches.mark_proposed(draft.mint, rule_set_id, now=now, ttl_s=ttl_s)
 
 
 async def insert_proposals_reserved(

@@ -41,7 +41,7 @@ from hunter_meme_worker.lab_repo import open_mints_for
 from hunter_meme_worker.lab_repo_e2b import lineage_for
 from hunter_meme_worker.lab_repo_fast import fast_window, load_fast_gate_rows
 from hunter_meme_worker.lab_trail import write_refusal_trail
-from hunter_meme_worker.proposal_race import insert_proposals_reserved
+from hunter_meme_worker.proposal_race import insert_proposals_reserved, reserve_all
 from hunter_meme_worker.proposals import (
     REFUSAL_ALREADY_OPEN,
     GateRow,
@@ -127,6 +127,7 @@ async def fast_gate_step(
             # T4.52b-4 (race fix): reserve each mint before its own insert
             # awaits, not after the whole batch — closes the window the event
             # lane could otherwise land a duplicate proposal in.
+            reserve_all(ctx.caches, spec.id, drafts, now=now, ttl_s=ttl)
             inserted = await insert_proposals_reserved(
                 session, ctx.caches, spec.id, drafts, now=now, ttl_s=ttl
             )
