@@ -437,7 +437,7 @@ padrão `descartar`, régua de **≥ 100 apostas medidas e 30 dias**, IC 95 % po
 | [[EXP-M10-compradores-25]] | `flow_v2/7` (porta) | `min_unique_buyers` 10 → **25**, aplicado **na escolha da barra** (reentrada); todo o resto é clone do vivo | Δ **+0,090 R** [+0,038; +0,201] em 273 entradas de 5 dias; cadência 79 % do controle ([[11-KNOWLEDGE/KB-0114-compradores-unicos-o-piso-e-o-r\|KB-0114]]) | `descartar`; leitura única a **150 propostas E 10 dias**, Δ previsto [+0,04; +0,20] | nenhuma — só criar o conjunto |
 | [[EXP-M11-saida-drawdown-20-apos-1p5x]] | `dd20_after_15x` (saída) | trailing 35 % → **recuo de 20 % do pico na série de 15 s, armado só depois de 1,5×**; entradas congeladas iguais às da mesa | Δ pareado **+0,0115 R** [−0,003; +0,027] em 291 apostas; gatilho toca 11,3 % delas a +0,359 R; cauda intacta ([[11-KNOWLEDGE/KB-0110-saida-por-drawdown-20-na-serie-de-15s\|KB-0110]]) | `descartar` — o IC de hoje **cruza o zero** | **T4.33**: a série de 15 s morre aos 300 s de vida da moeda e ignora o pin ([[11-KNOWLEDGE/KB-0113-ate-onde-as-series-acompanham-uma-aposta\|KB-0113]]); sem ela o braço não é julgável |
 | [[EXP-M12-celula-lenta-L2]] | `celula_lenta` **L2′** (porta) | entra na 1.ª barra de 1 min com **30 SOL reais**, idade ≥ 180 s, holders ≥ 20, fita, fluxo > 0, não-Mayhem, não nascida cheia, **teto de progresso 0,90 próprio do conjunto** | R médio **+0,349**, **mediana +0,046**, IC de blocos [+0,26; +0,41], **3,2 propostas/hora** admissíveis ([[11-KNOWLEDGE/KB-0107-celula-lenta-como-porta-da-mesa\|KB-0107]]) | `descartar`; prospectivo previsto [−0,10; +0,25], ponto +0,05 | **`curve_progress_max_pct` por conjunto** no motor de risco — mexer no risco é **decisão do dono**; até lá, papel e só papel |
-| [[EXP-M13-sem-entrar-apos-queda]] | `flow_v2/8` (porta) | **recusa de entrada** quando a curva perdeu **≥ 50 % do pico de `real_sol_reserves` com o pico nos últimos 60 s** (foto de cadeia, `fail-closed` sem foto fresca); reavaliado a cada decisão (reentrada); todo o resto é clone do vivo | Δ **+0,038 R** [+0,022; +0,054] em 613 entradas de 5 dias; corta 73 apostas a **−0,305 R** com cauda de 4,1 % contra ~13 %; cadência 88,1 % do controle ([[11-KNOWLEDGE/KB-0118-nao-entrar-depois-da-queda\|KB-0118]]) | `descartar`; leitura única a **150 propostas E 10 dias**, Δ previsto [+0,00; +0,08] | critério `recent_drawdown` lendo `meme_curve_snapshots` no relógio da decisão (não existe no código) |
+| [[EXP-M13-sem-entrar-apos-queda]] | `flow_v2/9` (porta; semeado 18/09, `0052`) | **recusa de entrada** quando a curva perdeu **≥ 50 % do pico de `real_sol_reserves` com o pico nos últimos 60 s** (foto de cadeia, `fail-closed` sem foto fresca); reavaliado a cada decisão (reentrada); todo o resto é clone do vivo | Δ **+0,038 R** [+0,022; +0,054] em 613 entradas de 5 dias; corta 73 apostas a **−0,305 R** com cauda de 4,1 % contra ~13 %; cadência 88,1 % do controle ([[11-KNOWLEDGE/KB-0118-nao-entrar-depois-da-queda\|KB-0118]]) | `descartar`; leitura única a **150 propostas E 10 dias**, Δ previsto [+0,00; +0,08] | critério `recent_drawdown` lendo `meme_curve_snapshots` no relógio da decisão (T4.52b-2 no portão; T4.61a na pista de 15 s) |
 
 **O que estas quatro páginas deliberadamente não fazem:** não ligam dinheiro real, não ajustam limiar olhando os
 primeiros dias, não combinam duas mudanças no mesmo braço e não leem veredito antes da régua. Braço reprovado só
@@ -450,13 +450,15 @@ lado a lado com o conjunto pai: R54 mediu **−0,053 SOL em 7 apostas (0 vitóri
 16→17/09; R56 mediu **+0,0237 SOL em 8 apostas (2 vitórias)** na janela seguinte (17→18/09). Ainda
 **inconclusivo** pela régua (bem abaixo de 150 propostas); a previsão pré-registrada continua `descartar`.
 
-**`EXP-M13` teve o mecanismo construído em código, mas segue desligado.** T4.52b-2 implementou
-`recent_drawdown` (`hunter_indicators.meme.drawdown`) e o campo opcional `EntryGate.max_recent_drawdown_pct`
-exatamente como o pré-registro descreve (fração 0–1, janela 60 s, recusa estrita `dd > X`), com 18 testes
-próprios e replay das fixtures batendo com os números da KB-0118. **Nenhum conjunto vivo ligou o critério**
-ainda — a coluna "Braço" do pré-registro nomeava `flow_v2/8`, mas esse número de conjunto foi ocupado por
-outro braço (`EXP-M14`, abaixo) antes de `EXP-M13` ser semeado; a numeração do braço fica em aberto até a
-guarda ser efetivamente armada em algum conjunto.
+**`EXP-M13` teve o mecanismo construído em código (T4.52b-2) e foi semeado em papel em 18/09 (T4.61a).**
+T4.52b-2 implementou `recent_drawdown` (`hunter_indicators.meme.drawdown`) e o campo opcional
+`EntryGate.max_recent_drawdown_pct` exatamente como o pré-registro descreve (fração 0–1, janela 60 s, recusa
+estrita `dd > X`), com 18 testes próprios e replay das fixtures batendo com os números da KB-0118. Como
+`flow_v2/8` foi ocupado pela `EXP-M14`, o braço é **`flow_v2/9`** (migração `0052_meme_gate_after_drop_arm`,
+`flow_v2/6` + `max_recent_drawdown_pct: "0.50"`, `research_only`), e a pista de 15 s passou a preencher o
+critério a partir de `meme_curve_snapshots.real_sol_reserves` (antes só a pista de evento o fazia — sem isso o
+braço recusaria tudo `recent_drawdown_unknown`). Seção "Braço semeado (T4.61a)" na página. A mesa
+(`operator/5`) segue **sem** o critério: ligar em dinheiro real é decisão de Everton com a leitura na mão.
 
 **`EXP-M14` (não estava nesta tabela) foi semeado em 17/09.** `flow_v2/8` (`max_sells_to_buys` 0,6 → 1,0,
 T4.49, migração `0050`) é `kind=research_only` desde ~02:50 BRT de 17/09. Primeiro dia com apostas fechadas
