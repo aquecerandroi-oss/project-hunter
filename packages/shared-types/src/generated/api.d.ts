@@ -528,6 +528,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/meme/live/wallet-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** T4.57 — Carteira real: dinheiro agora, hoje e desde o início */
+        get: operations["get_meme_live_wallet_summary_api_v1_orgs__org_id__meme_live_wallet_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/meme/overview": {
         parameters: {
             query?: never;
@@ -6500,6 +6517,82 @@ export interface components {
             items: components["schemas"]["VersionOut"][];
         };
         /**
+         * WalletAllTimeOut
+         * @description §3 "Desde o início" — every number a plain aggregate over
+         *     ``meme_live_positions``, never an inference across a gap in the data.
+         */
+        WalletAllTimeOut: {
+            best_trade: components["schemas"]["WalletBestWorstOut"] | null;
+            /** Starting Equity At */
+            starting_equity_at: string | null;
+            /** Starting Equity Reason */
+            starting_equity_reason?: string | null;
+            /** Starting Equity Sol */
+            starting_equity_sol: string | null;
+            /** Starting Equity Source */
+            starting_equity_source: string | null;
+            /** Total Bought */
+            total_bought: number;
+            /** Total Lost */
+            total_lost: number;
+            /** Total Pnl Brl */
+            total_pnl_brl: string | null;
+            /** Total Pnl Brl Reason */
+            total_pnl_brl_reason?: string | null;
+            /** Total Pnl Sol */
+            total_pnl_sol: string | null;
+            /** Total Pnl Sol Reason */
+            total_pnl_sol_reason?: string | null;
+            /** Total Won */
+            total_won: number;
+            worst_trade: components["schemas"]["WalletBestWorstOut"] | null;
+        };
+        /** WalletBestWorstOut */
+        WalletBestWorstOut: {
+            /** Mint */
+            mint: string;
+            /** Pnl Sol */
+            pnl_sol: string;
+        };
+        /** WalletClosedPositionOut */
+        WalletClosedPositionOut: {
+            /**
+             * Exit At
+             * Format: date-time
+             */
+            exit_at: string;
+            /** Exit Reason */
+            exit_reason: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mint */
+            mint: string;
+            /** Pnl Sol */
+            pnl_sol: string | null;
+            /** R Multiple */
+            r_multiple: string | null;
+        };
+        /**
+         * WalletFxOut
+         * @description The USD/BRL rate this response priced with, or the honest reason it
+         *     could not (``fx_rate.py``): never blocks the endpoint on the outside call.
+         */
+        WalletFxOut: {
+            /** Observed At */
+            observed_at: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Source */
+            source: string | null;
+            /** Stale */
+            stale: boolean;
+            /** Usd Brl */
+            usd_brl: string | null;
+        };
+        /**
          * WalletLabContextOut
          * @description What every active rule set's gate said in the last closed minute before
          *     a real buy — the answer to "would the Lab have done the same?".
@@ -6523,6 +6616,45 @@ export interface components {
             rule_sets: {
                 [key: string]: components["schemas"]["LabVerdictOut"];
             };
+        };
+        /**
+         * WalletNowOut
+         * @description §1 "Dinheiro agora": chain-fresh balances, the open book's marked
+         *     value, and the reserve left over.
+         */
+        WalletNowOut: {
+            fx: components["schemas"]["WalletFxOut"];
+            /** Open Marked Sol */
+            open_marked_sol: string;
+            /** Open Positions */
+            open_positions: number;
+            /** Open Unmarked Positions */
+            open_unmarked_positions: number;
+            /** Reserve Sol */
+            reserve_sol: string | null;
+            /** Reserve Sol Reason */
+            reserve_sol_reason?: string | null;
+            sol_usd: components["schemas"]["SolUsdOut"] | null;
+            /** Sol Usd Reason */
+            sol_usd_reason?: string | null;
+            /** Total Brl */
+            total_brl: string | null;
+            /** Total Brl Reason */
+            total_brl_reason?: string | null;
+            /** Total Usd */
+            total_usd: string | null;
+            /** Total Usd Reason */
+            total_usd_reason?: string | null;
+            /** Wallet Balance Stale S */
+            wallet_balance_stale_s: string | null;
+            /** Wallet Sol Balance */
+            wallet_sol_balance: string | null;
+            /** Wallet Sol Balance Reason */
+            wallet_sol_balance_reason?: string | null;
+            /** Wallet Usdc Balance */
+            wallet_usdc_balance: string | null;
+            /** Wallet Usdc Balance Reason */
+            wallet_usdc_balance_reason?: string | null;
         };
         /** WalletObservedOut */
         WalletObservedOut: {
@@ -6558,6 +6690,25 @@ export interface components {
             wallet: string;
             /** Wallet Short */
             wallet_short: string;
+        };
+        /** WalletOpenPositionOut */
+        WalletOpenPositionOut: {
+            /**
+             * Entry At
+             * Format: date-time
+             */
+            entry_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mark At */
+            mark_at: string | null;
+            /** Mark Sol */
+            mark_sol: string | null;
+            /** Mint */
+            mint: string;
         };
         /**
          * WalletOut
@@ -6639,6 +6790,78 @@ export interface components {
             wallet: string;
             /** Wallet Short */
             wallet_short: string;
+        };
+        /** WalletSummaryOut */
+        WalletSummaryOut: {
+            all_time: components["schemas"]["WalletAllTimeOut"];
+            /** Closed Today */
+            closed_today: components["schemas"]["WalletClosedPositionOut"][];
+            /**
+             * Executor Status
+             * @enum {string}
+             */
+            executor_status: "alive" | "stalled" | "never" | "heartbeat_missing" | "redis_unavailable";
+            /**
+             * Label
+             * @default REAL — transações assinadas na carteira Solana dedicada; a chave vive só no meme-executor, a API nunca assina
+             */
+            label: string;
+            now: components["schemas"]["WalletNowOut"];
+            /** Open */
+            open: components["schemas"]["WalletOpenPositionOut"][];
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
+            today: components["schemas"]["WalletTodayOut"];
+        };
+        /**
+         * WalletTodayOut
+         * @description §2 "Hoje", since 00:00 America/Sao_Paulo.
+         */
+        WalletTodayOut: {
+            /** Bought */
+            bought: number;
+            /** Daily Loss Cap Sol */
+            daily_loss_cap_sol: string | null;
+            /** Daily Loss Reason */
+            daily_loss_reason?: string | null;
+            /** Daily Loss Sol */
+            daily_loss_sol: string | null;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Fees Sol */
+            fees_sol: string;
+            /** Lost */
+            lost: number;
+            /** Open Pnl Sol */
+            open_pnl_sol: string | null;
+            /** Open Pnl Sol Reason */
+            open_pnl_sol_reason?: string | null;
+            /** Realized Pnl Brl */
+            realized_pnl_brl: string | null;
+            /** Realized Pnl Brl Reason */
+            realized_pnl_brl_reason?: string | null;
+            /** Realized Pnl Sol */
+            realized_pnl_sol: string;
+            /** Rent Sol */
+            rent_sol: string;
+            /** Small Test Remaining Sol */
+            small_test_remaining_sol: string | null;
+            /** Sold */
+            sold: number;
+            /** Treasury Sol Bought */
+            treasury_sol_bought: string;
+            /** Treasury Swaps */
+            treasury_swaps: number;
+            /** Treasury Usdc Spent */
+            treasury_usdc_spent: string;
+            /** Won */
+            won: number;
         };
         /** WalletTradeOut */
         WalletTradeOut: {
@@ -7882,6 +8105,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SellNowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_meme_live_wallet_summary_api_v1_orgs__org_id__meme_live_wallet_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalletSummaryOut"];
                 };
             };
             /** @description Validation Error */

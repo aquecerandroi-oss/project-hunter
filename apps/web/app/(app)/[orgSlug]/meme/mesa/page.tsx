@@ -11,6 +11,7 @@ import { ProposalsSection } from "@/components/meme-desk/proposals-section";
 import { LiveExecutorPanel } from "@/components/meme-live/live-executor-panel";
 import { buildLiveOutcomeIndex } from "@/components/meme-live/live-index";
 import { LivePositionsSection } from "@/components/meme-live/live-positions-section";
+import { WalletSummaryPanel } from "@/components/meme-live/wallet-summary-panel";
 import { MemeDeskTabs } from "@/components/meme-tests/meme-desk-tabs";
 import { isDayString } from "@/components/meme-tests/meme-tests-format";
 import { MemeTestsSection } from "@/components/meme-tests/meme-tests-section";
@@ -102,6 +103,7 @@ export default async function MemeDeskPage({ params, searchParams }: MemeDeskPag
     <div className="flex flex-col gap-6">
       <AutoRefresh intervalMs={DESK_REFRESH_MS} />
       <DeskHeader />
+      <WalletSummaryPanel orgId={orgId} />
       <MemeDeskTabs orgSlug={orgSlug} active="mesa" />
 
       {sources.ok ? (

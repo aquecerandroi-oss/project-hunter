@@ -22,12 +22,16 @@ from fastapi import APIRouter, Depends, status
 from hunter_api.auth.rbac import OrgContext, require_org
 from hunter_api.deps import OrgSession, get_redis, get_settings
 from hunter_api.repositories.meme_live import MemeLiveRepository
+from hunter_api.repositories.meme_live_wallet import MemeLiveWalletRepository
 from hunter_api.routers.orders import IdempotencyKey
 from hunter_api.schemas.meme_live import MemeLiveOut, SellNowOut
+from hunter_api.schemas.meme_live_wallet import WalletSummaryOut
+from hunter_api.services.fx_rate import usd_brl_cache
 from hunter_api.services.meme_desk_common import actor_id
 from hunter_api.services.meme_desk_idempotency import key_hash
 from hunter_api.services.meme_lab import day_bounds_brt
 from hunter_api.services.meme_live import LivePositionNotFoundError, build_meme_live
+from hunter_api.services.meme_live_wallet import build_wallet_summary
 from hunter_core.audit import AuditEvent, get_audit_sink
 from hunter_core.domain.enums import OrganizationRole
 from hunter_core.domain.types import utcnow
@@ -50,14 +54,17 @@ Redis = Annotated["redis_asyncio.Redis", Depends(get_redis)]
 Settings = Annotated["ApiSettings", Depends(get_settings)]
 
 MEME_EXECUTOR_HEARTBEAT_KEY = keys.heartbeat("meme", "executor")
+MEME_RADAR_HEARTBEAT_KEY = keys.heartbeat("meme", "radar")
 RECENT_ORDERS = 50
 
 
-async def _heartbeat(redis: redis_asyncio.Redis) -> tuple[dict[str, str] | None, str | None]:
+async def _heartbeat(
+    redis: redis_asyncio.Redis, key: str
+) -> tuple[dict[str, str] | None, str | None]:
     try:
-        raw = cast("dict[bytes, bytes]", await redis.hgetall(MEME_EXECUTOR_HEARTBEAT_KEY))
+        raw = cast("dict[bytes, bytes]", await redis.hgetall(key))
     except redis_exceptions.RedisError as exc:
-        logger.warning("meme_live_heartbeat_unavailable", error_type=type(exc).__name__)
+        logger.warning("meme_live_heartbeat_unavailable", error_type=type(exc).__name__, key=key)
         return None, type(exc).__name__
     return {k.decode(errors="replace"): v.decode(errors="replace") for k, v in raw.items()}, None
 
@@ -73,7 +80,7 @@ async def get_meme_live(
     now = utcnow()
     repo = MemeLiveRepository(session)
     _day, day_start, _end = day_bounds_brt(now)
-    heartbeat, error = await _heartbeat(redis)
+    heartbeat, error = await _heartbeat(redis, MEME_EXECUTOR_HEARTBEAT_KEY)
     return build_meme_live(
         await repo.list_orders(limit=RECENT_ORDERS),
         await repo.list_positions(closed_since=day_start - timedelta(days=1)),
@@ -82,6 +89,36 @@ async def get_meme_live(
         heartbeat_key=MEME_EXECUTOR_HEARTBEAT_KEY,
         redis_error=error,
         api_live_enabled=settings.enable_meme_live_trading,
+    )
+
+
+@router.get(
+    "/live/wallet-summary",
+    response_model=WalletSummaryOut,
+    summary="T4.57 — Carteira real: dinheiro agora, hoje e desde o início",
+)
+async def get_meme_live_wallet_summary(
+    context: ViewerOrg, session: OrgSession, redis: Redis
+) -> WalletSummaryOut:
+    now = utcnow()
+    day, day_start, day_end = day_bounds_brt(now)
+    executor_heartbeat, executor_error = await _heartbeat(redis, MEME_EXECUTOR_HEARTBEAT_KEY)
+    radar_heartbeat, _radar_error = await _heartbeat(redis, MEME_RADAR_HEARTBEAT_KEY)
+    fx = await usd_brl_cache.get()
+    repo = MemeLiveRepository(session)
+    wallet_repo = MemeLiveWalletRepository(session)
+    row = await wallet_repo.wallet_summary(day_start=day_start, day_end=day_end)
+    positions = await repo.list_positions(closed_since=day_start)
+    return build_wallet_summary(
+        as_of=now,
+        day=day,
+        row=row,
+        positions=positions,
+        executor_heartbeat=executor_heartbeat,
+        executor_heartbeat_error=executor_error,
+        executor_heartbeat_key=MEME_EXECUTOR_HEARTBEAT_KEY,
+        radar_heartbeat=radar_heartbeat,
+        fx=fx,
     )
 
 
