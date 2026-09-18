@@ -49,7 +49,7 @@ from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.creator_watch import spawn_creator_watch
 from hunter_meme_worker.discovery import run_discovery
-from hunter_meme_worker.event_gate import run_event_gate
+from hunter_meme_worker.event_gate import run_event_gate_forever
 from hunter_meme_worker.event_gate_caches import EventGateCaches
 from hunter_meme_worker.event_gate_wiring import (
     build_event_gate,
@@ -283,9 +283,11 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                     forever("lab", config.lab_cycle_s, lab_once, lab), name="meme-lab"
                 )
             if event_gate is not None:
-                # T4.52b-3: waits for the Lab's own first tick internally
-                # (``run_event_gate``) — no ordering needed with ``meme-lab`` here.
-                group.create_task(run_event_gate(event_gate), name="meme-event-gate")
+                # T4.52b-3/4: waits for the Lab's own first tick internally
+                # (``run_event_gate``) — no ordering needed with ``meme-lab``
+                # here; ``_forever`` (F2) restarts the gate on its own crash
+                # instead of ever taking this ``TaskGroup`` down with it.
+                group.create_task(run_event_gate_forever(event_gate), name="meme-event-gate")
     finally:
         await close_clients(ctx, boards)
         if lab is not None and isinstance(lab.quotes, PumpFunRestClient):

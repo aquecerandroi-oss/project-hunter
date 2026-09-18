@@ -37,10 +37,11 @@ from hunter_meme_worker.gate_refusal_trail import (
     decode_value_limit,
     select_trail_row,
 )
-from hunter_meme_worker.lab_repo import insert_proposals, open_mints_for
+from hunter_meme_worker.lab_repo import open_mints_for
 from hunter_meme_worker.lab_repo_e2b import lineage_for
 from hunter_meme_worker.lab_repo_fast import fast_window, load_fast_gate_rows
 from hunter_meme_worker.lab_trail import write_refusal_trail
+from hunter_meme_worker.proposal_race import insert_proposals_reserved
 from hunter_meme_worker.proposals import (
     REFUSAL_ALREADY_OPEN,
     GateRow,
@@ -122,12 +123,14 @@ async def fast_gate_step(
                     trail_candidates.append(candidate)
             refusals.setdefault(spec.name, Counter()).update(spec_refusals)
             rows_total += len(rows)
-            inserted = await insert_proposals(session, drafts)
+            ttl = ctx.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
+            # T4.52b-4 (race fix): reserve each mint before its own insert
+            # awaits, not after the whole batch — closes the window the event
+            # lane could otherwise land a duplicate proposal in.
+            inserted = await insert_proposals_reserved(
+                session, ctx.caches, spec.id, drafts, now=now, ttl_s=ttl
+            )
             proposals_total += inserted
-            if inserted and ctx.caches is not None:
-                ttl = ctx.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
-                for draft in drafts:
-                    ctx.caches.mark_proposed(draft.mint, spec.id, now=now, ttl_s=ttl)
         await write_refusal_trail(session, ctx.state.trail, trail_candidates)
     if ctx.caches is not None:
         refresh_event_gate_caches(

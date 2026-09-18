@@ -6,12 +6,14 @@ names (T4.52b-3, plan-T4.52b.md §4): no new query, the exact
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from hunter_core.domain.types import utcnow
 from hunter_exchanges.base import ExchangeUnavailable
 from hunter_exchanges.pumpfun.pdas import bonding_curve_address
+from hunter_meme_worker.event_gate_caches import MAX_CACHE_AGE_S, prune_event_gate_caches
 from hunter_meme_worker.event_gate_runtime import Subscription
 from hunter_meme_worker.fast_lane import young_mints
 
@@ -44,6 +46,9 @@ async def _unsubscribe_mint(rt: EventGateRuntime, mint: str) -> None:
     await rt.ws.unsubscribe(sub.account_id)
     rt.book.evict(mint)
     rt.reserves.pop(mint, None)
+    rt.debouncer.forget(mint)  # F1: no per-mint seat left behind on unsubscribe
+    rt.pending_trail.pop(mint, None)
+    rt.trail_last_written.pop(mint, None)
     rt.stats.record_unsubscribed()
 
 
@@ -70,3 +75,7 @@ async def sync_subscriptions(rt: EventGateRuntime, *, now: datetime | None = Non
             break
         await _subscribe_mint(rt, tracked.mint, first_seen_at=tracked.first_seen_at)
     rt.stats.subscriptions = len(rt.subs)
+    keep = frozenset(wanted)
+    if rt.lab.caches is not None:
+        prune_event_gate_caches(rt.lab.caches, keep=keep, now=now, max_mints=rt.config.max_mints)
+    rt.debouncer.prune(keep=keep, now_s=time.monotonic(), max_age_s=MAX_CACHE_AGE_S)

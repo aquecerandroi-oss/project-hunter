@@ -211,6 +211,69 @@ async def _serve_drop_once(connections: list[int]) -> Any:
     return await websockets.serve(handler, "127.0.0.1", 0)
 
 
+# ---- F2 (T4.52b-4): the read loop never escapes, never crash-loops --------------
+
+
+async def test_connect_retries_forever_across_repeated_refusals() -> None:
+    """A provider that refuses to connect six times before finally accepting
+    must never raise ``ExchangeUnavailable`` out of ``listen()`` — the task
+    stays alive and keeps retrying (review-T4.52b.md §4, F2)."""
+    attempts = {"n": 0}
+
+    @asynccontextmanager
+    async def flaky_connect(_: str) -> AsyncGenerator[_FakeConnection]:
+        attempts["n"] += 1
+        if attempts["n"] <= 6:
+            raise ConnectionError("refused")
+        yield _FakeConnection()
+
+    client = SolanaWsClient(connect_fn=flaky_connect, sleep=_fast_sleep, rand=lambda: 0.0)
+    task = asyncio.create_task(_drain(client))
+    try:
+        for _ in range(2000):
+            if attempts["n"] >= 7 and client.state.ws_state == "connected":
+                break
+            await asyncio.sleep(0)
+        assert attempts["n"] >= 7
+        assert client.state.ws_state == "connected"
+        assert not task.done()  # still alive -- no ExchangeUnavailable escaped
+    finally:
+        await client.aclose()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
+async def test_idle_timeout_is_skipped_with_zero_subscriptions() -> None:
+    """An idle connection with nothing subscribed must not be timed out for
+    it (F2) — scaled down from the plan's "10 min ⇒ alive" to a fraction of a
+    second so the test itself stays fast."""
+    connection = _FakeConnection()
+
+    @asynccontextmanager
+    async def connect(_: str) -> AsyncGenerator[_FakeConnection]:
+        yield connection
+
+    client = SolanaWsClient(
+        connect_fn=connect, idle_timeout_s=0.02, sleep=_fast_sleep, rand=lambda: 0.0
+    )
+    task = asyncio.create_task(_drain(client))
+    try:
+        for _ in range(2000):
+            if client.state.ws_state == "connected":
+                break
+            await asyncio.sleep(0)
+        assert client.state.ws_state == "connected"
+        await asyncio.sleep(0.2)  # 10x the idle timeout, never a single subscription
+        assert client.state.reconnects == 0
+        assert client.state.ws_state == "connected"
+    finally:
+        await client.aclose()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
 async def test_reconnect_resubscribes_the_whole_set_with_a_stable_logical_id() -> None:
     connections: list[int] = []
     server = await _serve_drop_once(connections)

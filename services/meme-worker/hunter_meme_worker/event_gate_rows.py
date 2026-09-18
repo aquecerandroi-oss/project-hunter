@@ -114,6 +114,7 @@ def build_event_row(
         progress_rising=fast.progress_rising,
         mcap_delta_60s=fast.mcap_delta_60s,
         snapshot=snapshot,
+        completed_at=base.completed_at or (as_of if state.complete else None),
         holders=trend.holders,
         holders_prev=trend.holders_prev,
         holders_rising=trend.holders_rising,
@@ -121,19 +122,32 @@ def build_event_row(
         dev_share=dev_share,
         dev_share_reason=dev_reason if latest_holders is not None else NO_HOLDERS_READER,
         snipers=None if latest_holders is None else latest_holders.snipers,
-        top10_share=None if latest_holders is None else latest_holders.top10_share,
-        top10_reason=(
-            NO_HOLDERS_READER
-            if latest_holders is None or latest_holders.top10_share is None
-            else None
-        ),
+        # F4 (review-T4.52b.md §1): the 15-second row never carries
+        # ``top10_share`` (``lab_repo_fast._FAST_ROWS`` selects no such
+        # column) — the event row must fail exactly as closed, not compute
+        # one from the boards the 15-second lane never reads.
+        top10_share=base.top10_share,
+        top10_reason=base.top10_reason,
         buys_1m=tape_cols.get("buys_1m"),
         sells_1m=tape_cols.get("sells_1m"),
         unique_buyers_1m=tape_cols.get("unique_buyers"),
         net_sol_flow_1m=tape_cols.get("net_sol_flow_1m"),
         curve_volume_1m_sol=tape_cols.get("curve_volume_1m_sol"),
         tape_reason=tape_cols.get("tape_reason"),
-        creator_sold=tape_cols.get("creator_net_seller"),
+        # F3 (review-T4.52b.md §1): the in-memory flow can only ADD a sale,
+        # never remove one already on the 15-second row. ``True`` on ``base``
+        # (any source saw the creator sell) always wins; ``None`` on ``base``
+        # defers entirely to the flow's own covered-from-birth rule; ``False``
+        # on ``base`` is only upgraded by a sale the flow itself witnessed.
+        creator_sold=(
+            True
+            if base.creator_sold
+            else (
+                tape_cols.get("creator_net_seller")
+                if base.creator_sold is None
+                else (True if tape_cols.get("creator_net_seller") else base.creator_sold)
+            )
+        ),
         recent_drawdown_pct=dd_pct,
         recent_drawdown_peak_age_s=peak_age_s,
         recent_drawdown_reason=dd_reason,

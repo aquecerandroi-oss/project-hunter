@@ -16,6 +16,12 @@ connection and never leaks out. Request/response matching: every request
 carries a locally unique ``id``, resolving an ``asyncio.Future``; a
 notification instead carries ``{"method": "...Notification"}`` with no
 top-level ``id`` — presence of ``id`` tells the two shapes apart.
+
+**F2 (T4.52b-4).** :meth:`SolanaWsClient.listen` never raises: a connect or
+read failure backs off (capped, jittered) and retries forever, never as
+``ExchangeUnavailable``; the idle timeout only arms once something is
+subscribed (no subscriptions yet is not a failure); ``attempt`` resets on
+connect, not only on a delivered notification.
 """
 
 from __future__ import annotations
@@ -52,16 +58,16 @@ _NOTIFICATION_PARSERS = {
 
 PUBLIC_WS_URL = "wss://api.mainnet-beta.solana.com"
 BACKOFF_BASE_S = 1.0
-BACKOFF_MAX_S = 60.0
+BACKOFF_MAX_S = 30.0
+"""F2: capped at 30 s (down from 60 s) — ``listen()`` never gives up, so the
+cap alone bounds how long a caller waits between attempts, forever."""
 IDLE_TIMEOUT_S = 60.0
 CONNECT_TIMEOUT_S = 15.0
 REQUEST_TIMEOUT_S = 15.0
-MAX_RECONNECT_FAILURES = 5
 
 __all__ = [
     "CONNECT_TIMEOUT_S",
     "IDLE_TIMEOUT_S",
-    "MAX_RECONNECT_FAILURES",
     "PUBLIC_WS_URL",
     "REQUEST_TIMEOUT_S",
     "SolanaWsClient",
@@ -94,7 +100,6 @@ class SolanaWsClient:
         idle_timeout_s: float = IDLE_TIMEOUT_S,
         connect_timeout_s: float = CONNECT_TIMEOUT_S,
         request_timeout_s: float = REQUEST_TIMEOUT_S,
-        max_reconnect_failures: int = MAX_RECONNECT_FAILURES,
     ) -> None:
         self._url = url
         self._connect_fn = connect_fn or default_connect
@@ -103,7 +108,6 @@ class SolanaWsClient:
         self._idle_timeout_s = idle_timeout_s
         self._connect_timeout_s = connect_timeout_s
         self._request_timeout_s = request_timeout_s
-        self._max_reconnect_failures = max_reconnect_failures
         self.state = ConnectionState()
         self._closed = False
         self._connection: WsConnection | None = None
@@ -256,20 +260,16 @@ class SolanaWsClient:
             )
         return parser(logical_id, result, utcnow())
 
-    async def _backoff_or_raise(self, attempt: int, exc: Exception, verb: str) -> int:
+    async def _backoff(self, attempt: int) -> int:
+        """F2: always sleeps, never raises — capped, jittered, and the only
+        thing that stands between a dead provider and a tight retry loop."""
         delay = min(BACKOFF_MAX_S, BACKOFF_BASE_S * (2**attempt)) + self._rand()
-        attempt += 1
-        if attempt >= self._max_reconnect_failures:
-            self.state.ws_state = "disconnected"
-            raise ExchangeUnavailable(
-                f"solana ws {verb} {attempt} times in a row: {exc}", exchange="solana"
-            ) from exc
         await self._sleep(delay)
-        return attempt
+        return attempt + 1
 
     async def listen(self) -> AsyncIterator[Notification]:
-        """Yield notifications forever; connects, resubscribes the known set,
-        and reconnects with backoff internally. A caller registers
+        """Yield notifications forever; connects, resubscribes and reconnects
+        with backoff internally — never raises (F2). A caller registers
         subscriptions with ``subscribe_*`` before or concurrently with this."""
         attempt = 0
         first = True
@@ -287,22 +287,25 @@ class SolanaWsClient:
                 raise
             except Exception as exc:
                 logger.warning("solana_ws_connect_error", error=str(exc))
-                attempt = await self._backoff_or_raise(attempt, exc, "failed to connect")
+                attempt = await self._backoff(attempt)
                 continue
 
             self.state.ws_state = "connected"
             self._connection = connection
             self._connected.set()
+            attempt = 0  # F2: reset on a successful (re)connect, not only on delivery
             # Concurrent, not awaited: awaiting it here would deadlock a
             # reconnect (its responses resolve through the read loop below).
             resubscribe_task = asyncio.create_task(self._resubscribe_all())
             failure: Exception | None = None
             try:
                 while not self._closed:
+                    # F2: idle timeout only means anything once something is
+                    # subscribed — a fresh or fully-aged-out connection has
+                    # nothing due to arrive and must not be timed out for it.
+                    timeout = self._idle_timeout_s if self._specs else None
                     try:
-                        raw = await asyncio.wait_for(
-                            connection.recv(), timeout=self._idle_timeout_s
-                        )
+                        raw = await asyncio.wait_for(connection.recv(), timeout=timeout)
                     except TimeoutError:
                         raise ConnectionError(
                             f"solana ws idle for {self._idle_timeout_s:.1f}s, no frames received"
@@ -315,7 +318,6 @@ class SolanaWsClient:
                         logger.warning("solana_ws_malformed_message", error=str(exc))
                         continue
                     if item is not None:
-                        attempt = 0
                         yield item
             except asyncio.CancelledError:
                 raise
@@ -338,7 +340,7 @@ class SolanaWsClient:
                 self._connection = None
                 self.state.ws_state = "disconnected"
             if failure is not None and not self._closed:
-                attempt = await self._backoff_or_raise(attempt, failure, "failed")
+                attempt = await self._backoff(attempt)
         self.state.ws_state = "disconnected"
 
     async def _close_quietly(self, cm: AbstractAsyncContextManager[WsConnection]) -> None:

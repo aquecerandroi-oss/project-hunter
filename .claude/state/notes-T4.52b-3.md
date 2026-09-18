@@ -114,3 +114,128 @@ T4.52b-4/5 futura se ainda for aberta: medir `event_to_proposal_s` ao vivo contr
 decidir se `event_gate_stats`/`event_gate_heartbeat_fields` precisam de um teste de reconexão via
 `main.py` inteiro (hoje só `_read_loop`+`handle_reconnect` são exercitados diretamente), e o
 rollout em três fases que `plan-T4.52b.md` §5 descreve (off → shadow 24 h → on).
+
+## T4.52b-4 (consertos)
+
+Data: 2026-09-18. Escopo: os sete achados de `review-T4.52b.md` (F1–F7), a corrida entre pistas do
+§2 e as métricas do §5, sobre o mesmo conjunto de arquivos da T4.52b-3 mais dois novos
+(`proposal_race.py`, `test_proposal_race.py`). `services/meme-executor/` e `apps/` não tocados.
+
+### F1 — memória sem teto
+
+`event_gate_caches.py` ganhou `EventGateCaches.updated_at` (quando `base_rows`/`pedigree`/`e2b`
+souberam de um mint pela última vez) e `prune_event_gate_caches(caches, keep, now, max_mints)`:
+evict por `mint not in keep` **ou** `updated_at < now - 10min`, depois um teto duro de
+`max_mints * 2` (derruba os mais antigos primeiro mesmo que ainda "kept"). `Debouncer` ganhou
+`forget(mint)` e `prune(keep, now_s, max_age_s)` com a mesma regra. Chamado de dentro de
+`sync_subscriptions` (a cada `subscription_sync_s`, que já calcula `young_mints`) — não dentro de
+`refresh_event_gate_caches` (chamado por `lab_fast.fast_gate_step`), para não mudar a assinatura
+que `test_refresh_replaces_open_mints_wholesale_but_merges_base_rows` já fixa. `_unsubscribe_mint`
+também chama `rt.debouncer.forget(mint)` e limpa `pending_trail`/`trail_last_written` do mint (ver
+F6/F7). Heartbeat: `_heartbeat_loop` (`event_gate.py`) monta `cache_sizes` (`base_rows`, `pedigree`,
+`e2b`, `debounce`) e `heartbeat_fields` os prefixa como `event_gate_cache_*`.
+
+### F2 — queda do WS / crash-loop do worker inteiro
+
+`rpc_ws.py`: `listen()` nunca mais levanta `ExchangeUnavailable` — `_backoff_or_raise` virou
+`_backoff` (sempre dorme, nunca levanta; teto de backoff caiu de 60 s para 30 s, como o brief
+pede); `MAX_RECONNECT_FAILURES`/`max_reconnect_failures` removidos (nada mais os lia fora do
+próprio módulo — conferido por grep). `attempt` zera na conexão bem-sucedida (`ws_state=connected`),
+não só na entrega de uma notificação. O timeout de ociosidade (`IDLE_TIMEOUT_S`) só arma quando
+`self._specs` não está vazio — zero assinaturas nunca conta como falha.
+`event_gate.py`: `run_event_gate_forever` é o que `main.py` roda agora (era `run_event_gate` direto)
+— qualquer exceção (incluindo o `ExceptionGroup` do `TaskGroup` interno) é logada e a porta inteira
+reinicia após 5 s, sem propagar para o `TaskGroup` de `main.py` (que mataria discovery/via
+rápida/Lab junto). Também novo: `_slot_subscribe_loop` (chama `subscribe_slot()` uma vez, com
+retry) — dá `rt.slot` para `event_to_proposal_s` e garante que a conexão nunca fica com zero
+assinaturas por muito tempo.
+
+### F3 — `creator_sold` só pode ADICIONAR uma venda
+
+`event_gate_rows.py`: `base.creator_sold=True` vence sempre; `base.creator_sold=None` usa a regra
+da própria pista (`covered_from_birth` → `False`, senão `None`); `base.creator_sold=False` só é
+promovido a `True` por uma venda que a memória de fato testemunhou — nunca voltando a `None`.
+
+### F4 — `top10_share` não pode nascer só na pista de evento
+
+`event_gate_rows.py`: `top10_share`/`top10_reason` agora vêm literalmente de `base.top10_share`/
+`base.top10_reason` (hoje sempre `None`, porque `lab_repo_fast._FAST_ROWS` não seleciona a coluna)
+em vez de calculados dos boards em memória — a pista de evento falha fechado exatamente como a de
+15 s até que exista um leitor lá.
+
+### F5 — curva completa no meio do caminho
+
+`event_gate_rows.py`: `completed_at=base.completed_at or (as_of if state.complete else None)` — um
+`accountNotification` que já viu `complete=True` marca `completed_at` na hora, em vez de esperar o
+próximo tique de 15 s atualizar `meme_tokens.completed_at`.
+
+### F6/F7 — sessão de banco por avaliação e `shadow` que escreve
+
+`event_gate_eval.py` reestruturado: `shadow` nunca abre `role_session` (avalia todos os sets em
+memória, classifica, conta, loga, retorna); `on` só abre uma sessão quando pelo menos um set
+produziu um rascunho para inserir. A trilha de recusa por mint não é mais escrita por avaliação —
+fica em `EventGateRuntime.pending_trail`/`trail_last_written` (novos campos) e só é gravada (a) na
+mesma sessão de um insert daquele mint, ou (b) pelo novo `_trail_flush_loop` (`event_gate.py`, a
+cada 15 s, via `event_gate_eval.flush_pending_trail`) — nunca mais de uma vez por mint por minuto
+(`TRAIL_COOLDOWN_S=60`).
+
+### Corrida entre pistas (§2) e métricas (§5)
+
+`proposal_race.py` (novo): `insert_proposals_reserved` reserva o mint (`caches.mark_proposed`)
+**antes** do `await insert_proposals`, e libera (`caches.unmark_proposed`, novo) se aquele insert
+não inseriu nada (a linha já existia — provavelmente da outra pista). `lab_fast.py` e
+`event_gate_eval.py` chamam a mesma função em vez de inserir em lote e só marcar depois.
+Métricas: `_slot_subscribe_loop` garante `rt.slot` (então `event_to_proposal_s` deixa de ser sempre
+vazio); `shadow_proposals_total` dedupa por `(mint, rule_set)` via `EventGateCaches.shadow_marked_until`
+(novo, TTL próprio, nunca lido por `already_open`); `shadow_only_event_mints`/`shadow_agree_mints`
+(novos campos em `EventGateStats`, janela de 60 s) classificam cada avaliação de `shadow` contra
+`caches.recently_proposed_mints` (a pista de 15 s): mint já coberto por ela → "agree"; mint que só
+o evento propõe → "only". Aproximação declarada: por não haver DB em `shadow`, a comparação é só
+contra o que a pista de 15 s marcou nesta mesma instância de processo (TTL do `lab_proposal_ttl_s`),
+não contra o histórico completo de `meme_proposals` — medir isso de verdade ao vivo (T4.52b-5).
+
+### Testes novos
+
+- `test_event_gate_pure.py`: +12 (F1 × 4 incluindo `Debouncer.forget`/`prune`; F3 × 3; F4 × 1; F5 × 2;
+  mais o par de pruning de `EventGateCaches`).
+- `test_proposal_race.py` (novo, 4 casos): reserva antes do insert, liberação em insert que não
+  inseriu nada, reserva seletiva quando só um de vários rascunhos vence, sem `caches` insere sem
+  reservar.
+- `test_pumpfun_rpc_ws.py`: +2 — seis recusas de conexão seguidas de uma aceita (a tarefa continua
+  viva, nunca um `ExchangeUnavailable`); ociosidade sem nenhuma assinatura não conta como falha
+  (escalado para frações de segundo, não os 10 min reais do plano).
+- `test_event_gate_integration.py`: +2 — `shadow` não escreve a trilha nem para um quase-passa
+  (contagem contra uma baseline, porque o próprio seed do teste já grava uma linha de "muito jovem"
+  para o mesmo mint); `on` enfileira a trilha em vez de escrever por avaliação, o flush periódico
+  escreve uma vez, e uma segunda quase-falha 2 s depois não duplica (cooldown de 60 s).
+
+### Comandos
+
+- `uv run pytest services/meme-worker/tests -q -m "not live and not integration"` → `387 passed,
+  102 deselected` (era 373 antes desta rodada).
+- `uv run pytest services/meme-worker/tests/test_event_gate_integration.py -q` → `8 passed in
+  ~36s` (era 6).
+- `uv run pytest services/meme-worker/tests/test_lab_fast.py test_lab_wake.py -q` → `10 passed`
+  (sem mudança de contagem — só a fiação do `insert_proposals_reserved`).
+- `uv run pytest services/meme-worker/tests/test_proposal_race.py -q` → `4 passed`.
+- `uv run pytest packages/exchange-adapters/tests/unit/test_pumpfun_rpc_ws.py -q` → `14 passed`
+  (era 12).
+- `uv run ruff check`/`format --check` limpos em `services/meme-worker/` e
+  `packages/exchange-adapters/` (313 arquivos formatados). `uv run python
+  infra/scripts/check_file_size.py` → `965 files; 0 over budget`. `uv run pyright` limpo (0 erros)
+  em todos os arquivos tocados (fonte e teste).
+- `uv run pytest services/meme-worker/tests -m "integration and not live"
+  --ignore=.../test_event_gate_integration.py` (a suíte de integração pré-existente, 94 casos
+  antes desta rodada): saída em segundo plano (excedeu 120 s), `exit code 0` — todos passaram; a
+  contagem exata não ficou no buffer capturado (só os pontos), mas o código de saída confirma zero
+  falhas.
+
+### Concerns
+
+- A classificação `shadow_only_event_mints`/`shadow_agree_mints` é uma aproximação (parágrafo
+  acima) — não é uma prova de "o evento chegou primeiro", só um indício.
+- `event_to_proposal_s` continua a fórmula aproximada da T4.52b-3 (§3 do plano) — o `subscribe_slot`
+  novo só garante que `rt.slot` deixa de ser `None`, não que a fórmula em si foi validada ao vivo.
+- Nenhum destes sete fixes muda o veredito de F-drawdown (janela fixa 60/30 ignorando
+  `recent_drawdown_window_s` do set) nem a lista de "raio de explosão" restante do §4 da revisão
+  além dos itens F1–F7 nomeados — continuam fora do escopo desta tarefa.

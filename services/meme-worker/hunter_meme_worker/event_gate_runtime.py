@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.rpc_ws_models import Notification
     from hunter_meme_worker.context import RadarContext
     from hunter_meme_worker.event_gate_config import EventGateConfig
+    from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
     from hunter_meme_worker.lab import LabContext
 
 __all__ = ["ConnectionStateLike", "Debouncer", "EventGateRuntime", "SolanaWs", "Subscription"]
@@ -46,6 +47,7 @@ class SolanaWs(Protocol):
 
     async def subscribe_logs(self, *, mentions: list[str], commitment: str) -> int: ...
     async def subscribe_account(self, pubkey: str, *, commitment: str) -> int: ...
+    async def subscribe_slot(self) -> int: ...
     async def unsubscribe(self, logical_id: int) -> bool: ...
     async def aclose(self) -> None: ...
 
@@ -86,6 +88,24 @@ class Debouncer:
             self._last[mint] = now_s
         return ready
 
+    def forget(self, mint: str) -> None:
+        """F1: called on unsubscribe — a mint no longer tracked keeps no seat
+        in ``_last``/``_dirty`` forever."""
+        self._last.pop(mint, None)
+        self._dirty.discard(mint)
+
+    def prune(self, *, keep: frozenset[str], now_s: float, max_age_s: float) -> None:
+        """F1: called every sync — a mint outside ``keep`` (``young_mints``)
+        or whose last poll is older than ``max_age_s`` is forgotten too, not
+        only the ones ``forget`` catches via an explicit unsubscribe."""
+        stale = [m for m, last in self._last.items() if m not in keep or now_s - last > max_age_s]
+        for mint in stale:
+            self.forget(mint)
+
+    @property
+    def size(self) -> int:
+        return len(self._last)
+
 
 @dataclass
 class EventGateRuntime:
@@ -105,6 +125,15 @@ class EventGateRuntime:
     reserves: dict[str, EventReserves] = field(default_factory=dict[str, EventReserves])
     slot: int | None = None
     seen_reconnects: int = 0
+    pending_trail: dict[str, list[RefusalTrailRow]] = field(
+        default_factory=dict[str, list["RefusalTrailRow"]]
+    )
+    """F6/F7's own batching: a mint's latest refusal-trail candidates, queued
+    here instead of written per evaluation — flushed in the same session as
+    an insert for that mint, or by the periodic trail-flush loop."""
+    trail_last_written: dict[str, datetime] = field(default_factory=dict[str, "datetime"])
+    """The last time this mint's trail was actually written — the 60-second
+    per-mint cooldown F7 wants."""
 
     def __post_init__(self) -> None:
         self.book = EventBook(max_mints=self.config.max_mints)

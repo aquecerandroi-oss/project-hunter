@@ -25,6 +25,12 @@ def _trim(window: deque[datetime], now: datetime) -> None:
         window.popleft()
 
 
+def _trim_pairs(window: deque[tuple[datetime, str]], now: datetime) -> None:
+    horizon = now - timedelta(seconds=WINDOW_S)
+    while window and window[0][0] < horizon:
+        window.popleft()
+
+
 @dataclass
 class EventGateStats:
     """Since boot, plus a 60-second rolling count for the rates."""
@@ -37,6 +43,16 @@ class EventGateStats:
     evaluations_window: deque[datetime] = field(default_factory=deque[datetime])
     proposals_total: int = 0
     shadow_proposals_total: int = 0
+    shadow_only_window: deque[tuple[datetime, str]] = field(
+        default_factory=deque[tuple[datetime, str]]
+    )
+    """(``at``, ``mint``) of a mint ``shadow`` would propose that the
+    15-second lane's own recent proposals did not cover — metrics §5."""
+    shadow_agree_window: deque[tuple[datetime, str]] = field(
+        default_factory=deque[tuple[datetime, str]]
+    )
+    """(``at``, ``mint``) of a mint the 15-second lane already proposed
+    recently that ``shadow`` also judged (agreed or would have)."""
     no_base_row_total: int = 0
     no_base_row_window: deque[datetime] = field(default_factory=deque[datetime])
     unsubscribed_total: int = 0
@@ -76,6 +92,14 @@ class EventGateStats:
     def record_shadow_proposals(self, count: int) -> None:
         self.shadow_proposals_total += count
 
+    def record_shadow_only(self, mint: str, now: datetime) -> None:
+        self.shadow_only_window.append((now, mint))
+        _trim_pairs(self.shadow_only_window, now)
+
+    def record_shadow_agree(self, mint: str, now: datetime) -> None:
+        self.shadow_agree_window.append((now, mint))
+        _trim_pairs(self.shadow_agree_window, now)
+
     def record_unsubscribed(self, count: int = 1) -> None:
         self.unsubscribed_total += count
 
@@ -83,11 +107,19 @@ class EventGateStats:
         self.reconnects += 1
 
 
-def heartbeat_fields(stats: EventGateStats, *, now: datetime, enabled: bool) -> dict[str, str]:
+def heartbeat_fields(
+    stats: EventGateStats,
+    *,
+    now: datetime,
+    enabled: bool,
+    cache_sizes: dict[str, int] | None = None,
+) -> dict[str, str]:
     _trim(stats.events_window, now)
     _trim(stats.dropped_window, now)
     _trim(stats.evaluations_window, now)
     _trim(stats.no_base_row_window, now)
+    _trim_pairs(stats.shadow_only_window, now)
+    _trim_pairs(stats.shadow_agree_window, now)
     latencies = list(stats.latency_s)
     p50, p95 = (
         percentile([int(v * 1000) for v in latencies], 0.50),
@@ -103,6 +135,8 @@ def heartbeat_fields(stats: EventGateStats, *, now: datetime, enabled: bool) -> 
         "evaluations": str(len(stats.evaluations_window)),
         "proposals_total": str(stats.proposals_total),
         "shadow_proposals_total": str(stats.shadow_proposals_total),
+        "shadow_only_event_mints": str(len({m for _, m in stats.shadow_only_window})),
+        "shadow_agree_mints": str(len({m for _, m in stats.shadow_agree_window})),
         "event_to_proposal_s_p50": "" if p50 is None else str(p50 / 1000),
         "event_to_proposal_s_p95": "" if p95 is None else str(p95 / 1000),
         "ws_state": stats.ws_state,
@@ -112,4 +146,6 @@ def heartbeat_fields(stats: EventGateStats, *, now: datetime, enabled: bool) -> 
         "no_base_row_60s": str(len(stats.no_base_row_window)),
         "unsubscribed_total": str(stats.unsubscribed_total),
     }
+    for key, value in (cache_sizes or {}).items():
+        fields[f"cache_{key}"] = str(value)
     return {HEARTBEAT_PREFIX + key: value for key, value in fields.items()}

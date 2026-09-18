@@ -28,7 +28,7 @@ from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.event_gate import _read_loop
 from hunter_meme_worker.event_gate_caches import EventGateCaches
 from hunter_meme_worker.event_gate_config import GATE_ON, GATE_SHADOW, EventGateConfig
-from hunter_meme_worker.event_gate_eval import evaluate_mint
+from hunter_meme_worker.event_gate_eval import evaluate_mint, flush_pending_trail
 from hunter_meme_worker.event_gate_rows import EventReserves
 from hunter_meme_worker.event_gate_runtime import EventGateRuntime
 from hunter_meme_worker.event_state import CurvePoint, TapeTrade
@@ -102,7 +102,7 @@ async def _seed_caches(
     return rule_set
 
 
-def _holders_pair(as_of: datetime) -> list[HoldersObservation]:
+def _holders_pair(as_of: datetime, *, snipers: int = 1) -> list[HoldersObservation]:
     return [
         HoldersObservation(
             observed_at=as_of - timedelta(seconds=90),
@@ -111,7 +111,7 @@ def _holders_pair(as_of: datetime) -> list[HoldersObservation]:
             holders=9,
             top10_share=Decimal("0.2"),
             dev_share=Decimal("0.05"),
-            snipers=1,
+            snipers=snipers,
         ),
         HoldersObservation(
             observed_at=as_of - timedelta(seconds=10),
@@ -120,7 +120,7 @@ def _holders_pair(as_of: datetime) -> list[HoldersObservation]:
             holders=12,
             top10_share=Decimal("0.2"),
             dev_share=Decimal("0.05"),
-            snipers=1,
+            snipers=snipers,
         ),
     ]
 
@@ -182,12 +182,16 @@ def _prime_state(rt: EventGateRuntime, mint: str, *, as_of: datetime) -> None:
     rt.reserves[mint] = EventReserves(Decimal("60"), INITIAL_REAL_TOKEN * Decimal("1.10"))
 
 
-def _patch_holders(monkeypatch: pytest.MonkeyPatch, mint: str, as_of: datetime) -> None:
+def _patch_holders(
+    monkeypatch: pytest.MonkeyPatch, mint: str, as_of: datetime, *, snipers: int = 1
+) -> None:
     """Stand in for ``ctx.boards``/``ctx.risk`` (neither wired in this test's
-    minimal ``RadarContext``) with the two readings ``flow_v2/1`` needs."""
+    minimal ``RadarContext``) with the two readings ``flow_v2/1`` needs.
+    ``snipers=3`` (``max_snipers`` is 2) turns this into a near-miss: exactly
+    one refusal, everything else about the row still satisfies the gate."""
 
     def fake(radar: RadarContext, m: str) -> list[HoldersObservation]:
-        return _holders_pair(as_of) if m == mint else []
+        return _holders_pair(as_of, snipers=snipers) if m == mint else []
 
     monkeypatch.setattr(event_gate_eval, "_holders_readings", fake)
 
@@ -203,6 +207,18 @@ async def _proposal_count(factory: async_sessionmaker[AsyncSession], mint: str) 
             (
                 await session.execute(
                     text("SELECT count(*) FROM meme_proposals WHERE mint = :m"), {"m": mint}
+                )
+            ).scalar_one()
+        )
+
+
+async def _trail_count(factory: async_sessionmaker[AsyncSession], mint: str) -> int:
+    async with role_session(factory, db_role=WORKER) as session:
+        return int(
+            (
+                await session.execute(
+                    text("SELECT count(*) FROM meme_gate_refusals_by_mint WHERE mint = :m"),
+                    {"m": mint},
                 )
             ).scalar_one()
         )
@@ -277,6 +293,63 @@ async def test_shadow_mode_counts_and_never_inserts(
     assert await _proposal_count(db_session_factory, mint) == 0
     assert rt.stats.shadow_proposals_total == 1
     assert rt.stats.proposals_total == 0
+
+
+async def test_shadow_mode_writes_no_refusal_trail_even_for_a_near_miss(
+    db_session_factory: async_sessionmaker[AsyncSession],
+    db_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F6/F7: ``shadow`` never opens ``role_session`` at all — a near-miss
+    (exactly one refusal, ``snipers_above_max``) that would have queued a
+    trail candidate in ``on`` leaves no row here."""
+    mint = f"EVT_{uuid4().hex[:12]}"
+    lab = _lab(db_session_factory)
+    await _seed_caches(db_session_factory, db_engine, mint, lab=lab)
+    baseline = await _trail_count(db_session_factory, mint)  # the seed's own too-young near-miss
+    rt = _rt(_radar(db_session_factory), lab, mode=GATE_SHADOW)
+    as_of = CREATED + timedelta(seconds=130)
+    _prime_state(rt, mint, as_of=as_of)
+    _patch_holders(monkeypatch, mint, as_of, snipers=3)  # max_snipers is 2
+    await evaluate_mint(rt, mint, as_of)
+    assert await _proposal_count(db_session_factory, mint) == 0
+    assert await _trail_count(db_session_factory, mint) == baseline  # unchanged: no session at all
+    assert rt.pending_trail == {}
+
+
+async def test_on_mode_batches_the_refusal_trail_not_per_evaluation(
+    db_session_factory: async_sessionmaker[AsyncSession],
+    db_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F6/F7: a near-miss with no proposal to insert must not open a session
+    of its own — it is queued and only written by the periodic flush."""
+    mint = f"EVT_{uuid4().hex[:12]}"
+    lab = _lab(db_session_factory)
+    await _seed_caches(db_session_factory, db_engine, mint, lab=lab)
+    baseline = await _trail_count(db_session_factory, mint)  # the seed's own too-young near-miss
+    rt = _rt(_radar(db_session_factory), lab)  # GATE_ON
+    as_of = CREATED + timedelta(seconds=130)
+    _prime_state(rt, mint, as_of=as_of)
+    _patch_holders(monkeypatch, mint, as_of, snipers=3)  # max_snipers is 2
+    await evaluate_mint(rt, mint, as_of)
+    assert await _proposal_count(db_session_factory, mint) == 0  # refused, nothing to insert
+    assert await _trail_count(db_session_factory, mint) == baseline  # F6: not written yet
+    assert mint in rt.pending_trail
+    await flush_pending_trail(rt, as_of + timedelta(seconds=1))
+    assert (
+        await _trail_count(db_session_factory, mint) == baseline + 1
+    )  # the periodic flush wrote it
+    assert mint not in rt.pending_trail
+
+    # Immediately after: the 60-second per-mint cooldown holds even if a new
+    # near-miss is queued right away — no flood (F7).
+    later = as_of + timedelta(seconds=2)
+    _prime_state(rt, mint, as_of=later)
+    _patch_holders(monkeypatch, mint, later, snipers=3)
+    await evaluate_mint(rt, mint, later)
+    await flush_pending_trail(rt, later + timedelta(seconds=1))
+    assert await _trail_count(db_session_factory, mint) == baseline + 1  # still just the one
 
 
 async def test_fast_gate_step_in_the_same_instant_makes_already_open(
