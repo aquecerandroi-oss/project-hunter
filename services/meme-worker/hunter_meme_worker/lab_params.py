@@ -32,6 +32,7 @@ __all__ = [
     "REFUSAL_EXCEEDS_MAX_SOL_PER_BET",
     "REFUSAL_SIZE_NOT_POSITIVE",
     "EffectiveParams",
+    "arm_multiple_or_none",
     "decimal_of",
     "effective_params",
 ]
@@ -52,6 +53,19 @@ def decimal_of(value: Any) -> Decimal:
 
 def optional_decimal(value: Any) -> Decimal | None:
     return None if value is None else decimal_of(value)
+
+
+def arm_multiple_or_none(value: Any) -> Decimal | None:
+    """``trailing_arm_x``, folded to ``None`` (armed from the entry) whenever
+    it is absent or at/below 1x — a convention, not a mathematical identity:
+    the first peak can sit below 1x (it is ``first_mark / spent``, after
+    costs), so an arm at exactly 1x could in principle still hold something
+    back for one tick. Below-or-at 1x is read as the operator's "always",
+    never as a stricter arm. 2026-09-18: operator/5 wrote ``"1.0"`` meaning
+    "trailing sempre"; read raw, it reached ``ExitRules.__post_init__``,
+    which refuses an arm <= 1x, and crash-looped the worker."""
+    decimal = optional_decimal(value)
+    return None if decimal is None or decimal <= 1 else decimal
 
 
 def decimal_or(value: Any, default: Decimal) -> Decimal:
@@ -143,7 +157,7 @@ class EffectiveParams:
             exit_on_line_break=bool_or(params.get("exit_on_line_break"), False),
             line_break_snapshots=int_or(params.get("line_break_snapshots"), 2),
             exit_on_migration=bool_or(params.get("exit_on_migration"), True),
-            trailing_arm_x=optional_decimal(params.get("trailing_arm_x")),
+            trailing_arm_x=arm_multiple_or_none(params.get("trailing_arm_x")),
             exit_on_dead=bool_or(params.get("exit_on_dead"), False),
             dead_stale_s=int_or(params.get("dead_stale_s"), DEFAULT_DEAD_STALE_S),
             dead_mark_pct=decimal_or(params.get("dead_mark_pct"), DEFAULT_DEAD_MARK_PCT),
@@ -180,7 +194,7 @@ def effective_params(spec: RuleSetSpec, decision: Mapping[str, Any]) -> Effectiv
         trailing_arm_x=(
             spec.trailing_arm_x
             if decision.get("trailing_arm_x") is None
-            else decimal_of(decision["trailing_arm_x"])
+            else arm_multiple_or_none(decision["trailing_arm_x"])
         ),
         exit_on_dead=bool_or(decision.get("exit_on_dead"), spec.exit_on_dead),
         dead_stale_s=int_or(decision.get("dead_stale_s"), spec.dead_stale_s),

@@ -174,6 +174,55 @@ def test_the_operator_may_ask_for_two_hours_and_the_time_stop_honours_them() -> 
     assert (edited.max_hold_s, edited.trailing_pct) == (10800, Decimal(40))
 
 
+def test_from_json_normalizes_an_arm_of_one_to_none_2026_09_18() -> None:
+    """2026-09-18: operator/5 wrote ``trailing_arm_x: "1.0"`` meaning "trailing
+    sempre" (armed from the entry); ``ExitRules`` refuses an arm <= 1x, so a
+    literal read crash-looped the worker. ``from_json`` must fold it to
+    ``None`` before it ever reaches ``exit_rules()``."""
+    params = EffectiveParams.from_json({**V0_PARAMS, "trailing_arm_x": "1"})
+    assert params.trailing_arm_x is None
+    params.exit_rules()  # must not raise
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("1", None),
+        ("1.0", None),
+        ("0.5", None),
+        ("1.5", Decimal("1.5")),
+        (None, None),
+    ],
+)
+def test_from_json_folds_arm_multiples_at_or_below_one(
+    raw: str | None, expected: Decimal | None
+) -> None:
+    params_json: dict[str, Any] = dict(V0_PARAMS)
+    if raw is None:
+        params_json.pop("trailing_arm_x", None)
+    else:
+        params_json["trailing_arm_x"] = raw
+    assert EffectiveParams.from_json(params_json).trailing_arm_x == expected
+
+
+def test_effective_params_folds_the_spec_and_the_decision_arm() -> None:
+    spec_arm_one = _spec({**MOONSHOT_PARAMS, "trailing_arm_x": "1.0"})
+    params = effective_params(spec_arm_one, {})
+    assert not isinstance(params, str)
+    assert params.trailing_arm_x is None
+
+    spec = _spec(MOONSHOT_PARAMS)
+    decided = effective_params(spec, {"trailing_arm_x": "1"})
+    assert not isinstance(decided, str)
+    assert decided.trailing_arm_x is None
+
+
+def test_rule_set_spec_loads_an_arm_of_one_as_none() -> None:
+    spec = _spec({**MOONSHOT_PARAMS, "trailing_arm_x": "1.0"})
+    assert spec.trailing_arm_x is None
+    assert "trailing_arm_x" not in spec.suggested()
+
+
 def test_the_pool_path_applies_only_to_a_migrated_bet_of_a_holding_set() -> None:
     frozen = _bet()
     moon = _bet(
