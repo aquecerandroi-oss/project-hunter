@@ -16,6 +16,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from hunter_exchanges.jupiter import JupiterClient
+from hunter_meme_executor.creator_flow import CreatorSoldMemory
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -96,6 +97,10 @@ class ExecutorState:
     measured as "Proposal->Received". p50/max of this ride the heartbeat
     (``proposal_pickup_lag_s_p50``/``_max``, ``heartbeat.py``) so the same
     number can be re-read after the wake-up (``wake.py``) ships."""
+    creator_sold_on_chain: CreatorSoldMemory = field(default_factory=CreatorSoldMemory)
+    """T4.56: per mint, the instant a chain read showed the creator sold (30
+    min, bounded). A later ``creator_sold = false`` from the lagging tape never
+    re-opens a mint this process saw dumped — COVER, 17/09/2026."""
     treasury_last_swap_at: datetime | None = None
     """T4.54: when a treasury swap last reached ``confirmed``."""
     treasury_last_attempt_reason: str | None = None

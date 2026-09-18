@@ -13,10 +13,15 @@ Both reads are *fallbacks for silence*, and both fail closed:
 1. **the rug numbers** (``risk_read``) — only when ``meme_risk_snapshots`` holds
    nothing fresh for the mint; a failure leaves ``bundled_share`` ``None`` and
    check 11 refuses exactly as before;
-2. **the creator's flow** (``creator_flow``) — only when the 1-minute fold's
-   ``creator_sold`` is still ``NULL`` *and* the creation instant's allocation was
-   recorded (``0048``); a failure leaves ``creator_net_sol`` ``None`` and check 10
-   refuses ``creator_flow_unknown`` exactly as before.
+2. **the creator's flow** (``creator_flow``) — when the 1-minute fold's
+   ``creator_sold`` has not seen a sale (``NULL`` or, since T4.56, ``false``)
+   *and* the creation instant's allocation was recorded (``0048``); a failure
+   leaves the chain silent, so the tape's ``false`` fills in (``+1``) or, with
+   the tape ``NULL`` too, check 10 refuses ``creator_flow_unknown`` as before.
+   T4.56 (COVER, R56 §3.2): a chain read that says "sold" beats a tape
+   ``false``, and the sighting is remembered per mint for 30 min
+   (``ExecutorState.creator_sold_on_chain``) so the lagging tape never re-opens
+   the coin; the verdict and every source that spoke go into ``creator_verdict``.
 
 Nothing here can make a check pass on missing data: a read that fails produces the
 same ``None`` the table produced, and the engine's own rule (``unavailable``
@@ -40,6 +45,7 @@ from hunter_meme_executor.creator_flow import (
     CreatorFlow,
     creator_flow_from_chain,
     needs_chain_creator_flow,
+    resolve_creator_flow,
 )
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.repo import (
@@ -134,13 +140,30 @@ async def build_admission_context(
             "bundled_share": "" if token.bundled_share is None else str(token.bundled_share),
         }
     flow: CreatorFlow | None = None
-    if needs_chain_creator_flow(token):
+    memory = ctx.state.creator_sold_on_chain
+    remembered = memory.seen_at(mint, now=now)
+    # T4.56: a mint this process already saw dumped on chain is settled — no
+    # second RPC read, and no tape ``false`` re-opens it (COVER, 17/09/2026).
+    if remembered is None and needs_chain_creator_flow(token):
         flow, creator_extras = await read_creator_flow(
             ctx, token, mint, token_program=curve.token_program, now=now
         )
         extras.update(creator_extras)
+        if flow is not None and flow.sold:
+            memory.remember(mint, flow.observed_at)
+    verdict = resolve_creator_flow(
+        tape_sold=token.creator_sold, flow=flow, remembered_at=remembered
+    )
+    extras["creator_verdict"] = verdict.as_json()
     return AdmissionContext(
-        context=context_from(mint, token, participation_used_sol=used, now=now, creator_flow=flow),
+        context=context_from(
+            mint,
+            token,
+            participation_used_sol=used,
+            now=now,
+            creator_flow=flow,
+            creator_sold_remembered_at=remembered,
+        ),
         positions=positions,
         pending=pending,
         extras=extras,

@@ -133,13 +133,20 @@ class TestWhenItIsNotDerivedAtAll:
         held anything to sell. ``> 0`` is the rule, and it lives here."""
         assert not needs_chain_creator_flow(token(creator_initial_tokens=Decimal(0)))
 
-    @pytest.mark.parametrize("sold", [True, False])
-    def test_the_tape_wins_when_it_has_spoken(self, sold: bool) -> None:
-        """This is a *fallback for silence*, never a second opinion: the fold's
-        ``creator_sold`` is a fact about trades, the chain read is an inference
-        from a balance. One RPC call is not spent to re-answer an answered
-        question, and the engine keeps seeing the tape's own value."""
-        assert not needs_chain_creator_flow(token(creator_sold=sold))
+    def test_a_tape_that_saw_the_sale_settles_it_without_an_rpc_call(self) -> None:
+        """``creator_sold = true`` is a trade on the tape — a fact. The chain
+        cannot un-sell it, so no RPC call is spent and the engine refuses on the
+        tape's own value."""
+        assert not needs_chain_creator_flow(token(creator_sold=True))
+
+    def test_a_tape_that_saw_no_sale_yet_does_not_silence_the_chain(self) -> None:
+        """T4.56 — the COVER hole (R56 §3.2, 17/09/2026 19:46:56 → 19:47:20 BRT).
+        The fold's ``false`` means "no sale in the tape covered so far", and the
+        tape received the creator's 20 SOL sale 37,7 s late. Before T4.56 this
+        ``false`` had precedence and the chain was not asked; the desk bought a
+        coin the chain had refused 23 s earlier. Now ``false`` is silence for the
+        purpose of this read: the balance is checked."""
+        assert needs_chain_creator_flow(token(creator_sold=False))
 
     def test_a_coin_with_no_known_creator_cannot_be_read(self) -> None:
         assert not needs_chain_creator_flow(token(creator=None))

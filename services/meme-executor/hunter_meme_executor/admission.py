@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 from hunter_exchanges.pumpfun.curve import TOKEN_SUBUNITS_PER_TOKEN
-from hunter_meme_executor.creator_flow import CreatorFlow
+from hunter_meme_executor.creator_flow import CreatorFlow, resolve_creator_flow
 from hunter_meme_executor.repo import (
     DEV_SHARE_MAX_AGE_S,
     Candidate,
@@ -170,19 +170,21 @@ def dev_share_input(
     return token.dev_share, token.dev_share_source, stamp
 
 
-def creator_net_sol(token: TokenContext, flow: CreatorFlow | None) -> Decimal | None:
-    """T4.45 - which answer check 10 gets, and in which order.
+def creator_net_sol(
+    token: TokenContext, flow: CreatorFlow | None, *, remembered_at: datetime | None = None
+) -> Decimal | None:
+    """T4.45/T4.56 - which answer check 10 gets, and in which order.
 
-    The fold's ``creator_sold`` is a fact about **trades** and wins whenever it
-    exists; the chain-derived flow (:mod:`hunter_meme_executor.creator_flow`) is
-    an inference from a **balance** and only speaks into the silence the R5 study
-    measured (``creator_sold`` non-NULL +123 to +441 s after creation, entries at
-    30-300 s). Neither invented: with both absent this stays ``None`` and the
-    engine refuses ``creator_flow_unknown``, as it always has.
+    One rule, in :func:`hunter_meme_executor.creator_flow.resolve_creator_flow`:
+    any source that saw the creator sell (this tick's chain read, this process's
+    memory of an earlier one, the fold's ``creator_sold = true``) refuses; the
+    fold's ``false`` only fills in when the chain read is absent or failed. With
+    every source silent this stays ``None`` and the engine refuses
+    ``creator_flow_unknown``, as it always has.
     """
-    if token.creator_sold is not None:
-        return Decimal(-1) if token.creator_sold else Decimal(1)
-    return None if flow is None else flow.net_sol
+    return resolve_creator_flow(
+        tape_sold=token.creator_sold, flow=flow, remembered_at=remembered_at
+    ).net_sol
 
 
 def context_from(
@@ -192,6 +194,7 @@ def context_from(
     participation_used_sol: Decimal,
     now: datetime,
     creator_flow: CreatorFlow | None = None,
+    creator_sold_remembered_at: datetime | None = None,
 ) -> MemeContext:
     volume_fresh = (
         token.features_end_time is not None
@@ -212,7 +215,9 @@ def context_from(
         bundled_share_pct=token.bundled_share,
         top10_share_pct=token.top10_share,
         holder_denominator_valid=None if token.top10_share is None else True,
-        creator_net_sol=creator_net_sol(token, creator_flow),
+        creator_net_sol=creator_net_sol(
+            token, creator_flow, remembered_at=creator_sold_remembered_at
+        ),
         dev_share_pct=dev_share,
         dev_share_source=dev_source,
         dev_share_ts=dev_at,

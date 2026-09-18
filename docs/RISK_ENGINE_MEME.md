@@ -301,7 +301,10 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
   mudar em dois minutos** só gasta uma leitura RPC da curva, uma linha `refused` e uma proposta
   `rejected`. Contam para a carência apenas as recusas de `hunter_risk_meme.checks` que dependem do
   **mercado ou do banco** mudar — `progress_above_window`, `token_too_old`,
-  `token_age_unknown`, `program_not_allowed`, `unsupported_quote`, `progress_denominator_missing`.
+  `token_age_unknown`, `program_not_allowed`, `unsupported_quote`, `progress_denominator_missing`
+  e, desde a T4.56, `creator_net_seller` (um criador que vendeu a alocação não "desvende" em 120 s,
+  seja qual for a fonte que viu; `creator_flow_unknown` fica **fora** — é disponibilidade de dado, e
+  a leitura da cadeia do próximo tique pode respondê-lo).
   Uma recusa que **o relógio sozinho** limpa nunca segura a retentativa: `token_too_young` (a janela
   abre em `token_age_min_s`, 30 s), `curve_state_stale`, `volume_unavailable`, `marks_incomplete`,
   `wallet_over_max_sol`. A carência **atrasa**, não proíbe: passada a janela o mesmo mint volta a ser
@@ -422,11 +425,48 @@ delas em check, limiar ou janela de frescor:
    `inicial × (1 − MEME_CREATOR_SELL_TOLERANCE_PCT)` (padrão 0,02), `+1` caso contrário, com
    `creator_flow_source = 'chain_ata_vs_initial'` no JSON da admissão. **Isto é o que a T4.28g §2.3 dizia
    faltar** — a base da criação — e por isso a derivação deixou de ser desonesta: um criador que largou
-   tudo aos 20 s agora lê `−1` (`creator_net_seller`), não `+1`. O que **não** mudou: `creator_sold`
-   conhecido sempre vence (fato de fita > inferência de saldo); base `NULL` ou `0` ⇒ nada é derivado e o
-   nome continua `creator_flow_unknown`; conta inexistente com base registrada é **dump**, não "não
-   medido" (é o oposto da regra do `creator_watch`, que não tem base contra o que comparar). A permissão
-   da T4.28h (§3.1) fica como está — ela deixa de ser necessária no caso comum, não é revogada.
+   tudo aos 20 s agora lê `−1` (`creator_net_seller`), não `+1`. O que **não** mudou: base `NULL` ou
+   `0` ⇒ nada é derivado e o nome continua `creator_flow_unknown`; conta inexistente com base registrada
+   é **dump**, não "não medido" (é o oposto da regra do `creator_watch`, que não tem base contra o que
+   comparar). A permissão da T4.28h (§3.1) fica como está — ela deixa de ser necessária no caso comum,
+   não é revogada.
+
+**Qualquer fonte que viu a venda vence (T4.56, 18/09/2026).** A T4.45 dizia "`creator_sold` conhecido
+sempre vence" — e a COVER (R56 §3.2, `.claude/state/notes-R56.md`) mostrou o buraco: o criador vendeu
+200 M tokens (20,1 SOL) às 19:46:28 BRT de 17/09; às 19:46:56 a cadeia leu saldo 0 contra a base e a
+admissão recusou `creator_net_seller`; às 19:47:20, 23 s depois, a mesa repropôs o mesmo mint, o fold de
+1 min dizia `creator_sold = false` (a venda entrou na fita 37,7 s atrasada — `false` quer dizer "nenhuma
+venda vista na fita coberta até aqui", não "não vendeu"), a fita tinha precedência, a cadeia não foi
+consultada, e a moeda foi comprada: −0,08 R real. Três mudanças, todas no executor
+(`hunter_meme_executor.creator_flow`, `admission_context`, `refusal_cooldown`), nenhuma em check, limiar
+ou janela:
+
+1. **Precedência à prova de fonte atrasada** (`resolve_creator_flow`, puro): a cadeia é lida quando a
+   fita ainda **não viu venda** (`NULL` **ou** `false`) e a base é > 0; `true` na fita é fato e dispensa
+   o RPC. Qualquer fonte que diga "vendeu" ⇒ `creator_net_sol = −1` (a leitura da cadeia deste tique,
+   a memória do processo, ou a fita); "não vendeu" exige que **toda** fonte presente concorde; uma
+   cadeia que diz "+1" **nunca** sobrepõe um `true` da fita (vendeu e recomprou continua sendo venda).
+   O `false` da fita só preenche o silêncio da cadeia (leitura ausente, timeout ou erro) — o
+   comportamento da T4.45, alcançado agora só por essa via. Com tudo calado, `None` e
+   `creator_flow_unknown`, como sempre.
+2. **Carência**: `creator_net_seller` entrou em `DETERMINISTIC_REFUSALS` (acima, §3.5) — a mesa não
+   reabre o mint por 120 s depois de uma recusa por venda do criador.
+3. **Memória por mint** (`ExecutorState.creator_sold_on_chain`, `CreatorSoldMemory`): a primeira
+   leitura da cadeia que viu a venda fica guardada por **30 min** (dicionário limitado a 4 096 mints,
+   despejo por idade em todo acesso e pelo mais antigo ao inserir). Enquanto lembrada, a moeda não gasta
+   um segundo RPC e nenhum `false` posterior da fita a reabre. Um restart esquece; o que sobrevive a
+   ele é a carência de 120 s em Postgres.
+
+**Auditoria pela linha.** O JSON `admission` da ordem ganha `creator_verdict` =
+`{net_sol, decided_by, tape_creator_sold, chain_net_sol, remembered_sold_at}` ao lado do `creator_flow`
+já existente (a leitura da cadeia, com `source = chain_ata_vs_initial`, ou `read_failed`). `decided_by`
+é uma de `chain_ata_vs_initial`, `executor_memory:creator_sold_on_chain`, `meme_features_1m.creator_sold`
+ou vazio (ninguém falou). Provado sem rede nem banco em
+`services/meme-executor/tests/test_creator_precedence.py`: a COVER (cadeia "vendeu" em t0, fita `false`
+em t0+23 s ⇒ recusada pela memória sem segundo RPC; em processo novo ⇒ recusada pela cadeia), o inverso
+(fita `true`, cadeia ausente ⇒ recusada pela fita, sem RPC), o caminho feliz (ambas "não" ⇒ passa, com a
+cadeia registrada como concordante), a leitura falha (a fita preenche) e o timeout (silêncio, nunca
+aprovação).
 
 **O que muda em relação ao SPOT, e por quê:** não existe `book_depth` nem `spread` — não há livro
 (T4-MEME-RADAR §0). O papel deles é feito por **dois** checks que a curva permite fazer melhor: o

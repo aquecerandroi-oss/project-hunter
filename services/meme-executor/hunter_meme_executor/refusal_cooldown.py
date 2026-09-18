@@ -45,6 +45,7 @@ DETERMINISTIC_REFUSALS: Final[frozenset[str]] = frozenset(
         "program_not_allowed",
         "unsupported_quote",
         "progress_denominator_missing",
+        "creator_net_seller",
     }
 )
 """T4.28f — the admission refusals that cool their mint (skip ``recently_refused``).
@@ -65,6 +66,15 @@ progress outside the 2–50 % window, a coin already past the age ceiling, a
 that is not SOL, a missing denominator. Retrying those every ~20 s (the desk's
 re-proposal cadence) only writes one ``refused`` order and one ``rejected``
 proposal per pass — measured 16/09/2026 11:46–11:48 BRT, five times on one mint.
+
+``creator_net_seller`` joined on T4.56 (COVER, 17/09/2026 — R56 §3.2): the chain
+read refused the mint at 19:46:56 BRT, the desk re-proposed it 23 s later, and
+the 1-minute fold's lagging ``creator_sold = false`` let it through. A creator
+who sold his allocation does not un-sell in 120 s, whichever source saw it — the
+chain's ATA read, this process's memory of one, or the tape itself. Its sibling
+``creator_flow_unknown`` stays **out**: that is data availability (the fold's
+row or T4.45's chain read can answer on the next tick), and cooling it would
+sit on a coin whose creator still holds everything.
 
 Names checked against §4 and **dropped** because no such refusal exists:
 ``creator_serial``, ``symbol_clone``, ``mayhem_curve``, ``mayhem_unknown`` — those
