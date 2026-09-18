@@ -71,7 +71,7 @@ O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) —
 | `meme_features_1m` | mensal | idem | idem |
 | `meme_trades` | mensal | idem | idem |
 | `meme_features_15s` | mensal | **7 d** (T4.16, `0030`: a série de 15 s das moedas jovens — em partições mensais o mês cai quando o seu fim tem mais de 7 dias) | idem — T4.33: uma moeda **fixada** (aposta/posição/proposta) segue na via rápida até 1 800 s (`MEME_FAST_LANE_PINNED_MAX_AGE_S`), não só 300 s; +2 % de linhas/dia medido, ~83 mints/dia |
-| `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `analytics-worker` diário, DELETE em lotes (M5) |
+| `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `infra/scripts/prune_outbox_events.py` diário (cron `hunter-outbox`, `infra/vps/README.md`), DELETE em lotes de 5 mil via `prune_dispatched`. Até 18/09/2026 **nenhum job rodava**: 19,57 M linhas despachadas (17 GB) na VPS, +2,1 M/dia — 3× os 700 mil/dia estimados abaixo; com 7 d a população estabiliza em ~15 M linhas (estimativa); apagar linha libera espaço para reuso dentro da tabela, **não** no `df` |
 | `shadow_outbox` | — | idem, enquanto a fila existir (§17.5 a absorve) | idem |
 
 **As duas filas de outbox não são particionadas — são podadas.** Elas são fila,

@@ -232,6 +232,51 @@ verdade — mas não espere por ele: um `lock_timeout` isolado é normal (gap
 detection ou outra query concorrente segurando o parent), vários dias seguidos
 não é.
 
+## Poda da outbox (`prune_outbox_events.py`)
+
+`outbox_events` é fila, não histórico (`docs/DATABASE.md` §1.3): a linha
+despachada fica **7 dias** só como teto da janela de replay e depois é peso
+morto numa tabela em que o despachante escreve o tempo todo. Até 18/09/2026
+nenhum job a podava — a VPS acumulou **19,57 milhões** de linhas despachadas
+(17 GB, +2,1 M/dia) e o dump noturno foi de 1,6 GB para 10,6 GB numa semana.
+O script chama `prune_dispatched` em laço (lotes de 5 mil ids em ordem de PK,
+uma transação por lote; pendente nunca é apagada):
+
+```bash
+bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --dry-run   # conta, não apaga
+bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py             # apaga até o lote vir curto
+bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --max-batches 400  # primeira passada em fatias
+```
+
+Agendamento (instalar uma vez, à mão, no mesmo padrão dos outros crons; 04:37 —
+depois do backup das 03:17 e do `create_partitions` das 04:07):
+
+```bash
+printf '%s\n' \
+  'SHELL=/bin/bash' \
+  'PATH=/usr/local/bin:/usr/bin:/bin' \
+  '37 4 * * * hunter cd /opt/project-hunter && flock -n /tmp/hunter-outbox-prune.lock bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py >> /opt/backups/outbox-prune.log 2>&1' \
+  | sudo tee /etc/cron.d/hunter-outbox >/dev/null
+sudo chmod 644 /etc/cron.d/hunter-outbox
+```
+
+**Três números diferentes, não confundir** (segunda opinião da Astra, `review-T4.63`):
+a *população lógica* (linhas) cai na hora; o *espaço reutilizável* dentro da tabela
+só aparece quando o `autovacuum` passa (ou `VACUUM (VERBOSE) outbox_events` à mão —
+nunca `VACUUM FULL`, que trava a tabela contra o despachante); e o *espaço livre no
+filesystem* (`df -h /`) **não volta** — o Postgres devolve página ao sistema só se
+ela estiver no fim do arquivo. O que a poda compra é que o crescimento pare de
+pedir páginas novas. Numa emergência de disco, o que devolve espaço ao `df` são as
+imagens Docker antigas (`docker image prune`), o build cache e os dumps.
+
+Primeira passada sobre o acúmulo (≈7 M linhas): comece com `--max-batches 200`
+(1 M linhas), meça duração, `pg_stat_progress_vacuum`, WAL e o `outbox_lag_s` dos
+heartbeats antes de ampliar; 400 lotes/dia = 2 M linhas, **menos** do que entra
+(2,1 M/dia), então o teto é fatia inicial, não regime permanente. O `flock` na linha
+do cron impede duas podas simultâneas disputando as mesmas linhas. Com 7 d a
+população estabiliza em ~15 M linhas (estimativa, não garantia); encurtar a retenção
+é mudança de política (`DATABASE.md` §1.3), não de operação.
+
 ## O que fica exposto
 
 | Porta | Onde escuta | Quem alcança |
