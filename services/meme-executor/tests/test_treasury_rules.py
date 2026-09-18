@@ -1,5 +1,7 @@
-"""T4.54 — sizing math, refusal reasons and the transaction-shape verifier.
-Pure functions: no network, no database, no signer, no chain."""
+"""T4.54 — sizing math, quote validation, the effective target, refusal
+reasons and the post-simulation balance invariant. Pure functions: no
+network, no database, no signer, no chain (the transaction verifier has its
+own file, ``test_treasury_verify.py``)."""
 
 from __future__ import annotations
 
@@ -9,25 +11,18 @@ from decimal import Decimal
 import pytest
 
 from hunter_exchanges.jupiter import JupiterQuote
-from hunter_exchanges.jupiter.versioned_tx import (
-    VersionedCompiledInstruction,
-    VersionedMessage,
-)
-from hunter_exchanges.pumpfun.solana_codec import TOKEN_PROGRAM_ID
 from hunter_meme_executor.treasury_rules import (
-    JUP_PROGRAM_ID,
-    TreasurySwapRefused,
+    check_simulated_balances,
     classify_quote_refusal,
+    effective_sol_target,
     should_attempt,
     size_first_pass,
     size_to_target,
-    verify_swap_transaction,
+    validate_quote,
 )
 
 pytestmark = pytest.mark.unit
 
-WALLET = "ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4"
-FOREIGN_PROGRAM = "11111111111111111111111111111111111111112"
 NOW = datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
 
 
@@ -37,7 +32,7 @@ def _quote(**overrides: object) -> JupiterQuote:
         "output_mint": "So11111111111111111111111111111111111111112",
         "in_amount": Decimal("5000000"),
         "out_amount": Decimal("34215678"),
-        "other_amount_threshold": Decimal("34044000"),
+        "other_amount_threshold": Decimal("34044599"),  # floor(out × 0.995)
         "price_impact_pct": Decimal("0.0012"),
         "slippage_bps": 50,
         "route_labels": ("Whirlpool",),
@@ -193,83 +188,94 @@ def test_should_attempt_allows_when_every_gate_passes() -> None:
     )
 
 
-# ---------------------------------------------------------------------- verify
-def _message(
-    *,
-    static_keys: list[str],
-    num_required_signatures: int = 1,
-    instructions: tuple[VersionedCompiledInstruction, ...],
-    blockhash: str = "5" * 32,
-) -> VersionedMessage:
-    return VersionedMessage(
-        version=0,
-        num_required_signatures=num_required_signatures,
-        num_readonly_signed=0,
-        num_readonly_unsigned=0,
-        static_account_keys=tuple(static_keys),
-        recent_blockhash=blockhash,
-        instructions=instructions,
-        address_table_lookups=(),
+# ------------------------------------------------------------- fix B: quote
+_ASK = {
+    "input_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "output_mint": "So11111111111111111111111111111111111111112",
+    "amount_atoms": 5_000_000,
+    "slippage_bps": 50,
+}
+
+
+def test_a_quote_that_matches_the_request_is_valid() -> None:
+    assert validate_quote(_quote(), **_ASK) is None  # type: ignore[arg-type]
+
+
+def test_the_real_quote_threshold_is_out_amount_times_one_minus_slippage_floored() -> None:
+    # 18/09/2026 capture: outAmount 9487602, slippageBps 50 -> Jupiter said 9440164
+    # (9440163.99 rounded up); the rule accepts anything >= the floor, 9440163.
+    real = _quote(
+        in_amount=Decimal(1_000_000),
+        out_amount=Decimal(9_487_602),
+        other_amount_threshold=Decimal(9_440_164),
+        price_impact_pct=Decimal(0),
+    )
+    assert validate_quote(real, **{**_ASK, "amount_atoms": 1_000_000}) is None  # type: ignore[arg-type]
+    short = _quote(
+        in_amount=Decimal(1_000_000),
+        out_amount=Decimal(9_487_602),
+        other_amount_threshold=Decimal(9_440_162),
+    )
+    assert validate_quote(short, **{**_ASK, "amount_atoms": 1_000_000}) == (  # type: ignore[arg-type]
+        "quote_mismatch:other_amount_threshold"
     )
 
 
-def test_a_clean_jupiter_route_verifies() -> None:
-    message = _message(
-        static_keys=[WALLET, JUP_PROGRAM_ID, TOKEN_PROGRAM_ID],
-        instructions=(
-            VersionedCompiledInstruction(1, (0,), b"\x01"),
-            VersionedCompiledInstruction(2, (0,), b"\x02"),
-        ),
+@pytest.mark.parametrize(
+    "overrides,expected",
+    [
+        ({"in_amount": Decimal("21330000")}, "quote_mismatch:in_amount"),
+        ({"input_mint": "So11111111111111111111111111111111111111112"}, "quote_mismatch:mints"),
+        ({"output_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"}, "quote_mismatch:mints"),
+        ({"slippage_bps": 10_000}, "quote_mismatch:slippage_bps"),
+        ({"other_amount_threshold": Decimal(1)}, "quote_mismatch:other_amount_threshold"),
+    ],
+)
+def test_a_quote_that_drifts_from_the_request_is_refused_by_name(
+    overrides: dict[str, object], expected: str
+) -> None:
+    assert validate_quote(_quote(**overrides), **_ASK) == expected  # type: ignore[arg-type]
+
+
+# ----------------------------------------------------------- fix E: target
+def test_a_target_below_the_wallet_ceiling_is_kept() -> None:
+    assert effective_sol_target(
+        configured_target_sol=Decimal("0.60"),
+        wallet_max_sol=Decimal("0.72"),
+        max_sol_per_trade=Decimal("0.02"),
+    ) == (Decimal("0.60"), None)
+
+
+def test_a_target_above_the_wallet_ceiling_is_capped_and_named() -> None:
+    assert effective_sol_target(
+        configured_target_sol=Decimal("1.0"),
+        wallet_max_sol=Decimal("0.72"),
+        max_sol_per_trade=Decimal("0.02"),
+    ) == (Decimal("0.70"), "target_above_wallet_max")
+
+
+# ----------------------------------------- fix A (2): simulated balances
+_BAL = {
+    "usdc_before_atoms": 21_330_000,
+    "usdc_after_atoms": 20_330_000,
+    "usdc_in_atoms": 1_000_000,
+    "sol_before_lamports": 680_000_000,
+    "sol_after_lamports": 689_380_000,  # + 9_440_164 threshold - ~60_000 fees
+    "min_out_lamports": 9_440_164,
+}
+
+
+def test_a_simulation_that_spends_exactly_the_request_passes() -> None:
+    assert check_simulated_balances(**_BAL) is None
+
+
+def test_a_simulation_that_drains_more_usdc_than_requested_is_refused() -> None:
+    assert check_simulated_balances(**{**_BAL, "usdc_after_atoms": 0}) == (
+        "simulation_usdc_overspent"
     )
-    verify_swap_transaction(message, wallet=WALLET)  # must not raise
 
 
-def test_a_foreign_transfer_program_is_refused() -> None:
-    message = _message(
-        static_keys=[WALLET, JUP_PROGRAM_ID, FOREIGN_PROGRAM],
-        instructions=(
-            VersionedCompiledInstruction(1, (0,), b"\x01"),
-            VersionedCompiledInstruction(2, (0,), b"\x02"),
-        ),
+def test_a_simulation_that_hands_back_less_sol_than_the_threshold_is_refused() -> None:
+    assert check_simulated_balances(**{**_BAL, "sol_after_lamports": 679_000_000}) == (
+        "simulation_sol_short"
     )
-    with pytest.raises(TreasurySwapRefused) as excinfo:
-        verify_swap_transaction(message, wallet=WALLET)
-    assert excinfo.value.reason == f"program_not_allowed:{FOREIGN_PROGRAM}"
-
-
-def test_a_program_behind_a_lookup_table_is_refused_not_trusted() -> None:
-    message = _message(
-        static_keys=[WALLET, JUP_PROGRAM_ID],
-        instructions=(VersionedCompiledInstruction(9, (0,), b"\x01"),),
-    )
-    with pytest.raises(TreasurySwapRefused, match="program_via_lookup_table"):
-        verify_swap_transaction(message, wallet=WALLET)
-
-
-def test_a_fee_payer_that_is_not_the_wallet_is_refused() -> None:
-    message = _message(
-        static_keys=[FOREIGN_PROGRAM, JUP_PROGRAM_ID],
-        instructions=(VersionedCompiledInstruction(1, (0,), b"\x01"),),
-    )
-    with pytest.raises(TreasurySwapRefused, match="fee_payer_not_wallet"):
-        verify_swap_transaction(message, wallet=WALLET)
-
-
-def test_more_than_one_signer_is_refused() -> None:
-    message = _message(
-        static_keys=[WALLET, FOREIGN_PROGRAM, JUP_PROGRAM_ID],
-        num_required_signatures=2,
-        instructions=(VersionedCompiledInstruction(2, (0, 1), b"\x01"),),
-    )
-    with pytest.raises(TreasurySwapRefused, match="more_than_one_signer"):
-        verify_swap_transaction(message, wallet=WALLET)
-
-
-def test_a_zero_blockhash_is_refused() -> None:
-    message = _message(
-        static_keys=[WALLET, JUP_PROGRAM_ID],
-        instructions=(VersionedCompiledInstruction(1, (0,), b"\x01"),),
-        blockhash="1" * 32,
-    )
-    with pytest.raises(TreasurySwapRefused, match="blockhash_missing"):
-        verify_swap_transaction(message, wallet=WALLET)

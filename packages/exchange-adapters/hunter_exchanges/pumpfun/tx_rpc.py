@@ -19,11 +19,14 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 
 from hunter_exchanges.base import ExchangeError, ExchangeUnavailable, MalformedMessage
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 __all__ = [
     "AccountSnapshot",
@@ -55,6 +58,10 @@ class SimulationResult:
     units_consumed: int | None
     slot: int | None
     return_data: str | None
+    accounts: tuple[dict[str, Any] | None, ...] = ()
+    """T4.54b: the post-simulation state of the ``accounts`` the caller asked
+    for (``jsonParsed``, same order; ``None`` for an account that would not
+    exist afterwards). Empty when nothing was asked."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,17 +195,26 @@ class SolanaTxRpcClient:
 
     # --------------------------------------------------------------- simulate
     def simulate_transaction(
-        self, transaction: bytes, *, sig_verify: bool = False, replace_blockhash: bool = False
+        self,
+        transaction: bytes,
+        *,
+        sig_verify: bool = False,
+        replace_blockhash: bool = False,
+        accounts: Sequence[str] = (),
     ) -> SimulationResult:
         """``simulateTransaction`` — never mutates the chain. ``sig_verify=False`` lets an
         *unsigned* transaction (zeroed signature) be simulated, which is how the
-        mainnet proof runs without any key."""
+        mainnet proof runs without any key. ``accounts`` (T4.54b) asks for the
+        post-state of those addresses, ``jsonParsed`` — the treasury's balance
+        invariant reads the wallet and its USDC ATA from it."""
         config: dict[str, Any] = {
             "encoding": "base64",
             "sigVerify": sig_verify,
             "replaceRecentBlockhash": replace_blockhash,
             "commitment": "confirmed",
         }
+        if accounts:
+            config["accounts"] = {"addresses": list(accounts), "encoding": "jsonParsed"}
         result = cast(
             dict[str, Any],
             self._call(
@@ -214,6 +230,7 @@ class SolanaTxRpcClient:
             units_consumed=cast(int | None, value.get("unitsConsumed")),
             slot=int(cast(dict[str, Any], result["context"])["slot"]),
             return_data=None if return_data is None else str(return_data.get("data")),
+            accounts=tuple(cast(list[dict[str, Any] | None], value.get("accounts") or [])),
         )
 
     # ------------------------------------------------------------------- send

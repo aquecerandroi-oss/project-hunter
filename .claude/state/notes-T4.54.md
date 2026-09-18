@@ -84,6 +84,7 @@ MEME_TREASURY_ENABLED=true
 # MEME_TREASURY_MAX_USDC_PER_DAY=50
 # MEME_TREASURY_MAX_SLIPPAGE_BPS=50
 # MEME_TREASURY_MIN_INTERVAL_S=600
+# MEME_TREASURY_JUPITER_BASE_URL=https://lite-api.jup.ag/swap/v1   (T4.54b; com chave: https://api.jup.ag/swap/v1)
 ```
 Subir com `MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update`. Exige
 `ENABLE_MEME_LIVE_TRADING` já ligada (a tesouraria nunca troca em papel). Desligar: apagar a
@@ -118,3 +119,128 @@ uv run ruff format <touched files>         -> formatted (pure reformatting)
 uv run pyright <touched production files>  -> 0 errors
 uv run python infra/scripts/check_file_size.py -> 0 over budget (935 files scanned)
 ```
+
+## T4.54b — correções da revisão de risco (`.claude/state/review-T4.54.md`, veredito BLOCK → A–E)
+
+Sessão de 18/09/2026, sem commit. Esta sessão **tinha rede**: gravei a cotação real e a transação
+real não assinada da Jupiter (só a chave pública `ARsuJEagSE2p…`; nada assinado, nada enviado, a
+chave privada não foi usada nem procurada). `quote-api.jup.ag/v6` **não resolve mais** (DNS, curl
+exit 6); `lite-api.jup.ag/swap/v1` e `api.jup.ag/swap/v1` respondem 200 com o mesmo formato v6.
+
+### O que a Jupiter realmente emite (USDC → SOL, `wrapAndUnwrapSol`, 1 USDC)
+`ComputeBudget.SetComputeUnitLimit(122885)`, `ComputeBudget.SetComputeUnitPrice(813768)` (= 0,0001
+SOL de prioridade), `AssociatedToken.CreateIdempotent` da ATA WSOL própria (mint atrás da ALT),
+`JUP6.route` (`e517cb977ae3ad2a`; 19 bytes finais = `in_amount 1000000, quoted_out 9487602,
+slippage_bps 50, platform_fee_bps 0`), `Token.CloseAccount(9)` da ATA WSOL → carteira. **Nenhuma
+instrução System** — o `Transfer`+`SyncNative` do wrap só existe quando SOL é a entrada. Fixtures:
+`services/meme-executor/tests/fixtures/jupiter_{quote,swap}_usdc_to_sol_real.json` e
+`packages/exchange-adapters/tests/fixtures/jupiter/quote_usdc_to_sol_real.json`.
+
+### Cada correção
+- **A — verificador** (`hunter_meme_executor/treasury_verify.py`, novo; saiu de `treasury_rules`):
+  instrução a instrução, como `pumpfun/verify.py`. System **recusado** (`system_program_not_allowed`);
+  ComputeBudget só limite/preço, sem duplicata, `limite × preço ≤ 0,005 SOL`
+  (`priority_fee_above_cap`); ATA só `Create`/`CreateIdempotent`, pagador e dono = carteira, ≤ 3;
+  Token/Token-2022 só `CloseAccount`(9)/`SyncNative`(17)/`InitializeAccount*`(1/16/18) na ATA WSOL
+  própria com destino/autoridade = carteira (discriminador decodificado; `Transfer`(3) →
+  `token_instruction_not_allowed:3`); `JUP6` exatamente uma `route`/`shared_accounts_route`
+  (discriminador Anchor conferido contra os bytes reais), autoridade = carteira, origem = ATA USDC,
+  destino = ATA WSOL, sem destino de terceiro (`route_third_party_destination`), sem conta de taxa,
+  `in_amount == usdc_atoms`, `quoted_out ≥ outAmount`, `slippage_bps ≤ teto`, `platform_fee_bps == 0`.
+  **Limite documentado:** os args da `route` vêm depois de `Vec<RoutePlanStep>` (enum `Swap` com
+  100+ variantes, impossível manter tabela) e são lidos do fim; o Anchor tolera bytes extras, então
+  um builder hostil poderia anexar uma cauda falsa — por isso implementei também a **opção 2 da
+  revisão**: `simulateTransaction` com `accounts=[carteira, ATA USDC]` (`jsonParsed`;
+  `tx_rpc.simulate_transaction` ganhou o parâmetro `accounts` e `SimulationResult.accounts`) e o
+  invariante puro `check_simulated_balances` (`USDC_depois ≥ USDC_antes − pedido`, `SOL_depois ≥
+  SOL_antes + otherAmountThreshold − 0,01 SOL`), com saldos "antes" relidos na hora; violação →
+  `simulation_usdc_overspent`/`simulation_sol_short`, nada assinado.
+- **B — cotação** (`treasury_rules.validate_quote`, chamada em `treasury._quote` nas duas cotações):
+  mints, `inAmount == pedido`, `slippageBps == cfg`, `otherAmountThreshold ≥ floor(out × (1 −
+  bps/10000))` → `quote_mismatch:<campo>`. **Unidade de `priceImpactPct`: fração** (2 M USDC →
+  `0.00333` com saída 0,34 % abaixo do spot; se fosse percentual leria `0.33`). Constante renomeada
+  `MAX_PRICE_IMPACT_FRACTION = 0.01` (= 1 %), documentada; `config.py` corrigido (o slippage agora
+  **é** decodificado da instrução; o teto diário conta `submitted`; o alvo é o efetivo).
+- **C — teto diário e reconcile** (`treasury_db.usdc_committed_last_24h` soma `submitted` +
+  `confirmed`; `submitted_swaps`; `treasury_reconcile.reconcile_once`, novo, roda no tique antes de
+  qualquer tentativa nova): `getSignatureStatuses` em lote → `classify_submitted` puro
+  (`confirmed`/`failed`/`pending`; sem status e > 180 s = `failed`); confirmado → relê a carteira e
+  grava `sol_out_filled`/`wallet_sol_after`. O `_confirm` do envio agora espera no máximo
+  `min(confirm_timeout_s, 20 s)` e **não** marca `failed` por estouro (fica `submitted`, contado);
+  erro on-chain marca `failed` na hora.
+- **D — flag antes de tudo** (`treasury.treasury_once`): `if not enabled: return` como primeira
+  linha (sem sessão, sem RPC, sem HTTP — provado com um `session_factory` que levanta ao ser
+  chamado); o resto em `try/except Exception` que loga `meme_treasury_tick_failed`, incrementa
+  `rpc_errors` e nunca re-levanta para o `TaskGroup`. Sem `live`/assinante também não lê nada.
+- **E — alvo** (`treasury_rules.effective_sol_target`): `cap = wallet_max_sol − max_sol_per_trade`
+  (hoje 0,72 − 0,02 = 0,70); alvo configurado acima do cap é **recusado por nome**
+  (`target_above_wallet_max`) antes de qualquer cotação (não silenciosamente reduzido — o operador
+  vê no heartbeat e corrige o `.env`); e, depois da cotação, `wallet + out > wallet_max_sol` também
+  recusa com o mesmo nome.
+- **F — endpoint**: `MEME_TREASURY_JUPITER_BASE_URL` (padrão `https://lite-api.jup.ag/swap/v1`);
+  `JupiterClient.DEFAULT_JUPITER_BASE_URL`; `main.build_context` passa a URL do config.
+
+`treasury.py` foi dividido: `treasury.py` (tique, gates, tamanho, cotação), `treasury_send.py`
+(verificar → simular+invariante → assinar → enviar → confirmar), `treasury_reconcile.py`,
+`treasury_verify.py`, `treasury_rules.py` — todos ≤ 350 linhas.
+
+### Testes (nomes)
+- `test_treasury_verify.py` (25): `test_the_real_jupiter_transaction_verifies_and_is_decoded_by_name`,
+  `test_the_anchor_discriminators_match_the_bytes_jupiter_emitted`,
+  `test_the_real_transaction_has_no_system_instruction`,
+  `test_a_system_transfer_to_a_foreign_key_is_refused`, `test_a_token_transfer_out_of_the_usdc_ata_is_refused`,
+  `test_a_route_for_the_whole_balance_is_refused`, `test_a_route_with_ten_thousand_bps_of_slippage_is_refused`,
+  `test_a_route_promising_less_than_the_quote_is_refused`, `test_a_route_with_a_platform_fee_is_refused`,
+  `test_a_route_whose_destination_is_not_our_wsol_ata_is_refused`, `test_a_route_with_a_third_party_destination_is_refused`,
+  `test_a_route_whose_authority_is_not_the_wallet_is_refused`, `test_an_unknown_route_discriminator_is_refused`,
+  `test_a_close_account_paying_someone_else_is_refused`, `test_an_ata_created_for_someone_else_is_refused`,
+  `test_a_priority_fee_above_the_cap_is_refused`, `test_a_second_route_instruction_is_refused`,
+  `test_a_message_without_a_route_is_refused`, `test_a_foreign_program_is_refused_by_name`,
+  `test_a_program_behind_a_lookup_table_is_refused_not_trusted`, `test_a_fee_payer_that_is_not_the_wallet_is_refused`,
+  `test_more_than_one_signer_is_refused`, `test_a_zero_blockhash_is_refused`,
+  `test_a_compute_budget_instruction_that_is_not_limit_or_price_is_refused`,
+  `test_a_shared_accounts_route_is_decoded_by_its_own_layout`.
+- `test_treasury_rules.py` (29): + `test_a_quote_that_matches_the_request_is_valid`,
+  `test_the_real_quote_threshold_is_out_amount_times_one_minus_slippage_floored`,
+  `test_a_quote_that_drifts_from_the_request_is_refused_by_name[5 casos]`,
+  `test_a_target_below_the_wallet_ceiling_is_kept`, `test_a_target_above_the_wallet_ceiling_is_capped_and_named`,
+  `test_a_simulation_that_spends_exactly_the_request_passes`,
+  `test_a_simulation_that_drains_more_usdc_than_requested_is_refused`,
+  `test_a_simulation_that_hands_back_less_sol_than_the_threshold_is_refused`.
+- `test_treasury_tick.py` (17, novo): `test_with_the_flag_off_the_tick_opens_no_session_and_makes_no_call`,
+  `test_a_failure_inside_the_tick_is_logged_and_counted_never_raised`, `test_without_live_or_signer_nothing_is_read_at_all`,
+  `test_a_target_above_the_wallet_ceiling_is_refused_before_any_quote`,
+  `test_the_size_is_capped_by_the_effective_target_not_the_configured_one`,
+  `test_a_quote_for_another_amount_is_refused_before_the_builder`,
+  `test_the_reconcile_settles_a_submitted_row_from_the_chain[5 casos]`,
+  `test_simulated_balances_reads_the_json_parsed_pair`, `test_simulated_balances_refuses_anything_it_cannot_read[5]`.
+- `test_treasury_db.py` (integração): `test_usdc_committed_last_24h_counts_submitted_and_confirmed_in_the_window`
+  (confirmed 12 + submitted 5 = 17; quoted/failed/30 h fora; `submitted_swaps` devolve só a pendente).
+- `test_treasury_config.py`: `test_the_jupiter_base_url_defaults_to_the_keyless_lite_endpoint`.
+- `test_jupiter_client.py`: `test_the_default_base_url_is_the_live_keyless_endpoint`,
+  `test_quote_parses_the_real_capture_and_its_price_impact_is_a_fraction`.
+
+### O que ainda precisa da prova ao vivo (§6 da revisão)
+1. `simulateTransaction` da transação real **com `accounts`** contra a RPC de produção, sem assinar:
+   conferir que `value.accounts` vem `jsonParsed` no formato que `simulated_balances` lê (carteira:
+   `lamports`; ATA: `data.parsed.info.tokenAmount.amount`), que o USDC cai exatamente 1,000000 e o
+   SOL sobe ≥ `otherAmountThreshold` − 0,01. Se a RPC pública não devolver `accounts`, o invariante
+   recusa tudo (`simulation_accounts_unreadable`) — fechado, mas a feature não troca.
+2. A primeira troca real de ~1 USDC com `MEME_TREASURY_MAX_USDC_PER_SWAP=1`,
+   `MEME_TREASURY_MAX_USDC_PER_DAY=1`, `MEME_TREASURY_SOL_FLOOR=0.70`, `MEME_TREASURY_SOL_TARGET=0.70`
+   (alvo ≤ cap 0,70 — `0.72` seria recusado por nome agora), conferindo assinatura no Solscan, linha
+   `confirmed`, e o reconcile numa linha `submitted` forjada por estouro.
+3. Rota `shared_accounts_route` real (a captura de hoje veio como `route`): o layout de contas está
+   de acordo com o IDL v6, mas só foi exercido com uma mensagem sintética.
+
+### Comandos (T4.54b)
+```
+timeout 590 uv run pytest services/meme-executor/tests packages/exchange-adapters/tests -q -p no:cacheprovider -m "not live"
+1068 passed, 2 skipped, 7 deselected in 143.77s (0:02:23)   # inclui test_treasury_db (Docker)
+uv run ruff check <16 tocados> -> All checks passed ; ruff format --check -> 16 already formatted
+uv run pyright <produção + testes tocados> -> 0 errors, 0 warnings
+uv run python infra/scripts/check_file_size.py -> scanned 946 files; 0 over budget
+```
+Árvore compartilhada: `config.py` foi refatorado em paralelo pelo agente da T4.55 (`config_env.py`,
+`send_tuning.py`) — as minhas linhas (`treasury_jupiter_base_url`, docstrings) sobreviveram; nada
+dele foi tocado por mim.

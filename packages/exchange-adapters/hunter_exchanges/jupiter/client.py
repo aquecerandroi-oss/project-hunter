@@ -1,6 +1,10 @@
-"""Jupiter v6 aggregator client (T4.54) — public quote + swap-transaction build.
+"""Jupiter swap API client (T4.54) — public quote + swap-transaction build.
 
-No API key (Jupiter's ``quote-api.jup.ag`` is public). One request per call,
+Endpoint (T4.54b, verified 18/09/2026): the historical ``quote-api.jup.ag/v6``
+no longer resolves; Jupiter serves the same ``GET /quote`` + ``POST /swap``
+at ``https://lite-api.jup.ag/swap/v1`` (keyless, rate-limited — the default
+here) and ``https://api.jup.ag/swap/v1`` (API key). The response shapes are
+the v6 ones this module already parsed. One request per call,
 5 s timeout, **no retries on a 4xx** (a bad request is a bad request, never a
 loop): a 4xx is :class:`JupiterQuoteError` with the body's ``error`` field
 when present. A 5xx or a transport failure is
@@ -24,9 +28,9 @@ import httpx
 from hunter_exchanges.base import ExchangeError, ExchangeUnavailable, MalformedMessage
 from hunter_exchanges.jupiter.models import JupiterQuote, JupiterSwapTransaction
 
-__all__ = ["JupiterClient", "JupiterQuoteError"]
+__all__ = ["DEFAULT_JUPITER_BASE_URL", "JupiterClient", "JupiterQuoteError"]
 
-DEFAULT_BASE_URL = "https://quote-api.jup.ag/v6"
+DEFAULT_JUPITER_BASE_URL = "https://lite-api.jup.ag/swap/v1"
 EXCHANGE = "jupiter"
 
 
@@ -42,7 +46,7 @@ class JupiterClient:
     def __init__(
         self,
         *,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: str = DEFAULT_JUPITER_BASE_URL,
         http_client: httpx.Client | None = None,
         timeout_s: float = 5.0,
     ) -> None:

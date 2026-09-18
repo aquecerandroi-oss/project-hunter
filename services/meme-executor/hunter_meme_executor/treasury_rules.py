@@ -1,56 +1,64 @@
-"""T4.54 — the treasury top-up's pure rules: sizing, refusal classification and
-the transaction-shape verifier. No network, no database, no signer; every
-function here is a plain value in, a plain value (or a named refusal) out, so
-the sizing math and the allowlist can be proven without a chain or a fixture.
+"""T4.54 — the treasury top-up's pure rules: sizing, quote validation, the
+effective SOL target, refusal classification and the post-simulation balance
+invariant. No network, no database, no signer; every function here is a
+plain value in, a plain value (or a named refusal) out, so the math can be
+proven without a chain or a fixture.
 
-See ``hunter_meme_executor.treasury`` for the orchestration these compose
-into and the doctrine they enforce (``docs/RISK_ENGINE_MEME.md`` new §).
+The instruction-by-instruction verifier of the built transaction lives in
+``treasury_verify`` (T4.54b); the orchestration these compose into is
+``hunter_meme_executor.treasury`` (``docs/RISK_ENGINE_MEME.md`` §16).
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
-
-from hunter_exchanges.pumpfun.solana_codec import (
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    COMPUTE_BUDGET_PROGRAM_ID,
-    SYSTEM_PROGRAM_ID,
-    TOKEN_2022_PROGRAM_ID,
-    TOKEN_PROGRAM_ID,
-)
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from hunter_exchanges.jupiter import JupiterQuote
-    from hunter_exchanges.jupiter.versioned_tx import VersionedMessage
 
 __all__ = [
     "JUP_PROGRAM_ID",
-    "MAX_PRICE_IMPACT_PCT",
-    "TREASURY_ALLOWED_PROGRAMS",
+    "MAX_PRICE_IMPACT_FRACTION",
+    "SIMULATION_SOL_FEE_ALLOWANCE_LAMPORTS",
+    "SUBMITTED_MAX_AGE_S",
+    "USDC_MINT",
     "TreasurySwapRefused",
+    "check_simulated_balances",
     "classify_quote_refusal",
+    "classify_submitted",
+    "effective_sol_target",
     "should_attempt",
     "size_first_pass",
     "size_to_target",
-    "verify_swap_transaction",
+    "validate_quote",
 ]
 
 JUP_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
-MAX_PRICE_IMPACT_PCT = Decimal("0.01")
-_ZERO_BLOCKHASH_B58 = "1" * 32
+USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
-TREASURY_ALLOWED_PROGRAMS = frozenset(
-    {
-        JUP_PROGRAM_ID,
-        TOKEN_PROGRAM_ID,
-        TOKEN_2022_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID,
-        SYSTEM_PROGRAM_ID,
-        COMPUTE_BUDGET_PROGRAM_ID,
-    }
-)
+MAX_PRICE_IMPACT_FRACTION = Decimal("0.01")
+"""Cap on Jupiter's ``priceImpactPct`` — despite the name the field is a
+**fraction**, not a percentage: a real 2 000 000 USDC quote (18/09/2026,
+``lite-api.jup.ag/swap/v1/quote``) reported ``0.00333`` while its
+``outAmount`` sat 0,34 % below the 1 USDC spot price; a percentage would have
+read ``0.33``. So ``0.01`` here is **1 %**. Quotes for the treasury's sizes
+(≤ 25 USDC) report ``0`` or ~``1e-6``."""
+
+SIMULATION_SOL_FEE_ALLOWANCE_LAMPORTS = 10_000_000
+"""0,01 SOL: the most the wallet may be short of ``sol_before +
+other_amount_threshold`` after the simulated swap — base fee (5 000) plus the
+priority fee (``treasury_verify.MAX_PRIORITY_FEE_LAMPORTS``, 0,005 SOL) plus
+rent for an intermediate ATA a multi-hop route may create."""
+
+
+SUBMITTED_MAX_AGE_S = 180.0
+"""A ``submitted`` row the chain has never seen after this long is dead: a
+blockhash is valid for ~60–90 s, and ``getSignatureStatuses`` with
+``searchTransactionHistory`` finds anything that landed."""
 
 
 class TreasurySwapRefused(Exception):
@@ -85,14 +93,101 @@ def size_to_target(
     return max(0, min(first_pass_usdc_atoms, needed_usdc_atoms))
 
 
+def effective_sol_target(
+    *, configured_target_sol: Decimal, wallet_max_sol: Decimal, max_sol_per_trade: Decimal
+) -> tuple[Decimal, str | None]:
+    """T4.54b fix E — the target a top-up may fill the wallet to.
+
+    The entry gate refuses every trade while ``wallet_sol > wallet_max_sol``
+    (``wallet_over_max_sol``, §3.1 check 17), so a target above
+    ``wallet_max_sol - max_sol_per_trade`` would buy SOL the desk could never
+    spend and park the wallet above its own ceiling until someone intervened.
+    Returns ``(target, None)`` when the configured target fits, or
+    ``(cap, "target_above_wallet_max")`` when it had to be lowered — the
+    caller sizes to the cap and logs the refusal reason once.
+    """
+    cap = wallet_max_sol - max_sol_per_trade
+    if configured_target_sol <= cap:
+        return configured_target_sol, None
+    return cap, "target_above_wallet_max"
+
+
+def validate_quote(
+    quote: JupiterQuote,
+    *,
+    input_mint: str,
+    output_mint: str,
+    amount_atoms: int,
+    slippage_bps: int,
+) -> str | None:
+    """T4.54b fix B — the quote must describe the swap that was asked for.
+
+    Everything the transaction builder will read back from ``quote.raw`` is
+    pinned here first: mints, ``inAmount`` (a quote for a bigger amount would
+    drain more USDC than the row records), ``slippageBps`` (what Jupiter puts
+    in the instruction) and ``otherAmountThreshold`` — the on-chain minimum
+    out must be at least ``outAmount × (1 − slippage)`` rounded down, or the
+    tolerance Jupiter enforces is looser than the one it quoted.
+    """
+    if quote.input_mint != input_mint or quote.output_mint != output_mint:
+        return "quote_mismatch:mints"
+    if quote.in_amount != amount_atoms:
+        return "quote_mismatch:in_amount"
+    if quote.slippage_bps != slippage_bps:
+        return "quote_mismatch:slippage_bps"
+    floor_out = int(quote.out_amount) * (10_000 - slippage_bps) // 10_000
+    if quote.other_amount_threshold < floor_out:
+        return "quote_mismatch:other_amount_threshold"
+    return None
+
+
 def classify_quote_refusal(
-    quote: JupiterQuote, *, max_price_impact_pct: Decimal = MAX_PRICE_IMPACT_PCT
+    quote: JupiterQuote, *, max_price_impact: Decimal = MAX_PRICE_IMPACT_FRACTION
 ) -> str | None:
     if not quote.route_labels or quote.out_amount <= 0:
         return "route_empty"
-    if quote.price_impact_pct > max_price_impact_pct:
+    if quote.price_impact_pct > max_price_impact:
         return "price_impact_above_cap"
     return None
+
+
+def check_simulated_balances(
+    *,
+    usdc_before_atoms: int,
+    usdc_after_atoms: int,
+    usdc_in_atoms: int,
+    sol_before_lamports: int,
+    sol_after_lamports: int,
+    min_out_lamports: int,
+    fee_allowance_lamports: int = SIMULATION_SOL_FEE_ALLOWANCE_LAMPORTS,
+) -> str | None:
+    """T4.54b fix A (second half) — ``equity = cash + Σ positions`` applied
+    before the signature: the simulated post-state may spend at most the
+    requested USDC and must hand back at least the quote's minimum SOL, less
+    fees. This is what bounds an instruction the verifier could only decode
+    from the tail (``treasury_verify``): whatever the route plan says, the
+    chain's own dry run has to agree with the row that will be recorded."""
+    if usdc_after_atoms < usdc_before_atoms - usdc_in_atoms:
+        return "simulation_usdc_overspent"
+    if sol_after_lamports < sol_before_lamports + min_out_lamports - fee_allowance_lamports:
+        return "simulation_sol_short"
+    return None
+
+
+def classify_submitted(
+    status: Mapping[str, Any] | None, *, age_s: float, max_age_s: float = SUBMITTED_MAX_AGE_S
+) -> str:
+    """T4.54b fix C — what a ``getSignatureStatuses`` entry means for a
+    ``submitted`` row: ``confirmed`` (landed), ``failed`` (errored on chain,
+    or unseen past ``max_age_s``) or ``pending`` (keep counting it as spent,
+    look again next tick)."""
+    if status is None:
+        return "failed" if age_s > max_age_s else "pending"
+    if status.get("err") is not None:
+        return "failed"
+    if status.get("confirmationStatus") in ("confirmed", "finalized"):
+        return "confirmed"
+    return "pending"
 
 
 def should_attempt(
@@ -125,25 +220,3 @@ def should_attempt(
     if usdc_spent_today >= daily_cap:
         return "daily_cap_reached"
     return None
-
-
-def verify_swap_transaction(
-    message: VersionedMessage, *, wallet: str, allowed_programs: frozenset[str] | None = None
-) -> None:
-    """§9.1's discipline, as far as a versioned/ALT transaction allows it
-    (module docstring, ``jupiter/versioned_tx.py``): the wallet is the sole
-    signer and fee payer, and every instruction's program is on the
-    allowlist — one behind a lookup table is refused, never trusted."""
-    allowed = allowed_programs or TREASURY_ALLOWED_PROGRAMS
-    if message.num_required_signatures != 1:
-        raise TreasurySwapRefused("more_than_one_signer")
-    if not message.static_account_keys or message.static_account_keys[0] != wallet:
-        raise TreasurySwapRefused("fee_payer_not_wallet")
-    if message.recent_blockhash == _ZERO_BLOCKHASH_B58:
-        raise TreasurySwapRefused("blockhash_missing")
-    for instruction in message.instructions:
-        program_id = message.program_id(instruction.program_id_index)
-        if program_id is None:
-            raise TreasurySwapRefused("program_via_lookup_table")
-        if program_id not in allowed:
-            raise TreasurySwapRefused(f"program_not_allowed:{program_id}")

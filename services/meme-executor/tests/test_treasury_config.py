@@ -88,3 +88,13 @@ def test_the_flag_off_is_the_only_default_that_matters_at_boot() -> None:
     config, _, _ = _boot({"MEME_TREASURY_SOL_FLOOR": "0.99"})
     assert config.treasury_enabled is False
     assert config.treasury_sol_floor == Decimal("0.99"), "still parsed, just inert while off"
+
+
+def test_the_jupiter_base_url_defaults_to_the_keyless_lite_endpoint() -> None:
+    # T4.54b: quote-api.jup.ag/v6 no longer resolves (18/09/2026)
+    config, _, _ = _boot({})
+    assert config.treasury_jupiter_base_url == "https://lite-api.jup.ag/swap/v1"
+    config, _, _ = _boot({"MEME_TREASURY_JUPITER_BASE_URL": " https://api.jup.ag/swap/v1 "})
+    assert config.treasury_jupiter_base_url == "https://api.jup.ag/swap/v1"
+    config, _, _ = _boot({"MEME_TREASURY_JUPITER_BASE_URL": "   "})
+    assert config.treasury_jupiter_base_url == "https://lite-api.jup.ag/swap/v1"

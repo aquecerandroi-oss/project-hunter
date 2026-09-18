@@ -14,7 +14,11 @@ import httpx
 import pytest
 
 from hunter_exchanges.base import ExchangeUnavailable, MalformedMessage
-from hunter_exchanges.jupiter.client import JupiterClient, JupiterQuoteError
+from hunter_exchanges.jupiter.client import (
+    DEFAULT_JUPITER_BASE_URL,
+    JupiterClient,
+    JupiterQuoteError,
+)
 from hunter_exchanges.jupiter.models import WRAPPED_SOL_MINT
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "jupiter"
@@ -145,3 +149,39 @@ def test_swap_posts_the_whole_quote_response_back() -> None:
     assert result.swap_transaction_b64 == "AA=="
     assert result.last_valid_block_height == 12345
     assert result.prioritization_fee_lamports == 5000
+
+
+def test_the_default_base_url_is_the_live_keyless_endpoint() -> None:
+    # T4.54b (18/09/2026): quote-api.jup.ag/v6 no longer resolves; the same
+    # /quote and /swap live under lite-api.jup.ag/swap/v1 (keyless).
+    assert DEFAULT_JUPITER_BASE_URL == "https://lite-api.jup.ag/swap/v1"
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(200, json=_load("quote_usdc_to_sol_real.json"))
+
+    with _client(handler) as client:
+        client.quote(
+            input_mint=USDC_MINT, output_mint=WRAPPED_SOL_MINT, amount=1_000_000, slippage_bps=50
+        )
+    assert seen[0].startswith("https://lite-api.jup.ag/swap/v1/quote?")
+
+
+def test_quote_parses_the_real_capture_and_its_price_impact_is_a_fraction() -> None:
+    body = _load("quote_usdc_to_sol_real.json")
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=body)
+
+    with _client(handler) as client:
+        quote = client.quote(
+            input_mint=USDC_MINT, output_mint=WRAPPED_SOL_MINT, amount=1_000_000, slippage_bps=50
+        )
+    assert quote.in_amount == Decimal(1_000_000)
+    assert quote.out_amount == Decimal(9_487_602)
+    assert quote.other_amount_threshold == Decimal(9_440_164)
+    assert quote.slippage_bps == 50
+    assert quote.price_impact_pct == Decimal(0)  # a fraction: "0.0033" would mean 0.33 %
+    assert quote.route_labels == ("HumidiFi",)
+    assert quote.raw["swapMode"] == "ExactIn"

@@ -9,6 +9,7 @@ in place as the attempt advances — never a second row for the same attempt.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = [
+    "SubmittedSwap",
     "insert_refused",
     "insert_quoted",
     "last_attempt_at",
@@ -27,13 +29,18 @@ __all__ = [
     "mark_refused",
     "mark_simulated",
     "mark_submitted",
-    "usdc_confirmed_last_24h",
+    "submitted_swaps",
+    "usdc_committed_last_24h",
 ]
 
 _LAST_ATTEMPT = text("SELECT max(requested_at) FROM meme_treasury_swaps")
 _USDC_24H = text(
     "SELECT coalesce(sum(usdc_in), 0) FROM meme_treasury_swaps "
-    "WHERE status = 'confirmed' AND requested_at >= :since"
+    "WHERE status IN ('submitted', 'confirmed') AND requested_at >= :since"
+)
+_SUBMITTED = text(
+    "SELECT id, signature, requested_at, wallet_sol_before FROM meme_treasury_swaps "
+    "WHERE status = 'submitted' AND signature IS NOT NULL ORDER BY requested_at"
 )
 _INSERT = text(
     "INSERT INTO meme_treasury_swaps (id, reason, usdc_in, sol_out_quoted, sol_out_filled, "
@@ -61,9 +68,36 @@ async def last_attempt_at(session: AsyncSession) -> datetime | None:
     return await session.scalar(_LAST_ATTEMPT)
 
 
-async def usdc_confirmed_last_24h(session: AsyncSession, *, now: datetime) -> Decimal:
+async def usdc_committed_last_24h(session: AsyncSession, *, now: datetime) -> Decimal:
+    """T4.54b fix C — what the daily cap counts: every ``confirmed`` swap
+    **and every ``submitted`` one** (sent, not yet proven landed or dead). A
+    swap that lands after the confirm timeout still spent the USDC; until the
+    reconcile (``treasury_reconcile``) settles the row it counts as spent."""
     result = await session.scalar(_USDC_24H, {"since": now - timedelta(hours=24)})
     return Decimal(result or 0)
+
+
+@dataclass(frozen=True, slots=True)
+class SubmittedSwap:
+    id: uuid.UUID
+    signature: str
+    requested_at: datetime
+    wallet_sol_before: Decimal
+
+
+async def submitted_swaps(session: AsyncSession) -> list[SubmittedSwap]:
+    """Rows sent but never settled — a confirm timeout, or a crash between
+    ``sendTransaction`` and ``mark_*`` — for the reconcile to resolve."""
+    rows = (await session.execute(_SUBMITTED)).mappings().all()
+    return [
+        SubmittedSwap(
+            id=row["id"],
+            signature=str(row["signature"]),
+            requested_at=row["requested_at"],
+            wallet_sol_before=Decimal(row["wallet_sol_before"]),
+        )
+        for row in rows
+    ]
 
 
 async def insert_refused(
@@ -172,7 +206,8 @@ async def mark_confirmed(
 
 
 async def mark_failed(session: AsyncSession, swap_id: uuid.UUID) -> None:
-    """A submitted swap that never confirmed in time — evidence stays
-    ``submitted``'s signature; no ``refusal`` (the CHECK reserves that word for
+    """A send that raised, or a submitted swap the chain reports as errored
+    or expired unseen (``treasury_reconcile``) — the signature stays as
+    evidence; no ``refusal`` (the CHECK reserves that word for
     ``status = 'refused'``, a swap nothing was ever sent for)."""
     await session.execute(_UPDATE_STATUS, {"id": swap_id, "status": "failed"})

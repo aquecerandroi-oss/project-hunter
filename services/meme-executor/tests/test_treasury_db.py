@@ -58,7 +58,7 @@ async def test_last_attempt_at_and_24h_spend_start_empty(
 ) -> None:
     async with role_session(db_session_factory, db_role=WORKER_ROLE) as session:
         assert await treasury_db.last_attempt_at(session) is None
-        assert await treasury_db.usdc_confirmed_last_24h(session, now=utcnow()) == Decimal(0)
+        assert await treasury_db.usdc_committed_last_24h(session, now=utcnow()) == Decimal(0)
 
 
 @pytest.mark.asyncio
@@ -143,7 +143,7 @@ async def test_a_quoted_row_can_still_be_refused_before_anything_sends(
 
 
 @pytest.mark.asyncio
-async def test_usdc_confirmed_last_24h_counts_only_confirmed_and_only_the_window(
+async def test_usdc_committed_last_24h_counts_submitted_and_confirmed_in_the_window(
     db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
 ) -> None:
     now = utcnow()
@@ -187,12 +187,40 @@ async def test_usdc_confirmed_last_24h_counts_only_confirmed_and_only_the_window
             text("UPDATE meme_treasury_swaps SET requested_at = :ts WHERE id = :id"),
             {"ts": now - timedelta(hours=30), "id": old_confirmed},
         )
+        # T4.54b fix C: sent but not yet settled counts as spent until proven dead
+        submitted = await treasury_db.insert_quoted(
+            session,
+            reason="sol_below_floor",
+            usdc_in=Decimal("5"),
+            sol_out_quoted=Decimal("0.03"),
+            price_impact_pct=Decimal("0.001"),
+            slippage_bps=50,
+            wallet_sol_before=Decimal("0.2"),
+        )
+        await treasury_db.mark_submitted(session, submitted, signature="9" * 88)
+        failed = await treasury_db.insert_quoted(
+            session,
+            reason="sol_below_floor",
+            usdc_in=Decimal("7"),
+            sol_out_quoted=Decimal("0.04"),
+            price_impact_pct=Decimal("0.001"),
+            slippage_bps=50,
+            wallet_sol_before=Decimal("0.2"),
+        )
+        await treasury_db.mark_submitted(session, failed, signature="A" * 88)
+        await treasury_db.mark_failed(session, failed)
 
-        spent = await treasury_db.usdc_confirmed_last_24h(session, now=now)
-        assert spent == Decimal("12"), (
-            "the still-quoted row and the 30h-old confirmed row must not count"
+        spent = await treasury_db.usdc_committed_last_24h(session, now=now)
+        assert spent == Decimal("17"), (
+            "confirmed (12) + submitted (5); the still-quoted, the failed and the "
+            "30h-old confirmed rows must not count"
         )
         last = await treasury_db.last_attempt_at(session)
         assert last is not None
 
-    await _delete(db_engine, [recent, still_quoted, old_confirmed])
+        pending = await treasury_db.submitted_swaps(session)
+        assert [row.id for row in pending] == [submitted]
+        assert pending[0].signature == "9" * 88
+        assert pending[0].wallet_sol_before == Decimal("0.2")
+
+    await _delete(db_engine, [recent, still_quoted, old_confirmed, submitted, failed])
