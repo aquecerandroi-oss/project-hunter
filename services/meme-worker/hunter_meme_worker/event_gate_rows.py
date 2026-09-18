@@ -83,7 +83,17 @@ def build_event_row(
     )
     newest = state.newest_point
     snapshot = None
-    if newest is not None and reserves is not None and state.total_supply is not None:
+    # A drained or migrated curve reports zero virtual reserves (19 evaluate_failed
+    # per hour on 18/09/2026, ``virtual_sol_reserves must be positive``): that is
+    # not a curve to quote — leave the snapshot ``None`` so the gate refuses
+    # ``no_snapshot_for_quote`` instead of raising per notification.
+    if (
+        newest is not None
+        and reserves is not None
+        and state.total_supply is not None
+        and reserves.virtual_sol_reserves > 0
+        and reserves.virtual_token_reserves > 0
+    ):
         snapshot = Snapshot(
             mint=state.mint,
             observed_at=as_of,
