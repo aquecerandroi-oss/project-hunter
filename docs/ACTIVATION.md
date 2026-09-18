@@ -928,6 +928,32 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    `priority_fee` escolhido, o `max_slippage_bps` usado e, depois de liquidada, `resends`.
    `skipPreflight` continua desligado e `maxRetries: 0` continua — o reenvio é nosso, não do nó.
 
+9f. **Tamanho por convicção (T4.61b) — a flag é dele, padrão desligado.** Até 18/09 toda compra
+   real saía a `min(MEME_MAX_SOL_PER_TRADE, size_sol da proposta)`, fixo (0,28 SOL). Com
+   `MEME_CONVICTION_SIZING=on` o executor compra uma **fração desse teto** decidida pela evidência que
+   a admissão já tem (criador lido na cadeia ou só na fita, compradores únicos, tendência de holders,
+   concentração) e **recusa** `entry_after_drop` quando o SOL real da curva está ≥ 50 % abaixo do pico
+   dos últimos 60 s (KB-0118) e `conviction_too_low` quando o produto cai abaixo de 0,25 — nunca
+   acima do teto, nunca abaixo de `MEME_MIN_TRADE_SOL`. Desligada, o tamanho é o de hoje e a escada é
+   só **escrita** no `admission.conviction` de cada ordem (sombra), para ele ver o que ela faria antes
+   de ligar. Regra e evidência: `docs/RISK_ENGINE_MEME.md` § "Tamanho por convicção".
+
+   | Variável | Padrão | O que faz |
+   |---|---|---|
+   | `MEME_CONVICTION_SIZING` | `off` | `on` aplica a escada ao tamanho; qualquer outro valor é `off`. Publicado como `conviction_sizing` no `policy` do heartbeat |
+   | `MEME_CONVICTION_TAPE_ONLY_MULT` | `0.5` | multiplicador quando o `creator_verdict.decided_by` é só a fita (ou ninguém falou) |
+   | `MEME_CONVICTION_MIN_UNIQUE_BUYERS` / `MEME_CONVICTION_BUYERS_MULT` | `25` / `0.5` | limiar de `unique_buyers_60s` (EXP-M10) e o multiplicador abaixo dele ou sem leitura |
+   | `MEME_CONVICTION_HOLDERS_MULT` | `0.5` | `holders_rising` falso ou desconhecido |
+   | `MEME_CONVICTION_BUNDLED_MAX_PCT` / `MEME_CONVICTION_TOP10_MAX_PCT` / `MEME_CONVICTION_CONCENTRATION_MULT` | `0.10` / `0.20` / `0.5` | frações; acima de qualquer uma (ou sem leitura) aplica o multiplicador |
+   | `MEME_CONVICTION_DROP_PCT` / `MEME_CONVICTION_DROP_WINDOW_S` | `0.50` / `60` | queda do SOL real contra o máximo da janela que **recusa** `entry_after_drop` |
+   | `MEME_CONVICTION_PEAK_UNKNOWN_MULT` | `0.5` | sem foto da curva na janela: desconto, nunca passe nem recusa |
+   | `MEME_CONVICTION_FLOOR` | `0.25` | produto abaixo disto recusa `conviction_too_low` |
+   | `MEME_CONVICTION_EVIDENCE_MAX_AGE_S` | `120` | idade máxima da linha de 15 s usada para compradores/holders |
+
+   Multiplicadores em `(0, 1]`, frações em `(0, 1]`, inteiros com piso; valor ilegível ou fora da
+   faixa cai no padrão — nunca recusa o boot e nunca sobe o teto (o teto continua sendo
+   `MEME_MAX_SOL_PER_TRADE`, política de capital dele).
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca

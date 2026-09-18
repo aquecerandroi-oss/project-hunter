@@ -6,16 +6,17 @@ cheapness and of authority: an approval past its TTL is refused before any
 chain read (restart safety); the kill switch is re-read at the top of every
 step; a chain read that fails **defers** (nothing written, the approval keeps
 its TTL — §8.2 ``rpc_unreachable``); the engine's decision is written with every
-check whether it approved or not; and only an approved decision reaches the
-builder, whose bytes the submitter verifies and simulates before the key is
-touched. The submitter runs in a thread: it is synchronous by design (T4.8)
+check whether it approved or not; the conviction ladder (T4.61b,
+``conviction.py``) sizes the request the engine judges and may refuse on top of
+an approval (``entry_after_drop``, ``conviction_too_low``), never approve; and
+only an approved decision reaches the builder, whose bytes the submitter
+verifies and simulates before the key is touched. The submitter runs in a thread: it is synchronous by design (T4.8)
 and its journal writes block on this loop's own transactions (``journal_db``).
 """
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -31,7 +32,6 @@ from hunter_core.logging import get_logger
 from hunter_meme_executor.admission import (
     AdmissionInputs,
     admit,
-    creates_ata,
     curve_from,
     proposal_from,
     wallet_from,
@@ -39,8 +39,9 @@ from hunter_meme_executor.admission import (
 from hunter_meme_executor.admission_context import build_admission_context
 from hunter_meme_executor.auto_approve import auto_approve_once, reject_if_auto
 from hunter_meme_executor.build import BuiltTrade, FillRecord, decode_fills, fee_bps
-from hunter_meme_executor.chain import CurveRead, TokenAccountRead, WalletRead
+from hunter_meme_executor.chain import read_entry
 from hunter_meme_executor.context import ExecutorContext
+from hunter_meme_executor.conviction_read import apply_ladder, conviction_for
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.repo import (
     Candidate,
@@ -64,23 +65,6 @@ __all__ = ["entries_once", "handle_candidate"]
 
 logger = get_logger(__name__)
 LAMPORTS = Decimal(1_000_000_000)
-
-
-@dataclass(frozen=True, slots=True)
-class ChainReads:
-    curve: CurveRead
-    wallet: WalletRead
-    token_account: TokenAccountRead
-    creates_ata: bool
-
-
-def _read_chain(ctx: ExecutorContext, mint: str, pubkey: str) -> ChainReads | None:
-    curve = ctx.chain.curve(mint)
-    if curve is None:
-        return None
-    wallet = ctx.chain.wallet(pubkey)
-    account = ctx.chain.token_account(pubkey, mint, curve.token_program)
-    return ChainReads(curve, wallet, account, creates_ata(account))
 
 
 async def _refuse(
@@ -137,7 +121,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
         # T4.55: the priority fee is read alongside the curve (bounded, cached,
         # the floor on failure) so the admission's fee check sees the real price.
         reads, fee = await asyncio.gather(
-            asyncio.to_thread(_read_chain, ctx, candidate.mint, pubkey),
+            asyncio.to_thread(read_entry, ctx.chain, candidate.mint, pubkey),
             priority_fee_for(ctx, curve_fee_accounts(candidate.mint)),
         )
         global_account = await asyncio.to_thread(ctx.chain.global_account)
@@ -170,14 +154,21 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
         )
         return
     fees = fee_bps(global_account)
+    proposal = proposal_from(
+        candidate,
+        wallet_id=pubkey,
+        limits=cfg.limits,
+        priority_fee_sol=fee.fee_sol(cfg.compute_unit_limit),
+        requested_cap_sol=None if scope is None else scope.requested_cap_sol,
+    )
+    # T4.61b: the size is a fraction of the cap decided by the evidence above
+    # (``conviction.py``); the engine then sizes from that request, never above
+    # it. Off (the default) the ladder is only written, and the size is flat.
+    ladder = await conviction_for(
+        ctx, built, reads.curve, proposal=proposal, limits=cfg.limits, now=now
+    )
     inputs = AdmissionInputs(
-        proposal=proposal_from(
-            candidate,
-            wallet_id=pubkey,
-            limits=cfg.limits,
-            priority_fee_sol=fee.fee_sol(cfg.compute_unit_limit),
-            requested_cap_sol=None if scope is None else scope.requested_cap_sol,
-        ),
+        proposal=apply_ladder(proposal, ladder),
         wallet=wallet_from(
             wallet_id=pubkey,
             now=now,
@@ -199,10 +190,14 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
         await ctx.kill.latch("daily_loss_cap_reached")
     admission = decision.to_jsonable()
     admission.update(built.extras)  # T4.45: what this admission read for itself
+    admission["conviction"] = ladder.as_json()
     if scope is not None:
         admission["small_test"] = scope.as_json()
     if not decision.approved or decision.sizing is None:
         await _refuse(ctx, candidate, decision.first_refusal or "refused", admission)
+        return
+    if ladder.refusal is not None:  # the engine's checks are on record; the ladder says no
+        await _refuse(ctx, candidate, ladder.refusal, admission)
         return
     try:
         blockhash, last_valid = await asyncio.to_thread(ctx.chain.blockhash)
@@ -223,6 +218,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     intent = built.intent_json()
     intent["priority_fee"] = fee.as_json(cfg.compute_unit_limit)
     intent["sol_final"] = str(decision.sizing.sol_final)
+    intent["conviction"] = ladder.as_json()
     intent["max_sol_cost_sol"] = str(Decimal(built.intent.sol_limit) / LAMPORTS)
     key = order_key(candidate.id, side="buy")
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:

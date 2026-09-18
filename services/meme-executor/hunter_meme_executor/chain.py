@@ -33,7 +33,15 @@ from hunter_exchanges.pumpswap.decode import (
 )
 from hunter_exchanges.pumpswap.pdas import pool_address
 
-__all__ = ["ChainReader", "CurveRead", "PoolRead", "TokenAccountRead", "WalletRead"]
+__all__ = [
+    "ChainReader",
+    "CurveRead",
+    "EntryReads",
+    "PoolRead",
+    "TokenAccountRead",
+    "WalletRead",
+    "read_entry",
+]
 
 _GLOBAL_TTL_S = 60.0
 
@@ -187,3 +195,24 @@ class ChainReader:
             slot=snapshot.slot,
             observed_at=datetime.now(UTC),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class EntryReads:
+    """The three reads one admission needs, taken together in the submitter's thread."""
+
+    curve: CurveRead
+    wallet: WalletRead
+    token_account: TokenAccountRead
+    creates_ata: bool
+
+
+def read_entry(reader: ChainReader, mint: str, pubkey: str) -> EntryReads | None:
+    """``None`` when the curve does not exist (``curve_not_found``); the wallet and
+    the buyer's ATA are read only for a curve that does."""
+    curve = reader.curve(mint)
+    if curve is None:
+        return None
+    wallet = reader.wallet(pubkey)
+    account = reader.token_account(pubkey, mint, curve.token_program)
+    return EntryReads(curve, wallet, account, not account.exists)

@@ -33,6 +33,7 @@ from hunter_meme_executor.send_tuning import SendTuning
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from hunter_meme_executor.conviction import ConvictionConfig
     from hunter_meme_executor.kill_switch import DayAnchor
     from hunter_risk_meme import MemeLimits
 
@@ -136,7 +137,9 @@ def _pickup_lag_fields(ctx: ExecutorContext) -> dict[str, str]:
     }
 
 
-def policy_fields(limits: MemeLimits, send: SendTuning | None = None) -> dict[str, object]:
+def policy_fields(
+    limits: MemeLimits, send: SendTuning | None = None, conviction: ConvictionConfig | None = None
+) -> dict[str, object]:
     """The ``policy`` blob: the five the owner writes, the check-10 allowance,
     (T4.58) the curve-progress window this process admits with — published so the
     desk can see that its ``max_progress_pct`` gate cannot exceed it in practice —
@@ -157,6 +160,8 @@ def policy_fields(limits: MemeLimits, send: SendTuning | None = None) -> dict[st
         "curve_progress_min_pct": str(limits.curve_progress_min_pct),
         "curve_progress_max_pct": str(limits.curve_progress_max_pct),
         "buy_max_slippage_pct": str(buy_pct),
+        # T4.61b: whether the buy is sized by the conviction ladder or flat.
+        "conviction_sizing": "on" if conviction is not None and conviction.enabled else "off",
     }
 
 
@@ -191,7 +196,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
             if state.wallet_read_at is None
             else str((now - state.wallet_read_at).total_seconds())
         ),
-        "policy": json.dumps(policy_fields(limits, cfg.send)),
+        "policy": json.dumps(policy_fields(limits, cfg.send, cfg.conviction)),
         "orders_by_state": json.dumps(by_state),
         "positions_open": str(len(positions)),
         "blocked_exits": json.dumps(state.blocked_exits),

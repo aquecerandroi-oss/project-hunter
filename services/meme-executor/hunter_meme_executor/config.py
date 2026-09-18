@@ -47,6 +47,7 @@ from hunter_meme_executor.config_env import (
     positive_decimal,
     tolerance,
 )
+from hunter_meme_executor.conviction import ConvictionConfig
 from hunter_meme_executor.send_tuning import SendTuning
 from hunter_risk_meme import MEME_PAPER_V0, MemeLimits, MemePolicyMissing, limits_from_env
 
@@ -143,6 +144,9 @@ class ExecutorConfig:
     """T4.55 — priority-fee floor/cap, exit and panic slippage, re-send cadence
     (``send_tuning.py``). ``compute_unit_price_micro_lamports`` above is only the
     static fallback of a context without a fee reader."""
+    conviction: ConvictionConfig = ConvictionConfig()
+    """T4.61b — ``MEME_CONVICTION_SIZING`` (default off) and the ladder's numbers
+    (``conviction.py``): the buy as a fraction of the cap, never above it."""
 
     @property
     def base_limits(self) -> MemeLimits:
@@ -276,6 +280,7 @@ def boot(
         treasury_jupiter_base_url=(env.get("MEME_TREASURY_JUPITER_BASE_URL") or "").strip()
         or DEFAULT_JUPITER_BASE_URL,
         send=SendTuning.from_env(env),
+        conviction=ConvictionConfig.from_env(env),
     )
     return config, mode, signer
 
