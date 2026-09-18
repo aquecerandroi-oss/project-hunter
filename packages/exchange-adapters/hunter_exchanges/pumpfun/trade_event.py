@@ -33,10 +33,15 @@ from __future__ import annotations
 
 import base64
 import struct
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, cast
 
+from hunter_core.domain.types import utcnow
+from hunter_exchanges.pumpfun.curve import raw_lamports_to_sol, raw_subunits_to_tokens
+from hunter_exchanges.pumpfun.models import NormalizedCurveTrade
 from hunter_exchanges.pumpfun.solana_codec import b58decode, b58encode
 
 __all__ = [
@@ -46,6 +51,8 @@ __all__ = [
     "TRADE_EVENT_DISCRIMINATOR",
     "TradeEvent",
     "decode_trade_event",
+    "normalized_curve_trade",
+    "trade_events_from_logs",
     "trade_events_from_transaction",
 ]
 
@@ -278,3 +285,62 @@ def trade_events_from_transaction(
     if _obj(transaction.get("meta")).get("err") is not None:
         return ()
     return tuple(decode_trade_event(raw) for raw in _event_payloads(transaction, program_id))
+
+
+def trade_events_from_logs(lines: Sequence[str]) -> tuple[TradeEvent, ...]:
+    """Every ``TradeEvent`` in one sequence of log lines (T4.52b-1) — typically
+    a Solana RPC ``logsSubscribe`` notification's ``value.logs``.
+
+    Unlike :func:`trade_events_from_transaction`'s logs-only fallback, this
+    does **not** filter by ``program_id``: the caller already scoped the
+    subscription to one mint's bonding-curve PDA via ``mentions``, so any
+    ``TradeEvent``-shaped ``Program data:`` line here is that curve's. A line
+    that fails to decode (truncated, wrong discriminator, unknown trailing
+    length) is skipped, never raised — a notification with zero trade events
+    (a non-trade instruction on the same PDA) is a normal, empty result.
+    """
+    events: list[TradeEvent] = []
+    for line in lines:
+        if not line.startswith(_LOG_PREFIX):
+            continue
+        try:
+            data = base64.b64decode(line[len(_LOG_PREFIX) :], validate=True)
+        except ValueError:
+            continue
+        if data[:8] != TRADE_EVENT_DISCRIMINATOR:
+            continue
+        try:
+            events.append(decode_trade_event(data))
+        except ValueError:
+            continue
+    return tuple(events)
+
+
+def normalized_curve_trade(
+    event: TradeEvent, *, slot: int, signature: str, received_at: datetime | None = None
+) -> NormalizedCurveTrade:
+    """``TradeEvent`` + the envelope fields it doesn't carry itself (``slot``,
+    ``signature`` — both live on the ``logsSubscribe`` notification, not the
+    event body) -> :class:`NormalizedCurveTrade`. Reserves are converted to
+    human units at this boundary, like every other model in ``models.py``;
+    ``lamports`` is kept raw on purpose (see the model's own docstring).
+    """
+    now = received_at or utcnow()
+    block_time = datetime.fromtimestamp(event.timestamp, tz=UTC) if event.timestamp > 0 else None
+    return NormalizedCurveTrade(
+        mint=event.mint,
+        slot=slot,
+        signature=signature,
+        trader=event.user,
+        side="buy" if event.is_buy else "sell",
+        lamports=Decimal(event.sol_amount),
+        virtual_sol_reserves=raw_lamports_to_sol(event.virtual_sol_reserves),
+        virtual_token_reserves=raw_subunits_to_tokens(event.virtual_token_reserves),
+        real_sol_reserves=raw_lamports_to_sol(event.real_sol_reserves),
+        real_token_reserves=raw_subunits_to_tokens(event.real_token_reserves),
+        creator=event.creator,
+        mayhem=event.mayhem_mode,
+        block_time=block_time,
+        received_at=now,
+        observed_at=now,
+    )

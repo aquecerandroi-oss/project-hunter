@@ -225,6 +225,49 @@ class NormalizedMemeTrade(_ReceivedAtMixin):
         return ensure_utc(v)
 
 
+class NormalizedCurveTrade(_ReceivedAtMixin):
+    """A bonding-curve fill as the Solana RPC WebSocket reports it (T4.52b-1,
+    ``rpc_ws.py`` + ``trade_event.py``'s ``normalized_curve_trade``): the exact
+    on-chain ``TradeEvent`` the pump program emits, dated by the subscription
+    envelope's ``slot``/``signature`` — never PumpPortal's paid trade channel
+    (out of scope, see :class:`NormalizedMemeTrade`'s docstring) and never a
+    REST poll's after-the-fact reconstruction. This is the shape T4.52b-2's
+    in-memory event state is built from.
+    """
+
+    kind: Literal["meme_curve_trade"] = "meme_curve_trade"
+    mint: str
+    slot: int
+    signature: str
+    trader: str
+    """``TradeEvent.user`` — the wallet that submitted the trade instruction."""
+    side: Literal["buy", "sell"]
+    lamports: Decimal
+    """``TradeEvent.sol_amount`` untouched, in raw lamports — an audit trail
+    against the event bytes, unlike every reserve field below, which *is*
+    converted to human units at this boundary like the rest of this module."""
+    virtual_sol_reserves: Decimal
+    virtual_token_reserves: Decimal
+    real_sol_reserves: Decimal
+    real_token_reserves: Decimal
+    """Post-trade reserves — the state the curve is in immediately after this
+    fill, not before it."""
+    creator: str
+    mayhem: bool
+    block_time: datetime | None
+    """``TradeEvent.timestamp`` (the program's own clock read at emit time),
+    converted to a UTC datetime — never ``None`` in practice since every
+    ``TradeEvent`` carries it, but optional here because a caller building
+    this model from a source that lacks the field (none exists yet) should
+    not have to invent one."""
+    source: str = "solana_rpc_ws"
+
+    @field_validator("block_time", mode="after")
+    @classmethod
+    def _block_time_is_utc(cls, v: datetime | None) -> datetime | None:
+        return None if v is None else ensure_utc(v)
+
+
 class NormalizedMayhemOverview(_ReceivedAtMixin):
     """Opaque upstream overview, explicitly labelled until its schema is stable."""
 
@@ -262,6 +305,7 @@ class NormalizedSolPrice(_ReceivedAtMixin):
 
 __all__ = [
     "NormalizedCurveState",
+    "NormalizedCurveTrade",
     "NormalizedMemeMigration",
     "NormalizedMemeTokenCreated",
     "NormalizedMemeTrade",
