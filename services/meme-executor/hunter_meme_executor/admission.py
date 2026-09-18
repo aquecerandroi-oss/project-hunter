@@ -245,7 +245,11 @@ def wallet_from(
     anchor: DayAnchor,
     limits: MemeLimits,
     unrecognized: tuple[str, ...] = (),
+    treasury_inflow_today_sol: Decimal = _ZERO,
 ) -> MemeWalletState:
+    """T4.60: ``treasury_inflow_today_sol`` is what the treasury added since
+    ``anchor.day_start_utc`` (``treasury_inflow.py``) — check 18 measures the
+    day's loss against ``day_start + inflow``, not against the refilled equity."""
     return MemeWalletState(
         wallet_id=wallet_id,
         as_of=now,
@@ -272,6 +276,7 @@ def wallet_from(
         marks_complete=all(p.mark_sol is not None for p in positions),
         is_active=True,
         rent_reserved_sol=limits.ata_rent_sol,
+        treasury_inflow_today_sol=treasury_inflow_today_sol,
     )
 
 

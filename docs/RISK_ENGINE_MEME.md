@@ -125,7 +125,7 @@ de entrada não pode impedir saída** (regra 3 da diretiva).
 | `MemeEntryProposal` | `proposal_id, wallet_id, agent_id?, mint, program, quote, action="buy", requested_sol` (teto, nunca meta), `max_slippage_pct, priority_fee_sol, jito_tip_sol, exit_plan, signal_valid, agent_enabled, mode` (`paper` \| `live`) |
 | `CurveState` | `mint, virtual_sol_reserves, virtual_token_reserves, real_sol_reserves, real_token_reserves, total_supply, complete, creator, is_mayhem_mode, slot, commitment, observed_at, source` |
 | `MemeContext` | `token_age_s` (com a procedência de `created_at`), `curve_progress_pct, organic_last_minute_sol_volume, volume_window_complete, unique_buyers_1m?, bundled_share_pct?, top10_share_pct?, holder_denominator_valid, creator_net_sol?, mayhem_agent_share?, rug_signals[], participation_used_sol` — **um carimbo por campo** |
-| `MemeWalletState` | `wallet_id, as_of, sol_balance, unrecognized_holdings, positions[], pending_intents[], day_start_sol_equity, peak_sol_equity, day_start_utc` (validado contra o dia de São Paulo), `daily_realized_loss_sol, marks_complete, is_active`; deriva `equity_sol, exposure_for_mint(), available_sol, slots_used, daily_loss_sol, drawdown_pct` — **sempre calculados aqui**, nunca recebidos prontos |
+| `MemeWalletState` | `wallet_id, as_of, sol_balance, unrecognized_holdings, positions[], pending_intents[], day_start_sol_equity, peak_sol_equity, day_start_utc` (validado contra o dia de São Paulo), `treasury_inflow_today_sol` (T4.60, §7 e §16.3: o SOL que a tesouraria **pôs** na carteira desde `day_start_utc`), `daily_realized_loss_sol, marks_complete, is_active`; deriva `equity_sol, exposure_for_mint(), available_sol, slots_used, daily_loss_sol, drawdown_pct` — **sempre calculados aqui**, nunca recebidos prontos |
 | `MemeLimits` | o perfil da §3 |
 | `MemeKillSwitchInputs` | `system, organization, wallet` → efetivo = o mais restritivo (§7) |
 
@@ -371,7 +371,7 @@ Todos os checks avaliáveis são registrados em `decision.checks[]` como
 | 15 | `duplicate_position` | já existe posição ou pendência neste mint | `duplicate_position` |
 | 16 | `concurrent_positions` | abertas + pendentes ≥ `max_open_positions` | `max_open_positions` |
 | 17 | `wallet_cap` | saldo > `MEME_WALLET_MAX_SOL`; holdings não reconhecidos | `wallet_over_max_sol`, `wallet_unrecognized_holdings` |
-| 18 | `daily_loss` | perda do dia ≥ `MEME_DAILY_LOSS_CAP_SOL` (**também aciona** a trava, §7) | `daily_loss_cap_reached` |
+| 18 | `daily_loss` | perda do dia ≥ `MEME_DAILY_LOSS_CAP_SOL` (**também aciona** a trava, §7); a perda é `equity_inicio_do_dia + entrada_da_tesouraria_hoje − equity` (T4.60, §16.3) | `daily_loss_cap_reached` |
 | 19 | `slippage_cap` | `max_slippage_pct` pedido > teto do perfil | `slippage_above_cap` |
 | 20 | `fee_caps` | priority fee > teto absoluto ou > fração da compra; tip > teto | `priority_fee_above_cap`, `jito_tip_above_cap` |
 | 21 | `participation` | tamanho > fração do volume orgânico do minuto; janela incompleta; volume só do feed pago ausente | `participation_above_cap`, `volume_window_incomplete`, `volume_unavailable` |
@@ -633,9 +633,39 @@ o câmbio do SOL entrando na decisão bloquearia a carteira por um movimento de 
 nosso. Dia de negociação em `America/Sao_Paulo`, como no SPOT.
 
 ```
-perda_do_dia_sol = max(0, equity_sol_inicio_do_dia − equity_sol)
+perda_do_dia_sol = max(0, equity_sol_inicio_do_dia + entrada_da_tesouraria_hoje_sol − equity_sol)
 drawdown_pct     = max(0, 1 − equity_sol / peak_equity_sol)
 ```
+
+**A perda do dia exclui o que a tesouraria pôs na carteira (T4.60, 18/09/2026).** Até a T4.59 a
+fórmula era `equity_inicio_do_dia − equity`, e ela ficou **cega** no dia em que a tesouraria (§16)
+entrou em operação: a posição YOU perdeu 0,0395 SOL (comprou 0,0516, vendeu 0,0121, saída pelo
+trailing, −0,77 R); às 13:12:06 BRT a tesouraria trocou 5,75 USDC → 0,0516 SOL porque a carteira
+caíra abaixo do piso; o heartbeat seguinte publicou `daily_loss_sol = 0` (`equity_sol 0,732 >
+day_start_sol_equity 0,686`). Um *top-up* de USDC repõe exatamente o que uma aposta ruim perdeu, e
+com a tesouraria ligada o teto `MEME_DAILY_LOSS_CAP_SOL` nunca dispararia. A regra agora:
+
+- `entrada_da_tesouraria_hoje_sol` = Σ `sol_out_filled` das linhas de `meme_treasury_swaps` com
+  `status ∈ {submitted, confirmed}` e `requested_at ≥ day_start_utc` (para uma linha ainda
+  `submitted`, sem `sol_out_filled`, conta o `sol_out_quoted` — superestimar a entrada superestima a
+  perda, que é o lado fechado). É um **insumo** de `MemeWalletState` (`treasury_inflow_today_sol`),
+  lido pelo executor (`treasury_inflow.py`): **um** SELECT limitado por tique do kill switch
+  (10 s), depois do `treasury_once` do mesmo tique (uma troca que acabou de pousar entra na conta na
+  hora), com cache de 10 s e releitura imediata na virada do dia de São Paulo.
+- **Leitura falha ⇒ o último valor conhecido, nunca zero** — zero é exatamente o número que
+  escondeu a perda. Antes da primeira leitura bem-sucedida o valor é desconhecido: a admissão recusa
+  por nome (`day_anchor_unavailable`, com `treasury_inflow_error` no `admission`) e o heartbeat
+  publica `daily_loss_sol` vazio, não `0`.
+- **A âncora do dia é líquida da entrada já registrada.** `day_start_sol_equity` é escrita na
+  primeira admissão do dia, que pode vir horas depois de um *top-up* (troca às 00:05, candidata às
+  09:00). Ancorar o equity bruto contaria a troca duas vezes — dentro da âncora e como entrada do
+  dia — e publicaria uma perda que a mesa nunca teve; por isso a âncora é `equity_agora −
+  entrada_hoje` (piso zero), o capital com que o dia **começou**. Sem a entrada legível, nenhuma
+  âncora é escrita e a âncora de ontem **nunca** serve para o dia de hoje.
+- O heartbeat `hb:meme:executor` publica `treasury_inflow_today_sol`, `treasury_inflow_read_at`,
+  `treasury_inflow_read_failures` e `treasury_inflow_error` ao lado de `daily_loss_sol`.
+- O `peak_sol_equity` (drawdown) **continua** bruto: um *top-up* sobe o pico. O drawdown não é
+  check de admissão nem gatilho do kill switch hoje; fica registrado como residual da T4.60.
 
 | Estado | Entradas | Saídas | Aciona |
 |---|---|---|---|
@@ -1443,3 +1473,16 @@ ou procurada. A prova mínima antes de ligar a flag é a §6 da revisão
 (`.claude/state/review-T4.54.md`): simular a transação real sem assinar e conferir que o USDC cai
 exatamente o pedido e o SOL sobe ≥ `otherAmountThreshold`; depois uma primeira troca de ~1 USDC com
 tetos de 1 USDC/dia.
+
+### 16.3 A tesouraria e o freio de perda diária (T4.60)
+
+Uma troca USDC → SOL **não é lucro**: é capital que muda de moeda dentro da mesma carteira. Mas o
+freio da §7 media a perda do dia pelo equity em SOL, e o equity em SOL sobe com cada troca — a
+tesouraria, ligada em 18/09/2026, apagou a perda da YOU (0,0395 SOL) no mesmo minuto em que a
+repôs (0,0516 SOL). A correção está na §7: a perda do dia é `equity_inicio_do_dia +
+entrada_da_tesouraria_hoje − equity`, a entrada vem desta tabela (`submitted` + `confirmed`,
+desde a meia-noite de São Paulo), a leitura é uma por tique com cache de 10 s, falha mantém o
+último valor (nunca zero), e a âncora do dia desconta o que já entrou. Consequência prática: com
+`MEME_DAILY_LOSS_CAP_SOL = 0,15`, três *top-ups* de 0,0516 SOL (0,1548 SOL) que reponham 0,15 SOL
+de perda **travam** a carteira (`daily_loss = 0,15`), embora o saldo pareça 0,0048 SOL acima do
+início do dia. O USDC continua sendo capital de gás, e o teto continua sendo do dono.

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from hunter_exchanges.jupiter import JupiterClient
 from hunter_meme_executor.creator_flow import CreatorSoldMemory
+from hunter_meme_executor.treasury_inflow import TreasuryInflowReader
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -157,3 +158,8 @@ class ExecutorContext:
     """T4.55: the bounded ``getRecentPrioritizationFees`` reader every send
     prices itself with (``send_path.priority_fee_for``). ``None`` keeps the
     configured static ``compute_unit_price_micro_lamports`` (tests)."""
+    treasury_inflow: TreasuryInflowReader = field(default_factory=TreasuryInflowReader)
+    """T4.60: the SOL the treasury put into the wallet since the Sao Paulo day
+    start (``meme_treasury_swaps``), cached 10 s, the last known value on a
+    failed read — the input that keeps the daily-loss brake from being refilled
+    by USDC top-ups (``daily_loss = day_start + inflow - equity``)."""

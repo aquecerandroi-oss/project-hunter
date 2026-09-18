@@ -33,9 +33,16 @@ from hunter_meme_executor.send_tuning import SendTuning
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from hunter_meme_executor.kill_switch import DayAnchor
     from hunter_risk_meme import MemeLimits
 
-__all__ = ["gates_fields", "heartbeat_fields", "heartbeat_once", "policy_fields"]
+__all__ = [
+    "daily_loss_fields",
+    "gates_fields",
+    "heartbeat_fields",
+    "heartbeat_once",
+    "policy_fields",
+]
 
 logger = get_logger(__name__)
 LAMPORTS = Decimal(1_000_000_000)
@@ -213,13 +220,9 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         "last_exits_tick_at": ""
         if state.last_exits_tick_at is None
         else state.last_exits_tick_at.isoformat(),
-        "day_start_utc": "" if anchor is None else anchor.day_start_utc.isoformat(),
-        "day_start_sol_equity": "" if anchor is None else str(anchor.day_start_sol_equity),
-        "equity_sol": "" if equity is None else str(equity),
-        "daily_loss_sol": ""
-        if anchor is None or equity is None
-        else str(max(Decimal(0), anchor.day_start_sol_equity - equity)),
     }
+    fields.update(daily_loss_fields(anchor, equity, ctx.treasury_inflow.inflow_sol))
+    fields.update(ctx.treasury_inflow.describe())
     fields.update(gates_fields(ctx))
     fields.update(auto)
     fields.update(ctx.kill.describe())
@@ -227,6 +230,26 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     fields["treasury"] = _treasury_field(ctx)
     fields.update(_send_fields(ctx))
     return fields
+
+
+def daily_loss_fields(
+    anchor: DayAnchor | None, equity: Decimal | None, inflow: Decimal | None
+) -> dict[str, str]:
+    """T4.60 — ``daily_loss_sol = day_start + treasury_inflow_today − equity``,
+    the same arithmetic as ``MemeWalletState.daily_loss_sol``. YOU (18/09/2026):
+    day start 0.686, loss 0.0395, a 0.0516 top-up at 13:12:06 — the old
+    ``day_start − equity`` published ``0``; this publishes ``0.0395``. An
+    inflow never read yet is published as unknown (empty), never as zero."""
+    loss = ""
+    if anchor is not None and equity is not None and inflow is not None:
+        loss = str(max(Decimal(0), anchor.day_start_sol_equity + inflow - equity))
+    return {
+        "day_start_utc": "" if anchor is None else anchor.day_start_utc.isoformat(),
+        "day_start_sol_equity": "" if anchor is None else str(anchor.day_start_sol_equity),
+        "equity_sol": "" if equity is None else str(equity),
+        "treasury_inflow_today_sol": "" if inflow is None else str(inflow),
+        "daily_loss_sol": loss,
+    }
 
 
 def _send_fields(ctx: ExecutorContext) -> dict[str, str]:

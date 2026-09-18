@@ -153,6 +153,14 @@ class MemeWalletState(MemeModel):
     marks_complete: bool = True
     is_active: bool = True
     rent_reserved_sol: Decimal = Field(ge=0, default=_ZERO)
+    treasury_inflow_today_sol: Decimal = Field(ge=0, default=_ZERO)
+    """SOL the treasury (USDC → SOL, §16) put **into** the wallet since
+    ``day_start_utc`` — an input the caller reads from ``meme_treasury_swaps``
+    (``submitted`` + ``confirmed``, since the day start). T4.60: without it the
+    daily loss is ``day_start − equity`` and a top-up refills what a bad trade
+    lost, so the cap never trips (YOU, 18/09/2026: −0.0395 SOL, +0.0516 SOL
+    of USDC, ``daily_loss_sol = 0``). A caller that cannot read it must hand in
+    the **last** value it knew, never zero (§7)."""
 
     @model_validator(mode="after")
     def _anchored_to_the_sao_paulo_day(self) -> MemeWalletState:
@@ -203,7 +211,12 @@ class MemeWalletState(MemeModel):
 
     @property
     def daily_loss_sol(self) -> Decimal:
-        return max(_ZERO, self.day_start_sol_equity - self.equity_sol)
+        """``day_start + treasury inflow − equity``, floored at zero: what the
+        day's trades cost, with the capital the treasury *added* taken out of
+        the equity it is compared against (§7, T4.60)."""
+        return max(
+            _ZERO, self.day_start_sol_equity + self.treasury_inflow_today_sol - self.equity_sol
+        )
 
     @property
     def drawdown_pct(self) -> Decimal:

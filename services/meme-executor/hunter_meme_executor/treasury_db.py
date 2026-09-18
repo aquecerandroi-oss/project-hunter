@@ -29,6 +29,7 @@ __all__ = [
     "mark_refused",
     "mark_simulated",
     "mark_submitted",
+    "sol_inflow_since",
     "submitted_swaps",
     "usdc_committed_last_24h",
 ]
@@ -36,6 +37,11 @@ __all__ = [
 _LAST_ATTEMPT = text("SELECT max(requested_at) FROM meme_treasury_swaps")
 _USDC_24H = text(
     "SELECT coalesce(sum(usdc_in), 0) FROM meme_treasury_swaps "
+    "WHERE status IN ('submitted', 'confirmed') AND requested_at >= :since"
+)
+_SOL_INFLOW = text(
+    "SELECT coalesce(sum(coalesce(sol_out_filled, sol_out_quoted)), 0) "
+    "FROM meme_treasury_swaps "
     "WHERE status IN ('submitted', 'confirmed') AND requested_at >= :since"
 )
 _SUBMITTED = text(
@@ -74,6 +80,17 @@ async def usdc_committed_last_24h(session: AsyncSession, *, now: datetime) -> De
     swap that lands after the confirm timeout still spent the USDC; until the
     reconcile (``treasury_reconcile``) settles the row it counts as spent."""
     result = await session.scalar(_USDC_24H, {"since": now - timedelta(hours=24)})
+    return Decimal(result or 0)
+
+
+async def sol_inflow_since(session: AsyncSession, *, since: datetime) -> Decimal:
+    """T4.60 — the SOL the treasury put **into** the wallet since ``since`` (the
+    Sao Paulo day start), for the daily-loss brake: every ``confirmed`` swap by
+    what it filled, and every ``submitted`` one by what it **quoted** (a swap
+    sent and not yet settled has no ``sol_out_filled``; counting the quote
+    overstates the inflow, which overstates the loss — the closed side).
+    One bounded read on ``ix_meme_treasury_swaps_requested_at``."""
+    result = await session.scalar(_SOL_INFLOW, {"since": since})
     return Decimal(result or 0)
 
 

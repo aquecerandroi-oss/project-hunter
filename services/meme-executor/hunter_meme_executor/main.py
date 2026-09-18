@@ -59,6 +59,7 @@ from hunter_meme_executor.program_check import check_program_at_boot, program_ch
 from hunter_meme_executor.repo import unconfirmed_orders
 from hunter_meme_executor.send_path import record_failed_onchain_fee
 from hunter_meme_executor.treasury import treasury_once
+from hunter_meme_executor.treasury_inflow import treasury_inflow_once
 from hunter_meme_executor.wake import ProposalWakeListener
 from hunter_meme_executor.wallet_refresh import wallet_refresh_once
 
@@ -142,6 +143,10 @@ async def kill_switch_once(ctx: ExecutorContext) -> None:
     # T4.54: the treasury top-up (USDC -> SOL) also rides this tick, after the
     # wallet balance it depends on has just been refreshed above.
     await treasury_once(ctx)
+    # T4.60: what the treasury added today, read after the top-up so a swap that
+    # just landed is in the daily-loss brake on this same tick (never raises:
+    # a failed read keeps the last known inflow).
+    await treasury_inflow_once(ctx, now=utcnow())
 
 
 def build_context(

@@ -33,7 +33,6 @@ from hunter_meme_executor.admission import (
     admit,
     creates_ata,
     curve_from,
-    day_start_utc,
     proposal_from,
     wallet_from,
 )
@@ -59,6 +58,7 @@ from hunter_meme_executor.send_path import (
     record_send_result,
     submit_policy,
 )
+from hunter_meme_executor.treasury_inflow import ensure_anchor
 
 __all__ = ["entries_once", "handle_candidate"]
 
@@ -106,16 +106,6 @@ async def _refuse(
     logger.warning(
         "meme_live_entry_refused", proposal_id=candidate.id, mint=candidate.mint, reason=reason
     )
-
-
-async def _ensure_anchor(ctx: ExecutorContext, now: datetime, equity: Decimal) -> None:
-    """Persist today's São Paulo midnight equity once; raise the peak when it grows."""
-    start = day_start_utc(now)
-    anchor = ctx.kill.anchor
-    if anchor is None or anchor.day_start_utc != start:
-        await ctx.kill.anchor_day(start, equity)
-        return
-    await ctx.kill.raise_peak(equity)
 
 
 async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: datetime) -> None:
@@ -170,10 +160,14 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     built = await build_admission_context(ctx, candidate.mint, reads.curve, now=now)
     positions, pending = built.positions, built.pending
     marks = sum((p.mark_sol or Decimal(0) for p in positions), Decimal(0))
-    await _ensure_anchor(ctx, now, Decimal(reads.wallet.lamports) / LAMPORTS + marks)
-    anchor = ctx.kill.anchor
-    if anchor is None:
-        await _refuse(ctx, candidate, "day_anchor_unavailable", {})
+    # T4.60: the anchor is net of today's treasury inflow, and the inflow is an
+    # input of check 18 — neither is guessed when Postgres cannot answer.
+    anchor = await ensure_anchor(ctx, now, Decimal(reads.wallet.lamports) / LAMPORTS + marks)
+    inflow = ctx.treasury_inflow.inflow_sol
+    if anchor is None or inflow is None:
+        await _refuse(
+            ctx, candidate, "day_anchor_unavailable", dict(ctx.treasury_inflow.describe())
+        )
         return
     fees = fee_bps(global_account)
     inputs = AdmissionInputs(
@@ -192,6 +186,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             pending=pending,
             anchor=anchor,
             limits=cfg.limits,
+            treasury_inflow_today_sol=inflow,
         ),
         curve=curve_from(reads.curve),
         context=built.context,
