@@ -171,6 +171,61 @@ def _meme_activity_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("meme_activity"), name))
 
 
+def _meme_events_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0041_meme_social``'s lists in ``ddl/meme_events.py`` (T4.26).
+
+    It adds no class: ``meme_events`` is read-only for ``hunter_app`` — the desk
+    reads the announcement, it does not record one — and ``SELECT``/``INSERT``/
+    ``UPDATE`` for ``hunter_worker``, the matching job that stamps ``mint``,
+    ``matched_at`` and (since ``0043``) ``last_scanned_created_at`` on a row it
+    appended. Neither role may ``DELETE``. The shape itself is asserted in
+    ``test_migrations.py::test_0041_creates_meme_events_with_its_grants_and_fk``;
+    what this file needs from it is the classification (§52.2).
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_events"), name))
+
+
+def _meme_event_matches_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0043_meme_events_scan_cursor``'s lists in
+    ``ddl/meme_event_matches.py`` (T4.26b).
+
+    It adds no class: the ``market_breadth`` shape one more time — read-only for
+    ``hunter_app``, append-only for ``hunter_worker``. "Matched once stays
+    matched" (§52.3) is that missing ``UPDATE``, not a promise about the writer.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_event_matches"), name))
+
+
+def _meme_gate_refusal_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0046``'s list in ``ddl/meme_gate_refusals.py`` (T4.35).
+
+    It adds no ``hunter_app`` class: ``meme_gate_refusals_by_mint`` is read-only
+    for the API ("why not coin X" is a query away, §54.2). The engine side is the
+    ``meme_tokens`` shape rather than the append-only one — the fast lane prunes
+    its own 7-day trail row by row, so ``hunter_worker`` carries ``DELETE`` here;
+    that half is asserted in ``test_migration_0046.py``.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_gate_refusals"), name))
+
+
+def _meme_rule_set_history_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0046``'s list in ``ddl/meme_rule_set_history.py`` (T4.35).
+
+    It adds a class this file had never needed: **owner-only**, no grant to
+    either role. ``meme_rule_set_param_history`` is written by
+    ``infra/scripts/meme_rule_set.py --set-param --apply`` in the same
+    transaction as the ``UPDATE`` on ``meme_rule_sets.params`` it describes, over
+    the owner connection, and read back by ``--history``; no running service
+    touches it, so neither role is given a way to (§54.1).
+
+    Counting it here is the honest move and not a loophole: the coverage test
+    below asks only "is every table classified", and
+    :func:`test_the_owner_only_param_history_is_reachable_by_neither_role` is
+    what makes this particular answer mean something.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_rule_set_history"), name))
+
+
 def _meme_lab_tick_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0031_meme_lab_ticks``'s lists in ``ddl/meme_lab_ticks.py`` (T4.15).
 
@@ -475,6 +530,20 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     meme_lab_ticks_read_only = _meme_lab_tick_tables("MEME_LAB_TICKS_APP_READ_ONLY_TABLES")
     meme_gate_read_only = _meme_gate_tables("MEME_GATE_APP_READ_ONLY_TABLES")
     meme_activity_read_only = _meme_activity_tables("MEME_ACTIVITY_APP_READ_ONLY_TABLES")
+    meme_events_read_only = _meme_events_tables("MEME_EVENTS_APP_READ_ONLY_TABLES")
+    meme_event_matches_read_only = _meme_event_matches_tables(
+        "MEME_EVENT_MATCHES_APP_READ_ONLY_TABLES"
+    )
+    meme_gate_refusals_read_only = _meme_gate_refusal_tables(
+        "MEME_GATE_REFUSALS_APP_READ_ONLY_TABLES"
+    )
+    # 0046's second table is in no ``hunter_app`` class at all — the operator's
+    # CLI owns it end to end (§54.1). It is listed so the union below can stay a
+    # statement about *every* table; the test right after this one is what says
+    # "owner-only" out loud, so an ungranted table can never hide in here.
+    meme_rule_set_history_owner_only = _meme_rule_set_history_tables(
+        "MEME_RULE_SET_HISTORY_OWNER_ONLY_TABLES"
+    )
 
     classified = (
         list(write)
@@ -502,6 +571,10 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(meme_lab_ticks_read_only)
         + list(meme_gate_read_only)
         + list(meme_activity_read_only)
+        + list(meme_events_read_only)
+        + list(meme_event_matches_read_only)
+        + list(meme_gate_refusals_read_only)
+        + list(meme_rule_set_history_owner_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
@@ -515,6 +588,40 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         )
         actual = {row[0] for row in result}
     assert set(classified) == actual
+
+
+async def test_the_owner_only_param_history_is_reachable_by_neither_role(
+    schema_engine: AsyncEngine,
+) -> None:
+    """What the owner-only class costs to claim (T4.53).
+
+    ``meme_rule_set_param_history`` is counted as classified by the test above
+    while holding no grant at all, which is only honest if "no grant at all" is
+    itself asserted — otherwise the coverage test would read a table somebody
+    forgot to grant exactly like a table deliberately left to the operator's CLI
+    (``replay_runs``' argument about a policy nobody wrote, §54.1).
+
+    ``hunter_runtime`` is included because it is the login every container
+    actually uses (§27.1): with ``NOINHERIT`` it holds nothing of its own, and
+    ``SET ROLE`` into either application role leads nowhere here either.
+    """
+    tables = _meme_rule_set_history_tables("MEME_RULE_SET_HISTORY_OWNER_ONLY_TABLES")
+    assert tables, "the owner-only list is empty"
+
+    async with schema_engine.connect() as connection:
+        held = {
+            f"{role}:{table}": {
+                privilege
+                for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+                if await connection.scalar(
+                    text("SELECT has_table_privilege(:r, :t, :p)"),
+                    {"r": role, "t": table, "p": privilege},
+                )
+            }
+            for role in ("hunter_app", "hunter_worker", "hunter_runtime")
+            for table in tables
+        }
+    assert all(privileges == set() for privileges in held.values()), held
 
 
 async def test_the_app_role_cannot_delete_an_organization_or_a_user(

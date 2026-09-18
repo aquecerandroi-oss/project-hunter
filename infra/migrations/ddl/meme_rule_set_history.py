@@ -31,6 +31,26 @@ from alembic import op
 
 TABLE = "meme_rule_set_param_history"
 
+MEME_RULE_SET_HISTORY_OWNER_ONLY_TABLES: tuple[str, ...] = (TABLE,)
+"""The one class no revision had needed before: **no grant to either role** (T4.53).
+
+Every other table in the schema lands in an ``hunter_app`` class — write, no
+delete, read-only, append-only, decision, lock-only. This one lands in none of
+them on purpose (the module docstring above, DATABASE.md §54.1): the diary is
+written by ``infra/scripts/meme_rule_set.py --set-param --apply`` in the same
+transaction as the ``UPDATE`` it describes, over ``DATABASE_URL_MIGRATIONS`` as
+the owner, and read back by ``--history``. No running service touches it, so
+neither ``hunter_app`` nor ``hunter_worker`` is given a way to.
+
+It is declared rather than left out because
+``test_schema_privileges.py::test_the_grant_lists_cover_every_table_exactly_once``
+compares the union of the lists against the database: a table missing from all
+of them and a table somebody forgot to grant look identical from outside. The
+shape itself is asserted in
+``test_migration_0046.py::test_grants_let_the_worker_write_the_trail_and_the_api_only_read_it``
+(both roles hold *nothing* here), which is what keeps this list honest.
+"""
+
 _CREATE = f"""
 CREATE TABLE {TABLE} (
     id uuid NOT NULL DEFAULT gen_random_uuid(),

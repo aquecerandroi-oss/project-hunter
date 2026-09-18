@@ -20,6 +20,20 @@ from hunter_core.db.models import APP_ROLE, WORKER_ROLE
 MEME_EVENT_MATCHES_TABLE = "meme_event_matches"
 MATCH_KINDS = ("buy", "avoid")
 
+MEME_EVENT_MATCHES_APP_READ_ONLY_TABLES: tuple[str, ...] = (MEME_EVENT_MATCHES_TABLE,)
+"""The desk reads which coins an event named; it names none itself (T4.53).
+
+``meme_events``' shape one table over (§52.3): ``hunter_app`` gets ``SELECT``
+only, because a pairing a request handler could write is not evidence that the
+announcement swept the coin up — it is the handler saying so.
+"""
+
+MEME_EVENT_MATCHES_WORKER_APPEND_TABLES: tuple[str, ...] = (MEME_EVENT_MATCHES_TABLE,)
+"""``SELECT``/``INSERT`` and nothing else: the job writes each pair once with
+``ON CONFLICT DO NOTHING`` and never rewrites ``match_kind`` — "matched once
+stays matched" is a privilege here, not a convention in the writer.
+"""
+
 _CURSOR_COLUMN = "ALTER TABLE meme_events ADD COLUMN last_scanned_created_at timestamptz"
 _DROP_CURSOR_COLUMN = "ALTER TABLE meme_events DROP COLUMN IF EXISTS last_scanned_created_at"
 
@@ -57,8 +71,10 @@ def create_meme_event_matches_table() -> None:
 
 
 def grant_meme_event_matches_privileges() -> None:
-    op.execute(f"GRANT SELECT ON {MEME_EVENT_MATCHES_TABLE} TO {APP_ROLE}")
-    op.execute(f"GRANT SELECT, INSERT ON {MEME_EVENT_MATCHES_TABLE} TO {WORKER_ROLE}")
+    for table in MEME_EVENT_MATCHES_APP_READ_ONLY_TABLES:
+        op.execute(f"GRANT SELECT ON {table} TO {APP_ROLE}")
+    for table in MEME_EVENT_MATCHES_WORKER_APPEND_TABLES:
+        op.execute(f"GRANT SELECT, INSERT ON {table} TO {WORKER_ROLE}")
 
 
 def drop_meme_event_matches_table() -> None:

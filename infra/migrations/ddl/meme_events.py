@@ -35,6 +35,24 @@ from alembic import op
 from hunter_core.db.models import APP_ROLE, WORKER_ROLE
 
 MEME_EVENTS_TABLE = "meme_events"
+
+MEME_EVENTS_APP_READ_ONLY_TABLES: tuple[str, ...] = (MEME_EVENTS_TABLE,)
+"""The desk reads the event and never records one (T4.53).
+
+The only writer that runs as a service is the matching job, as
+``hunter_worker``; a manual event is written by ``infra/scripts/meme_event.py
+add`` over the owner connection. ``hunter_app`` gets ``SELECT`` and nothing
+else — the ``meme_rule_sets`` shape (§52.2). Declared here, as ``0041``'s own
+list, because ``ddl/tables.py``'s four classes are frozen as of ``0001``;
+``test_schema_privileges.py`` unions it so every table stays in exactly one
+class.
+"""
+
+MEME_EVENTS_WORKER_UPSERT_TABLES: tuple[str, ...] = (MEME_EVENTS_TABLE,)
+"""``SELECT``/``INSERT``/``UPDATE``, never ``DELETE``: the job appends an event
+and moves ``mint``/``matched_at``/``last_scanned_created_at`` (``0043``) on it,
+and nobody erases one (§17.7 — the downgrade refuses while a row exists).
+"""
 EVENT_SOURCES = ("plantao", "baha", "indexer_boost", "dexscreener_profile", "manual")
 EVENT_KINDS = (
     "public_figure_launch",
@@ -130,8 +148,10 @@ def create_meme_events_table() -> None:
 
 
 def grant_meme_events_privileges() -> None:
-    op.execute(f"GRANT SELECT ON {MEME_EVENTS_TABLE} TO {APP_ROLE}")
-    op.execute(f"GRANT SELECT, INSERT, UPDATE ON {MEME_EVENTS_TABLE} TO {WORKER_ROLE}")
+    for table in MEME_EVENTS_APP_READ_ONLY_TABLES:
+        op.execute(f"GRANT SELECT ON {table} TO {APP_ROLE}")
+    for table in MEME_EVENTS_WORKER_UPSERT_TABLES:
+        op.execute(f"GRANT SELECT, INSERT, UPDATE ON {table} TO {WORKER_ROLE}")
 
 
 def seed_event_v0() -> None:
