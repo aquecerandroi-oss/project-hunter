@@ -28,12 +28,21 @@ coin's curve is moved by the agent's virtual SOL, not by buyers
 (:mod:`hunter_indicators.meme.executable`) — and ``mayhem_unknown`` when no
 photo has said the bit yet. Fail closed: a flag nobody read is not "not
 Mayhem". An arm that wants Mayhem on purpose says ``exclude_mayhem: false``.
+
+T4.52b-2 moves the three base criteria (age, progress, participation) here
+from ``rules.py`` — same code, same names — and adds EXP-M13's guard
+(KB-0118): ``max_recent_drawdown_pct`` refuses ``recent_drawdown`` when the
+real SOL lost **more than** that fraction of its peak of the last
+``recent_drawdown_window_s`` (``atual / pico < X``, the frozen definition),
+and ``recent_drawdown_unknown`` when the feature is ``None`` — no observation,
+or one older than ``recent_drawdown_max_gap_s``. Off by default; a peak older
+than the window is a fall that stopped, never a refusal.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal, localcontext
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from hunter_core.strategies.numeric import CONTEXT
 
@@ -41,12 +50,79 @@ if TYPE_CHECKING:
     from hunter_indicators.meme.rules import EntryFeatures, EntryGate
 
 __all__ = [
+    "age_refusals",
     "creator_refusals",
+    "drawdown_refusals",
     "flow_refusals",
     "hype_refusals",
     "line_refusals",
     "mayhem_refusals",
+    "participation_pct",
+    "participation_refusals",
+    "progress_refusals",
 ]
+
+_HUNDRED: Final = Decimal(100)
+
+
+def age_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    if features.age_s is None:
+        return ["age_unknown"]
+    if features.age_s < gate.min_age_s:
+        return ["age_below_min"]
+    if features.age_s > gate.max_age_s:
+        return ["age_above_max"]
+    return []
+
+
+def progress_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    if not gate.require_progress:
+        return []
+    if features.progress_pct is None:
+        return ["progress_unknown"]
+    if features.progress_pct < gate.min_progress_pct:
+        return ["progress_below_min"]
+    if features.progress_pct > gate.max_progress_pct:
+        return ["progress_above_max"]
+    return []
+
+
+def participation_pct(size_sol: Decimal, curve_volume_1m_sol: Decimal | None) -> Decimal | None:
+    """Our size as a percentage of the last minute of curve volume, or ``None``.
+
+    ``None`` for an unknown **or** zero denominator: a minute with no volume does
+    not make our participation 0 %, it makes it unmeasurable.
+    """
+    if curve_volume_1m_sol is None or curve_volume_1m_sol <= 0:
+        return None
+    with localcontext(CONTEXT):
+        return _HUNDRED * size_sol / curve_volume_1m_sol
+
+
+def participation_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    if features.curve_volume_1m_sol is None:
+        return ["curve_volume_1m_unknown"]
+    if features.curve_volume_1m_sol <= 0:
+        return ["curve_volume_1m_zero"]
+    share = participation_pct(features.intended_size_sol, features.curve_volume_1m_sol)
+    if share is not None and share > gate.max_participation_pct:
+        return ["participation_above_cap"]
+    return []
+
+
+def drawdown_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
+    """EXP-M13 (T4.52b-2): ``recent_drawdown`` when the real SOL lost more
+    than the ceiling from a peak no older than the window; unknown by name."""
+    if gate.max_recent_drawdown_pct is None:
+        return []
+    if features.recent_drawdown_pct is None:
+        return ["recent_drawdown_unknown"]
+    age = features.recent_drawdown_peak_age_s
+    if age is not None and age > gate.recent_drawdown_window_s:
+        return []
+    if features.recent_drawdown_pct > gate.max_recent_drawdown_pct:
+        return ["recent_drawdown"]
+    return []
 
 
 def mayhem_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:

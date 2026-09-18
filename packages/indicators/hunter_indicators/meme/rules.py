@@ -37,16 +37,18 @@ coin's curve is moved by the agent's virtual SOL, not by demand, so its
 ``mcap_delta_60s``/``progress_rising`` are not the market speaking
 (:mod:`hunter_indicators.meme.executable`). Refuses ``mayhem_curve`` when the
 coin is known Mayhem and ``mayhem_unknown`` when the flag was not observed.
+
+T4.52b-2 adds ``max_recent_drawdown_pct`` (EXP-M13, off by default) and moves
+the base criteria beside the optional ones in ``rules_criteria`` (the budget).
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import Decimal, localcontext
+from decimal import Decimal
 from typing import Final
 
-from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.exits import (
     EXIT_INPUTS,
     ExitDecision,
@@ -62,11 +64,16 @@ from hunter_indicators.meme.exits import (
     hit_trailing,
 )
 from hunter_indicators.meme.rules_criteria import (
+    age_refusals,
     creator_refusals,
+    drawdown_refusals,
     flow_refusals,
     hype_refusals,
     line_refusals,
     mayhem_refusals,
+    participation_pct,
+    participation_refusals,
+    progress_refusals,
 )
 from hunter_indicators.meme.rules_validation import validate_entry_gate
 
@@ -115,6 +122,7 @@ GATE_INPUTS: Final = (
     "meme_features_15s.holders",
     "meme_features_15s.holders_prev",
     "meme_tokens.mayhem_enabled",
+    "meme_curve_snapshots.real_sol_reserves",
 )
 
 
@@ -174,6 +182,13 @@ class EntryGate:
     exclude_mayhem: bool = True
     """T4.27: refuse a Mayhem coin (``mayhem_curve``) and an unobserved flag
     (``mayhem_unknown``). On in every set; ``False`` is an arm's explicit word."""
+    max_recent_drawdown_pct: Decimal | None = None
+    recent_drawdown_window_s: int = 60
+    recent_drawdown_max_gap_s: int = 30
+    """T4.52b-2 (EXP-M13, KB-0118): a **fraction** (``0.50`` = half) the real
+    SOL may have lost from its peak of the last ``recent_drawdown_window_s``;
+    ``None`` = not a criterion. An observation older than
+    ``recent_drawdown_max_gap_s`` is ``recent_drawdown_unknown`` (fail closed)."""
     inputs: tuple[str, ...] = GATE_INPUTS
 
     def __post_init__(self) -> None:
@@ -219,7 +234,11 @@ class EntryGate:
             ),
             "progress_or_mcap_rising": self.progress_or_mcap_rising or None,
             "exclude_mayhem": None if self.exclude_mayhem else False,
+            "max_recent_drawdown_pct": self.max_recent_drawdown_pct,
         }
+        if self.max_recent_drawdown_pct is not None:
+            optional["recent_drawdown_window_s"] = self.recent_drawdown_window_s
+            optional["recent_drawdown_max_gap_s"] = self.recent_drawdown_max_gap_s
         parameters.update({k: str(v) for k, v in optional.items() if v is not None})
         return parameters
 
@@ -268,6 +287,12 @@ class EntryFeatures:
     is_mayhem: bool | None = None
     """T4.27: the chain's ``is_mayhem_mode`` bit (or the site's agent state,
     ``executable.is_mayhem_curve``); ``None`` = not observed, refused by name."""
+    recent_drawdown_pct: Decimal | None = None
+    recent_drawdown_peak_age_s: Decimal | None = None
+    recent_drawdown_reason: str | None = None
+    """T4.52b-2: :func:`hunter_indicators.meme.drawdown.recent_drawdown` —
+    the fraction of real SOL lost from the window's peak, that peak's age and
+    why both are ``None`` (``no_observation`` / ``stale``)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,51 +301,6 @@ class GateDecision:
 
     allowed: bool
     refusals: tuple[str, ...]
-
-
-def participation_pct(size_sol: Decimal, curve_volume_1m_sol: Decimal | None) -> Decimal | None:
-    """Our size as a percentage of the last minute of curve volume, or ``None``.
-
-    ``None`` for an unknown **or** zero denominator: a minute with no volume does
-    not make our participation 0 %, it makes it unmeasurable.
-    """
-    if curve_volume_1m_sol is None or curve_volume_1m_sol <= 0:
-        return None
-    with localcontext(CONTEXT):
-        return HUNDRED * size_sol / curve_volume_1m_sol
-
-
-def _age_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
-    if features.age_s is None:
-        return ["age_unknown"]
-    if features.age_s < gate.min_age_s:
-        return ["age_below_min"]
-    if features.age_s > gate.max_age_s:
-        return ["age_above_max"]
-    return []
-
-
-def _progress_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
-    if not gate.require_progress:
-        return []
-    if features.progress_pct is None:
-        return ["progress_unknown"]
-    if features.progress_pct < gate.min_progress_pct:
-        return ["progress_below_min"]
-    if features.progress_pct > gate.max_progress_pct:
-        return ["progress_above_max"]
-    return []
-
-
-def _participation_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
-    if features.curve_volume_1m_sol is None:
-        return ["curve_volume_1m_unknown"]
-    if features.curve_volume_1m_sol <= 0:
-        return ["curve_volume_1m_zero"]
-    share = participation_pct(features.intended_size_sol, features.curve_volume_1m_sol)
-    if share is not None and share > gate.max_participation_pct:
-        return ["participation_above_cap"]
-    return []
 
 
 def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
@@ -333,11 +313,12 @@ def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
     if features.migrated:
         refusals.append("already_migrated")
     refusals.extend(mayhem_refusals(features, gate))
-    refusals.extend(_age_refusals(features, gate))
-    refusals.extend(_progress_refusals(features, gate))
+    refusals.extend(age_refusals(features, gate))
+    refusals.extend(progress_refusals(features, gate))
     refusals.extend(creator_refusals(features, gate))
-    refusals.extend(_participation_refusals(features, gate))
+    refusals.extend(participation_refusals(features, gate))
     refusals.extend(line_refusals(features, gate))
     refusals.extend(hype_refusals(features, gate))
     refusals.extend(flow_refusals(features, gate))
+    refusals.extend(drawdown_refusals(features, gate))
     return GateDecision(allowed=not refusals, refusals=tuple(refusals))

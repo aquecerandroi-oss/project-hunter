@@ -46,6 +46,7 @@ def validate_entry_gate(gate: EntryGate) -> None:
         raise ValueError("min_holders cannot be negative")
     _validate_sniper_band(gate)
     _validate_top10_band(gate)
+    _validate_drawdown(gate)
 
 
 def _validate_sniper_band(gate: EntryGate) -> None:
@@ -66,3 +67,16 @@ def _validate_top10_band(gate: EntryGate) -> None:
         raise ValueError("min_top10_share must be in [0, 1]")
     if gate.max_top10_share is not None and gate.min_top10_share > gate.max_top10_share:
         raise ValueError("min_top10_share must be <= max_top10_share")
+
+
+def _validate_drawdown(gate: EntryGate) -> None:
+    """T4.52b-2 (EXP-M13): the ceiling is a fraction in (0, 1]; the window and
+    the staleness bound are positive seconds even when the criterion is off."""
+    if gate.recent_drawdown_window_s <= 0:
+        raise ValueError("recent_drawdown_window_s must be positive")
+    if gate.recent_drawdown_max_gap_s <= 0:
+        raise ValueError("recent_drawdown_max_gap_s must be positive")
+    if gate.max_recent_drawdown_pct is None:
+        return
+    if not 0 < gate.max_recent_drawdown_pct <= 1:
+        raise ValueError("max_recent_drawdown_pct is a fraction in (0, 1]")

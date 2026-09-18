@@ -21,11 +21,8 @@ probe → scale second leg (``scale_size_sol``, ``scale_gate`` = the
 ``name/version`` of the rule set whose gate must be satisfied for the same
 mint while the probe is open).
 
-T4.11 (EXP-M4, the moonshot arms) adds ``exit_on_migration`` (``false`` = hold
-through the migration and mark on the PumpSwap pool's tape), ``trailing_arm_x``
-(trailing armed only after that multiple) and the ``dead`` exit
-(``exit_on_dead``, ``dead_stale_s``, ``dead_mark_pct``) — again optional, so
-``meme_paper_v0``/``trendline_v0``/``hype_probe_v0`` keep selling on migration.
+T4.11 (EXP-M4) adds ``exit_on_migration``, ``trailing_arm_x`` and the ``dead``
+exit; T4.52b-2 (EXP-M13) the ``max_recent_drawdown_pct`` guard — all optional.
 """
 
 from __future__ import annotations
@@ -129,6 +126,10 @@ def _gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> Ent
         progress_or_mcap_rising=bool(params.get("progress_or_mcap_rising", False)),
         # T4.27: on unless the set says ``false`` — no arm wants Mayhem today.
         exclude_mayhem=bool_or(params.get("exclude_mayhem"), True),
+        # T4.52b-2 (EXP-M13): the recent-drawdown guard, off unless the set names it.
+        max_recent_drawdown_pct=optional_decimal(params.get("max_recent_drawdown_pct")),
+        recent_drawdown_window_s=int_or(params.get("recent_drawdown_window_s"), 60),
+        recent_drawdown_max_gap_s=int_or(params.get("recent_drawdown_max_gap_s"), 30),
     )
 
 
