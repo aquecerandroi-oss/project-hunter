@@ -915,7 +915,8 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    | `MEME_RESEND_INTERVAL_S` | `2` | cadência do reenvio dos mesmos bytes durante a janela de confirmação (`MEME_LIVE_CONFIRM_TIMEOUT_S`, 30 s); `0` volta ao envio único |
    | `MEME_PRIORITY_FEE_FLOOR_MICRO_LAMPORTS` | `100000` | piso da prioridade em µL/CU (com 400 000 CU = 0,00004 SOL, 0,08 % de uma compra de 0,05) |
    | `MEME_PRIORITY_FEE_MAX_SOL` | `0.002` | teto do **custo total** da prioridade; o teto em µL/CU é `max_sol / compute_unit_limit` (5 000 000 com 400 000 CU) — igual ao `max_priority_fee_sol` do perfil, que a admissão continua conferindo (check 20) |
-   | `MEME_EXIT_MAX_SLIPPAGE_PCT` | `5` | tolerância (em **por cento**) do `min_sol_output` de toda venda; a compra continua com o `max_slippage_pct` do perfil (1 %) |
+   | `MEME_BUY_MAX_SLIPPAGE_PCT` | `1` | (T4.59) tolerância (em **por cento**) do `max_sol_cost` de toda compra; faixa `(0, 20]` — acima disso é política de capital, não ajuste. 18/09: EMRLD e TIME morreram com `6002 TooMuchSolRequired` a 1 %; a carteira pode pagar até `sol_final × (1 + pct)`. Publicado como `buy_max_slippage_pct` no `policy` do heartbeat |
+   | `MEME_EXIT_MAX_SLIPPAGE_PCT` | `5` | tolerância (em **por cento**) do `min_sol_output` de toda venda |
    | `MEME_PANIC_EXIT_MAX_SLIPPAGE_PCT` | `15` | tolerância das vendas `creator_dump` e `rug_signal` — a venda que tem de acontecer numa curva derretendo |
 
    Leitura da taxa: `getRecentPrioritizationFees` no RPC dele, no máximo uma vez por tique, 1,5 s de

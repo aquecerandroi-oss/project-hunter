@@ -28,6 +28,7 @@ from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.repo import open_positions, orders_by_state
 from hunter_meme_executor.scope import read_scope_use
+from hunter_meme_executor.send_tuning import SendTuning
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -128,10 +129,13 @@ def _pickup_lag_fields(ctx: ExecutorContext) -> dict[str, str]:
     }
 
 
-def policy_fields(limits: MemeLimits) -> dict[str, object]:
-    """The ``policy`` blob: the five the owner writes, the check-10 allowance and
+def policy_fields(limits: MemeLimits, send: SendTuning | None = None) -> dict[str, object]:
+    """The ``policy`` blob: the five the owner writes, the check-10 allowance,
     (T4.58) the curve-progress window this process admits with — published so the
-    desk can see that its ``max_progress_pct`` gate cannot exceed it in practice."""
+    desk can see that its ``max_progress_pct`` gate cannot exceed it in practice —
+    and (T4.59) the buy tolerance the instruction is built with (``send``; the
+    profile's 1 % when absent, which is what the buy used before T4.59)."""
+    buy_pct = (send or SendTuning()).buy_max_slippage_pct
     return {
         "profile": limits.profile,
         "wallet_max_sol": str(limits.wallet_max_sol),
@@ -145,6 +149,7 @@ def policy_fields(limits: MemeLimits) -> dict[str, object]:
         "creator_unknown_max_dev_share_pct": str(limits.creator_unknown_max_dev_share_pct),
         "curve_progress_min_pct": str(limits.curve_progress_min_pct),
         "curve_progress_max_pct": str(limits.curve_progress_max_pct),
+        "buy_max_slippage_pct": str(buy_pct),
     }
 
 
@@ -179,7 +184,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
             if state.wallet_read_at is None
             else str((now - state.wallet_read_at).total_seconds())
         ),
-        "policy": json.dumps(policy_fields(limits)),
+        "policy": json.dumps(policy_fields(limits, cfg.send)),
         "orders_by_state": json.dumps(by_state),
         "positions_open": str(len(positions)),
         "blocked_exits": json.dumps(state.blocked_exits),

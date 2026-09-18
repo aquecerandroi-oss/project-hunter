@@ -39,7 +39,7 @@ from hunter_meme_executor.admission import (
 )
 from hunter_meme_executor.admission_context import build_admission_context
 from hunter_meme_executor.auto_approve import auto_approve_once, reject_if_auto
-from hunter_meme_executor.build import BuiltTrade, FillRecord, build_buy, decode_fills, fee_bps
+from hunter_meme_executor.build import BuiltTrade, FillRecord, decode_fills, fee_bps
 from hunter_meme_executor.chain import CurveRead, TokenAccountRead, WalletRead
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.journal_db import WORKER_ROLE
@@ -53,6 +53,7 @@ from hunter_meme_executor.repo import (
 )
 from hunter_meme_executor.scope import ScopeUse, read_scope_use, requested_sol_of
 from hunter_meme_executor.send_path import (
+    build_entry_buy,
     curve_fee_accounts,
     priority_fee_for,
     record_send_result,
@@ -210,16 +211,15 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
         return
     try:
         blockhash, last_valid = await asyncio.to_thread(ctx.chain.blockhash)
-        built = build_buy(
+        built = build_entry_buy(
+            cfg,
             reads.curve,
             global_account,
             user=pubkey,
             budget_sol=decision.sizing.sol_final,
-            max_slippage_bps=int(cfg.limits.max_slippage_pct * 10_000),
+            fee=fee,
             blockhash=blockhash,
             last_valid_block_height=last_valid,
-            compute_unit_limit=cfg.compute_unit_limit,
-            compute_unit_price_micro_lamports=fee.micro_lamports,
             creates_ata=reads.creates_ata,
         )
     except Exception as exc:

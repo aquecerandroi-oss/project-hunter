@@ -4,9 +4,16 @@ policy of capital (the five ``MEME_*`` of §3 stay where they are):
 - ``MEME_PRIORITY_FEE_FLOOR_MICRO_LAMPORTS`` (default 100 000) and
   ``MEME_PRIORITY_FEE_MAX_SOL`` (default 0,002): the floor and the total-cost cap
   of the dynamic priority fee (``priority_fee.py``);
+- ``MEME_BUY_MAX_SLIPPAGE_PCT`` (default **1**, in per cent, T4.59): the
+  tolerance a buy's ``max_sol_cost`` is built with. 18/09: EMRLD landed with
+  ``6002 TooMuchSolRequired`` *after* the send (the network fee was paid for
+  nothing) and TIME died in simulation with the same code — the curve moved more
+  than 1 % between the quote and the landing. Allowed ``(0, 20]``: the wallet
+  can pay up to ``sol_final × (1 + pct)``, so the ceiling is tighter than the
+  sells' 50 %. The profile's ``max_slippage_pct`` (1 %) is what the admission's
+  check 19 still judges; this knob is the instruction's tolerance;
 - ``MEME_EXIT_MAX_SLIPPAGE_PCT`` (default **5**, in per cent): the tolerance a
-  sell's ``min_sol_output`` is built with — separate from the buy's
-  ``max_slippage_pct`` (unchanged, 1 %). R56 §2: the second sell of PS died in
+  sell's ``min_sol_output`` is built with. R56 §2: the second sell of PS died in
   simulation with ``6003 TooLittleSolReceived`` because the curve dropped 14 %
   in the second between the quote and the check, against a 1 % tolerance;
 - ``MEME_PANIC_EXIT_MAX_SLIPPAGE_PCT`` (default **15**): the tolerance of a
@@ -17,7 +24,8 @@ policy of capital (the five ``MEME_*`` of §3 stay where they are):
 
 An unreadable or out-of-range value falls back to the default (the safe one),
 never refuses the boot: these are tuning, not authorization (T4.28h's two
-families). Slippage is capped at 50 % (``quote.MAX_SLIPPAGE_BPS``).
+families). Exit slippage is capped at 50 % (``quote.MAX_SLIPPAGE_BPS``), buy
+slippage at 20 %.
 """
 
 from __future__ import annotations
@@ -30,6 +38,7 @@ from hunter_exchanges.pumpfun.quote import MAX_SLIPPAGE_BPS
 from hunter_meme_executor.priority_fee import DEFAULT_FLOOR_MICRO_LAMPORTS, DEFAULT_MAX_SOL
 
 __all__ = [
+    "ENV_BUY_MAX_SLIPPAGE_PCT",
     "ENV_EXIT_MAX_SLIPPAGE_PCT",
     "ENV_PANIC_EXIT_MAX_SLIPPAGE_PCT",
     "ENV_PRIORITY_FEE_FLOOR",
@@ -41,6 +50,7 @@ __all__ = [
 
 ENV_PRIORITY_FEE_FLOOR = "MEME_PRIORITY_FEE_FLOOR_MICRO_LAMPORTS"
 ENV_PRIORITY_FEE_MAX_SOL = "MEME_PRIORITY_FEE_MAX_SOL"
+ENV_BUY_MAX_SLIPPAGE_PCT = "MEME_BUY_MAX_SLIPPAGE_PCT"
 ENV_EXIT_MAX_SLIPPAGE_PCT = "MEME_EXIT_MAX_SLIPPAGE_PCT"
 ENV_PANIC_EXIT_MAX_SLIPPAGE_PCT = "MEME_PANIC_EXIT_MAX_SLIPPAGE_PCT"
 ENV_RESEND_INTERVAL_S = "MEME_RESEND_INTERVAL_S"
@@ -50,20 +60,30 @@ PANIC_EXIT_REASONS: frozenset[str] = frozenset({"creator_dump", "rug_signal"})
 panic tolerance. ``sell_now``, ``target``, ``trailing``, ``time_stop``,
 ``migrated``, ``curve_complete``, ``emergency_auto_close`` use the normal one."""
 
+DEFAULT_BUY_MAX_SLIPPAGE_PCT = Decimal(1)
 DEFAULT_EXIT_MAX_SLIPPAGE_PCT = Decimal(5)
 DEFAULT_PANIC_EXIT_MAX_SLIPPAGE_PCT = Decimal(15)
 DEFAULT_RESEND_INTERVAL_S = 2.0
 MAX_SLIPPAGE_PCT = Decimal(MAX_SLIPPAGE_BPS) / 100
+MAX_BUY_SLIPPAGE_PCT = Decimal(20)
+"""T4.59: a buy's ceiling. Above this the instruction's ``max_sol_cost`` would let
+the wallet pay more than a fifth over the sized budget — a policy question, not tuning."""
 
 
 @dataclass(frozen=True, slots=True)
 class SendTuning:
     priority_fee_floor_micro_lamports: int = DEFAULT_FLOOR_MICRO_LAMPORTS
     priority_fee_max_sol: Decimal = DEFAULT_MAX_SOL
+    buy_max_slippage_pct: Decimal = DEFAULT_BUY_MAX_SLIPPAGE_PCT
+    """Per cent, ``(0, 20]``: the buy instruction's ``max_sol_cost`` tolerance (T4.59)."""
     exit_max_slippage_pct: Decimal = DEFAULT_EXIT_MAX_SLIPPAGE_PCT
     """Per cent: ``5`` means 5 % (unlike ``MemeLimits.max_slippage_pct``, a fraction)."""
     panic_exit_max_slippage_pct: Decimal = DEFAULT_PANIC_EXIT_MAX_SLIPPAGE_PCT
     resend_interval_s: float = DEFAULT_RESEND_INTERVAL_S
+
+    def buy_slippage_bps(self) -> int:
+        """The ``max_slippage_bps`` a buy is quoted and built with."""
+        return int(self.buy_max_slippage_pct * 100)
 
     def exit_slippage_bps(self, reason: str) -> int:
         """The ``max_slippage_bps`` a sell for ``reason`` is quoted and built with."""
@@ -81,6 +101,12 @@ class SendTuning:
                 env, ENV_PRIORITY_FEE_FLOOR, DEFAULT_FLOOR_MICRO_LAMPORTS, minimum=0
             ),
             priority_fee_max_sol=_positive_decimal(env, ENV_PRIORITY_FEE_MAX_SOL, DEFAULT_MAX_SOL),
+            buy_max_slippage_pct=_slippage_pct(
+                env,
+                ENV_BUY_MAX_SLIPPAGE_PCT,
+                DEFAULT_BUY_MAX_SLIPPAGE_PCT,
+                maximum=MAX_BUY_SLIPPAGE_PCT,
+            ),
             exit_max_slippage_pct=_slippage_pct(
                 env, ENV_EXIT_MAX_SLIPPAGE_PCT, DEFAULT_EXIT_MAX_SLIPPAGE_PCT
             ),
@@ -130,7 +156,10 @@ def _positive_decimal(env: Mapping[str, str], name: str, default: Decimal) -> De
     return value if value > 0 else default
 
 
-def _slippage_pct(env: Mapping[str, str], name: str, default: Decimal) -> Decimal:
-    """``(0, 50]`` per cent — the quote refuses more than ``MAX_SLIPPAGE_BPS``."""
+def _slippage_pct(
+    env: Mapping[str, str], name: str, default: Decimal, *, maximum: Decimal = MAX_SLIPPAGE_PCT
+) -> Decimal:
+    """``(0, maximum]`` per cent — 50 by default (the quote refuses more than
+    ``MAX_SLIPPAGE_BPS``), 20 for the buy."""
     value = _positive_decimal(env, name, default)
-    return value if value <= MAX_SLIPPAGE_PCT else default
+    return value if value <= maximum else default

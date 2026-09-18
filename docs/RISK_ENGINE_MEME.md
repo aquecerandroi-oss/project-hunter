@@ -167,7 +167,7 @@ Everton escrever o dele** (§14).
 | `max_exposure_per_mint_sol` | `0.05` | **a decidir** | igual ao teto por trade: em v0 **não há reforço de posição** |
 | `max_participation_pct` | `0.01` | **a decidir** | fração do volume **orgânico** do último minuto da curva (§5) |
 | `max_price_impact_pct` | `0.005` | **a decidir** | impacto da **nossa própria** compra na curva, pela fórmula |
-| `max_slippage_pct` | `0.01` | **a decidir** | tolerância que vira `max_sol_cost` na instrução (§9.4) |
+| `max_slippage_pct` | `0.01` | **a decidir** | teto que o check 19 confere e base do `max_sol_cost_sol` do sizing (§9.4); a **instrução** usa `MEME_BUY_MAX_SLIPPAGE_PCT` (§6, T4.59; padrão igual, 1 %) |
 | `max_priority_fee_sol` | `0.002` | **a decidir** | teto absoluto do priority fee |
 | `max_priority_fee_pct_of_trade` | `0.05` | **a decidir** | e teto relativo: uma compra de 0,05 SOL nunca paga 0,005 de prioridade |
 | `max_jito_tip_sol` | `0.001` | **a decidir** | teto do tip; `0` significa "sem bundle" (§9.3) |
@@ -574,7 +574,8 @@ através da migração vende pela PumpSwap (linha da tabela), com a mesma faixa 
 participação e o mesmo `mark_stale_s` como sinal de mercado morto — nunca com uma marca pela curva vazia.
 
 **A venda tolera mais que a compra (T4.55).** `max_slippage_pct` (1 %) continua sendo a tolerância
-da **compra** — vira `max_sol_cost` e é conferida pelo check 19. A **venda** constrói o seu
+da **compra** que o check 19 confere; desde a T4.59 a **instrução** de compra é montada com
+`MEME_BUY_MAX_SLIPPAGE_PCT` (padrão **1 %**, ver abaixo). A **venda** constrói o seu
 `min_sol_output` com `MEME_EXIT_MAX_SLIPPAGE_PCT` (padrão **5 %**) e, quando o motivo é
 `creator_dump` ou `rug_signal`, com `MEME_PANIC_EXIT_MAX_SLIPPAGE_PCT` (padrão **15 %**) — os demais
 motivos (`sell_now`, `target`, `trailing`, `time_stop`, `migrated`, `curve_complete`,
@@ -585,6 +586,34 @@ emergência a 1 % numa curva que derrete é uma venda que não acontece. A toler
 marca (§ acima: a marca é o líquido da cota, não o mínimo aceito) nem o sizing; ela só diz quanto
 abaixo da cota a cadeia ainda pode liquidar. O `intent` da ordem grava o `max_slippage_bps` usado.
 Vale também para a venda na PumpSwap (T4.29a). Valor fora de `(0, 50]` cai no padrão.
+
+**A compra também tem a sua (T4.59).** Em 18/09, com a mesa a 0,28 SOL por compra, duas entradas
+morreram com `6002 TooMuchSolRequired`: EMRLD (54,8 % de progresso) **depois** do envio — a
+transação pousou com erro, a taxa de rede foi paga por nada — e TIME (52,3 %) na simulação. Entre a
+cota e o pouso o preço da curva andou mais de 1 %. A tolerância da compra passa a ser
+`MEME_BUY_MAX_SLIPPAGE_PCT` (em **por cento**, padrão **1**, faixa **(0, 20]**; fora dela cai no
+padrão): é o `max_slippage_bps` com que `build_buy` monta o `max_sol_cost` da instrução, gravado no
+`intent` da ordem, e o `hb:meme:executor` publica `buy_max_slippage_pct` dentro de `policy`. O teto é
+mais apertado que o das vendas (50 %) porque na compra a tolerância é **dinheiro que pode sair a
+mais**: a carteira paga até `sol_final × (1 + pct)`. O que **não** muda: a simulação antes do envio, o
+check 20 (taxa de prioridade) e o check 19, que continua julgando o `max_slippage_pct` do perfil
+(1 %) — o `max_sol_cost_sol` do sizing é calculado com esse 1 %, enquanto a instrução usa o
+configurado; a diferença fica registrada no `intent` (`max_slippage_bps`, `max_sol_cost_sol`).
+
+| Tolerância | Variável | Padrão | Faixa | Onde entra |
+|---|---|---|---|---|
+| compra | `MEME_BUY_MAX_SLIPPAGE_PCT` | 1 % | (0, 20] | `max_sol_cost` da instrução `buy` |
+| venda normal | `MEME_EXIT_MAX_SLIPPAGE_PCT` | 5 % | (0, 50] | `min_sol_output` de `sell` (curva e PumpSwap) |
+| venda de pânico | `MEME_PANIC_EXIT_MAX_SLIPPAGE_PCT` | 15 % | (0, 50] | idem, motivos `creator_dump` / `rug_signal` |
+
+**A taxa de uma transação que pousou com erro é registrada (T4.59).** Um `failed`
+`onchain_error:…` depois do envio (ou na reconciliação de um `submitted_unconfirmed`) pagou a taxa
+de rede — o `fill` da ordem recebe `{failed_onchain: true, network_fee_lamports, err, reason,
+signature, slot}` lido do `meta` da transação, e a soma de taxas do dia no painel da carteira
+(`meme_live_wallet`: `fill ->> 'network_fee_lamports'`) passa a contá-la. Falha de simulação,
+preflight recusado ou blockhash expirado **não** pagaram nada e continuam sem `fill`. Nenhum leitor
+trata `fill IS NOT NULL` como fill de negócio: todos exigem `status = confirmed` **e** o
+`FillRecord` decodificado.
 
 **A tentativa acaba, a intenção não.** Cópia literal da §10 do contrato SPOT: cada tentativa de
 venda tem identidade própria; a intenção durável guarda a quantidade remanescente; só termina quando

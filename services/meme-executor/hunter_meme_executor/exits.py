@@ -59,6 +59,7 @@ from hunter_meme_executor.repo import (
 from hunter_meme_executor.send_path import (
     curve_fee_accounts,
     priority_fee_for,
+    record_failed_onchain_fee,
     record_send_result,
     submit_policy,
 )
@@ -305,6 +306,7 @@ async def _reconcile_sell(
         now=utcnow,
     )
     result = await asyncio.to_thread(submitter.reconcile, key)
+    await record_failed_onchain_fee(ctx, key, result)  # T4.59: a landed error paid its fee
     if (
         result is not None
         and result.state is SubmitState.CONFIRMED

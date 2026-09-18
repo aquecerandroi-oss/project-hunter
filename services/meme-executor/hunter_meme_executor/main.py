@@ -57,6 +57,7 @@ from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.priority_fee import PriorityFeeReader
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
+from hunter_meme_executor.send_path import record_failed_onchain_fee
 from hunter_meme_executor.treasury import treasury_once
 from hunter_meme_executor.wake import ProposalWakeListener
 from hunter_meme_executor.wallet_refresh import wallet_refresh_once
@@ -126,6 +127,7 @@ async def reconcile_once(ctx: ExecutorContext) -> None:
             continue
         if result is not None:
             logger.info("meme_live_reconciled", order=key, state=result.state, reason=result.reason)
+        await record_failed_onchain_fee(ctx, key, result)  # T4.59: a landed error paid its fee
 
 
 async def kill_switch_once(ctx: ExecutorContext) -> None:

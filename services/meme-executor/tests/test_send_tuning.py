@@ -1,6 +1,7 @@
 """T4.55 — the send knobs from the environment, and the exit slippage reaching the
 sell's ``min_sol_output``: 5 % for a normal exit, 15 % for ``creator_dump`` /
-``rug_signal``, and the buy's 1 % untouched."""
+``rug_signal``, and the buy's 1 % untouched by default (T4.59 made it a knob of its
+own, ``MEME_BUY_MAX_SLIPPAGE_PCT`` — ``test_buy_slippage.py``)."""
 
 from __future__ import annotations
 

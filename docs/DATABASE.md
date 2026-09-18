@@ -6555,7 +6555,11 @@ Uma linha por **tentativa**: `client_order_id` único (`meme:{proposal_id}` a co
 para a linha — RISK_ENGINE_MEME §9.4 regra 1), `signing_at` (a trava de assinatura, regra 2:
 `UPDATE … WHERE signing_at IS NULL RETURNING` é o que impede duas sessões), `fill` (**o `TradeEvent`
 decodificado**, §9.6: `sol_amount`, `token_amount`, `fee`, `creator_fee`, `fee_basis_points`,
-`network_fee_lamports`, `buy_total_lamports`/`sell_net_lamports`, reservas depois) e os carimbos
+`network_fee_lamports`, `buy_total_lamports`/`sell_net_lamports`, reservas depois; **ou**, numa
+linha `failed` por `onchain_error:…`, o custo da transação que pousou com erro — T4.59:
+`{failed_onchain: true, network_fee_lamports, err, reason, signature, slot}`, para a soma de taxas
+do dia contar o que foi pago; quem lê `fill` como negócio exige `status = 'confirmed'` **e** o
+`FillRecord`, nunca `fill IS NOT NULL`) e os carimbos
 `received_at`/`admitted_at`/`simulated_at`/`submitted_at`/`settled_at`.
 
 CHECKs: `side`/`status` no vocabulário; `refused`/`failed` ⇒ `reason`; `submitted_unconfirmed`/`confirmed`
