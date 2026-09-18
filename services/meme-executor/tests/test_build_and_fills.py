@@ -326,7 +326,7 @@ def test_a_partial_sell_never_closes_the_ata() -> None:
 
 def test_the_close_flag_is_off_unless_everton_sets_it() -> None:
     """T4.46b: the real sell transaction only changes on his written flag."""
-    from hunter_meme_executor.exits import _close_ata_on_full_sell
+    from hunter_meme_executor.exit_common import close_ata_on_full_sell as _close_ata_on_full_sell
 
     assert _close_ata_on_full_sell({}) is False
     assert _close_ata_on_full_sell({"MEME_CLOSE_ATA_ON_FULL_SELL": "1"}) is True

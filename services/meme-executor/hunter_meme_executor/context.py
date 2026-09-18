@@ -13,7 +13,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from hunter_exchanges.jupiter import JupiterClient
 from hunter_meme_executor.creator_flow import CreatorSoldMemory
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from hunter_meme_executor.config import ExecutorConfig
     from hunter_meme_executor.journal_db import PostgresOrderJournal
     from hunter_meme_executor.kill_switch import KillSwitchReader
+    from hunter_meme_executor.priority_fee import PriorityFeeReader
     from hunter_meme_executor.risk_read import RiskSource
 
 HeartbeatWriter = "Callable[[dict[str, str]], Awaitable[None]]"
@@ -109,6 +110,18 @@ class ExecutorState:
     the floor and nothing was attempted."""
     treasury_wallet_usdc: Decimal | None = None
     """T4.54: the USDC ATA balance as last read, for the heartbeat only."""
+    resends_total: int = 0
+    """T4.55: re-sends of already-signed bytes across every attempt of this
+    process (``submit.py``'s confirmation loop) — same signature each time."""
+    resend_errors_total: int = 0
+    last_resends: int = 0
+    """The re-send count of the last settled attempt."""
+    last_priority_fee: dict[str, Any] | None = None
+    """T4.55: the last ``PriorityFeeChoice.as_json`` — price, source, p75,
+    floor, cap, samples, fee in SOL — as published in the heartbeat."""
+    priority_fee_read_failures: int = 0
+    """T4.55: sends that paid the floor because ``getRecentPrioritizationFees``
+    failed or answered nothing (the desk's signal that the RPC is degrading)."""
 
 
 @dataclass(slots=True)
@@ -140,3 +153,7 @@ class ExecutorContext:
     transaction (``hunter_meme_executor.treasury`` verifies, simulates, signs
     and sends). A short-lived ``httpx.Client`` per process; not explicitly
     closed at shutdown (a process exit reclaims the socket)."""
+    priority_fees: PriorityFeeReader | None = None
+    """T4.55: the bounded ``getRecentPrioritizationFees`` reader every send
+    prices itself with (``send_path.priority_fee_for``). ``None`` keeps the
+    configured static ``compute_unit_price_micro_lamports`` (tests)."""

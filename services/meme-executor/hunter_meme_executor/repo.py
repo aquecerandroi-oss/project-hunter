@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
-from hunter_core.domain.types import uuid7
+from hunter_core.domain.types import utcnow, uuid7
 from hunter_meme_executor.repo_context import (
     DEV_SHARE_MAX_AGE_S,
     RISK_SNAPSHOT_MAX_AGE_S,
@@ -149,6 +149,10 @@ the send) **and** ``simulated`` (a crash between recording the signature and the
 or between the send and the state write) — every one is settled by reading the chain,
 never by sending again."""
 _BY_STATE = text("SELECT status, count(*) FROM meme_live_orders GROUP BY status")
+_SEND_STATS = text(
+    "UPDATE meme_live_orders SET intent = intent || CAST(:patch AS jsonb), updated_at = :now "
+    "WHERE client_order_id = :key"
+)
 
 
 def _decimal(value: Any) -> Decimal | None:
@@ -270,6 +274,17 @@ async def unconfirmed_orders(session: AsyncSession) -> list[str]:
 
 async def orders_by_state(session: AsyncSession) -> dict[str, int]:
     return {str(r[0]): int(r[1]) for r in await session.execute(_BY_STATE)}
+
+
+async def record_send_stats(
+    session: AsyncSession, client_order_id: str, patch: dict[str, Any]
+) -> None:
+    """T4.55: the re-send count of an attempt, merged into the row's ``intent``
+    after the submitter settled it (``resends``, ``resend_errors``)."""
+    await session.execute(
+        _SEND_STATS,
+        {"key": client_order_id, "patch": json.dumps(patch, default=str), "now": utcnow()},
+    )
 
 
 def order_key(proposal_id: str, *, side: str, attempt: int = 1) -> str:

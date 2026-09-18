@@ -24,14 +24,12 @@ from __future__ import annotations
 
 import asyncio
 import os
-from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import KillSwitchState
 from hunter_core.domain.types import utcnow
-from hunter_core.execution.meme.gates import parse_flag
 from hunter_core.execution.meme.journal import SubmitState
 from hunter_core.execution.meme.submit import (
     ApprovedSubmission,
@@ -44,7 +42,7 @@ from hunter_exchanges.pumpfun.quote import quote_sell
 from hunter_meme_executor.build import FillRecord, build_sell, decode_fills, fee_bps, reserves_of
 from hunter_meme_executor.chain import CurveRead
 from hunter_meme_executor.context import ExecutorContext
-from hunter_meme_executor.exit_common import BACKOFF_S, mark_blocked
+from hunter_meme_executor.exit_common import BACKOFF_S, close_ata_on_full_sell, mark_blocked
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.pumpswap_exit import handle_migrated_position
 from hunter_meme_executor.repo import (
@@ -58,22 +56,18 @@ from hunter_meme_executor.repo import (
     token_context,
     update_mark,
 )
+from hunter_meme_executor.send_path import (
+    curve_fee_accounts,
+    priority_fee_for,
+    record_send_result,
+    submit_policy,
+)
 from hunter_risk_meme import ExitParams, PositionForExit, decide_exit
 
 __all__ = ["exits_once", "manage_position"]
 
 logger = get_logger(__name__)
 LAMPORTS = Decimal(1_000_000_000)
-ENV_CLOSE_ATA_ON_FULL_SELL = "MEME_CLOSE_ATA_ON_FULL_SELL"
-
-
-def _close_ata_on_full_sell(env: Mapping[str, str]) -> bool:
-    """T4.46 — OFF by default: a full sell closes the mint's ATA (rent back,
-    R43) only when Everton sets ``MEME_CLOSE_ATA_ON_FULL_SELL=1`` in the VPS
-    ``.env``. Review of 5bbae3ab: safe, but a systematic close error would park
-    every position at simulation, and the first mainnet close is the only
-    real test — a change to the real sell transaction is his flag."""
-    return parse_flag(env.get(ENV_CLOSE_ATA_ON_FULL_SELL), default=False)
 
 
 def _params(position: OpenPosition, ctx: ExecutorContext) -> ExitParams:
@@ -194,6 +188,9 @@ async def _sell(
 ) -> None:
     assert ctx.signer is not None
     cfg, pubkey = ctx.config, ctx.signer.pubkey
+    # T4.55: the fee of the moment (bounded, cached, the floor on failure), read
+    # before the blockhash so the read never eats into the blockhash's validity.
+    fee = await priority_fee_for(ctx, curve_fee_accounts(position.mint))
     try:
         account = await asyncio.to_thread(
             ctx.chain.token_account, pubkey, position.mint, read.token_program
@@ -210,19 +207,21 @@ async def _sell(
     if tokens <= 0:
         await mark_blocked(ctx, position, reason, "reconciliation_mismatch:no_tokens_on_chain", now)
         return
+    # T4.55: a sell tolerates more than a buy (5 %; 15 % on a creator dump / rug —
+    # R56 §2, ``6003 TooLittleSolReceived`` at 1 %).
     try:
         built = build_sell(
             read,
             global_account,
             user=pubkey,
             token_amount=tokens,
-            max_slippage_bps=int(cfg.limits.max_slippage_pct * 10_000),
+            max_slippage_bps=cfg.send.exit_slippage_bps(reason),
             blockhash=blockhash,
             last_valid_block_height=last_valid,
             compute_unit_limit=cfg.compute_unit_limit,
-            compute_unit_price_micro_lamports=cfg.compute_unit_price_micro_lamports,
+            compute_unit_price_micro_lamports=fee.micro_lamports,
             wallet_token_balance=account.amount,
-            close_ata_on_full_sell=_close_ata_on_full_sell(os.environ),
+            close_ata_on_full_sell=close_ata_on_full_sell(os.environ),
         )
     except Exception as exc:
         await mark_blocked(ctx, position, reason, f"build_failed:{type(exc).__name__}", now)
@@ -230,6 +229,7 @@ async def _sell(
     key = order_key(position.proposal_id, side="sell", attempt=attempt)
     intent = built.intent_json()
     intent["exit_reason"] = reason
+    intent["priority_fee"] = fee.as_json(cfg.compute_unit_limit)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         order_id = await insert_order(
             session,
@@ -257,11 +257,7 @@ async def _sell(
         journal=ctx.journal,
         verify=built.verify,
         decode_fill=decode_fills,
-        policy=SubmitPolicy(
-            allow_send=cfg.live and ctx.chain.rpc.allow_send,
-            cluster=cfg.cluster,
-            confirm_timeout_s=cfg.confirm_timeout_s,
-        ),
+        policy=submit_policy(cfg, ctx.chain.rpc),
         now=utcnow,
     )
     approval = ApprovedSubmission(
@@ -271,6 +267,7 @@ async def _sell(
         result = await asyncio.to_thread(submitter.submit, approval)
     except MemeLiveTradingDisabled:
         return
+    await record_send_result(ctx, key, result)
     if result.signature:
         ctx.state.last_signature = result.signature
     logger.info(

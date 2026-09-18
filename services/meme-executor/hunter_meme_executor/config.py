@@ -25,7 +25,6 @@ from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
-from typing import Literal
 
 from hunter_core.domain.enums import KillSwitchState
 from hunter_core.execution.meme.gates import (
@@ -37,8 +36,18 @@ from hunter_core.execution.meme.gates import (
     parse_flag,
 )
 from hunter_core.execution.meme.signer import MemeSigner, boot_meme_execution
+from hunter_exchanges.jupiter.client import DEFAULT_JUPITER_BASE_URL
 from hunter_exchanges.pumpfun.tx_rpc import MAINNET_PUBLIC_RPC_URL
-from hunter_meme_executor.creator_flow import DEFAULT_SELL_TOLERANCE_PCT
+from hunter_meme_executor.config_env import (
+    Cluster,
+    bps,
+    cluster,
+    float_env,
+    int_env,
+    positive_decimal,
+    tolerance,
+)
+from hunter_meme_executor.send_tuning import SendTuning
 from hunter_risk_meme import MEME_PAPER_V0, MemeLimits, MemePolicyMissing, limits_from_env
 
 __all__ = [
@@ -56,8 +65,6 @@ INSTANCE = "executor"
 ENV_AUTO_APPROVE = "MEME_LIVE_AUTO_APPROVE"
 """``hb:meme:executor`` — the brief's key. A fixed instance: one wallet, one
 signer, one process (two would race the same signing locks by design)."""
-
-Cluster = Literal["mainnet", "devnet"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,28 +119,30 @@ class ExecutorConfig:
     recomposes from this, never from ``limits``: ``min`` over an
     already-tightened value would pin yesterday's smaller number forever."""
     treasury_enabled: bool = False
-    """T4.54 — ``MEME_TREASURY_ENABLED``: Everton's flag, off by default. On
-    means the kill-switch tick may swap USDC for SOL through Jupiter when the
-    wallet's SOL falls below ``treasury_sol_floor``; a swap is also refused
-    unless ``live`` is on (§9.2's discipline: no real send with the live flag
-    off, treasury included)."""
+    """T4.54 — ``MEME_TREASURY_ENABLED``: Everton's flag, off by default. On, the
+    tick may swap USDC -> SOL below ``treasury_sol_floor``; needs ``live`` too."""
     treasury_sol_floor: Decimal = Decimal("0.30")
     """``MEME_TREASURY_SOL_FLOOR`` — below this the wallet is topped up."""
     treasury_sol_target: Decimal = Decimal("0.60")
-    """``MEME_TREASURY_SOL_TARGET`` — a swap sizes itself to reach this, never
-    to overshoot it, at the quote's own price."""
+    """``MEME_TREASURY_SOL_TARGET`` — sized to, never overshot; refused by name
+    above ``wallet_max_sol - max_sol_per_trade`` (T4.54b fix E)."""
     treasury_max_usdc_per_swap: Decimal = Decimal("25")
     """``MEME_TREASURY_MAX_USDC_PER_SWAP`` — the ceiling of one attempt."""
     treasury_max_usdc_per_day: Decimal = Decimal("50")
-    """``MEME_TREASURY_MAX_USDC_PER_DAY`` — the ceiling of every *confirmed*
-    swap in the trailing 24 h."""
+    """``MEME_TREASURY_MAX_USDC_PER_DAY`` — every confirmed *or submitted* swap, 24 h."""
     treasury_max_slippage_bps: int = 50
-    """``MEME_TREASURY_MAX_SLIPPAGE_BPS`` — passed to Jupiter's quote and
-    checked against the built transaction's own tolerance."""
+    """``MEME_TREASURY_MAX_SLIPPAGE_BPS`` — sent to the quote, required back
+    unchanged, and decoded from the built ``route`` (``treasury_verify``)."""
+    treasury_jupiter_base_url: str = DEFAULT_JUPITER_BASE_URL
+    """``MEME_TREASURY_JUPITER_BASE_URL`` — keyless ``lite-api.jup.ag/swap/v1``
+    by default (``quote-api.jup.ag/v6`` is gone); keyed: ``api.jup.ag/swap/v1``."""
     treasury_min_interval_s: float = 600.0
     """``MEME_TREASURY_MIN_INTERVAL_S`` — no two attempts (successful, failed or
-    refused) closer together than this; a persistent refusal must not hammer
-    Jupiter or the chain every 10 s tick."""
+    refused) closer than this; a persistent refusal must not hammer every tick."""
+    send: SendTuning = SendTuning()
+    """T4.55 — priority-fee floor/cap, exit and panic slippage, re-send cadence
+    (``send_tuning.py``). ``compute_unit_price_micro_lamports`` above is only the
+    static fallback of a context without a fee reader."""
 
     @property
     def base_limits(self) -> MemeLimits:
@@ -145,75 +154,6 @@ class ExecutorConfig:
     def priority_fee_sol(self) -> Decimal:
         lamports = self.compute_unit_limit * self.compute_unit_price_micro_lamports // 1_000_000
         return Decimal(lamports) / Decimal(1_000_000_000)
-
-
-def _float(env: Mapping[str, str], name: str, default: float) -> float:
-    raw = (env.get(name) or "").strip()
-    try:
-        return float(raw) if raw else default
-    except ValueError:
-        return default
-
-
-def _int(env: Mapping[str, str], name: str, default: int) -> int:
-    raw = (env.get(name) or "").strip()
-    try:
-        return int(raw) if raw else default
-    except ValueError:
-        return default
-
-
-def _tolerance(env: Mapping[str, str]) -> Decimal:
-    """``MEME_CREATOR_SELL_TOLERANCE_PCT`` in ``[0, 1)``.
-
-    Unreadable or out of range falls back to the default instead of refusing the
-    boot: this is not policy of capital and not an authorization (the two
-    families of T4.28h), it is the dust margin of one inference, and its safe
-    value is the small one. A ``1`` would make every creator a holder, so the
-    range stops before it.
-    """
-    raw = (env.get("MEME_CREATOR_SELL_TOLERANCE_PCT") or "").strip()
-    if not raw:
-        return DEFAULT_SELL_TOLERANCE_PCT
-    try:
-        value = Decimal(raw)
-    except (ArithmeticError, ValueError):
-        return DEFAULT_SELL_TOLERANCE_PCT
-    return value if Decimal(0) <= value < Decimal(1) else DEFAULT_SELL_TOLERANCE_PCT
-
-
-def _positive_decimal(env: Mapping[str, str], name: str, default: Decimal) -> Decimal:
-    """A ``Decimal`` that must be ``> 0`` — an unreadable or non-positive value
-    falls back to the default (the safe, small value) rather than refusing the
-    boot: these are treasury sizing knobs, not the five policy variables."""
-    raw = (env.get(name) or "").strip()
-    if not raw:
-        return default
-    try:
-        value = Decimal(raw)
-    except (ArithmeticError, ValueError):
-        return default
-    return value if value > 0 else default
-
-
-def _bps(env: Mapping[str, str], name: str, default: int) -> int:
-    """Basis points in ``[1, 10_000]`` — outside that range falls back to the
-    default rather than building a quote nobody asked for."""
-    raw = (env.get(name) or "").strip()
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return default
-    return value if 0 < value <= 10_000 else default
-
-
-def _cluster(env: Mapping[str, str]) -> Cluster:
-    raw = (env.get("MEME_EXECUTOR_CLUSTER") or "mainnet").strip().lower()
-    if raw not in ("mainnet", "devnet"):
-        raise MemeLiveTradingRefused("cluster_unknown", raw)
-    return "devnet" if raw == "devnet" else "mainnet"
 
 
 def effective_limits(base: MemeLimits, small: SmallTestAuthorization | None) -> MemeLimits:
@@ -275,13 +215,13 @@ def boot(
     env_limits = _base_limits(env, mode)
     small_at_boot = mode.gates.small_test if mode.gates is not None else None
     limits = effective_limits(env_limits, small_at_boot)
-    cluster = _cluster(env)
+    cluster_name = cluster(env)
     rpc_url = (env.get("SOLANA_RPC_URL") or "").strip()
     if mode.live and not rpc_url:
         raise MemeLiveTradingRefused(
             "rpc_url_missing", "live execution needs SOLANA_RPC_URL (never the public endpoint)"
         )
-    if mode.live and cluster == "mainnet" and "devnet" in rpc_url:
+    if mode.live and cluster_name == "mainnet" and "devnet" in rpc_url:
         raise MemeLiveTradingRefused("rpc_url_cluster_mismatch", "devnet URL with cluster=mainnet")
     small = mode.gates.small_test if mode.gates is not None else None
     auto_approve = parse_flag(env.get(ENV_AUTO_APPROVE)) and mode.live
@@ -296,43 +236,46 @@ def boot(
     kill_file = (env.get("MEME_KILL_FILE") or "").strip() or None
     config = ExecutorConfig(
         live=mode.live,
-        cluster=cluster,
+        cluster=cluster_name,
         rpc_url=rpc_url or MAINNET_PUBLIC_RPC_URL,
         limits=limits,
         system_kill_switch=system_kill_switch,
         kill_file=kill_file,
         auto_close_on_emergency=parse_flag(env.get("MEME_AUTO_CLOSE_ON_EMERGENCY")),
-        approval_ttl_s=_float(env, "MEME_LIVE_APPROVAL_TTL_S", 30.0),
-        loop_s=_float(env, "MEME_LIVE_LOOP_S", 1.0),
-        mark_s=_float(env, "MEME_LIVE_MARK_S", 5.0),
-        confirm_timeout_s=_float(env, "MEME_LIVE_CONFIRM_TIMEOUT_S", 30.0),
-        compute_unit_limit=_int(env, "MEME_COMPUTE_UNIT_LIMIT", 400_000),
-        compute_unit_price_micro_lamports=_int(
+        approval_ttl_s=float_env(env, "MEME_LIVE_APPROVAL_TTL_S", 30.0),
+        loop_s=float_env(env, "MEME_LIVE_LOOP_S", 1.0),
+        mark_s=float_env(env, "MEME_LIVE_MARK_S", 5.0),
+        confirm_timeout_s=float_env(env, "MEME_LIVE_CONFIRM_TIMEOUT_S", 30.0),
+        compute_unit_limit=int_env(env, "MEME_COMPUTE_UNIT_LIMIT", 400_000),
+        compute_unit_price_micro_lamports=int_env(
             env, "MEME_COMPUTE_UNIT_PRICE_MICRO_LAMPORTS", 10_000
         ),
         small_test_max_trades=None if small is None else small.max_trades,
         small_test_max_total_sol=None if small is None else small.max_total_sol,
         auto_approve=auto_approve,
-        auto_approve_max_per_hour=max(0, _int(env, "MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR", 5)),
+        auto_approve_max_per_hour=max(0, int_env(env, "MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR", 5)),
         auto_approve_refusal_cooldown_s=max(
-            0.0, _float(env, "MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S", 120.0)
+            0.0, float_env(env, "MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S", 120.0)
         ),
-        risk_read_timeout_s=max(0.1, _float(env, "MEME_RISK_READ_TIMEOUT_S", 1.5)),
-        wallet_read_timeout_s=max(0.1, _float(env, "MEME_WALLET_REFRESH_TIMEOUT_S", 1.5)),
-        creator_sell_tolerance_pct=_tolerance(env),
+        risk_read_timeout_s=max(0.1, float_env(env, "MEME_RISK_READ_TIMEOUT_S", 1.5)),
+        wallet_read_timeout_s=max(0.1, float_env(env, "MEME_WALLET_REFRESH_TIMEOUT_S", 1.5)),
+        creator_sell_tolerance_pct=tolerance(env),
         gates_file=(env.get(ENV_GATES_FILE) or "").strip() or None if mode.live else None,
         env_limits=env_limits,
         treasury_enabled=parse_flag(env.get("MEME_TREASURY_ENABLED")),
-        treasury_sol_floor=_positive_decimal(env, "MEME_TREASURY_SOL_FLOOR", Decimal("0.30")),
-        treasury_sol_target=_positive_decimal(env, "MEME_TREASURY_SOL_TARGET", Decimal("0.60")),
-        treasury_max_usdc_per_swap=_positive_decimal(
+        treasury_sol_floor=positive_decimal(env, "MEME_TREASURY_SOL_FLOOR", Decimal("0.30")),
+        treasury_sol_target=positive_decimal(env, "MEME_TREASURY_SOL_TARGET", Decimal("0.60")),
+        treasury_max_usdc_per_swap=positive_decimal(
             env, "MEME_TREASURY_MAX_USDC_PER_SWAP", Decimal("25")
         ),
-        treasury_max_usdc_per_day=_positive_decimal(
+        treasury_max_usdc_per_day=positive_decimal(
             env, "MEME_TREASURY_MAX_USDC_PER_DAY", Decimal("50")
         ),
-        treasury_max_slippage_bps=_bps(env, "MEME_TREASURY_MAX_SLIPPAGE_BPS", 50),
-        treasury_min_interval_s=max(0.0, _float(env, "MEME_TREASURY_MIN_INTERVAL_S", 600.0)),
+        treasury_max_slippage_bps=bps(env, "MEME_TREASURY_MAX_SLIPPAGE_BPS", 50),
+        treasury_min_interval_s=max(0.0, float_env(env, "MEME_TREASURY_MIN_INTERVAL_S", 600.0)),
+        treasury_jupiter_base_url=(env.get("MEME_TREASURY_JUPITER_BASE_URL") or "").strip()
+        or DEFAULT_JUPITER_BASE_URL,
+        send=SendTuning.from_env(env),
     )
     return config, mode, signer
 

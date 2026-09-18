@@ -213,7 +213,28 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     fields.update(ctx.kill.describe())
     fields.update(_pickup_lag_fields(ctx))
     fields["treasury"] = _treasury_field(ctx)
+    fields.update(_send_fields(ctx))
     return fields
+
+
+def _send_fields(ctx: ExecutorContext) -> dict[str, str]:
+    """T4.55 — the re-send loop and the dynamic priority fee, as numbers the desk
+    can re-read after the deploy: how many re-sends this process made (and the
+    last attempt's), how often the fee read failed (the floor was paid), and the
+    last fee choice with every number that made it."""
+    state, cfg = ctx.state, ctx.config
+    reader = ctx.priority_fees
+    return {
+        "resends_total": str(state.resends_total),
+        "resend_errors_total": str(state.resend_errors_total),
+        "last_resends": str(state.last_resends),
+        "resend_interval_s": str(cfg.send.resend_interval_s),
+        "priority_fee_reads": "" if reader is None else str(reader.reads),
+        "priority_fee_read_failures": str(state.priority_fee_read_failures),
+        "priority_fee_last": json.dumps(state.last_priority_fee or {}),
+        "exit_max_slippage_pct": str(cfg.send.exit_max_slippage_pct),
+        "panic_exit_max_slippage_pct": str(cfg.send.panic_exit_max_slippage_pct),
+    }
 
 
 def _treasury_field(ctx: ExecutorContext) -> str:

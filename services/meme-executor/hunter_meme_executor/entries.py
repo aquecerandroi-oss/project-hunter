@@ -26,7 +26,6 @@ from hunter_core.execution.meme.submit import (
     ApprovedSubmission,
     MemeLiveTradingDisabled,
     MemeSubmitter,
-    SubmitPolicy,
 )
 from hunter_core.logging import get_logger
 from hunter_meme_executor.admission import (
@@ -53,6 +52,12 @@ from hunter_meme_executor.repo import (
     refuse_admitted_order,
 )
 from hunter_meme_executor.scope import ScopeUse, read_scope_use, requested_sol_of
+from hunter_meme_executor.send_path import (
+    curve_fee_accounts,
+    priority_fee_for,
+    record_send_result,
+    submit_policy,
+)
 
 __all__ = ["entries_once", "handle_candidate"]
 
@@ -138,7 +143,12 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             return
     pubkey = ctx.signer.pubkey
     try:
-        reads = await asyncio.to_thread(_read_chain, ctx, candidate.mint, pubkey)
+        # T4.55: the priority fee is read alongside the curve (bounded, cached,
+        # the floor on failure) so the admission's fee check sees the real price.
+        reads, fee = await asyncio.gather(
+            asyncio.to_thread(_read_chain, ctx, candidate.mint, pubkey),
+            priority_fee_for(ctx, curve_fee_accounts(candidate.mint)),
+        )
         global_account = await asyncio.to_thread(ctx.chain.global_account)
     except Exception as exc:
         ctx.state.rpc_errors += 1
@@ -170,7 +180,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             candidate,
             wallet_id=pubkey,
             limits=cfg.limits,
-            priority_fee_sol=cfg.priority_fee_sol,
+            priority_fee_sol=fee.fee_sol(cfg.compute_unit_limit),
             requested_cap_sol=None if scope is None else scope.requested_cap_sol,
         ),
         wallet=wallet_from(
@@ -209,13 +219,14 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             blockhash=blockhash,
             last_valid_block_height=last_valid,
             compute_unit_limit=cfg.compute_unit_limit,
-            compute_unit_price_micro_lamports=cfg.compute_unit_price_micro_lamports,
+            compute_unit_price_micro_lamports=fee.micro_lamports,
             creates_ata=reads.creates_ata,
         )
     except Exception as exc:
         await _refuse(ctx, candidate, f"build_failed:{type(exc).__name__}", admission)
         return
     intent = built.intent_json()
+    intent["priority_fee"] = fee.as_json(cfg.compute_unit_limit)
     intent["sol_final"] = str(decision.sizing.sol_final)
     intent["max_sol_cost_sol"] = str(Decimal(built.intent.sol_limit) / LAMPORTS)
     key = order_key(candidate.id, side="buy")
@@ -272,11 +283,7 @@ async def _submit_and_record(
         journal=ctx.journal,
         verify=built.verify,
         decode_fill=decode_fills,
-        policy=SubmitPolicy(
-            allow_send=cfg.live and ctx.chain.rpc.allow_send,
-            cluster=cfg.cluster,
-            confirm_timeout_s=cfg.confirm_timeout_s,
-        ),
+        policy=submit_policy(cfg, ctx.chain.rpc),
         now=utcnow,
     )
     approval = ApprovedSubmission(
@@ -290,6 +297,7 @@ async def _submit_and_record(
     except MemeLiveTradingDisabled:
         ctx.state.last_refusal = "meme_live_disabled"
         return
+    await record_send_result(ctx, key, result)
     if result.signature:
         ctx.state.last_signature = result.signature
     logger.info(

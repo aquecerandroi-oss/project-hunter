@@ -887,6 +887,34 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    `last_result`, `wallet_usdc`). Detalhe técnico e o que fica de fora do escopo mainnet:
    `docs/RISK_ENGINE_MEME.md` § "Tesouraria — USDC → SOL (T4.54)".
 
+9e. **Envio: reenvio, prioridade dinâmica e slippage de saída (T4.55) — nada a ligar, tudo
+   revisável.** R56 (`.claude/state/notes-R56.md` §2.1) mediu 3 de ~23 envios reais em 30 h mortos em
+   `blockhash_expired_never_landed` e uma venda em `6003 TooLittleSolReceived`: a causa era **uma**
+   transação com 0,000004 SOL de prioridade, enviada **uma** vez e nunca reenviada, e uma venda a 1 %
+   de tolerância numa curva que caiu 14 % num segundo. Desde a T4.55 o executor (a) reenvia os
+   **mesmos bytes assinados** a cada 2 s enquanto espera a confirmação (mesma assinatura — a rede
+   deduplica, nunca uma posição dupla), (b) escolhe a prioridade pelo p75 das taxas recentes do
+   programa pump + a curva do mint, com piso e teto, e (c) vende com tolerância própria. As variáveis,
+   todas opcionais no `.env` da VPS (valor ilegível ou fora da faixa cai no padrão — nunca recusa o
+   boot; **não** são política de capital):
+
+   | Variável | Padrão | O que faz |
+   |---|---|---|
+   | `MEME_RESEND_INTERVAL_S` | `2` | cadência do reenvio dos mesmos bytes durante a janela de confirmação (`MEME_LIVE_CONFIRM_TIMEOUT_S`, 30 s); `0` volta ao envio único |
+   | `MEME_PRIORITY_FEE_FLOOR_MICRO_LAMPORTS` | `100000` | piso da prioridade em µL/CU (com 400 000 CU = 0,00004 SOL, 0,08 % de uma compra de 0,05) |
+   | `MEME_PRIORITY_FEE_MAX_SOL` | `0.002` | teto do **custo total** da prioridade; o teto em µL/CU é `max_sol / compute_unit_limit` (5 000 000 com 400 000 CU) — igual ao `max_priority_fee_sol` do perfil, que a admissão continua conferindo (check 20) |
+   | `MEME_EXIT_MAX_SLIPPAGE_PCT` | `5` | tolerância (em **por cento**) do `min_sol_output` de toda venda; a compra continua com o `max_slippage_pct` do perfil (1 %) |
+   | `MEME_PANIC_EXIT_MAX_SLIPPAGE_PCT` | `15` | tolerância das vendas `creator_dump` e `rug_signal` — a venda que tem de acontecer numa curva derretendo |
+
+   Leitura da taxa: `getRecentPrioritizationFees` no RPC dele, no máximo uma vez por tique, 1,5 s de
+   prazo, cache de 10 s; falhou ⇒ paga o piso e conta em `priority_fee_read_failures`. O que o
+   `hb:meme:executor` publica: `resends_total`, `resend_errors_total`, `last_resends`,
+   `priority_fee_reads`, `priority_fee_read_failures`, `priority_fee_last` (JSON com `micro_lamports`,
+   `source` = `p75`|`floor`|`cap`|`floor:read_failed`|…, `p75_micro_lamports`, `samples`, `fee_sol`),
+   `exit_max_slippage_pct`, `panic_exit_max_slippage_pct`. Cada ordem grava em `intent` o
+   `priority_fee` escolhido, o `max_slippage_bps` usado e, depois de liquidada, `resends`.
+   `skipPreflight` continua desligado e `maxRetries: 0` continua — o reenvio é nosso, não do nó.
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca

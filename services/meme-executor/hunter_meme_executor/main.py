@@ -41,6 +41,7 @@ from hunter_core.execution.meme.gates import MemeLiveTradingRefused
 from hunter_core.execution.meme.submit import MemeSubmitter, SubmitPolicy
 from hunter_core.logging import get_logger
 from hunter_core.redis import keys
+from hunter_exchanges.jupiter import JupiterClient
 from hunter_exchanges.pumpfun.indexer_rest import AdvancedIndexerClient
 from hunter_exchanges.pumpfun.tx_rpc import SolanaTxRpcClient
 from hunter_meme_executor.build import decode_fills
@@ -53,6 +54,7 @@ from hunter_meme_executor.gates_reload import gates_reload_once, prime_gates
 from hunter_meme_executor.heartbeat import heartbeat_once
 from hunter_meme_executor.journal_db import WORKER_ROLE, PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
+from hunter_meme_executor.priority_fee import PriorityFeeReader
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
 from hunter_meme_executor.treasury import treasury_once
@@ -177,6 +179,14 @@ def build_context(
         heartbeat=write_fields,
         loop=loop,
         risk_client=risk_client,
+        treasury_client=JupiterClient(base_url=config.treasury_jupiter_base_url),
+        # T4.55: every send prices itself from ``getRecentPrioritizationFees``
+        # (bounded, cached, the floor on failure) — never the fixed 10 000 µL/CU.
+        priority_fees=PriorityFeeReader(
+            rpc,
+            floor=config.send.priority_fee_floor_micro_lamports,
+            max_sol=config.send.priority_fee_max_sol,
+        ),
     )
 
 

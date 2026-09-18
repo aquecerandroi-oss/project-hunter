@@ -26,7 +26,7 @@ from hunter_core.execution.meme.submit import (
 )
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.solana_codec import TOKEN_PROGRAM_ID
-from hunter_exchanges.pumpswap.decode import WSOL_MINT
+from hunter_exchanges.pumpswap.decode import PUMPSWAP_PROGRAM_ID, WSOL_MINT
 from hunter_meme_executor.chain import PoolRead
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.exit_common import BACKOFF_S, mark_blocked
@@ -44,6 +44,7 @@ from hunter_meme_executor.repo import (
     order_key,
     set_exit_intent,
 )
+from hunter_meme_executor.send_path import priority_fee_for, record_send_result, submit_policy
 
 __all__ = ["handle_migrated_position"]
 
@@ -83,6 +84,7 @@ async def _sell(
 ) -> None:
     assert ctx.signer is not None
     cfg, pubkey = ctx.config, ctx.signer.pubkey
+    fee = await priority_fee_for(ctx, (PUMPSWAP_PROGRAM_ID, pool_read.address))  # T4.55
     try:
         mint_account = await asyncio.to_thread(ctx.chain.rpc.get_account, position.mint)
         if mint_account is None:
@@ -116,11 +118,11 @@ async def _sell(
             user=pubkey,
             base_token_program=base_token_program,
             token_amount=tokens,
-            max_slippage_bps=int(cfg.limits.max_slippage_pct * 10_000),
+            max_slippage_bps=cfg.send.exit_slippage_bps(reason),
             blockhash=blockhash,
             last_valid_block_height=last_valid,
             compute_unit_limit=cfg.compute_unit_limit,
-            compute_unit_price_micro_lamports=cfg.compute_unit_price_micro_lamports,
+            compute_unit_price_micro_lamports=fee.micro_lamports,
             creates_wsol_ata=not wsol_account.exists,
         )
     except Exception as exc:
@@ -129,6 +131,7 @@ async def _sell(
     key = order_key(position.proposal_id, side="sell", attempt=attempt)
     intent_json = built.intent_json()
     intent_json["exit_reason"] = reason
+    intent_json["priority_fee"] = fee.as_json(cfg.compute_unit_limit)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         order_id = await insert_order(
             session,
@@ -156,11 +159,7 @@ async def _sell(
         journal=ctx.journal,
         verify=built.verify,
         decode_fill=decode_pumpswap_fills,
-        policy=SubmitPolicy(
-            allow_send=cfg.live and ctx.chain.rpc.allow_send,
-            cluster=cfg.cluster,
-            confirm_timeout_s=cfg.confirm_timeout_s,
-        ),
+        policy=submit_policy(cfg, ctx.chain.rpc),
         now=utcnow,
     )
     approval = ApprovedSubmission(
@@ -170,6 +169,7 @@ async def _sell(
         result = await asyncio.to_thread(submitter.submit, approval)
     except MemeLiveTradingDisabled:
         return
+    await record_send_result(ctx, key, result)
     if result.signature:
         ctx.state.last_signature = result.signature
     logger.info(

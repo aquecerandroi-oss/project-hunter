@@ -573,6 +573,19 @@ até 0,30 %; nunca 0,30 % fixo) menos os 0,5 % do caminho; a venda é precificad
 através da migração vende pela PumpSwap (linha da tabela), com a mesma faixa de taxa, o mesmo orçamento de
 participação e o mesmo `mark_stale_s` como sinal de mercado morto — nunca com uma marca pela curva vazia.
 
+**A venda tolera mais que a compra (T4.55).** `max_slippage_pct` (1 %) continua sendo a tolerância
+da **compra** — vira `max_sol_cost` e é conferida pelo check 19. A **venda** constrói o seu
+`min_sol_output` com `MEME_EXIT_MAX_SLIPPAGE_PCT` (padrão **5 %**) e, quando o motivo é
+`creator_dump` ou `rug_signal`, com `MEME_PANIC_EXIT_MAX_SLIPPAGE_PCT` (padrão **15 %**) — os demais
+motivos (`sell_now`, `target`, `trailing`, `time_stop`, `migrated`, `curve_complete`,
+`emergency_auto_close`) usam os 5 %. Motivo medido (R56 §2): a segunda venda da PS em 17/09 morreu na
+simulação com `6003 TooLittleSolReceived` porque, entre a cota e a checagem, cinco vendas seguidas
+levaram o preço de 86,7 para 74,4 µSOL/token (−14 %) contra 1 % de tolerância — uma venda de
+emergência a 1 % numa curva que derrete é uma venda que não acontece. A tolerância **não** muda a
+marca (§ acima: a marca é o líquido da cota, não o mínimo aceito) nem o sizing; ela só diz quanto
+abaixo da cota a cadeia ainda pode liquidar. O `intent` da ordem grava o `max_slippage_bps` usado.
+Vale também para a venda na PumpSwap (T4.29a). Valor fora de `(0, 50]` cai no padrão.
+
 **A tentativa acaba, a intenção não.** Cópia literal da §10 do contrato SPOT: cada tentativa de
 venda tem identidade própria; a intenção durável guarda a quantidade remanescente; só termina quando
 a quantidade pretendida foi liquidada ou houve substituição explícita e auditada. Sem estado
@@ -812,6 +825,37 @@ assinar, a transação decodificada tem de passar por um verificador nosso, e a 
   falharia" sem custo.
 - Confirmação por `getSignatureStatuses` com `commitment` do perfil; sem resposta dentro do prazo, a
   tentativa vira `submitted_unconfirmed` — que **não é fill nem cancelamento** (§9.5).
+- **Reenvio dos mesmos bytes enquanto espera (T4.55, regra 3 da §9.4 mecanizada).** Enquanto a
+  assinatura não aparece em lugar nenhum, o executor manda de novo a **mesma transação assinada** a
+  cada `MEME_RESEND_INTERVAL_S` (2 s; `0` desliga) — mesma assinatura, a rede deduplica, nunca uma
+  segunda posição — até (i) confirmar, (ii) a cadeia passar do `last_valid_block_height` do
+  blockhash sem a assinatura existir (⇒ `failed:blockhash_expired_never_landed`, o mesmo veredito
+  que a reconciliação dava 50–60 s depois, dado agora e sem mais reenvios), ou (iii) a janela de
+  confirmação fechar (30 s ⇒ `submitted_unconfirmed:confirmation_timeout`, reconciliação como
+  sempre). Um reenvio que o nó recusa (`AlreadyProcessed`, transporte) é **contado e ignorado**: o
+  primeiro envio já entrou na rede e só o `getSignatureStatuses` decide. Status `processed` não é
+  reenviado (um nó já tem a transação) nem decide (§8.2). `maxRetries: 0` e `skipPreflight: false`
+  continuam — o reenvio é nosso, auditável (`resends` no `intent` da ordem e `resends_total` no
+  heartbeat), não do nó. Bundles Jito (§9.3) não são reenviados. Motivo medido (R56 §2.1): 3 de
+  ~23 envios reais em 30 h terminaram `blockhash_expired_never_landed`, todos no instante em que a
+  mesma curva estava disputada — uma transação de prioridade mínima que o líder descarta some sem
+  erro, e ninguém a reenviava.
+- **Prioridade dinâmica com piso e teto (T4.55).** O `compute_unit_price` de cada transação deixa de
+  ser a constante `MEME_COMPUTE_UNIT_PRICE_MICRO_LAMPORTS` (10 000 µL/CU = 0,000004 SOL, 500× abaixo
+  do teto da §3.1) e passa a ser o **p75** de `getRecentPrioritizationFees` para o programa pump **e
+  a curva do mint** (o RPC responde, por slot, a taxa que uma transação pagou para travar *todas* as
+  contas pedidas — a disputa por *esta* moeda, não a média do cluster), sobre os 50 slots mais
+  recentes, com **piso** `MEME_PRIORITY_FEE_FLOOR_MICRO_LAMPORTS` (100 000 = 0,00004 SOL com 400 000
+  CU, 0,08 % de uma compra de 0,05) e **teto por custo total** `MEME_PRIORITY_FEE_MAX_SOL` (0,002 =
+  o `max_priority_fee_sol` do perfil; em µL/CU, `max_sol / compute_unit_limit`). Leitura limitada:
+  no máximo uma por tique, 1,5 s de prazo, cache de 10 s por conjunto de contas; **falhou ⇒ piso**,
+  nunca espera, nunca chuta acima do piso. A escolha vai inteira para o `intent` da ordem
+  (`priority_fee`: `micro_lamports`, `source` ∈ `p75`|`floor`|`cap`|`floor:read_failed`|
+  `floor:no_samples`|`floor:throttled`, `p75_micro_lamports`, `samples`, `fee_sol`) e para o
+  heartbeat (`priority_fee_last`). O check 20 (`fee_caps`) continua conferindo o valor **escolhido**
+  contra os dois tetos do perfil — a admissão vê a taxa real, não a constante. Fora do escopo desta
+  tarefa (R56 §2.1 item 3): baixar o `compute_unit_limit` para o consumo real (40–105 mil CU medidos
+  nas simulações da T4.8c) — exige gravar `computeUnitsConsumed` nas fills antes.
 
 ### 9.3 Jito bundles
 
@@ -837,7 +881,9 @@ uma retentativa "igual" com blockhash novo é uma **compra nova**. Regras:
    assinam a mesma proposta (VM9).
 3. Retentativa **reusa o mesmo blockhash** enquanto ele é válido: mesma assinatura, e a rede
    deduplica (a validade de um blockhash em slots **não foi reconfirmada nesta rodada** — a ser
-   fixada em T4.6 contra `solana.com/docs`).
+   fixada em T4.6 contra `solana.com/docs`). **Implementada na T4.55** como o reenvio periódico da
+   §9.2: `hunter_core.execution.meme.confirm.poll_until_settled` reenvia os bytes já assinados
+   (nunca assina de novo, nunca troca o blockhash) até confirmar, expirar ou a janela fechar.
 4. Blockhash expirado ⇒ a retentativa é uma **tentativa nova**, e exige: reconciliar a assinatura
    anterior (`getSignatureStatuses`) **antes**, reler as reservas, e a reserva da proposta ainda não
    expirada (`reservation_ttl_s`, §9.5).
@@ -1250,44 +1296,79 @@ Uma vez por tique do kill switch (10 s, depois do saldo de SOL ter sido relido �
 1. `MEME_TREASURY_ENABLED` ligada (padrão **desligada** — a flag do Everton), `live` ligado (a
    tesouraria nunca troca em papel), há um assinante, o kill switch não está travado.
 2. `wallet_sol < MEME_TREASURY_SOL_FLOOR` (padrão 0,30) — acima disso nada acontece.
-3. O intervalo mínimo desde a última tentativa (`MEME_TREASURY_MIN_INTERVAL_S`, padrão 600 s) e o
-   teto diário de USDC **confirmado** nas últimas 24 h (`MEME_TREASURY_MAX_USDC_PER_DAY`, padrão
-   50) permitem uma nova tentativa.
-4. O tamanho é `min(saldo de USDC da carteira, teto por troca (MEME_TREASURY_MAX_USDC_PER_SWAP,
-   padrão 25), teto diário restante, o que falta para `MEME_TREASURY_SOL_TARGET` (padrão 0,60) ao
-   preço da própria cotação)` — a última parte pede uma cotação da Jupiter primeiro (o tamanho
-   "ingênuo") e, se ela permitir um valor menor, uma segunda cotação nesse valor menor (nunca mais
-   de duas por tentativa).
-5. A cotação é recusada (`route_empty`, `price_impact_above_cap` acima de 1 %) antes de qualquer
-   transação ser montada.
-6. A transação vem pronta da Jupiter (`POST /v6/swap`, versão v0/ALT) e é **verificada antes de
-   assinar** (`treasury_rules.verify_swap_transaction`, o mesmo espírito de §9.1 do
-   `pumpfun/verify.py`, até onde uma transação versionada com *address lookup tables* permite): a
-   carteira é o único signatário e o *fee payer*, e todo `program_id` de toda instrução está na
-   lista branca (`JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4`, Token, Token-2022, Associated Token
-   Account, System, ComputeBudget) — uma conta cujo programa só existe atrás de uma *lookup table*
-   é **recusada**, nunca resolvida e confiada (essa resolução pediria mais uma chamada RPC que este
-   módulo deliberadamente não faz).
-7. Simulação (`simulateTransaction`, `sigVerify=false`) antes de assinar; assinatura com o mesmo
-   `MemeSigner` do resto do executor; envio só com `allow_send=True` (isto é, `live` ligado); a
-   confirmação usa `getSignatureStatuses` até `MEME_LIVE_CONFIRM_TIMEOUT_S`.
-8. Uma linha em `meme_treasury_swaps` por tentativa (`0051_meme_treasury_swaps`), do primeiro
+3. Antes de qualquer tentativa nova, o **reconcile** (T4.54b, `treasury_reconcile`): toda linha
+   `submitted` é consultada por `getSignatureStatuses` (`searchTransactionHistory`) — pousou →
+   `confirmed` com `sol_out_filled`/`wallet_sol_after` relidos da carteira; erro on-chain, ou
+   invisível há mais de 180 s (`SUBMITTED_MAX_AGE_S`, além da validade do blockhash) → `failed`;
+   senão continua `submitted`. Um reinício ou um estouro de confirmação **nunca reenvia**.
+4. O intervalo mínimo desde a última tentativa (`MEME_TREASURY_MIN_INTERVAL_S`, padrão 600 s) e o
+   teto diário de USDC **confirmado ou ainda `submitted`** nas últimas 24 h
+   (`MEME_TREASURY_MAX_USDC_PER_DAY`, padrão 50; `usdc_committed_last_24h`) permitem uma nova
+   tentativa — uma troca enviada conta como gasta até a cadeia provar que morreu.
+5. O alvo efetivo é `min(MEME_TREASURY_SOL_TARGET, wallet_max_sol − max_sol_per_trade)`
+   (`effective_sol_target`); um alvo configurado acima disso é **recusado por nome**
+   (`target_above_wallet_max`) antes de qualquer cotação — um *top-up* nunca estaciona a carteira
+   acima do teto que recusa toda entrada (`wallet_over_max_sol`, check 17). O tamanho é `min(saldo
+   de USDC da carteira, teto por troca (MEME_TREASURY_MAX_USDC_PER_SWAP, padrão 25), teto diário
+   restante, o que falta para o alvo efetivo ao preço da própria cotação)` — a última parte pede
+   uma cotação primeiro (o tamanho "ingênuo") e, se ela permitir um valor menor, uma segunda
+   cotação nesse valor (nunca mais de duas por tentativa).
+6. Cada cotação é **validada contra o pedido** (`validate_quote`): `inputMint`/`outputMint` =
+   USDC/WSOL, `inAmount` = o pedido, `slippageBps` = `MEME_TREASURY_MAX_SLIPPAGE_BPS`,
+   `otherAmountThreshold ≥ floor(outAmount × (1 − slippage))` — senão `quote_mismatch:<campo>`.
+   Depois é classificada (`route_empty`; `price_impact_above_cap` acima de **1 %** —
+   `priceImpactPct` da Jupiter é **fração**, não percentual: uma cotação real de 2 M USDC devolveu
+   `0.00333` com a saída 0,34 % abaixo do spot; `MAX_PRICE_IMPACT_FRACTION = 0.01`).
+7. A transação vem pronta da Jupiter (`POST /swap`, v0/ALT) e é **verificada instrução a instrução
+   antes de assinar** (`treasury_verify.verify_swap_transaction`, o espírito de §9.1 do
+   `pumpfun/verify.py`). O que a Jupiter realmente emite para USDC → SOL com `wrapAndUnwrapSol`
+   (captura real de 18/09/2026 com a chave pública da carteira, nada assinado):
+   `ComputeBudget.SetComputeUnitLimit`, `ComputeBudget.SetComputeUnitPrice`,
+   `AssociatedToken.CreateIdempotent` (ATA WSOL própria), `JUP6.route`, `Token.CloseAccount`.
+   Regras: carteira única signatária e *fee payer*; ComputeBudget só limite/preço, uma vez cada,
+   `limite × preço ≤ 0,005 SOL`; ATA só `Create`/`CreateIdempotent` pagas e possuídas pela carteira
+   (≤ 3); Token/Token-2022 só `CloseAccount` (9), `SyncNative` (17) e `InitializeAccount*` (1/16/18)
+   na ATA WSOL própria, destino e autoridade a carteira (discriminador decodificado); **System
+   proibido** (o *wrap* só existe quando SOL é a entrada); exatamente uma `JUP6` `route` ou
+   `shared_accounts_route` (discriminador Anchor), autoridade = carteira, origem = ATA USDC própria,
+   destino = ATA WSOL própria, sem destino de terceiro e sem conta de taxa, `in_amount ==
+   usdc_atoms`, `quoted_out_amount ≥ outAmount` da cotação, `slippage_bps ≤ teto`,
+   `platform_fee_bps == 0`; qualquer outro programa, ou instrução indecodificável, é recusado por
+   nome. Limite conhecido: os argumentos da `route` vêm depois de um `Vec<RoutePlanStep>` cujo enum
+   `Swap` tem 100+ variantes; eles são lidos do **fim** dos dados (19 bytes) e o Anchor tolera
+   bytes extras — por isso existe o item 8.
+8. Simulação (`simulateTransaction`, `sigVerify=false`, `accounts=[carteira, ATA USDC]`,
+   `jsonParsed`) com o **invariante de saldos** (`check_simulated_balances`): `USDC_depois ≥
+   USDC_antes − usdc_atoms` e `SOL_depois ≥ SOL_antes + otherAmountThreshold − 0,01 SOL` (taxa base +
+   prioridade + rent de ATA intermediária), com os saldos "antes" relidos na hora — senão
+   `simulation_usdc_overspent`/`simulation_sol_short`, nada assinado. É `equity = cash + Σ posições`
+   aplicado antes da assinatura, e é a última palavra sobre o item 7.
+9. Assinatura com o mesmo `MemeSigner` do resto do executor; envio só com `allow_send=True` (`live`
+   ligado); confirmação por `getSignatureStatuses` por no máximo `min(MEME_LIVE_CONFIRM_TIMEOUT_S,
+   20 s)` — passado isso a linha fica `submitted` (contada no teto diário) e o reconcile do item 3
+   a resolve; um erro on-chain marca `failed` na hora.
+10. Uma linha em `meme_treasury_swaps` por tentativa (`0051_meme_treasury_swaps`), do primeiro
    `quoted` até `confirmed`/`failed`/`refused` — nunca apagada (mesma disciplina de
    `meme_wallet_trades`, §17.7 do `DATABASE.md`).
 
-Falha fechada em cada ponto: qualquer leitura que falhe, cotação vazia, transação que não verifica,
-simulação que falha ou confirmação que estoura o prazo termina a tentativa sem enviar nada (ou,
-tendo já enviado, marca `failed` sem reenviar). O `hb:meme:executor` publica `treasury` (`enabled`,
-`last_swap_at`, `last_result`, `wallet_usdc`).
+Falha fechada em cada ponto: qualquer leitura que falhe, cotação vazia ou divergente, transação que
+não verifica, simulação que falha ou viola o invariante termina a tentativa sem enviar nada. Com
+`MEME_TREASURY_ENABLED=false` o tique é um **no-op puro** (nenhuma sessão, nenhuma RPC, nenhum
+HTTP; provado por teste), e nenhuma exceção de dentro do tique chega ao laço do kill switch — é
+logada e contada em `rpc_errors`. O `hb:meme:executor` publica `treasury` (`enabled`,
+`last_swap_at`, `last_result`, `wallet_usdc`). Endpoint: `MEME_TREASURY_JUPITER_BASE_URL` (padrão
+`https://lite-api.jup.ag/swap/v1`, sem chave; `quote-api.jup.ag/v6` deixou de resolver em
+18/09/2026; `api.jup.ag/swap/v1` com chave).
 
-### 16.2 O que **não** foi testado contra a mainnet
+### 16.2 O que foi e o que **não** foi testado contra a mainnet
 
-O ambiente desta sessão não tem acesso de rede de saída (`curl` a `quote-api.jup.ag` devolveu
-conexão recusada); as fixtures de `packages/exchange-adapters/tests/fixtures/jupiter/` são
-sintéticas — no formato documentado da API v6 da Jupiter, não uma captura real — e a transação
-versionada que os testes decodificam é construída em processo pelo próprio teste (nenhuma chave de
-carteira foi usada ou procurada para isso). O caminho de assinar/enviar/confirmar contra uma RPC
-real nunca rodou nesta sessão; só a matemática de tamanho, a classificação de recusa e o verificador
-de lista branca foram provados (testes unitários, offline). Antes de ligar `MEME_TREASURY_ENABLED`
-na VPS, vale gravar pelo menos uma cotação real (`GET /v6/quote`, sem carteira) para confirmar que a
-resposta real bate com o formato assumido aqui.
+T4.54b (18/09/2026): a cotação real (`GET lite-api.jup.ag/swap/v1/quote`, 1 USDC → SOL) e a
+transação real não assinada (`POST /swap` com a **chave pública** da carteira) estão gravadas em
+`services/meme-executor/tests/fixtures/jupiter_*_real.json`; o decodificador v0 e o verificador
+passam nelas (`test_treasury_verify.py`), e a unidade de `priceImpactPct` foi confirmada como fração.
+O que continua **sem prova ao vivo**: `simulateTransaction` com `accounts` contra a RPC real (o
+invariante de saldos), e o caminho assinar → enviar → confirmar → reconcile — nenhuma chave foi usada
+ou procurada. A prova mínima antes de ligar a flag é a §6 da revisão
+(`.claude/state/review-T4.54.md`): simular a transação real sem assinar e conferir que o USDC cai
+exatamente o pedido e o SOL sobe ≥ `otherAmountThreshold`; depois uma primeira troca de ~1 USDC com
+tetos de 1 USDC/dia.
