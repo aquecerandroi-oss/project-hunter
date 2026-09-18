@@ -103,10 +103,11 @@ class GateRow:
     recent_drawdown_peak_age_s: Decimal | None = None
     recent_drawdown_reason: str | None = None
     """T4.52b-3 (EXP-M13): :func:`hunter_indicators.meme.drawdown.recent_drawdown`
-    over the mint's in-memory reserve series — ``None`` on every row this
-    revision does not compute it for (the closed-minute and 15-second gates),
-    which is exactly ``recent_drawdown_unknown`` for a set that turns the
-    guard on; only the event gate's own row builder fills the three."""
+    over the mint's in-memory reserve series on the event lane, and — since
+    T4.61a — over the mint's stored photos on the 15-second lane
+    (``lab_repo_drawdown``, one bounded read per tick). ``None`` on a
+    closed-minute row, which is exactly ``recent_drawdown_unknown`` for a set
+    that turns the guard on."""
 
 
 __all__ = ["GateRow"]

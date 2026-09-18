@@ -139,6 +139,8 @@ _NUMERIC_REFUSALS: dict[
     "top10_above_max": (lambda f: f.top10_share, lambda g: g.max_top10_share),
     "buyers_below_min": (lambda f: f.unique_buyers_1m, lambda g: g.min_unique_buyers),
     "holders_below_min": (lambda f: f.holders, lambda g: g.min_holders),
+    # T4.61a (EXP-M13): the fraction lost from the window's peak against the ceiling.
+    "recent_drawdown": (lambda f: f.recent_drawdown_pct, lambda g: g.max_recent_drawdown_pct),
 }
 """One entry per refusal name this revision already decodes into a numeric
 pair (docs/DATABASE.md §54.2's own example, ``snipers_above_max``). A name

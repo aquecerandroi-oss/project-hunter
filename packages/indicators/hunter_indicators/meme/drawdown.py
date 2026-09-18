@@ -16,6 +16,14 @@ fall" is coverage noise, not a criterion):
 - ``no_observation`` — nothing reached us by ``as_of``;
 - ``stale`` — the newest observation is older than ``max_gap_s``.
 
+A third name, ``too_few_points``, belongs to the same vocabulary but is not
+raised by :func:`recent_drawdown` itself: over a full history (the event
+lane's deque) one point *is* the peak and the drawdown is 0. The 15-second
+lane, which reads a bounded lookback of stored photos rather than the whole
+life of the coin (T4.61a, ``hunter_meme_worker.lab_repo_drawdown``), names it
+when fewer than two photos are known by ``as_of`` — one photo cannot say
+whether anything fell.
+
 **Non-anticipation is decided here.** Every point carries ``received_at``; a
 point received after ``as_of`` is not an input of that instant, however early
 its ``observed_at``. Over a plain sequence the fold filters and is O(n); over a
@@ -44,6 +52,7 @@ __all__ = [
     "DRAWDOWN_REASONS",
     "NO_OBSERVATION",
     "STALE",
+    "TOO_FEW_POINTS",
     "PeakDeque",
     "RecentDrawdown",
     "ReservePoint",
@@ -56,7 +65,8 @@ DEFAULT_MAX_GAP_S: Final = 30
 
 NO_OBSERVATION: Final = "no_observation"
 STALE: Final = "stale"
-DRAWDOWN_REASONS: Final = frozenset({NO_OBSERVATION, STALE})
+TOO_FEW_POINTS: Final = "too_few_points"
+DRAWDOWN_REASONS: Final = frozenset({NO_OBSERVATION, STALE, TOO_FEW_POINTS})
 
 _FRACTION = Decimal("0.000001")
 _SECONDS = Decimal("0.001")

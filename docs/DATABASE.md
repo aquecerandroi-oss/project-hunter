@@ -7674,3 +7674,73 @@ existir linha referenciando o conjunto em `meme_proposals`, `meme_paper_bets`,
 `meme_rule_set_param_history` e `meme_gate_refusals_by_mint`, como na `0049`.
 `packages/core/tests/integration/test_migration_0050.py` prova as duas pontas contra um Postgres real,
 mais o `alembic check` (esta revisão não muda schema: a comparação com os modelos tem de continuar vazia).
+
+## 59. Não entrar depois da queda, como braço — M5 (`0052_meme_gate_after_drop_arm`)
+
+**O que a `0052` faz:** semeia **um** conjunto de pesquisa, `flow_v2/9` (`…0016`, `research_only`,
+`exp_ref EXP-M13`, relógio de 15 s) = `flow_v2/6` (§53) com **uma** chave acrescentada,
+`max_recent_drawdown_pct: "0.50"` (string decimal, fração), e todo o resto byte a byte igual. A janela
+(60 s) e a defasagem máxima (30 s) são os defaults do portão (`EntryGate.recent_drawdown_window_s` /
+`recent_drawdown_max_gap_s`, lidos por `lab_models._gate_from_params`) e **não** são semeadas: o
+pré-registro as congelou junto com o braço. Nenhuma mudança de schema, nada aposentado, `flow_v2/6`
+continua ativo (é o controle) e a mesa (`operator/5`) não é tocada. Tudo em
+`ddl/meme_gate_after_drop_arm.py`; a contagem de conjuntos ativos vai a 18.
+
+**Por que 0,50 / 60 s** ([[11-KNOWLEDGE/KB-0118-nao-entrar-depois-da-queda|KB-0118]], R56): sobre 613
+entradas da porta viva em 5 dias (12–16/09), a célula *caiu ≥ 50 % de um pico com ≤ 60 s* foi a **única**
+negativa (−0,305 R, cauda ≥ +2 R de 4,1 % contra ~13 %); a mesma queda com pico **velho** (60–180 s) foi a
+melhor de todas (+0,566 R, n = 17) — por isso o critério é recusa por decisão, nunca banimento da moeda. A R56
+(18/09) leu as primeiras compras reais da mesa (17→18/09): **7 de 7** depois de uma queda. Tudo in-sample, X e
+N escolhidos entre nove combinações (KB-0092), então a previsão registrada na EXP-M13 é `descartar`. Papel por
+construção, como nas §57–§58: o executor só abre proposta de `kind = 'operator'`.
+
+**O que a semente sozinha não faria — e por isso a T4.61a entrega as duas metades.** Até esta tarefa a
+pista de 15 s nunca preenchia `GateRow.recent_drawdown_*` (só a pista de evento, em memória), então um
+conjunto com a chave recusaria **toda** linha `recent_drawdown_unknown`. `meme_features_15s` **não tem
+coluna de reserva**: cada linha nomeia a sua foto (`snapshot_observed_at`/`snapshot_source`) e o SOL real
+mora em `meme_curve_snapshots.real_sol_reserves` — exatamente a entrada que a EXP-M13 congelou (nunca
+`mcap_sol`, KB-0115). `hunter_meme_worker.lab_repo_drawdown` faz **uma consulta limitada por tick**
+sobre os mints julgados (`mint = ANY(:mints)`, `observed_at` nos últimos 120 s, `received_at <=
+max(as_of)`), e dobra cada linha no **seu próprio** `as_of` com
+`hunter_indicators.meme.drawdown.recent_drawdown` — a mesma aritmética da pista de evento. Medido
+(`services/meme-worker/tests/test_lab_drawdown.py`, `.claude/state/notes-T4.61a-explain.txt`): sobre
+40 020 fotos (5 000 mints × 8 na janela) pedindo 130 mints, `Bitmap Index Scan` no filho
+`meme_curve_snapshots_2026_10_mint_observed_at_idx` de `ix_meme_curve_snapshots_mint_observed`, uma
+partição só (o teto poda as seguintes), estimativa de 1 039 linhas, sem `Seq Scan`. Sem foto conhecida no
+instante é `no_observation`; **uma** foto é `too_few_points` (vocabulário novo em `drawdown.py`, não
+levantado pela função compartilhada — na pista de evento um ponto é o próprio pico); foto mais nova com
+> 30 s é `stale`. Uma leitura que falhe (timeout de 8 s no savepoint) deixa os três campos `None` e loga
+`meme_drawdown_read_failed` — o tick segue, como pedigree e E2-b já fazem. A trilha de recusas
+(`meme_gate_refusals_by_mint`, §54.2) passou a decodificar `recent_drawdown` em `(value, limit)` = (fração
+perdida, teto).
+
+**Cinco desvios declarados (T4.61a),** escritos também na página da EXP-M13:
+
+1. **A versão é `flow_v2/9`, não a `/8` que a página congelou.** A página (16/09) reservou `/8` para si;
+   a `0050` (T4.49, EXP-M14) tomou `/8` no dia seguinte. Mesmo braço, próxima versão livre.
+2. **A revisão é `0052_meme_gate_after_drop_arm` (29 caracteres).** O brief a nomeou
+   `0052_meme_gate_no_entry_after_drop_arm` (38): `alembic_version.version_num` é `VARCHAR(32)` (§17.6,
+   §30.7) e `test_every_revision_id_fits_the_alembic_version_column` recusaria — o id encurtou, o
+   contrato não.
+3. **A base é `flow_v2/6`, que carrega `pedigree_e2b: true`.** A página nomeia o conjunto vivo
+   (`flow_v2/5`) como controle; como nas §57–§58, a leitura honesta é `flow_v2/9` **contra `flow_v2/6`**,
+   os dois com E2-b, nunca contra `operator/5`.
+4. **`gate_version` continua 3.** Um critério é ligado por um parâmetro que o portão já sabe ler; quem
+   identifica o braço é `flow_v2/9`.
+5. **O preenchimento olha 120 s e a janela do portão é 60 s.** A definição operacional da página toma o
+   pico em `[t − 60 s, t]`; o portão puro (T4.52b-2) recusa só quando o pico tem no máximo
+   `recent_drawdown_window_s` de idade e **deixa passar** um pico mais velho (a célula de +0,566 R). Dobrar
+   sobre os próprios 60 s tornaria essa idade invisível, então a pista de 15 s dobra sobre o horizonte da
+   série (120 s, `snapshots_120s`) e o portão julga a idade. A recusa é a mesma para um pico único; as duas
+   leituras divergem apenas quando um pico mais baixo e mais novo está dentro dos 60 s atrás de um mais
+   alto e mais velho — e é a leitura do portão (já entregue, e a da pista de evento) que vale.
+
+**Downgrade guardado (§17.7).** `refuse_a_downgrade_that_would_orphan_an_after_drop_row` recusa enquanto
+existir linha referenciando o conjunto em `meme_proposals`, `meme_paper_bets`,
+`meme_rule_set_param_history` e `meme_gate_refusals_by_mint`, como na `0049`/`0050`.
+`packages/core/tests/integration/test_migration_0052.py` prova as duas pontas contra um Postgres real,
+mais o `alembic check` num banco levado ao `head` (esta revisão não muda schema: a comparação com os modelos
+tem de continuar vazia). Os testes da `0051` passaram a se posicionar em `0051_meme_treasury_swaps` antes de
+reverter, e o seu `alembic check` roda num banco próprio no `head` — o mesmo formato que a `0050` adotou
+quando a `0051` chegou. **Trava, pooler:** um `INSERT ... ON CONFLICT DO NOTHING` e nada de estado de
+sessão; a revisão não abre janela de manutenção.

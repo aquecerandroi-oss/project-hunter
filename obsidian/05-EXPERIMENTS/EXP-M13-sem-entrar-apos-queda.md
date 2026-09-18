@@ -1,11 +1,11 @@
 ---
 tags: [experimento, meme, pumpfun, paper, pre-registro, drawdown, entrada, porta, m4]
-updated: 2026-09-16
+updated: 2026-09-18
 status: pre-registrado
 owner: astra-quant
 exp: EXP-M13
 strategy: "meme/pumpfun — porta calibrada com recusa de entrada quando a curva perdeu ≥ 50 % do pico de real_sol_reserves com o pico nos últimos 60 s; clone do conjunto vivo em todo o resto"
-version: "gate fluxo_e_holders v3 (recent_drawdown_block X=0,50 N=60 s) + exit alvo_3x_trailing_35_apos_1_5x_tempo_30m v1 (flow_v2/8; porta no relógio de 15 s, drawdown na foto de curva)"
+version: "gate fluxo_e_holders v3 (max_recent_drawdown_pct 0,50, janela 60 s, defasagem 30 s) + exit alvo_3x_trailing_35_apos_1_5x_tempo_30m v1 (flow_v2/9 semeado pela 0052; porta no relógio de 15 s, drawdown na foto de curva)"
 result: nao-iniciado
 evaluable: 0
 days: 0
@@ -128,6 +128,47 @@ e que o Δ **cai** (+0,024 e +0,018 contra +0,038); baixar X para 20 % (Δ +0,03
 de cadência); transformar o critério em **banimento** da moeda em vez de recusa por decisão (mataria a célula de
 +0,566 R); rodar junto com EXP-M10 ou EXP-M11 no mesmo conjunto; usar `mcap_sol` em vez de `real_sol_reserves`
 ([[11-KNOWLEDGE/KB-0115-volta-ao-piso-e-real-ou-artefato|KB-0115]]); ligar dinheiro real antes da régua.
+
+## Braço semeado (T4.61a)
+
+**18/09/2026, 15:2x BRT** — o braço existe no banco e a pista de 15 s passou a enxergar a queda. Diretiva
+de Everton (18/09, 15:0x BRT): "usar a inteligência que já adquirimos e operar agora"; a
+[[03-TRADING/Meme/Candidatas/2026-09-18-r56|R56]] tinha acabado de ler as primeiras compras reais da mesa
+(17→18/09): **7 de 7 depois de uma queda**.
+
+| item | valor |
+|---|---|
+| migração | `0052_meme_gate_after_drop_arm` (sobre `0051_meme_treasury_swaps`), `docs/DATABASE.md` §59 |
+| conjunto | **`flow_v2/9`** (`01994d00-6c1a-7000-8000-000000000016`), `research_only`, `exp_ref EXP-M13`, `status active`, relógio 15 s |
+| base / controle | `flow_v2/6` (`0044`, com `pedigree_e2b: true`) — leitura honesta é `/9` contra `/6`, nunca contra `operator/5` |
+| a única chave nova | `max_recent_drawdown_pct: "0.50"` (string decimal, fração) |
+| janela / defasagem máxima | 60 s / 30 s — defaults do portão (`EntryGate`), não semeados |
+| recusas | `recent_drawdown` (caiu > 50 % de um pico com ≤ 60 s), `recent_drawdown_unknown` (sem foto no instante, uma foto só — `too_few_points` —, ou foto mais nova com > 30 s) |
+| preenchimento na pista de 15 s | `hunter_meme_worker.lab_repo_drawdown`: uma consulta limitada por tick em `meme_curve_snapshots.real_sol_reserves` (últimos 120 s dos mints julgados, `received_at <= as_of`), dobrada com `hunter_indicators.meme.drawdown.recent_drawdown` — a mesma aritmética da pista de evento; nunca `mcap_sol` (KB-0115) |
+| EXPLAIN | 40 020 fotos, 130 mints: `Bitmap Index Scan` em `meme_curve_snapshots_2026_10_mint_observed_at_idx`, uma partição, ~1 039 linhas, sem Seq Scan (`.claude/state/notes-T4.61a-explain.txt`) |
+| papel por construção | o executor só abre proposta de `kind = 'operator'`; este braço nunca chega a dinheiro real |
+
+**Regra de decisão (inalterada, repetida para não haver dúvida):** leitura **única** no fim — mínimo
+**150 propostas do braço E 10 dias corridos**, o que vier por último, com leave-one-day-out obrigatório;
+qualquer gatilho de descarte da seção acima basta; P3 (a coorte recusada, medida à parte, tem de ser pior) e
+P5 (`recent_drawdown_unknown` ≤ 10 % das recusas do braço) são o que separa "mediu queda" de "mediu
+cobertura". Veredito de vida só pela régua do laboratório (≥ 100 apostas medidas e 30 dias). Enquanto isso,
+**a mesa (`operator/5`) segue sem o critério**: ligar o portão em dinheiro real é decisão de Everton, com a
+leitura do braço na mão, nunca deste seed.
+
+**Desvios em relação ao pré-registro, declarados aqui (e em `docs/DATABASE.md` §59):**
+
+1. a versão é **`flow_v2/9`**, não `/8` — a `0050` (EXP-M14, T4.49) tomou `/8` em 17/09, um dia depois de
+   esta página o reservar;
+2. a base é `flow_v2/6` (com E2-b), não o conjunto vivo `flow_v2/5` — mesma declaração da EXP-M10 e da
+   EXP-M14;
+3. o **preenchimento** olha os últimos **120 s** de fotos e o **portão** julga a idade do pico contra os
+   **60 s**: a recusa é idêntica à definição operacional acima para um pico único, e diverge só quando há um
+   pico mais baixo e mais novo dentro dos 60 s atrás de um mais alto e mais velho — a leitura do portão
+   (T4.52b-2, a mesma da pista de evento) é a que vale, e é a que preserva a célula de +0,566 R;
+4. `gate_version` continua 3 (um critério ligado por parâmetro, não um conjunto de critérios novo);
+5. a migração chama-se `0052_meme_gate_after_drop_arm` (29 caracteres), não o nome de 38 do brief — o
+   teto de `alembic_version` é 32.
 
 ## Avaliação
 _(append-only; o fechamento diário acrescenta uma seção datada por dia com aposta fechada)_

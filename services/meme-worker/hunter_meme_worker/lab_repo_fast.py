@@ -21,6 +21,7 @@ from sqlalchemy.exc import DBAPIError
 from hunter_core.logging import get_logger
 from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, PedigreeGate
 from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
+from hunter_meme_worker.lab_repo_drawdown import with_recent_drawdown
 from hunter_meme_worker.lab_rows import snapshot_from_row
 from hunter_meme_worker.proposals import SERIES_15S, GateRow
 
@@ -143,7 +144,9 @@ async def load_fast_gate_rows(
     session: AsyncSession, *, since: datetime, until: datetime, features_version: str
 ) -> list[GateRow]:
     """Every 15-second row with ``since < as_of <= until``, as the gate reads it
-    (``end_time`` = ``as_of``, ``series = SERIES_15S``)."""
+    (``end_time`` = ``as_of``, ``series = SERIES_15S``) — including, since
+    T4.61a, EXP-M13's ``recent_drawdown_*`` folded from the mint's own photos
+    (:mod:`hunter_meme_worker.lab_repo_drawdown`, one bounded read per tick)."""
     rows = (
         await session.execute(
             _FAST_ROWS, {"since": since, "until": until, "version": features_version}
@@ -214,7 +217,7 @@ async def load_fast_gate_rows(
                 event_match_kind=r["event_match_kind"],
             )
         )
-    return out
+    return await with_recent_drawdown(session, out)
 
 
 async def pedigree_for(

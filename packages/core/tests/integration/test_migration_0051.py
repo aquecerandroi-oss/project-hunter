@@ -61,9 +61,11 @@ def db_url(container_url: str) -> str:
 
 @pytest.fixture(scope="module")
 def upgraded(db_url: str) -> Iterator[str]:
-    """``alembic upgrade head`` on a clean database of this revision's own —
-    this revision *is* the head of the repository's chain today."""
-    command.upgrade(alembic_config(db_url), "head")
+    """This revision, not ``head``: ``0052`` (T4.61a) now lands on top of it,
+    and this module's downgrade assertions (``"-1"`` -> ``PREVIOUS``) are about
+    the one step this revision itself takes, not about whatever the chain
+    grows to after it."""
+    command.upgrade(alembic_config(db_url), REVISION)
     yield db_url
 
 
@@ -105,8 +107,16 @@ async def _count(url: str) -> int:
         await created.dispose()
 
 
-def test_the_models_and_the_migrations_agree(upgraded: str) -> None:
-    command.check(alembic_config(upgraded))
+def test_the_models_and_the_migrations_agree(container_url: str) -> None:
+    """``alembic check`` needs the true head, not just this revision — ``0052``
+    (T4.61a) lands on top of ``0051`` and seeds a rule set of its own, so this
+    assertion runs on its own database taken all the way to ``head`` rather
+    than on ``upgraded`` (staged at ``REVISION`` for the downgrade tests),
+    the same shape ``test_migration_0050`` settled on."""
+    db_url = asyncio.run(create_database(container_url, "hunter_migration_0051_head"))
+    config = alembic_config(db_url)
+    command.upgrade(config, "head")
+    command.check(config)
 
 
 @pytest.mark.asyncio
@@ -257,7 +267,10 @@ def test_the_downgrade_removes_the_table_on_a_clean_database_and_comes_back(
 
         assert asyncio.run(_table_exists()) is False
     finally:
-        command.upgrade(config, "head")
+        # Back to REVISION, not "head": 0052 (T4.61a) lands on top of this one
+        # now, and this module's database is staged at REVISION on purpose (see
+        # the ``upgraded`` fixture) — ``test_the_models_and_the_migrations_
+        # agree`` above is the one that checks the whole chain against "head".
+        command.upgrade(config, REVISION)
     assert asyncio.run(_revision_of(upgraded)) == REVISION
     assert asyncio.run(_count(upgraded)) == 0
-    command.check(config)
