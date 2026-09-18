@@ -57,6 +57,17 @@ class EventGateStats:
     no_base_row_window: deque[datetime] = field(default_factory=deque[datetime])
     unsubscribed_total: int = 0
     reconnects: int = 0
+    restarts_total: int = 0
+    """S-T4.62 MEDIUM: :func:`event_gate.run_event_gate_forever` restarts —
+    the 13/h signal the security review flagged; exposed on the heartbeat so
+    a spike is visible without grepping logs."""
+    gap_write_failed_total: int = 0
+    """S-T4.62 MEDIUM: a reconnect gap ``INSERT`` that raised instead of
+    landing (``event_gate_eval.handle_reconnect``) — counted, never raised."""
+    bad_frames_total: int = 0
+    """S-T4.62 MEDIUM: a notification that crashed folding/evaluation
+    (malformed ``TradeEvent``, bad pydantic frame, ...) and was dropped
+    instead of killing the gate."""
     subscriptions: int = 0
     ws_state: str = "disconnected"
     last_event_at: datetime | None = None
@@ -106,6 +117,15 @@ class EventGateStats:
     def record_reconnect(self) -> None:
         self.reconnects += 1
 
+    def record_restart(self) -> None:
+        self.restarts_total += 1
+
+    def record_gap_write_failed(self) -> None:
+        self.gap_write_failed_total += 1
+
+    def record_bad_frame(self) -> None:
+        self.bad_frames_total += 1
+
 
 def heartbeat_fields(
     stats: EventGateStats,
@@ -142,6 +162,9 @@ def heartbeat_fields(
         "ws_state": stats.ws_state,
         "subscriptions": str(stats.subscriptions),
         "reconnects": str(stats.reconnects),
+        "restarts_total": str(stats.restarts_total),
+        "gap_write_failed_total": str(stats.gap_write_failed_total),
+        "bad_frames": str(stats.bad_frames_total),
         "last_event_age_s": age,
         "no_base_row_60s": str(len(stats.no_base_row_window)),
         "unsubscribed_total": str(stats.unsubscribed_total),

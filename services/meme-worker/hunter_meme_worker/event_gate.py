@@ -94,16 +94,30 @@ async def _read_loop(rt: EventGateRuntime, queue: asyncio.Queue[Notification]) -
                 state.mark_gap(now)
 
 
+def _log_bad_frame(rt: EventGateRuntime, event: str, exc: Exception, *, mint: str | None) -> None:
+    """S-T4.62 MEDIUM: a single bad notification/evaluation must never kill
+    the gate's own ``TaskGroup`` — counted and logged, the loop continues."""
+    rt.stats.record_bad_frame()
+    logger.warning(event, mint=mint, error_type=type(exc).__name__, error=str(exc))
+
+
 async def _evaluate_loop(rt: EventGateRuntime, queue: asyncio.Queue[Notification]) -> None:
     while True:
         notif = await queue.get()
         now = utcnow()
-        mint = apply_notification(rt, notif)
+        try:
+            mint = apply_notification(rt, notif)
+        except Exception as exc:  # a malformed frame is dropped, not a crash
+            _log_bad_frame(rt, "meme_event_gate_bad_frame", exc, mint=None)
+            continue
         if mint is None:
             continue
         rt.stats.record_event(now)
         if rt.debouncer.poll(mint, time.monotonic()):
-            await evaluate_mint(rt, mint, now)
+            try:
+                await evaluate_mint(rt, mint, now)
+            except Exception as exc:  # a bad row/spec must not stop the gate
+                _log_bad_frame(rt, "meme_event_gate_evaluate_failed", exc, mint=mint)
 
 
 async def _flush_loop(rt: EventGateRuntime) -> None:
@@ -111,7 +125,10 @@ async def _flush_loop(rt: EventGateRuntime) -> None:
     while True:
         await asyncio.sleep(interval)
         for mint in rt.debouncer.drain_ready(time.monotonic()):
-            await evaluate_mint(rt, mint, utcnow())
+            try:
+                await evaluate_mint(rt, mint, utcnow())
+            except Exception as exc:  # a bad row/spec must not stop the gate
+                _log_bad_frame(rt, "meme_event_gate_evaluate_failed", exc, mint=mint)
 
 
 async def _trail_flush_loop(rt: EventGateRuntime) -> None:
@@ -190,6 +207,13 @@ async def run_event_gate_forever(rt: EventGateRuntime) -> None:
             return  # ``rt.ws`` closed deliberately (``aclose``) — not a crash
         except asyncio.CancelledError:
             raise
-        except Exception:
-            logger.warning("meme_event_gate_crashed_restarting", delay_s=RESTART_DELAY_S)
+        except Exception as exc:
+            rt.stats.record_restart()
+            logger.warning(
+                "meme_event_gate_crashed_restarting",
+                delay_s=RESTART_DELAY_S,
+                error_type=type(exc).__name__,
+                error=str(exc),
+                exc_info=True,
+            )
             await asyncio.sleep(RESTART_DELAY_S)

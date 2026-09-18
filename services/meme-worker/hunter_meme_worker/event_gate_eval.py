@@ -309,7 +309,13 @@ def _gap_start(rt: EventGateRuntime, *, before: datetime) -> datetime:
 
 async def handle_reconnect(rt: EventGateRuntime, now: datetime) -> None:
     """A WS reconnect invalidates every window (plan §4 "WS morre"): every
-    subscribed mint's tape warms again, and the gap is durable."""
+    subscribed mint's tape warms again, and the gap is durable.
+
+    S-T4.62 MEDIUM: this runs inline in ``_read_loop`` (``event_gate.py``) —
+    a ``statement_timeout``/pool error out of the ``INSERT`` below must not
+    kill the gate's own ``TaskGroup`` (the likely source of the 13
+    restarts/h the security review measured). The in-memory gap marks above
+    always land; only the durable record can fail, and it fails quietly."""
     rt.seen_reconnects = rt.ws.state.reconnects
     rt.stats.record_reconnect()
     rt.stats.ws_state = rt.ws.state.ws_state
@@ -318,14 +324,20 @@ async def handle_reconnect(rt: EventGateRuntime, now: datetime) -> None:
         state = rt.book.get(mint)
         if state is not None:
             state.mark_gap(now)
-    async with role_session(rt.lab.session_factory, db_role=WORKER_ROLE) as session:
-        await record_gap(
-            session,
-            GapRow(
-                stream=GAP_STREAM,
-                gap_start=start,
-                gap_end=now,
-                reason="reconnect",
-                generation=rt.seen_reconnects,
-            ),
+    try:
+        async with role_session(rt.lab.session_factory, db_role=WORKER_ROLE) as session:
+            await record_gap(
+                session,
+                GapRow(
+                    stream=GAP_STREAM,
+                    gap_start=start,
+                    gap_end=now,
+                    reason="reconnect",
+                    generation=rt.seen_reconnects,
+                ),
+            )
+    except Exception as exc:  # never let a DB hiccup kill the read loop
+        rt.stats.record_gap_write_failed()
+        logger.warning(
+            "meme_event_gate_gap_write_failed", error_type=type(exc).__name__, error=str(exc)
         )

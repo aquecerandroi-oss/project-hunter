@@ -35,7 +35,7 @@ from itertools import count
 from typing import Any, Protocol, cast
 
 from hunter_core.domain.types import utcnow
-from hunter_core.logging import get_logger
+from hunter_core.logging import get_logger, redact_url
 from hunter_exchanges.base import ExchangeUnavailable, MalformedMessage
 from hunter_exchanges.pumpfun.rpc_ws_models import (
     ConnectionState,
@@ -285,8 +285,8 @@ class SolanaWsClient:
                 )
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:
-                logger.warning("solana_ws_connect_error", error=str(exc))
+            except Exception as exc:  # InvalidURI/InvalidProxy can embed the keyed URL
+                logger.warning("solana_ws_connect_error", error=redact_url(str(exc)))
                 attempt = await self._backoff(attempt)
                 continue
 
@@ -322,7 +322,7 @@ class SolanaWsClient:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logger.warning("solana_ws_connection_error", error=str(exc))
+                logger.warning("solana_ws_connection_error", error=redact_url(str(exc)))
                 self.state.ws_state = "reconnecting"
                 failure = exc
             finally:
@@ -333,7 +333,7 @@ class SolanaWsClient:
                 except asyncio.CancelledError:
                     pass
                 except Exception as exc:
-                    logger.warning("solana_ws_resubscribe_error", error=str(exc))
+                    logger.warning("solana_ws_resubscribe_error", error=redact_url(str(exc)))
                 self._connected.clear()
                 self._fail_pending(ConnectionError("solana ws connection closed"))
                 await self._close_quietly(cm)
@@ -347,4 +347,4 @@ class SolanaWsClient:
         try:
             await cm.__aexit__(None, None, None)
         except Exception as exc:
-            logger.warning("solana_ws_close_error", error=str(exc))
+            logger.warning("solana_ws_close_error", error=redact_url(str(exc)))
