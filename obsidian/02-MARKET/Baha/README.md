@@ -2,7 +2,7 @@
 tags: [market, fonte, noticias, baha, plantao]
 status: vivo
 owner: sexta-feira
-updated: 2026-09-15
+updated: 2026-09-18
 ---
 
 # baha.com/news — a fonte fixa de notícias (pedido do Everton, 15/09/2026 17:5x BRT)
@@ -31,4 +31,5 @@ institucional (regulação, BTC/ETH, bancos); o pump.fun em si não aparece. Ser
 não como sinal de moeda.
 
 ## Diários
+- [[02-MARKET/Baha/2026-09-18|2026-09-18]] — turno automático 19:50 BRT: BTC rompe 80 k (+6,3 %) com Europa caindo; Groenlândia (Trump × Dinamarca) candidato a `meme_event`, não registrado; Schmid fala em alta de juros.
 - [[02-MARKET/Baha/2026-09-15|2026-09-15]] — primeira varredura: Clarity Act barrado no Senado, BTC −3 %, juros de 10 anos no maior nível desde 2007, CPI e decisão do Fed amanhã.

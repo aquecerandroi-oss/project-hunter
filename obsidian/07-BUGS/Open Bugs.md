@@ -1,6 +1,6 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-11
+updated: 2026-09-18
 status: aberto
 owner: sexta-feira
 severity: misto
@@ -11,6 +11,56 @@ closed: ""
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## Disco da VPS em 88 % — o banco cresce ~6 GB/dia e ninguém poda a outbox (plantão 18/09, 19:5x BRT)
+
+**HIGH (operação), medido às 22:46Z de 2026-09-18 na VPS.** `df -h /` = **306 G de 348 G (88 %)**;
+em 08/09 estavam 32 %. Com a taxa medida a máquina enche em **poucos dias**, e quando o Postgres
+parar de escrever cai junto o `meme-executor` com dinheiro real na mesa. Decomposição real
+(`docker system df`, `du`, `pg_total_relation_size`):
+
+| Onde | Tamanho | Recuperável | Causa |
+|---|---|---|---|
+| Imagens Docker | **178 GB** (267 imagens) | **170,7 GB** | cada `compose.sh update` deixa `hunter-api:<sha>` + `hunter-web:<sha>` (~1 GB por deploy) e nada apaga as antigas; só 7 em uso |
+| Build cache | 37 GB | 33 GB | idem |
+| Volume do Postgres | 65 GB (banco 58 GB) | — | ver tabelas abaixo |
+| `/opt/backups` | 41 GB | — | 8 dumps; o diário passou de **1,6 GB (11/09) a 10,6 GB (18/09)** e leva 32 min; retenção 7 d |
+
+Tabelas que puxam o banco (`pg_total_relation_size`, 22:5xZ):
+
+| Tabela | Total | Linhas | Crescimento medido |
+|---|---|---|---|
+| `opportunity_history_2026_09` | **25 GB** | 1,86 M | **355 034 linhas / 4,2 GB em 24 h** — 13 kB por linha (`decomposition` + `envelope` JSON); é o radar de perpétuos (M2), hoje "só manutenção" |
+| `outbox_events` | **17 GB** | 19,57 M | **2 121 139 linhas / 1,2 GB de payload em 24 h**; **100 % despachadas**, nenhuma pendente; nunca podada desde 06/09 |
+| `feature_snapshots_2026_09` | 5 GB | 2,1 M | perpétuos |
+| as 6 `meme_*_2026_09` | 7,2 GB somadas | — | com retenção própria (`MEME_RETENTION_DAYS`, 15 s em 7 d) |
+
+- **Causa raiz da outbox:** `docs/DATABASE.md` §1.3 dava a poda ao `analytics-worker` (M5), que não
+  existe; `services/execution-worker/.../events.py:198` já dizia "a job the M3 stack does not yet run
+  anywhere". `prune_dispatched` (core, testado por `test_outbox_integration.py`) nunca foi chamado em
+  produção. A estimativa da doc (700 mil/dia) está 3× abaixo do medido (2,1 M/dia).
+- **Corrigido neste plantão (T4.63):** `infra/scripts/prune_outbox_events.py` — laço sobre
+  `prune_dispatched` (lotes de 5 mil ids em ordem de PK, uma transação por lote, pendente nunca sai,
+  `--dry-run`, `--max-batches`), teste unitário do laço (8 verdes), receita do cron `hunter-outbox` em
+  `infra/vps/README.md`, linha da §1.3 corrigida. Contagem real do que o 7 d apaga hoje:
+  **6 965 409 linhas / 4 012 MB de payload**; com 7 d a população estabiliza em ~15 M linhas (estimativa). **Atenção (Astra):** apagar linha libera espaço para reuso dentro da tabela; o `df` não volta — só as imagens Docker, o build cache e os dumps devolvem disco na hora.
+- **Não feito (negado ao plantão pelo classificador / decisão do Everton):**
+  1. `docker image prune -a -f --filter until=72h` + `docker builder prune -f --filter until=72h` na
+     VPS — devolve **~200 GB na hora**, mantém as imagens em uso e as dos últimos 3 dias (janela de
+     rollback). Imagem se reconstrói do git; não é dado. **Comando pronto, Everton roda.**
+  2. Poda permanente das imagens dentro do `compose.sh update` (deixar as N últimas) — tarefa pequena
+     para o `devops-engineer` (T4.63b).
+  3. `opportunity_history` a 4,2 GB/dia é **decisão de escopo**: ou a retenção cai de 90 d para 14 d
+     (§1.3), ou o radar de perpétuos grava `envelope` só quando muda, ou o scanner de perpétuos sai do
+     ar enquanto o foco é meme. Só o Everton decide; o número está aqui para ele.
+  4. Retenção do backup (7 d × dumps de 10 GB crescendo) — idem, decisão dele; alternativa técnica é
+     excluir `outbox_events` e `opportunity_history` do dump (`pg_dump --exclude-table-data`), que são
+     fila e histórico reconstruível, não estado.
+- **Também visto:** o cron `hunter-partitions` (`create_partitions.py` diário, `infra/vps/README.md`)
+  **não está instalado** em `/etc/cron.d` (só `hunter-backup` e `hunter-meme-close`). Sem urgência:
+  as partições de 2026_10 e 2026_11 já existem (25 cada), criadas pelas migrações.
+- Ligações: [[Diario/2026-09-18]], [[System Overview]], `docs/DATABASE.md` §1.3, `infra/vps/README.md`
+  "Poda da outbox".
 
 ## Código corrigido na T3.87 (2026-09-11) — o portão do replay ficou cego quando o worker vivo foi shardado, pendente de deploy
 

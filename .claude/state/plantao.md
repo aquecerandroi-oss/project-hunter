@@ -1,109 +1,55 @@
 # Plantão da Sexta-feira — nota do turno
 
-Atualizado: 2026-09-08, **meio-dia** (12:30–12:55Z / 09:30–09:55 de Brasília).
-Primeiro turno **de volta no Claude Code** (`c2ee96b`). Plantão de documentação e
-medição: nenhuma linha de código tocada, nenhuma suíte rodada, `.env*` intocado.
+Atualizado: **2026-09-18, 19:45–20:2x BRT** (22:45–23:2xZ). Turno automático (ninguém olhando).
+Antes desta nota a anterior era de 08/09 — dez dias de trabalho ao vivo com o Everton sem passar por aqui;
+o registro do dia a dia está em `obsidian/09-OPERATIONS/Diario/2026-09-1*.md`.
+
+## Onde o projeto está (leitura de hoje, não de 08/09)
+
+- **M4 / memes é o foco total** (decisão de 16/09). A mesa real (`meme-executor`, `label REAL`) opera na VPS com
+  0,28 SOL por operação, 2 posições, cap diário 0,15 SOL, tesouraria USDC→SOL ligada. Pacote 6 (`cabec23d`:
+  T4.61a guarda de queda, T4.61b/c escada de convicção **desligada**, T4.62 segredos mascarados nos logs)
+  implantado pelo Everton ~18:54 BRT; portão de evento **on** (3 599 eventos/min).
+- `.claude/state/milestone.json` ainda descreve o M3 de 07/09 — está **defasado**; atualizei só o cabeçalho
+  (`wave`, `updated`, `next_action`) para apontar para o diário e para esta nota.
 
 ## O que mudou neste turno
 
-- **O Lab está rodando e agora está medido.** A linha **paper** do momentum (`v3`,
-  `purpose = paper`) foi ativada pelo Everton em **2026-09-08 05:57:30Z** (02:57 de
-  Brasília) pelo caminho auditado, e emite desde 06:00:09Z. O **replay histórico**
-  (T3.19b) rodou 31 dias reais nas duas estratégias de pesquisa.
-- **Três avaliações datadas acrescentadas**, com SQL da VPS e saída real colados:
-  [[EXP-0001-momentum-v1]], [[EXP-0002-volume-anomaly-v1]] e a **primeira** da
-  [[EXP-0005-momentum-paper]]. Nenhuma seção anterior foi tocada (append-only).
-- **Seção nova "Replay histórico (rotulado `replay`, D14/D15)"** nas EXP-0001 e
-  EXP-0002, com recibo de `replay_runs` e o rótulo explícito: **replay não conta
-  para a régua `validada`/`reprovada`**.
-- **Changelog** com os **47 commits** de `abf8e80..d91fac8`, uma entrada por commit.
-- **Bugs:** dois fechados (`market_betas` vazia; 160 pyright), um fechado por
-  descrição superada (candles 11 dias), dois abertos (backfill *newest-first* que
-  deixou o BTC em 14 dias; `compose.sh update` que não sobe serviço de perfil novo
-  e dá falso positivo no `migrate`).
-- **Catálogo de estratégias reexportado** do banco da VPS: 7 de 19 páginas mudaram.
-- **[[Sexta-feira no Hermes]]** marcada como histórico: a casa voltou ao Claude Code.
-
-## Números do turno (`as_of = 2026-09-08T12:00:00Z`, `read_at = 12:34:22.305724Z`)
-
-| População | Avaliáveis com `R_net` | Expectancy | PF | Dias |
-|---|---|---|---|---|
-| momentum `v2` `prospective` | 49 | −0,1363 R | 0,7210 | 1 |
-| momentum `v1` `prospective` (fechada) | 929 | −0,1905 R | 0,6131 | 3 |
-| momentum `v3` **paper** | 30 | −0,2550 R | 0,5202 | 1 |
-| volume_anomaly `v2` `prospective` | 194 | −0,3714 R | 0,4546 | 1 |
-| volume_anomaly `v1` `prospective` (fechada) | 2.079 | −0,3301 R | 0,5337 | 3 |
-| momentum `v2` **replay** `f8d8279c` | 222 | −0,1717 R | 0,6454 | 24 |
-| volume_anomaly `v2` **replay** `bac27c12` | 337 | −0,5957 R | 0,2798 | 29 |
-
-Sete populações, sete sinais negativos, **todas `inconclusivo`** pela régua
-(100 outcomes avaliáveis **E** 30 dias distintos). `PnL de carteira` e
-`Max Drawdown de carteira`: **não aplicável** em todas.
+- **Vermelho novo: disco da VPS em 88 %** (306/348 G; era 32 % em 08/09). Decomposto em
+  `obsidian/07-BUGS/Open Bugs.md` ("Disco da VPS em 88 %"): imagens Docker por commit **178 GB (170 recuperáveis)**,
+  build cache 37 GB, banco 58 GB — `opportunity_history_2026_09` **25 GB a +4,2 GB/dia** (radar de perpétuos) e
+  `outbox_events` **17 GB, 19,57 M linhas despachadas, nunca podadas, +2,1 M/dia** —, backups 41 GB com dump
+  diário de 10,6 GB (era 1,6 GB em 11/09). No ritmo medido a máquina enche em poucos dias e derruba a mesa real junto.
+- **T4.63 feita:** `infra/scripts/prune_outbox_events.py` (o job que a `DATABASE.md` §1.3 dava ao `analytics-worker`
+  do M5, que não existe) + 10 testes unitários + receita do cron `hunter-outbox` (`infra/vps/README.md`) + §1.3
+  corrigida. Revisada pela Astra (must-fix aceito: poda libera espaço para reuso, **não** devolve `df`). Commitada
+  e enviada; **ainda não está na imagem da VPS** (precisa de `compose.sh update`).
+- **Baha lido às 19:50 BRT** pelo Chrome do Everton: BTC rompe 80 k (+6,3 %); Groenlândia (Trump × Dinamarca)
+  candidato a `meme_event`, não registrado. `obsidian/02-MARKET/Baha/2026-09-18.md`.
 
 ## Saúde
 
 | Onde | Estado |
 |---|---|
-| VPS | **Verde.** 13 contêineres de pé. `hb:market:binance:0of4` conectado, 318 assinaturas, 53 mercados, 0 gaps, 0 descartes; `covered_until` 12:41:37Z contra relógio de 12:41:38Z. Spot conectado, 15 mercados, 0 gaps. `hb:strategy:shadow`: 3.187 barras, 1.081 `unavailable` (33,9 %), 39 acompanhamentos, outbox 0, erros 0. `hb:execution:paper`: equity 19.333,0111164813 USDT, `kill_switch = ACTIVE` (menos restritivo), 0 posições. Disco 32 % de 348 G, load 4,86 em 12 vCPU. |
-| Local | **Postgres desligado** (conexão recusada). Sem impacto: tudo foi lido da VPS. |
+| VPS | **Verde de processo, vermelho de disco.** 18 contêineres `healthy` em `e130906d`. Radar: 129 rastreadas, 4 apostas de papel abertas, 0 gaps, 0 429. Executor: 0,7341 SOL, perda do dia 0,1025/0,15, 0 erros de RPC. Backup 01:17Z ok (10,6 GB, 32 min). Load 5,0 em 12 vCPU. **Disco 88 %.** |
+| Local | Postgres e Redis **desligados**; os 4 workers de dev reiniciam em laço (`gaierror` em `postgres`) há dias, ~2 núcleos queimados. Sem impacto na VPS. |
 
-## Higiene da base Obsidian — rodar em todo plantão
+## Em voo (não tocar)
+Nada em voo em código; os 4 arquivos modificados sem commit na árvore (`.claude/launch.json`, `docs/DESIGN.md`,
+`packages/core/tests/unit/test_settings.py`, `notes-T4.31-explain.txt`) têm 10 dias e não são deste turno.
 
-```
-uv run python infra/scripts/obsidian_lint.py
-```
+## O que preciso do Everton (em ordem)
 
-Somente leitura, relatório em português, sai 1 quando há achado. Consertar o que
-for da base (link morto, frontmatter faltando, nota órfã); **não** consertar o que
-tiver dono em outra tarefa em voo — esse vai para a `ALLOWLIST` do script com
-motivo, ou para `obsidian/07-BUGS/Open Bugs.md`. Um achado `exp_reescrita` nunca
-se resolve reescrevendo de volta: ou a alteração foi indevida e se desfaz, ou é
-uma leitura nova e vira seção nova, datada, abaixo. Padrão completo em
-`docs/OBSIDIAN.md`.
-
-**Passo do catálogo de estratégias** (o banco vive na VPS; esta máquina só tem SSH):
-
-```
-tar czf /tmp/estrat.tgz -C obsidian/03-TRADING Estrategias
-tar czf /tmp/exps.tgz  -C obsidian 05-EXPERIMENTS
-scp /tmp/estrat.tgz /tmp/exps.tgz hunter-vps:/tmp/
-ssh hunter-vps 'docker cp /tmp/estrat.tgz hunter-api-1:/tmp/ && docker cp /tmp/exps.tgz hunter-api-1:/tmp/'
-ssh hunter-vps 'docker exec hunter-api-1 sh -c "cd /app/obsidian/03-TRADING && tar xzf /tmp/estrat.tgz; cd /app/obsidian && tar xzf /tmp/exps.tgz"'
-ssh hunter-vps 'docker exec hunter-api-1 python infra/scripts/export_strategies_to_obsidian.py --dry-run'
-```
-
-**Semear as páginas locais no contêiner antes de rodar é obrigatório.** O exportador
-só reescreve o bloco entre os marcadores, mas ele lê as páginas de
-`05-EXPERIMENTS` para preencher a coluna **Veredito** das páginas de família —
-sem elas, o veredito sai `-` e a página de família perde informação.
-
-## Em voo (não tocar nos arquivos)
-
-| Tarefa | Arquivos |
-|---|---|
-| T3.24/T3.25 (web) | `apps/web/**` |
-| Design (auditoria T3.23) | `docs/DESIGN.md`, `docs/**` |
-| T3.15d (owner DSN + `compose.sh`) | `infra/docker/**`, `infra/vps/**` |
-
-## Próximo passo
-
-1. **T3.15d** (`devops-engineer`): DSN de owner só em `migrate`/`ops`, mais as duas
-   correções do `compose.sh` registradas no adendo do brief.
-2. **Backfill do BTC**: priorizar o mercado de referência do `beta_v1` na fila, senão
-   nenhum β sai válido e a ponte segue recusando por `beta_unavailable`.
-3. **T3.10 / parecer do M3**: o relatório estendido já está reescrito (`4deef9d`);
-   falta o parecer da Sexta-feira depois das revisões pendentes.
-4. **Próximo plantão**: uma avaliação datada por experimento ativo, como sempre.
-
-## O que preciso do Everton
-
-**Nada para o Lab continuar.** Duas coisas quando ele quiser:
-
-1. **Ligar `ENABLE_PAPER_AUTONOMY`** na VPS é decisão dele. Hoje está `false`, e por
-   isso a linha paper emite 154 sinais e produz **0 propostas, 0 posições, 0 trades**.
-   **Recomendo esperar:** com β indisponível em 100 % dos mercados (199 de 200
-   revisões por corte em `insufficient_history`), o Risk Engine recusaria as
-   propostas de qualquer jeito.
-2. **Saber que o número está negativo nas sete populações medidas.** Isso é o Lab
-   funcionando. Quando a régua de 30 dias fechar, o veredito provável do
-   `volume_anomaly` é `reprovada` — melhor ele ver isso chegando de longe.
+1. **Disco da VPS — hoje.** Um comando devolve ~200 GB na hora e não apaga dado nenhum (imagem se reconstrói do git;
+   ficam as em uso e as dos últimos 3 dias):
+   `ssh hunter-vps 'docker image prune -a -f --filter until=72h && docker builder prune -f --filter until=72h && df -h /'`
+   O classificador desta sessão negou o comando ao plantão.
+2. **Depois do próximo `compose.sh update`:** instalar o cron `hunter-outbox` (receita em `infra/vps/README.md`,
+   "Poda da outbox") e rodar a primeira fatia à mão: `bash infra/vps/compose.sh ops python
+   infra/scripts/prune_outbox_events.py --max-batches 200`.
+3. **Decisões de escopo (só dele):** `opportunity_history` a 4,2 GB/dia — retenção 90 d → 14 d, gravar `envelope`
+   só quando muda, ou pausar o scanner de perpétuos enquanto o foco é meme; retenção/escopo do backup
+   (`--exclude-table-data` para fila e histórico reconstruível).
+4. **Groenlândia como `meme_event`?** Comando pronto em `.claude/state/plantao-meme/baha-2026-09-18-1950.md`.
+5. Opcional: `docker compose ... stop execution-worker strategy-worker scanner-worker market-worker` no PC para
+   parar o laço de reinício.
