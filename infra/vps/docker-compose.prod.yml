@@ -392,6 +392,12 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
       MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-90}
       MEME_TRACKED_MINTS_MAX: ${MEME_TRACKED_MINTS_MAX:-120}
+      # T4.52b-3: o portão de evento, off por padrão (docs/RISK_ENGINE_MEME.md §9).
+      # SOLANA_RPC_WS_URL vazio deriva de SOLANA_RPC_URL (https->wss/http->ws) ou o RPC público.
+      MEME_EVENT_GATE: ${MEME_EVENT_GATE:-off}
+      SOLANA_RPC_WS_URL: ${SOLANA_RPC_WS_URL:-}
+      MEME_EVENT_COMMITMENT: ${MEME_EVENT_COMMITMENT:-confirmed}
+      MEME_EVENT_GATE_MAX_MINTS: ${MEME_EVENT_GATE_MAX_MINTS:-150}
       DB_POOL_SIZE: "2"
       DB_MAX_OVERFLOW: "2"
     logging: *prod-logging

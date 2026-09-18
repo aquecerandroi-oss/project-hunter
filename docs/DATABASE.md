@@ -6806,6 +6806,16 @@ diário da semana, não do trimestre. Quem lê: a porta de 15 s do Lab (`lab_rep
 `as_of <= tick`, atraso máximo 45 s); a proposta nascida dela leva `features_end_time = as_of` e
 `reasons[0].series = meme_features_15s_v1`.
 
+**T4.52b-3 (18/09/2026): o portão de evento lê esta mesma tabela, nunca escreve nela.** A última
+linha de cada mint (`EventGateCaches.base_rows`, alimentada por `lab_fast.fast_gate_step` a cada
+tique) é a base da `GateRow` que `hunter_meme_worker.event_gate_rows.build_event_row` monta em
+memória a partir de um evento de trade — a série de 15 s continua sendo o único produtor durável;
+o portão de evento só sobrescreve os campos voláteis (progresso, mcap, fita, holders) com o que o
+evento em memória sabe agora. Uma proposta nascida do evento leva `features_end_time = as_of` do
+próprio evento e `reasons[0].series = meme_event_gate_v1` — a terceira série que `reasons[0].series`
+pode carregar, ao lado de `meme_features_1m` (implícito, minuto fechado) e `meme_features_15s_v1`.
+`docs/RISK_ENGINE_MEME.md` §9 tem o desenho completo.
+
 ### 43.3 A vista reescrita — `meme_lab_scoreboard_v1`
 
 A de `0027` (§39.3) byte a byte, com `measured` (= `status = 'closed' AND outcome_quality = 'measured'`) a

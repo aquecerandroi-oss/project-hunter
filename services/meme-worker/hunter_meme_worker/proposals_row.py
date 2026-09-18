@@ -93,5 +93,20 @@ class GateRow:
     ``events.py``'s per-minute job), if any — ``None`` for the overwhelming
     majority of rows judged."""
 
+    initial_real_token_reserves: Decimal | None = None
+    """T4.52b-3: ``meme_tokens.initial_real_token_reserves`` — the launch
+    denominator the event gate needs to fold ``curve_progress_pct`` itself
+    (``hunter_indicators.meme.fast.compute_fast``) over the in-memory series;
+    unused by the closed-minute/15-second gate, which already reads a
+    precomputed ``curve_progress_pct`` column."""
+    recent_drawdown_pct: Decimal | None = None
+    recent_drawdown_peak_age_s: Decimal | None = None
+    recent_drawdown_reason: str | None = None
+    """T4.52b-3 (EXP-M13): :func:`hunter_indicators.meme.drawdown.recent_drawdown`
+    over the mint's in-memory reserve series — ``None`` on every row this
+    revision does not compute it for (the closed-minute and 15-second gates),
+    which is exactly ``recent_drawdown_unknown`` for a set that turns the
+    guard on; only the event gate's own row builder fills the three."""
+
 
 __all__ = ["GateRow"]

@@ -36,7 +36,6 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import create_session_factory
-from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_core.redis import keys
 from hunter_exchanges.pumpfun.rest import PumpFunRestClient
@@ -50,11 +49,19 @@ from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.creator_watch import spawn_creator_watch
 from hunter_meme_worker.discovery import run_discovery
+from hunter_meme_worker.event_gate import run_event_gate
+from hunter_meme_worker.event_gate_caches import EventGateCaches
+from hunter_meme_worker.event_gate_wiring import (
+    build_event_gate,
+    load_event_gate_config,
+    register_event_gate_health,
+)
 from hunter_meme_worker.events import spawn_events_match
 from hunter_meme_worker.fast_lane import fast_once
 from hunter_meme_worker.graduation import GlobalParamsStore
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
 from hunter_meme_worker.mayhem import mayhem_once
+from hunter_meme_worker.status_wiring import register_health, register_lab_health
 from hunter_meme_worker.tracker import MintTracker
 from hunter_meme_worker.wake import wake_publisher
 from hunter_meme_worker.wallets import build_wallets, wallets_once
@@ -78,12 +85,6 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.trenches import TrenchesWsClient
 
 logger = get_logger(__name__)
-
-STALE_EVENT_AFTER_S = 600
-"""No new token for ten minutes is *suspicious*, not fatal: pump.fun genuinely has
-quiet stretches, and T4.1's acceptance criterion separates "the socket is alive"
-from "there is activity". It shows up as a status detail, never as a red
-``/ready`` (``hunter_core.runtime`` keeps the two apart)."""
 
 SOL_PRICE_BUDGET_PER_MINUTE = 50
 """``/sol-price`` is its own upstream rate-limit group (50/60 s, ``docs/PUMPFUN.md``
@@ -138,11 +139,15 @@ def _heartbeat_writer(runtime: WorkerRuntime) -> Callable[[dict[str, str]], Awai
     return write_fields
 
 
-def build_lab_context(runtime: WorkerRuntime, config: MemeConfig, ctx: RadarContext) -> LabContext:
+def build_lab_context(
+    runtime: WorkerRuntime, config: MemeConfig, ctx: RadarContext, *, event_gate_enabled: bool
+) -> LabContext:
     """The Lab's own view: the same session factory, a quote client of its own,
     a writer onto this worker's heartbeat hash, and — since T4.16b — the
     radar's own tracker and chain client, so the Lab can reload the pinned set
-    every tick and attempt one point read before an indeterminate close."""
+    every tick and attempt one point read before an indeterminate close.
+    ``caches`` (T4.52b-3) is only built when the event gate is not ``off`` —
+    an idle cache nobody reads is still work every tick, however small."""
     return LabContext(
         config=config,
         session_factory=create_session_factory(runtime.engine),
@@ -156,74 +161,8 @@ def build_lab_context(runtime: WorkerRuntime, config: MemeConfig, ctx: RadarCont
         tracker=ctx.tracker,
         chain=ctx.chain,
         wake=wake_publisher(runtime),
+        caches=EventGateCaches() if event_gate_enabled else None,
     )
-
-
-def _register_health(
-    runtime: WorkerRuntime, ctx: RadarContext, boards: dict[str, TrenchesWsClient]
-) -> None:
-    """Readiness answers "should traffic reach me"; the details answer "what is degraded"."""
-
-    async def discovery_connected() -> bool:
-        return ctx.events.state.ws_state == "connected"
-
-    runtime.readiness_checks.append(discovery_connected)
-    runtime.status_details["discovery_stream"] = lambda: ctx.events.state.ws_state
-    runtime.status_details["tracked_mints"] = lambda: str(len(ctx.tracker))
-    runtime.status_details["last_event_age_s"] = lambda: _last_event_age(ctx)
-    runtime.status_details["ws_generation"] = lambda: str(ctx.state.ws_generation)
-    runtime.status_details["trenches"] = lambda: (
-        "disabled (MEME_TRENCHES_ENABLED=false)"
-        if not boards
-        else ", ".join(f"{b}:{c.state.ws_state}" for b, c in boards.items())
-    )
-    runtime.status_details["swap_api"] = lambda: (
-        "disabled (MEME_SWAP_API_ENABLED=false)"
-        if ctx.trades is None
-        else f"{len(ctx.trades.coverage)} mints covered"
-    )
-    runtime.status_details["risk"] = lambda: (
-        "disabled (MEME_RISK_ENABLED=false)"
-        if ctx.risk is None
-        else f"{len(ctx.risk.last_read)} mints read"
-    )
-    runtime.status_details["activity"] = lambda: (
-        "disabled (MEME_ACTIVITY_ENABLED=false or swap_api off)"
-        if ctx.activity is None
-        else f"{len(ctx.activity.readings)} mints with a 1m reading"
-    )
-    runtime.status_details["wallets"] = lambda: (
-        "disabled (MEME_WATCH_WALLETS empty)"
-        if ctx.wallets is None
-        else ctx.wallets.describe(utcnow())
-    )
-
-
-def _register_lab_health(runtime: WorkerRuntime, lab: LabContext | None) -> None:
-    """The Lab's liveness as a detail, never a verdict: a stopped loop must be
-    visible next to a green collector, and a quiet gate must not turn ``/ready``
-    red (contract §Semântica 5)."""
-    if lab is None:
-        runtime.status_details["lab"] = lambda: "disabled (MEME_LAB_ENABLED=false)"
-        return
-
-    def describe() -> str:
-        last = lab.state.last_tick_at
-        if last is None:
-            return "starting"
-        age = int((utcnow() - last).total_seconds())
-        stalled = age > 3 * lab.config.lab_cycle_s
-        return f"{age}s since last tick" + (" (stalled)" if stalled else "")
-
-    runtime.status_details["lab"] = describe
-
-
-def _last_event_age(ctx: RadarContext) -> str:
-    last = ctx.state.last_event_at
-    if last is None:
-        return "never"
-    age = int((utcnow() - last).total_seconds())
-    return f"{age}s{' (stale)' if age > STALE_EVENT_AFTER_S else ''}"
 
 
 async def run_meme(runtime: WorkerRuntime) -> None:
@@ -239,15 +178,22 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         return
 
     ctx, boards = build_context(runtime, config)
-    _register_health(runtime, ctx, boards)
-    lab = build_lab_context(runtime, config, ctx) if config.lab_enabled else None
-    _register_lab_health(runtime, lab)
+    register_health(runtime, ctx, boards)
+    event_gate_config = load_event_gate_config()
+    lab = (
+        build_lab_context(runtime, config, ctx, event_gate_enabled=event_gate_config.enabled)
+        if config.lab_enabled
+        else None
+    )
+    register_lab_health(runtime, lab)
     write = _heartbeat_writer(runtime)
     if lab is None:
         logger.warning("meme_lab_disabled", reason="MEME_LAB_ENABLED is false")
         await write_lab_heartbeat(
             LabContext(config, ctx.session_factory, LabState(), None, write), enabled=False
         )
+    event_gate = build_event_gate(runtime, ctx, lab, event_gate_config, write)
+    register_event_gate_health(runtime, event_gate)
     warmed = await warm_tracked_set(ctx)
     logger.info(
         "meme_radar_starting",
@@ -336,7 +282,13 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                 group.create_task(
                     forever("lab", config.lab_cycle_s, lab_once, lab), name="meme-lab"
                 )
+            if event_gate is not None:
+                # T4.52b-3: waits for the Lab's own first tick internally
+                # (``run_event_gate``) — no ordering needed with ``meme-lab`` here.
+                group.create_task(run_event_gate(event_gate), name="meme-event-gate")
     finally:
         await close_clients(ctx, boards)
         if lab is not None and isinstance(lab.quotes, PumpFunRestClient):
             await lab.quotes.aclose()
+        if event_gate is not None:
+            await event_gate.ws.aclose()

@@ -31,6 +31,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
+from hunter_meme_worker.event_gate_caches import refresh_event_gate_caches
 from hunter_meme_worker.gate_refusal_trail import (
     RefusalTrailRow,
     decode_value_limit,
@@ -88,6 +89,7 @@ async def fast_gate_step(
     since = fast_window(now, ctx.state.last_fast_as_of, backlog_s=ctx.config.lab_fast_backlog_s)
     rows_total = proposals_total = 0
     trail_candidates: list[RefusalTrailRow] = []
+    open_mints_by_spec: dict[str, frozenset[str]] = {}
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         rows = await load_fast_gate_rows(
             session, since=since, until=now, features_version=ctx.config.features_15s_version
@@ -98,7 +100,9 @@ async def fast_gate_step(
         # never by the tick's clock — a backlog row would read the future.
         pedigree, e2b = await lineage_for(session, rows, fast)
         for spec in fast:
-            already_open = await open_mints_for(session, spec.id)
+            open_mints_by_spec[spec.id] = already_open = await open_mints_for(session, spec.id)
+            if ctx.caches is not None:  # T4.52b-3: the event gate's own inserts count too
+                already_open = already_open | ctx.caches.recently_proposed_mints(spec.id, now=now)
             drafts: list[ProposalDraft] = []
             spec_refusals: Counter[str] = Counter()
             for row in rows:
@@ -118,7 +122,22 @@ async def fast_gate_step(
                     trail_candidates.append(candidate)
             refusals.setdefault(spec.name, Counter()).update(spec_refusals)
             rows_total += len(rows)
-            proposals_total += await insert_proposals(session, drafts)
+            inserted = await insert_proposals(session, drafts)
+            proposals_total += inserted
+            if inserted and ctx.caches is not None:
+                ttl = ctx.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
+                for draft in drafts:
+                    ctx.caches.mark_proposed(draft.mint, spec.id, now=now, ttl_s=ttl)
         await write_refusal_trail(session, ctx.state.trail, trail_candidates)
+    if ctx.caches is not None:
+        refresh_event_gate_caches(
+            ctx.caches,
+            specs=fast,
+            rows=rows,
+            open_mints=open_mints_by_spec,
+            pedigree=pedigree,
+            e2b=e2b,
+            now=now,
+        )
     ctx.state.last_fast_as_of = max(row.end_time for row in rows)
     return rows_total, proposals_total

@@ -792,6 +792,48 @@ assume:
 > número de R55 seja relido depois do deploy. O tick de 15 s do próprio radar (fila do radar até a
 > proposta existir) não muda nesta tarefa — fica para T4.52b.
 
+> **T4.52b-3 (18/09/2026): o portão de evento — o radar decide por trade, não por tique de 15 s.**
+> Fila que sobrava depois da T4.52a (proposta escrita → executor acordado, < 200 ms): o próprio
+> radar só julgava a cada 15 s (`lab_fast.fast_gate_step`), e o tique do Lab podia levar até 45 s
+> de atraso (`lab_fast_backlog_s`) para ver uma foto nova. `hunter_meme_worker.event_gate.run_event_gate`
+> assina `logsSubscribe`/`accountSubscribe` da PDA da curva de cada mint jovem (o mesmo conjunto de
+> `fast_lane.young_mints`, ressincronizado a cada 5 s) num WebSocket de RPC Solana próprio
+> (`packages/exchange-adapters/hunter_exchanges/pumpfun/rpc_ws.py`, T4.52b-1) e, a cada evento,
+> monta em memória a mesma `GateRow` que a pista de 15 s julgaria — a última linha de 15 s do mint
+> (`EventGateCaches.base_rows`, alimentada pelo próprio `fast_gate_step` a cada tique do Lab)
+> sobrescrita pelos campos que o evento mudou: `curve_progress_pct`/`mcap_sol` via
+> `hunter_indicators.meme.fast.compute_fast` sobre a série de fotos em memória
+> (`hunter_meme_worker.event_state.MintEventState`, T4.52b-2), a fita de 60 s via
+> `tape_minute`/`features_tape.tape_for`, holders/dev/snipers via os boards e o risk já em memória,
+> o snapshot das reservas do próprio evento. A mesma `proposals.evaluate_gate`, o mesmo
+> `lab_repo.insert_proposals` (o índice único `(rule_set_id, mint, features_end_time)` continua
+> sendo a última guarda), o mesmo `LabContext.wake` (T4.52a) e a mesma trilha de recusa por mint
+> (`lab_fast._trail_row` + `lab_trail.write_refusal_trail`) — a única coisa nova no rótulo da
+> proposta é `reasons[0].series = meme_event_gate_v1` (`docs/DATABASE.md` §43.2).
+>
+> **Sem dupla proposta entre as duas pistas.** Além do índice único do schema, um guarda em
+> memória (`EventGateCaches.recently_proposed_mints`/`mark_proposed`, TTL = o `ttl_s` do set) é
+> escrito no instante do `insert` por **qualquer** das duas pistas e consultado pelas duas como
+> parte do `already_open` — `fast_gate_step` já é o produtor e o consumidor desse guarda, não só o
+> portão de evento.
+>
+> **Falha fechada, o mesmo vocabulário de sempre.** Sem linha-base de 15 s → o mint não é julgado
+> (contador `event_gate_no_base_row`, plan §2: a maioria dos mints tem < 45 s desde o `first_seen_at`
+> e `min_age_s = 30`); fita mais nova que 60 s → `event_feed_warming`; sem leitor de holders →
+> `no_holders_reader`; `total_supply` desconhecido → sem `snapshot`, `no_snapshot_for_quote`.
+>
+> **Atrás de `MEME_EVENT_GATE` (`off` por padrão), com um modo intermediário.** `shadow` avalia,
+> conta (`event_gate_shadow_proposals_total`) e loga "teria proposto" — nunca insere; `on` escreve
+> de verdade. O portão só liga depois do primeiro tique do Lab aquecer `LabContext.caches`
+> (restart-safe, `run_event_gate` espera `caches.specs` não vazio antes de abrir uma única
+> assinatura). Backpressure: fila limitada (`asyncio.Queue(2000)`) entre o leitor do WS e o
+> avaliador — cheia, o frame é descartado e contado, nunca bloqueia o socket; debounce de 100 ms
+> por mint (`Debouncer`) evita reavaliar a cada notificação de uma rajada. Uma queda do WS
+> (`event_gate_eval.handle_reconnect`) reaquece a fita de todo mint assinado (`mark_gap`) e grava
+> uma linha em `meme_ingest_gaps` (`stream = solana_ws`) — a pista de 15 s e o `lab_tick` continuam
+> intocados nesse meio-tempo. Nada disso muda a admissão, o kill switch ou o dimensionamento do
+> executor — a proposta chega mais cedo pelo mesmo código que já existia.
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |

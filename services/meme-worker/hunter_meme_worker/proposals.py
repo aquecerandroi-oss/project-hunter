@@ -155,6 +155,9 @@ def entry_features_of(
         top10_share=row.top10_share,
         top10_reason=row.top10_reason,
         is_mayhem=is_mayhem_curve(row.mayhem_enabled, row.mayhem_state),
+        recent_drawdown_pct=row.recent_drawdown_pct,
+        recent_drawdown_peak_age_s=row.recent_drawdown_peak_age_s,
+        recent_drawdown_reason=row.recent_drawdown_reason,
     )
 
 

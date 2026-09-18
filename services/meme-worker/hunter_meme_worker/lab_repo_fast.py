@@ -188,6 +188,7 @@ async def load_fast_gate_rows(
                 holders_reason=r["holders_reason"],
                 progress_rising=r["progress_rising"],
                 series=SERIES_15S,
+                initial_real_token_reserves=r["initial_real_token_reserves"],
                 symbol=None if r["symbol"] is None else str(r["symbol"]),
                 # T4.27: the token's bit, else the photo's own (a chain read
                 # says it before the token row learns it); the state as a witness.

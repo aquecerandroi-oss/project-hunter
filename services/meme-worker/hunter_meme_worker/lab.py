@@ -83,6 +83,7 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.models import NormalizedSolPrice
     from hunter_meme_worker.config import MemeConfig
     from hunter_meme_worker.context import ChainSource
+    from hunter_meme_worker.event_gate_caches import EventGateCaches
     from hunter_meme_worker.tracker import MintTracker
 
 logger = get_logger(__name__)
@@ -155,6 +156,10 @@ class LabContext:
     """T4.52a: fires once per tick that commits a proposal (Redis pub/sub,
     ``main._wake_publisher``) so the executor wakes instead of polling;
     ``None`` is a safe no-op — a quiet Lab is still correct, just slower."""
+    caches: EventGateCaches | None = None
+    """T4.52b-3: filled every tick by ``lab_fast.fast_gate_step`` for
+    ``event_gate.run_event_gate`` to read without ever opening a session of
+    its own; ``None`` until the flag is on and the first tick has run."""
 
     async def sol_usd(self, now: datetime) -> SolUsd | None:
         """The observed quote, at most ``lab_sol_usd_max_age_s`` old; ``None`` and
