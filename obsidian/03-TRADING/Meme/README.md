@@ -113,3 +113,21 @@ banco com hora e SQL anexados.
 - [[03-TRADING/Meme/Estudo-2026-09-16-o-que-a-admissao-nova-admitiria-hoje|R26 — o que a admissão nova admitiria hoje]] — reavalia as 26 ordens do dia contra T4.28g (espera pelo retrato), T4.28h (`creator_flow_unknown` com `dev_share` medido) e o teto de `top10_share` a 30 % do KB-0109.
 - [[03-TRADING/Meme/Balanco-2026-09-16-mesa-real|R39 — balanço do dia da mesa real (11:46–19:28 BRT)]] — **58 ordens, 29 moedas, 100 % recusadas, zero assinatura**; cada recusa julgada pela cadeia (`real_sol_reserves`, KB-0115): **16 boas, 6 ruins, 6 neutras, 1 graduou** (GREMLIN encheu a curva 8 s depois da 4.ª recusa por `progress_above_window`); comprar todas daria **−7,51 R por moeda / −23,54 R pelas 58 ordens** (regra da mesa: 3×, trailing 35 % após 1,5×, 30 min, piso −50 %, 1,75 %/perna); **28 das 58 recusas são por dado ausente** (27 `creator_flow_unknown`) e **8 recusas por "progresso abaixo de 2 %" caíram em curvas com 11,6–23,2 SOL reais** (INCEPT lida como −5×10⁵ %); a janela de encanamento compraria **1 moeda no dia** (RIZZLERS, −1,64 R) e, na versão frouxa, 17 moedas por −5,75 R — recusando a GREMLIN assim que o retrato chegasse (bundle 39,8 %); gargalo = **bundle ausente em 36 das 39 ordens com progresso na janela**.
 - [[03-TRADING/Meme/Estudo-2026-09-16-a-porta-real-versus-a-replica|R27 — a porta real versus a réplica]] — Kintsugi não virou proposta porque a porta mudou de teto para piso de snipers entre 16:20 e 16:25 BRT; não foi corrida nem bug de gravação, foi a réplica comparando contra uma porta que já não estava mais em vigor.
+
+## Balanços do dinheiro real — estágios 1 e 1b (17–18/09)
+
+**Nota sobre a lacuna:** entre R44 e R60 (16–18/09) a pesquisa quant continuou em ritmo diário, mas
+foi registrada em `.claude/state/notes-R44.md`…`notes-R60.md` e `.claude/state/notes-T4.*.md` — não em
+páginas `Candidatas/` como as rodadas de 16/09 acima. Os achados dessas ~15 notas foram compilados nas
+[[11-KNOWLEDGE/KB-0119-entrada-depois-da-queda-em-producao|KB-0119]] a
+[[11-KNOWLEDGE/KB-0134-websocket-do-rpc-lag-medido-ao-vivo|KB-0134]] em 18/09, para não ficarem só no
+estado de trabalho. As duas páginas de balanço abaixo continuam sendo a referência número a número.
+
+- [[03-TRADING/Meme/Balanco-2026-09-16-mesa-real|Balanço 16/09 — mesa real (R39)]] — primeiro dia
+  completo da mesa real, 58 ordens, zero fills.
+- [[03-TRADING/Meme/Balanco-2026-09-17-estagio-1|Balanço 17/09 — estágio 1 (R54)]] — as primeiras 5
+  compras reais fecham: 0 vitórias, **−0,0449 SOL (−0,87 R)**; o erro está na entrada (compra logo
+  depois de uma queda), não na saída.
+- [[03-TRADING/Meme/Balanco-2026-09-18-estagio-1b|Balanço 18/09 — estágio 1b (R56)]] — 7 compras, 6
+  fills, **1 vitória (PS, +0,66 R)**, **+0,0078 SOL líquido**; a vitória veio de duas falhas de envio
+  com sorte, não de acerto de porta; diagnostica `blockhash_expired` e o buraco cadeia×fita da COVER.

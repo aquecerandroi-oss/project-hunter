@@ -768,3 +768,37 @@ população ou por K1, nunca por expectancy feia.**
 [[EXP-0010-session-orb-faixa-de-abertura]] · [[EXP-0011-derivatives-reversao-de-funding]] ·
 [[EXP-0012-momentum-teto-de-pedagio]] · [[EXP-0013-momentum-alvo-3-atr]] ·
 [[KB-0076-por-que-perdemos-2026-09-08]]
+
+---
+
+## Oitava rodada (17–18/09) — mesa real de memes: dois estágios, Proposta A, tamanho maior, tesouraria, radar por evento
+
+**Diferença desta rodada: não são candidatas de parâmetro sobre uma coorte de pesquisa — são
+decisões operacionais tomadas sobre a mesa real, com dinheiro do Everton.** Entram aqui pela mesma
+regra que rege o resto da página (toda mudança que altera o que a mesa faz é registrada com data e
+resultado, nunca só narrada no diário). Não consomem a régua de multiplicidade estatística das rodadas
+anteriores — não são hipóteses de estratégia — mas são **tentativas de operação**, e o vocabulário de
+"Resultado" substitui `δ`/Início-fim, que não se aplicam a decisões humanas de escopo.
+
+| ID | Tentativa | Nota de origem | O que mudou | Resultado | Data | Status |
+|---|---|---|---|---|---|---|
+| T-041 | Estágio 1 — 5 compras reais, modo sozinho (`MEME_LIVE_AUTO_APPROVE`) | [[03-TRADING/Meme/Balanco-2026-09-17-estagio-1]] · `.claude/state/notes-R54.md` | primeira autonomia total do executor com dinheiro real; 0,05 SOL/op, teto 0,72, `max_trades` 5 | **5/5 compras, 0 vitórias, −0,0449 SOL (−0,87 R)** | 16/09 21:31 → 17/09 06:29 BRT | **concluída** |
+| T-042 | "Deixa comprar à vontade" — `max_trades` 5 → 1000 (escopo liberado) → estágio 1b | [[03-TRADING/Meme/Balanco-2026-09-18-estagio-1b]] · `.claude/state/notes-R56.md` | remove só o teto de número de compras; 0,05 SOL/op e 0,72 de teto total continuam | **7 compras, 6 fills, 1 vitória, +0,0078 SOL (+0,15 R)**; sem a PS: −0,0261 | 17/09 13:42 → 18/09 08:38 BRT | **concluída** — acumulado 12 compras, −0,0371 SOL |
+| T-043 | Proposta A — `operator/5` alinhado ao braço vencedor do papel (`progress_or_mcap_rising`/`require_progress_rising`/`require_holders_rising` ligados, `max_progress_pct` 50→100, snipers 21–1000 → 0–10) | [[06-DECISIONS/2026-09-12-teste-pequeno-meme-real]] adendo 18/09 10:5x · `.claude/state/notes-R54.md` · `.claude/state/notes-R46.md` | alinha a porta real ao desenho do `flow_v2/5` (KB-0119, KB-0120) | primeiro retrato (até 11:16): 2 propostas, 0 compras; primeira compra depois (T-044): YOU −0,0395 SOL | 18/09 10:38 BRT | **em andamento** — leitura cedo demais para veredito |
+| T-044 | Tamanho por operação 0,05 → **0,28 SOL** (R$ 150) | [[06-DECISIONS/2026-09-12-teste-pequeno-meme-real]] adendo 18/09 09:3x | `MEME_MAX_SOL_PER_TRADE` e `scope.max_sol_per_trade` — o menor dos dois manda | primeira compra no tamanho novo: **YOU −0,0395 SOL (−0,77 R)**, rug em 40 s | 18/09 13:1x BRT | **em andamento** |
+| T-045 | Tesouraria USDC→SOL ligada (T4.54/T4.54b, prova ao vivo) | [[11-KNOWLEDGE/KB-0130-tesouraria-usdc-sol-block-ate-prova-ao-vivo\|KB-0130]] · `.claude/state/notes-T4.54.md` | conversão automática quando o SOL cai abaixo do piso, com tetos e verificação instrução a instrução | **2 trocas reais confirmadas**: 1 USDC → 0,009465 SOL (10:08 BRT); 3,2 USDC → 0,0303 SOL (10:19 BRT) | 18/09 10:08–10:19 BRT | **concluída a prova**; operação contínua |
+| T-046 | Radar por evento em sombra → `on` (T4.52b) | [[11-KNOWLEDGE/KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos\|KB-0124]] · `.claude/state/plan-T4.52b.md` | WS do RPC decide por evento de trade em vez do tique de 15 s; sombra decidida por 3 min antes de ir a `on` (decisão do Everton: "se achou oportunidade eu quero que ela entre já") | sombra: WS conectado, ~2 300 eventos/min, 0 descartados, 0 reconexões, 0 propostas-sombra ainda no instante da troca para `on` | 18/09 14:19–14:3x BRT | **ligado (`on`)** — sem leitura de resultado ainda |
+
+**O que esta rodada não é.** Não é um teste A/B pré-registrado: cada tentativa muda mais de uma coisa
+de uma vez (T-043 muda sete parâmetros juntos) e nenhuma tem controle formal. O valor de registrar
+aqui é rastreabilidade — toda mudança na mesa real com data, motivo e resultado, no mesmo lugar onde
+as tentativas de estratégia já vivem.
+
+## Relacionados
+
+[[03-TRADING/Meme/README]] · [[03-TRADING/Meme/Balanco-2026-09-17-estagio-1]] ·
+[[03-TRADING/Meme/Balanco-2026-09-18-estagio-1b]] · [[06-DECISIONS/2026-09-12-teste-pequeno-meme-real]] ·
+[[11-KNOWLEDGE/KB-0119-entrada-depois-da-queda-em-producao|KB-0119]] ·
+[[11-KNOWLEDGE/KB-0120-piso-de-snipers-e-as-vencedoras-do-papel|KB-0120]] ·
+[[11-KNOWLEDGE/KB-0130-tesouraria-usdc-sol-block-ate-prova-ao-vivo|KB-0130]] ·
+[[05-EXPERIMENTS/Experiments Index]]

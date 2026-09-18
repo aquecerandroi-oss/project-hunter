@@ -443,6 +443,38 @@ padrão `descartar`, régua de **≥ 100 apostas medidas e 30 dias**, IC 95 % po
 primeiros dias, não combinam duas mudanças no mesmo braço e não leem veredito antes da régua. Braço reprovado só
 volta com **mecanismo novo**, nunca com dados novos.
 
+## Acréscimo de 17–18/09 — dois braços semeados, um construído e desligado, três em estudo
+
+**`EXP-M10` saiu de pré-registro para braço vivo.** `flow_v2/7` foi semeado em 16/09 e roda desde então
+lado a lado com o conjunto pai: R54 mediu **−0,053 SOL em 7 apostas (0 vitórias)** na janela de 14 h de
+16→17/09; R56 mediu **+0,0237 SOL em 8 apostas (2 vitórias)** na janela seguinte (17→18/09). Ainda
+**inconclusivo** pela régua (bem abaixo de 150 propostas); a previsão pré-registrada continua `descartar`.
+
+**`EXP-M13` teve o mecanismo construído em código, mas segue desligado.** T4.52b-2 implementou
+`recent_drawdown` (`hunter_indicators.meme.drawdown`) e o campo opcional `EntryGate.max_recent_drawdown_pct`
+exatamente como o pré-registro descreve (fração 0–1, janela 60 s, recusa estrita `dd > X`), com 18 testes
+próprios e replay das fixtures batendo com os números da KB-0118. **Nenhum conjunto vivo ligou o critério**
+ainda — a coluna "Braço" do pré-registro nomeava `flow_v2/8`, mas esse número de conjunto foi ocupado por
+outro braço (`EXP-M14`, abaixo) antes de `EXP-M13` ser semeado; a numeração do braço fica em aberto até a
+guarda ser efetivamente armada em algum conjunto.
+
+**`EXP-M14` (não estava nesta tabela) foi semeado em 17/09.** `flow_v2/8` (`max_sells_to_buys` 0,6 → 1,0,
+T4.49, migração `0050`) é `kind=research_only` desde ~02:50 BRT de 17/09. Primeiro dia com apostas fechadas
+(18/09): **+0,063 SOL em 10 apostas (4 vitórias)** — número do fechamento diário, distinto da janela parcial
+de R56 (25 apostas até 09:02 BRT, −0,0161 SOL). Ainda muito abaixo da régua pré-registrada (150 propostas
+**e** 10 dias corridos, não antes de 2026-09-27); nenhuma leitura decide nada até lá.
+
+**Três hipóteses em estudo (R57–R59), sem página própria ainda — index como placeholder:**
+
+| Experimento | Tema | Status |
+|---|---|---|
+| `EXP-M15` | Carteiras vencedoras — identificar endereços com histórico de graduações lucrativas e usar como sinal de pedigree positivo | **em estudo** (R57) |
+| `EXP-M16` | Explosão de compradores — janela curta de aceleração de `unique_buyers` como gatilho de entrada, distinto do piso estático já medido (KB-0114) | **em estudo** (R58) |
+| `EXP-M17` | Regra de saída — revisão das saídas do executor real (só 4 regras: dump do criador, alvo, trailing desarmado, tempo) contra o conjunto maior do papel | **em estudo** (R59) |
+
+Nenhuma das três tem pré-registro, código ou proposta ainda; entram aqui só para não desaparecer entre a
+pesquisa do plantão e o índice.
+
 ## Relacionadas
 
 [[Strategies]] · [[Agents Overview]] · [[Momentum Agent]] · [[Volume Agent]] · [[Performance Overview]] · [[Strategy Performance]] · [[Dialogos/SHADOW]] · [[Architecture Decisions]]

@@ -1012,3 +1012,30 @@ perguntas, não de promessas.
 [[EXP-0011-derivatives-reversao-de-funding]] · [[EXP-0012-momentum-teto-de-pedagio]] ·
 [[EXP-0013-momentum-alvo-3-atr]] · [[KB-0076-por-que-perdemos-2026-09-08]] ·
 [[KB-0077-linhas-de-tendencia]] · [[11-KNOWLEDGE/Index|Index]]
+
+---
+
+## Backlog de meme (17–18/09) — o que a mesa real e o papel já ensinaram
+
+**Esta seção não é fila de pesquisa nova: é o que os balanços da mesa real (R54, R56) e o portão de
+evento (T4.52b) tornaram candidatas concretas para o próximo braço.** Segue a mesma regra do resto da
+página: nada aqui está ativo; toda linha entra em [[Registro de Tentativas]] antes de rodar.
+
+| # | Candidata | Notas-fonte | O que muda | Esforço | Status |
+|---|---|---|---|---|---|
+| M-20 | Religar `progress_or_mcap_rising`/`require_progress_rising`/`require_holders_rising` no `operator/5` | [[11-KNOWLEDGE/KB-0119-entrada-depois-da-queda-em-producao\|KB-0119]] · [[11-KNOWLEDGE/KB-0099-por-que-a-mesa-nao-propoe-e-quanto-custa-cada-criterio\|KB-0099]] | nenhuma das 7 compras do estágio 1b teria entrado com o critério ligado | baixo (parâmetro) | **aplicado em 18/09 — Proposta A**, ver [[Registro de Tentativas]] T-043 |
+| M-21 | Armar a guarda `recent_drawdown` (EXP-M13) em algum conjunto vivo | [[05-EXPERIMENTS/EXP-M13-sem-entrar-apos-queda\|EXP-M13]] | mecanismo já existe em código (T4.52b-2), desligado em todo conjunto | baixo (ligar) | **pendente** — sem número de conjunto definido |
+| M-22 | Reenvio + prioridade dinâmica de fee (o que já mudou) | [[11-KNOWLEDGE/KB-0127-blockhash-expirado-e-prioridade-fixa-sem-reenvio\|KB-0127]] | 13 % dos envios não pousavam por prioridade fixa e zero reenvio | médio | **feito (T4.55)** — corrida residual MÉDIA ainda aberta (`review-T4.55-56.md`) |
+| M-23 | Fechar a ATA na venda cheia por padrão (`MEME_CLOSE_ATA_ON_FULL_SELL`) | [[11-KNOWLEDGE/KB-0133-papel-vs-real-custo-fixo-e-atraso-de-30s\|KB-0133]] | recupera ~1/3 do custo fixo por operação (0,0015 SOL de rent) | baixo (flag) | **implementado (T4.46), desligado por padrão** — decisão do Everton para ligar |
+| M-24 | Ler a cadeia mesmo sem `creator_initial_tokens` (base ausente) | [[11-KNOWLEDGE/KB-0128-cadeia-vence-fita-no-fluxo-do-criador\|KB-0128]] · `.claude/state/notes-R56.md` §3.1 | fecha 34 das 35 moedas hoje presas em `creator_flow_unknown` (90 % vindas do board) | médio | ideia — não implementada |
+| M-25 | Carteiras vencedoras como sinal de pedigree | R57 (em estudo) | endereços de criador com histórico de graduações lucrativas | a definir | **em estudo**, sem código — [[05-EXPERIMENTS/Experiments Index]] `EXP-M15` |
+| M-26 | Explosão de compradores (aceleração de `unique_buyers`, não piso estático) | R58 (em estudo) | distinto do piso já medido em [[11-KNOWLEDGE/KB-0114-compradores-unicos-o-piso-e-o-r\|KB-0114]] | a definir | **em estudo**, sem código — `EXP-M16` |
+| M-27 | Revisão da regra de saída do executor real (só 4 regras) contra o conjunto maior do papel | R59 (em estudo) | o executor real não tem `line_break`, `max_loss` nem trailing armado — só o papel tem | a definir | **em estudo**, sem código — `EXP-M17` |
+
+## Relacionadas (meme)
+
+[[03-TRADING/Meme/README]] · [[Registro de Tentativas]] · [[05-EXPERIMENTS/Experiments Index]] ·
+[[11-KNOWLEDGE/KB-0119-entrada-depois-da-queda-em-producao|KB-0119]] ·
+[[11-KNOWLEDGE/KB-0127-blockhash-expirado-e-prioridade-fixa-sem-reenvio|KB-0127]] ·
+[[11-KNOWLEDGE/KB-0128-cadeia-vence-fita-no-fluxo-do-criador|KB-0128]] ·
+[[11-KNOWLEDGE/KB-0133-papel-vs-real-custo-fixo-e-atraso-de-30s|KB-0133]]
