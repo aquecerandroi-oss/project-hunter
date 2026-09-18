@@ -1,6 +1,6 @@
 """The two pure entry points of ``docs/RISK_ENGINE_MEME.md`` §2.
 
-``evaluate_meme_entry`` runs the 25 checks of §4 in order, **records every one**
+``evaluate_meme_entry`` runs the 26 checks of §4 in order, **records every one**
 (even after the first refusal), sizes only when the admissibility checks passed
 and publishes the binding ceiling. ``evaluate_meme_exit`` runs no entry check
 and always approves: it decides the quantity (never more than the position) and
@@ -16,6 +16,7 @@ from decimal import Decimal
 from hunter_core.domain.enums import KillSwitchState
 from hunter_risk_meme.checks import coin_checks
 from hunter_risk_meme.checks_wallet import wallet_checks
+from hunter_risk_meme.conviction import MemeConviction, conviction_check
 from hunter_risk_meme.decision import MemeCheck, MemeDecision, MemeExitPlan, check
 from hunter_risk_meme.inputs import (
     CurveState,
@@ -46,9 +47,12 @@ def evaluate_meme_entry(
     live_enabled: bool,
     curve_fee_pct: Decimal,
     creates_ata: bool = True,
+    conviction: MemeConviction | None = None,
 ) -> MemeDecision:
-    """§4 checks 1–25 and §5 sizing. ``curve_fee_pct`` is the curve's fee tier as the
-    caller last read it (a ``TradeEvent`` or ``Global``), never a constant of this module."""
+    """§4 checks 1–26 and §5 sizing. ``curve_fee_pct`` is the curve's fee tier as the
+    caller last read it (a ``TradeEvent`` or ``Global``), never a constant of this
+    module; ``conviction`` (T4.61c, §17) is the ladder's verdict the caller computed —
+    absent or off, check 26 passes and the ``conviction`` ceiling does not constrain."""
     ks = assess(wallet, limits, kill_switch)
     checks: list[MemeCheck] = coin_checks(
         proposal,
@@ -70,8 +74,10 @@ def evaluate_meme_entry(
         kill_switch_multiplier=ks.entry_size_multiplier,
         curve_fee_pct=curve_fee_pct,
         creates_ata=creates_ata,
+        conviction=conviction,
     )
     checks.extend(sizing_checks)
+    checks.append(conviction_check(conviction, limits))
     approved = all(c.passed for c in checks) and sizing is not None
     return MemeDecision(
         approved=approved,

@@ -41,6 +41,7 @@ from hunter_meme_executor.repo import (
 from hunter_risk_meme import (
     CurveState,
     MemeContext,
+    MemeConviction,
     MemeDecision,
     MemeEntryProposal,
     MemeKillSwitchInputs,
@@ -289,6 +290,8 @@ class AdmissionInputs:
     kill_switch: MemeKillSwitchInputs
     creates_ata: bool
     curve_fee_pct: Decimal
+    conviction: MemeConviction | None = None
+    """T4.61c: the ladder's verdict (``conviction_read``), check 26 + the ceiling."""
 
 
 def admit(inputs: AdmissionInputs, limits: MemeLimits, *, live_enabled: bool) -> MemeDecision:
@@ -302,6 +305,7 @@ def admit(inputs: AdmissionInputs, limits: MemeLimits, *, live_enabled: bool) ->
         live_enabled=live_enabled,
         curve_fee_pct=inputs.curve_fee_pct,
         creates_ata=inputs.creates_ata,
+        conviction=inputs.conviction,
     )
 
 

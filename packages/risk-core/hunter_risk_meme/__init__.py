@@ -7,6 +7,13 @@ the whole spend, caps in SOL, a latched daily kill switch, no book and no beta).
 """
 
 from hunter_risk_meme.checks import REFUSAL_NAMES
+from hunter_risk_meme.conviction import (
+    CONVICTION_REFUSALS,
+    LADDER_REFUSALS,
+    MemeConviction,
+    conviction_cap,
+    conviction_check,
+)
 from hunter_risk_meme.decision import (
     CheckState,
     Counterfactual,
@@ -55,7 +62,9 @@ from hunter_risk_meme.sizing import CAP_ORDER, size_entry
 
 __all__ = [
     "CAP_ORDER",
+    "CONVICTION_REFUSALS",
     "EXIT_REASONS",
+    "LADDER_REFUSALS",
     "MEME_PAPER_V0",
     "POLICY_ENV",
     "PUMPSWAP_PROGRAM",
@@ -68,6 +77,7 @@ __all__ = [
     "LimitCap",
     "MemeCheck",
     "MemeContext",
+    "MemeConviction",
     "MemeDecision",
     "MemeEntryProposal",
     "MemeExitPlan",
@@ -84,6 +94,8 @@ __all__ = [
     "PendingMemeIntent",
     "PositionForExit",
     "assess",
+    "conviction_cap",
+    "conviction_check",
     "decide_exit",
     "evaluate_meme_entry",
     "evaluate_meme_exit",

@@ -16,6 +16,7 @@ from hunter_risk_meme import (
     MEME_PAPER_V0,
     CurveState,
     MemeContext,
+    MemeConviction,
     MemeDecision,
     MemeEntryProposal,
     MemeKillSwitchInputs,
@@ -113,6 +114,7 @@ def decide(
     ks: MemeKillSwitchInputs | None = None,
     live_enabled: bool = False,
     creates_ata: bool = True,
+    conv: MemeConviction | None = None,
 ) -> MemeDecision:
     return evaluate_meme_entry(
         p or proposal(),
@@ -124,4 +126,5 @@ def decide(
         live_enabled=live_enabled,
         curve_fee_pct=FEE_PCT,
         creates_ata=creates_ata,
+        conviction=conv,
     )

@@ -68,9 +68,14 @@ REFUSAL_NAMES: Final[frozenset[str]] = frozenset(
         "below_min_sol",
         "insufficient_sol",
         "exposure_after_above_cap",
+        # T4.61c — check 26 ``conviction`` (``hunter_risk_meme.conviction``).
+        "entry_after_drop",
+        "entry_after_drop_unknown",
+        "conviction_too_low",
+        "conviction_too_small",
     }
 )
-"""Every refusal name of §4, checks 1–25. ``test_refusal_names.py`` proves each is
+"""Every refusal name of §4, checks 1–26. ``test_checks_table.py`` proves each is
 produced by at least one case of the table."""
 
 

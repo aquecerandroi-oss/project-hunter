@@ -82,6 +82,9 @@ POLICY = {
     "MEME_DAILY_LOSS_CAP_SOL": "0.1",
     "MEME_MAX_OPEN_POSITIONS": "3",
     "MEME_COOLDOWN_S": "3600",
+    # T4.61c: the live floor defaults to 0,02 SOL; these scenarios buy 0,01 (and
+    # a ~0,0065 scope remainder), so the owner's floor is written lower here.
+    "MEME_MIN_TRADE_SOL": "0.005",
 }
 
 
@@ -923,9 +926,10 @@ async def test_the_kill_switch_from_redis_blocks_and_the_daily_latch_persists(
         p=proposal_id,
     )
     assert orders[0]["status"] == "refused" and orders[0]["reason"] == "kill_switch_blocked"
-    assert len(orders[0]["admission"]["checks"]) == 25, (
-        "every check recorded after the first refusal"
+    assert len(orders[0]["admission"]["checks"]) == 26, (
+        "every check recorded after the first refusal (T4.61c: 26 with ``conviction``)"
     )
+    assert orders[0]["admission"]["conviction"] == {"enabled": False, "evaluated": False}
     assert harness.rpc.sent == []
     assert await harness.ctx.kill.latch("daily_loss_cap_reached")
     fresh = KillSwitchReader(

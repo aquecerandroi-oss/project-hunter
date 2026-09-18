@@ -379,6 +379,7 @@ Todos os checks avaliáveis são registrados em `decision.checks[]` como
 | 23 | `sizing` | tamanho final abaixo do mínimo economicamente sensato (taxas + rent > ganho possível) — **rejeita, nunca arredonda para cima** | `below_min_sol` |
 | 24 | `sol_available` | tamanho + taxas + rent + tip > `available_sol` | `insufficient_sol` |
 | 25 | `exposure_after` | exposição por mint ou total depois desta entrada acima do teto (passa por construção, registrado para prova) | `exposure_after_above_cap` |
+| 26 | `conviction` | **T4.61c** (§17): a escada de convicção, entregue ao motor como insumo (`MemeConviction`), disse não — queda ≥ 50 % do SOL real contra o pico de 60 s; menos de duas fotos na janela ou leitura falha (a borda que não se vê **recusa**, nunca desconta); produto abaixo do piso; ou o tamanho dimensionado abaixo de `MEME_MIN_TRADE_SOL` (decidido **aqui**, contra o perfil). Com a flag desligada ou sem escada: **passa** com `message = off` e nada muda | `entry_after_drop`, `entry_after_drop_unknown`, `conviction_too_low`, `conviction_too_small` |
 
 **A consequência de recusar por falta de dado, declarada e não escondida.** Com só os canais
 gratuitos do PumpPortal (`subscribeNewToken`, `subscribeMigration`) os checks 10, 11, 12 e 21 são
@@ -492,6 +493,7 @@ available_sol       = max(0, sol_balance − Σ reserved_sol − rent_reservado)
 
 sol_by_request      = proposal.requested_sol
 sol_by_trade_cap    = MEME_MAX_SOL_PER_TRADE
+sol_by_conviction   = escada.sol_sized quando ligada e sem recusa (T4.61c, §17); senão não limita
 sol_by_wallet_cap   = max(0, MEME_WALLET_MAX_SOL − exposicao_total_incl_pendentes)
 sol_by_mint_cap     = max(0, max_exposure_per_mint_sol − exposicao_do_mint)
 sol_by_daily_cap    = max(0, MEME_DAILY_LOSS_CAP_SOL − perda_do_dia − perda_maxima_comprometida)
@@ -504,21 +506,31 @@ limitante   = argmin(...)                       → sizing.binding_constraint
 sol_final   = quantize(sol_bruto × ks_multiplier)
 ```
 
-- **`sol_by_request` pode já ser o tamanho por convicção (T4.61b, §17).** Com
-  `MEME_CONVICTION_SIZING=on` o executor entrega ao motor um pedido que é uma fração do teto por trade
-  decidida pela evidência da admissão; o motor não sabe disso e não precisa — o pedido é um teto, e a
-  escada só o abaixa.
+- **`sol_by_conviction` é a escada de convicção como teto (T4.61c, §17).** Com
+  `MEME_CONVICTION_SIZING=on` o executor entrega ao motor a escada (`MemeConviction`: multiplicador,
+  `sol_sized`, recusa) e o motor a publica como o teto `conviction`, logo depois de `trade_cap` — uma
+  compra descontada tem `binding_constraint = conviction`, nunca `requested` (a T4.61b encolhia o
+  pedido e a mesa levava a culpa do clamp da política). Produto 1,0 empata com `trade_cap` e o nome
+  da política vence; escada recusando ou flag desligada ⇒ o teto não limita (`sol = null`) e os
+  outros 25 checks medem o tamanho cheio — a recusa é o check 26.
 - **`sol_by_daily_cap` é o que torna o teto diário um teto de verdade.** Como a perda plausível de
   uma compra é o valor inteiro, o compromisso máximo já assumido pelas posições abertas entra na
   conta: cinco compras de 0,05 SOL não passam por baixo de um teto diário de 0,20 SOL.
 - **`tied_limits` e `CAP_ORDER`** — desempate estável e declarado, como no SPOT: `requested`,
-  `trade_cap`, `daily_cap`, `mint_cap`, `wallet_cap`, `participation`, `impact`, `available`.
+  `trade_cap`, `conviction`, `daily_cap`, `mint_cap`, `wallet_cap`, `participation`, `impact`,
+  `available`.
 - **Dois contrafactuais distintos, nunca reportados como um só:** `size_without_multipliers` (mede o
   degrau do kill switch) e `size_without_participation` (mede quanto a participação está mordendo).
   Insumo indisponível → **nulo com motivo**, nunca zero.
 - **O multiplicador age sobre o tamanho final** (R-KS-1 do contrato SPOT), e o mínimo do check 23 é
   revalidado depois: tamanho reduzido que não paga as próprias taxas é **rejeitado**, nunca
-  arredondado para cima.
+  arredondado para cima. **O mínimo do perfil live é `MEME_MIN_TRADE_SOL`** (T4.61c, opcional no
+  `.env`, padrão **0,02 SOL**; o preset de papel mantém 0,001): contra ~0,0025 SOL de custos fixos
+  (rent da ATA 0,00204 + taxas) uma compra de 0,0175 SOL pagava 12 % só para existir — e era enviada.
+  Um escopo escrito (`small_test.max_sol_per_trade`) menor que o piso puxa o piso para o número do
+  escopo, em vez de recusar o boot. Consequência declarada, com a flag desligada: um teto qualquer
+  (participação, restante do escopo, disponível) que caia entre 0,001 e 0,02 SOL passa a recusar
+  (`below_min_sol`/`participation_above_cap`) em vez de mandar pó.
 - **Volume orgânico exclui o agente Mayhem** (carteira `BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s`,
   T4.0d §7) e exclui o que reconhecemos como wash/bundle. Sem poder excluir, o volume é
   `unavailable` — não é volume.
@@ -1491,7 +1503,7 @@ desde a meia-noite de São Paulo), a leitura é uma por tique com cache de 10 s,
 de perda **travam** a carteira (`daily_loss = 0,15`), embora o saldo pareça 0,0048 SOL acima do
 início do dia. O USDC continua sendo capital de gás, e o teto continua sendo do dono.
 
-## 17. Tamanho por convicção (T4.61b)
+## 17. Tamanho por convicção (T4.61b, corrigido na T4.61c)
 
 **O pedido (Everton, 18/09/2026, 15:0x BRT):** "usa a inteligência que já adquirimos e opera agora
 com o dinheiro que temos; pode variar os valores da entrada a partir de agora". Até então toda
@@ -1501,15 +1513,18 @@ cujo criador só a fita atrasada vouchou, com 8 compradores e a curva esvaziando
 
 **O que muda — e o que não muda.** A escada abaixo decide **que fração do teto** a compra usa. O teto
 continua sendo `MEME_MAX_SOL_PER_TRADE` (política de capital, §3), o mínimo continua sendo
-`MEME_MIN_TRADE_SOL` (check 23), e **nenhum degrau sobe**: o produto começa em 1,0 e só desce. A
-escada corre na admissão do executor (`hunter_meme_executor.conviction`, puro; a leitura em
-`conviction_read`), **antes** do motor: o pedido que chega ao `evaluate_meme_entry` já é o tamanho
-por convicção, e o motor o trata como o que sempre foi — o teto `requested` da §5, o primeiro do
-`CAP_ORDER`. Consequências: o `sizing.binding_constraint` de uma compra descontada é `requested`; o
-check 23 (`below_min_sol`), o 21 (participação), o 22 (impacto), o 24 (`sol_available`) e o 25
-(exposição) julgam o **tamanho final**; o check 18 (perda diária) e a tesouraria (§16) não mudam em
-nada. Os outros tetos da §5 continuam podendo apertar mais — a escada nunca é a última palavra para
-cima, só para baixo.
+`MEME_MIN_TRADE_SOL` (§5, 0,02 SOL no perfil live desde a T4.61c), e **nenhum degrau sobe**: o
+produto começa em 1,0 e só desce. A escada corre na admissão do executor
+(`hunter_meme_executor.conviction`, puro; a leitura guardada em `conviction_read`) e entra **no
+motor** como insumo (`hunter_risk_meme.MemeConviction`): o check 26 `conviction` (§4) e o teto
+`conviction` do `CAP_ORDER` (§5). A T4.61b entregava ao motor um pedido já encolhido e recusava
+por fora da decisão; a revisão (`.claude/state/review-T4.61b.md`, A4/A9) mostrou o custo: o
+`binding_constraint` dizia `requested` quando o clamp era da política, e uma ordem recusada pela
+escada saía com `admission.approved = true` e `first_refusal = null` — a mesa e qualquer R-study
+liam como aprovada. Agora: uma compra descontada tem `binding_constraint = conviction`,
+`sizing.requested_sol` continua sendo o pedido da mesa, e uma recusa da escada é
+`approved = false` com `first_refusal` nomeando, por construção (`MemeDecision._consistent`). Os
+checks 21–25 julgam o tamanho final; o check 18 (perda diária) e a tesouraria (§16) não mudam.
 
 ### 17.1 A escada
 
@@ -1523,15 +1538,16 @@ cima, só para baixo.
 | | `false`, ou sem leitura | × 0,5 | |
 | `concentration` | `bundled_share ≤ 10 %` **e** `top10_share ≤ 20 %` | 1,0 | metade dos tetos dos checks 11/12 (20 % / 25 %); KB-0103: "uma carteira paga um quinto" |
 | | acima de qualquer um, ou sem leitura | × 0,5 | |
-| `drop` | `real_sol` da leitura **desta** admissão contra `max(real_sol_reserves)` de `meme_curve_snapshots` nos últimos 60 s: queda < 50 % | 1,0 | KB-0118: N = 60 s manda mais que X |
+| `drop` | `recent_drawdown_pct` v1 (`hunter_indicators.meme.drawdown`, EXP-M13) sobre as fotos de `meme_curve_snapshots` dos últimos 60 s **mais** o `real_sol` da leitura `confirmed` desta admissão como ponto mais novo: queda < 50 % | 1,0 | KB-0118: N = 60 s manda mais que X |
 | | queda ≥ 50 % | **recusa `entry_after_drop`** | KB-0118 §1: −0,305 R em 73 apostas, cauda 4,1 %; R56 §1: 6 das 7 compras reais do estágio 1b |
-| | sem foto na janela | × 0,5 (`peak_unknown`) | desconto, nunca passe nem recusa |
+| | menos de **duas** fotos guardadas na janela (`too_few_points`/`no_observation`), leitura falha ou sem leitura da curva | **recusa `entry_after_drop_unknown`** | T4.61c (A2): uma foto só, tirada depois da queda, lia `dd ≈ 0` e passava — exatamente a borda da KB-0118 com o radar chegando tarde (soly, COVER, Punch). É a regra `too_few_points` da via de 15 s (`lab_repo_drawdown`), uma definição só |
 
-`multiplicador = Π degraus`; `tamanho = quantize(min(pedido, MEME_MAX_SOL_PER_TRADE) × multiplicador)`,
-arredondado **para baixo** ao lamport. **Piso:** produto < 0,25 ⇒ recusa `conviction_too_low` (não se
-manda pó); tamanho < `MEME_MIN_TRADE_SOL` ⇒ o mesmo nome. Com os padrões, duas evidências fracas
-ainda compram (0,25 × 0,28 = 0,07 SOL); três recusam. A recusa da queda tem precedência sobre a do
-piso.
+`multiplicador = Π degraus`; `sol_sized = quantize(min(pedido, MEME_MAX_SOL_PER_TRADE) × multiplicador)`,
+arredondado **para baixo** ao lamport. **Piso:** produto < 0,25 ⇒ recusa `conviction_too_low`;
+`sol_sized < MEME_MIN_TRADE_SOL` ⇒ recusa **`conviction_too_small`** — esta é do motor, contra o
+perfil (T4.61c, A5): 0,07 × 0,25 = **0,0175 SOL não é enviado** sob o piso de 0,02. Com os padrões,
+duas evidências fracas ainda compram (0,25 × 0,28 = 0,07 SOL); três recusam. Precedência:
+`entry_after_drop` > `entry_after_drop_unknown` > `conviction_too_low` > `conviction_too_small`.
 
 **Por que a queda é recusa e não desconto.** A KB-0118 mediu nove variantes; a única célula claramente
 ruim é "queda > 50 % **e** fresca (pico ≤ 60 s)", negativa nos cinco dias separados. R56 mostrou o
@@ -1539,35 +1555,49 @@ mesmo desenho em dinheiro real: soly (11,4 → 0,65 SOL, −94 %), COVER (61,9 �
 1,6) — o `curve_progress` (check 9) só olha a janela 2–50 % no instante da leitura e aprovou todas.
 Meia aposta numa curva que está sendo drenada continua sendo uma aposta ruim; o que a evidência
 sustenta é **não entrar**. A mesma queda **já parada** (pico a 60–180 s: +0,566 R, n = 17) não é
-tocada — a janela é de 60 s exatamente por isso, e a PS (R56 §2, +0,66 R) teria passado.
+tocada — a janela é de 60 s exatamente por isso (uma foto a −80 s não conta), e a PS (R56 §2,
++0,66 R) teria passado.
 
-**Desconhecido desconta, nunca passa.** É a regra da §8 aplicada ao tamanho: o que não foi medido não
-vouchou pela moeda. Quatro desconhecidos dão 1/16 e recusam; a moeda sem série de 15 s e sem foto de
-curva é, por construção, a moeda que o radar ainda não olhou.
+**Por que "não vi" também é recusa (T4.61c).** A T4.61b descontava × 0,5 (`peak_unknown`) quando não
+havia foto — e deixava passar a × 1,0 quando havia **uma**, pós-queda. Um mint com linha de 15 s mas
+sem duas fotos de curva nos últimos 60 s é um mint que a via rápida largou no último minuto: isso é
+sinal, não ausência. A borda única da escada falha fechada, como a porta do Lab
+(`recent_drawdown_unknown`); os quatro descontos continuam descontos.
 
-### 17.2 A flag, a sombra e a auditoria
+### 17.2 A flag, o custo e a auditoria
 
-- **`MEME_CONVICTION_SIZING=off|on`, padrão `off`** — a flag é do Everton. Desligada, o tamanho é o
-  de antes (fixo) e a escada é **calculada e escrita** mesmo assim em `admission.conviction` de toda
-  ordem (`enabled: false`, `applied: false`, `ladder_refusal` diz o que ela teria feito) — é a sombra
-  que permite decidir ligar com dados, não com fé. Ligada, `applied: true` nas ordens descontadas e
-  `refusal` nas recusadas.
+- **`MEME_CONVICTION_SIZING=off|on`, padrão `off`** — a flag é do Everton. Desligada, **nada é lido
+  nem calculado** (T4.61c, A1: custo zero; a sombra da T4.61b saiu), o check 26 passa com
+  `message = off`, o teto `conviction` não limita e `admission.conviction = {enabled: false,
+  evaluated: false}`. Ligada, a leitura roda guardada (prazo próprio de 3 s, `try/except` no molde
+  de `read_creator_flow`): timeout ou erro é logado, gravado em `admission.conviction.read_failed`
+  e julgado como `entry_after_drop_unknown` — nunca sobe para `entries_once`, nunca derruba o loop
+  de saídas.
 - **Os números** (`docs/ACTIVATION.md` 9f): multiplicadores, limiares, janela, piso e idade máxima da
   evidência, cada um com override no `.env`; ilegível ou fora da faixa cai no padrão, nunca recusa o
-  boot, nunca sobe um teto.
-- **O que a linha grava.** `admission.conviction = {enabled, applied, multiplier, sol_cap, sol_sized,
-  sol_requested, refusal, ladder_refusal, rungs: [{name, value, multiplier, reason}] × 5}`; o mesmo
-  bloco vai no `intent` da ordem admitida. Uma ordem recusada pela escada tem o `admission` do motor
-  **completo** (os 25 checks no tamanho cheio) e `reason = entry_after_drop | conviction_too_low` —
-  o motor continua sendo o registro de verdade, a escada só diz "não" por cima dele, nunca "sim".
-- **Custo.** Uma consulta limitada por candidata admitida (índices `(mint, observed_at)` e
-  `(mint, as_of)`, janelas de 60 s e 120 s), flag ligada ou não. Nenhuma RPC a mais.
-- **Carência.** Nem `entry_after_drop` nem `conviction_too_low` entram em `DETERMINISTIC_REFUSALS`
-  (§3.5): a primeira o relógio limpa em 60 s (a queda envelhece), a segunda muda a cada linha de 15 s.
+  boot, nunca sobe um teto. `MEME_CONVICTION_PEAK_UNKNOWN_MULT` **deixou de existir**.
+- **O que a linha grava.** `admission.conviction = {enabled, evaluated, multiplier, sol_cap,
+  sol_sized, refusal, read_failed?, rungs: [{name, value, multiplier, reason}] × 5}`; o mesmo bloco
+  vai no `intent` da ordem admitida. O `value` do degrau `drop` traz `now`, `peak`, `dd`,
+  `peak_age_s` e `points`. A decisão do motor traz o check 26 (`value = sol_sized`, `limit =
+  multiplicador`, ou `limit = MEME_MIN_TRADE_SOL` na recusa `conviction_too_small`) e o teto
+  `conviction` em `sizing.caps`. Uma ordem recusada pela escada tem `reason = first_refusal` como
+  qualquer outra.
+- **Custo, ligada.** Duas consultas limitadas por candidata admitida (fotos da janela de 60 s em
+  `ix_meme_curve_snapshots_mint_observed`, `received_at ≤ now`; linha de 15 s ≤ 120 s em
+  `ix_meme_features_15s_mint_as_of`, `LIMIT 1`). Nenhuma RPC a mais.
+- **Carência.** `entry_after_drop` cola **30 s** de carência no `auto_approve`
+  (`refusal_cooldown.SHORT_COOLDOWNS`, limitada pelo `MEME_AUTO_APPROVE_REFUSAL_COOLDOWN_S` do dono):
+  a mesa repropõe em ~20 s e a resposta só muda quando o pico envelhece; 30 s ficam abaixo dos 60 s
+  da KB-0118, então a queda **já parada** nunca é pulada por ela. `entry_after_drop_unknown` e
+  `conviction_too_low` não colam nada — a próxima foto ou a próxima linha de 15 s respondem.
 - **Heartbeat.** `policy.conviction_sizing = on|off`.
 
 **Não é vantagem nova.** A KB-0118 é explícita: o filtro tira a porta de −0,022 para +0,016 R por
 aposta — de perdedora para empatada. Os quatro descontos são higiene de tamanho sobre evidência já
-medida (EXP-M10, KB-0108, KB-0103, R56), não uma tese de que a moeda "forte" ganha. O que medirá:
-`admission.conviction` das ordens dos próximos dias contra o `pnl_sol` das posições — o estudo cabe
-numa consulta.
+medida (EXP-M10, KB-0108, KB-0103, R56), não uma tese de que a moeda "forte" ganha. O que medirá,
+**com a flag ligada**: `admission.conviction` das ordens contra o `pnl_sol` das posições — o estudo
+cabe numa consulta. Provas: `packages/risk-core/tests/unit/meme/test_conviction_input.py` (A4, A9,
+A5, off byte a byte) e `test_checks_table.py` (os quatro nomes na tabela);
+`services/meme-executor/tests/test_conviction.py` (cada degrau, A1 com exceção e timeout, A2 uma
+foto, carência), `test_conviction_db.py` (a leitura contra Postgres).

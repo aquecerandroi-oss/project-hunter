@@ -17,6 +17,7 @@ from __future__ import annotations
 from decimal import ROUND_DOWN, Decimal
 from typing import Final
 
+from hunter_risk_meme.conviction import MemeConviction, conviction_cap
 from hunter_risk_meme.decision import (
     Counterfactual,
     LimitCap,
@@ -33,6 +34,7 @@ __all__ = ["CAP_ORDER", "LAMPORTS_PER_SOL", "size_entry"]
 CAP_ORDER: Final[tuple[str, ...]] = (
     "requested",
     "trade_cap",
+    "conviction",
     "daily_cap",
     "mint_cap",
     "wallet_cap",
@@ -40,7 +42,10 @@ CAP_ORDER: Final[tuple[str, ...]] = (
     "impact",
     "available",
 )
-"""Stable tie-break order (§5): the first name wins, the rest are ``tied_limits``."""
+"""Stable tie-break order (§5): the first name wins, the rest are ``tied_limits``.
+``conviction`` (T4.61c, §17) sits right after ``trade_cap``: a full-conviction
+ladder ties with it and the policy's name still wins; a discounted one binds by
+its own name, never as ``requested``."""
 
 LAMPORTS_PER_SOL = Decimal(1_000_000_000)
 _ZERO = Decimal(0)
@@ -66,12 +71,14 @@ def _caps(
     *,
     costs: Decimal,
     curve_fee_pct: Decimal,
+    conviction: MemeConviction | None,
 ) -> tuple[list[LimitCap], MemeCheck]:
     """Every ceiling in SOL, and the participation check that may be unavailable."""
     committed = sum((p.sol_spent for p in wallet.positions), _ZERO) + wallet.reserved_sol
     caps = [
         LimitCap(name="requested", sol=proposal.requested_sol, limit=proposal.requested_sol),
         LimitCap(name="trade_cap", sol=limits.max_sol_per_trade, limit=limits.max_sol_per_trade),
+        conviction_cap(conviction, limits),
         LimitCap(
             name="daily_cap",
             sol=_quantize(limits.daily_loss_cap_sol - wallet.daily_loss_sol - committed),
@@ -152,11 +159,19 @@ def size_entry(
     kill_switch_multiplier: Decimal,
     curve_fee_pct: Decimal,
     creates_ata: bool,
+    conviction: MemeConviction | None = None,
 ) -> tuple[MemeSizing | None, list[MemeCheck]]:
     """The §5 formula plus checks 21–25. ``None`` sizing when a ceiling is unavailable."""
     costs = fixed_costs(proposal, limits, creates_ata=creates_ata)
     caps, participation = _caps(
-        proposal, wallet, limits, curve, context, costs=costs, curve_fee_pct=curve_fee_pct
+        proposal,
+        wallet,
+        limits,
+        curve,
+        context,
+        costs=costs,
+        curve_fee_pct=curve_fee_pct,
+        conviction=conviction,
     )
     checks: list[MemeCheck] = [participation]
     if participation.refusal is not None:

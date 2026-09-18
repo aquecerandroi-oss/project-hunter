@@ -179,6 +179,9 @@ def effective_limits(base: MemeLimits, small: SmallTestAuthorization | None) -> 
                 base.max_exposure_per_mint_sol, small.max_sol_per_trade
             ),
             "wallet_max_sol": min(base.wallet_max_sol, small.max_total_sol),
+            # T4.61c: a written scope below the live floor (0,02 SOL by default)
+            # is the owner's number — the floor follows it instead of refusing the boot.
+            "min_trade_sol": min(base.min_trade_sol, small.max_sol_per_trade),
         }
     )
 

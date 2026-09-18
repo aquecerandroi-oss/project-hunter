@@ -74,3 +74,72 @@ compra real era `min(policy.max_sol_per_trade, proposal.size)` = **0,28 SOL fixo
 6. O `params` da posição não carrega o multiplicador; o `intent`/`admission` da ordem de entrada
    (`entry_order_id`) carregam a escada inteira.
 7. Não medido em produção; não commitado.
+
+## T4.61c — os cinco achados da revisão, fechados (18/09/2026)
+
+Revisão: `.claude/state/review-T4.61b.md` (veredito SAFE off com A1; não ligar antes de A2, A4,
+A5, A9). Tudo fechado; nada commitado; `.env`, VPS e `uv.lock` intocados.
+
+- **A1 — leitura guardada, custo zero desligada.** `conviction_read.conviction_for` devolve
+  `ConvictionOutcome`: flag off ⇒ **nenhuma consulta, nenhuma escada** (`{enabled: false,
+  evaluated: false}`; a sombra da T4.61b saiu — medir exige ligar). On ⇒ `asyncio.timeout(3 s)` +
+  `try/except` no molde de `read_creator_flow`; timeout/erro ⇒ log, `read_failed` na ordem e o
+  degrau `drop` recusa `entry_after_drop_unknown`. Nunca sobe para `entries_once`.
+- **A2 — uma foto pós-queda não passa.** O degrau `drop` reutiliza `recent_drawdown` (EXP-M13,
+  `hunter_indicators.meme.drawdown`) sobre as fotos guardadas da janela de 60 s (`received_at ≤ now`)
+  **mais** a leitura `confirmed` desta admissão como ponto mais novo; menos de duas fotos guardadas
+  ⇒ `too_few_points`/`no_observation` ⇒ **recusa** `entry_after_drop_unknown`. `peak_unknown` (× 0,5)
+  e `MEME_CONVICTION_PEAK_UNKNOWN_MULT` deixaram de existir (A3 decidido pela revisão: fail closed).
+- **A4 + A9 — a escada entrou no motor.** `hunter_risk_meme.conviction` (novo, 128 linhas):
+  `MemeConviction` (insumo: `enabled`, `multiplier`, `sol_sized`, `refusal`, `detail`), check 26
+  `conviction` (último da lista; `off` passa) e teto `conviction` em `CAP_ORDER` logo depois de
+  `trade_cap` (limita só quando a escada permite um tamanho admissível; recusa ⇒ `sol = null`, os
+  25 checks medem o tamanho cheio). `evaluate_meme_entry(..., conviction=None)`. Resultado:
+  `binding_constraint = conviction` numa compra descontada com `sizing.requested_sol` = pedido da
+  mesa; recusa da escada ⇒ `approved = false`, `first_refusal` nomeado, `reason` da ordem = o mesmo.
+  `entries.py` perdeu o `if ladder.refusal` e o `apply_ladder`; `AdmissionInputs.conviction`.
+  `REFUSAL_NAMES` += `entry_after_drop`, `entry_after_drop_unknown`, `conviction_too_low`,
+  `conviction_too_small` (a tabela §4 exige um caso para cada — `test_checks_table.py`).
+- **A5 — `MEME_MIN_TRADE_SOL` existe.** `limits_from_env`: opcional, padrão **0,02 SOL** no perfil
+  live (paper mantém 0,001); ilegível/≤ 0/acima do `MEME_MAX_SOL_PER_TRADE` ⇒ `MemePolicyMissing`
+  pelo nome. `effective_limits` puxa o piso para `small_test.max_sol_per_trade` quando o escopo é
+  menor (senão o boot quebraria por `min_trade_sol > max_sol_per_trade`). O motor recusa
+  `conviction_too_small` quando `sol_sized < min_trade_sol` (0,07 × 0,25 = 0,0175 **não sai**).
+- **Carência.** `refusal_cooldown.SHORT_COOLDOWNS = {entry_after_drop: 30 s}` (limitada pelo
+  cooldown do dono; `cooling_mints_by_window`; a consulta passou a trazer `received_at`).
+  `entry_after_drop_unknown` e `conviction_too_low` não colam.
+- **Arquivos.** Motor: `packages/risk-core/hunter_risk_meme/{conviction.py (novo), sizing.py,
+  evaluate.py, checks.py, limits.py, __init__.py}`. Executor: `hunter_meme_executor/{conviction.py
+  (262, reescrito), conviction_config.py (novo, 134 — `ConvictionConfig` saiu do `conviction.py`
+  para caber), conviction_read.py (188), entries.py, admission.py, config.py, refusal_cooldown.py}`.
+  Docs: `docs/RISK_ENGINE_MEME.md` §4 (linha 26), §5, §17; `docs/ACTIVATION.md` 9f;
+  `obsidian/11-KNOWLEDGE/KB-0137`.
+
+### Provas
+
+- `uv run pytest services/meme-executor/tests packages/risk-core/tests -q -p no:cacheprovider -m
+  "not live"` → ver o relatório da T4.61c (o executor com Docker, ~2,5 min). Unidade:
+  `packages/risk-core/tests` **394 passed** (+ `test_conviction_input.py`, 23 novos: A4 binding,
+  empate, A9 por nome × 3, tamanho cheio na recusa, A5 pó, piso exato, precedência, off byte a byte,
+  `MEME_MIN_TRADE_SOL` × 5); `services/meme-executor/tests/test_conviction.py` **45 passed** (cada
+  degrau; A2 uma foto/nenhuma/recebida tarde/duas bastam/leitura falha; A4; A9 × 3; A5 0,0175 sob
+  0,02 e sob 0,001; A1 off sem sessão, exceção, timeout; carência × 4).
+- `ruff check` / `ruff format --check` em `packages/risk-core` e `services/meme-executor`: limpos.
+  `pyright` nos 12 arquivos tocados: 0 erros. `check_file_size.py`: 971 arquivos, 0 acima
+  (`limits.py` está em **350** exatas — próximo toque ali precisa de poda).
+
+### Ressalvas
+
+1. **`hunter_indicators` importado pelo executor sem constar no `pyproject.toml`** do
+   `services/meme-executor` (mesmo precedente do `meme-worker`; a imagem instala `--all-packages`).
+   Não toquei no `pyproject`/`uv.lock` para não forçar re-lock; declarar a dependência é um
+   commit à parte.
+2. **O piso de 0,02 SOL muda o caminho com a flag desligada**: tetos entre 0,001 e 0,02 (participação
+   de moedas com < 2 SOL/min de volume orgânico, restante de escopo, disponível) passam a recusar.
+   É política do Everton — se ele quiser o de antes, `MEME_MIN_TRADE_SOL=0.001` no `.env`.
+3. **Testes de integração ajustados**: `POLICY` de `test_live_persistence.py` ganhou
+   `MEME_MIN_TRADE_SOL=0.005` (os cenários compram 0,01); `test_config_boot` prova o piso seguindo o
+   escopo de 0,01; a contagem de checks na recusa do kill switch é 26.
+4. A sombra da T4.61b (escada calculada com flag off) **saiu** por A1 — o custo zero foi a escolha do
+   brief. Sem ela, a única medição é com a flag ligada.
+5. Não medido em produção; não commitado.

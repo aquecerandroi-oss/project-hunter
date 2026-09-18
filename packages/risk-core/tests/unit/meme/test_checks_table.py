@@ -13,6 +13,7 @@ import pytest
 from hunter_core.domain.enums import KillSwitchState
 from hunter_risk_meme import (
     REFUSAL_NAMES,
+    MemeConviction,
     MemeKillSwitchInputs,
     OpenMemePosition,
     PendingMemeIntent,
@@ -57,6 +58,7 @@ CHECK_NAMES = (
     "sizing",
     "sol_available",
     "exposure_after",
+    "conviction",
 )
 
 OTHER = "So11111111111111111111111111111111111111112"
@@ -131,6 +133,28 @@ FAILING = {
     "exposure_after_above_cap": {
         "lim": limits(
             max_exposure_per_mint_sol=Decimal("0.0009"), max_sol_per_trade=Decimal("0.001")
+        )
+    },
+    # T4.61c — check 26: the ladder's own three names, and the engine's dust floor.
+    "entry_after_drop": {
+        "conv": MemeConviction(enabled=True, multiplier=Decimal(0), refusal="entry_after_drop")
+    },
+    "entry_after_drop_unknown": {
+        "conv": MemeConviction(
+            enabled=True, multiplier=Decimal(0), refusal="entry_after_drop_unknown"
+        )
+    },
+    "conviction_too_low": {
+        "conv": MemeConviction(
+            enabled=True,
+            multiplier=Decimal("0.125"),
+            sol_sized=Decimal("0.00625"),
+            refusal="conviction_too_low",
+        )
+    },
+    "conviction_too_small": {
+        "conv": MemeConviction(
+            enabled=True, multiplier=Decimal("0.25"), sol_sized=Decimal("0.0005")
         )
     },
 }

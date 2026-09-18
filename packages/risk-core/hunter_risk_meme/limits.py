@@ -10,12 +10,11 @@ environment and refuses — :class:`MemePolicyMissing`, every missing or malform
 name listed — when any of them is absent. The executor calls it only with the live
 flag on: paper never needs a policy from the environment.
 
-T4.58: the **curve-progress window** (a strategy parameter, ``0.02``–``0.50`` in the
-paper column) may be overridden by two optional variables,
-``MEME_CURVE_PROGRESS_MIN_PCT`` / ``MEME_CURVE_PROGRESS_MAX_PCT``, so the owner can
-align the executor's admission with the desk gate (``operator/5``
-``max_progress_pct``) from the ``.env`` — absent keeps the base's values, and a
-window that cannot be read or is empty refuses the boot by name, like the five.
+T4.58: the **curve-progress window** (``0.02``–``0.50`` in the paper column) may be
+overridden by ``MEME_CURVE_PROGRESS_MIN_PCT`` / ``MEME_CURVE_PROGRESS_MAX_PCT`` so the
+owner can align the admission with the desk gate (``operator/5`` ``max_progress_pct``)
+— absent keeps the base's values; unreadable or empty refuses the boot by name.
+T4.61c: the live floor ``MEME_MIN_TRADE_SOL`` (:data:`LIVE_MIN_TRADE_SOL`) is optional too.
 """
 
 from __future__ import annotations
@@ -31,6 +30,8 @@ from hunter_risk_meme.base import MemeModel
 __all__ = [
     "ENV_CURVE_PROGRESS_MAX",
     "ENV_CURVE_PROGRESS_MIN",
+    "ENV_MIN_TRADE_SOL",
+    "LIVE_MIN_TRADE_SOL",
     "MEME_PAPER_V0",
     "POLICY_ENV",
     "MemeLimits",
@@ -57,6 +58,15 @@ ENV_CURVE_PROGRESS_MAX: Final = "MEME_CURVE_PROGRESS_MAX_PCT"
 """T4.58 — optional, fractions in ``[0, 1]``: the window check 9 admits. Absent ⇒
 the base's ``0.02``–``0.50``; unreadable, out of range or ``min >= max`` ⇒
 :class:`MemePolicyMissing` naming the variable(s), like the five."""
+
+
+ENV_MIN_TRADE_SOL: Final = "MEME_MIN_TRADE_SOL"
+LIVE_MIN_TRADE_SOL: Final = Decimal("0.02")
+"""T4.61c — optional, SOL: the smallest buy the live profile sends (check 23, and
+check 26's ``conviction_too_small``). Absent ⇒ 0,02 — never the paper preset's 0,001:
+against ~0,0025 SOL of fixed costs (ATA rent 0,00204 + fees) a 0,0175 SOL buy pays 12 %
+to exist, and was being sent. Unreadable, ``<= 0`` or above ``MEME_MAX_SOL_PER_TRADE``
+⇒ :class:`MemePolicyMissing` naming it."""
 
 
 class MemePolicyMissing(RuntimeError):
@@ -279,6 +289,18 @@ def _curve_progress_window(
     return given, ""
 
 
+def _min_trade_sol(env: Mapping[str, str], invalid: list[str]) -> Decimal:
+    raw = (env.get(ENV_MIN_TRADE_SOL) or "").strip()
+    try:
+        value = _decimal(raw) if raw else LIVE_MIN_TRADE_SOL
+    except (InvalidOperation, ValueError):
+        value = Decimal(0)
+    if value <= 0:
+        invalid.append(ENV_MIN_TRADE_SOL)
+        return LIVE_MIN_TRADE_SOL
+    return value
+
+
 def limits_from_env(
     env: Mapping[str, str], *, base: MemeLimits = MEME_PAPER_V0, profile: str = "meme_live_v0"
 ) -> MemeLimits:
@@ -300,9 +322,14 @@ def limits_from_env(
             invalid.append(name)
     allowance = _creator_unknown_allowance(env, invalid)
     window, detail = _curve_progress_window(env, base, invalid)
+    floor = _min_trade_sol(env, invalid)
+    per_trade = values.get("MEME_MAX_SOL_PER_TRADE")
+    if per_trade is not None and floor > per_trade and ENV_MIN_TRADE_SOL not in invalid:
+        invalid.append(ENV_MIN_TRADE_SOL)
+        detail = f"{detail}; " if detail else ""
+        detail += f"min_trade_sol {floor} exceeds max_sol_per_trade {per_trade}"
     if missing or invalid:
         raise MemePolicyMissing(missing, tuple(invalid), detail)
-    per_trade = values["MEME_MAX_SOL_PER_TRADE"]
     # Re-validated as a whole: the cross-field rules (`per_trade <= wallet_max`)
     # must hold for the owner's numbers, not only for the paper preset.
     return MemeLimits.model_validate(
@@ -316,6 +343,7 @@ def limits_from_env(
             "rug_cooldown_s": values["MEME_COOLDOWN_S"],
             # v0: no position reinforcement, so the per-mint cap *is* the per-trade cap.
             "max_exposure_per_mint_sol": per_trade,
+            "min_trade_sol": floor,
             **allowance,
             **window,
         }

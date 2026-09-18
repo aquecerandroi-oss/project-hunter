@@ -1,6 +1,7 @@
-"""T4.61b — the conviction read against a real Postgres: one statement, the 60 s
-peak of ``meme_curve_snapshots`` and the newest fresh ``meme_features_15s`` row,
-as ``hunter_worker`` (the role the admission reads with)."""
+"""T4.61b/T4.61c — the conviction read against a real Postgres: the photos of
+``meme_curve_snapshots`` in the 60 s window (received by ``now``) and the newest
+fresh ``meme_features_15s`` row, as ``hunter_worker`` (the role the admission
+reads with)."""
 
 from __future__ import annotations
 
@@ -26,9 +27,10 @@ NOW = datetime(2026, 9, 18, 18, 5, tzinfo=UTC)
 CONFIG = ConvictionConfig()
 
 _SNAPSHOT = text(
-    "INSERT INTO meme_curve_snapshots (observed_at, mint, source, virtual_sol_reserves, "
-    "  virtual_token_reserves, real_sol_reserves, real_token_reserves, total_supply, complete) "
-    "VALUES (:at, :mint, :source, 30, 1000000000, :real, 700000000, 1000000000, false)"
+    "INSERT INTO meme_curve_snapshots (observed_at, received_at, mint, source, "
+    "  virtual_sol_reserves, virtual_token_reserves, real_sol_reserves, real_token_reserves, "
+    "  total_supply, complete) "
+    "VALUES (:at, :received, :mint, :source, 30, 1000000000, :real, 700000000, 1000000000, false)"
 )
 _FEATURES = text(
     "INSERT INTO meme_features_15s (as_of, mint, features_version, snapshots_120s, "
@@ -43,12 +45,19 @@ _FEATURES = text(
 
 async def _seed(engine: AsyncEngine) -> None:
     async with engine.begin() as connection:
-        for offset, real in ((-80, "40"), (-45, "12.5"), (-20, "9"), (5, "99")):
+        for offset, received, real in (
+            (-80, -80, "40"),
+            (-45, -45, "12.5"),
+            (-20, -20, "9"),
+            (-15, 3, "50"),  # observed inside the window, received after NOW: not an input
+            (5, 5, "99"),
+        ):
             # -80 s is outside the 60 s window; +5 s is in the future (never read).
             await connection.execute(
                 _SNAPSHOT,
                 {
                     "at": NOW + timedelta(seconds=offset),
+                    "received": NOW + timedelta(seconds=received),
                     "mint": MINT,
                     "source": "solana_rpc",
                     "real": Decimal(real),
@@ -89,8 +98,9 @@ async def test_the_peak_is_the_window_max_and_the_row_is_the_newest_fresh_one(
             series = await read_series_evidence(session, MINT, config=CONFIG, now=NOW)
     finally:
         await _clean(db_engine)
-    assert series["peak_real_sol"] == Decimal("12.5"), "not the 40 at -80 s, not the 99 at +5 s"
-    assert series["peak_points"] == 2
+    reals = [p.real_sol for p in series["points"]]
+    assert reals == [Decimal("12.5"), Decimal("9")], "not -80 s, not +5 s, not received late"
+    assert all(p.received_at <= NOW for p in series["points"])
     assert series["unique_buyers_60s"] == 12 and series["holders_rising"] is True
     assert series["as_of"] == NOW - timedelta(seconds=10)
 
@@ -101,5 +111,4 @@ async def test_a_mint_nobody_photographed_reads_as_nothing(
 ) -> None:
     async with role_session(db_session_factory, db_role=WORKER_ROLE) as session:
         series = await read_series_evidence(session, "NoSuchMint", config=CONFIG, now=NOW)
-    assert series["peak_real_sol"] is None and series["peak_points"] == 0
-    assert series["unique_buyers_60s"] is None and series["holders_rising"] is None
+    assert series == {"points": ()}

@@ -17,6 +17,7 @@ reached. The cooldown is a delay, never a ban.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import timedelta
 from typing import TYPE_CHECKING, Final
 
@@ -32,6 +33,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "DETERMINISTIC_REFUSALS",
+    "SHORT_COOLDOWNS",
+    "cooling_mints_by_window",
     "cooling_mints_of",
     "refusal_cooling_mints",
     "refusal_window_start",
@@ -82,8 +85,20 @@ are the *radar gate*'s refusals (``hunter_meme_worker.rules_criteria``), never
 written to ``meme_live_orders.reason``; a mint refused by the gate never reaches
 the executor at all."""
 
+SHORT_COOLDOWNS: Final[Mapping[str, float]] = {"entry_after_drop": 30.0}
+"""T4.61c — refusals the **clock** clears, but not on the next tick: each cools
+its mint for its own window, never longer than the owner's cooldown.
+
+``entry_after_drop`` (check 26, §17): the real SOL fell ≥ 50 % from the peak of
+the last 60 s. The desk re-proposes in ~20 s and every retry costs three RPC
+reads, the creator's ATA and the series read for the same answer, because the
+peak only leaves the window as it ages — 30 s is short enough to stay under
+KB-0118's 60 s (the fall that has *stopped*, +0,566 R at 60–180 s, is never
+skipped by it) and long enough to skip one useless retry. Its sibling
+``entry_after_drop_unknown`` is **not** here: the next photo can answer it."""
+
 _COOLING_REFUSALS = text(
-    "SELECT p.mint, o.reason FROM meme_live_orders o "
+    "SELECT p.mint, o.reason, o.received_at FROM meme_live_orders o "
     "JOIN meme_proposals p ON p.id = o.proposal_id "
     "WHERE p.decided_by = :by AND o.side = 'buy' AND o.status = 'refused' "
     "  AND o.received_at >= :since"
@@ -109,6 +124,23 @@ def cooling_mints_of(rows: Iterable[tuple[str, str]]) -> frozenset[str]:
     return frozenset(mint for mint, reason in rows if reason in DETERMINISTIC_REFUSALS)
 
 
+def cooling_mints_by_window(
+    rows: Iterable[tuple[str, str, datetime]], *, now: datetime, cooldown_s: float
+) -> frozenset[str]:
+    """Pure: the deterministic refusals inside the owner's window, plus the
+    short-cooldown ones (:data:`SHORT_COOLDOWNS`) inside their own — each capped
+    by ``cooldown_s``, so the owner's number is always the longest wait."""
+    out: set[str] = set()
+    for mint, reason, refused_at in rows:
+        short = SHORT_COOLDOWNS.get(reason)
+        window = cooldown_s if reason in DETERMINISTIC_REFUSALS else short
+        if window is None:
+            continue
+        if refused_at >= now - timedelta(seconds=min(window, cooldown_s)):
+            out.add(mint)
+    return frozenset(out)
+
+
 async def refusal_cooling_mints(
     session: AsyncSession, *, now: datetime, cooldown_s: float
 ) -> frozenset[str]:
@@ -117,4 +149,6 @@ async def refusal_cooling_mints(
     if since is None:
         return frozenset()
     rows = await session.execute(_COOLING_REFUSALS, {"by": AUTO_STAGE1_DECIDED_BY, "since": since})
-    return cooling_mints_of((str(row[0]), str(row[1])) for row in rows)
+    return cooling_mints_by_window(
+        ((str(row[0]), str(row[1]), row[2]) for row in rows), now=now, cooldown_s=cooldown_s
+    )

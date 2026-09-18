@@ -928,31 +928,43 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    `priority_fee` escolhido, o `max_slippage_bps` usado e, depois de liquidada, `resends`.
    `skipPreflight` continua desligado e `maxRetries: 0` continua — o reenvio é nosso, não do nó.
 
-9f. **Tamanho por convicção (T4.61b) — a flag é dele, padrão desligado.** Até 18/09 toda compra
-   real saía a `min(MEME_MAX_SOL_PER_TRADE, size_sol da proposta)`, fixo (0,28 SOL). Com
-   `MEME_CONVICTION_SIZING=on` o executor compra uma **fração desse teto** decidida pela evidência que
-   a admissão já tem (criador lido na cadeia ou só na fita, compradores únicos, tendência de holders,
-   concentração) e **recusa** `entry_after_drop` quando o SOL real da curva está ≥ 50 % abaixo do pico
-   dos últimos 60 s (KB-0118) e `conviction_too_low` quando o produto cai abaixo de 0,25 — nunca
-   acima do teto, nunca abaixo de `MEME_MIN_TRADE_SOL`. Desligada, o tamanho é o de hoje e a escada é
-   só **escrita** no `admission.conviction` de cada ordem (sombra), para ele ver o que ela faria antes
-   de ligar. Regra e evidência: `docs/RISK_ENGINE_MEME.md` § "Tamanho por convicção".
+9f. **Tamanho por convicção (T4.61b, corrigido na T4.61c) — a flag é dele, padrão desligado.** Até
+   18/09 toda compra real saía a `min(MEME_MAX_SOL_PER_TRADE, size_sol da proposta)`, fixo (0,28 SOL).
+   Com `MEME_CONVICTION_SIZING=on` o executor compra uma **fração desse teto** decidida pela evidência
+   que a admissão já tem (criador lido na cadeia ou só na fita, compradores únicos, tendência de
+   holders, concentração) e **recusa** `entry_after_drop` quando o SOL real da curva está ≥ 50 % abaixo
+   do pico dos últimos 60 s (KB-0118), `entry_after_drop_unknown` quando há menos de duas fotos da
+   curva na janela ou a leitura falhou (a borda que não se vê recusa, nunca desconta),
+   `conviction_too_low` quando o produto cai abaixo de 0,25 e `conviction_too_small` quando o tamanho
+   dimensionado fica abaixo de `MEME_MIN_TRADE_SOL` — nunca acima do teto, nunca pó. A escada entra
+   **no motor** (check 26 `conviction` + teto `conviction`): uma compra descontada mostra
+   `binding_constraint = conviction` na mesa, e uma recusa da escada é `admission_approved = false`
+   com `first_refusal` nomeando, como qualquer outra. Desligada, **nada é lido nem calculado** (custo
+   zero; `admission.conviction = {enabled: false, evaluated: false}`) e o tamanho é o de hoje. Ligada,
+   a leitura tem prazo próprio (3 s) e nunca derruba o executor: falhou ⇒ `read_failed` na ordem e
+   `entry_after_drop_unknown`. `entry_after_drop` cola 30 s de carência no robô (abaixo dos 60 s da
+   KB-0118). Regra e evidência: `docs/RISK_ENGINE_MEME.md` § "Tamanho por convicção".
+
+   **Antes de ligar** (revisão `.claude/state/review-T4.61b.md`, fechada na T4.61c): A1 leitura guardada,
+   A2 uma foto ⇒ recusa, A4 `binding_constraint = conviction`, A5 piso real, A9 `approved = false`.
 
    | Variável | Padrão | O que faz |
    |---|---|---|
-   | `MEME_CONVICTION_SIZING` | `off` | `on` aplica a escada ao tamanho; qualquer outro valor é `off`. Publicado como `conviction_sizing` no `policy` do heartbeat |
+   | `MEME_CONVICTION_SIZING` | `off` | `on` avalia e aplica a escada; qualquer outro valor é `off`. Publicado como `conviction_sizing` no `policy` do heartbeat |
+   | `MEME_MIN_TRADE_SOL` | `0.02` | **política de capital, opcional (T4.61c)**: a menor compra que o perfil live envia — piso do check 23 e da recusa `conviction_too_small`. Ilegível, ≤ 0 ou acima de `MEME_MAX_SOL_PER_TRADE` recusa o boot pelo nome. Um escopo escrito (`max_sol_per_trade` do teste pequeno) menor que o piso puxa o piso para o número do escopo. Com a flag desligada também vale: um teto entre 0,001 e 0,02 SOL (participação, restante do escopo) passa a recusar em vez de mandar pó |
    | `MEME_CONVICTION_TAPE_ONLY_MULT` | `0.5` | multiplicador quando o `creator_verdict.decided_by` é só a fita (ou ninguém falou) |
    | `MEME_CONVICTION_MIN_UNIQUE_BUYERS` / `MEME_CONVICTION_BUYERS_MULT` | `25` / `0.5` | limiar de `unique_buyers_60s` (EXP-M10) e o multiplicador abaixo dele ou sem leitura |
    | `MEME_CONVICTION_HOLDERS_MULT` | `0.5` | `holders_rising` falso ou desconhecido |
    | `MEME_CONVICTION_BUNDLED_MAX_PCT` / `MEME_CONVICTION_TOP10_MAX_PCT` / `MEME_CONVICTION_CONCENTRATION_MULT` | `0.10` / `0.20` / `0.5` | frações; acima de qualquer uma (ou sem leitura) aplica o multiplicador |
-   | `MEME_CONVICTION_DROP_PCT` / `MEME_CONVICTION_DROP_WINDOW_S` | `0.50` / `60` | queda do SOL real contra o máximo da janela que **recusa** `entry_after_drop` |
-   | `MEME_CONVICTION_PEAK_UNKNOWN_MULT` | `0.5` | sem foto da curva na janela: desconto, nunca passe nem recusa |
+   | `MEME_CONVICTION_DROP_PCT` / `MEME_CONVICTION_DROP_WINDOW_S` | `0.50` / `60` | queda do SOL real (`recent_drawdown_pct` v1 sobre as fotos da janela + a leitura desta admissão) que **recusa** `entry_after_drop`; menos de duas fotos na janela recusa `entry_after_drop_unknown` |
    | `MEME_CONVICTION_FLOOR` | `0.25` | produto abaixo disto recusa `conviction_too_low` |
    | `MEME_CONVICTION_EVIDENCE_MAX_AGE_S` | `120` | idade máxima da linha de 15 s usada para compradores/holders |
 
-   Multiplicadores em `(0, 1]`, frações em `(0, 1]`, inteiros com piso; valor ilegível ou fora da
-   faixa cai no padrão — nunca recusa o boot e nunca sobe o teto (o teto continua sendo
-   `MEME_MAX_SOL_PER_TRADE`, política de capital dele).
+   `MEME_CONVICTION_PEAK_UNKNOWN_MULT` **deixou de existir** na T4.61c (sem foto era desconto; agora é
+   recusa). Multiplicadores em `(0, 1]`, frações em `(0, 1]`, inteiros com piso; valor ilegível ou fora
+   da faixa cai no padrão — nunca recusa o boot e nunca sobe o teto (o teto continua sendo
+   `MEME_MAX_SOL_PER_TRADE`, política de capital dele). Só `MEME_MIN_TRADE_SOL` recusa o boot, porque é
+   política.
 
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*

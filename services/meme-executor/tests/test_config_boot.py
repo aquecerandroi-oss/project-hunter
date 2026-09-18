@@ -132,6 +132,8 @@ def test_the_written_small_test_replaces_gates_a_and_b_and_caps_the_policy(tmp_p
     limits = config.limits
     assert limits.max_sol_per_trade == Decimal("0.01")
     assert limits.wallet_max_sol == Decimal("0.03")
+    assert limits.min_trade_sol == Decimal("0.01"), "T4.61c: the floor follows a smaller scope"
+    assert config.base_limits.min_trade_sol == Decimal("0.02"), "the live default, before the scope"
     assert config.small_test_max_trades == 3
     assert mode.gates is not None and mode.gates.small_test is not None
     assert mode.gates.small_test.decision_note.startswith("obsidian/06-DECISIONS/")
