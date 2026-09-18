@@ -55,6 +55,7 @@ from hunter_meme_executor.journal_db import WORKER_ROLE, PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
+from hunter_meme_executor.treasury import treasury_once
 from hunter_meme_executor.wake import ProposalWakeListener
 from hunter_meme_executor.wallet_refresh import wallet_refresh_once
 
@@ -134,6 +135,9 @@ async def kill_switch_once(ctx: ExecutorContext) -> None:
     # T4.51: the wallet balance rides this tick too — a quiet desk (every
     # position closed) must not let ``hb:meme:executor`` age past 10 s.
     await wallet_refresh_once(ctx)
+    # T4.54: the treasury top-up (USDC -> SOL) also rides this tick, after the
+    # wallet balance it depends on has just been refreshed above.
+    await treasury_once(ctx)
 
 
 def build_context(

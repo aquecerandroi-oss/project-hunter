@@ -64,8 +64,11 @@ def db_url(container_url: str) -> str:
 
 @pytest.fixture(scope="module")
 def upgraded(db_url: str) -> Iterator[str]:
-    """``alembic upgrade head`` on a clean database of this revision's own."""
-    command.upgrade(alembic_config(db_url), "head")
+    """This revision, not ``head``: ``0051`` (T4.54) now lands on top of it, and
+    this module's downgrade assertions (``"-1"`` -> ``PREVIOUS``) are about the
+    one step this revision itself takes, not about whatever the chain grows to
+    after it."""
+    command.upgrade(alembic_config(db_url), REVISION)
     yield db_url
 
 
@@ -205,11 +208,17 @@ async def test_the_desk_is_untouched_and_the_control_stays_active(engine: AsyncE
     assert desk == ["operator/5"]
 
 
-def test_the_models_and_the_migrations_agree(upgraded: str) -> None:
-    """``alembic check``: this revision seeds data and changes no schema, so the
-    autogenerate comparison must still find nothing — the same assertion the
-    ``0049`` tests make around their seed."""
-    command.check(alembic_config(upgraded))
+def test_the_models_and_the_migrations_agree(container_url: str) -> None:
+    """``alembic check`` needs the true head, not just this revision — ``0051``
+    (T4.54) lands on top of ``0050`` and adds a table of its own, so this
+    assertion runs on its own database taken all the way to ``head`` rather
+    than on ``upgraded`` (staged at ``REVISION`` for the downgrade tests
+    below): this revision itself still seeds data and changes no schema, the
+    same assertion the ``0049`` tests make around their own seed."""
+    db_url = asyncio.run(create_database(container_url, "hunter_migration_0050_head"))
+    config = alembic_config(db_url)
+    command.upgrade(config, "head")
+    command.check(config)
 
 
 def test_the_downgrade_refuses_while_a_proposal_or_a_bet_references_the_arm(
@@ -260,10 +269,13 @@ def test_the_downgrade_removes_the_seed_on_a_clean_database_and_comes_back(
         )
         assert asyncio.run(_count_of(upgraded, E2B_RULE_SET)) == 1
     finally:
-        command.upgrade(config, "head")
+        # Back to REVISION, not "head": 0051 (T4.54) lands on top of this one
+        # now, and this module's database is staged at REVISION on purpose
+        # (see the ``upgraded`` fixture) — ``test_the_models_and_the_migrations_
+        # agree`` above is the one that checks the whole chain against "head".
+        command.upgrade(config, REVISION)
     assert asyncio.run(_revision_of(upgraded)) == REVISION
     assert asyncio.run(_count_of(upgraded, RATIO10_RULE_SET)) == 1
-    command.check(config)
 
 
 async def _count_of(url: str, rule_set: str) -> int:

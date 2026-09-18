@@ -111,6 +111,29 @@ class ExecutorConfig:
     """The owner's policy **before** the written scope's ceiling. A reload
     recomposes from this, never from ``limits``: ``min`` over an
     already-tightened value would pin yesterday's smaller number forever."""
+    treasury_enabled: bool = False
+    """T4.54 — ``MEME_TREASURY_ENABLED``: Everton's flag, off by default. On
+    means the kill-switch tick may swap USDC for SOL through Jupiter when the
+    wallet's SOL falls below ``treasury_sol_floor``; a swap is also refused
+    unless ``live`` is on (§9.2's discipline: no real send with the live flag
+    off, treasury included)."""
+    treasury_sol_floor: Decimal = Decimal("0.30")
+    """``MEME_TREASURY_SOL_FLOOR`` — below this the wallet is topped up."""
+    treasury_sol_target: Decimal = Decimal("0.60")
+    """``MEME_TREASURY_SOL_TARGET`` — a swap sizes itself to reach this, never
+    to overshoot it, at the quote's own price."""
+    treasury_max_usdc_per_swap: Decimal = Decimal("25")
+    """``MEME_TREASURY_MAX_USDC_PER_SWAP`` — the ceiling of one attempt."""
+    treasury_max_usdc_per_day: Decimal = Decimal("50")
+    """``MEME_TREASURY_MAX_USDC_PER_DAY`` — the ceiling of every *confirmed*
+    swap in the trailing 24 h."""
+    treasury_max_slippage_bps: int = 50
+    """``MEME_TREASURY_MAX_SLIPPAGE_BPS`` — passed to Jupiter's quote and
+    checked against the built transaction's own tolerance."""
+    treasury_min_interval_s: float = 600.0
+    """``MEME_TREASURY_MIN_INTERVAL_S`` — no two attempts (successful, failed or
+    refused) closer together than this; a persistent refusal must not hammer
+    Jupiter or the chain every 10 s tick."""
 
     @property
     def base_limits(self) -> MemeLimits:
@@ -157,6 +180,33 @@ def _tolerance(env: Mapping[str, str]) -> Decimal:
     except (ArithmeticError, ValueError):
         return DEFAULT_SELL_TOLERANCE_PCT
     return value if Decimal(0) <= value < Decimal(1) else DEFAULT_SELL_TOLERANCE_PCT
+
+
+def _positive_decimal(env: Mapping[str, str], name: str, default: Decimal) -> Decimal:
+    """A ``Decimal`` that must be ``> 0`` — an unreadable or non-positive value
+    falls back to the default (the safe, small value) rather than refusing the
+    boot: these are treasury sizing knobs, not the five policy variables."""
+    raw = (env.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = Decimal(raw)
+    except (ArithmeticError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+def _bps(env: Mapping[str, str], name: str, default: int) -> int:
+    """Basis points in ``[1, 10_000]`` — outside that range falls back to the
+    default rather than building a quote nobody asked for."""
+    raw = (env.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if 0 < value <= 10_000 else default
 
 
 def _cluster(env: Mapping[str, str]) -> Cluster:
@@ -272,6 +322,17 @@ def boot(
         creator_sell_tolerance_pct=_tolerance(env),
         gates_file=(env.get(ENV_GATES_FILE) or "").strip() or None if mode.live else None,
         env_limits=env_limits,
+        treasury_enabled=parse_flag(env.get("MEME_TREASURY_ENABLED")),
+        treasury_sol_floor=_positive_decimal(env, "MEME_TREASURY_SOL_FLOOR", Decimal("0.30")),
+        treasury_sol_target=_positive_decimal(env, "MEME_TREASURY_SOL_TARGET", Decimal("0.60")),
+        treasury_max_usdc_per_swap=_positive_decimal(
+            env, "MEME_TREASURY_MAX_USDC_PER_SWAP", Decimal("25")
+        ),
+        treasury_max_usdc_per_day=_positive_decimal(
+            env, "MEME_TREASURY_MAX_USDC_PER_DAY", Decimal("50")
+        ),
+        treasury_max_slippage_bps=_bps(env, "MEME_TREASURY_MAX_SLIPPAGE_BPS", 50),
+        treasury_min_interval_s=max(0.0, _float(env, "MEME_TREASURY_MIN_INTERVAL_S", 600.0)),
     )
     return config, mode, signer
 

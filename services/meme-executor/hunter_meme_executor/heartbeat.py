@@ -212,7 +212,31 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     fields.update(auto)
     fields.update(ctx.kill.describe())
     fields.update(_pickup_lag_fields(ctx))
+    fields["treasury"] = _treasury_field(ctx)
     return fields
+
+
+def _treasury_field(ctx: ExecutorContext) -> str:
+    """T4.54 — one JSON blob: whether the top-up is on, when it last landed,
+    the wallet's USDC as last read, and the last tick's outcome (empty when
+    nothing was attempted this tick)."""
+    cfg, state = ctx.config, ctx.state
+    return json.dumps(
+        {
+            "enabled": cfg.treasury_enabled,
+            "sol_floor": str(cfg.treasury_sol_floor),
+            "sol_target": str(cfg.treasury_sol_target),
+            "last_swap_at": (
+                None
+                if state.treasury_last_swap_at is None
+                else state.treasury_last_swap_at.isoformat()
+            ),
+            "last_result": state.treasury_last_attempt_reason or "",
+            "wallet_usdc": (
+                None if state.treasury_wallet_usdc is None else str(state.treasury_wallet_usdc)
+            ),
+        }
+    )
 
 
 async def heartbeat_once(ctx: ExecutorContext) -> None:

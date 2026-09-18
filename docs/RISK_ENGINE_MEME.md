@@ -1192,3 +1192,62 @@ Fontes internas: `docs/RISK_ENGINE.md` v2.5 (§2–§5, §7.1, §8, §10, §11),
 `.claude/state/notes-T4.0.md`, `.claude/state/notes-T4.0b.md`, `.claude/state/notes-T4.1.md`,
 `.claude/state/spec-T3.9-verificacoes.md`, `.claude/state/notes-T3.70.md`,
 `packages/exchange-adapters/hunter_exchanges/pumpfun/{curve,models}.py`.
+
+## 16. Tesouraria — USDC → SOL (T4.54)
+
+Diretiva do Everton, 17/09/2026 (texto dele: "eu quero deixar atualizado para usar outra
+moeda"): a carteira do robô (`ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4`) guardava 21,33 USDC
+(mint `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`) ao lado de ~0,67 SOL, e o pump.fun só compra
+com SOL. Objetivo: a carteira troca USDC por SOL **sozinha** quando o SOL fica baixo, dentro de
+tetos fixos, com auditoria — o USDC vira capital de gás, nunca capital de aposta (isso continua
+sendo só SOL, pela política de §3.1).
+
+### 16.1 Desenho
+
+Uma vez por tique do kill switch (10 s, depois do saldo de SOL ter sido relido —
+`wallet_refresh.py`), `hunter_meme_executor.treasury.treasury_once` decide, na ordem:
+
+1. `MEME_TREASURY_ENABLED` ligada (padrão **desligada** — a flag do Everton), `live` ligado (a
+   tesouraria nunca troca em papel), há um assinante, o kill switch não está travado.
+2. `wallet_sol < MEME_TREASURY_SOL_FLOOR` (padrão 0,30) — acima disso nada acontece.
+3. O intervalo mínimo desde a última tentativa (`MEME_TREASURY_MIN_INTERVAL_S`, padrão 600 s) e o
+   teto diário de USDC **confirmado** nas últimas 24 h (`MEME_TREASURY_MAX_USDC_PER_DAY`, padrão
+   50) permitem uma nova tentativa.
+4. O tamanho é `min(saldo de USDC da carteira, teto por troca (MEME_TREASURY_MAX_USDC_PER_SWAP,
+   padrão 25), teto diário restante, o que falta para `MEME_TREASURY_SOL_TARGET` (padrão 0,60) ao
+   preço da própria cotação)` — a última parte pede uma cotação da Jupiter primeiro (o tamanho
+   "ingênuo") e, se ela permitir um valor menor, uma segunda cotação nesse valor menor (nunca mais
+   de duas por tentativa).
+5. A cotação é recusada (`route_empty`, `price_impact_above_cap` acima de 1 %) antes de qualquer
+   transação ser montada.
+6. A transação vem pronta da Jupiter (`POST /v6/swap`, versão v0/ALT) e é **verificada antes de
+   assinar** (`treasury_rules.verify_swap_transaction`, o mesmo espírito de §9.1 do
+   `pumpfun/verify.py`, até onde uma transação versionada com *address lookup tables* permite): a
+   carteira é o único signatário e o *fee payer*, e todo `program_id` de toda instrução está na
+   lista branca (`JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4`, Token, Token-2022, Associated Token
+   Account, System, ComputeBudget) — uma conta cujo programa só existe atrás de uma *lookup table*
+   é **recusada**, nunca resolvida e confiada (essa resolução pediria mais uma chamada RPC que este
+   módulo deliberadamente não faz).
+7. Simulação (`simulateTransaction`, `sigVerify=false`) antes de assinar; assinatura com o mesmo
+   `MemeSigner` do resto do executor; envio só com `allow_send=True` (isto é, `live` ligado); a
+   confirmação usa `getSignatureStatuses` até `MEME_LIVE_CONFIRM_TIMEOUT_S`.
+8. Uma linha em `meme_treasury_swaps` por tentativa (`0051_meme_treasury_swaps`), do primeiro
+   `quoted` até `confirmed`/`failed`/`refused` — nunca apagada (mesma disciplina de
+   `meme_wallet_trades`, §17.7 do `DATABASE.md`).
+
+Falha fechada em cada ponto: qualquer leitura que falhe, cotação vazia, transação que não verifica,
+simulação que falha ou confirmação que estoura o prazo termina a tentativa sem enviar nada (ou,
+tendo já enviado, marca `failed` sem reenviar). O `hb:meme:executor` publica `treasury` (`enabled`,
+`last_swap_at`, `last_result`, `wallet_usdc`).
+
+### 16.2 O que **não** foi testado contra a mainnet
+
+O ambiente desta sessão não tem acesso de rede de saída (`curl` a `quote-api.jup.ag` devolveu
+conexão recusada); as fixtures de `packages/exchange-adapters/tests/fixtures/jupiter/` são
+sintéticas — no formato documentado da API v6 da Jupiter, não uma captura real — e a transação
+versionada que os testes decodificam é construída em processo pelo próprio teste (nenhuma chave de
+carteira foi usada ou procurada para isso). O caminho de assinar/enviar/confirmar contra uma RPC
+real nunca rodou nesta sessão; só a matemática de tamanho, a classificação de recusa e o verificador
+de lista branca foram provados (testes unitários, offline). Antes de ligar `MEME_TREASURY_ENABLED`
+na VPS, vale gravar pelo menos uma cotação real (`GET /v6/quote`, sem carteira) para confirmar que a
+resposta real bate com o formato assumido aqui.

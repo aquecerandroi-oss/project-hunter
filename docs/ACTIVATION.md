@@ -872,6 +872,21 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    apagar a linha + `compose.sh update`. Um valor ilegível (`sim`, `maybe`) **recusa o boot** pelo
    nome da variável.
 
+9d. **Tesouraria — trocar USDC por SOL sozinho quando o gás fica baixo (T4.54), decisão dele
+   de 17/09/2026** ("eu quero deixar atualizado para usar outra moeda"). Desligada por padrão.
+   Para ligar, no `.env` da VPS: `MEME_TREASURY_ENABLED=true` (mais nada é obrigatório — os
+   padrões são `MEME_TREASURY_SOL_FLOOR=0.30`, `MEME_TREASURY_SOL_TARGET=0.60`,
+   `MEME_TREASURY_MAX_USDC_PER_SWAP=25`, `MEME_TREASURY_MAX_USDC_PER_DAY=50`,
+   `MEME_TREASURY_MAX_SLIPPAGE_BPS=50`, `MEME_TREASURY_MIN_INTERVAL_S=600`; qualquer um pode
+   ser sobrescrito na mesma `.env`) e `MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash
+   infra/vps/compose.sh update`. A troca só sai com `ENABLE_MEME_LIVE_TRADING` **também** ligada
+   (nunca em papel) e com o kill switch destravado — o mesmo `touch
+   /opt/project-hunter/run/meme/meme.kill` do item 8 também para a tesouraria na hora. Cada
+   tentativa (cotada, recusada, simulada, enviada, confirmada ou falha) vira uma linha em
+   `meme_treasury_swaps`; `hb:meme:executor` publica `treasury` (`enabled`, `last_swap_at`,
+   `last_result`, `wallet_usdc`). Detalhe técnico e o que fica de fora do escopo mainnet:
+   `docs/RISK_ENGINE_MEME.md` § "Tesouraria — USDC → SOL (T4.54)".
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca

@@ -12,7 +12,10 @@ import asyncio
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
+
+from hunter_exchanges.jupiter import JupiterClient
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -93,6 +96,14 @@ class ExecutorState:
     measured as "Proposal->Received". p50/max of this ride the heartbeat
     (``proposal_pickup_lag_s_p50``/``_max``, ``heartbeat.py``) so the same
     number can be re-read after the wake-up (``wake.py``) ships."""
+    treasury_last_swap_at: datetime | None = None
+    """T4.54: when a treasury swap last reached ``confirmed``."""
+    treasury_last_attempt_reason: str | None = None
+    """T4.54: the last tick's outcome, published verbatim in the heartbeat —
+    ``ok:<signature>``, a refusal reason, or ``""`` when the wallet is above
+    the floor and nothing was attempted."""
+    treasury_wallet_usdc: Decimal | None = None
+    """T4.54: the USDC ATA balance as last read, for the heartbeat only."""
 
 
 @dataclass(slots=True)
@@ -118,3 +129,9 @@ class ExecutorContext:
     wake_event=...)`` so a fresh proposal wakes it instead of waiting for
     ``config.loop_s``. Never read directly by test code that does not also run
     the listener — a stray ``set()`` is harmless (the next tick just runs early)."""
+    treasury_client: JupiterClient = field(default_factory=JupiterClient)
+    """T4.54: the public Jupiter quote/swap client the treasury top-up drives.
+    No key, no ``sendTransaction`` — it only ever returns an unsigned
+    transaction (``hunter_meme_executor.treasury`` verifies, simulates, signs
+    and sends). A short-lived ``httpx.Client`` per process; not explicitly
+    closed at shutdown (a process exit reclaims the socket)."""

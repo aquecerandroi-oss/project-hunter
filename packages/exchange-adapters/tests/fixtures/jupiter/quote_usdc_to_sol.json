@@ -1,0 +1,29 @@
+{
+  "_fixture_note": "T4.54: recorded 2026-09-17 against GET https://quote-api.jup.ag/v6/quote (public, no wallet, no key) for inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v outputMint=So11111111111111111111111111111111111111112 amount=5000000 slippageBps=50. This sandbox has no outbound network access, so the body below is a schema-accurate synthetic reply (documented Jupiter v6 shape) rather than a byte-for-byte capture -- see .claude/state/notes-T4.54.md for the concern this leaves open.",
+  "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "inAmount": "5000000",
+  "outputMint": "So11111111111111111111111111111111111111112",
+  "outAmount": "34215678",
+  "otherAmountThreshold": "34044000",
+  "swapMode": "ExactIn",
+  "slippageBps": 50,
+  "platformFee": null,
+  "priceImpactPct": "0.0012",
+  "routePlan": [
+    {
+      "swapInfo": {
+        "ammKey": "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2",
+        "label": "Whirlpool",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "outputMint": "So11111111111111111111111111111111111111112",
+        "inAmount": "5000000",
+        "outAmount": "34215678",
+        "feeAmount": "1250",
+        "feeMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      },
+      "percent": 100
+    }
+  ],
+  "contextSlot": 293845123,
+  "timeTaken": 0.014892
+}

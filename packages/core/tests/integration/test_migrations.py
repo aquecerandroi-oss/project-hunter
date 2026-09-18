@@ -40,14 +40,15 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0050_meme_gate_ratio10_arm"
-"""``0050`` (T4.49) lands on ``0049`` (T4.48),
+HEAD_REVISION = "0051_meme_treasury_swaps"
+"""``0051`` (T4.54) lands on ``0050`` (T4.49), which lands on ``0049`` (T4.48),
 which lands on ``0048`` (T4.45), which lands on ``0047`` (T4.39),
 which lands on ``0046`` (T4.35), which lands on ``0044`` (T4.31),
 which lands on ``0043`` (T4.26b), which lands on ``0042`` (T4.27),
 which lands on ``0041`` (T4.26), which lands on ``0040`` (T4.24b); bumped here
 so the shared fixtures agree with the repository's actual chain rather than any
-one task's private assumption."""
+one task's private assumption. ``0051`` adds one table (``meme_treasury_swaps``)
+and seeds no rule set, so every active-rule-set-count assertion is unchanged."""
 EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
 E2B_ARM_REVISION = "0044_meme_gate_e2b_arm"
 """Where the ``0044`` tests stage now that ``0046``/``0047`` sit on top (T4.44):
