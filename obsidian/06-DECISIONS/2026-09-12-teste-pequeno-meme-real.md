@@ -162,3 +162,7 @@ Evidência: R54 (45 vencedoras do papel com 0–10 snipers, 26 acima de 50 %), R
 ## Adendo 18/09/2026 12:5x BRT — "terminando já liga" (Everton, por escrito): radar por evento (T4.52b)
 
 Everton manda ligar o portão de evento assim que os consertos F1–F7 (T4.52b-4) fecharem e a revisão liberar. Registro da Sexta-feira: sobe **desligado** no pacote 5; o Everton põe `MEME_EVENT_GATE=shadow` no `.env` e recria o radar; a Sexta-feira mede **1 h no pico** (propostas da pista de evento × pista de 15 s nos mesmos mints, `event_to_proposal_s`, CPU, quedas); com a medição em mãos ele troca para `MEME_EVENT_GATE=on`. A sombra curta substitui as 24 h do plano por decisão dele ("liga"); o que não se pula é a medição, porque `on` gera proposta real que o executor compra a 0,28 SOL.
+
+## Adendo 18/09/2026 14:3x BRT — "se achou oportunidade eu quero que ela entre já" (Everton, por escrito): `MEME_EVENT_GATE=on`
+
+Everton decide pular a hora de sombra: o portão de evento passa a propor de verdade (`on`). Estado no momento: sombra viva há 3 min, WS conectado, 132 assinaturas, ~2 300 eventos/min, 0 descartados, 0 reconexões, 1 097 avaliações, 0 propostas-sombra ainda (as moedas passam a porta tão raramente quanto na via de 15 s: ~6/h). Bloqueios de código da re-revisão fechados (corrida T4.52b-5, latência em sombra). A Sexta-feira acompanha a 1.ª hora com os critérios da revisão (dropped 0, reconexões ≤ 2, memória estável, sem proposta dupla por (mint, set)) e o desligamento é `MEME_EVENT_GATE=off` + recriar o radar.
