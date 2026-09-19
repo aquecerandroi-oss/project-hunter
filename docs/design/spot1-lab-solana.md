@@ -86,7 +86,7 @@ de rede) **e** `R_líquido`. Subir para ≥ 0,15 SOL depois de 5 operações lim
 
 ## 4. Saídas — a regra do sinal, avaliada na Jupiter
 **Geometria gravada na entrada** (`spot_positions.params`): `ref` = `signal_outcomes.meta.reference_price` (fallback
-`supporting_features.features.close_15m`), `stop_frac = (ref − stop)/ref`, `target_frac = (targets[0] − ref)/ref`,
+`supporting_features.features[name = close_15m].value` — a lista é de `{name, value}`, lida com `jsonb_array_elements`; T4.74-3), `stop_frac = (ref − stop)/ref`, `target_frac = (targets[0] − ref)/ref`,
 `horizon_s = min(expected_holding_s, SPOT1_MAX_HOLD_S 14 400)`, `entry_sol_per_atom = sol_spent ÷ tokens`, `r_unit_sol`,
 `sol_usd_at_entry`, `bin_usd_at_entry`, `jup_usd_at_entry`. `geometry_invalid` recusa se `stop_frac ≤ 0` ou `target_frac ≤ 0`.
 **Marca (`spot_exits.py`, a cada `SPOT1_MARK_S` = 20 s, ≤ 3 posições ⇒ ≤ 9 `GET /quote`/min):** `mark_sol = out_amount`
