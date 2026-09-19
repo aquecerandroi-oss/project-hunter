@@ -91,10 +91,9 @@ docstring do campo para a próxima tarefa não duplicar a lógica.
   test_event_gate_crowd_integration.py -q` → 10 passed (~39 s).
 - `uv run pytest services/meme-worker/tests -q -m "integration and not live"
   --ignore=.../test_event_gate_integration.py --ignore=.../test_event_gate_crowd_integration.py`
-  (a suíte de integração pré-existente): rodando em segundo plano no momento em que esta nota foi
-  escrita — ver o relatório final para o resultado real (nenhuma mudança de comportamento esperada
-  fora de `services/meme-worker`, mas `_rt`'s novo parâmetro `ws` é uma mudança de assinatura numa
-  função de teste compartilhada e merece a confirmação).
+  (a suíte de integração pré-existente): `exit code 0`, sem falhas (saída em pontos, contagem exata
+  não capturada, mas confirma zero regressões — inclusive na mudança de assinatura de `_rt` em
+  `test_event_gate_integration.py`, que ganhou um parâmetro `ws` opcional default `None`).
 - `uv run ruff check`/`format --check` em `services/meme-worker/`: limpos (0 erros, 195 arquivos
   formatados). `uv run pyright` nos arquivos tocados: 0 erros (dois achados corrigidos no caminho —
   `reportUnnecessaryComparison` em `event_state.py`, já que `NormalizedCurveTrade.slot` é `int` não
