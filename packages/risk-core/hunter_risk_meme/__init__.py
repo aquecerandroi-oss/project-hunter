@@ -66,6 +66,15 @@ from hunter_risk_meme.profile import (
     launch_open_cap_check,
 )
 from hunter_risk_meme.sizing import CAP_ORDER, size_entry
+from hunter_risk_meme.spot_profile import (
+    SPOT_CAP_ORDER,
+    SPOT_CHECK_NAMES,
+    SPOT_LANE,
+    SPOT_REFUSAL_NAMES,
+    MemeSpotProfile,
+    SpotSignalInputs,
+    evaluate_spot_entry,
+)
 
 __all__ = [
     "CAP_ORDER",
@@ -80,6 +89,10 @@ __all__ = [
     "PUMPSWAP_PROGRAM",
     "PUMP_PROGRAM",
     "REFUSAL_NAMES",
+    "SPOT_CAP_ORDER",
+    "SPOT_CHECK_NAMES",
+    "SPOT_LANE",
+    "SPOT_REFUSAL_NAMES",
     "CheckState",
     "Counterfactual",
     "CurveState",
@@ -100,16 +113,19 @@ __all__ = [
     "MemeResumeAuthorization",
     "MemeResumeRefused",
     "MemeSizing",
+    "MemeSpotProfile",
     "MemeWalletState",
     "OpenMemePosition",
     "PendingMemeIntent",
     "PositionForExit",
+    "SpotSignalInputs",
     "assess",
     "conviction_cap",
     "conviction_check",
     "decide_exit",
     "evaluate_meme_entry",
     "evaluate_meme_exit",
+    "evaluate_spot_entry",
     "exit_route",
     "launch_open_cap_check",
     "limits_from_env",

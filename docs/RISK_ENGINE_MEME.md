@@ -2018,3 +2018,48 @@ cada relaxado com sua recusa, cada mantido recusando por nome, o teto 27, o bilh
 `test_event_exits_launch.py` (as três regras em frames gravados, a trava contra venda dupla),
 `test_launch_integration.py` (Postgres real: proposta `launch_v0/1` em `on` ⇒ uma compra com
 `admission.profile = launch` ⇒ venda de terceiro reproduzida ⇒ uma venda; `paper`/`off` ⇒ nada).
+
+## 19. Perfil spot/1 (T4.74-2)
+
+`hunter_risk_meme/spot_profile.py` — `evaluate_spot_entry(wallet, limits, profile, signal, kill, now=None)
+-> MemeDecision(profile="spot")`. Mesmo motor, sem curva: nenhum check de moeda de §4 roda; carteira, kill
+switch e perda do dia (com entrada da tesouraria, T4.60) são os de sempre, sobre **todas** as posições
+(`MemeWalletState.positions` inclui `lane = "spot"`). Puro (instante = `now` ou `wallet.as_of`); todo check
+gravado com decomposição; entrada ausente recusa `*_unavailable`, nunca zero; `Decimal` em tudo. Desenho:
+`docs/design/spot1-lab-solana.md` §2–§3. **Entradas:** `MemeSpotProfile` (frações, como `MemeLimits`):
+`ticket_sol` 0,05, `max_open` 3, `max_parity_pct` 0,03, `max_impact_pct` 0,005, `max_cost_r` 0,5,
+`max_signal_age_s` 180. `SpotSignalInputs`: `signal_id`, `market_symbol`, `mint`, `reference_price`,
+`stop_price`, `target1_price`, `emitted_at`, `expires_at`, `parity_ratio` (`jup_usd ÷ bin_usd` > 0, ou `None` +
+`parity_reason`), `quote_impact_pct` (≥ 0 — negativo é recusado na construção, nunca vira desconto; ou `None`),
+`priority_fee_sol` (por perna, já capada), `open_spot_markets`, `pending_spot_markets`.
+`ticket = min(profile.ticket_sol, limits.max_sol_per_trade)` (o escopo clampa antes).
+
+**Checks, nesta ordem (`SPOT_CHECK_NAMES`; recusa em itálico):**
+1. `kill_switch` — *kill_switch_blocked* (`TRADING_DISABLED`/`EMERGENCY` efetivo), *daily_loss_cap_latched*.
+2. `wallet_status` — *wallet_inactive*, *marks_incomplete*.
+3. `daily_loss` — *daily_loss_cap_reached* (`day_start + entrada tesouraria − equity ≥ cap`).
+4. `wallet_cap` — *wallet_over_max_sol*, *wallet_unrecognized_holdings*.
+5. `concurrent_positions` — *max_open_positions*: memes + lançamento + spot + intenções pendentes.
+6. `spot1_open_cap` — *spot_max_open_reached*: só `lane = spot` (posições + intenções) ≥ `max_open`.
+7. `duplicate_market` — *duplicate_market*: símbolo aberto/pendente na mesa **ou** mint já na carteira.
+8. `signal_stale` — *signal_stale*: `now − emitted_at > max_signal_age_s`; *signal_clock_skew*: emitido no
+    futuro além de `clock_skew_tolerance_s` (2 s) — carimbo futuro é relógio errado, não sinal fresco.
+9. `signal_expired` — *signal_expired*: `expires_at ≤ now`.
+10. `geometry_invalid` — *geometry_invalid*: `stop_frac ≤ 0` ou `target_frac ≤ 0` (value = `stop_frac`).
+11. `parity` — *parity_above_cap* (`|ratio − 1| > max_parity_pct`), *parity_unavailable* (motivo na mensagem).
+12. `impact` — *impact_above_cap*, *impact_unavailable*.
+13. `fee_caps` — *priority_fee_above_cap*: por perna, `min(max_priority_fee_sol, ticket × pct_of_trade)`.
+14. `cost_r` — *cost_above_r_cap*: `(2 × (prioridade + taxa de rede) + ticket × (2 × impacto + 0,003)) ÷
+    (ticket × stop_frac) > max_cost_r` (a taxa de rede é o custo que o desenho §3 omite); *cost_unavailable*
+    sem impacto/geometria. A 0,05 SOL e stop 2 % (R = 0,001), 0,0002 SOL/perna dá 0,66 R — acima do teto: o
+    executor tem de capar a prioridade em ≤ 0,00012 SOL/perna para a ficha passar.
+15. `sizing` — ficha ou nada. Tetos (`SPOT_CAP_ORDER`, mesmo `LimitCap`/`MemeSizing` de §5): `requested`
+    (= ficha), `trade_cap`, `daily_cap` (cap − perda do dia − Σ gasto das abertas de **todas** as pistas −
+    reservas), `wallet_cap`, `available` (saldo − reservas − rent reservado − rent de ATA − 2 × (prioridade +
+    rede)), `kill_switch_multiplier` (só em `WARNING`: meia ficha não é ficha). `min < ficha` ⇒
+    *below_ticket:<binding_constraint>*; aprovado ⇒ `sol_final = ficha`, `binding_constraint = requested`.
+    Sem cotação ⇒ *sizing_unavailable*, `sizing = None`.
+
+Provas: `packages/risk-core/tests/test_spot_profile.py` (cada recusa na tabela, aprovado por `requested`,
+posição spot ocupa vaga global e reduz `daily_cap`, indisponível ≠ zero, guarda AST contra `float`). Astra
+(19/09) revisou a ordem: carimbo futuro e impacto negativo eram furos — fechados acima.

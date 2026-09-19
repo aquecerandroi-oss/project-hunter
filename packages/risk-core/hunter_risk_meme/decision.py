@@ -178,9 +178,10 @@ class MemeDecision(MemeModel):
     checks: tuple[MemeCheck, ...]
     sizing: MemeSizing | None = None
     exit_plan: MemeExitPlan | None = None
-    profile: Literal["full", "launch"] = "full"
+    profile: Literal["full", "launch", "spot"] = "full"
     """T4.67b: which admission profile produced ``checks`` — ``launch`` records
-    skipped and relaxed checks by name (``profile.py``); ``full`` is §4 as is."""
+    skipped and relaxed checks by name (``profile.py``); ``full`` is §4 as is;
+    ``spot`` (T4.74-2, ``spot_profile.py``) is the Lab-signal desk of §19."""
 
     @model_validator(mode="after")
     def _consistent(self) -> MemeDecision:
