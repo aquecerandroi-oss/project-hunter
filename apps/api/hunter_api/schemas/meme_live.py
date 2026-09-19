@@ -27,6 +27,10 @@ __all__ = [
     "LivePositionOut",
     "MemeLiveOut",
     "SellNowOut",
+    "Spot1ClosedOut",
+    "Spot1OpenPositionOut",
+    "Spot1Out",
+    "Spot1RefutationOut",
 ]
 
 MEME_LIVE_LABEL = (
@@ -35,6 +39,62 @@ MEME_LIVE_LABEL = (
 )
 
 ExecutorStatus = Literal["alive", "stalled", "never", "heartbeat_missing", "redis_unavailable"]
+
+
+class Spot1OpenPositionOut(BaseModel):
+    """One open leg of the ``spot/1`` desk, design §7 -- at most 3 in practice."""
+
+    market: str
+    mint8: str
+    entry_at: datetime
+    sol_spent: DecimalStr
+    mark_sol: DecimalStr | None
+    r_now: DecimalStr | None
+    age_s: int | None
+    horizon_s: int | None
+    mark_stale_s: int | None
+    """Only set after three consecutive failed quotes (design §4); ``None`` means fresh."""
+
+
+class Spot1ClosedOut(BaseModel):
+    n: int
+    sum_r_gross: DecimalStr
+    sum_r_net: DecimalStr
+    sum_pnl_sol: DecimalStr
+    expectancy_r_net: DecimalStr | None
+    """``None`` with ``n == 0`` -- no sample yet, never a made-up zero."""
+
+
+class Spot1RefutationOut(BaseModel):
+    trades: int
+    threshold: int
+    state: str
+    """``ok`` / ``refuted`` / ``cooldown`` -- design §8's hard stop, as written."""
+
+
+class Spot1Out(BaseModel):
+    """``spot1`` field of ``hb:meme:executor``, design §7 -- the whole contract,
+    parsed field by field; absent or malformed is ``None`` at the caller, never
+    a partial/invented shape."""
+
+    mode: str
+    """``on`` / ``inert:<motivo>`` / ``refuted`` / ``cooldown`` (design §7/§8)."""
+    strategy_version: str
+    ticket_sol: DecimalStr
+    max_open: int
+    markets_enabled: int
+    open: list[Spot1OpenPositionOut]
+    signals_seen: int
+    admitted: int
+    refused_by_reason: dict[str, int]
+    exits_by_reason: dict[str, int]
+    blocked_exits: dict[str, str]
+    closed: Spot1ClosedOut
+    refutation: Spot1RefutationOut
+    last_signature: str | None
+    last_refusal: str | None
+    last_entries_tick_at: datetime | None
+    last_exits_tick_at: datetime | None
 
 
 class LiveExecutorOut(BaseModel):
@@ -97,6 +157,9 @@ class LiveExecutorOut(BaseModel):
     """The latched reload reason, or ``deferred:<reason>`` during the one-tick
     grace after a parse failure (T4.28f) — empty/``None`` means the last read
     of the file was a good one."""
+    spot1: Spot1Out | None = None
+    """The ``spot/1`` desk (T4.74, design §7) -- ``None`` on an executor build
+    that predates the field, or on any malformed blob; never invented."""
 
 
 class LiveOrderOut(BaseModel):

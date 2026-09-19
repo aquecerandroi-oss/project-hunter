@@ -2714,6 +2714,7 @@ export interface components {
             small_test_trades_done?: number | null;
             /** Small Test Used Sol */
             small_test_used_sol?: string | null;
+            spot1?: components["schemas"]["Spot1Out"] | null;
             /**
              * Status
              * @enum {string}
@@ -5871,6 +5872,101 @@ export interface components {
             tick_minute: string | null;
             /** Unfilled Total */
             unfilled_total: number | null;
+        };
+        /** Spot1ClosedOut */
+        Spot1ClosedOut: {
+            /** Expectancy R Net */
+            expectancy_r_net: string | null;
+            /** N */
+            n: number;
+            /** Sum Pnl Sol */
+            sum_pnl_sol: string;
+            /** Sum R Gross */
+            sum_r_gross: string;
+            /** Sum R Net */
+            sum_r_net: string;
+        };
+        /**
+         * Spot1OpenPositionOut
+         * @description One open leg of the ``spot/1`` desk, design §7 -- at most 3 in practice.
+         */
+        Spot1OpenPositionOut: {
+            /** Age S */
+            age_s: number | null;
+            /**
+             * Entry At
+             * Format: date-time
+             */
+            entry_at: string;
+            /** Horizon S */
+            horizon_s: number | null;
+            /** Mark Sol */
+            mark_sol: string | null;
+            /** Mark Stale S */
+            mark_stale_s: number | null;
+            /** Market */
+            market: string;
+            /** Mint8 */
+            mint8: string;
+            /** R Now */
+            r_now: string | null;
+            /** Sol Spent */
+            sol_spent: string;
+        };
+        /**
+         * Spot1Out
+         * @description ``spot1`` field of ``hb:meme:executor``, design §7 -- the whole contract,
+         *     parsed field by field; absent or malformed is ``None`` at the caller, never
+         *     a partial/invented shape.
+         */
+        Spot1Out: {
+            /** Admitted */
+            admitted: number;
+            /** Blocked Exits */
+            blocked_exits: {
+                [key: string]: string;
+            };
+            closed: components["schemas"]["Spot1ClosedOut"];
+            /** Exits By Reason */
+            exits_by_reason: {
+                [key: string]: number;
+            };
+            /** Last Entries Tick At */
+            last_entries_tick_at: string | null;
+            /** Last Exits Tick At */
+            last_exits_tick_at: string | null;
+            /** Last Refusal */
+            last_refusal: string | null;
+            /** Last Signature */
+            last_signature: string | null;
+            /** Markets Enabled */
+            markets_enabled: number;
+            /** Max Open */
+            max_open: number;
+            /** Mode */
+            mode: string;
+            /** Open */
+            open: components["schemas"]["Spot1OpenPositionOut"][];
+            /** Refused By Reason */
+            refused_by_reason: {
+                [key: string]: number;
+            };
+            refutation: components["schemas"]["Spot1RefutationOut"];
+            /** Signals Seen */
+            signals_seen: number;
+            /** Strategy Version */
+            strategy_version: string;
+            /** Ticket Sol */
+            ticket_sol: string;
+        };
+        /** Spot1RefutationOut */
+        Spot1RefutationOut: {
+            /** State */
+            state: string;
+            /** Threshold */
+            threshold: number;
+            /** Trades */
+            trades: number;
         };
         /** StrategiesOut */
         StrategiesOut: {

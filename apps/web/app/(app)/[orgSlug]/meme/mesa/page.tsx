@@ -11,6 +11,7 @@ import { ProposalsSection } from "@/components/meme-desk/proposals-section";
 import { LiveExecutorPanel } from "@/components/meme-live/live-executor-panel";
 import { buildLiveOutcomeIndex } from "@/components/meme-live/live-index";
 import { LivePositionsSection } from "@/components/meme-live/live-positions-section";
+import { Spot1Panel } from "@/components/meme-live/spot1-panel";
 import { WalletSummaryPanel } from "@/components/meme-live/wallet-summary-panel";
 import { MemeDeskTabs } from "@/components/meme-tests/meme-desk-tabs";
 import { isDayString } from "@/components/meme-tests/meme-tests-format";
@@ -104,6 +105,8 @@ export default async function MemeDeskPage({ params, searchParams }: MemeDeskPag
       <AutoRefresh intervalMs={DESK_REFRESH_MS} />
       <DeskHeader />
       <WalletSummaryPanel orgId={orgId} />
+      {/* T4.74-6: same "Carteira real" wallet, the Lab's spot/1 pista -- read once alongside `GET /meme/live` above (`live`), not the wallet panel's own 10 s poll. */}
+      <Spot1Panel spot1={live.ok ? live.data.executor.spot1 : null} />
       <MemeDeskTabs orgSlug={orgSlug} active="mesa" />
 
       {sources.ok ? (

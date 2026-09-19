@@ -15,13 +15,23 @@ from fastapi import status
 
 from hunter_api.errors import HunterError
 from hunter_api.repositories.meme_live import LiveOrderRow, LivePositionRow
-from hunter_api.schemas.meme_live import LiveExecutorOut, LiveOrderOut, LivePositionOut, MemeLiveOut
+from hunter_api.schemas.meme_live import (
+    LiveExecutorOut,
+    LiveOrderOut,
+    LivePositionOut,
+    MemeLiveOut,
+    Spot1ClosedOut,
+    Spot1OpenPositionOut,
+    Spot1Out,
+    Spot1RefutationOut,
+)
 from hunter_api.services.meme_lab_goal import parse_heartbeat_datetime
 
 __all__ = [
     "EXECUTOR_STALLED_AFTER_S",
     "LivePositionNotFoundError",
     "build_meme_live",
+    "parse_spot1",
     "read_executor",
 ]
 
@@ -85,6 +95,102 @@ def _json(raw: str | None) -> dict[str, Any] | None:
     except ValueError:
         return None
     return cast(dict[str, Any], parsed) if isinstance(parsed, dict) else None
+
+
+def _spot_decimal(raw: Any) -> Decimal | None:
+    """Same tolerance as ``_decimal`` but over an already-parsed JSON value
+    (str, int or float), since the ``spot1`` blob is nested JSON, not a hash
+    of top-level strings."""
+    if raw is None or raw == "":
+        return None
+    try:
+        return Decimal(str(raw))
+    except InvalidOperation:
+        return None
+
+
+def _spot_int(raw: Any) -> int | None:
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _spot_open_position(raw: Any) -> Spot1OpenPositionOut | None:
+    if not isinstance(raw, dict):
+        return None
+    position = cast(dict[str, Any], raw)
+    entry_at = parse_heartbeat_datetime(position.get("entry_at"))
+    sol_spent = _spot_decimal(position.get("sol_spent"))
+    if entry_at is None or sol_spent is None:
+        return None
+    return Spot1OpenPositionOut(
+        market=str(position.get("market") or ""),
+        mint8=str(position.get("mint8") or ""),
+        entry_at=entry_at,
+        sol_spent=sol_spent,
+        mark_sol=_spot_decimal(position.get("mark_sol")),
+        r_now=_spot_decimal(position.get("r_now")),
+        age_s=_spot_int(position.get("age_s")),
+        horizon_s=_spot_int(position.get("horizon_s")),
+        mark_stale_s=_spot_int(position.get("mark_stale_s")),
+    )
+
+
+def parse_spot1(raw: str | None) -> Spot1Out | None:
+    """The ``spot1`` JSON blob off the heartbeat, design §7. Absent, not JSON,
+    not an object, or missing one of the contract's required keys is ``None``
+    -- never a raise, never a partially-invented shape."""
+    parsed = _json(raw)
+    if parsed is None:
+        return None
+    try:
+        closed_raw = cast(dict[str, Any], parsed.get("closed") or {})
+        refutation_raw = cast(dict[str, Any], parsed.get("refutation") or {})
+        open_raw = cast(list[Any], parsed.get("open") or [])
+        open_positions = [
+            position
+            for position in (_spot_open_position(item) for item in open_raw)
+            if position is not None
+        ]
+        return Spot1Out(
+            mode=str(parsed["mode"]),
+            strategy_version=str(parsed.get("strategy_version") or ""),
+            ticket_sol=_spot_decimal(parsed.get("ticket_sol")) or Decimal(0),
+            max_open=_spot_int(parsed.get("max_open")) or 0,
+            markets_enabled=_spot_int(parsed.get("markets_enabled")) or 0,
+            open=open_positions,
+            signals_seen=_spot_int(parsed.get("signals_seen")) or 0,
+            admitted=_spot_int(parsed.get("admitted")) or 0,
+            refused_by_reason=_int_dict(
+                cast(dict[str, Any] | None, parsed.get("refused_by_reason"))
+            ),
+            exits_by_reason=_int_dict(cast(dict[str, Any] | None, parsed.get("exits_by_reason"))),
+            blocked_exits={
+                str(k): str(v)
+                for k, v in cast(dict[str, Any], parsed.get("blocked_exits") or {}).items()
+            },
+            closed=Spot1ClosedOut(
+                n=_spot_int(closed_raw.get("n")) or 0,
+                sum_r_gross=_spot_decimal(closed_raw.get("sum_r_gross")) or Decimal(0),
+                sum_r_net=_spot_decimal(closed_raw.get("sum_r_net")) or Decimal(0),
+                sum_pnl_sol=_spot_decimal(closed_raw.get("sum_pnl_sol")) or Decimal(0),
+                expectancy_r_net=_spot_decimal(closed_raw.get("expectancy_r_net")),
+            ),
+            refutation=Spot1RefutationOut(
+                trades=_spot_int(refutation_raw.get("trades")) or 0,
+                threshold=_spot_int(refutation_raw.get("threshold")) or 0,
+                state=str(refutation_raw.get("state") or ""),
+            ),
+            last_signature=parsed.get("last_signature") or None,
+            last_refusal=parsed.get("last_refusal") or None,
+            last_entries_tick_at=parse_heartbeat_datetime(parsed.get("last_entries_tick_at")),
+            last_exits_tick_at=parse_heartbeat_datetime(parsed.get("last_exits_tick_at")),
+        )
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
 
 
 def read_executor(
@@ -152,6 +258,7 @@ def read_executor(
         gates_mtime=parse_heartbeat_datetime(fields.get("gates_mtime")),
         gates_reloaded_at=parse_heartbeat_datetime(fields.get("gates_reloaded_at")),
         gates_reload_error=fields.get("gates_reload_error") or None,
+        spot1=parse_spot1(fields.get("spot1")),
     )
 
 
