@@ -1090,6 +1090,38 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    é `blocked_exits`). **Desligar:** `MEME_LAUNCH_LANE=paper` (o radar continua medindo) ou `off` +
    `update`; as posições abertas continuam sendo vendidas pelos tiques.
 
+9i. **Troca à vista (spot) manual pela Jupiter, qualquer par (T4.73)** — Everton, 19/09/2026:
+    usar a Binance como sinal e comprar na Solana pela carteira do robô, via Jupiter. Diferente da
+    tesouraria (9j abaixo, automática, só USDC → SOL), esta é uma ferramenta manual e auditada:
+    `infra/scripts/meme_spot_swap.py`, rodado por `compose.sh ops`, dry-run por padrão.
+
+    ```bash
+    # dry-run: cota, mostra a rota, o impacto e a saída esperada (sem tocar a carteira)
+    bash infra/vps/compose.sh ops python infra/scripts/meme_spot_swap.py \
+        --from SOL --to <MINT> --amount 0.02 --reason "teste T4.73"
+
+    # o mesmo, com o verificador rodando de verdade (chave pública só, nunca a secreta)
+    bash infra/vps/compose.sh ops python infra/scripts/meme_spot_swap.py \
+        --from SOL --to <MINT> --amount 0.02 --reason "teste T4.73" \
+        --user ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4
+
+    # ida e volta, ainda em dry-run: compra + cotação de venda de volta, custo em fração
+    bash infra/vps/compose.sh ops python infra/scripts/meme_spot_swap.py \
+        --from SOL --to <MINT> --amount 0.02 --round-trip --reason "teste T4.73"
+
+    # aplicar de verdade (assina com SOLANA_WALLET_SECRET_KEY do .env da VPS, nunca impressa)
+    bash infra/vps/compose.sh ops python infra/scripts/meme_spot_swap.py \
+        --from SOL --to <MINT> --amount 0.02 --round-trip --apply --reason "teste T4.73"
+    ```
+
+    Tetos recusados por nome antes de montar qualquer coisa: `--amount` acima de 0,05
+    SOL-equivalente exige `--i-know`; impacto de preço acima de `--max-impact-pct` (padrão 1%);
+    `--apply` exige o interruptor de emergência **exatamente** `ACTIVE` e só aceita um par com uma
+    perna em SOL (a outra ponta pode ser qualquer mint). Cada tentativa grava uma linha em
+    `meme_treasury_swaps` (mesma tabela da tesouraria, `input_mint`/`output_mint` preenchidos) e um
+    `system_events`. Detalhe e o que ainda não foi provado ao vivo: `docs/RISK_ENGINE_MEME.md`
+    §16.4.
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca

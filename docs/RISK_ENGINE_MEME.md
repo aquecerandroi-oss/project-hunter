@@ -1693,6 +1693,64 @@ desde a meia-noite de São Paulo), a leitura é uma por tique com cache de 10 s,
 de perda **travam** a carteira (`daily_loss = 0,15`), embora o saldo pareça 0,0048 SOL acima do
 início do dia. O USDC continua sendo capital de gás, e o teto continua sendo do dono.
 
+### 16.4 Troca à vista (spot) pela Jupiter, qualquer par (T4.73)
+
+Everton, 19/09/2026 10:2x BRT: usar a Binance como fonte de sinal e comprar na Solana pela
+carteira, via Jupiter — "faça um teste". Generaliza a tesouraria acima (fixa em USDC → SOL,
+`treasury*.py`, **intocada**) para qualquer par de mints, como ferramenta manual e auditada —
+não é um laço automático do executor.
+
+- `hunter_exchanges.jupiter.spot` (`resolve_mint`, `quote`, `swap_tx`): camada fina sobre
+  `client.py`, que já aceitava `input_mint`/`output_mint` livres desde a T4.54 — só resolve o
+  atalho `"SOL"` para o mint do SOL empacotado; qualquer outro símbolo é um endereço de mint, sem
+  registro de tickers.
+- `hunter_meme_executor.spot_verify.verify_spot_swap_tx` — a mesma disciplina instrução a
+  instrução de `treasury_verify.verify_swap_transaction` (§16.1 item 7), generalizada e **num
+  módulo próprio** (o arquivo do T4.54/T4.54b, já revisado e em produção, fica intocado): as
+  contas de Token só podem ser as ATAs próprias da carteira dos **dois** mints (criação pelo
+  programa Associated Token, mint-agnóstica); embrulhar/desembrulhar SOL nativo (System.Transfer
+  de gorjeta e Token.CloseAccount/SyncNative) só na ATA WSOL própria, e só quando um dos dois lados
+  é SOL; qualquer outro programa, ou instrução que este módulo não decodifica, é recusado por
+  nome. Limite conhecido, documentado no próprio módulo: a rota `JUP6` assume o Token program
+  clássico para derivar as ATAs de origem/destino — um mint Token-2022 em qualquer ponta é
+  recusado (`route_source_mismatch`/`route_destination_mismatch`), nunca aceito por engano.
+- `infra/scripts/meme_spot_swap.py` (rodado por `compose.sh ops`) — dry-run por padrão:
+  `--from SOL|<mint> --to <mint>|SOL --amount <decimal> [--slippage-bps 50] [--max-impact-pct 1]
+  --reason "..."` cota, mostra a rota, o impacto, a saída esperada e — com `--user <chave pública>`
+  — monta e verifica a transação de verdade (sem assinar, sem chave). Tetos, recusados por nome
+  antes de montar qualquer coisa: `--amount` acima de 0,05 SOL-equivalente exige `--i-know`; um par
+  sem perna em SOL não tem SOL-equivalente calculável e é recusado do mesmo jeito (fecha, não
+  adivinha); impacto de preço acima de `--max-impact-pct`. `--round-trip` cota a compra e, em
+  seguida, cota a venda de volta pelo valor mínimo garantido, imprimindo o custo da ida-e-volta em
+  fração.
+- `--apply` (assina e envia, `compose.sh ops`, nunca em CI): exige o interruptor de emergência
+  **exatamente** `ACTIVE` (mais estrito que o próprio executor, que ainda opera em `WARNING`) —
+  lido das mesmas quatro fontes de `kill_switch.py` (`meme_spot_swap_kill.py`), antes de qualquer
+  leitura de carteira. Só aceita um par com uma perna em SOL nativo (`apply_requires_a_sol_leg`
+  recusa token↔token): simula com `accounts=[carteira, ATA do outro mint]` e aplica o mesmo
+  invariante de saldos da tesouraria (`meme_spot_swap_rules.check_buy_with_sol`/
+  `check_sell_for_sol`), assina com o mesmo `MemeSigner` (`SOLANA_WALLET_SECRET_KEY`, lido uma vez,
+  nunca impresso) e grava uma linha em `meme_treasury_swaps` por perna. `--round-trip --apply`
+  compra, espera `--hold-s` (padrão 0) e vende de volta o que foi realmente preenchido — nunca o
+  valor cotado.
+- **Tabela reaproveitada, sem migração para uma tabela nova**: `0056_meme_spot_swaps` acrescenta
+  duas colunas `text` anuláveis, `input_mint`/`output_mint`, a `meme_treasury_swaps` (nenhum CHECK
+  da `0051` nomeava USDC/SOL por valor, só por rótulo de coluna) — a tesouraria em §16.1–16.3 nunca
+  as preenche (ficam `NULL`); toda linha do script as preenche junto com `reason` nomeando o par
+  (`"<motivo>:SOL->WIF"`). `usdc_in`/`sol_out_quoted`/`sol_out_filled` seguem numéricos e são
+  reaproveitados como entrada/saída de qualquer par — os nomes das colunas continuam sendo os da
+  tesouraria original, documentado na migração.
+- **O que não foi provado ao vivo nesta sessão** (mesma limitação que a T4.54 registrou, e pela
+  mesma razão): uma cotação real (`GET /quote`, SOL → WIF, 0,02 SOL) foi gravada em
+  `packages/exchange-adapters/tests/fixtures/jupiter/quote_sol_to_wif_real.json`; o verificador
+  genérico foi provado contra transações sintéticas (o mesmo método que a suíte da T4.54 já usa
+  para `shared_accounts_route`), não contra uma transação real de compra com SOL como entrada. O
+  caminho `simulateTransaction` → assinar → enviar → confirmar nunca rodou nesta sessão — nenhuma
+  chave foi usada ou procurada. Antes de um primeiro `--apply` de verdade: repetir a §6 da revisão
+  da T4.54 (`.claude/state/review-T4.54.md`) para o par escolhido — cotação real, transação real
+  não assinada com a chave pública da carteira, `simulateTransaction` com `accounts` conferindo o
+  invariante — e só então uma primeira troca pequena (0,02 SOL) com `--i-know` se necessário.
+
 ## 17. Tamanho por convicção (T4.61b, corrigido na T4.61c)
 
 **O pedido (Everton, 18/09/2026, 15:0x BRT):** "usa a inteligência que já adquirimos e opera agora

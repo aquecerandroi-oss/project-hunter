@@ -13,6 +13,9 @@ from hunter_exchanges.jupiter.models import (
     JupiterQuote,
     JupiterSwapTransaction,
 )
+from hunter_exchanges.jupiter.spot import quote as spot_quote
+from hunter_exchanges.jupiter.spot import resolve_mint
+from hunter_exchanges.jupiter.spot import swap_tx as spot_swap_tx
 from hunter_exchanges.jupiter.versioned_tx import (
     AddressTableLookup,
     VersionedCompiledInstruction,
@@ -34,4 +37,7 @@ __all__ = [
     "VersionedTransaction",
     "decode_versioned_message",
     "decode_versioned_transaction",
+    "resolve_mint",
+    "spot_quote",
+    "spot_swap_tx",
 ]

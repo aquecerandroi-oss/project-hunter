@@ -63,6 +63,7 @@ class MemeTreasurySwap(Base, UUIDPrimaryKeyMixin):
             name="amounts_are_not_negative",
         ),
         CheckConstraint("char_length(reason) > 0", name="identity_is_not_empty"),
+        CheckConstraint("(input_mint IS NULL) = (output_mint IS NULL)", name="mint_pair_is_named"),
     )
 
     requested_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -80,6 +81,10 @@ class MemeTreasurySwap(Base, UUIDPrimaryKeyMixin):
     refusal: Mapped[str | None] = mapped_column(Text)
     wallet_sol_before: Mapped[Decimal]
     wallet_sol_after: Mapped[Decimal | None]
+    input_mint: Mapped[str | None] = mapped_column(Text)
+    """T4.73: the mint pair of a generic ``infra/scripts/meme_spot_swap.py``
+    swap; ``NULL`` for the USDC->SOL treasury (``0051``)."""
+    output_mint: Mapped[str | None] = mapped_column(Text)
 
 
 __all__ = ["TREASURY_SWAP_STATUSES", "MemeTreasurySwap"]
