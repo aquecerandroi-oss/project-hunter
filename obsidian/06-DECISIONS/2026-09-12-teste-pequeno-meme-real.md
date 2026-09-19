@@ -194,3 +194,11 @@ Medido: reais que chegaram a +30 % = 4 de 15 (27 %); a +10–15 % = 6 de 15 (40 
 ## Adendo 19/09/2026 09:5x BRT — "vi que o Lab está dando bom, vamos operar com dinheiro real também" (Everton, por escrito): segunda mesa real
 
 Papel 72 h: flow_v2/2 +0,105 (mas −0,084 nas últimas 24 h), **flow_v2/1 +0,054 e +0,103 nas 24 h (38 apostas, 45 % de acerto)**, flow_v2/5 +0,035/−0,030, operator/5 −0,070. O dia bom foi 17/09. Decisão: **segunda mesa `operator/6` = entrada do `flow_v2/1` + saída do Everton (1,15×, trailing 10 %, 5 min), ticket 0,07**, freios compartilhados (2 posições, cap 0,15, tesouraria, kill switch). Migração de semente (T4.71), revisão relâmpago, deploy; comparação real × papel dos dois conjuntos por 3 dias. Expectativa honesta: −0,02 a +0,05 SOL em 3 dias. R62: "sair na venda do grande" não ajuda (é o próprio gatilho); o dinheiro ficou no trailing 10 % → EXP-M17 (trailing 20/30 % em papel).
+
+## Adendo 19/09/2026 10:3x BRT — o Lab de cripto normal vai para o real (mesa `spot/1`)
+
+**Decisão do Everton (escrita, 10:2x–10:3x):** "o Lab já faz estratégia de análise, então pode ser que ali vamos ter mais vantagem do que o meme — quero testar logo no real com ele" e, depois da ressalva, "eu quero ir no dinheiro real e testar no real mesmo".
+
+**Ressalva registrada (Sexta-feira):** o Lab de perps/spot não tem vantagem medida — `momentum v3` está *inconclusiva* (30 resultados, expectância −0,26 R) e nunca operou nem em papel (T4.72). A decisão é de aprendizado com perda aceita, mesma régua da mesa de memes (decisão 18/09).
+
+**Como vai ser real:** não pela Binance (Fase 4: `LiveExecutionAdapter` bloqueado, sem cofre de chave de API) e sim pela **Solana com a carteira que já existe**: sinal do Lab (mercados da Binance) → mapa sinal→mint na Solana (R63) → compra/venda pela Jupiter (T4.73, troca genérica + script auditado) → mesa **`spot/1`**: ficha pequena (0,05 SOL), saída pela regra do próprio sinal (alvo/stop/tempo), mesmos freios da carteira (teto diário, posições abertas, chave). Primeiro passo obrigatório: teste real de ida e volta de 0,02 SOL com `--apply` do Everton. Revisão do risk-engine-guardian e do Codex antes de ligar. A autonomia em papel (T4.72) é ligada em paralelo para ter o contraste papel × real.
