@@ -1765,8 +1765,8 @@ não é um laço automático do executor.
 - **Verificador (T4.73b, achado 6):** `Create ATA` cujo mint (pos. 3) ou cuja ATA (pos. 1) só é
   alcançável por address lookup table é recusado por nome (`ata_account_via_lookup_table`) — antes
   a derivação do endereço era pulada quando `_key` devolvia `None`.
-- **Pendência ABERTA que bloqueia o primeiro `--apply` (achado da Astra na T4.73b, fora do escopo
-  de edição daquela tarefa — `hunter_meme_executor.treasury_db`):** os três leitores da tabela
+- **Fechado na T4.73c (era a pendência que bloqueava o primeiro `--apply`; achado da Astra na
+  T4.73b — `hunter_meme_executor.treasury_db`):** os três leitores da tabela
   reaproveitada não filtram por mint: `_SOL_INFLOW` soma `coalesce(sol_out_filled, sol_out_quoted)`
   de **toda** linha `submitted|confirmed` do dia e alimenta `treasury_inflow_today_sol` do freio de
   perda diária (§16.3) a cada tick do `reconcile`, com ou sem `MEME_TREASURY_ENABLED`; uma compra
@@ -1777,8 +1777,11 @@ não é um laço automático do executor.
   (zero numa compra), passando por cima da reconciliação manual. Correção de três cláusulas:
   `AND input_mint IS NULL` em `_USDC_24H`, `_SOL_INFLOW` e `_SUBMITTED` (a CHECK da `0056` garante
   `(input_mint IS NULL) = (output_mint IS NULL)`, então isso seleciona exatamente as linhas da
-  tesouraria), com um teste de que uma linha spot confirmada não entra no inflow. **Enquanto isso
-  não estiver commitado, nenhum `--apply` deste script deve rodar.**
+  tesouraria), com um teste de que uma linha spot confirmada não entra no inflow. **Feito na
+  T4.73c:** as três consultas carregam `input_mint IS NULL`; `test_treasury_db.py` (Postgres real:
+  2 linhas de tesouraria + 2 spot, inflow = 0,079 + 0,03 e não 20,8 M) e
+  `test_treasury_db_spot_rows.py` (cada leitura envia uma única SQL com o predicado). `_LAST_ATTEMPT`
+  ficou sem o filtro de propósito (falha fechado: uma linha spot presa só adia a tesouraria).
 - **Tabela reaproveitada, sem migração para uma tabela nova**: `0056_meme_spot_swaps` acrescenta
   duas colunas `text` anuláveis, `input_mint`/`output_mint`, a `meme_treasury_swaps` (nenhum CHECK
   da `0051` nomeava USDC/SOL por valor, só por rótulo de coluna) — a tesouraria em §16.1–16.3 nunca

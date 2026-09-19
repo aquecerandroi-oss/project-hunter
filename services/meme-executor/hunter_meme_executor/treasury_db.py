@@ -34,19 +34,29 @@ __all__ = [
     "usdc_committed_last_24h",
 ]
 
+# T4.73c — since ``0056`` the same table also holds the generic spot swaps of
+# ``infra/scripts/meme_spot_swap.py``: rows with ``input_mint``/``output_mint``
+# set (the ``0056`` CHECK makes the pair all-or-nothing, so one column names
+# it), whose ``usdc_in``/``sol_out_*`` are the amounts of *those* mints — token
+# atoms, not USDC or SOL. Every read below that feeds a SOL or USDC number, or
+# hands a row to ``treasury_reconcile``, sees the USDC->SOL treasury rows only:
+# ``input_mint IS NULL``, spelled out in each statement.
 _LAST_ATTEMPT = text("SELECT max(requested_at) FROM meme_treasury_swaps")
 _USDC_24H = text(
     "SELECT coalesce(sum(usdc_in), 0) FROM meme_treasury_swaps "
-    "WHERE status IN ('submitted', 'confirmed') AND requested_at >= :since"
+    "WHERE input_mint IS NULL AND status IN ('submitted', 'confirmed') "
+    "AND requested_at >= :since"
 )
 _SOL_INFLOW = text(
     "SELECT coalesce(sum(coalesce(sol_out_filled, sol_out_quoted)), 0) "
     "FROM meme_treasury_swaps "
-    "WHERE status IN ('submitted', 'confirmed') AND requested_at >= :since"
+    "WHERE input_mint IS NULL AND status IN ('submitted', 'confirmed') "
+    "AND requested_at >= :since"
 )
 _SUBMITTED = text(
     "SELECT id, signature, requested_at, wallet_sol_before FROM meme_treasury_swaps "
-    "WHERE status = 'submitted' AND signature IS NOT NULL ORDER BY requested_at"
+    "WHERE input_mint IS NULL AND status = 'submitted' AND signature IS NOT NULL "
+    "ORDER BY requested_at"
 )
 _INSERT = text(
     "INSERT INTO meme_treasury_swaps (id, reason, usdc_in, sol_out_quoted, sol_out_filled, "

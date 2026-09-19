@@ -1122,6 +1122,17 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
     `system_events`. Detalhe e o que ainda não foi provado ao vivo: `docs/RISK_ENGINE_MEME.md`
     §16.4.
 
+    **Teto duro, piso da carteira e códigos de saída (T4.73b/T4.73c).** Além do teto brando de
+    0,05, há um teto **duro** de 0,10 SOL-equivalente que `--i-know` **não** levanta; e uma perna de
+    compra com SOL só passa se `carteira − amount − 0,01 ≥ MEME_WALLET_MIN_SOL_AFTER_SWAP` (padrão
+    0,30 SOL, lido do `.env` da VPS; valor inválido ou ≤ 0 recusa, nunca cai para um piso menor).
+    O script sai com **0** quando a operação (ou o dry-run) terminou limpa, **64** uso errado,
+    **65** recusada por nome (antes ou dentro de uma perna), **66** perna enviada mas **não
+    confirmada** em 20 s — a linha fica `submitted` com a assinatura impressa, a volta do
+    `--round-trip` **não** dispara e a reconciliação é manual, pela assinatura (a tesouraria
+    automática não a toca: os leitores dela só veem linhas com `input_mint IS NULL`) —, **67** perna
+    falhou na cadeia. Num wrapper, só o 0 é sucesso.
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca
