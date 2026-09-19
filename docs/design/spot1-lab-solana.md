@@ -75,11 +75,12 @@ posição aberta **ou** compra pendente), e o **global** `MEME_MAX_OPEN_POSITION
 (`hunter_risk_meme.checks_wallet.concurrent_positions_check` sobre `MemeWalletState.positions`, que a pista passa a
 preencher com as suas). Consequência para o Everton: com `MEME_MAX_OPEN_POSITIONS=2` hoje, a mesa spot disputa as duas
 vagas com as memes; para ter 3 + 2 ele sobe para 5 no `.env` — é a única forma de "um freio só" ser verdade.
-**Custo em R (check `cost_r`, novo):** `est_cost_sol = 2 × priority_fee_sol + ticket × (2 × impacto_da_cotação +
-0,003)`; `r_unit_sol = ticket × stop_frac`; recusa `cost_above_r_cap` se `est_cost_sol ÷ r_unit_sol > SPOT1_MAX_COST_R`
-(0,5). **Honestidade sobre 0,05 SOL:** com stop de 1–2,5 % o R vale 0,0005–0,00125 SOL; a taxa de prioridade "auto" da
-Jupiter pode chegar a 0,005 SOL (4–10 R!). Por isso a pista **capa a prioridade** em `SPOT1_PRIORITY_FEE_MAX_LAMPORTS`
-= 200 000 (0,0002 SOL/perna; pools fundas não disputam bloco) e ainda assim o custo fixo fica em 0,3–0,7 R por operação.
+**Custo em R (check `cost_r`, novo; T4.74-2):** `est_cost_sol = 2 × (priority_fee_sol + taxa_de_rede_sol) + ticket ×
+(2 × impacto_da_cotação + 0,003)`; `r_unit_sol = ticket × stop_frac`; recusa `cost_above_r_cap` se `est_cost_sol ÷
+r_unit_sol > SPOT1_MAX_COST_R` (0,5). **Honestidade sobre 0,05 SOL:** com stop de 1–2,5 % o R vale 0,0005–0,00125 SOL; a
+taxa de prioridade "auto" da Jupiter pode chegar a 0,005 SOL (4–10 R!). Por isso a pista **capa a prioridade** em
+`SPOT1_PRIORITY_FEE_MAX_LAMPORTS` = **100 000** (0,0001 SOL/perna; pools fundas não disputam bloco — com 200 000 e stop
+de 2 % o check dá 0,66 R e recusa) e ainda assim o custo fixo fica em 0,3–0,5 R por operação.
 A ficha 0,05 é tamanho de **encanamento**; a leitura de expectância tem de ser publicada em `R_bruto` (antes das taxas
 de rede) **e** `R_líquido`. Subir para ≥ 0,15 SOL depois de 5 operações limpas é decisão dele, registrada como sugestão.
 
@@ -157,7 +158,7 @@ admissão e a assinatura**, `signer.sign` só aqui. `JupiterClient.swap` ganha `
 | `SPOT1_MAX_SIGNAL_AGE_S` / `SPOT1_MAX_HOLD_S` | `180` / `14400` | `max_entry_delay_s` do sinal (120) + uma vela |
 | `SPOT1_MAX_PARITY_PCT` / `SPOT1_MAX_IMPACT_PCT` / `SPOT1_MAX_COST_R` | `3` / `0.5` / `0.5` | checks §2–§3 |
 | `SPOT1_MARK_S` / `SPOT1_EXIT_SLIPPAGE_BPS` / `SPOT1_PANIC_SLIPPAGE_BPS` | `20` / `50` / `300` | §4 |
-| `SPOT1_PRIORITY_FEE_MAX_LAMPORTS` | `200000` | por perna; o verificador confere `limit × price` |
+| `SPOT1_PRIORITY_FEE_MAX_LAMPORTS` | `100000` | por perna; o verificador confere `limit × price` (T4.74-2: 200 000 estourava `cost_r` a 0,05 SOL) |
 | `SPOT1_REFUTE_MIN_TRADES` / `SPOT1_REFUTE_MAX_LOSS_SOL` / `SPOT1_CONSECUTIVE_STOPS_PAUSE_S` | `20` / `0.15` / `7200` | §8 |
 | `SPOT1_REFUTATION_RESET_AT` | vazio | ISO; só operações fechadas depois disto contam — a "assinatura" dele para reabrir |
 Valores fora de faixa caem no padrão com aviso (padrão `launch_config.py`). Estágio 1 = **sem clique**, como
