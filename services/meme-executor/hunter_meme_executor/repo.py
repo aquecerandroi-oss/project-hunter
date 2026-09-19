@@ -30,8 +30,10 @@ from hunter_meme_executor.repo_positions import (
     OpenPosition,
     close_position,
     insert_position,
+    open_position,
     open_positions,
     set_exit_intent,
+    stamp_creator_sold,
     update_mark,
 )
 
@@ -51,7 +53,9 @@ __all__ = [
     "insert_order",
     "insert_position",
     "latest_sell_order",
+    "latest_sell_submitted_at",
     "live_candidates",
+    "open_position",
     "open_positions",
     "order_key",
     "orders_by_state",
@@ -59,6 +63,7 @@ __all__ = [
     "pending_attempts",
     "refuse_admitted_order",
     "set_exit_intent",
+    "stamp_creator_sold",
     "token_context",
     "unconfirmed_orders",
     "update_mark",
@@ -137,6 +142,10 @@ _COUNT_BUYS = text(
 _LATEST_SELL = text(
     "SELECT id, proposal_id, side, client_order_id, attempt, status, reason, intent, admission "
     "FROM meme_live_orders WHERE proposal_id = :proposal_id AND side = 'sell' "
+    "ORDER BY attempt DESC LIMIT 1"
+)
+_LATEST_SELL_SUBMITTED = text(
+    "SELECT submitted_at FROM meme_live_orders WHERE proposal_id = :proposal_id AND side = 'sell' "
     "ORDER BY attempt DESC LIMIT 1"
 )
 _UNCONFIRMED = text(
@@ -270,6 +279,12 @@ async def latest_sell_order(session: AsyncSession, proposal_id: str) -> OrderRow
         intent=dict(r["intent"] or {}),
         admission=dict(r["admission"] or {}),
     )
+
+
+async def latest_sell_submitted_at(session: AsyncSession, proposal_id: str) -> datetime | None:
+    """T4.63: when the newest sell attempt of this position was submitted (or
+    ``None`` while none was) — the far end of ``event_to_sell_submit_s``."""
+    return (await session.execute(_LATEST_SELL_SUBMITTED, {"proposal_id": proposal_id})).scalar()
 
 
 async def unconfirmed_orders(session: AsyncSession) -> list[str]:

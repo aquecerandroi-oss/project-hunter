@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from hunter_exchanges.jupiter import JupiterClient
 from hunter_meme_executor.creator_flow import CreatorSoldMemory
+from hunter_meme_executor.event_exits_stats import EventExitsStats
 from hunter_meme_executor.treasury_inflow import TreasuryInflowReader
 
 if TYPE_CHECKING:
@@ -123,6 +124,9 @@ class ExecutorState:
     priority_fee_read_failures: int = 0
     """T4.55: sends that paid the floor because ``getRecentPrioritizationFees``
     failed or answered nothing (the desk's signal that the RPC is degrading)."""
+    exit_locks: dict[str, asyncio.Lock] = field(default_factory=lambda: dict[str, asyncio.Lock]())
+    """T4.63: one lock per open position (``exit_common.exit_lock``) — the tick
+    and the event path never both sell it; pruned by the event runtime's sync."""
 
 
 @dataclass(slots=True)
@@ -158,6 +162,12 @@ class ExecutorContext:
     """T4.55: the bounded ``getRecentPrioritizationFees`` reader every send
     prices itself with (``send_path.priority_fee_for``). ``None`` keeps the
     configured static ``compute_unit_price_micro_lamports`` (tests)."""
+    event_exits: EventExitsStats = field(default_factory=EventExitsStats)
+    """T4.63: the counters of the event-driven exits (``event_exits.py``),
+    published by the heartbeat whether or not the flag is on."""
+    event_exits_wake: asyncio.Event = field(default_factory=asyncio.Event)
+    """T4.63: set by the entries loop right after a fill opened a position, so
+    the event runtime subscribes to its curve now instead of on its next 2 s sync."""
     treasury_inflow: TreasuryInflowReader = field(default_factory=TreasuryInflowReader)
     """T4.60: the SOL the treasury put into the wallet since the Sao Paulo day
     start (``meme_treasury_swaps``), cached 10 s, the last known value on a

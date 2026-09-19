@@ -909,6 +909,60 @@ assume:
 > intocados nesse meio-tempo. Nada disso muda a admissão, o kill switch ou o dimensionamento do
 > executor — a proposta chega mais cedo pelo mesmo código que já existia.
 
+> **T4.63 (18/09/2026): saída por evento — a posição real é julgada a cada trade da sua curva,
+> não a cada tique.** CITIZEN (18/09, 19:06:43 → 19:11:29 BRT, `KB-0139`): comprada a 0,0716 SOL,
+> pico de marca 0,1303 (+82 %), vendida pelo trailing a 0,0142 (−0,80 R) — a curva foi drenada em
+> segundos **entre dois tiques** de `exits.py` (10 s). Com `MEME_EVENT_EXITS=on` (padrão `off`) o
+> executor abre **um** WebSocket de RPC Solana próprio (`hunter_exchanges.pumpfun.rpc_ws.SolanaWsClient`,
+> `SOLANA_RPC_WS_URL`, `confirmed`; `processed` nunca decide, §8.2) e, para cada posição aberta,
+> assina a PDA da curva do mint — `accountSubscribe` (as reservas depois de cada trade) e
+> `logsSubscribe` (o `TradeEvent` de cada trade). Cada notificação vira **a mesma marca** do tique
+> (`exit_common.mark_sol`: o líquido de vender tudo agora pelo mesmo `quote_sell`, taxas e rede
+> fora), atualiza o pico em memória **e na linha** (`high_water_sol`, `GREATEST`, para um restart
+> não esquecer de onde o trailing mede), e passa pelo **mesmo** `decide_exit` com os **mesmos**
+> `ExitParams` do conjunto (`target_x`/`trailing_pct`/`max_hold_s`, `exit_common.exit_params`).
+> Disparou ⇒ `exits.sell_on_event` — **a mesma porta** do tique: a mesma trava por posição
+> (`exit_common.exit_lock`), releitura da linha sob a trava (fechada nesse meio-tempo ⇒ nada), um
+> `CurveRead` **fresco** por HTTP para montar a instrução, a mesma simulação, a mesma tolerância
+> (5 %; 15 % em `creator_dump`/`rug_signal`), o mesmo reenvio dos mesmos bytes (`_sell`). O tique de
+> 10 s continua rodando como reserva e reconciliação — nada da política mudou; a mesma decisão chega
+> antes.
+>
+> **A venda do criador vista no evento.** Um `TradeEvent` de venda cujo `user` é o `creator` do mint
+> (`meme_tokens.creator`) carimba na hora `creator_sold_seen_at` **com a fração medida**
+> (`creator_sold_fraction` = tokens vendidos ÷ `creator_initial_tokens` da `0048`, teto 1, piso
+> 0,000001 — a `0038` exige a fração junto do carimbo) e o mesmo frame é julgado com
+> `creator_dump = true`. Sem alocação registrada (moeda anterior à `0048`) a visão fica **só em
+> memória** (`CreatorSoldMemory` + o `Watched` da posição): `creator_dump` dispara igual, e nada é
+> escrito que o schema recusaria — este caminho nunca inventa um denominador.
+>
+> **Um só envio, sempre.** A trava é por `position_id`; o segundo a entrar (tique ou evento) relê a
+> linha e a encontra fechada (`exit_order_id` preenchido, `status = closed`) ou com a tentativa
+> pendente (`latest_sell_order` em `admitted`/`simulated`/`submitted_unconfirmed` ⇒ reconcilia, não
+> reenvia). Dois disparos da mesma posição em < 1 s são um (`TRIGGER_MIN_INTERVAL_S`); um disparo com
+> venda em voo não abre outra. Provado com Postgres real
+> (`test_event_exits_integration.py`): uma notificação de −35 % ⇒ **uma** ordem `confirmed`,
+> `intent.exit_reason = trailing`, posição fechada com o mesmo motivo, e o tique logo depois não
+> vende nada.
+>
+> **Falha fechada = "só tique", nunca executor parado.** Cada frame é avaliado sob `try`/`except`
+> (frame ruim conta `event_exits_bad_frames`); o `listen()` do cliente reconecta com backoff para
+> sempre (`event_exits_reconnects`); a fila entre leitor e avaliador é limitada (1000; cheia descarta
+> e conta `event_exits_dropped` — o tique cobre); qualquer exceção do runtime o reinicia 5 s depois
+> (`event_exits_restarts_total`), sem tocar o `TaskGroup` do `main.py`. A marca da WS é gravada no
+> máximo uma vez por segundo por posição, **exceto** um pico novo e **o frame que disparou** — a linha
+> carrega o número da decisão. Assinaturas: sincronizadas a cada 2 s contra `open_positions` e no
+> instante do fill (`ExecutorContext.event_exits_wake`), teto `max_open_positions` posições
+> (× 2 assinaturas), fechada ⇒ `unsubscribe`. O `mark_source` continua `solana_rpc` (mesmos bytes do
+> mesmo nó, outro transporte; um rótulo `solana_ws` exigiria migração).
+>
+> **Heartbeat** (`hb:meme:executor`, publicados com a flag desligada também, como `off`/`0`):
+> `event_exits_enabled`, `event_exits_ws_state`, `event_exits_subscriptions`, `event_exits_updates_60s`,
+> `event_exits_triggered_total`, `event_to_sell_submit_s_p50`/`_p95` (segundos entre a notificação que
+> disparou e o `submitted_at` da venda — o número que CITIZEN perdeu), `event_exits_bad_frames`,
+> `event_exits_restarts_total`, `event_exits_reconnects`, `event_exits_dropped`,
+> `event_exits_creator_sells_seen`, `event_exits_marks_written`, `event_exits_sell_errors`.
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |

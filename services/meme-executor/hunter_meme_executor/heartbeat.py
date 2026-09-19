@@ -25,6 +25,7 @@ from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_meme_executor.auto_approve import auto_approved_last_hour, auto_refused_last_hour
 from hunter_meme_executor.context import ExecutorContext
+from hunter_meme_executor.event_exits_stats import heartbeat_fields as event_exits_fields
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.repo import open_positions, orders_by_state
 from hunter_meme_executor.scope import read_scope_use
@@ -234,6 +235,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     fields.update(_pickup_lag_fields(ctx))
     fields["treasury"] = _treasury_field(ctx)
     fields.update(_send_fields(ctx))
+    fields.update(event_exits_fields(ctx.event_exits, now=now, enabled=cfg.event_exits.enabled))
     return fields
 
 

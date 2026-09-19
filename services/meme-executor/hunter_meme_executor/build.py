@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from hunter_exchanges.pumpfun.decode import NATIVE_SOL_QUOTE_MINT
+from hunter_exchanges.pumpfun.decode import NATIVE_SOL_QUOTE_MINT, BondingCurveAccount
 from hunter_exchanges.pumpfun.global_state import GlobalAccount
 from hunter_exchanges.pumpfun.quote import (
     BONDING_CURVE_FEE_TIER_2026_05_20,
@@ -46,6 +46,7 @@ __all__ = [
     "decode_fills",
     "fee_bps",
     "reserves_of",
+    "reserves_of_account",
 ]
 
 LAMPORTS_PER_SOL = 1_000_000_000
@@ -97,7 +98,12 @@ class BuiltTrade:
 
 
 def reserves_of(read: CurveRead) -> CurveReserves:
-    a = read.account
+    return reserves_of_account(read.account)
+
+
+def reserves_of_account(a: BondingCurveAccount) -> CurveReserves:
+    """T4.63: the same reserves off a decoded account — an ``accountNotification``
+    (``event_exits.py``) is the same bytes ``ChainReader.curve`` reads by HTTP."""
     if a.quote_mint != NATIVE_SOL_QUOTE_MINT:
         raise ValueError(f"unsupported_quote:{a.quote_mint}")
     return CurveReserves(

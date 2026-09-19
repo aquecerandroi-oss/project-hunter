@@ -24,8 +24,10 @@ __all__ = [
     "OpenPosition",
     "close_position",
     "insert_position",
+    "open_position",
     "open_positions",
     "set_exit_intent",
+    "stamp_creator_sold",
     "update_mark",
 ]
 
@@ -60,11 +62,18 @@ class OpenPosition:
         return self.creator_sold_seen_at is not None or tape_creator_sold is True
 
 
-_OPEN_POSITIONS = text(
+_POSITION_COLUMNS = (
     "SELECT id, proposal_id, mint, entry_at, tokens, sol_spent_lamports, initial_risk_sol, "
     "       params, mark_sol, high_water_sol, exit_intent, sell_requested_at, "
     "       sell_requested_by, migrated, creator_sold_seen_at "
-    "FROM meme_live_positions WHERE status = 'open' ORDER BY entry_at"
+    "FROM meme_live_positions WHERE status = 'open'"
+)
+_OPEN_POSITIONS = text(_POSITION_COLUMNS + " ORDER BY entry_at")
+_OPEN_POSITION = text(_POSITION_COLUMNS + " AND id = :id")
+_CREATOR_SOLD = text(
+    "UPDATE meme_live_positions SET creator_sold_seen_at = :at, "
+    "  creator_sold_fraction = :fraction, creator_balance_reason = NULL, updated_at = :now "
+    "WHERE id = :id AND status = 'open' AND creator_sold_seen_at IS NULL RETURNING id"
 )
 _INSERT_POSITION = text(
     "INSERT INTO meme_live_positions (id, proposal_id, entry_order_id, mint, status, entry_at, "
@@ -98,27 +107,52 @@ def _decimal(value: Any) -> Decimal | None:
     return None if value is None else Decimal(str(value))
 
 
+def _position(r: Any) -> OpenPosition:
+    return OpenPosition(
+        id=str(r["id"]),
+        proposal_id=str(r["proposal_id"]),
+        mint=str(r["mint"]),
+        entry_at=r["entry_at"],
+        tokens=int(r["tokens"]),
+        sol_spent_lamports=int(r["sol_spent_lamports"]),
+        initial_risk_sol=Decimal(str(r["initial_risk_sol"])),
+        params=dict(r["params"] or {}),
+        mark_sol=_decimal(r["mark_sol"]),
+        high_water_sol=_decimal(r["high_water_sol"]),
+        exit_intent=None if r["exit_intent"] is None else dict(r["exit_intent"]),
+        sell_requested_at=r["sell_requested_at"],
+        sell_requested_by=r["sell_requested_by"],
+        migrated=bool(r["migrated"]),
+        creator_sold_seen_at=r["creator_sold_seen_at"],
+    )
+
+
 async def open_positions(session: AsyncSession) -> list[OpenPosition]:
-    return [
-        OpenPosition(
-            id=str(r["id"]),
-            proposal_id=str(r["proposal_id"]),
-            mint=str(r["mint"]),
-            entry_at=r["entry_at"],
-            tokens=int(r["tokens"]),
-            sol_spent_lamports=int(r["sol_spent_lamports"]),
-            initial_risk_sol=Decimal(str(r["initial_risk_sol"])),
-            params=dict(r["params"] or {}),
-            mark_sol=_decimal(r["mark_sol"]),
-            high_water_sol=_decimal(r["high_water_sol"]),
-            exit_intent=None if r["exit_intent"] is None else dict(r["exit_intent"]),
-            sell_requested_at=r["sell_requested_at"],
-            sell_requested_by=r["sell_requested_by"],
-            migrated=bool(r["migrated"]),
-            creator_sold_seen_at=r["creator_sold_seen_at"],
-        )
-        for r in (await session.execute(_OPEN_POSITIONS)).mappings()
-    ]
+    return [_position(r) for r in (await session.execute(_OPEN_POSITIONS)).mappings()]
+
+
+async def open_position(session: AsyncSession, position_id: str) -> OpenPosition | None:
+    """T4.63: the row **now**, or ``None`` once it is no longer open — what the
+    tick and the event path re-read under the position's lock before selling."""
+    r = (await session.execute(_OPEN_POSITION, {"id": position_id})).mappings().first()
+    return None if r is None else _position(r)
+
+
+async def stamp_creator_sold(
+    session: AsyncSession, position_id: str, *, at: datetime, fraction: Decimal, now: datetime
+) -> bool:
+    """T4.63: the creator's sell seen in a ``TradeEvent`` of the position's own
+    curve — the same columns the radar's 15 s watch stamps (``0038``), first
+    sighting kept. ``fraction`` is sold ÷ allocation in ``(0, 1]``: the row's
+    CHECK ``a_creator_sale_has_its_fraction`` refuses a sighting without one,
+    so a caller that cannot measure it keeps the sighting in memory instead.
+    ``True`` when this call was the one that stamped it."""
+    if not Decimal(0) < fraction <= Decimal(1):
+        raise ValueError(f"creator_sold_fraction_out_of_range:{fraction}")
+    stamped = await session.execute(
+        _CREATOR_SOLD, {"id": position_id, "at": at, "fraction": fraction, "now": now}
+    )
+    return stamped.scalar() is not None
 
 
 async def insert_position(

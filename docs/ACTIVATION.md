@@ -966,6 +966,32 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    `MEME_MAX_SOL_PER_TRADE`, política de capital dele). Só `MEME_MIN_TRADE_SOL` recusa o boot, porque é
    política.
 
+9g. **Saída por evento (T4.63) — a flag é dele, padrão desligado.** CITIZEN (18/09, `KB-0139`) foi
+   de +82 % a −80 % entre dois tiques de 10 s do laço de saídas. Com `MEME_EVENT_EXITS=on` o executor
+   abre um WebSocket de RPC Solana próprio (`SOLANA_RPC_WS_URL`; vazio deriva de `SOLANA_RPC_URL`,
+   `https`→`wss`; sem nenhum, o público — que **não** serve para produção), assina a curva de cada
+   posição aberta e vende no instante em que a **mesma** regra do tique dispara (`decide_exit`, os
+   mesmos `target_x`/`trailing_pct`/`max_hold_s` do conjunto), pela **mesma** venda (trava por
+   posição, `CurveRead` fresco, simulação, tolerância normal/pânico, reenvio). Uma venda do criador
+   vista no `TradeEvent` carimba `creator_sold_seen_at` com a fração medida e dispara `creator_dump`
+   ali. O tique de 10 s continua como reserva: WS caído = "só tique", nunca executor parado. Nada de
+   política, tamanho ou admissão muda. Regra: `docs/RISK_ENGINE_MEME.md` §9 "T4.63: saída por
+   evento".
+
+   | Variável | Padrão | O que faz |
+   |---|---|---|
+   | `MEME_EVENT_EXITS` | `off` | `on` liga o runtime; qualquer outro valor é `off` com aviso. Publicado como `event_exits_enabled` no heartbeat |
+   | `SOLANA_RPC_WS_URL` | vazio | o WS do executor (o mesmo nome que o portão de evento do radar usa); vazio deriva de `SOLANA_RPC_URL` |
+   | `MEME_EVENT_COMMITMENT` | `confirmed` | `confirmed` \| `processed` — o mesmo do radar; `processed` não decide sozinho |
+
+   **Ligar:** no `.env` da VPS `MEME_EVENT_EXITS=on` (e `SOLANA_RPC_WS_URL` se o provedor usa outro
+   host para WS), `compose.sh update meme-executor`. **Conferir** no `hb:meme:executor`:
+   `event_exits_ws_state = connected`, `event_exits_subscriptions = 2 × posições abertas`,
+   `event_exits_updates_60s > 0` enquanto a moeda negocia; depois da primeira saída por evento,
+   `event_to_sell_submit_s_p50` (alvo: < 2 s) e `event_exits_triggered_total`. `event_exits_restarts_total`
+   ou `event_exits_dropped` crescendo é o sinal de que o WS do provedor não aguenta — a mesa continua
+   protegida pelo tique. **Desligar:** `MEME_EVENT_EXITS=off` + `update`; nada mais precisa mudar.
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca

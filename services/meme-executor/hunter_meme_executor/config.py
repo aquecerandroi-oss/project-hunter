@@ -48,6 +48,7 @@ from hunter_meme_executor.config_env import (
     tolerance,
 )
 from hunter_meme_executor.conviction import ConvictionConfig
+from hunter_meme_executor.event_exits_config import EventExitsConfig
 from hunter_meme_executor.send_tuning import SendTuning
 from hunter_risk_meme import MEME_PAPER_V0, MemeLimits, MemePolicyMissing, limits_from_env
 
@@ -147,6 +148,9 @@ class ExecutorConfig:
     conviction: ConvictionConfig = ConvictionConfig()
     """T4.61b — ``MEME_CONVICTION_SIZING`` (default off) and the ladder's numbers
     (``conviction.py``): the buy as a fraction of the cap, never above it."""
+    event_exits: EventExitsConfig = EventExitsConfig()
+    """T4.63 — ``MEME_EVENT_EXITS`` (default off): exits decided on every curve
+    update over the executor's own WS (``event_exits.py``); the tick stays."""
 
     @property
     def base_limits(self) -> MemeLimits:
@@ -284,6 +288,7 @@ def boot(
         or DEFAULT_JUPITER_BASE_URL,
         send=SendTuning.from_env(env),
         conviction=ConvictionConfig.from_env(env),
+        event_exits=EventExitsConfig.from_env(env),
     )
     return config, mode, signer
 

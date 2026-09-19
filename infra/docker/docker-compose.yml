@@ -690,6 +690,10 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
       MEME_KILL_FILE: /run/hunter/meme.kill
       MEME_AUTO_CLOSE_ON_EMERGENCY: ${MEME_AUTO_CLOSE_ON_EMERGENCY:-false}
+      # T4.63: exits decided on every curve update over the executor's own WS
+      # (docs/RISK_ENGINE_MEME.md §9 "Saída por evento"); off = the 10 s tick only.
+      MEME_EVENT_EXITS: ${MEME_EVENT_EXITS:-off}
+      SOLANA_RPC_WS_URL: ${SOLANA_RPC_WS_URL:-}
       MEME_LIVE_APPROVAL_TTL_S: ${MEME_LIVE_APPROVAL_TTL_S:-30}
       # T4.28 stage 1 ("liga sozinho"): the executor opens the desk's operator
       # proposal as live without the click, only with the live flag on AND a

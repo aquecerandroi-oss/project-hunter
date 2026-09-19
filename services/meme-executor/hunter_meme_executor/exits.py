@@ -18,6 +18,12 @@ the curve — or say by name why it cannot.
   — never sold quietly, never silently retried into the old blanket refusal.
 - **A ``submitted_unconfirmed`` sell is reconciled before any new one** (VM5); a
   ``failed`` one is retried with backoff under a new ``:exit:{n}`` key, never re-signed.
+- **T4.63 — two paths, one sell.** ``manage_position`` is the tick; ``sell_on_event``
+  is the event runtime's door (``event_exits.py``) when ``decide_exit`` fired on a
+  WS curve update. Both take the position's ``exit_lock``, re-read the row inside
+  it (closed meanwhile ⇒ nothing) and go through the same ``route_exit`` → ``_sell``
+  with a **fresh** ``CurveRead`` for the build — so an event exit and a tick exit for
+  the same position never both send (CITIZEN, 18/09/2026, was lost between two ticks).
 """
 
 from __future__ import annotations
@@ -35,21 +41,28 @@ from hunter_core.execution.meme.submit import (
     ApprovedSubmission,
     MemeLiveTradingDisabled,
     MemeSubmitter,
-    SubmitPolicy,
 )
 from hunter_core.logging import get_logger
-from hunter_exchanges.pumpfun.quote import quote_sell
-from hunter_meme_executor.build import FillRecord, build_sell, decode_fills, fee_bps, reserves_of
+from hunter_meme_executor.build import FillRecord, build_sell, decode_fills, reserves_of
 from hunter_meme_executor.chain import CurveRead
 from hunter_meme_executor.context import ExecutorContext
-from hunter_meme_executor.exit_common import BACKOFF_S, close_ata_on_full_sell, mark_blocked
+from hunter_meme_executor.exit_common import (
+    BACKOFF_S,
+    LAMPORTS,
+    close_ata_on_full_sell,
+    exit_lock,
+    exit_params,
+    mark_blocked,
+    mark_sol,
+)
+from hunter_meme_executor.exit_settle import close_from_fill, reconcile_sell
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.pumpswap_exit import handle_migrated_position
 from hunter_meme_executor.repo import (
     OpenPosition,
-    close_position,
     insert_order,
     latest_sell_order,
+    open_position,
     open_positions,
     order_key,
     set_exit_intent,
@@ -59,43 +72,14 @@ from hunter_meme_executor.repo import (
 from hunter_meme_executor.send_path import (
     curve_fee_accounts,
     priority_fee_for,
-    record_failed_onchain_fee,
     record_send_result,
     submit_policy,
 )
-from hunter_risk_meme import ExitParams, PositionForExit, decide_exit
+from hunter_risk_meme import PositionForExit, decide_exit
 
-__all__ = ["exits_once", "manage_position"]
+__all__ = ["exits_once", "manage_position", "route_exit", "sell_on_event"]
 
 logger = get_logger(__name__)
-LAMPORTS = Decimal(1_000_000_000)
-
-
-def _params(position: OpenPosition, ctx: ExecutorContext) -> ExitParams:
-    p, lim = position.params, ctx.config.limits
-    trailing = Decimal(str(p.get("trailing_pct", lim.trailing_from_peak_pct * 100))) / 100
-    return ExitParams(
-        target_multiple=Decimal(str(p.get("target_x", lim.target_multiple))),
-        trailing_from_peak_pct=trailing if 0 < trailing < 1 else lim.trailing_from_peak_pct,
-        time_stop_s=int(p.get("max_hold_s", lim.time_stop_s)),
-    )
-
-
-def _mark(ctx: ExecutorContext, read: CurveRead, tokens: int) -> Decimal | None:
-    """Net SOL of selling everything now, or ``None`` when the curve no longer trades."""
-    if read.account.complete or tokens <= 0:
-        return None
-    try:
-        quote = quote_sell(
-            reserves_of(read),
-            tokens,
-            fee_bps(ctx.chain.global_account()),
-            max_slippage_bps=int(ctx.config.limits.max_slippage_pct * 10_000),
-        )
-    except ValueError:
-        return Decimal(0)
-    net = Decimal(quote.net_proceeds) / LAMPORTS - ctx.config.limits.network_fee_sol
-    return max(Decimal(0), net)
 
 
 def _retry_due(position: OpenPosition, now: datetime) -> bool:
@@ -104,9 +88,22 @@ def _retry_due(position: OpenPosition, now: datetime) -> bool:
     return raw is None or datetime.fromisoformat(str(raw)) <= now
 
 
+async def _reload(ctx: ExecutorContext, position_id: str) -> OpenPosition | None:
+    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+        return await open_position(session, position_id)
+
+
 async def manage_position(ctx: ExecutorContext, position: OpenPosition, *, now: datetime) -> None:
     if ctx.signer is None:
         return
+    async with exit_lock(ctx, position.id):
+        fresh = await _reload(ctx, position.id)
+        if fresh is None:
+            return  # closed by the event path while this tick waited (T4.63)
+        await _manage_locked(ctx, fresh, now=now)
+
+
+async def _manage_locked(ctx: ExecutorContext, position: OpenPosition, *, now: datetime) -> None:
     try:
         read = await asyncio.to_thread(ctx.chain.curve, position.mint)
     except Exception as exc:
@@ -126,7 +123,7 @@ async def manage_position(ctx: ExecutorContext, position: OpenPosition, *, now: 
         token = await token_context(session, position.mint)
     migrated = position.migrated or token.migrated_at is not None
     complete = read is not None and read.account.complete
-    mark = None if read is None else _mark(ctx, read, position.tokens)
+    mark = None if read is None else mark_sol(ctx, reserves_of(read), position.tokens)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         await update_mark(
             session,
@@ -153,7 +150,7 @@ async def manage_position(ctx: ExecutorContext, position: OpenPosition, *, now: 
         ),
         mark,
         now,
-        _params(position, ctx),
+        exit_params(position.params, ctx.config.limits),
         sell_now=position.sell_requested_at is not None,
         creator_dump=position.creator_dump_seen(token.creator_sold),
         emergency_auto_close=(
@@ -162,6 +159,49 @@ async def manage_position(ctx: ExecutorContext, position: OpenPosition, *, now: 
     )
     if reason is None:
         return
+    await route_exit(ctx, position, read, reason, migrated=migrated, complete=complete, now=now)
+
+
+async def sell_on_event(
+    ctx: ExecutorContext, position_id: str, reason: str, *, now: datetime
+) -> None:
+    """T4.63: ``decide_exit`` fired on a WS update — sell through the same door
+    as the tick, under the same lock, with a fresh ``CurveRead`` for the build."""
+    if ctx.signer is None:
+        return
+    async with exit_lock(ctx, position_id):
+        position = await _reload(ctx, position_id)
+        if position is None:
+            return
+        try:
+            read = await asyncio.to_thread(ctx.chain.curve, position.mint)
+        except Exception as exc:
+            ctx.state.rpc_errors += 1
+            logger.warning(
+                "meme_live_exit_rpc_unreachable",
+                position_id=position_id,
+                error_type=type(exc).__name__,
+            )
+            return
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            token = await token_context(session, position.mint)
+        migrated = position.migrated or token.migrated_at is not None
+        complete = read is not None and read.account.complete
+        await route_exit(ctx, position, read, reason, migrated=migrated, complete=complete, now=now)
+
+
+async def route_exit(
+    ctx: ExecutorContext,
+    position: OpenPosition,
+    read: CurveRead | None,
+    reason: str,
+    *,
+    migrated: bool,
+    complete: bool,
+    now: datetime,
+) -> None:
+    """The venue, the pending attempt, the backoff — then one ``_sell``. Caller
+    holds ``exit_lock`` and ``position`` was re-read under it."""
     if migrated:
         await handle_migrated_position(ctx, position, reason, now)
         return
@@ -171,7 +211,7 @@ async def manage_position(ctx: ExecutorContext, position: OpenPosition, *, now: 
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         latest = await latest_sell_order(session, position.proposal_id)
     if latest is not None and latest.status in ("admitted", "simulated", "submitted_unconfirmed"):
-        await _reconcile_sell(ctx, position, latest.client_order_id, latest.id, now)
+        await reconcile_sell(ctx, position, latest.client_order_id, latest.id)
         return
     if latest is not None and not _retry_due(position, now):
         return
@@ -275,7 +315,7 @@ async def _sell(
         "meme_live_exit_settled", position_id=position.id, state=result.state, reason=result.reason
     )
     if result.state is SubmitState.CONFIRMED and isinstance(result.fill, FillRecord):
-        await _close(ctx, position, order_id, result.fill, reason)
+        await close_from_fill(ctx, position, order_id, result.fill, reason)
     elif result.state is SubmitState.FAILED:
         delay = BACKOFF_S[min(attempt - 1, len(BACKOFF_S) - 1)]
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
@@ -291,53 +331,6 @@ async def _sell(
                 },
                 now=utcnow(),
             )
-
-
-async def _reconcile_sell(
-    ctx: ExecutorContext, position: OpenPosition, key: str, order_id: str, now: datetime
-) -> None:
-    submitter = MemeSubmitter(
-        rpc=ctx.chain.rpc,
-        signer=None,
-        journal=ctx.journal,
-        verify=lambda _raw: None,
-        decode_fill=decode_fills,
-        policy=SubmitPolicy(allow_send=False, cluster=ctx.config.cluster),
-        now=utcnow,
-    )
-    result = await asyncio.to_thread(submitter.reconcile, key)
-    await record_failed_onchain_fee(ctx, key, result)  # T4.59: a landed error paid its fee
-    if (
-        result is not None
-        and result.state is SubmitState.CONFIRMED
-        and isinstance(result.fill, FillRecord)
-    ):
-        reason = str((position.exit_intent or {}).get("reason", "reconciled"))
-        await _close(ctx, position, order_id, result.fill, reason)
-
-
-async def _close(
-    ctx: ExecutorContext, position: OpenPosition, order_id: str, fill: FillRecord, reason: str
-) -> None:
-    payload = fill.as_json()
-    payload["reason"] = reason
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        closed = await close_position(
-            session,
-            position.id,
-            exit_order_id=order_id,
-            exit_at=fill.block_time or utcnow(),
-            exit_payload=payload,
-            sol_received_lamports=fill.sell_net_lamports,
-            sol_spent_lamports=position.sol_spent_lamports,
-            initial_risk_sol=position.initial_risk_sol,
-            now=utcnow(),
-        )
-    if closed:
-        ctx.state.exits_confirmed += 1
-        ctx.state.blocked_exits.pop(position.id, None)
-        if (fill.ata_rent_refund_lamports or 0) > 0:
-            ctx.state.ata_closed += 1
 
 
 async def exits_once(ctx: ExecutorContext) -> None:

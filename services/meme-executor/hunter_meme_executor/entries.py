@@ -318,6 +318,7 @@ async def _submit_and_record(
             now=utcnow(),
         )
     ctx.state.entries_confirmed += 1
+    ctx.event_exits_wake.set()  # T4.63: subscribe to this curve now, not on the next sync
 
 
 async def entries_once(ctx: ExecutorContext) -> None:

@@ -26,6 +26,12 @@ the only reason the loop runs. R55 measured the old poll-only path at 4.8s
 median / 7.5s p95 from insert to pickup (76% of the end-to-end decision
 latency); ``hb:meme:executor`` now also carries ``proposal_pickup_lag_s_p50``/
 ``_max`` so the same number can be re-read after this ships.
+
+T4.63: with ``MEME_EVENT_EXITS=on`` a seventh task, ``meme-event-exits``
+(``event_exits.py``), owns one Solana RPC WebSocket and sells an open position
+the instant its curve update says so — through the tick's own lock and sell
+path; the tick stays as fallback. It restarts itself after any failure and
+never takes this ``TaskGroup`` down.
 """
 
 from __future__ import annotations
@@ -49,6 +55,11 @@ from hunter_meme_executor.chain import ChainReader
 from hunter_meme_executor.config import ExecutorConfig, boot, process_environment
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.entries import entries_once
+from hunter_meme_executor.event_exits import (
+    EventExitsRuntime,
+    event_exits_client,
+    run_event_exits_forever,
+)
 from hunter_meme_executor.exits import exits_once
 from hunter_meme_executor.gates_reload import gates_reload_once, prime_gates
 from hunter_meme_executor.heartbeat import heartbeat_once
@@ -252,10 +263,15 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
         small_test_max_total_sol=str(config.small_test_max_total_sol),
         auto_approve=config.auto_approve,
         auto_approve_max_per_hour=config.auto_approve_max_per_hour,
+        event_exits=config.event_exits.enabled,
     )
     wake_listener = ProposalWakeListener(runtime.redis, ctx.wake_event)
+    event_ws = event_exits_client(config.event_exits)  # None with the flag off
     try:
         async with asyncio.TaskGroup() as group:
+            if event_ws is not None:
+                event_rt = EventExitsRuntime(ctx=ctx, ws=event_ws, config=config.event_exits)
+                group.create_task(run_event_exits_forever(event_rt), name="meme-event-exits")
             group.create_task(
                 forever("entries", config.loop_s, entries_once, ctx, wake_event=ctx.wake_event),
                 name="meme-entries",
@@ -274,5 +290,7 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
             )
     finally:
         ctx.chain.rpc.close()
+        if event_ws is not None:
+            await event_ws.aclose()
         if isinstance(ctx.risk_client, AdvancedIndexerClient):
             await ctx.risk_client.aclose()
