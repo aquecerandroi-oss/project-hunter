@@ -143,6 +143,11 @@ def _meme_wallet_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("meme_wallets"), name))
 
 
+def _spot_desk_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0057_spot_desk``'s lists in ``ddl/spot_desk.py`` (T4.74-1)."""
+    return cast(tuple[str, ...], getattr(migration_ddl("spot_desk"), name))
+
+
 def _meme_live_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0028_meme_live``'s lists in ``ddl/meme_live.py`` (T4.14).
 
@@ -545,6 +550,15 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         "MEME_RULE_SET_HISTORY_OWNER_ONLY_TABLES"
     )
 
+    # T4.74-1: the spot/1 desk (0057) mirrors the meme desk's two classes; and
+    # ``meme_treasury_swaps`` (0051) is SELECT-only for the app — it had been
+    # missing from this union since 0051 (this test was red at head).
+    spot_desk_read_only = _spot_desk_tables("SPOT_DESK_APP_READ_ONLY_TABLES")
+    spot_desk_sell_request = _spot_desk_tables("SPOT_DESK_APP_SELL_REQUEST_TABLES")
+    treasury_read_only = (
+        cast(str, migration_ddl("meme_treasury_swaps").MEME_TREASURY_SWAPS_TABLE),
+    )
+
     classified = (
         list(write)
         + list(no_delete)
@@ -575,6 +589,9 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(meme_event_matches_read_only)
         + list(meme_gate_refusals_read_only)
         + list(meme_rule_set_history_owner_only)
+        + list(spot_desk_read_only)
+        + list(spot_desk_sell_request)
+        + list(treasury_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

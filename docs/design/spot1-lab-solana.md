@@ -129,8 +129,9 @@ DDL em `ddl/spot_desk.py` + semente `ddl/spot_desk_seed.py`; ORM `hunter_core/db
 - Grants (forma da `0028`): `hunter_worker` SELECT/INSERT/UPDATE nas três; `hunter_app` SELECT nas três + UPDATE
   (`sell_requested_at`, `sell_requested_by`) em `spot_positions`. Globais, sem RLS, sem partição.
 - **Downgrade (§17.7):** recusa com `RAISE EXCEPTION` + `HINT` de `COPY` enquanto `spot_orders` tiver linha com
-  `tx_signature IS NOT NULL` (uma transação real perderia o seu livro-razão); limpo, derruba `spot_orders`,
-  `spot_positions`, `spot_desk_markets`, nesta ordem.
+  `tx_signature IS NOT NULL` ou qualquer linha em `spot_positions` (uma transação real perderia o seu livro-razão;
+  T4.74-1: `LOCK TABLE … ACCESS EXCLUSIVE` antes de contar); limpo, derruba `spot_positions`, `spot_orders`,
+  `spot_desk_markets`, nesta ordem (a FK `entry_order_id` obriga).
 **Por que não reaproveitar `meme_live_*`:** `meme_live_orders.proposal_id` é `NOT NULL` FK para `meme_proposals`, que
 exige `rule_set_id` e `origin IN ('rules','operator')` — cada sinal viraria uma proposta sintética que o laço de papel,
 `/meme/mesa`, `meme_close_day.py`, `wallet-summary` e o fechamento diário contariam como aposta de meme;

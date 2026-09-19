@@ -111,6 +111,7 @@ from hunter_core.db.models.paper_wallet import PortfolioCurrencyAnchor, Portfoli
 from hunter_core.db.models.portfolios import Portfolio, PortfolioEquitySnapshot, RiskProfile
 from hunter_core.db.models.replay_runs import ReplayRunRow
 from hunter_core.db.models.risk import KillSwitchTransition, RiskEvent
+from hunter_core.db.models.spot_desk import SpotDeskMarket, SpotOrder, SpotPosition
 from hunter_core.db.models.system import (
     AuditLog,
     OutboxEvent,
@@ -265,6 +266,9 @@ __all__ = [
     "ShadowEpisode",
     "ShadowOutbox",
     "SignalOutcome",
+    "SpotDeskMarket",
+    "SpotOrder",
+    "SpotPosition",
     "Strategy",
     "StrategyVersion",
     "Subscription",

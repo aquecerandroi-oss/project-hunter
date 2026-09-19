@@ -7915,3 +7915,103 @@ proposta do `operator/5` e a posição sob uma do `operator/6`), depois em `meme
 `packages/core/tests/integration/test_migration_0055.py` prova as duas pontas contra um Postgres real, mais o
 `alembic check` num banco levado ao `head`. **Trava, pooler:** um `INSERT ... ON CONFLICT DO NOTHING` e nada
 de estado de sessão; a revisão não abre janela de manutenção; `0055_meme_operator6_desk` tem 24 caracteres.
+
+## 63. A mesa `spot/1` — o mapa Binance → Solana, as ordens e as posições reais — M19 (`0057_spot_desk`)
+
+**O que a `0057` faz (T4.74-1, `docs/design/spot1-lab-solana.md` §2/§5):** **três tabelas** (`spot_desk_markets`,
+`spot_orders`, `spot_positions`), nove índices, um `ALTER` que fecha o ciclo ordens ⇄ posições, uma **semente de 50
+linhas** e grants por subtração. Nenhum enum, vista, partição ou política; nada tocado na `0022`–`0056`. Globais e
+sem RLS (§1.1), a forma da `0028` (§40): uma ordem assinada numa rota da Jupiter não pertence a organização — a ausência
+é asserida (`test_migration_0057.py::test_the_tables_are_global_and_carry_no_policy`, o padrão da §25.5). Nada aqui
+liga dinheiro: `SPOT1_ENABLED` nasce `false` no executor. DDL em `ddl/spot_desk.py`, semente em `ddl/spot_desk_seed.py`,
+ORM em `hunter_core/db/models/spot_desk.py`; `0057_spot_desk` tem 14 caracteres (§17.6).
+
+```
+spot_desk_markets                 (o mapa do R63 §2a; PK natural binance_symbol)
+  binance_symbol PK, base, mint, units_per_binance_unit NUMERIC(28,10) DEFAULT 1 (1000 para 1000BONK/1000PEPE),
+  kind ∈ {nativo, ponte, representacao}, tier ∈ {A, B, C}, liquidity_usd_at_seed NUMERIC(28,10),
+  round_trip_cost_pct_at_seed NUMERIC(9,6) (FRAÇÃO, §1: 0.00193 = 0,193 %), decimals smallint NULL (0–18; o executor
+  lê o mint uma vez e grava), enabled DEFAULT false, note, updated_at, updated_by NOT NULL
+  -- sem FK para markets (a semente planta em banco vazio; o JOIN da §2 do desenho é por símbolo)
+
+spot_orders                       (a forma de meme_live_orders, §40.2)
+  id, desk DEFAULT 'spot/1', signal_id → agent_signals NOT NULL, position_id → spot_positions NULL (ALTER depois),
+  market_symbol → spot_desk_markets, mint, side, client_order_id UNIQUE, attempt ≥ 1, quote jsonb (a cotação que
+  gerou a tx), intent, admission, status (os seis rótulos da 0028), reason, tx_signature, signatures, signing_at,
+  fill (os deltas REAIS lidos da cadeia após confirmed, nunca a cotação), os cinco carimbos, updated_at
+  UNIQUE (signal_id) WHERE side = 'buy'; UNIQUE (tx_signature) WHERE NOT NULL
+  INDEX (status, received_at), (signal_id, side), (market_symbol, status), (position_id) WHERE NOT NULL
+  CHECKs da 0028 (recusa nomeia motivo; confirmada carrega fill e assinatura; enviada tem assinatura) +
+  (side = 'sell') = (position_id IS NOT NULL)   -- uma venda nomeia a posição que fecha; uma compra nunca
+
+spot_positions                    (a forma de meme_live_positions, §40.3, sem migrated/creator_*)
+  id, signal_id → agent_signals UNIQUE, entry_order_id → spot_orders UNIQUE, market_symbol → spot_desk_markets,
+  mint, status, entry_at, entry, tokens, sol_spent_lamports, initial_risk_sol (= r_unit_sol: o R da linha é o R do
+  sinal, não o gasto), params (a geometria da entrada, §4 do desenho), ata_rent_lamports ≥ 0 DEFAULT 0 (fora do
+  pnl_sol), mark_sol/mark_at/mark_source ∈ {jupiter_quote}/mark_reason, high_water_sol, exit_intent,
+  sell_requested_at/by, exit_order_id → spot_orders, exit_at, exit, sol_received_lamports, pnl_sol, r_multiple
+  INDEX (status, entry_at), (market_symbol, status), (exit_order_id) WHERE NOT NULL
+  CHECKs da 0028 (fechada diz quando; saída carrega os números; saída depois da entrada; marca diz quando e de
+  onde; pedido de venda diz quem; risco > 0, gasto > 0, tokens ≥ 0)
+```
+
+**Semente (`SPOT_DESK_SEED_0057`): 50 linhas, 35 habilitadas.** Os 52 mercados monitorados executáveis do R63 §2a
+menos `SOLUSDT` (comprar SOL com SOL não é posição) e `ENAUSDT` (1,02 % de ida-e-volta). **Todo mint foi copiado do
+JSON do R63 §6 e cruzado com a tabela §2a por script, nunca digitado.** `enabled` é **derivado** em `seed_rows()` pela
+regra do desenho — `tier ≠ 'C' AND custo ≤ 0,4 %` (`is_enabled_at_seed`) — e não guardado na constante, para a regra
+morar num lugar só. Ficam desligadas 15: as dez de tier C que o desenho nomeia (`SUI`, `AVAX`, `STRK`, `CAKE`, `GALA`,
+`CHZ`, `MEGA`, `WLFI`, `GRASS`, `DRIFT`), `VIRTUAL` (0,60 %) **e quatro que o desenho não nomeia mas a regra alcança**:
+`ARX` 0,458 %, `PNUT` 0,500 %, `MOODENG` 0,500 %, `CHILLGUY` 0,501 % (Raydium AMM, 0,25 % por perna) — declarado aqui
+em vez de "consertado" à mão: quem quiser uma delas liga por `infra/scripts/spot_desk_markets.py --enable --reason`.
+`ON CONFLICT (binance_symbol) DO NOTHING`: um re-run nunca reescreve uma linha editada pelo operador;
+`updated_by = 'migration:0057_spot_desk'` na semente.
+
+**Grants (`ddl/spot_desk.py`, a forma da `0028`):** `hunter_worker` `SELECT`/`INSERT`/`UPDATE` nas três (o executor
+escreve o livro e grava `decimals` no mapa); `hunter_app` `SELECT` nas três + `UPDATE (sell_requested_at,
+sell_requested_by)` em `spot_positions` — a API pede uma venda, nunca registra uma; `DELETE` a ninguém (uma assinatura é
+evidência; o mapa se edita, não se apaga). Provado **como o papel** em
+`test_migration_0057.py::test_the_worker_writes_the_ledger_and_the_api_only_asks_for_a_sale`.
+
+**Guardas.** **Sem guarda de subida — asserção**: tabelas novas, semente `DO NOTHING`. **A descida recusa** (§17.7,
+`RAISE EXCEPTION` + `HINT` de `COPY`) enquanto `spot_orders` tiver linha com `tx_signature IS NOT NULL` **ou
+`spot_positions` tiver qualquer linha** — uma transação real perderia o seu livro-razão, e uma posição é dinheiro na
+cadeia mesmo que a sua ordem de entrada ainda não diga assinatura (o schema permite esse estado; o executor nunca o
+escreve — revisão da Astra deste DDL, adotada como desvio do desenho §5, que só nomeava a assinatura). **A contagem
+vem depois de um `LOCK TABLE spot_orders, spot_positions IN ACCESS EXCLUSIVE MODE`** (a mesma trava que o `DROP`
+tomaria, só que antes): sem ele, o executor podia confirmar uma assinatura entre a contagem e a derrubada (Astra);
+é trava de transação, nunca de sessão, e a migração roda em conexão direta (`env.py`), nunca pelo pooler.
+Tentativas `refused`/`failed` sem assinatura são decisões, não dinheiro, e **não** são guardadas (a fronteira que o
+desenho §5 declara; a Astra preferiria guardar toda ordem — registrado, não adotado: um banco cheio de recusas
+tornaria o downgrade impossível sem perder nada que a admissão não recompute). Limpa, derruba a FK do ciclo, depois `spot_positions`,
+`spot_orders`, `spot_desk_markets` — **a ordem inversa da criação**, e não "ordens, posições, mapa" como o desenho
+escreve: `spot_positions.entry_order_id` referencia `spot_orders`, então as ordens só caem depois das posições.
+Provado nas duas pontas em `test_migration_0057.py`, mais o `alembic check` num banco levado ao `head`.
+
+**Desvios declarados em relação ao §1 e ao desenho.** (1) `spot_desk_markets` tem **PK natural** (`binance_symbol`),
+não `id` UUID v7 — o precedente é `meme_tokens.mint`, `meme_live_kill_switch.scope` e `feature_flags.key`: a
+identidade da linha é o símbolo que o `JOIN` da §2 usa e que a posição nomeia. (2) `round_trip_cost_pct_at_seed` é
+**fração** (§1), logo a regra de habilitação é `≤ 0.004`, e o nome `_pct` segue o vocabulário das tabelas `meme_*`
+(§33.5a). (3) `market_symbol` **tem FK** para `spot_desk_markets` nas duas tabelas — o desenho só diz "sem FK para
+`markets`"; uma posição que nomeia uma linha inexistente do mapa seria a segunda verdade do §19.3. (4) `(side =
+'sell') = (position_id IS NOT NULL)` é bicondicional (uma compra nunca carrega posição: a posição nasce **depois** da
+compra confirmada e a aponta por `entry_order_id`). (5) `UNIQUE (entry_order_id)`: uma compra abre uma posição só,
+além de ser o índice que o §1 exige da FK. (6) `decimals` entre 0 e 18: um token verificado da Jupiter tem ≤ 9 e a
+paridade da §2 divide por `10^decimals`.
+
+**Pendência declarada — `test_schema_privileges.py::test_the_grant_lists_cover_every_table_exactly_once`.** O teste
+une as listas congeladas de todas as revisões e compara com o `pg_class` vivo (§15.6); as três tabelas desta revisão
+(`SPOT_DESK_APP_READ_ONLY_TABLES`, `SPOT_DESK_APP_SELL_REQUEST_TABLES`) ainda **não** entraram nessa união — o arquivo
+está fora da lista de arquivos da T4.74-1 —, e a mesma corrida mostrou que **`meme_treasury_swaps` (`0051`, T4.54)
+já estava de fora antes desta revisão**: o teste está vermelho no `head` por quatro tabelas, três desta e uma herdada.
+Fechar é acrescentar as duas tuplas (e a da tesouraria) à união, no padrão da §34.4.
+
+**Trava, pooler.** `CREATE TABLE`/`CREATE INDEX` em relações que não existiam, um `ALTER` em tabela vazia, `GRANT`s
+no catálogo, 50 inserts: **não abre janela de manutenção**. Nada depende de estado de sessão: sem prepared statement
+de sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão.
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-executor/**` (T4.74-3/4/5) | lê `spot_desk_markets WHERE enabled` no `JOIN` da §2; escreve `spot_orders` (uma linha por tentativa, `client_order_id` `spot:{signal_id}` / `spot:{signal_id}:exit:{n}`), `spot_positions` (geometria em `params`, `initial_risk_sol = r_unit_sol`) e `decimals` no mapa; a venda nomeia `position_id` |
+| `packages/risk-core` (T4.74-2) | **nada nesta revisão**: o perfil é puro; a posição `lane = spot` entra em `MemeWalletState.positions` por leitura do executor |
+| `infra/scripts/spot_desk_markets.py` (T4.74-6) | o único editor do mapa (`--enable/--disable/--set-mint --reason`, dry-run padrão, `system_events` componente `spot_desk`); `--sell-now` grava `sell_requested_at/by` |
+| `apps/**` (T4.74-6) | só leitura (`hunter_app` `SELECT`); o `sell-now` da mesa, se vier, usa o grant de coluna |
