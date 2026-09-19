@@ -96,6 +96,72 @@ auditado do mesmo jeito. A ponte então conta `agent_unavailable` em vez de
 simplesmente não ver o sinal — que é a diferença entre "pausado" e "nunca
 existiu", e o operador precisa vê-la.
 
+## 8c. O vínculo `agents` agora é um script (T4.72, 2026-09-19)
+
+O SQL manual acima continua correto, mas de 2026-09-08 até hoje ninguém o
+rodou: o time pivotou para o funil de memes (`foco-total-memes`, 16/09) com o
+checklist do §8 parcialmente verde (linha 3, β, ainda amarela em 10/09 —
+`.claude/state/notes-T3.71.md`) e a linha 1 (`agents`) nunca saiu de zero.
+`equity=19333.0111164813`, `trade_proposals=0`, `trades=0` no `hb:execution:paper`
+de 10/09 são exatamente os números de hoje: nada mudou porque ninguém rodou o
+passo 8a, não porque o caminho tenha um defeito novo.
+
+`infra/scripts/link_portfolio_agent.py` é esse passo, repetível e
+pré-checado (mesmo padrão auditado de `link_portfolio_risk_profile.py`):
+recusa uma versão que não seja `purpose=paper`/`status=active`, escreve
+`allowed_directions=ARRAY['long']` sempre (a mesma razão do §8a: `paper_v1`
+é SPOT sem alavancagem), e reativa em vez de duplicar se o agente já existir
+pausado. Testes: `infra/scripts/tests/test_link_portfolio_agent.py`
+(testcontainers, 10 casos: refusals de org/versão/status/purpose, dry-run,
+criação, replay idempotente, reativação).
+
+```
+uv run python infra/scripts/link_portfolio_agent.py \
+    --org-slug ever --strategy momentum --version v3 --dry-run
+uv run python infra/scripts/link_portfolio_agent.py \
+    --org-slug ever --strategy momentum --version v3 --yes --actor "Everton"
+```
+
+Na VPS, pelo serviço `ops` (T3.15d, DEPLOYMENT.md §3.4), depois do deploy que
+traz este script para a imagem:
+
+```
+bash infra/vps/compose.sh run --rm ops python infra/scripts/link_portfolio_agent.py \
+    --org-slug ever --strategy momentum --version v3 --dry-run
+bash infra/vps/compose.sh run --rm ops python infra/scripts/link_portfolio_agent.py \
+    --org-slug ever --strategy momentum --version v3 --yes --actor "Everton"
+```
+
+**Este script não decide qual versão linkar nem vira a flag.** A candidata com
+histórico auditado é `momentum v3` (a mesma da [[EXP-0005-momentum-paper]],
+D10) — único veredito até aqui é `inconclusivo` (30 outcomes/1 dia, abaixo do
+limiar de 100/30 dias), não "positivo"; o script existe para o dia em que
+Everton decidir ligar mesmo assim (aprender operando, `real-como-aprendizado`)
+ou por uma versão com evidência melhor. Rodar o script não muda
+`ENABLE_PAPER_AUTONOMY`, que continua um passo separado e seu (passo 8).
+
+**Checklist do §8 — o que precisa ser remedido antes de virar a flag.** A
+última medição real é de 2026-09-10 (T3.71); este agente não tem acesso SSH à
+VPS (roda em sandbox local com testcontainers), então não pôde remedir as
+linhas ao vivo — os números abaixo são o último estado conhecido, não um novo
+`read_at`. Comandos exatos para o operador rodar de novo, na ordem do §8:
+
+| # | Linha | Última medição (10/09) | Consulta para remedir |
+|---|---|---|---|
+| 1 | `agents` | 0 linhas | `SELECT count(*) FROM agents WHERE status='enabled';` (o script acima resolve) |
+| 2 | `avgPrice` | 🟢 18/18 SPOT | `SELECT count(*) FROM markets WHERE market_type='spot' AND is_monitored AND (metadata->'spot_market_filters'->>'apply_min_to_market')::bool;` |
+| 3 | β válido | 🟡 12/18 monitorados, 23/366 sinais 24h | consulta completa em §8, "linhas 2 e 3" — **provavelmente mudou em 9 dias sem acompanhamento**, remedir antes de decidir |
+| 4 | `mark_quality` | 🟢 | `HGET hb:execution:paper mark_quality` |
+| 5 | backup restaurável | 🟢 (rehearsal 10/09) | repetir o rehearsal do §8 se > 30 dias desde a última prova |
+| 6 | MTM vivo | 🟢 | `HGETALL hb:execution:paper` (`ts`/`last_mtm` recentes) |
+| 7 | `paper_autonomy=false` até aqui | 🟢 (correto) | `HGET hb:execution:paper paper_autonomy` |
+| 8 | `risk_profile` persistido | 🟢 (`paper_v1` linkado, 10/09) | `SELECT rp.preset FROM portfolios p JOIN risk_profiles rp ON rp.id=p.risk_profile_id WHERE p.type='paper' AND NOT p.is_arena;` |
+
+Vermelho real hoje: **linha 1** (script pronto, não rodado — ato do Everton) e
+**linha 3**, que só a remedição ao vivo decide (o β depende do backfill/job
+horário terem seguido rodando durante o pivô para memes, o que este agente não
+pôde confirmar). Passo a passo completo para ligar de vez: `.claude/state/notes-T4.72.md`.
+
 ## Estado em 2026-09-08 ~06:50Z
 | Passo | Estado |
 |---|---|
