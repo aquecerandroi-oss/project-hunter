@@ -155,6 +155,22 @@ Os valores da coluna "papel" abaixo são **parâmetros de um experimento em pape
 aprovados. A coluna "live" fica vazia de propósito: **nenhum número de dinheiro real existe até o
 Everton escrever o dele** (§14).
 
+**Duas mesas reais, um só freio (T4.71, `0055_meme_operator6_desk`, 19/09/2026).** Desde a `0055` há
+**dois** conjuntos `operator` ativos — `operator/5` (E1 braço 2 + reincidência do criador) e `operator/6`
+(a entrada do `flow_v2/1` como o seed da `0030` a congelou + a "regra do Everton": alvo 1,15×, trailing 10 %
+armado desde a entrada, 5 min, ticket 0,07 SOL) — e o executor abre proposta de **qualquer** um deles
+(`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED`: `kind = 'operator' AND status = 'active'`, sem nome
+nem versão). O que **não** dobra é a política de capital desta seção: o nº de posições abertas
+(`MEME_MAX_OPEN_POSITIONS`) e o cap de perda diária (`MEME_DAILY_LOSS_CAP_SOL`) são contados pelo motor
+(`hunter_risk_meme.checks_wallet`) sobre **todas** as posições reais e sobre a perda do dia da carteira,
+sem olhar qual conjunto abriu cada uma — o `max_open_positions: 2` que cada conjunto carrega em `params` é o
+teto por conjunto do laço de **papel**, não um segundo orçamento real. O kill switch (`meme_live_kill_switch`,
+escopo `wallet`) trava as duas mesas de uma vez; a tesouraria (§16) e o teto por operação (`MEME_MAX_SOL_PER_TRADE`)
+também são um só. Na prática: as duas mesas competem pelas mesmas duas vagas e pelo mesmo cap do dia, e a
+comparação entre elas (`obsidian/03-TRADING/Meme/Mesa-operator-6.md`) é feita por conjunto, sobre um freio
+compartilhado. Consequência declarada em `docs/DATABASE.md` §62: a compra **manual** da mesa passa a ser
+arquivada sob a maior versão ativa, `operator/6`.
+
 ### 3.1 Perfil `meme_paper_v0`
 
 | Chave | Papel (proposta, revisável sem tocar dinheiro) | Live | O que é |

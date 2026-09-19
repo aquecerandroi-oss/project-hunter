@@ -40,8 +40,8 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0054_meme_gate_crowd_arm"
-"""``0054`` (T4.66) lands on ``0053`` (T4.67a), which lands on ``0052``
+HEAD_REVISION = "0056_meme_spot_swaps"
+"""``0056`` (T4.73) lands on ``0055`` (T4.71), which lands on ``0054`` (T4.66), which lands on ``0053`` (T4.67a), which lands on ``0052``
 (T4.61a), which lands on ``0051`` (T4.54), which lands on ``0050`` (T4.49),
 which lands on ``0049`` (T4.48),
 which lands on ``0048`` (T4.45), which lands on ``0047`` (T4.39), which lands
@@ -54,7 +54,10 @@ rule set; ``0052`` seeds one research set (``flow_v2/9``, EXP-M13) and
 changes no schema, so the active-rule-set count went 17 → 18; ``0053`` seeds
 one more (``launch_v0/1``, EXP-M18) and changes no schema, so it goes 18 →
 19; ``0054`` seeds one more (``flow_v2/10``, EXP-M19) and changes no schema,
-so it goes 19 → 20."""
+so it goes 19 → 20; ``0055`` seeds a **second active operator set**
+(``operator/6``, the desk that buys where ``flow_v2/1`` buys), retires
+nothing and changes no schema, so it goes 20 → 21 — and every assertion below
+that read the desk as ``operator/5`` alone at ``head`` now reads two."""
 EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
 E2B_ARM_REVISION = "0044_meme_gate_e2b_arm"
 """Where the ``0044`` tests stage now that ``0046``/``0047`` sit on top (T4.44):
@@ -4511,9 +4514,10 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     # ``0052`` seeds flow_v2/9 (no entry after the fall), nothing retired (+1 = 18) — T4.61a.
     # ``0053`` seeds launch_v0/1 (the launch lane), nothing retired (+1 = 19) — T4.67a.
     # ``0054`` seeds flow_v2/10 (the crowd behind the rise), nothing retired (+1 = 20) — T4.66.
+    # ``0055`` seeds operator/6 (the second real desk), nothing retired (+1 = 21) — T4.71.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["20"]
+    ) == ["21"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",
@@ -5434,10 +5438,10 @@ def test_0029_adds_the_mark_and_venue_columns_and_seeds_the_moonshot_arms(upgrad
         _scalars(
             upgraded,
             "SELECT name || '/' || version FROM meme_rule_sets WHERE name = 'operator' "
-            "AND status = 'active'",
+            "AND status = 'active' ORDER BY version",
             {},
         )
-    ) == ["operator/5"], "exactly one active operator set for the desk's manual buys (0039's)"
+    ) == ["operator/5", "operator/6"], "0039's operator/5 and 0055's operator/6 (T4.71)"
     try:
         asyncio.run(
             _write(
@@ -6758,9 +6762,10 @@ def test_0033_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"], (
-        "0039 (T4.24) hands the desk to operator/5 on the way back up"
-    )
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ], "0039 (T4.24) hands the desk to operator/5 on the way back up"
     command.check(config)
 
 
@@ -6798,7 +6803,10 @@ def test_0033_refuses_to_upgrade_a_desk_that_already_has_another_active_operator
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -6944,9 +6952,10 @@ def test_0034_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"], (
-        "0039 (T4.24) hands the desk to operator/5 on the way back up"
-    )
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ], "0039 (T4.24) hands the desk to operator/5 on the way back up"
     command.check(config)
 
 
@@ -6977,7 +6986,10 @@ def test_0034_refuses_to_upgrade_a_desk_that_already_has_another_active_operator
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -7280,9 +7292,10 @@ def test_0037_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"], (
-        "0039 (T4.24) hands the desk to operator/5 on the way back up"
-    )
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ], "0039 (T4.24) hands the desk to operator/5 on the way back up"
     command.check(config)
 
 
@@ -7467,7 +7480,10 @@ def test_0039_seeds_the_repeat_dumper_arm_and_hands_the_desk_to_operator_5(upgra
     assert statuses == ["flow_v2/1:active", "flow_v2/2:active", "operator/4:retired"], (
         "arms 1 and 2 keep being measured; the desk moved on"
     )
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ]
     command.check(alembic_config(upgraded))
 
 
@@ -7543,7 +7559,10 @@ def test_0039_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ]
     command.check(config)
 
 
@@ -7580,7 +7599,10 @@ def test_0039_refuses_to_upgrade_a_desk_that_already_has_another_active_operator
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -8429,9 +8451,10 @@ def test_0044_seeds_the_e2b_arm_without_touching_the_desk(upgraded: str) -> None
         )
     )
     assert untouched == ["flow_v2/5:active", "operator/5:active"]
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/5"], (
-        "the desk keeps its own set: E2-b never fires on money by hand"
-    )
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ], "the desk keeps its own set: E2-b never fires on money by hand"
     command.check(alembic_config(upgraded))
 
 

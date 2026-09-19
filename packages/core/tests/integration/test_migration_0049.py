@@ -59,8 +59,10 @@ def db_url(container_url: str) -> str:
 
 @pytest.fixture(scope="module")
 def upgraded(db_url: str) -> Iterator[str]:
-    """``alembic upgrade head`` on a clean database of this revision's own."""
-    command.upgrade(alembic_config(db_url), "head")
+    """This revision by name, not ``head`` (T4.71: ``0055`` seeds a second active
+    ``operator`` set, so "the desk is ``operator/5`` alone" is true **at** this
+    revision and false at the head — the shape ``0050``+ already use)."""
+    command.upgrade(alembic_config(db_url), REVISION)
     yield db_url
 
 
@@ -195,11 +197,15 @@ async def test_the_desk_is_untouched_and_the_control_stays_active(engine: AsyncE
     assert desk == ["operator/5"]
 
 
-def test_the_models_and_the_migrations_agree(upgraded: str) -> None:
-    """``alembic check``: this revision seeds data and changes no schema, so the
-    autogenerate comparison must still find nothing — the same assertion the
-    ``0044`` tests make around their seed."""
-    command.check(alembic_config(upgraded))
+def test_the_models_and_the_migrations_agree(container_url: str) -> None:
+    """``alembic check`` on a database of its own taken all the way to ``head``
+    (this module's own database is staged at ``REVISION``, where the models —
+    which describe the head — would legitimately differ): this revision seeds
+    data and changes no schema, so the comparison must still find nothing."""
+    db_url = asyncio.run(create_database(container_url, "hunter_migration_0049_head"))
+    config = alembic_config(db_url)
+    command.upgrade(config, "head")
+    command.check(config)
 
 
 def test_the_downgrade_refuses_while_a_proposal_or_a_bet_references_the_arm(

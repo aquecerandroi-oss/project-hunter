@@ -7849,3 +7849,69 @@ linha referenciando o conjunto em `meme_proposals`, `meme_paper_bets`, `meme_rul
 o `alembic check` num banco levado ao `head`. Os testes da `0053` já se posicionam em
 `0053_meme_launch_lane_arm` antes de reverter. **Trava, pooler:** um `INSERT ... ON CONFLICT DO NOTHING` e
 nada de estado de sessão; a revisão não abre janela de manutenção.
+
+## 62. A segunda mesa real — `operator/6` = entrada do `flow_v2/1` + saída do Everton — M19 (`0055_meme_operator6_desk`)
+
+**O que a `0055` faz:** semeia **um** conjunto, `operator/6` (`…0019`, `kind = operator`, `exp_ref` nulo,
+relógio de 15 s), e **não aposenta nada** — `operator/5` continua ativo ao lado. Decisão do Everton
+(19/09/2026 09:5x BRT, por escrito; adendo em `obsidian/06-DECISIONS/2026-09-12-teste-pequeno-meme-real.md`):
+72 h de papel leram `flow_v2/1` em +0,054 SOL (+0,103 nas últimas 24 h, 38 apostas, 45 % de acerto) e a mesa
+(`operator/5`) em −0,070 — "vi que o Lab está dando bom, vamos operar com dinheiro real também". Nenhuma
+mudança de schema; tudo em `ddl/meme_operator_6.py`; a contagem de conjuntos ativos vai a 21.
+
+**A composição, em SQL e nunca redigitada:** `params = FLOW_V2_PARAMS || OPERATOR_6_OVERRIDES`. A base é a
+**constante da `0030`** que plantou `flow_v2/1` (`ddl/meme_gate_v2_seed.py`) — porta `fluxo_e_holders/1`,
+30–300 s, progresso ≥ 5 % e subindo, fluxo positivo, ≥ 10 compradores únicos, vendas/compras ≤ 0,6, holders
+subindo, ≤ 2 snipers, `dev_share ≤ 0,10` (desconhecido recusa), criador não vendedor líquido, participação
+≤ 1 %, exclusões de pedigree — **lida do seed do DDL de propósito**: a linha viva de `flow_v2/1` pode ter sido
+editada por `infra/scripts/meme_rule_set.py --set-param` (§54; `operator/5` foi, quatro vezes em 16/09), e uma
+migração que copiasse a linha viva plantaria uma mesa diferente em cada banco. O que se planta é a porta E1
+**pré-registrada**; `--history flow_v2/1` diz quanto a viva divergiu. A sobreposição são exatamente **doze**
+chaves (`OPERATOR_6_DESK_KEYS`, congelada ao lado da constante e conferida por teste): a saída — "regra do
+Everton", medida em 19/09 02:10 BRT no `operator/5` — `target_x "1.15"`, `trailing_pct "10"`, `trailing_arm_x
+null` (armado desde a entrada; `lab_params.arm_multiple_or_none` lê `null` como "sempre", e o trailing do
+executor é sempre armado), `max_hold_s 300`, `exit_key "alvo_1_15x_trailing_10_tempo_5m"`, `exit_on_line_break
+true` (como `operator/5`); o tamanho — `size_sol`/`max_sol_per_bet`/`max_exposure_per_mint_sol` `"0.07"`,
+`max_open_positions 2`, `ttl_s 180`; e `pedigree_repeat_dumper true` (como `operator/5`). `max_loss_pct "50"`,
+`wallet_max_sol`, `daily_loss_cap_sol`, `fee_pct`, `clock "15s"` ficam os do `flow_v2/1`. Decimais são
+**strings** (T4.64: o Lab recusa float solto). `test_migration_0055` prova `operator/6.params − as doze =
+flow_v2/1.params − as doze` byte a byte (isto é, igual em **toda** chave de entrada) e carrega os `params`
+semeados por `RuleSetSpec.from_params` + `effective_params(...).exit_rules()` — o caminho exato de
+`meme_rule_set.py --validate`.
+
+**Duas mesas, um freio — lido do código, não suposto.** O executor abre proposta de **qualquer** conjunto
+`operator` ativo (`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED`: `WHERE rs.kind = 'operator' AND
+rs.status = 'active'`, sem nome nem versão; `repo_tape.pending_operator_mints` idem), então `operator/6` chega
+ao dinheiro no instante em que a semente pousa, cada proposta levando o `suggested` do **seu** conjunto para
+`decision` e daí para `meme_live_positions.params` — a saída de uma posição é a do conjunto que a abriu. Já
+`max_open_positions` e o cap diário são **do executor, compartilhados**: `hunter_risk_meme.checks_wallet` conta
+**todas** as posições reais abertas contra `MEME_MAX_OPEN_POSITIONS` e a perda do dia contra
+`MEME_DAILY_LOSS_CAP_SOL`, sem `rule_set_id` no predicado; o `max_open_positions: 2` do `params` é o teto por
+conjunto do **laço de papel** (e o que o `manual_plan` escreve). O kill switch (`meme_live_kill_switch`,
+escopo `wallet`) trava para as duas. Asserido em
+`test_migration_0055.py::test_the_executor_opens_any_active_operator_set_and_the_brakes_are_shared`, lendo
+o fonte.
+
+**Desvio declarado: a invariante "exatamente um `operator` ativo" acaba aqui.** A `0033`/`0034`/`0039` a
+afirmavam depois de cada passagem de bastão (§45.3, §51) porque a compra **manual** da mesa
+(`MemeDeskRepository.get_operator_rule_set`) arquiva sob *o* conjunto operator. A asserção vive só dentro
+daquelas revisões (no próprio upgrade/downgrade delas) e o downgrade da `0055` remove `operator/6` antes de
+qualquer uma delas rodar, então a cadeia continua reversível. A consequência de comportamento fica dita, não
+escondida: `get_operator_rule_set` lê `name = 'operator' AND status = 'active'` ordenado por versão, **maior
+primeiro** — a partir desta revisão uma compra manual pela mesa é arquivada sob `operator/6` (teto
+`max_sol_per_bet "0.07"`, o `enforce_max_sol_per_bet` da API); `meme_rule_set.py --deprecate` deixa qualquer
+uma das duas aposentar enquanto a outra fica (`last_operator_set` só recusa a última). A frase da §45.1 ("a
+mesa nunca ver dois conjuntos operator ativos") descreve o estado de `0033`–`0054`, não o contrato daqui em
+diante. Os testes de `test_migrations.py` que liam a mesa como `["operator/5"]` no `head` passam a ler
+`["operator/5", "operator/6"]`; `test_migration_0049.py` passou a se posicionar em `0049` (o formato da
+`0050`+) e roda o seu `alembic check` num banco próprio no `head`.
+
+**Downgrade guardado (§17.7), o dinheiro primeiro.** `refuse_a_downgrade_that_would_orphan_an_operator_6_row`
+recusa enquanto existir linha referenciando o conjunto em `meme_live_orders` e `meme_live_positions`
+(**através de `meme_proposals.rule_set_id`** — nenhuma das duas carrega `rule_set_id` próprio; uma posição real
+aberta sob o conjunto bloqueia a descida com a sua própria mensagem, provado com a ordem de entrada sob uma
+proposta do `operator/5` e a posição sob uma do `operator/6`), depois em `meme_proposals`, `meme_paper_bets`,
+`meme_rule_set_param_history` e `meme_gate_refusals_by_mint`, como na `0049`–`0054`.
+`packages/core/tests/integration/test_migration_0055.py` prova as duas pontas contra um Postgres real, mais o
+`alembic check` num banco levado ao `head`. **Trava, pooler:** um `INSERT ... ON CONFLICT DO NOTHING` e nada
+de estado de sessão; a revisão não abre janela de manutenção; `0055_meme_operator6_desk` tem 24 caracteres.
