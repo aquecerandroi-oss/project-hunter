@@ -1092,7 +1092,7 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
 
 9i. **Troca à vista (spot) manual pela Jupiter, qualquer par (T4.73)** — Everton, 19/09/2026:
     usar a Binance como sinal e comprar na Solana pela carteira do robô, via Jupiter. Diferente da
-    tesouraria (9j abaixo, automática, só USDC → SOL), esta é uma ferramenta manual e auditada:
+    tesouraria (9d acima, automática, só USDC → SOL), esta é uma ferramenta manual e auditada:
     `infra/scripts/meme_spot_swap.py`, rodado por `compose.sh ops`, dry-run por padrão.
 
     ```bash
@@ -1132,6 +1132,82 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
     `--round-trip` **não** dispara e a reconciliação é manual, pela assinatura (a tesouraria
     automática não a toca: os leitores dela só veem linhas com `input_mint IS NULL`) —, **67** perna
     falhou na cadeia. Num wrapper, só o 0 é sucesso.
+
+9j. **Mesa `spot/1` — sinal do Lab (Binance) executado na Solana (T4.74)** — Everton, 19/09/2026:
+    "quero ir no dinheiro real e testar no real mesmo". Desenho completo em
+    `docs/design/spot1-lab-solana.md`; schema `0057_spot_desk` (`docs/DATABASE.md` §63); perfil de
+    risco `docs/RISK_ENGINE_MEME.md` §19. **Nada liga sozinho:** `SPOT1_ENABLED` nasce `false` no
+    `.env`, e mesmo com ele em `true` a pista só lê se `ENABLE_MEME_LIVE_TRADING=true` e o signer
+    estiver presente — do contrário o heartbeat mostra `spot1.mode = inert:<motivo>`.
+
+    **As linhas do `.env` (padrões do desenho §6; todo valor fora de faixa cai no padrão com aviso,
+    doutrina de `launch_config.py`):**
+
+    ```bash
+    SPOT1_ENABLED=false                    # true só depois da checklist do risk-engine-guardian + Codex
+    SPOT1_STRATEGY_VERSION=v14             # mean_reversion/v14; outra estratégia recusa spot1_strategy_unsupported no boot
+    SPOT1_TICKET_SOL=0.05
+    SPOT1_MAX_OPEN=3
+    SPOT1_MAX_SIGNAL_AGE_S=180
+    SPOT1_MAX_HOLD_S=14400
+    SPOT1_MAX_PARITY_PCT=0.03
+    SPOT1_MAX_IMPACT_PCT=0.005
+    SPOT1_MAX_COST_R=0.5
+    SPOT1_MARK_S=20
+    SPOT1_EXIT_SLIPPAGE_BPS=50
+    SPOT1_PANIC_SLIPPAGE_BPS=300
+    SPOT1_PRIORITY_FEE_MAX_LAMPORTS=100000 # por perna; 200000 já estoura o teto de custo em R a 0,05 SOL (T4.74-2)
+    SPOT1_REFUTE_MIN_TRADES=20
+    SPOT1_REFUTE_MAX_LOSS_SOL=0.15
+    SPOT1_CONSECUTIVE_STOPS_PAUSE_S=7200
+    SPOT1_REFUTATION_RESET_AT=             # ISO vazio; só a assinatura dele (data nova aqui, ou SPOT1_STRATEGY_VERSION nova) reabre depois de `refuted`
+    ```
+
+    **Editar o mapa Binance → Solana, nunca à mão no banco** — `infra/scripts/spot_desk_markets.py`
+    (dry-run por padrão, `--apply` grava e registra `system_events` componente `spot_desk`):
+
+    ```bash
+    # ver as 50 linhas semeadas pela 0057 (símbolo, mint, tipo, tier, custo %, ligado)
+    uv run python infra/scripts/spot_desk_markets.py --list
+
+    # ligar um mercado tier C que a semente deixou desligado (dry-run primeiro)
+    uv run python infra/scripts/spot_desk_markets.py --enable SUIUSDT \
+        --reason "R63 §5.5 revista: liquidez subiu"
+    uv run python infra/scripts/spot_desk_markets.py --enable SUIUSDT --apply \
+        --reason "R63 §5.5 revista: liquidez subiu"
+
+    # trocar um mint (a Jupiter recadastrou, ou o mapa errou)
+    uv run python infra/scripts/spot_desk_markets.py --set-mint WIFUSDT <MINT> --apply \
+        --reason "mint trocado pela Jupiter"
+
+    # pedir a venda manual de uma posição aberta (o executor vende no próximo tique de saída)
+    uv run python infra/scripts/spot_desk_markets.py --sell-now <POSITION_ID> --apply \
+        --reason "Everton pediu para fechar na mão"
+    ```
+
+    **Ficha por operação no vault (regra de 18/09: toda compra real vira ficha no mesmo dia)** —
+    `infra/scripts/spot_ficha.py`, dry-run por padrão, `--write` grava:
+
+    ```bash
+    uv run python infra/scripts/spot_ficha.py --position <POSITION_ID>            # dry-run: só imprime a ficha
+    uv run python infra/scripts/spot_ficha.py --position <POSITION_ID> --write    # grava Ficha-AAAA-MM-DD-SÍMBOLO-id8.md
+    #                                                                               e acrescenta a linha em Mesa-spot-1.md (idempotente pelo marcador <id8>)
+    ```
+
+    **A prova ao vivo, nesta ordem — cada passo é dele (desenho §9):**
+    (a) T4.73b fechada e re-revisada → ida-e-volta de 0,02 SOL com `meme_spot_swap.py --round-trip
+    --apply` (item 9i acima), conferida na Solscan e em `meme_treasury_swaps`;
+    (b) deploy da T4.74 com `SPOT1_ENABLED=false`: heartbeat `spot1.mode = inert:disabled`, `0057`
+    aplicada (`--list` mostra as 50 linhas), painel de "Carteira real" em `/meme/mesa` renderiza com
+    `spot1 = null` sem quebrar;
+    (c) `SPOT1_ENABLED=true`, `SPOT1_MAX_OPEN=1` → **1 operação real por sinal**: linhas `spot_orders`
+    (compra + venda), posição fechada, PnL batendo ao lamport com a cadeia, ficha gravada no vault;
+    (d) `SPOT1_MAX_OPEN=3` → 20 operações → veredito da refutação (`docs/RISK_ENGINE_MEME.md` §19) e
+    balanço papel (T4.72, `mean_reversion/v14` em paralelo) × real, na mesma versão.
+
+    **Desligar:** `SPOT1_ENABLED=false` + reiniciar, ou `touch
+    /opt/project-hunter/run/meme/meme.kill` (o mesmo arquivo do item 8 — entradas param em ≤ 10 s;
+    saídas continuam sob qualquer estado).
 
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
