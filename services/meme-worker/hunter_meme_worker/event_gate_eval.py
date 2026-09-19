@@ -243,6 +243,10 @@ async def evaluate_mint(rt: EventGateRuntime, mint: str, now: datetime) -> None:
         holders_readings=_holders_readings(rt.radar, mint),
     )
     rt.stats.record_evaluation(now)
+    if row.early_retention_pct is None:
+        # T4.70 (notes-T4.66.md §7, P0): the heartbeat's own acceptance
+        # number — the share of judged mints EXP-M19 could not measure.
+        rt.stats.record_early_retention_unknown(now)
     shadow = rt.config.mode == GATE_SHADOW
     to_insert: list[tuple[RuleSetSpec, list[ProposalDraft]]] = []
     trail_candidates: list[RefusalTrailRow] = []

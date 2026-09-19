@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from hunter_meme_worker.activity import ActivityPuller
     from hunter_meme_worker.boards import BoardCollector
     from hunter_meme_worker.config import MemeConfig
+    from hunter_meme_worker.event_gate_runtime import EventGateRuntime
     from hunter_meme_worker.graduation import GlobalParamsStore
     from hunter_meme_worker.launch_lane_runtime import LaunchLaneRuntime
     from hunter_meme_worker.risk import RiskReader
@@ -143,7 +144,9 @@ class RadarState:
 
 @dataclass(frozen=True, slots=True)
 class RadarContext:
-    """Everything a loop is allowed to reach. Built once, in ``main``."""
+    """Everything a loop is allowed to reach. Built once, in ``main`` — except
+    ``event_gate`` (T4.70), wired in once more right after it exists; see
+    :func:`attach_event_gate`."""
 
     config: MemeConfig
     session_factory: async_sessionmaker[AsyncSession]
@@ -170,9 +173,24 @@ class RadarContext:
     launch_lane: LaunchLaneRuntime | None = None
     """T4.67a's own runtime: ``None`` when ``MEME_LAUNCH_LANE=off`` — then
     ``discovery.py`` calls nothing extra per create."""
+    event_gate: EventGateRuntime | None = None
+    """T4.70: wired by :func:`attach_event_gate` **after** construction, not
+    passed here like ``launch_lane`` — the event gate needs ``tracker``/
+    ``chain`` off this very context (via ``LabContext``) before it can exist,
+    so the two cannot be built in the usual order. ``None`` until then, and
+    always ``None`` when ``MEME_EVENT_GATE=off``: ``discovery.py`` then calls
+    nothing extra per ``create`` either."""
     creator: CreatorWatchStats = field(default_factory=CreatorWatchStats)
     """The creator watch's own gauges and its measured sale → exit latency
     (T4.2h-b, ``creator_stats.py``). Defaulted rather than wired in ``main.py``
     because it holds only counters: whether the loop *runs* is
     ``config.creator_watch_enabled``, which the heartbeat reads at write time —
     so a context built anywhere still reports honestly instead of silently."""
+
+
+def attach_event_gate(ctx: RadarContext, event_gate: EventGateRuntime | None) -> None:
+    """The one-time wiring ``main.py`` performs once the event gate exists
+    (T4.70) — ``RadarContext`` is frozen because every *other* field is known
+    at construction; this field alone is not, so this function is the
+    documented escape hatch instead of a mutable context."""
+    object.__setattr__(ctx, "event_gate", event_gate)

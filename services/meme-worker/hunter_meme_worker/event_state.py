@@ -104,6 +104,18 @@ class MintEventState:
     crowd: CrowdLedger = field(init=False)
     """T4.66 (EXP-M19): the early wallets, their fills, every wallet's firsts,
     the last 30 s — fed by every ``apply_trade``, gapped with ``mark_gap``."""
+    expects_create_slot: bool = False
+    """T4.70 (notes-T4.66.md §7, P0): ``True`` only when
+    ``event_gate_subscriptions.subscribe_at_create`` opened this
+    subscription — the coverage began at the ``create`` instant, so the very
+    first trade's slot *is* the creation slot. A mint the periodic sync
+    subscribed to later has no such guarantee and keeps ``crowd.create_slot``
+    unknown (the safe 10-buyers fallback, T4.66)."""
+    creation_block_buyers: frozenset[str] = frozenset()
+    """T4.70: the creator (from the ``create`` frame itself) plus any other
+    buyer seen in the same slot as the creation, once known — recorded for
+    audit; ``crowd.py``'s early-wallet set reads ``crowd.create_slot``
+    directly, not this field."""
     gaps: int = 0
     block_time_missing: int = 0
 
@@ -122,6 +134,14 @@ class MintEventState:
         if self.creator is None:
             self.creator = trade.creator
         self.crowd.creator = self.creator
+        if self.expects_create_slot and self.crowd.create_slot is None:
+            # T4.70: the subscription began at the ``create`` instant — the
+            # first trade notification's slot *is* the creation slot, which
+            # unlocks ``crowd.py``'s own 3-slot early-wallet rule (T4.66).
+            self.crowd.create_slot = trade.slot
+            self.expects_create_slot = False
+        if trade.slot == self.crowd.create_slot and trade.side == "buy":
+            self.creation_block_buyers = self.creation_block_buyers | {trade.trader}
         self.mayhem = trade.mayhem
         tape = TapeTrade(
             block_time=block_time,

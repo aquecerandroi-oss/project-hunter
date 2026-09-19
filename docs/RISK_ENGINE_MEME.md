@@ -1054,6 +1054,35 @@ assume:
 > sincronização de assinaturas roda a cada 5 s sobre `young_mints`, e a graça de cobertura é 5 s —
 > se a maioria dos mints nasce fora dela, o braço mede a cegueira, não a multidão.
 
+> **T4.70 (19/09/2026): assinar no instante do `create` — o P0 do EXP-M19 endereçado.** A leitura
+> acima tinha um furo: a sincronização de assinaturas do portão de evento (`sync_subscriptions`,
+> `fast_lane.young_mints`) só roda a cada 5 s, e um sniper compra em 1–2 s — a maioria dos mints
+> nascia fora da graça de cobertura, e `early_retention_pct` saía `early_retention_unknown` por
+> `not_covered_from_birth`, não porque a multidão vendeu. `discovery._handle` agora chama
+> `hunter_meme_worker.event_gate_subscriptions.subscribe_at_create` no **mesmo** gancho de `create`
+> que a pista de lançamento já usa (T4.67a) — independente de `MEME_LAUNCH_LANE` — sempre que
+> `ctx.event_gate` existe (`MEME_EVENT_GATE` em `shadow` ou `on`): deriva a PDA da curva
+> (`pumpfun/pdas.py`) e abre `logsSubscribe`/`accountSubscribe` na hora, sujeito ao mesmo teto
+> `max_mints` e à mesma regra de despejo que `sync_subscriptions` já aplicava a cada 5 s — as duas
+> pistas de assinatura se deduplicam pelo mesmo `mint in rt.subs`, nunca uma dupla assinatura.
+> `MintEventState.subscribed_at` fica a poucos milissegundos do `received_at` do próprio `create`,
+> o que torna `covered_from_birth` estruturalmente verdadeiro (não mais um acerto de sorte contra a
+> janela de 5 s). Como o frame do `create` não carrega o slot da criação, `expects_create_slot`
+> (novo, `False` por padrão — só `True` quando `subscribe_at_create` abriu a assinatura) faz a
+> **primeira** notificação de trade recebida virar `crowd.create_slot`, o que liga a regra dos 3
+> primeiros slots de `hunter_indicators.meme.crowd` (T4.66, até aqui nunca exercitada — todo mint
+> caía no fallback dos 10 primeiros compradores); um mint que a sincronização periódica assinou
+> depois nunca infere um slot (a suposição só vale quando a cobertura começou no próprio `create`).
+> `creation_block_buyers` (novo campo, auditoria) começa como `{creator}` (o comprador do próprio
+> frame de `create`, T4.67a) e ganha qualquer outro comprador visto no mesmo slot da criação.
+> **Heartbeat** (`hb:meme:radar`, prefixo `event_gate_`, sempre publicado mesmo com o portão
+> desligado): `subscribed_at_create_total`, `create_to_subscribe_ms_p50`/`_p95` (o número que prova
+> a assinatura instantânea) e `early_retention_unknown_share_60s` — a própria fração que o P0 da
+> EXP-M19 pede, agora medível ao vivo em vez de só inferida das recusas gravadas. Nada mudou na
+> admissão, no kill switch, no dimensionamento ou no vocabulário de recusa — só quando a assinatura
+> abre. Provado com Postgres real (`test_event_gate_crowd_integration.py`): um `create` seguido de
+> trades faz a retenção sair conhecida (`0,9`), não `early_retention_unknown`.
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |

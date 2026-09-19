@@ -46,7 +46,7 @@ from hunter_meme_worker.activity import run_activity
 from hunter_meme_worker.chain import chain_once
 from hunter_meme_worker.collect import fold_once, forever, poll_once, prune_once, reconcile_once
 from hunter_meme_worker.config import MemeConfig, load_config
-from hunter_meme_worker.context import RadarContext, RadarState
+from hunter_meme_worker.context import RadarContext, RadarState, attach_event_gate
 from hunter_meme_worker.creator_watch import spawn_creator_watch
 from hunter_meme_worker.discovery import run_discovery
 from hunter_meme_worker.event_gate import run_event_gate_forever
@@ -201,6 +201,7 @@ async def run_meme(runtime: WorkerRuntime) -> None:
             LabContext(config, ctx.session_factory, LabState(), None, write), enabled=False
         )
     event_gate = build_event_gate(runtime, ctx, lab, event_gate_config, write)
+    attach_event_gate(ctx, event_gate)
     register_event_gate_health(runtime, event_gate)
     warmed = await warm_tracked_set(ctx)
     logger.info(

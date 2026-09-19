@@ -31,6 +31,7 @@ from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.models import NormalizedMemeMigration, NormalizedMemeTokenCreated
 from hunter_meme_worker.config import WS_STREAM
+from hunter_meme_worker.event_gate_subscriptions import subscribe_at_create
 from hunter_meme_worker.graduation import (
     POOL_SOURCE_PUMPPORTAL,
     CompletionSignals,
@@ -187,6 +188,12 @@ async def _handle(ctx: RadarContext, event: MemeEvent) -> None:
         # durable — never awaited by anything downstream of it, and never
         # allowed to raise into this loop (``on_create``'s own contract).
         await launch_lane_on_create(ctx.launch_lane, event, utcnow())
+    if ctx.event_gate is not None and isinstance(event, NormalizedMemeTokenCreated):
+        # T4.70 (notes-T4.66.md §7, P0): the same hook, independent of
+        # ``MEME_LAUNCH_LANE`` — the event gate (``shadow``/``on``) opens its
+        # own subscription right here instead of waiting up to 5 s for the
+        # periodic sync.
+        await subscribe_at_create(ctx.event_gate, event, now=utcnow())
     ctx.state.last_event_at = row.last_seen_at
     if ctx.sources is not None:
         ctx.sources[PUMPPORTAL_WS].record_ok(

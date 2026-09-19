@@ -73,6 +73,18 @@ class EventGateStats:
     last_event_at: datetime | None = None
     latency_s: deque[float] = field(default_factory=lambda: deque(maxlen=LATENCY_SAMPLE))
     """``event_to_proposal_s`` of every proposal this process wrote."""
+    subscribed_at_create_total: int = 0
+    """T4.70 (notes-T4.66.md §7, P0): ``create`` frames that opened a
+    subscription right there — never the periodic 5 s sync — since boot."""
+    create_to_subscribe_ms: deque[float] = field(
+        default_factory=lambda: deque(maxlen=LATENCY_SAMPLE)
+    )
+    """Milliseconds from the ``create`` frame's own ``received_at`` to the
+    subscription landing in ``rt.subs`` — the number the P0 finding asks for."""
+    early_retention_unknown_window: deque[datetime] = field(default_factory=deque[datetime])
+    """``at`` of every judged evaluation whose row measured
+    ``early_retention_pct is None`` — the heartbeat's share is this over
+    ``evaluations_window`` (same 60 s), the P0 acceptance number itself."""
 
     def record_event(self, now: datetime) -> None:
         self.events_total += 1
@@ -126,6 +138,14 @@ class EventGateStats:
     def record_bad_frame(self) -> None:
         self.bad_frames_total += 1
 
+    def record_subscribed_at_create(self, latency_ms: float) -> None:
+        self.subscribed_at_create_total += 1
+        self.create_to_subscribe_ms.append(latency_ms)
+
+    def record_early_retention_unknown(self, now: datetime) -> None:
+        self.early_retention_unknown_window.append(now)
+        _trim(self.early_retention_unknown_window, now)
+
 
 def heartbeat_fields(
     stats: EventGateStats,
@@ -140,10 +160,20 @@ def heartbeat_fields(
     _trim(stats.no_base_row_window, now)
     _trim_pairs(stats.shadow_only_window, now)
     _trim_pairs(stats.shadow_agree_window, now)
+    _trim(stats.early_retention_unknown_window, now)
     latencies = list(stats.latency_s)
     p50, p95 = (
         percentile([int(v * 1000) for v in latencies], 0.50),
         percentile([int(v * 1000) for v in latencies], 0.95),
+    )
+    subscribe_latencies = [int(v) for v in stats.create_to_subscribe_ms]
+    subscribe_p50, subscribe_p95 = (
+        percentile(subscribe_latencies, 0.50),
+        percentile(subscribe_latencies, 0.95),
+    )
+    judged = len(stats.evaluations_window)
+    unknown_share = (
+        "" if judged == 0 else str(round(len(stats.early_retention_unknown_window) / judged, 4))
     )
     age = (
         "" if stats.last_event_at is None else str(int((now - stats.last_event_at).total_seconds()))
@@ -168,6 +198,10 @@ def heartbeat_fields(
         "last_event_age_s": age,
         "no_base_row_60s": str(len(stats.no_base_row_window)),
         "unsubscribed_total": str(stats.unsubscribed_total),
+        "subscribed_at_create_total": str(stats.subscribed_at_create_total),
+        "create_to_subscribe_ms_p50": "" if subscribe_p50 is None else str(subscribe_p50),
+        "create_to_subscribe_ms_p95": "" if subscribe_p95 is None else str(subscribe_p95),
+        "early_retention_unknown_share_60s": unknown_share,
     }
     for key, value in (cache_sizes or {}).items():
         fields[f"cache_{key}"] = str(value)

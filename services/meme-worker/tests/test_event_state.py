@@ -266,6 +266,71 @@ def test_the_creator_booleans_are_false_only_when_covered_from_birth() -> None:
     assert not covered.covered_from_birth, "a gap breaks the proof of coverage"
 
 
+MINT_X = "4k3Dyjzvzp8eYnbNBGVfL5V1Z6VpAmoEsFmPtnxJhMKZ"
+CREATOR_X = "CreatorWa11etAddress1111111111111111111111"
+
+
+def _curve_trade(
+    *, slot: int, side: str, trader: str, at: datetime, tokens: Decimal = Decimal(100)
+) -> NormalizedCurveTrade:
+    return NormalizedCurveTrade(
+        mint=MINT_X,
+        slot=slot,
+        signature=f"sig-{slot}-{trader}",
+        trader=trader,
+        side=side,  # type: ignore[arg-type]
+        lamports=Decimal(1_000_000),
+        token_amount=tokens,
+        virtual_sol_reserves=Decimal(31),
+        virtual_token_reserves=Decimal(1_000_000_000),
+        real_sol_reserves=Decimal(30),
+        real_token_reserves=Decimal(900_000_000),
+        creator=CREATOR_X,
+        mayhem=False,
+        block_time=at,
+        received_at=at,
+    )
+
+
+def test_expects_create_slot_learns_the_slot_from_the_first_trade_only() -> None:
+    """T4.70 (notes-T4.66.md §7, P0): a state subscribed at the ``create``
+    instant (``expects_create_slot``) takes its ``crowd.create_slot`` from the
+    very first trade notification only -- never a later one -- and the
+    creator itself is never admitted as an early wallet (``crowd.py``'s own
+    rule, unchanged)."""
+    born = datetime(2026, 9, 20, 0, 0, tzinfo=UTC)
+    state = MintEventState(mint=MINT_X, subscribed_at=born, first_seen_at=born)
+    state.expects_create_slot = True
+    # The creator's own dev-buy, in the create transaction itself: slot 100.
+    state.apply_trade(_curve_trade(slot=100, side="buy", trader=CREATOR_X, at=born))
+    assert state.crowd.create_slot == 100
+    assert state.expects_create_slot is False
+    assert state.creation_block_buyers == frozenset({CREATOR_X})
+    # A second buyer in the same slot (bundled with the create) joins the set.
+    state.apply_trade(_curve_trade(slot=100, side="buy", trader="EARLY_1", at=born))
+    assert state.creation_block_buyers == frozenset({CREATOR_X, "EARLY_1"})
+    # Slot 102 is still within the 3-slot rule (100, 101, 102); 103 is not.
+    state.apply_trade(_curve_trade(slot=102, side="buy", trader="EARLY_2", at=born))
+    state.apply_trade(_curve_trade(slot=103, side="buy", trader="TOO_LATE", at=born))
+    assert state.crowd.early_wallets == frozenset({"EARLY_1", "EARLY_2"})
+    assert "TOO_LATE" not in state.crowd.early_wallets
+    assert CREATOR_X not in state.crowd.early_wallets  # never the creator
+    # A later notification never overwrites the slot already learned.
+    state.apply_trade(_curve_trade(slot=999, side="buy", trader="LATER", at=born))
+    assert state.crowd.create_slot == 100
+
+
+def test_a_mint_subscribed_late_never_infers_a_create_slot() -> None:
+    """A mint the periodic sync (not ``subscribe_at_create``) subscribed to
+    keeps ``expects_create_slot`` false by default -- the safe 10-buyers
+    fallback (T4.66) stays, never a slot guessed from an arbitrary trade."""
+    born = datetime(2026, 9, 20, 0, 0, tzinfo=UTC)
+    state = MintEventState(mint=MINT_X, subscribed_at=born, first_seen_at=born)
+    state.apply_trade(_curve_trade(slot=500, side="buy", trader="X", at=born))
+    assert state.crowd.create_slot is None
+    assert state.creation_block_buyers == frozenset()
+
+
 def test_a_rule_set_names_the_guard_or_reads_exactly_as_frozen() -> None:
     """``lab_models._gate_from_params`` (T4.52b-2): the three keys parse from
     the JSON strings; a set without them is the same gate it always was."""

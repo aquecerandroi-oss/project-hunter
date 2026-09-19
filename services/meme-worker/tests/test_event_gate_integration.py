@@ -196,9 +196,11 @@ def _patch_holders(
     monkeypatch.setattr(event_gate_eval, "_holders_readings", fake)
 
 
-def _rt(radar: RadarContext, lab: LabContext, *, mode: str = GATE_ON) -> EventGateRuntime:
+def _rt(
+    radar: RadarContext, lab: LabContext, *, mode: str = GATE_ON, ws: Any = None
+) -> EventGateRuntime:
     config = EventGateConfig(mode=mode, ws_url="ws://x", commitment="confirmed", max_mints=150)
-    return EventGateRuntime(radar=radar, lab=lab, ws=None, config=config)  # type: ignore[arg-type]
+    return EventGateRuntime(radar=radar, lab=lab, ws=ws, config=config)  # type: ignore[arg-type]
 
 
 async def _proposal_count(factory: async_sessionmaker[AsyncSession], mint: str) -> int:

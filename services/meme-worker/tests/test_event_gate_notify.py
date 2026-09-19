@@ -10,9 +10,11 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from hunter_exchanges.pumpfun.models import NormalizedMemeTokenCreated
 from hunter_exchanges.pumpfun.rpc_ws import SolanaWsClient
 from hunter_exchanges.pumpfun.rpc_ws_models import (
     AccountNotification,
@@ -26,7 +28,7 @@ from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.event_gate_config import EventGateConfig
 from hunter_meme_worker.event_gate_eval import apply_notification
 from hunter_meme_worker.event_gate_runtime import EventGateRuntime
-from hunter_meme_worker.event_gate_subscriptions import sync_subscriptions
+from hunter_meme_worker.event_gate_subscriptions import subscribe_at_create, sync_subscriptions
 from hunter_meme_worker.lab import LabContext, LabState
 from hunter_meme_worker.tracker import MintTracker, TrackedMint
 
@@ -166,6 +168,77 @@ async def test_sync_stops_at_the_max_mints_cap() -> None:
     await sync_subscriptions(rt, now=NOW)
     assert len(rt.subs) == 1
     assert MINT_NEW in rt.subs  # young_mints orders newest first
+
+
+# ---- subscribe at create (T4.70, notes-T4.66.md §7 P0) ------------------------------
+
+
+def _create(mint: str, at: datetime, *, creator: str = "CREATOR") -> NormalizedMemeTokenCreated:
+    return NormalizedMemeTokenCreated(
+        mint=mint,
+        name="n",
+        symbol="s",
+        uri="u",
+        creator=creator,
+        created_at=at,
+        bonding_curve="curve",
+        initial_virtual_sol_reserves=Decimal(30),
+        initial_virtual_token_reserves=Decimal(1_073_000_000),
+        signature="sig-create",
+        received_at=at,
+        observed_at=at,
+    )
+
+
+async def test_subscribe_at_create_opens_a_subscription_in_the_same_tick() -> None:
+    ws = FakeWs()
+    rt = _runtime(ws)
+    event = _create(MINT_A, NOW)
+    await subscribe_at_create(rt, event, now=NOW + timedelta(milliseconds=5))
+    assert MINT_A in rt.subs
+    assert len(ws.subscribed) == 2  # logs + account
+    state = rt.book.get(MINT_A)
+    assert state is not None
+    assert state.subscribed_at <= event.received_at + timedelta(milliseconds=50)
+    assert state.covered_from_birth
+    assert state.expects_create_slot is True
+    assert state.creation_block_buyers == frozenset({"CREATOR"})
+    assert rt.stats.subscribed_at_create_total == 1
+    assert list(rt.stats.create_to_subscribe_ms) == [5.0]
+
+
+async def test_subscribe_at_create_dedupes_with_the_periodic_sync() -> None:
+    ws = FakeWs()
+    rt = _runtime(ws)
+    event = _create(MINT_A, NOW)
+    await subscribe_at_create(rt, event, now=NOW)
+    rt.radar.tracker.observe(
+        TrackedMint(mint=MINT_A, first_seen_at=NOW, created_at=NOW - timedelta(seconds=1))
+    )
+    await sync_subscriptions(rt, now=NOW + timedelta(seconds=1))
+    assert len(ws.subscribed) == 2  # the periodic sync found it already subscribed
+
+    # The other order: the periodic sync gets there first, the create hook
+    # (a replayed frame, or a race) is the one that must not double-subscribe.
+    ws2 = FakeWs()
+    rt2 = _runtime(ws2)
+    rt2.radar.tracker.observe(
+        TrackedMint(mint=MINT_A, first_seen_at=NOW, created_at=NOW - timedelta(seconds=1))
+    )
+    await sync_subscriptions(rt2, now=NOW)
+    await subscribe_at_create(rt2, event, now=NOW)
+    assert len(ws2.subscribed) == 2
+    assert rt2.stats.subscribed_at_create_total == 0
+
+
+async def test_subscribe_at_create_respects_the_max_mints_cap() -> None:
+    ws = FakeWs()
+    rt = _runtime(ws, max_mints=1)
+    await subscribe_at_create(rt, _create(MINT_OLD, NOW), now=NOW)
+    await subscribe_at_create(rt, _create(MINT_NEW, NOW), now=NOW)
+    assert MINT_OLD in rt.subs
+    assert MINT_NEW not in rt.subs
+    assert rt.stats.subscribed_at_create_total == 1
 
 
 # ---- notification dispatch -----------------------------------------------------------

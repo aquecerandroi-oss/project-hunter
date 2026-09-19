@@ -10,6 +10,7 @@ Run alone (``timeout 590``): shares the container fixture of ``conftest.py``.
 
 from __future__ import annotations
 
+import os
 from dataclasses import replace
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -19,9 +20,12 @@ from uuid import uuid4
 import pytest
 
 from hunter_core.db.session import role_session
+from hunter_exchanges.pumpfun.models import NormalizedCurveTrade, NormalizedMemeTokenCreated
+from hunter_exchanges.pumpfun.solana_codec import b58encode
 from hunter_indicators.meme.crowd import CrowdTrade
 from hunter_indicators.meme.rules import evaluate_entry
 from hunter_meme_worker.event_gate_rows import EventReserves, build_event_row
+from hunter_meme_worker.event_gate_subscriptions import subscribe_at_create
 from hunter_meme_worker.lab_repo import load_active_rule_sets
 from hunter_meme_worker.proposals import entry_features_of
 from hunter_meme_worker.proposals_row import GateRow
@@ -113,3 +117,125 @@ async def test_flow_v2_10_refuses_forty_percent_retention_and_passes_ninety(
         assert control_decision.allowed, (label, control_decision.refusals)
         outcomes[label] = arm_decision.refusals
     assert outcomes == {"kept_40": ("early_retention_below_min",), "kept_90": ()}
+
+
+class _FakeWs:
+    """The minimal ``SolanaWs`` double ``subscribe_at_create`` needs — this
+    file otherwise never opens a socket (``_rt``'s own ``ws=None``)."""
+
+    def __init__(self) -> None:
+        self._next_id = 1
+
+    async def subscribe_logs(self, *, mentions: list[str], commitment: str) -> int:
+        self._next_id += 1
+        return self._next_id
+
+    async def subscribe_account(self, pubkey: str, *, commitment: str) -> int:
+        self._next_id += 1
+        return self._next_id
+
+    async def unsubscribe(self, logical_id: int) -> bool:
+        return True
+
+
+def _curve_trade(
+    mint: str, creator: str, *, slot: int, side: str, trader: str, at: datetime, tokens: str
+) -> NormalizedCurveTrade:
+    return NormalizedCurveTrade(
+        mint=mint,
+        slot=slot,
+        signature=f"sig-{slot}-{trader}-{side}",
+        trader=trader,
+        side=side,  # type: ignore[arg-type]
+        lamports=Decimal(1_000_000),
+        token_amount=Decimal(tokens),
+        virtual_sol_reserves=Decimal(60),
+        virtual_token_reserves=INITIAL_REAL_TOKEN * Decimal("1.10"),
+        real_sol_reserves=Decimal(33),
+        real_token_reserves=INITIAL_REAL_TOKEN * Decimal("0.90"),
+        creator=creator,
+        mayhem=False,
+        block_time=at,
+        received_at=at,
+    )
+
+
+async def test_subscribe_at_create_then_trades_make_early_retention_known(
+    db_session_factory: async_sessionmaker[AsyncSession],
+    db_engine: AsyncEngine,
+) -> None:
+    """T4.70 (notes-T4.66.md §7, P0): the old failure mode was a mint the
+    periodic 5 s sync subscribed to too late — ``not_covered_from_birth`` ⇒
+    ``early_retention_unknown`` for most young mints, because a sniper buys
+    in 1-2 s. Subscribing at the ``create`` instant (the same hook the launch
+    lane already uses) fixes ``covered_from_birth`` structurally, and the
+    creation slot learned from the very first trade lets the 3-slot rule
+    (not the 10-buyers fallback) name the early wallets."""
+    mint = b58encode(os.urandom(32))  # a real pubkey — subscribe_at_create derives its PDA
+    creator = f"C_{mint}"
+    lab = _lab(db_session_factory)
+    await _seed_caches(db_session_factory, db_engine, mint, lab=lab)
+    rt = _rt(_radar(db_session_factory), lab, ws=_FakeWs())
+    create_event = NormalizedMemeTokenCreated(
+        mint=mint,
+        name="n",
+        symbol="s",
+        uri="u",
+        creator=creator,
+        created_at=CREATED,
+        bonding_curve="curve",
+        initial_virtual_sol_reserves=Decimal(30),
+        initial_virtual_token_reserves=Decimal(1_073_000_000),
+        signature="sig-create",
+        pool="pump",
+        received_at=CREATED,
+        observed_at=CREATED,
+    )
+    await subscribe_at_create(rt, create_event, now=CREATED + timedelta(milliseconds=50))
+    state = rt.book.get(mint)
+    assert state is not None and state.covered_from_birth  # the P0 fix itself
+    assert state.expects_create_slot  # no trade folded yet
+    state.total_supply = Decimal("1000000000")
+    state.complete = False
+    state.mayhem = False
+    # The creator's own dev-buy, in the create transaction itself: slot 100 —
+    # the very first trade notification, which becomes ``crowd.create_slot``.
+    state.apply_trade(
+        _curve_trade(mint, creator, slot=100, side="buy", trader=creator, at=CREATED, tokens="500")
+    )
+    assert state.crowd.create_slot == 100 and not state.expects_create_slot
+    # Nine early buyers, all within the 3-slot window (100, 101, 102).
+    for i in range(9):
+        at = CREATED + timedelta(milliseconds=200 + i)
+        state.apply_trade(
+            _curve_trade(
+                mint,
+                creator,
+                slot=100 + (i % 3),
+                side="buy",
+                trader=f"EARLY_{i}",
+                at=at,
+                tokens="100",
+            )
+        )
+    assert len(state.crowd.early_wallets) == 9  # never the creator
+    as_of = CREATED + timedelta(seconds=130)
+    # Each early wallet sells 10 % of what it bought, well before ``as_of``.
+    for i in range(9):
+        at = as_of - timedelta(seconds=10)
+        state.apply_trade(
+            _curve_trade(
+                mint, creator, slot=5000, side="sell", trader=f"EARLY_{i}", at=at, tokens="10"
+            )
+        )
+    assert lab.caches is not None
+    base = lab.caches.base_rows[mint]
+    row = build_event_row(
+        base,
+        state,
+        as_of=as_of,
+        reserves=EventReserves(Decimal("60"), INITIAL_REAL_TOKEN * Decimal("1.10")),
+        holders_readings=_holders_pair(as_of, snipers=1),
+    )
+    assert row.early_retention_pct == Decimal("0.9")  # (100 - 10) / 100, known — not unknown
+    assert row.early_age_s is not None
