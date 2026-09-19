@@ -1,6 +1,6 @@
 ---
 tags: [experimento, meme, lancamento, sniper, evento, m4]
-status: pre-registrado
+status: descartado
 owner: sexta-feira
 updated: 2026-09-19
 origem: Everton, 19/09/2026 00:3x BRT — "assim que a moeda é criada dá um pico; se compramos assim que começa a subir conseguimos comprar no lançamento e vender na alta rápida?"
@@ -57,3 +57,33 @@ mesmas peças do Lab (`BetEntry`/`BetExit`/`mark_filled`/`close_bet_row`/`paper_
 Nada disto decide ainda: `kind = 'research_only'`, papel por construção. Detalhes técnicos e as
 simplificações declaradas em `.claude/state/notes-T4.67a.md`; braço executável real (T4.67b,
 `docs/RISK_ENGINE_MEME.md` §18) semeado em paralelo, ainda sem dado medido.
+
+## Resultado (R60, 19/09/2026 — papel, cadeia inteira)
+
+**Descartado pela regra pré-registrada.** Captura própria de 60 min (`logsSubscribe` no programa pump,
+RPC público, `processed` + segunda conexão em `confirmed`; 00:35–01:35 BRT, hora fraca): 1 072 `create`,
+114 832 trades, 0 quadros perdidos; 885 lançamentos em SOL avaliados (15,8 % com quote ≠ SOL excluídos).
+
+| entrada | t6 | t15 | t60 | 1.º sell de terceiro | 1.º sell de comprador do bloco | braço T4.67a |
+|---|---|---|---|---|---|---|
+| +0,5 s (RPC regional) | −15,1 % | −11,5 % | −11,2 % | −15,1 % | −11,2 % | −14,8 % |
+| **+1 s (feed por evento)** | **−15,2 %** | −11,9 % | −12,0 % | −15,5 % | −11,9 % | **−15,2 %** |
+| +3 s (infra atual) | −13,9 % | −10,5 % | −10,0 % | −14,3 % | −9,6 % | −13,9 % |
+
+R médio líquido (1,25 %/perna, slippage 5 %/3 %, prioridade 0,0002 SOL/tx, ticket 0,01 SOL), n = 885 em
+cada célula; acerto 6–16 %; mediana −13,9 % em todas (preço parado); MDD ≈ ΣR (a equity só desce); top-3 =
+16–44 % de um lucro bruto que é menos da metade das perdas. Só com taxa (slippage 0, prioridade 0):
+−3,9 % … +1,7 % — o movimento bruto médio do lançamento é ≈ 0 a +2 %. Oráculo "pico exato em 6 s": −7,2 %.
+Nenhum subconjunto vira positivo (já subindo em ≤ 1 s: −14,2 %; ≥ 2 compradores em 1 s: −13,6 %; +10 % em
+1 s: −16,6 %; dev-buy ≤ 2 SOL: −15,1 %; não nasce cheia: −15,2 %).
+
+Regra de decisão: R médio a +1 s < 0 com n ≥ 300 → **o jogo do lançamento é dos bots colocados no bloco**
+(30 % dos lançamentos têm comprador de terceiros no mesmo slot do `create`; 45 % em ≤ 1 s; 1.º comprador →
+pico p50 3,5 s, p25 = mesmo instante). Nasce cheia: 2,0 % de todos os `create`. Sem trade depois do
+`create`: 6,2 %; sem comprador de terceiros em 60 s: 18 %. `confirmed` chega 0,18 s depois de `processed`.
+Sanity do R58 nesta captura: 54/54 células de explosão negativas (−6,6 % … −9,1 %).
+
+O braço `launch_v0/1` (T4.67a) fica `MEME_LAUNCH_LANE=off`; se alguém o ligar em papel, a previsão
+pré-registrada é **R médio ≈ −15 %, acerto ≈ 6–10 %** (controle negativo). Captura diurna 14:00–15:00 BRT
+agendada em processo desanexado (não faz parte deste resultado). Detalhes, tabelas completas e ressalvas:
+`.claude/state/notes-R60.md` · [[KB-0141-sniper-de-lancamento]].
