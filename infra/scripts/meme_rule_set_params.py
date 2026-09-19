@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any
 
 from meme_ops_db import record_event
 from meme_rule_set_types import COMPONENT, Refused, load
+from meme_rule_set_validate import validate_set_param
 from sqlalchemy import text
 
 from hunter_core.domain.types import utcnow
@@ -141,9 +142,15 @@ async def set_param(
     reason: str,
 ) -> tuple[int, str]:
     key, value = parse_param(spec)
+    raw = spec.partition("=")[2]
     targets = _targets(rows, all_active=all_active, labels=labels)
     encoded = json.dumps(value)
     to_change = [r for r in targets if r.params.get(key) != value]
+    # T4.64: every set the merge would actually change, loaded the way the
+    # worker loads it, *before* the dry-run report or the UPDATE — a set
+    # already carrying the value is not re-validated (unwritten, unchanged).
+    for row in to_change:
+        validate_set_param(row, key, value, raw)
     lines = [f"set-param {key} = {encoded} on {len(targets)} active set(s):"]
     for r in targets:
         current = "<unset>" if key not in r.params else json.dumps(r.params[key])

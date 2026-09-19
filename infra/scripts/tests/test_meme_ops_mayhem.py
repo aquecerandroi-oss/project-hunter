@@ -81,6 +81,29 @@ class FakeConn:
 # ---- meme_rule_set --set-param ----------------------------------------------------
 
 
+# T4.64: a full, valid document — every key ``RuleSetSpec.from_params``/the
+# gate/the exit rules require — so ``--set-param``'s pre-write validation
+# (``meme_rule_set_validate.validate_set_param``) loads it exactly as the
+# worker would, the same shape as a real seeded set (``meme_gate_v2_seed.py``).
+_BASE_PARAMS: dict[str, Any] = {
+    "gate_key": "fluxo_e_holders",
+    "gate_version": 1,
+    "min_age_s": 30,
+    "max_age_s": 300,
+    "min_progress_pct": "5",
+    "max_progress_pct": "100",
+    "max_participation_pct": "1",
+    "size_sol": "0.05",
+    "target_x": "3",
+    "trailing_pct": "35",
+    "max_hold_s": 1800,
+    "max_loss_pct": "50",
+    "wallet_max_sol": "2.0",
+    "max_sol_per_bet": "0.05",
+    "daily_loss_cap_sol": "0.20",
+}
+
+
 def _set(name: str, version: str, *, kind: str = "research_only", **params: Any) -> dict[str, Any]:
     return {
         "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{name}/{version}")),
@@ -91,7 +114,7 @@ def _set(name: str, version: str, *, kind: str = "research_only", **params: Any)
         "status": params.pop("status", "active"),
         "open_bets": 0,
         "pending_proposals": 0,
-        "params": {"size_sol": "0.05", **params},
+        "params": {**_BASE_PARAMS, **params},
     }
 
 

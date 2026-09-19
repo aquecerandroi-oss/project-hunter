@@ -7430,6 +7430,19 @@ gravou um `data` estruturado antes de T4.35, só a `message` livre (`KEY = VALOR
 (ANTIGO), …; reason: MOTIVO`), então o backfill faz *parsing* dessa forma congelada — uma mensagem que não
 bate é contada `unparsed` e ignorada, nunca adivinhada.
 
+**T4.64 — `--set-param` valida antes de gravar.** Dois incidentes em 18/09/2026 (KB-0140): 14:19 BRT
+`max_sol_per_bet=0.28` gravou um número JSON onde o worker exige uma **string** (`RuleSetSpec.from_params`,
+`hunter_meme_worker/lab_models.py`, recusa com "a float is not an exact number") e travou o worker em loop
+de 10 minutos; 19:47 BRT `trailing_arm_x="1.0"` chegou ao `ExitRules.__post_init__` e travou o worker por
+~3,5 h (até a T4.65 tornar a leitura tolerante). Desde a T4.64, `infra/scripts/meme_rule_set.py --set-param`
+— em dry-run **e** em `--apply` — monta o documento `params` que resultaria da mudança e o carrega pelo
+mesmo caminho do worker (`RuleSetSpec.from_params`, o portão `_gate_from_params` e as regras de saída
+`effective_params(...).exit_rules()`, todos em `meme_rule_set_validate.py`); qualquer recusa aí é
+`WouldNotLoad`, imprime o erro exato, não grava nada e sai com código 2. Um número solto (`0.28`) sobre uma
+chave que o documento vivo já guarda como string é recusado antes disso, com a sintaxe certa: `decimals are
+strings: use 'max_sol_per_bet="0.28"'`. `--validate NAME/VERSION` (somente leitura) roda a mesma validação
+sobre os parâmetros já gravados de um conjunto, para conferência rápida.
+
 ### 54.2 `meme_gate_refusals_by_mint` — a recusa por moeda, amostrada
 
 ```

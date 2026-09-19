@@ -12,6 +12,7 @@ dry-run by default (T4.16; ``--set-param`` since T4.27; ``--history``/
         --apply --reason "T4.27: os picos de mcap sao SOL virtual do agente Mayhem, nao demanda"
     uv run python infra/scripts/meme_rule_set.py --history operator/5
     uv run python infra/scripts/meme_rule_set.py --backfill --apply
+    uv run python infra/scripts/meme_rule_set.py --validate operator/5
 
 ``--deprecate name/version`` sets ``status = 'retired'``, ``retired_at = now()``
 on an **active** row and leaves a ``system_events`` row with the reason — the
@@ -45,8 +46,22 @@ the active ``operator`` set; retiring the last one would leave it none),
 (``--set-param`` without ``--all-active``/``--rule-set``), ``rule_set_retired``
 (a parameter on a retired set is a rewrite of evidence).
 
+**``--set-param`` never writes a document the Lab cannot load (T4.64,
+``meme_rule_set_validate.py``).** Two incidents on 18/09/2026 (KB-0140):
+``max_sol_per_bet=0.28`` stored a JSON number where the worker's
+``RuleSetSpec.from_params`` demands a string, and ``trailing_arm_x="1.0"``
+reached ``ExitRules.__post_init__``'s floor — both crash-looped the worker
+before anyone noticed. In dry-run **and** ``--apply``, every set the merge
+would change is loaded through that exact path (the entry gate and the exit
+rules included); a value that would not load is refused as ``WouldNotLoad``
+with the worker's own error, exit 2, nothing written — a bare number over a
+key the live document already carries as a string is caught earlier still,
+with the fix spelled out (``decimals are strings: use 'key="0.28"'``).
+``--validate NAME/VERSION`` runs the same check, read-only, on a set already
+in the table.
+
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler).
-Exit codes: 0 done, 64 usage, 65 refused.
+Exit codes: 0 done, 2 would not load, 64 usage, 65 refused.
 """
 
 from __future__ import annotations
@@ -61,17 +76,19 @@ from typing import Any
 from meme_ops_db import migration_url, record_event
 from meme_rule_set_params import backfill_history, history_for, parse_param
 from meme_rule_set_params import set_param as _apply_set_param
-from meme_rule_set_types import COMPONENT, Connection, Refused, load
+from meme_rule_set_types import COMPONENT, Connection, Refused, WouldNotLoad, load
+from meme_rule_set_validate import validate_live
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 MIN_REASON_LENGTH = 10
-EX_USAGE, EX_REFUSED = 64, 65
+EX_USAGE, EX_REFUSED, EX_WOULD_NOT_LOAD = 64, 65, 2
 
 __all__ = [
     "Connection",
     "Refused",
     "RuleSetRow",
+    "WouldNotLoad",
     "list_rule_sets",
     "load",
     "main",
@@ -186,9 +203,14 @@ async def run(
     rule_sets: Sequence[str] = (),
     history: str | None = None,
     backfill: bool = False,
+    validate: str | None = None,
 ) -> tuple[int, str]:
     """``(exit code, report)``. Writes only with ``--apply`` and a reason."""
     rows = await list_rule_sets(conn)
+    if validate is not None:
+        row = load(rows, validate)
+        validate_live(row)  # raises WouldNotLoad; nothing to catch on success
+        return 0, f"OK: {row.label} loads (gate, exit rules, RuleSetSpec.from_params)"
     if history is not None:
         return await history_for(conn, load(rows, history))
     if backfill:
@@ -222,6 +244,7 @@ def _parse(argv: Sequence[str]) -> argparse.Namespace:
     )
     parser.add_argument("--history", metavar="NAME/VERSION", default=None)
     parser.add_argument("--backfill", action="store_true")
+    parser.add_argument("--validate", metavar="NAME/VERSION", default=None)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--reason", default=None)
     args = parser.parse_args(argv)
@@ -230,14 +253,17 @@ def _parse(argv: Sequence[str]) -> argparse.Namespace:
         args.set_param is not None,
         args.history is not None,
         args.backfill,
+        args.validate is not None,
     ]
     if not args.list and not any(acts):
         parser.error(
             "one of --list, --deprecate NAME/VERSION, --set-param KEY=VALUE, "
-            "--history NAME/VERSION or --backfill is required"
+            "--history NAME/VERSION, --backfill or --validate NAME/VERSION is required"
         )
     if sum(acts) > 1:
-        parser.error("--deprecate/--set-param/--history/--backfill are acts; run one at a time")
+        parser.error(
+            "--deprecate/--set-param/--history/--backfill/--validate are acts; run one at a time"
+        )
     return args
 
 
@@ -257,10 +283,14 @@ async def _main(argv: Sequence[str]) -> int:
                     rule_sets=args.rule_sets,
                     history=args.history,
                     backfill=args.backfill,
+                    validate=args.validate,
                 )
             except Refused as refused:
                 print(f"refused: {refused}", file=sys.stderr)
                 return EX_REFUSED
+            except WouldNotLoad as bad:
+                print(f"would not load: {bad}", file=sys.stderr)
+                return EX_WOULD_NOT_LOAD
         print(report)
         return code
     finally:

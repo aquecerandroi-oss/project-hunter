@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from meme_rule_set import RuleSetRow
 
-__all__ = ["COMPONENT", "Connection", "Refused", "load"]
+__all__ = ["COMPONENT", "Connection", "Refused", "WouldNotLoad", "load"]
 
 COMPONENT = "meme_rule_set"
 
@@ -29,6 +29,14 @@ class Refused(Exception):
     def __init__(self, reason: str, detail: str) -> None:
         super().__init__(f"{reason}: {detail}")
         self.reason = reason
+
+
+class WouldNotLoad(Exception):
+    """T4.64: the params document ``--set-param``/``--validate`` is about to
+    write (or already carries) would crash-loop the meme worker —
+    ``hunter_meme_worker.lab_models.RuleSetSpec.from_params``, its entry gate
+    or its exit rules refuse it. Raised by ``meme_rule_set_validate``, caught
+    only by ``meme_rule_set.py``'s own CLI (exit 2, nothing written)."""
 
 
 def load(rows: Sequence[RuleSetRow], label: str) -> RuleSetRow:
