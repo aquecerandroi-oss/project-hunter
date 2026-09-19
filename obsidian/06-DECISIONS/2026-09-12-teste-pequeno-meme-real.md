@@ -186,3 +186,7 @@ Everton manda construir a estratégia de lançamento (comprar no bloco da criaç
 ## Adendo 19/09/2026 01:0x BRT — "pode subir ligado já" (Everton, por escrito): pista de lançamento em modo `on`
 
 Everton autoriza a pista de lançamento a subir já em modo real (`MEME_LAUNCH_LANE=on`), sem esperar o R60. Registro da Sexta-feira: cumpre, com a revisão de risco relâmpago do guardião antes do deploy (regra do dia: nada que assina transação sobe sem revisão), ticket 0,01 SOL, no máximo 2 posições de lançamento, cap diário compartilhado (0,15), simulação mantida. A linha do `.env` é dele; a Sexta-feira mede as primeiras 20 compras (proposta → envio em ms, acerto, R) e compara com o R60.
+
+## Adendo 19/09/2026 02:1x BRT — "esse alvo nosso não está alto?" / "pronto, começa agora" (Everton, por escrito): saída curta na mesa
+
+Medido: reais que chegaram a +30 % = 4 de 15 (27 %); a +10–15 % = 6 de 15 (40 %); papel (3 dias) +30 % = 9–20 %, +15 % = 27–35 %. A mesa passa a **alvo 1,15×, trailing 10 % armado desde a entrada, 5 min** ("regra do Everton": entrar cedo, esperar ficar positiva, vender). Aplicado por ele às 02:10 via script auditado (agora validado antes de gravar, T4.64). Contexto que ele trouxe: à mão lucrava apostando alto, escolhendo "as que gostava", esperando ficar positiva e vendendo; o que perdia era descobrir tarde — o radar por evento resolve a descoberta. Pendências: endereço público da carteira manual dele para medir o histórico real; braço em papel `everton_v0/1` com a mesma regra.
