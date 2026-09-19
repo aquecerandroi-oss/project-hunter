@@ -1,0 +1,894 @@
+NO TAPE ANCHOR for Cupsey#2 last tape trade 2026-09-19 08:48:06+00:00
+====================================================================================================
+XCrypto entry 02:54:06.000 exit 02:54:33.000 trailing spent 0.0716 net 0.0698 pnl -2.40%
+mark0 0.0683 peak(reconstr) 0.0801 at 02:54:23.000 hw(db) 0.080053181 recon-exit-vsol-diff SOL 0.0
+early10: ['CoQcKy*C', 'FnTETz', '6fAV85', 'HfmGwF', '4kgP66', 'Da5NTw', 'nya666', 'AU4TBn', 'BtLa4z', 'D3n3u8']
+trailing cross (tape): ('02:54:30.000', '0.0713', 'EZbw9M', 'sell', '0.3962') | trigger(db) 02:54:31.258
+target cross (tape): None
+post-exit max hold-mark: ('04:02:10.000', '0.5124')
+flagged sells before exit:
+    02:54:30.000 rcv 02:55:35.162 897GsV sol 1.8976 share 15.1% real_before 12.6023 mark_after 0.0727 BIG 
+timeline (trades after entry to exit+60s):
+    02:54:06.000 US buy - - mark 0.0683 entry fill
+    02:54:07.000 3TB4Ew sell 0.4213 4.5% mark 0.0668 
+    02:54:10.000 897GsV buy 0.9975 11.0% mark 0.0703 
+    02:54:10.000 EZbw9M buy 0.4102 4.1% mark 0.0717 
+    02:54:10.000 ExMXNX buy 0.9778 9.4% mark 0.0752 
+    02:54:12.000 6M3ur1 buy 0.0439 0.4% mark 0.0754 
+    02:54:16.000 BfWeTf buy 0.1975 1.7% mark 0.0761 
+    02:54:21.000 BB1jeG buy 0.9877 8.5% mark 0.0798 
+    02:54:23.000 8Wj1Jo buy 0.0802 0.6% mark 0.0801 
+    02:54:23.000 4wbrLx sell 0.1358 1.1% mark 0.0796 
+    02:54:24.000 7UdBqa buy 0.0098 0.1% mark 0.0796 
+    02:54:30.000 897GsV sell 1.8976 15.1% mark 0.0727 BIG
+    02:54:30.000 EZbw9M sell 0.3962 3.7% mark 0.0713 
+    02:54:30.000 omegoM sell 0.3907 3.8% mark 0.0699 
+    02:54:31.000 D3n3u8 buy 0.0004 0.0% mark 0.0699 
+    02:54:33.000 US sell 0.0708 0.7% mark 0.0699 our exit fill (reconstructed mark just before)
+    02:54:33.000 8dtx2t sell 0.7727 7.8% mark 0.0672 BIG
+    02:54:36.000 27Rzkf buy 0.6123 6.7% mark 0.0693 
+    02:54:36.000 9m4Uet buy 0.4938 5.1% mark 0.0710 
+    02:54:36.000 FZU56d buy 1.2346 12.0% mark 0.0754 
+    02:54:36.000 6V2MN5 buy 0.0983 0.9% mark 0.0758 
+    02:54:36.000 67LwNG buy 0.0182 0.2% mark 0.0758 
+    02:54:36.000 EZbw9M buy 0.3969 3.4% mark 0.0774 
+    02:54:37.000 Gc79oW buy 0.0029 0.0% mark 0.0774 
+    02:54:37.000 Gc79oW buy 0.0027 0.0% mark 0.0774 
+    02:54:38.000 4F8hmn buy 0.2773 2.3% mark 0.0784 
+    02:54:38.000 omegoM buy 0.4008 3.3% mark 0.0799 
+    02:54:39.000 5veTCy buy 0.0020 0.0% mark 0.0799 
+    02:54:39.000 897GsV sell 1.7737 14.0% mark 0.0734 BIG
+    02:54:40.000 9UHyzg buy 0.0880 0.8% mark 0.0737 
+    02:54:41.000 3TKkfX buy 0.0196 0.2% mark 0.0738 
+    02:54:42.000 57P41k buy 0.4889 4.4% mark 0.0756 
+    02:54:42.000 EaaCfV buy 1.1852 10.3% mark 0.0799 
+    02:54:48.000 DLdesd buy 0.9877 7.8% mark 0.0837 
+    02:54:49.000 C8AhEm buy 0.0196 0.1% mark 0.0838 
+    02:54:49.000 2eS19w buy 0.0879 0.6% mark 0.0841 
+    02:54:50.000 CQd3ea buy 0.0430 0.3% mark 0.0843 
+    02:54:52.000 Etbn7X buy 1.2711 9.2% mark 0.0892 
+    02:54:55.000 66hhKt buy 0.0978 0.6% mark 0.0896 
+    02:54:57.000 2eS19w buy 0.0439 0.3% mark 0.0898 
+    02:54:57.000 ceBaMg sell 0.2644 1.7% mark 0.0887 
+    02:54:58.000 ALKjDW sell 0.0578 0.4% mark 0.0885 
+    02:54:58.000 67LwNG sell 0.0227 0.2% mark 0.0884 
+    02:54:59.000 57P41k sell 0.5716 3.8% mark 0.0862 
+    02:54:59.000 5veTCy sell 0.0021 0.0% mark 0.0862 
+    02:55:00.000 4wbrLx sell 0.1093 0.8% mark 0.0858 
+    02:55:03.000 BB1jeG sell 0.9981 7.0% mark 0.0818 BIG
+    02:55:03.000 EaaCfV sell 1.2701 9.6% mark 0.0772 BIG
+    02:55:03.000 9m4Uet sell 0.5253 4.4% mark 0.0753 
+    02:55:05.000 omegoM sell 0.3556 3.1% mark 0.0739 
+    02:55:05.000 5zXdgR sell 1.2251 11.1% mark 0.0696 BIG
+    02:55:10.000 B6DSox buy 0.0439 0.4% mark 0.0698 
+    02:55:10.000 omegoM buy 0.3781 3.8% mark 0.0711 
+    02:55:10.000 5veTCy buy 0.0020 0.0% mark 0.0711 
+    02:55:11.000 6M3ur1 buy 0.0439 0.4% mark 0.0713 
+    02:55:12.000 A62Atp buy 0.2469 2.4% mark 0.0721 
+    02:55:13.000 CQd3ea buy 0.0430 0.4% mark 0.0723 
+    02:55:14.000 57P41k buy 0.4889 4.6% mark 0.0740 
+    02:55:16.000 Fyc4pf buy 0.0439 0.4% mark 0.0742 
+    02:55:18.000 2d6kZv buy 0.0997 0.9% mark 0.0746 
+    02:55:27.000 ADJUFt buy 0.0264 0.2% mark 0.0747 
+    02:55:27.000 57P41k sell 0.4929 4.4% mark 0.0729 
+    02:55:30.000 CxkxCQ sell 0.1986 1.8% mark 0.0722 
+    02:55:32.000 8Wj1Jo sell 0.0720 0.7% mark 0.0719 
+====================================================================================================
+EQUITITTY entry 04:03:24.000 exit 04:03:39.000 trailing spent 0.0700 net 0.0528 pnl -24.49%
+mark0 0.0667 peak(reconstr) 0.0668 at 04:03:24.000 hw(db) 0.065036118 recon-exit-vsol-diff SOL -0.001474073
+early10: ['J4wvkf*C', '7E8fJ4', '2mQLof', '2ksQ77', '2CQgjc', 'HL9rRB', 'BQEQ48', 'Hxnxpc', '6M3ur1', 'CxkxCQ']
+trailing cross (tape): ('04:03:33.000', '0.0571', '5Ta9XC', 'sell', '2.7076') | trigger(db) 04:03:34.167
+target cross (tape): None
+post-exit max hold-mark: ('04:15:36.000', '0.0578')
+flagged sells before exit:
+    04:03:30.000 rcv 04:04:18.359 7QBQLN sol 1.8169 share 5.8% real_before 31.4293 mark_after 0.0609 BIG 
+    04:03:33.000 rcv 04:04:18.359 5Ta9XC sol 2.7076 share 8.9% real_before 30.4301 mark_after 0.0571 BIG 
+timeline (trades after entry to exit+60s):
+    04:03:24.000 US buy - - mark 0.0667 entry fill
+    04:03:24.000 EZ7gDL buy 0.0196 0.1% mark 0.0668 
+    04:03:24.000 rXmT45 sell 0.4836 1.5% mark 0.0657 
+    04:03:24.000 AQxAzU buy 0.0147 0.0% mark 0.0658 
+    04:03:24.000 2vm5LD sell 0.2129 0.7% mark 0.0653 
+    04:03:24.000 C9MMHx sell 0.1761 0.6% mark 0.0649 
+    04:03:25.000 CEuPm1 sell 0.0541 0.2% mark 0.0648 
+    04:03:25.000 9z3SYL buy 0.0088 0.0% mark 0.0649 
+    04:03:25.000 FjkKwy sell 0.2858 0.9% mark 0.0643 
+    04:03:26.000 8sz2Qn buy 0.0988 0.3% mark 0.0645 
+    04:03:26.000 a9Cct2 buy 0.2933 0.9% mark 0.0651 
+    04:03:26.000 8N9C8Y sell 0.1701 0.5% mark 0.0647 
+    04:03:26.000 E84DPt sell 0.3827 1.2% mark 0.0639 
+    04:03:27.000 3aBD62 sell 0.0070 0.0% mark 0.0639 
+    04:03:29.000 8HWDVF buy 0.2646 0.9% mark 0.0645 
+    04:03:29.000 2WB2VQ buy 0.0419 0.1% mark 0.0645 
+    04:03:30.000 5tNLRp buy 0.0296 0.1% mark 0.0646 
+    04:03:30.000 9z3SYL buy 0.0088 0.0% mark 0.0646 
+    04:03:30.000 7QBQLN sell 1.8169 5.8% mark 0.0609 BIG
+    04:03:30.000 9CuugF buy 0.1975 0.7% mark 0.0613 
+    04:03:30.000 CzkkFq buy 0.1975 0.7% mark 0.0617 
+    04:03:31.000 9RkLeu buy 0.0988 0.3% mark 0.0619 
+    04:03:32.000 7iiKSk sell 0.0689 0.2% mark 0.0617 
+    04:03:33.000 GjKjTm buy 0.0988 0.3% mark 0.0619 
+    04:03:33.000 2x3n3M buy 0.0988 0.3% mark 0.0621 
+    04:03:33.000 C6Fzsv buy 0.0966 0.3% mark 0.0623 
+    04:03:33.000 DMmR6s buy 0.0988 0.3% mark 0.0625 
+    04:03:33.000 5Ta9XC sell 2.7076 8.9% mark 0.0571 BIG
+    04:03:33.000 5vbBW8 sell 0.0917 0.3% mark 0.0569 
+    04:03:33.000 67LwNG sell 0.0226 0.1% mark 0.0568 
+    04:03:33.000 Egqa7m sell 0.1825 0.7% mark 0.0565 
+    04:03:33.000 AFUXTp sell 0.1381 0.5% mark 0.0562 
+    04:03:33.000 B7V1va sell 0.1389 0.5% mark 0.0559 
+    04:03:33.000 EorGEb sell 1.1267 4.2% mark 0.0538 
+    04:03:34.000 ETSxXT sell 0.1341 0.5% mark 0.0535 
+    04:03:34.000 HkPhW8 sell 0.1354 0.5% mark 0.0532 
+    04:03:34.000 H5TrUt sell 0.1361 0.5% mark 0.0530 
+    04:03:34.000 BxyYZc sell 0.1348 0.5% mark 0.0527 
+    04:03:34.000 H3Rwxe sell 0.1335 0.5% mark 0.0525 
+    04:03:34.000 61fsvQ sell 0.1312 0.5% mark 0.0522 
+    04:03:34.000 2pqfUX sell 0.1328 0.5% mark 0.0520 
+    04:03:34.000 5kWsuR sell 0.2148 0.9% mark 0.0516 
+    04:03:34.000 3gZ8ny sell 0.0025 0.0% mark 0.0516 
+    04:03:34.000 EZ7gDL sell 0.0151 0.1% mark 0.0515 
+    04:03:35.000 BFhJkE buy 0.0884 0.4% mark 0.0517 
+    04:03:35.000 HA5gjX buy 0.1066 0.4% mark 0.0519 
+    04:03:35.000 4egtgC buy 0.0927 0.4% mark 0.0521 
+    04:03:35.000 FAGfw2 buy 0.0842 0.3% mark 0.0522 
+    04:03:36.000 H8EESx buy 0.2511 1.0% mark 0.0527 
+    04:03:36.000 6JQKFa buy 0.0464 0.2% mark 0.0528 
+    04:03:36.000 Es7Se1 buy 0.0099 0.0% mark 0.0528 
+    04:03:36.000 Es7Se1 buy 0.0099 0.0% mark 0.0528 
+    04:03:36.000 Es7Se1 buy 0.0099 0.0% mark 0.0529 
+    04:03:36.000 DpnHfE buy 0.0441 0.2% mark 0.0529 
+    04:03:36.000 Es7Se1 buy 0.0099 0.0% mark 0.0530 
+    04:03:37.000 Gsu7a2 buy 0.0176 0.1% mark 0.0530 
+    04:03:37.000 5ge6zn buy 0.0177 0.1% mark 0.0530 
+    04:03:37.000 5ixErS sell 0.7799 3.0% mark 0.0515 
+    04:03:37.000 WdetFN buy 0.0782 0.3% mark 0.0517 
+    04:03:38.000 CMGRmA buy 0.4938 2.0% mark 0.0526 
+    04:03:38.000 BNDK5R buy 0.1323 0.5% mark 0.0529 
+    04:03:39.000 US sell 0.0536 0.2% mark 0.0529 our exit fill (reconstructed mark just before)
+    04:03:39.000 3K9ehX buy 0.0015 0.0% mark 0.0529 
+    04:03:39.000 3zZpCZ buy 0.0320 0.1% mark 0.0529 
+    04:03:39.000 2JFkhn buy 0.2209 0.9% mark 0.0534 
+    04:03:41.000 EsZF46 sell 0.0645 0.2% mark 0.0532 
+    04:03:41.000 ARu4n5 buy 0.0018 0.0% mark 0.0532 
+    04:03:42.000 8C32uG buy 1.0647 4.1% mark 0.0553 
+    04:03:42.000 7sfseK buy 0.1975 0.7% mark 0.0557 
+    04:03:42.000 ARu4n5 buy 0.0077 0.0% mark 0.0557 
+    04:03:43.000 F6hhXu buy 0.0494 0.2% mark 0.0558 
+    04:03:43.000 AExXfr buy 0.0883 0.3% mark 0.0560 
+    04:03:44.000 FKAwiW buy 0.0494 0.2% mark 0.0561 
+    04:03:44.000 sGT9Zk buy 0.0099 0.0% mark 0.0561 
+    04:03:44.000 J6jkNR buy 0.2015 0.7% mark 0.0565 
+    04:03:45.000 BnA7HQ sell 0.1194 0.4% mark 0.0562 
+    04:03:45.000 6JQSDz buy 0.2190 0.8% mark 0.0567 
+    04:03:46.000 EsZF46 buy 0.0693 0.3% mark 0.0568 
+    04:03:49.000 8LMFd5 buy 0.0748 0.3% mark 0.0570 
+    04:03:50.000 2k2jJV sell 0.4312 1.6% mark 0.0561 
+    04:03:50.000 GVVP8N sell 0.6767 2.5% mark 0.0548 
+    04:03:50.000 CMfSm7 buy 0.0863 0.3% mark 0.0550 
+    04:03:50.000 EsJ9U8 sell 0.1536 0.6% mark 0.0547 
+    04:03:51.000 9zHZGd buy 0.0296 0.1% mark 0.0547 
+    04:03:52.000 2vm5LD sell 0.3653 1.4% mark 0.0540 
+    04:03:52.000 2RACdJ buy 0.0884 0.3% mark 0.0542 
+    04:03:53.000 29mDUJ sell 0.0223 0.1% mark 0.0541 
+    04:03:53.000 E1acoT sell 0.5879 2.2% mark 0.0530 
+    04:03:54.000 2ksQ77 sell 2.8119 11.0% mark 0.0478 EARLY4 BIG
+    04:03:54.000 AR7Kf6 sell 0.4078 1.8% mark 0.0470 
+    04:03:54.000 5vwKkQ sell 0.4211 1.9% mark 0.0463 
+    04:03:54.000 8rpnuC sell 0.0455 0.2% mark 0.0462 
+    04:03:54.000 EvW2uY buy 0.0606 0.3% mark 0.0463 
+    04:03:54.000 72uqVN sell 0.4470 2.0% mark 0.0455 
+    04:03:54.000 3gXqYS sell 0.0281 0.1% mark 0.0455 
+    04:03:55.000 5AMtZi sell 0.0164 0.1% mark 0.0455 
+    04:03:55.000 6M3ur1 sell 0.1907 0.9% mark 0.0451 EARLY9
+    04:03:55.000 4rjx8T sell 0.7139 3.3% mark 0.0439 
+    04:03:55.000 B11c1b sell 0.0009 0.0% mark 0.0439 
+    04:03:55.000 6hDg6x sell 0.0021 0.0% mark 0.0439 
+    04:03:55.000 6ENbJb sell 0.0009 0.0% mark 0.0439 
+    04:03:55.000 7QBQLN sell 1.2293 6.0% mark 0.0418 BIG
+    04:03:55.000 9m4Uet buy 0.4938 2.5% mark 0.0426 
+    04:03:55.000 3ytCrP sell 0.0006 0.0% mark 0.0426 
+    04:03:55.000 3vnqjU sell 0.1775 0.9% mark 0.0423 
+    04:03:56.000 AQxAzU sell 0.0092 0.0% mark 0.0423 
+    04:03:56.000 js7VBn sell 0.1866 0.9% mark 0.0420 
+    04:03:56.000 6jXA1f buy 0.1146 0.6% mark 0.0422 
+    04:03:56.000 FSz6mp buy 1.2346 6.3% mark 0.0443 
+    04:03:56.000 1oveSc buy 0.0494 0.2% mark 0.0444 
+    04:03:56.000 8owCuU sell 0.1446 0.7% mark 0.0441 
+    04:03:56.000 CBVwEz sell 0.8063 3.9% mark 0.0427 
+    04:03:56.000 FQwZUa sell 0.8779 4.4% mark 0.0412 
+    04:03:56.000 2A1vcV buy 0.0494 0.3% mark 0.0413 
+    04:03:56.000 ARu4n5 buy 0.4914 2.6% mark 0.0422 
+    04:03:56.000 7LUDa5 sell 0.1209 0.6% mark 0.0419 
+    04:03:56.000 AfAqBz sell 0.6407 3.3% mark 0.0409 
+    04:03:57.000 D6GdUw sell 0.4465 2.4% mark 0.0401 
+    04:03:57.000 B4u5Ps buy 0.0265 0.1% mark 0.0402 
+    04:03:57.000 Fr1Cfq buy 0.0988 0.5% mark 0.0403 
+    04:03:57.000 E7Bj1L sell 0.2299 1.2% mark 0.0399 
+    04:03:57.000 Ffsp9U buy 0.4409 2.4% mark 0.0407 
+    04:03:57.000 5kWsuR sell 0.0515 0.3% mark 0.0406 
+    04:03:57.000 CMfSm7 sell 0.0643 0.3% mark 0.0405 
+    04:03:57.000 CzkkFq sell 0.2187 1.2% mark 0.0401 
+    04:03:58.000 HHvuer sell 0.6260 3.4% mark 0.0391 
+    04:03:58.000 2dvvut sell 0.0007 0.0% mark 0.0391 
+    04:03:58.000 2J7dY5 sell 0.1578 0.9% mark 0.0388 
+    04:03:58.000 6JQKFa sell 0.0343 0.2% mark 0.0388 
+    04:03:58.000 7RyhX6 sell 0.1417 0.8% mark 0.0385 
+    04:03:58.000 644kCY buy 0.0978 0.6% mark 0.0387 
+    04:03:59.000 7sfseK sell 0.1373 0.8% mark 0.0385 
+    04:03:59.000 sGT9Zk sell 0.0067 0.0% mark 0.0385 
+    04:03:59.000 DZDWRf sell 0.3375 1.9% mark 0.0379 
+    04:03:59.000 8xJCi1 sell 0.1528 0.9% mark 0.0377 
+    04:03:59.000 DpnHfE sell 0.0826 0.5% mark 0.0375 
+    04:04:00.000 9RkLeu buy 0.4938 2.9% mark 0.0383 
+    04:04:00.000 9uBoTL sell 0.4961 2.9% mark 0.0375 
+    04:04:00.000 644kCY buy 0.0978 0.6% mark 0.0377 
+    04:04:00.000 Ax9cfc sell 0.0536 0.3% mark 0.0376 
+    04:04:00.000 CBVwEz buy 0.8802 5.2% mark 0.0390 
+    04:04:00.000 2undvD buy 0.9778 5.5% mark 0.0407 
+    04:04:01.000 HciY7L sell 0.2569 1.4% mark 0.0402 
+    04:04:01.000 GjKjTm sell 0.0647 0.4% mark 0.0401 
+    04:04:01.000 EZbw9M buy 0.4868 2.6% mark 0.0409 
+    04:04:01.000 CEuPm1 sell 0.0341 0.2% mark 0.0409 
+    04:04:01.000 DMmR6s sell 0.0643 0.3% mark 0.0408 
+    04:04:01.000 2x3n3M sell 0.0646 0.3% mark 0.0407 
+    04:04:01.000 5Eu4my buy 0.0593 0.3% mark 0.0408 
+    04:04:01.000 82J2y1 buy 0.0988 0.5% mark 0.0409 
+    04:04:01.000 haqqiU buy 0.0099 0.1% mark 0.0409 
+    04:04:02.000 8owCuU buy 0.1369 0.7% mark 0.0412 
+    04:04:02.000 Drqtx5 sell 0.3026 1.6% mark 0.0407 
+    04:04:02.000 3aBD62 buy 0.0085 0.0% mark 0.0407 
+    04:04:02.000 mmJDE8 buy 0.9877 5.3% mark 0.0423 
+    04:04:02.000 9xWZrn sell 0.0750 0.4% mark 0.0422 
+    04:04:02.000 Fiox39 buy 0.3527 1.8% mark 0.0428 
+    04:04:02.000 8yvckq sell 0.0210 0.1% mark 0.0428 
+    04:04:03.000 EPzm28 sell 0.0025 0.0% mark 0.0428 
+    04:04:03.000 4CwdGw buy 0.0335 0.2% mark 0.0428 
+    04:04:04.000 7sfseK buy 0.1975 1.0% mark 0.0432 
+    04:04:04.000 AExXfr buy 0.0883 0.4% mark 0.0433 
+    04:04:04.000 mV16u6 buy 0.9877 4.9% mark 0.0450 
+    04:04:04.000 5kWsuR buy 0.0494 0.2% mark 0.0451 
+    04:04:04.000 CcrG4e buy 0.0176 0.1% mark 0.0452 
+    04:04:04.000 9z3SYL sell 0.0123 0.1% mark 0.0451 
+    04:04:04.000 67R1q5 buy 0.0265 0.1% mark 0.0452 
+    04:04:04.000 GmrxZa buy 0.0978 0.5% mark 0.0454 
+    04:04:04.000 HciY7L buy 0.2495 1.2% mark 0.0458 
+    04:04:04.000 4V8ARd buy 1.4667 6.8% mark 0.0484 
+    04:04:05.000 B6GK4U sell 2.7637 11.9% mark 0.0435 BIG
+    04:04:05.000 3vnqjU buy 0.3703 1.8% mark 0.0442 
+    04:04:05.000 E7Bj1L buy 0.0176 0.1% mark 0.0442 
+    04:04:06.000 E7Bj1L buy 0.0176 0.1% mark 0.0442 
+    04:04:06.000 2XvErB buy 0.0227 0.1% mark 0.0443 
+    04:04:06.000 EvW2uY buy 0.0256 0.1% mark 0.0443 
+    04:04:06.000 Hjp6Ne buy 0.0186 0.1% mark 0.0444 
+    04:04:07.000 2J7dY5 buy 0.1831 0.9% mark 0.0447 
+    04:04:08.000 2dvvut buy 0.0010 0.0% mark 0.0447 
+    04:04:08.000 9RkLeu sell 0.4849 2.3% mark 0.0438 
+    04:04:08.000 1oveSc sell 0.0529 0.3% mark 0.0437 
+    04:04:08.000 CqShs3 buy 0.0401 0.2% mark 0.0438 
+    04:04:09.000 47Fa9y sell 0.2497 1.2% mark 0.0434 
+    04:04:09.000 5ixErS buy 0.3527 1.7% mark 0.0440 
+    04:04:11.000 82J2y1 sell 0.1062 0.5% mark 0.0438 
+    04:04:11.000 CEuPm1 buy 0.0177 0.1% mark 0.0438 
+    04:04:11.000 DpnHfE buy 0.0882 0.4% mark 0.0440 
+    04:04:11.000 ARu4n5 sell 0.3381 1.6% mark 0.0434 
+    04:04:11.000 5Eu4my sell 0.0631 0.3% mark 0.0433 
+    04:04:12.000 B4u5Ps sell 0.0286 0.1% mark 0.0432 
+    04:04:13.000 7eSpms buy 0.0510 0.3% mark 0.0433 
+    04:04:13.000 8NFh9y sell 0.2170 1.1% mark 0.0430 
+    04:04:13.000 haqqiU sell 0.0104 0.1% mark 0.0429 
+    04:04:13.000 5kWsuR buy 0.0494 0.2% mark 0.0430 
+    04:04:13.000 9RkLeu sell 0.0393 0.2% mark 0.0430 
+    04:04:14.000 3bgZ5C buy 0.0088 0.0% mark 0.0430 
+    04:04:14.000 mV16u6 sell 0.9458 4.7% mark 0.0414 
+    04:04:15.000 C6Fzsv sell 0.0642 0.3% mark 0.0413 
+    04:04:15.000 3aBD62 sell 0.1538 0.8% mark 0.0410 
+    04:04:15.000 FKAwiW sell 0.0361 0.2% mark 0.0409 
+    04:04:16.000 6dX5B8 buy 0.0016 0.0% mark 0.0409 
+    04:04:17.000 5kWsuR buy 0.0494 0.3% mark 0.0410 
+    04:04:17.000 CBVwEz sell 0.8881 4.7% mark 0.0395 
+    04:04:17.000 4EvYf9 buy 1.9949 11.0% mark 0.0429 
+    04:04:17.000 Eqc5DH buy 0.9877 4.9% mark 0.0446 
+    04:04:17.000 6tDY58 buy 0.0866 0.4% mark 0.0448 
+    04:04:18.000 FqLuM5 buy 0.1815 0.9% mark 0.0451 
+    04:04:18.000 EN4XQq sell 0.0579 0.3% mark 0.0450 
+    04:04:18.000 FtMSgA buy 0.2469 1.2% mark 0.0454 
+    04:04:18.000 2WB2VQ sell 0.0294 0.1% mark 0.0454 
+    04:04:19.000 6G1ocm buy 0.1778 0.8% mark 0.0457 
+    04:04:20.000 4CwdGw sell 0.0358 0.2% mark 0.0456 
+    04:04:20.000 9m4Uet sell 0.5195 2.4% mark 0.0447 
+    04:04:20.000 Ffsp9U sell 0.4915 2.3% mark 0.0438 
+    04:04:20.000 8HWDVF buy 0.0441 0.2% mark 0.0439 
+    04:04:21.000 3BGFtb buy 0.0168 0.1% mark 0.0439 
+    04:04:21.000 2WB2VQ buy 0.0586 0.3% mark 0.0441 
+    04:04:22.000 4egtgC buy 0.1063 0.5% mark 0.0442 
+    04:04:23.000 7sfseK sell 0.2024 1.0% mark 0.0439 
+    04:04:26.000 4V8ARd buy 0.0098 0.0% mark 0.0439 
+    04:04:26.000 omegoM sell 0.4829 2.3% mark 0.0431 
+    04:04:26.000 FSz6mp sell 1.2322 6.1% mark 0.0410 BIG
+    04:04:26.000 EZbw9M sell 0.4852 2.6% mark 0.0402 
+    04:04:26.000 Fr1Cfq sell 0.1036 0.6% mark 0.0400 
+    04:04:27.000 GmrxZa sell 0.0854 0.5% mark 0.0399 
+    04:04:28.000 9CuugF sell 0.1209 0.7% mark 0.0397 
+    04:04:29.000 5kWsuR buy 0.0494 0.3% mark 0.0397 
+    04:04:29.000 5tnGX9 sell 0.7536 4.1% mark 0.0385 
+    04:04:29.000 HciY7L sell 0.2106 1.2% mark 0.0382 
+    04:04:29.000 8owCuU sell 0.1269 0.7% mark 0.0380 
+    04:04:30.000 Dp8jGi sell 0.3700 2.2% mark 0.0374 
+    04:04:30.000 644kCY buy 0.0978 0.6% mark 0.0375 
+    04:04:30.000 mmJDE8 buy 0.9877 5.9% mark 0.0391 
+    04:04:30.000 GW6rbg sell 0.7131 4.0% mark 0.0380 
+    04:04:31.000 7x7fRG sell 0.8911 5.2% mark 0.0365 BIG
+    04:04:31.000 2J7dY5 sell 0.1497 0.9% mark 0.0363 
+    04:04:32.000 E7Bj1L sell 0.0287 0.2% mark 0.0363 
+    04:04:32.000 EsZF46 sell 0.0443 0.3% mark 0.0362 
+    04:04:32.000 9RkLeu sell 0.0990 0.6% mark 0.0360 
+    04:04:32.000 67R1q5 buy 0.0265 0.2% mark 0.0361 
+    04:04:32.000 ByWtv6 sell 0.0718 0.5% mark 0.0360 
+    04:04:33.000 D3aDvg sell 0.5177 3.3% mark 0.0351 
+    04:04:34.000 9zHZGd buy 0.0198 0.1% mark 0.0352 
+    04:04:34.000 FAGfw2 sell 0.0568 0.4% mark 0.0351 
+    04:04:34.000 2undvD buy 0.4889 3.2% mark 0.0359 
+    04:04:35.000 DtBoHT buy 0.9877 6.3% mark 0.0374 
+    04:04:36.000 CEuPm1 sell 0.0150 0.1% mark 0.0374 
+    04:04:36.000 4V8ARd buy 0.8311 5.0% mark 0.0387 
+    04:04:36.000 FrGFZR buy 0.0494 0.3% mark 0.0388 
+    04:04:36.000 8Qcxnh buy 0.1732 1.0% mark 0.0391 
+    04:04:38.000 7x7fRG buy 0.8839 5.0% mark 0.0406 
+    04:04:39.000 BgEaCj sell 0.0573 0.3% mark 0.0405 
+    04:04:39.000 6obcG7 buy 0.0193 0.1% mark 0.0405 
+====================================================================================================
+FEPE entry 05:11:39.000 exit 05:11:49.000 trailing spent 0.0716 net 0.0617 pnl -13.75%
+mark0 0.0683 peak(reconstr) 0.0704 at 05:11:42.000 hw(db) 0.070383844 recon-exit-vsol-diff SOL 0.0
+early10: ['9yxmCN', '22vL22', '2wHHnA', '5Jvcdi*C', '2AqFJz', 'GDysaD', '7kVbYK', 'EJhww2', '5FYFzd', '55ZVYC']
+trailing cross (tape): ('05:11:44.000', '0.0623', '2AqFJz', 'sell', '2.9570') | trigger(db) 05:11:45.515
+target cross (tape): None
+post-exit max hold-mark: ('05:27:25.000', '0.2446')
+flagged sells before exit:
+    05:11:44.000 rcv 05:12:31.920 2AqFJz sol 2.9570 share 14.8% real_before 19.9511 mark_after 0.0623 EARLY5 BIG 
+timeline (trades after entry to exit+60s):
+    05:11:39.000 US buy - - mark 0.0683 entry fill
+    05:11:40.000 DpsjUP buy 0.7476 3.9% mark 0.0704 
+    05:11:42.000 FDute3 buy 0.0099 0.0% mark 0.0704 
+    05:11:44.000 2AqFJz sell 2.9570 14.8% mark 0.0623 EARLY5 BIG
+    05:11:47.000 98Qonk sell 0.2043 1.2% mark 0.0618 
+    05:11:49.000 US sell 0.0625 0.4% mark 0.0618 our exit fill (reconstructed mark just before)
+    05:11:50.000 FDute3 sell 0.0086 0.1% mark 0.0617 
+    05:11:52.000 3ujwuH buy 0.2520 1.5% mark 0.0624 
+    05:11:52.000 3RgtM5 buy 0.0988 0.6% mark 0.0627 
+    05:11:54.000 FBoVuL buy 0.4524 2.6% mark 0.0639 
+    05:12:01.000 8wXd3c buy 0.9877 5.6% mark 0.0666 
+    05:12:02.000 DEUMWT buy 0.1978 1.1% mark 0.0671 
+    05:12:04.000 Cm9k6b buy 0.4043 2.2% mark 0.0682 
+    05:12:04.000 FDute3 buy 0.0099 0.1% mark 0.0683 
+    05:12:05.000 3DvaQb buy 0.5494 2.9% mark 0.0698 
+    05:12:07.000 C4Bfgd buy 0.4482 2.3% mark 0.0711 
+    05:12:08.000 58MUA9 buy 0.0494 0.2% mark 0.0712 
+    05:12:09.000 4qP6Do sell 0.0020 0.0% mark 0.0712 
+    05:12:10.000 H2fNE5 buy 0.2006 1.0% mark 0.0718 
+    05:12:14.000 CVgtsW buy 0.9877 4.8% mark 0.0746 
+    05:12:15.000 58MUA9 sell 0.0517 0.2% mark 0.0744 
+    05:12:16.000 6XTb1n buy 0.4036 1.9% mark 0.0756 
+    05:12:22.000 22vL22 sell 2.9524 13.6% mark 0.0672 EARLY2 BIG
+    05:12:22.000 JAEDMG buy 0.0914 0.5% mark 0.0675 
+    05:12:22.000 Fakckx buy 0.1045 0.6% mark 0.0678 
+    05:12:22.000 8pfQix buy 0.0974 0.5% mark 0.0680 
+    05:12:28.000 FnMvcb buy 0.6020 3.2% mark 0.0697 
+    05:12:31.000 25uKbN buy 0.3512 1.8% mark 0.0707 
+    05:12:33.000 jLJAuA buy 0.6992 3.5% mark 0.0727 
+    05:12:34.000 4QYMtm buy 0.0092 0.0% mark 0.0727 
+    05:12:34.000 HkCq35 buy 0.0243 0.1% mark 0.0728 
+    05:12:34.000 EfaWCX buy 0.2001 1.0% mark 0.0734 
+    05:12:41.000 9QnueM buy 0.5053 2.4% mark 0.0748 
+    05:12:42.000 HrZj38 buy 0.0010 0.0% mark 0.0748 
+    05:12:43.000 Bv1cnL buy 0.0089 0.0% mark 0.0749 
+    05:12:46.000 9kqe9u buy 0.7704 3.6% mark 0.0771 
+    05:12:47.000 CzB78q buy 0.4506 2.0% mark 0.0785 
+====================================================================================================
+Cupsey#1 entry 05:45:44.000 exit 05:46:24.000 target spent 0.0721 net 0.0852 pnl 18.25%
+mark0 0.0688 peak(reconstr) 0.0835 at 05:46:24.000 hw(db) 0.086543277 recon-exit-vsol-diff SOL -0.488888888
+early10: ['4CUEXz', '91GvZz', 'A5mMDT', 'AM3JZa*C', 'DxhpC9', '9FQnf1', '84UBp5', 'J3gZFp', '6Jzyqc', 'GGiqYV']
+trailing cross (tape): None | trigger(db) 05:46:24.836
+target cross (tape): ('05:46:24.000', '0.0831')
+post-exit max hold-mark: ('05:47:00.000', '0.1196')
+flagged sells before exit:
+    05:45:54.000 rcv 05:47:05.725 DjiJKV sol 0.8394 share 7.3% real_before 11.4977 mark_after 0.0658 BIG 
+    05:45:56.000 rcv 05:47:05.725 Dggd6X sol 0.5677 share 5.3% real_before 10.6583 mark_after 0.0640 BIG 
+timeline (trades after entry to exit+60s):
+    05:45:44.000 US buy - - mark 0.0688 entry fill
+    05:45:46.000 AXx6t3 buy 0.0861 0.7% mark 0.0690 
+    05:45:49.000 Gtkbu7 sell 0.0280 0.2% mark 0.0689 
+    05:45:51.000 3Vggwn sell 0.1080 0.9% mark 0.0686 
+    05:45:54.000 DjiJKV sell 0.8394 7.3% mark 0.0658 BIG
+    05:45:56.000 Dggd6X sell 0.5677 5.3% mark 0.0640 BIG
+    05:45:58.000 5mEUdV buy 0.0099 0.1% mark 0.0641 
+    05:46:06.000 DQiEUH sell 0.0857 0.8% mark 0.0638 
+    05:46:07.000 HeGi8a sell 0.3043 3.0% mark 0.0628 
+    05:46:09.000 4Tksvf buy 0.2933 3.0% mark 0.0637 
+    05:46:09.000 HrZj38 buy 0.0010 0.0% mark 0.0637 
+    05:46:10.000 BEgBqx sell 0.0000 0.0% mark 0.0637 
+    05:46:11.000 BdfKXF sell 0.0000 0.0% mark 0.0637 
+    05:46:11.000 8cxYvf buy 0.1965 2.0% mark 0.0644 
+    05:46:14.000 35zvtd buy 0.0988 1.0% mark 0.0647 
+    05:46:17.000 9vweyp buy 0.0050 0.0% mark 0.0647 
+    05:46:21.000 4wbrLx sell 0.0775 0.8% mark 0.0645 
+    05:46:23.000 ByUDHg buy 1.9427 19.0% mark 0.0708 
+    05:46:23.000 CyBiGy buy 2.2716 18.7% mark 0.0787 
+    05:46:23.000 DwxG2M buy 0.4938 3.4% mark 0.0804 
+    05:46:23.000 AmwJTo buy 0.3900 2.6% mark 0.0818 
+    05:46:24.000 DTbX3S buy 0.2081 1.4% mark 0.0826 
+    05:46:24.000 8BLZqM buy 0.1467 0.9% mark 0.0831 
+    05:46:24.000 EowQHF buy 0.0494 0.3% mark 0.0833 
+    05:46:24.000 51LsGC buy 0.0494 0.3% mark 0.0835 
+    05:46:24.000 US sell 0.0863 0.5% mark 0.0835 our exit fill (reconstructed mark just before)
+    05:46:24.000 GJTju8 buy 0.4889 3.1% mark 0.0853 
+    05:46:24.000 56S29m buy 0.2818 1.7% mark 0.0863 
+    05:46:24.000 4N1dth buy 0.1552 0.9% mark 0.0869 
+    05:46:25.000 852AYX buy 0.0988 0.6% mark 0.0872 
+    05:46:26.000 Finr5r buy 0.3749 2.2% mark 0.0886 
+    05:46:29.000 35zvtd sell 0.1348 0.8% mark 0.0881 
+    05:46:31.000 AmwJTo sell 0.4185 2.5% mark 0.0866 
+    05:46:31.000 ceBaMg sell 0.2880 1.7% mark 0.0856 
+    05:46:31.000 E64wuS buy 1.7494 10.7% mark 0.0921 
+    05:46:31.000 5e8DjV buy 1.4815 8.2% mark 0.0979 
+    05:46:31.000 6Us8oi buy 0.1458 0.7% mark 0.0984 
+    05:46:31.000 4asn7b buy 0.8707 4.4% mark 0.1019 
+    05:46:31.000 8KUYGi buy 0.1140 0.6% mark 0.1024 
+    05:46:32.000 8oavCs buy 0.3446 1.7% mark 0.1038 
+    05:46:32.000 CEpgtQ buy 0.8707 4.1% mark 0.1074 
+    05:46:32.000 4DLVmd buy 0.1055 0.5% mark 0.1078 
+    05:46:33.000 7J8rAR buy 0.0927 0.4% mark 0.1082 
+    05:46:33.000 6kVeQu buy 0.2444 1.1% mark 0.1092 
+    05:46:33.000 7a4XEW buy 0.1516 0.7% mark 0.1098 
+    05:46:33.000 EowQHF buy 0.0247 0.1% mark 0.1099 
+    05:46:33.000 51LsGC buy 0.0247 0.1% mark 0.1100 
+    05:46:34.000 5pHk81 buy 0.0499 0.2% mark 0.1102 
+    05:46:35.000 AXx6t3 sell 0.1380 0.6% mark 0.1097 
+    05:46:35.000 4vs3hm buy 0.1975 0.9% mark 0.1105 
+    05:46:36.000 8BLZqM sell 0.1942 0.9% mark 0.1097 
+    05:46:36.000 FSz6mp buy 0.2963 1.3% mark 0.1109 
+    05:46:36.000 ByUDHg buy 0.8709 3.8% mark 0.1146 
+    05:46:36.000 AEVWTE buy 0.2049 0.9% mark 0.1155 
+    05:46:36.000 omegoM buy 0.5124 2.1% mark 0.1177 
+    05:46:36.000 Bpo8DP buy 0.0010 0.0% mark 0.1177 
+    05:46:39.000 FSz6mp sell 0.3052 1.3% mark 0.1164 
+    05:46:39.000 AWp1BK buy 0.0862 0.4% mark 0.1168 
+    05:46:42.000 7YSTma buy 0.0167 0.1% mark 0.1168 
+    05:46:43.000 CN76Nj buy 0.2896 1.2% mark 0.1181 
+    05:46:44.000 FJKFZa buy 0.0861 0.4% mark 0.1185 
+    05:46:45.000 2GZRH1 buy 0.1511 0.6% mark 0.1191 
+    05:46:47.000 omegoM sell 0.4565 1.8% mark 0.1170 
+    05:46:47.000 CyBiGy sell 3.3887 14.0% mark 0.1029 BIG
+    05:46:48.000 BLD75D buy 0.1694 0.8% mark 0.1036 
+    05:46:49.000 FSz6mp buy 0.2963 1.4% mark 0.1048 
+    05:46:49.000 ZbFA6a buy 0.8762 4.1% mark 0.1085 
+    05:46:49.000 GJTju8 buy 0.4889 2.2% mark 0.1105 
+    05:46:49.000 omegoM buy 0.4993 2.2% mark 0.1126 
+    05:46:51.000 2VDA52 buy 0.0431 0.2% mark 0.1128 
+    05:46:58.000 7YSTma buy 0.4841 2.1% mark 0.1148 
+    05:47:00.000 qzrpVf buy 1.0963 4.6% mark 0.1196 
+    05:47:01.000 EPGRCt sell 0.0356 0.1% mark 0.1194 
+    05:47:01.000 EPGRCt sell 0.0356 0.1% mark 0.1193 
+    05:47:01.000 omegoM sell 0.4950 2.0% mark 0.1171 
+    05:47:01.000 5e8DjV sell 1.7800 7.3% mark 0.1096 BIG
+    05:47:02.000 Gtkbu7 buy 0.0247 0.1% mark 0.1097 
+    05:47:03.000 ZbFA6a buy 0.2525 1.1% mark 0.1107 
+    05:47:05.000 Gt2Rdk buy 0.0790 0.3% mark 0.1111 
+    05:47:07.000 ARu4n5 buy 0.0983 0.4% mark 0.1115 
+    05:47:07.000 4szcuA buy 0.0988 0.4% mark 0.1119 
+    05:47:07.000 3oaiHC buy 0.0010 0.0% mark 0.1119 
+    05:47:08.000 HeGi8a buy 0.3947 1.7% mark 0.1136 
+    05:47:09.000 6aLiXu buy 0.0879 0.4% mark 0.1139 
+    05:47:10.000 EPGRCt sell 0.1062 0.5% mark 0.1135 
+    05:47:10.000 4BBY96 buy 0.1975 0.8% mark 0.1143 
+    05:47:12.000 4dMB9n buy 0.1474 0.6% mark 0.1150 
+    05:47:12.000 EPGRCt sell 0.0965 0.4% mark 0.1145 
+    05:47:14.000 78YXri buy 0.0440 0.2% mark 0.1147 
+    05:47:15.000 78YXri buy 0.0440 0.2% mark 0.1149 
+    05:47:17.000 8aqRZe buy 0.0988 0.4% mark 0.1153 
+    05:47:18.000 qzrpVf buy 0.4938 2.1% mark 0.1175 
+    05:47:18.000 DbcBtS buy 0.0145 0.1% mark 0.1175 
+    05:47:18.000 G3fGui buy 0.0183 0.1% mark 0.1176 
+    05:47:18.000 GT46My buy 0.0102 0.0% mark 0.1177 
+    05:47:18.000 7n69JA buy 0.0177 0.1% mark 0.1177 
+    05:47:18.000 5HwZq3 buy 0.0188 0.1% mark 0.1178 
+    05:47:18.000 HSH17f buy 0.0189 0.1% mark 0.1179 
+    05:47:18.000 6VJy5z buy 0.0103 0.0% mark 0.1179 
+    05:47:18.000 HyFd1K buy 0.0160 0.1% mark 0.1180 
+    05:47:18.000 DYuaFB buy 0.0109 0.0% mark 0.1181 
+    05:47:18.000 4H5wi9 buy 0.0178 0.1% mark 0.1181 
+    05:47:18.000 5q3CQ6 buy 0.0115 0.0% mark 0.1182 
+    05:47:18.000 8GKnUd buy 0.0176 0.1% mark 0.1183 
+    05:47:18.000 ANJruP buy 0.0129 0.1% mark 0.1183 
+    05:47:19.000 EPGRCt sell 0.0894 0.4% mark 0.1179 
+    05:47:19.000 78YXri buy 0.0219 0.1% mark 0.1180 
+    05:47:21.000 A5mMDT sell 0.4240 1.7% mark 0.1162 EARLY3
+    05:47:21.000 FSz6mp sell 0.3072 1.3% mark 0.1148 
+    05:47:21.000 4CUEXz sell 0.5109 2.2% mark 0.1126 EARLY1
+    05:47:21.000 6Jzyqc sell 0.3881 1.7% mark 0.1110 EARLY9
+    05:47:21.000 91GvZz sell 0.4768 2.1% mark 0.1090 EARLY2
+    05:47:21.000 GGiqYV sell 0.3940 1.8% mark 0.1074 EARLY10
+    05:47:21.000 4CUEXz sell 0.4603 2.1% mark 0.1055 EARLY1
+    05:47:21.000 6Jzyqc sell 0.3780 1.8% mark 0.1040 EARLY9
+    05:47:21.000 A5mMDT sell 0.3816 1.8% mark 0.1024 EARLY3
+    05:47:21.000 91GvZz sell 0.4080 2.0% mark 0.1008 EARLY2
+    05:47:21.000 GGiqYV sell 0.3725 1.8% mark 0.0993 EARLY10
+    05:47:22.000 3oaiHC sell 0.0009 0.0% mark 0.0993 
+    05:47:23.000 7xsZ7L buy 0.0590 0.3% mark 0.0995 
+    05:47:24.000 2eS19w sell 0.0780 0.4% mark 0.0992 
+====================================================================================================
+Cupsey#2 entry 05:48:41.000 exit 05:49:09.000 trailing spent 0.0700 net 0.0625 pnl -10.76%
+mark0 0.0000 peak(reconstr) 0.0000 at 05:48:41.000 hw(db) 0.07161829 recon-exit-vsol-diff SOL None
+early10: ['4CUEXz', '91GvZz', 'A5mMDT', 'AM3JZa*C', 'DxhpC9', '9FQnf1', '84UBp5', 'J3gZFp', '6Jzyqc', 'GGiqYV']
+trailing cross (tape): None | trigger(db) 05:49:09.913
+target cross (tape): None
+post-exit max hold-mark: None
+flagged sells before exit:
+timeline (trades after entry to exit+60s):
+====================================================================================================
+CYBER entry 07:57:47.000 exit 07:58:21.000 target spent 0.0223 net 0.0282 pnl 26.72%
+mark0 0.0202 peak(reconstr) 0.0283 at 07:58:20.000 hw(db) 0.03072501 recon-exit-vsol-diff SOL 0.0
+early10: ['4H1xCB*C', 'C1pcQH', 'HWsmJ1', 'xMPPhH', '4cHQEM', '7x7fRG', 'HETFdv', 'FeqP1r', '6t8dSZ', 'Dee791']
+trailing cross (tape): None | trigger(db) 07:58:21.572
+target cross (tape): ('07:58:20.000', '0.0280')
+post-exit max hold-mark: ('07:58:26.000', '0.0321')
+flagged sells before exit:
+    07:57:52.000 rcv 07:58:18.389 HWsmJ1 sol 0.0576 share 0.6% real_before 9.8884 mark_after 0.0212 EARLY3 
+    07:57:54.000 rcv 07:58:18.389 DU5mNJ sol 0.8318 share 8.5% real_before 9.8308 mark_after 0.0203 BIG 
+timeline (trades after entry to exit+60s):
+    07:57:47.000 US buy - - mark 0.0202 entry fill
+    07:57:48.000 GvvAxe buy 0.9877 11.1% mark 0.0213 
+    07:57:52.000 HWsmJ1 sell 0.0576 0.6% mark 0.0212 EARLY3
+    07:57:54.000 DU5mNJ sell 0.8318 8.5% mark 0.0203 BIG
+    07:57:55.000 9RhxCR buy 1.0424 11.6% mark 0.0214 
+    07:57:58.000 8HWDVF buy 0.4421 4.4% mark 0.0219 
+    07:58:00.000 BTyHCM buy 0.0880 0.8% mark 0.0220 
+    07:58:06.000 DcRp3H buy 0.5708 5.4% mark 0.0226 
+    07:58:06.000 97jv9p sell 0.3306 3.0% mark 0.0223 
+    07:58:06.000 omegoM buy 0.3964 3.7% mark 0.0227 
+    07:58:06.000 nya666 buy 0.9346 8.3% mark 0.0237 
+    07:58:07.000 7a4XEW buy 0.1580 1.3% mark 0.0239 
+    07:58:08.000 51LsGC buy 0.0247 0.2% mark 0.0239 
+    07:58:08.000 EowQHF buy 0.0247 0.2% mark 0.0240 
+    07:58:09.000 Dfcfzw buy 0.2010 1.6% mark 0.0242 
+    07:58:10.000 BTyHCM buy 0.0880 0.7% mark 0.0243 
+    07:58:12.000 DcRp3H buy 0.0469 0.4% mark 0.0243 
+    07:58:15.000 GPA1gH buy 0.4938 3.9% mark 0.0249 
+    07:58:20.000 CcJX97 buy 2.6408 20.0% mark 0.0280 
+    07:58:20.000 3gntdi buy 0.1975 1.2% mark 0.0283 
+    07:58:21.000 US sell 0.0286 0.2% mark 0.0283 our exit fill (reconstructed mark just before)
+    07:58:21.000 6Yu9GA buy 1.9753 12.3% mark 0.0308 
+    07:58:22.000 DU5mNJ buy 0.7795 4.3% mark 0.0318 
+    07:58:23.000 7J8rAR buy 0.0828 0.4% mark 0.0319 
+    07:58:24.000 R66PG8 buy 0.0177 0.1% mark 0.0319 
+    07:58:26.000 Hx3ojH buy 0.1541 0.8% mark 0.0321 
+    07:58:30.000 omegoM sell 0.5033 2.6% mark 0.0314 
+    07:58:30.000 GvvAxe sell 1.4819 8.0% mark 0.0296 BIG
+    07:58:31.000 7x7fRG sell 0.4532 2.7% mark 0.0290 EARLY6
+    07:58:32.000 AVMsTG sell 0.1261 0.8% mark 0.0288 
+    07:58:33.000 6M3ur1 buy 0.0883 0.5% mark 0.0289 
+    07:58:33.000 9RhxCR sell 1.4013 8.5% mark 0.0272 BIG
+    07:58:34.000 Dee791 sell 0.1092 0.7% mark 0.0271 EARLY10
+    07:58:34.000 FeqP1r sell 0.2211 1.5% mark 0.0268 EARLY8
+    07:58:35.000 5HFsuN sell 0.1814 1.2% mark 0.0266 
+    07:58:35.000 6t8dSZ sell 0.0430 0.3% mark 0.0266 EARLY9
+    07:58:35.000 DU5mNJ sell 0.6525 4.5% mark 0.0258 
+    07:58:35.000 GWCeGo buy 0.0880 0.6% mark 0.0259 
+    07:58:36.000 GPA1gH sell 0.5127 3.7% mark 0.0253 
+    07:58:37.000 FjNKps buy 0.0558 0.4% mark 0.0254 
+    07:58:37.000 7J8rAR sell 0.0658 0.5% mark 0.0253 
+    07:58:37.000 nya666 sell 1.0129 7.5% mark 0.0241 BIG
+    07:58:39.000 EZsjh8 buy 0.0978 0.8% mark 0.0242 
+    07:58:41.000 6M3ur1 buy 0.0442 0.4% mark 0.0243 
+    07:58:41.000 5tnGX9 buy 1.0810 8.6% mark 0.0255 
+    07:58:41.000 PaYXBy sell 0.1162 0.8% mark 0.0254 
+    07:58:41.000 omegoM buy 0.4200 3.1% mark 0.0259 
+    07:58:41.000 2WJTQ6 buy 0.3261 2.3% mark 0.0263 
+    07:58:42.000 5veTCy buy 0.0020 0.0% mark 0.0263 
+    07:58:48.000 7jyebU buy 0.0031 0.0% mark 0.0263 
+    07:58:48.000 4xfSMu buy 0.0198 0.1% mark 0.0263 
+    07:58:51.000 3iFv56 buy 0.0808 0.6% mark 0.0264 
+    07:58:53.000 GPA1gH buy 0.4938 3.4% mark 0.0270 
+    07:58:54.000 DU5mNJ buy 0.6558 4.4% mark 0.0278 
+    07:58:54.000 5xFj46 sell 0.1583 1.0% mark 0.0276 
+    07:58:57.000 2WJTQ6 sell 0.3490 2.3% mark 0.0272 
+    07:58:59.000 3nZ5t6 buy 0.0177 0.1% mark 0.0272 
+    07:59:00.000 CmqCNo buy 0.0088 0.1% mark 0.0272 
+    07:59:00.000 ESiNJN buy 0.0442 0.3% mark 0.0272 
+    07:59:03.000 AiDejx buy 0.0088 0.1% mark 0.0273 
+    07:59:03.000 5HFsuN sell 0.6217 4.1% mark 0.0265 
+    07:59:03.000 omegoM sell 0.4239 2.9% mark 0.0260 
+    07:59:04.000 D8na6c sell 0.0741 0.5% mark 0.0259 
+    07:59:04.000 DU5mNJ sell 0.6123 4.4% mark 0.0252 
+    07:59:05.000 4rjd9T buy 0.0152 0.1% mark 0.0252 
+    07:59:05.000 HQRujt sell 1.0390 7.7% mark 0.0240 BIG
+    07:59:05.000 EZsjh8 sell 0.1018 0.8% mark 0.0239 
+    07:59:05.000 5tnGX9 buy 0.4416 3.6% mark 0.0244 
+    07:59:07.000 HufuiW buy 0.9877 7.7% mark 0.0256 
+    07:59:07.000 omegoM buy 0.4151 3.0% mark 0.0261 
+    07:59:11.000 3gntdi sell 0.2045 1.4% mark 0.0258 
+    07:59:12.000 5tnGX9 buy 0.4416 3.2% mark 0.0263 
+    07:59:15.000 FLginT buy 0.9321 6.5% mark 0.0274 
+    07:59:19.000 8zyuhZ buy 0.1006 0.7% mark 0.0276 
+    07:59:19.000 5o11dr buy 0.0346 0.2% mark 0.0276 
+====================================================================================================
+NARKY#1 entry 08:21:53.000 exit 08:22:24.000 trailing spent 0.0726 net 0.0693 pnl -4.59%
+mark0 0.0693 peak(reconstr) 0.0779 at 08:22:20.000 hw(db) 0.077904705 recon-exit-vsol-diff SOL 0.0
+early10: ['9TRoCh*C', 'DCqSf1', 'FdSShB', 'HPtU9B', '4kgP66', '2YVvtk', '56e2Pj', 'HL9rRB', 'BTit6h', '3Bgs6Z']
+trailing cross (tape): ('08:22:23.000', '0.0691', 'GvvAxe', 'sell', '0.9736') | trigger(db) 08:22:24.280
+target cross (tape): None
+post-exit max hold-mark: ('08:26:03.000', '0.1731')
+flagged sells before exit:
+    08:21:58.000 rcv 08:22:50.736 2YVvtk sol 0.3591 share 2.9% real_before 12.2094 mark_after 0.0685 EARLY6 
+    08:22:23.000 rcv 08:22:50.736 2YVvtk sol 0.1330 share 1.0% real_before 13.4315 mark_after 0.0733 EARLY6 
+    08:22:23.000 rcv 08:22:50.736 GvvAxe sol 0.9736 share 7.5% real_before 13.0172 mark_after 0.0691 BIG 
+    08:22:24.000 rcv 08:22:50.736 2YVvtk sol 0.1018 share 0.8% real_before 12.1917 mark_after 0.0693 EARLY6 
+timeline (trades after entry to exit+60s):
+    08:21:53.000 US buy - - mark 0.0693 entry fill
+    08:21:53.000 CviKTo sell 0.1631 1.3% mark 0.0687 
+    08:21:57.000 RM9M5x buy 0.4242 3.6% mark 0.0701 
+    08:21:58.000 4wbrLx sell 0.1327 1.1% mark 0.0697 
+    08:21:58.000 2YVvtk sell 0.3591 2.9% mark 0.0685 EARLY6
+    08:21:58.000 GvvAxe buy 0.9877 8.3% mark 0.0718 
+    08:21:58.000 3Vggwn sell 0.0447 0.3% mark 0.0716 
+    08:22:01.000 ETWT2Y sell 0.2477 1.9% mark 0.0708 
+    08:22:02.000 ACfTTL buy 0.2206 1.8% mark 0.0715 
+    08:22:03.000 5qAQVm buy 0.0088 0.1% mark 0.0716 
+    08:22:04.000 FWBWuU buy 0.1731 1.4% mark 0.0722 
+    08:22:05.000 5cjZoC buy 0.0107 0.1% mark 0.0722 
+    08:22:08.000 omegoM buy 0.4163 3.2% mark 0.0736 
+    08:22:08.000 7x7fRG buy 0.8826 6.6% mark 0.0766 
+    08:22:09.000 7JCe3G buy 0.0153 0.1% mark 0.0767 
+    08:22:09.000 9so4Qm buy 0.0176 0.1% mark 0.0767 
+    08:22:11.000 6oWM3y buy 0.1490 1.0% mark 0.0772 
+    08:22:11.000 AekZxs buy 0.0788 0.5% mark 0.0775 
+    08:22:12.000 HBxCRy buy 0.0678 0.5% mark 0.0778 
+    08:22:12.000 D8na6c buy 0.0441 0.3% mark 0.0779 
+    08:22:20.000 AekZxs buy 0.0006 0.0% mark 0.0779 
+    08:22:22.000 4rjx8T sell 0.5623 3.8% mark 0.0760 
+    08:22:22.000 4wbrLx sell 0.1075 0.8% mark 0.0756 
+    08:22:22.000 CviKTo sell 0.5295 3.8% mark 0.0738 
+    08:22:23.000 2YVvtk sell 0.1330 1.0% mark 0.0733 EARLY6
+    08:22:23.000 6UWszf sell 0.2814 2.1% mark 0.0724 
+    08:22:23.000 GvvAxe sell 0.9736 7.5% mark 0.0691 BIG
+    08:22:24.000 HR7nKT buy 0.1481 1.2% mark 0.0696 
+    08:22:24.000 2YVvtk sell 0.1018 0.8% mark 0.0693 EARLY6
+    08:22:24.000 US sell 0.0702 0.6% mark 0.0693 our exit fill (reconstructed mark just before)
+    08:22:25.000 E1oDRx buy 0.0391 0.3% mark 0.0694 
+    08:22:27.000 5tnGX9 buy 0.4416 3.6% mark 0.0709 
+    08:22:28.000 8wwPWb buy 0.0129 0.1% mark 0.0709 
+    08:22:30.000 GPs6X7 buy 0.0489 0.4% mark 0.0711 
+    08:22:32.000 HGSLpU buy 0.0101 0.1% mark 0.0711 
+    08:22:33.000 5tnGX9 sell 1.1948 9.5% mark 0.0672 BIG
+    08:22:34.000 8dtx2t sell 0.8439 7.4% mark 0.0645 BIG
+    08:22:34.000 CapEWd sell 0.0502 0.5% mark 0.0643 
+    08:22:34.000 2YVvtk sell 0.0750 0.7% mark 0.0641 EARLY6
+    08:22:35.000 E1oDRx sell 0.0361 0.3% mark 0.0640 
+    08:22:36.000 2Vrggg buy 0.0988 0.9% mark 0.0643 
+    08:22:36.000 F3Mi3j buy 0.2113 2.0% mark 0.0650 
+    08:22:37.000 Dggd6X sell 0.9627 9.0% mark 0.0619 BIG
+    08:22:38.000 45hcrK buy 0.0532 0.5% mark 0.0621 
+    08:22:38.000 EZbw9M buy 0.4039 4.1% mark 0.0633 
+    08:22:38.000 5tnGX9 buy 0.4416 4.3% mark 0.0647 
+    08:22:38.000 ESiNJN buy 0.1285 1.2% mark 0.0652 
+    08:22:38.000 2Vrggg buy 0.0988 0.9% mark 0.0655 
+    08:22:38.000 HPtU9B sell 0.5648 5.2% mark 0.0637 EARLY4 BIG
+    08:22:38.000 HGSLpU buy 0.0018 0.0% mark 0.0637 
+    08:22:38.000 9so4Qm sell 0.0146 0.1% mark 0.0636 
+    08:22:38.000 3Vggwn sell 0.0395 0.4% mark 0.0635 
+    08:22:41.000 APFVC5 buy 0.0988 1.0% mark 0.0638 
+    08:22:41.000 HYYrjd buy 0.0159 0.2% mark 0.0639 
+    08:22:42.000 DU5mNJ buy 0.4984 4.8% mark 0.0655 
+    08:22:43.000 7eUp6k buy 0.0794 0.7% mark 0.0657 
+    08:22:43.000 6PrQJM buy 0.0061 0.1% mark 0.0657 
+    08:22:44.000 ACfTTL buy 0.0441 0.4% mark 0.0659 
+    08:22:44.000 5qAQVm buy 0.0088 0.1% mark 0.0659 
+    08:22:45.000 GPs6X7 sell 0.0045 0.0% mark 0.0659 
+    08:22:47.000 6UWszf buy 0.0489 0.4% mark 0.0661 
+    08:22:48.000 72kWm5 buy 0.2203 2.0% mark 0.0668 
+    08:22:49.000 7x7fRG buy 0.2205 1.9% mark 0.0675 
+    08:22:49.000 79CjQH buy 0.0976 0.8% mark 0.0678 
+    08:22:50.000 6D47WM buy 0.0983 0.8% mark 0.0681 
+    08:22:50.000 ceBaMg sell 0.2291 2.0% mark 0.0674 
+    08:22:51.000 H4JM6r buy 0.0176 0.2% mark 0.0674 
+    08:22:51.000 CxkxCQ sell 0.3771 3.3% mark 0.0662 
+    08:22:53.000 2YVvtk sell 0.3071 2.8% mark 0.0652 EARLY6
+    08:22:54.000 88XHVt buy 0.0198 0.2% mark 0.0653 
+    08:22:56.000 4f4qDG sell 0.0286 0.3% mark 0.0652 
+    08:22:59.000 6PrQJM buy 0.0017 0.0% mark 0.0652 
+    08:22:59.000 2kBk31 buy 0.0590 0.5% mark 0.0654 
+    08:23:00.000 Gb2mRa buy 0.1481 1.4% mark 0.0659 
+    08:23:01.000 G7FPgW buy 0.6017 5.5% mark 0.0678 
+    08:23:04.000 3aDuBr buy 0.1956 1.7% mark 0.0685 
+    08:23:04.000 Cc1E9q buy 0.0983 0.8% mark 0.0688 
+    08:23:08.000 91D8gA buy 0.4409 3.7% mark 0.0702 
+    08:23:11.000 B7icQc buy 0.1975 1.6% mark 0.0709 
+    08:23:11.000 Dggd6X buy 0.9877 7.9% mark 0.0742 
+    08:23:12.000 CxkxCQ sell 0.4149 3.1% mark 0.0728 
+    08:23:14.000 HVG37p buy 0.0441 0.3% mark 0.0730 
+    08:23:15.000 D9jtLL buy 0.0037 0.0% mark 0.0730 
+    08:23:16.000 AdU2zc buy 0.1058 0.8% mark 0.0733 
+    08:23:17.000 GvvAxe buy 0.9877 7.4% mark 0.0767 
+    08:23:18.000 5tbqAr buy 0.0378 0.3% mark 0.0768 
+    08:23:19.000 9rByjR buy 0.0494 0.3% mark 0.0770 
+    08:23:22.000 9G9quk buy 0.0617 0.4% mark 0.0772 
+    08:23:22.000 Gqa3Ju buy 0.0988 0.7% mark 0.0776 
+    08:23:23.000 Hq9cs2 buy 0.0088 0.1% mark 0.0776 
+    08:23:24.000 GPs6X7 sell 0.0048 0.0% mark 0.0776 
+    08:23:24.000 ESiNJN sell 0.1169 0.8% mark 0.0772 
+====================================================================================================
+NARKY#2 entry 08:24:53.000 exit 08:25:00.000 target spent 0.0699 net 0.0841 pnl 20.30%
+mark0 0.0681 peak(reconstr) 0.0842 at 08:25:00.000 hw(db) 0.084115771 recon-exit-vsol-diff SOL 0.0
+early10: ['9TRoCh*C', 'DCqSf1', 'FdSShB', 'HPtU9B', '4kgP66', '2YVvtk', '56e2Pj', 'HL9rRB', 'BTit6h', '3Bgs6Z']
+trailing cross (tape): None | trigger(db) 08:25:00.500
+target cross (tape): ('08:24:59.000', '0.0825')
+post-exit max hold-mark: ('08:26:03.000', '0.0855')
+flagged sells before exit:
+timeline (trades after entry to exit+60s):
+    08:24:53.000 US buy - - mark 0.0681 entry fill
+    08:24:53.000 6KJBbA buy 1.9753 6.7% mark 0.0727 
+    08:24:54.000 7B8E7t buy 0.1866 0.6% mark 0.0732 
+    08:24:54.000 ARu4n5 buy 0.4034 1.3% mark 0.0741 
+    08:24:54.000 FXLRQA buy 0.2086 0.7% mark 0.0746 
+    08:24:54.000 5zSUHA buy 0.0494 0.2% mark 0.0747 
+    08:24:55.000 As31YQ buy 0.0437 0.1% mark 0.0749 
+    08:24:56.000 9rByjR sell 0.0237 0.1% mark 0.0748 
+    08:24:56.000 Gb2mRa sell 0.1711 0.5% mark 0.0744 
+    08:24:56.000 88XHVt buy 0.0109 0.0% mark 0.0744 
+    08:24:56.000 8ydRDf sell 0.0932 0.3% mark 0.0742 
+    08:24:57.000 DGsAe9 buy 0.1501 0.5% mark 0.0745 
+    08:24:57.000 EowQHF buy 0.0494 0.2% mark 0.0747 
+    08:24:57.000 6F3sdB sell 0.1405 0.4% mark 0.0743 
+    08:24:57.000 BvR1Ym buy 0.4938 1.5% mark 0.0755 
+    08:24:58.000 5uCjAC buy 0.0441 0.1% mark 0.0756 
+    08:24:58.000 EHDnbs buy 0.0441 0.1% mark 0.0757 
+    08:24:58.000 H9E2bP buy 1.5802 4.8% mark 0.0796 
+    08:24:59.000 8c7FCZ buy 0.1956 0.6% mark 0.0801 
+    08:24:59.000 4LNAtE buy 0.9568 2.8% mark 0.0825 
+    08:24:59.000 7a4XEW buy 0.1558 0.4% mark 0.0829 
+    08:24:59.000 7yKz5R buy 0.2963 0.8% mark 0.0836 
+    08:25:00.000 51LsGC buy 0.0247 0.1% mark 0.0837 
+    08:25:00.000 Be2fKA buy 0.0098 0.0% mark 0.0837 
+    08:25:00.000 EowQHF buy 0.0247 0.1% mark 0.0838 
+    08:25:00.000 5pHk81 buy 0.0499 0.1% mark 0.0839 
+    08:25:00.000 97uMq3 buy 0.0988 0.3% mark 0.0842 
+    08:25:00.000 FPGm3P sell 0.0128 0.0% mark 0.0841 
+    08:25:00.000 US sell 0.0852 0.2% mark 0.0841 our exit fill (reconstructed mark just before)
+    08:25:01.000 2CKJnZ buy 0.0864 0.2% mark 0.0843 
+    08:25:02.000 5rPGA1 sell 0.2546 0.7% mark 0.0837 
+    08:25:02.000 G7FPgW sell 0.1607 0.4% mark 0.0833 
+    08:25:03.000 GvvAxe sell 2.1496 6.0% mark 0.0779 BIG
+    08:25:03.000 VYqx6y sell 0.0066 0.0% mark 0.0779 
+    08:25:03.000 9rByjR sell 0.0185 0.1% mark 0.0779 
+    08:25:04.000 2TY5wT sell 0.8216 2.5% mark 0.0758 
+    08:25:04.000 5heAtL sell 0.0394 0.1% mark 0.0758 
+    08:25:04.000 6UWszf sell 0.0823 0.3% mark 0.0756 
+    08:25:04.000 CEvBJM buy 0.1763 0.5% mark 0.0760 
+    08:25:06.000 6qwo9v sell 0.0065 0.0% mark 0.0760 
+    08:25:06.000 ACfTTL sell 0.2881 0.9% mark 0.0753 
+    08:25:07.000 DokbWd buy 0.0614 0.2% mark 0.0754 
+    08:25:07.000 6qgsHE sell 0.1322 0.4% mark 0.0751 
+    08:25:07.000 3Kcgq6 sell 1.0390 3.2% mark 0.0726 
+    08:25:07.000 8c7FCZ sell 0.1769 0.6% mark 0.0722 
+    08:25:08.000 94CSkm buy 0.0247 0.1% mark 0.0723 
+    08:25:08.000 Csh9Qj buy 0.0356 0.1% mark 0.0723 
+    08:25:08.000 B7V1va sell 0.1537 0.5% mark 0.0720 
+    08:25:08.000 HkPhW8 sell 0.1509 0.5% mark 0.0716 
+    08:25:08.000 ETSxXT sell 0.1502 0.5% mark 0.0713 
+    08:25:08.000 H3Rwxe sell 0.1494 0.5% mark 0.0709 
+    08:25:08.000 AFUXTp sell 0.1522 0.5% mark 0.0706 
+    08:25:08.000 2pqfUX sell 0.1530 0.5% mark 0.0702 
+    08:25:08.000 5vbBW8 sell 0.1010 0.3% mark 0.0700 
+    08:25:09.000 AhMerQ buy 0.0094 0.0% mark 0.0700 
+    08:25:09.000 87kRbP sell 0.0402 0.1% mark 0.0699 
+    08:25:09.000 FWBWuU sell 0.1695 0.6% mark 0.0695 
+    08:25:10.000 Bpo8DP sell 0.0012 0.0% mark 0.0695 
+    08:25:11.000 6CL1r5 buy 0.0978 0.3% mark 0.0697 
+    08:25:11.000 FdSShB sell 0.8189 2.7% mark 0.0678 EARLY3
+    08:25:12.000 BzfPij sell 0.2868 1.0% mark 0.0672 
+    08:25:12.000 Be2fKA buy 0.0098 0.0% mark 0.0672 
+    08:25:12.000 H5TrUt sell 0.1428 0.5% mark 0.0669 
+    08:25:13.000 EowQHF sell 0.0603 0.2% mark 0.0667 
+    08:25:13.000 2WJTQ6 buy 0.4246 1.5% mark 0.0677 
+    08:25:13.000 Dggd6X sell 2.0331 7.0% mark 0.0631 BIG
+    08:25:13.000 EHk9XP sell 0.0130 0.0% mark 0.0631 
+    08:25:14.000 51LsGC sell 0.0185 0.1% mark 0.0631 
+    08:25:14.000 7a4XEW sell 0.1184 0.4% mark 0.0628 
+    08:25:15.000 8ydRDf buy 0.0813 0.3% mark 0.0630 
+    08:25:16.000 ARu4n5 buy 0.4914 1.8% mark 0.0641 
+    08:25:16.000 nya666 sell 0.1127 0.4% mark 0.0638 
+    08:25:16.000 5XbhQ6 buy 0.0010 0.0% mark 0.0638 
+    08:25:16.000 BZc476 buy 0.0442 0.2% mark 0.0639 
+    08:25:17.000 GhEfuW buy 0.1481 0.5% mark 0.0643 
+    08:25:17.000 FdSShB buy 0.0198 0.1% mark 0.0643 
+    08:25:17.000 E5BDam buy 0.0088 0.0% mark 0.0643 
+    08:25:18.000 EEY83r buy 0.0440 0.2% mark 0.0644 
+    08:25:18.000 9BSk3w buy 0.1975 0.7% mark 0.0649 
+    08:25:19.000 9vXEkM buy 0.1075 0.4% mark 0.0651 
+    08:25:19.000 8GFo4B sell 0.2781 1.0% mark 0.0645 
+    08:25:19.000 HjuSth buy 0.9877 3.6% mark 0.0667 
+    08:25:19.000 BxyYZc buy 0.1546 0.5% mark 0.0671 
+    08:25:19.000 Egqa7m buy 0.2074 0.7% mark 0.0675 
+    08:25:19.000 61fsvQ buy 0.1565 0.5% mark 0.0679 
+    08:25:19.000 Dggd6X buy 0.4938 1.7% mark 0.0690 
+    08:25:19.000 2WJTQ6 sell 0.4661 1.6% mark 0.0680 
+    08:25:19.000 Drqtx5 buy 0.1975 0.7% mark 0.0684 
+    08:25:20.000 BBeft5 buy 0.1651 0.6% mark 0.0688 
+    08:25:21.000 87kRbP buy 0.0403 0.1% mark 0.0689 
+    08:25:21.000 44XbZu buy 0.1762 0.6% mark 0.0693 
+    08:25:21.000 9q2Ao1 buy 0.0881 0.3% mark 0.0695 
+    08:25:21.000 BvR1Ym buy 0.0988 0.3% mark 0.0697 
+    08:25:21.000 CEvBJM buy 0.0881 0.3% mark 0.0699 
+    08:25:22.000 3gU96i buy 0.2624 0.9% mark 0.0705 
+    08:25:22.000 9dUeCM buy 0.3713 1.2% mark 0.0714 
+    08:25:22.000 2QxX7t buy 0.0988 0.3% mark 0.0716 
+    08:25:23.000 B1BoFf buy 0.0988 0.3% mark 0.0719 
+    08:25:23.000 5tnGX9 sell 0.1284 0.4% mark 0.0716 
+    08:25:23.000 GHLzad buy 0.4938 1.6% mark 0.0727 
+    08:25:24.000 97uMq3 buy 0.0988 0.3% mark 0.0730 
+    08:25:24.000 5due7r buy 0.1731 0.5% mark 0.0734 
+    08:25:24.000 HWsNgm buy 0.0580 0.2% mark 0.0735 
+    08:25:25.000 Byayt3 buy 0.5926 1.9% mark 0.0749 
+    08:25:25.000 CTWPyi buy 0.1975 0.6% mark 0.0754 
+    08:25:26.000 8Wj1Jo buy 0.0822 0.3% mark 0.0756 
+    08:25:26.000 EFAmoH buy 0.5926 1.8% mark 0.0771 
+    08:25:26.000 E5BDam sell 0.0026 0.0% mark 0.0770 
+    08:25:27.000 A6TmhN buy 0.0296 0.1% mark 0.0771 
+    08:25:27.000 B8dTTE buy 0.0824 0.2% mark 0.0773 
+    08:25:27.000 9rByjR buy 0.0198 0.1% mark 0.0774 
+    08:25:29.000 9G9quk sell 0.0499 0.1% mark 0.0772 
+    08:25:29.000 5PGFrV buy 0.1248 0.4% mark 0.0775 
+    08:25:29.000 BvR1Ym sell 0.6128 1.8% mark 0.0761 
+    08:25:30.000 25yWYv buy 0.0044 0.0% mark 0.0761 
+    08:25:30.000 97uMq3 sell 0.1918 0.6% mark 0.0756 
+    08:25:31.000 2PfumW buy 0.0835 0.3% mark 0.0758 
+    08:25:32.000 ESiNJN sell 0.0145 0.0% mark 0.0758 
+    08:25:32.000 9tPTZi buy 0.0385 0.1% mark 0.0759 
+    08:25:32.000 7QBQLN sell 0.0577 0.2% mark 0.0757 
+    08:25:33.000 F9VyYH buy 0.0405 0.1% mark 0.0758 
+    08:25:33.000 FTykT4 buy 0.2650 0.8% mark 0.0765 
+    08:25:35.000 GrR6oW buy 0.3700 1.1% mark 0.0774 
+    08:25:36.000 8VBrUX sell 0.0063 0.0% mark 0.0774 
+    08:25:36.000 GvvAxe buy 0.9877 3.0% mark 0.0798 
+    08:25:38.000 DQiEUH buy 0.0801 0.2% mark 0.0800 
+    08:25:38.000 ENSjw6 buy 0.7901 2.3% mark 0.0820 
+    08:25:39.000 GjKjTm buy 0.0988 0.3% mark 0.0822 
+    08:25:39.000 6oWM3y sell 0.1592 0.5% mark 0.0818 
+    08:25:39.000 2x3n3M buy 0.0988 0.3% mark 0.0821 
+    08:25:39.000 6sAFaC buy 0.0983 0.3% mark 0.0823 
+    08:25:39.000 DMmR6s buy 0.0988 0.3% mark 0.0826 
+    08:25:40.000 E5BDam sell 0.0021 0.0% mark 0.0826 
+    08:25:41.000 97uMq3 buy 0.0988 0.3% mark 0.0828 
+    08:25:42.000 2QxX7t sell 0.1142 0.3% mark 0.0825 
+    08:25:42.000 CFbjuD buy 0.0865 0.2% mark 0.0827 
+    08:25:44.000 GhEfuW sell 0.1906 0.5% mark 0.0822 
+    08:25:44.000 CEvBJM sell 0.3513 1.0% mark 0.0814 
+    08:25:44.000 EFAmoH buy 0.9877 2.8% mark 0.0839 
+    08:25:44.000 6pZE5y buy 0.0026 0.0% mark 0.0839 
+    08:25:45.000 CeEwMC buy 0.0983 0.3% mark 0.0841 
+    08:25:45.000 8ydRDf sell 0.1083 0.3% mark 0.0838 
+    08:25:45.000 DiQWV9 buy 0.0865 0.2% mark 0.0841 
+    08:25:45.000 85bGdt buy 0.0988 0.3% mark 0.0843 
+    08:25:46.000 5c6Pqa buy 0.0088 0.0% mark 0.0843 
+    08:25:46.000 8zpyCq buy 0.0150 0.0% mark 0.0844 
+    08:25:48.000 CDjJwP sell 0.0611 0.2% mark 0.0842 
+    08:25:49.000 HBxCRy sell 0.1482 0.4% mark 0.0838 
+    08:25:49.000 3Bgs6Z sell 0.0904 0.3% mark 0.0836 EARLY10
+    08:25:50.000 EkQzVr sell 0.0758 0.2% mark 0.0834 
+    08:25:50.000 B1BoFf sell 0.0574 0.2% mark 0.0833 
+    08:25:50.000 9u6MRN buy 0.2845 0.8% mark 0.0840 
+    08:25:51.000 8VBrUX sell 0.0069 0.0% mark 0.0840 
+    08:25:51.000 Drqtx5 sell 0.2387 0.7% mark 0.0834 
+    08:25:51.000 9RLx2E buy 0.0610 0.2% mark 0.0835 
+    08:25:52.000 EFAmoH buy 0.3951 1.1% mark 0.0845 
+    08:25:54.000 44XbZu sell 0.2137 0.6% mark 0.0840 
+    08:25:55.000 F5CLTe buy 0.0624 0.2% mark 0.0841 
+    08:25:55.000 Gqa3Ju sell 0.4871 1.4% mark 0.0829 
+    08:25:55.000 9dUeCM sell 0.2162 0.6% mark 0.0824 
+    08:25:56.000 GvvAxe sell 1.0193 2.9% mark 0.0798 
+    08:25:56.000 FAVJ4s buy 0.0631 0.2% mark 0.0800 
+    08:25:57.000 Gv9UUL buy 0.0049 0.0% mark 0.0800 
+    08:25:57.000 HXCJQt buy 0.4069 1.2% mark 0.0810 
+    08:25:57.000 C61G5s buy 0.3832 1.1% mark 0.0820 
+    08:26:00.000 FryD2D buy 0.0881 0.3% mark 0.0822 
+    08:26:00.000 7pnQU2 buy 0.9877 2.8% mark 0.0847 
