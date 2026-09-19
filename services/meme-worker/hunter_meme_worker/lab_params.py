@@ -78,6 +78,10 @@ def int_or(value: Any, default: int) -> int:
     return default if value is None else int(value)
 
 
+def optional_int(value: Any) -> int | None:
+    return None if value is None else int(value)
+
+
 def bool_or(value: Any, default: bool) -> bool:
     return default if value is None else bool(value)
 

@@ -334,6 +334,7 @@ def normalized_curve_trade(
         trader=event.user,
         side="buy" if event.is_buy else "sell",
         lamports=Decimal(event.sol_amount),
+        token_amount=Decimal(event.token_amount),
         virtual_sol_reserves=raw_lamports_to_sol(event.virtual_sol_reserves),
         virtual_token_reserves=raw_subunits_to_tokens(event.virtual_token_reserves),
         real_sol_reserves=raw_lamports_to_sol(event.real_sol_reserves),

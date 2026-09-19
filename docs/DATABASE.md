@@ -7800,3 +7800,52 @@ enquanto existir linha referenciando o conjunto em `meme_proposals`, `meme_paper
 `packages/core/tests/integration/test_migration_0053.py` prova as duas pontas contra um Postgres
 real, mais o `alembic check` num banco levado ao `head`. **Trava, pooler:** um `INSERT ... ON
 CONFLICT DO NOTHING` e nada de estado de sessão; a revisão não abre janela de manutenção.
+
+## 61. Subida com gente atrás, como braço — M19 (`0054_meme_gate_crowd_arm`)
+
+**O que a `0054` faz:** semeia **um** conjunto de pesquisa, `flow_v2/10` (`…0018`, `research_only`,
+`exp_ref EXP-M19`, relógio de 15 s) = `flow_v2/6` (§53) com **quatro** chaves acrescentadas —
+`min_early_retention_pct: "0.70"` (string decimal, fração), `min_early_age_s: 60`, `min_new_wallets_30s: 5`,
+`max_quick_flip_share_30s: "0.20"` (string decimal, fração) — e todo o resto byte a byte igual
+(`test_migration_0054` prova `flow_v2/10.params − as quatro = flow_v2/6.params`). Nenhuma mudança de
+schema, nada aposentado, `flow_v2/6` continua ativo (é o controle) e a mesa (`operator/5`) não é tocada —
+paper por construção, como nas §57–§60. Tudo em `ddl/meme_gate_crowd_arm.py`; a contagem de conjuntos
+ativos vai a 20. `gate_version` continua 3 (critérios ligados por parâmetros que o portão já lê; quem
+identifica o braço é `flow_v2/10`).
+
+**O que as quatro chaves leem** (`obsidian/05-EXPERIMENTS/EXP-M19-subida-com-gente-atras.md`;
+`hunter_indicators.meme.crowd`, T4.66): as **carteiras iniciais** de um mint são os compradores (nunca o
+criador) dos 3 primeiros slots contados do `create` quando o slot é conhecido, senão os 10 primeiros
+compradores distintos na ordem de chegada; `early_retention_pct` = Σ max(comprado − vendido, 0) ÷ Σ comprado
+sobre elas (por carteira, saldo negativo vira 0 — tokens que chegaram por transferência não são "retenção
+negativa"); `early_age_s` = segundos desde a primeira compra inicial; `new_wallets_30s` = carteiras cujo
+**primeiro** trade no mint caiu nos últimos 30 s; `quick_flip_share_30s` = fração dos trades dos últimos
+30 s que são vendas de carteira cuja primeira compra foi há < 20 s. Quatro `FeatureDefinition` v1
+(`CROWD_DEFINITIONS`); parâmetros congelados, mudar um é versão nova.
+
+**Só a pista de evento mede.** As quatro colunas vivem na `GateRow` em memória
+(`hunter_meme_worker.proposals_row.GateRow.early_retention_pct` etc.) e são preenchidas apenas por
+`event_gate_rows.build_event_row`, a partir do `CrowdLedger` que `MintEventState.apply_trade` alimenta com
+cada `TradeEvent` (o `token_amount` do evento passou a viajar em `NormalizedCurveTrade.token_amount`,
+subunidades cruas como `lamports`). A pista de 15 s e a do minuto deixam as quatro `None`, e o portão
+recusa por nome — `early_retention_unknown`, `new_wallets_unknown`, `quick_flip_unknown` — exatamente como
+a `flow_v2/9` recusava `recent_drawdown_unknown` antes da T4.61a. **Nenhuma tabela nova**: as leituras não
+são persistidas por linha; o que fica é a recusa nomeada em `meme_lab_ticks.refusals` e, para o quase-passa,
+a trilha `meme_gate_refusals_by_mint` (§54.2), que decodifica `early_retention_below_min` /
+`early_age_below_min` / `new_wallets_below_min` / `quick_flip_above_max` em `(value, limit)`.
+
+**Falha fechada, declarada.** O conjunto inicial só é uma medição quando a assinatura cobriu o mint desde o
+nascimento (`MintEventState.covered_from_birth`: `covered_since ≤ first_seen_at + 5 s`); assinatura tardia ⇒
+`not_covered_from_birth` ⇒ `early_retention_unknown`. Um gap de cobertura (`mark_gap`) torna a retenção
+desconhecida para sempre naquele mint (uma venda no gap é uma venda que ninguém contou) e reaquece a janela
+de 30 s. Como a sincronização de assinaturas roda a cada 5 s sobre `young_mints`, a fração de
+`early_retention_unknown` entre as recusas do braço é **o primeiro número a ler** depois do deploy
+(EXP-M19, bloco "Braço semeado").
+
+**Downgrade guardado (§17.7).** `refuse_a_downgrade_that_would_orphan_a_crowd_row` recusa enquanto existir
+linha referenciando o conjunto em `meme_proposals`, `meme_paper_bets`, `meme_rule_set_param_history` e
+`meme_gate_refusals_by_mint`, como na `0049`/`0050`/`0052`/`0053`.
+`packages/core/tests/integration/test_migration_0054.py` prova as duas pontas contra um Postgres real, mais
+o `alembic check` num banco levado ao `head`. Os testes da `0053` já se posicionam em
+`0053_meme_launch_lane_arm` antes de reverter. **Trava, pooler:** um `INSERT ... ON CONFLICT DO NOTHING` e
+nada de estado de sessão; a revisão não abre janela de manutenção.

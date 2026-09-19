@@ -47,6 +47,7 @@ def validate_entry_gate(gate: EntryGate) -> None:
     _validate_sniper_band(gate)
     _validate_top10_band(gate)
     _validate_drawdown(gate)
+    _validate_crowd(gate)
 
 
 def _validate_sniper_band(gate: EntryGate) -> None:
@@ -80,3 +81,16 @@ def _validate_drawdown(gate: EntryGate) -> None:
         return
     if not 0 < gate.max_recent_drawdown_pct <= 1:
         raise ValueError("max_recent_drawdown_pct is a fraction in (0, 1]")
+
+
+def _validate_crowd(gate: EntryGate) -> None:
+    """T4.66 (EXP-M19): the two fractions in [0, 1] (the retention floor
+    strictly above 0 — a floor of zero asks nothing), the two counts ≥ 0."""
+    if gate.min_early_retention_pct is not None and not 0 < gate.min_early_retention_pct <= 1:
+        raise ValueError("min_early_retention_pct is a fraction in (0, 1]")
+    if gate.min_early_age_s is not None and gate.min_early_age_s < 0:
+        raise ValueError("min_early_age_s cannot be negative")
+    if gate.min_new_wallets_30s is not None and gate.min_new_wallets_30s < 0:
+        raise ValueError("min_new_wallets_30s cannot be negative")
+    if gate.max_quick_flip_share_30s is not None and not 0 <= gate.max_quick_flip_share_30s <= 1:
+        raise ValueError("max_quick_flip_share_30s is a fraction in [0, 1]")

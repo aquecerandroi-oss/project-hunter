@@ -246,6 +246,10 @@ class NormalizedCurveTrade(_ReceivedAtMixin):
     """``TradeEvent.sol_amount`` untouched, in raw lamports — an audit trail
     against the event bytes, unlike every reserve field below, which *is*
     converted to human units at this boundary like the rest of this module."""
+    token_amount: Decimal | None = None
+    """``TradeEvent.token_amount`` untouched, in raw subunits (T4.66: what the
+    crowd ledger sums per wallet — a ratio, so the unit never matters);
+    ``None`` from a source that lacks the field."""
     virtual_sol_reserves: Decimal
     virtual_token_reserves: Decimal
     real_sol_reserves: Decimal

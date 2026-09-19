@@ -108,6 +108,14 @@ class GateRow:
     (``lab_repo_drawdown``, one bounded read per tick). ``None`` on a
     closed-minute row, which is exactly ``recent_drawdown_unknown`` for a set
     that turns the guard on."""
+    early_retention_pct: Decimal | None = None
+    early_age_s: Decimal | None = None
+    new_wallets_30s: int | None = None
+    quick_flip_share_30s: Decimal | None = None
+    """T4.66 (EXP-M19): :class:`hunter_indicators.meme.crowd.CrowdFeatures`,
+    filled by the event lane only (``event_gate_rows.build_event_row``); the
+    15-second and closed-minute rows leave them ``None`` — ``*_unknown`` for a
+    set that asks, fail closed."""
 
 
 __all__ = ["GateRow"]

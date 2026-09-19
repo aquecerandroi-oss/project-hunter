@@ -114,6 +114,7 @@ def build_event_row(
     dd_pct, peak_age_s, dd_reason = state.recent_drawdown(
         as_of, window_s=DEFAULT_WINDOW_S, max_gap_s=DEFAULT_MAX_GAP_S
     )
+    crowd = state.crowd_features(as_of)
     return replace(
         base,
         end_time=as_of,
@@ -161,4 +162,10 @@ def build_event_row(
         recent_drawdown_pct=dd_pct,
         recent_drawdown_peak_age_s=peak_age_s,
         recent_drawdown_reason=dd_reason,
+        # T4.66 (EXP-M19): the crowd behind the rise — only this lane can read
+        # who bought and sold; the 15-second row leaves the four ``None``.
+        early_retention_pct=crowd.early_retention_pct,
+        early_age_s=crowd.early_age_s,
+        new_wallets_30s=crowd.new_wallets_30s,
+        quick_flip_share_30s=crowd.quick_flip_share_30s,
     )

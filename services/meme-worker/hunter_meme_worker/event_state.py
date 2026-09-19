@@ -8,7 +8,10 @@ One :class:`MintEventState` per subscribed mint holds (a) ``points``: the last
 fills as the tape fold reads them (:class:`TapeTrade`); (c) the creator's flow
 since the subscription; (d) ``subscribed_at``, ``last_event_at``, ``slot``;
 (e) a monotonic deque of ``real_sol`` (:class:`PeakDeque`) for the peak of
-the last 60 s. The bounded dict of them is :mod:`hunter_meme_worker.event_book`.
+the last 60 s; (f) since T4.66, the crowd ledger of EXP-M19
+(:class:`hunter_indicators.meme.crowd.CrowdLedger`: early wallets and their
+retention, new wallets and quick flips of the last 30 s). The bounded dict of
+them is :mod:`hunter_meme_worker.event_book`.
 
 **Reuse, not reimplementation.** ``tape_minute`` folds the trades with
 :func:`hunter_meme_worker.features_tape.tape_for` — the same function, the same
@@ -44,6 +47,7 @@ from hunter_exchanges.pumpfun.curve import (
 )
 from hunter_exchanges.pumpfun.decode import BondingCurveAccount
 from hunter_exchanges.pumpfun.models import NormalizedCurveTrade
+from hunter_indicators.meme.crowd import CrowdFeatures, CrowdLedger, CrowdTrade
 from hunter_indicators.meme.drawdown import (
     DEFAULT_MAX_GAP_S,
     DEFAULT_WINDOW_S,
@@ -53,6 +57,7 @@ from hunter_indicators.meme.drawdown import (
     recent_drawdown,
 )
 from hunter_indicators.meme.fast import WINDOW_S, FastPoint
+from hunter_meme_worker.event_state_values import CreatorFlow, CurvePoint
 from hunter_meme_worker.features_tape import TapeMinute, TapeTrade, tape_for
 
 __all__ = [
@@ -76,56 +81,6 @@ MAX_POINTS: Final = 4096
 a trades overflow is a coverage gap, never a silent undercount."""
 
 
-@dataclass(frozen=True, slots=True)
-class CurvePoint:
-    """One photo of the curve with its two clocks, from whichever source."""
-
-    observed_at: datetime
-    received_at: datetime
-    mcap_sol: Decimal | None
-    real_sol: Decimal
-    real_token: Decimal
-    mayhem: bool | None
-    slot: int | None = None
-    source: str = "trade_event"
-
-    def as_fast_point(self) -> FastPoint:
-        return FastPoint(
-            observed_at=self.observed_at,
-            received_at=self.received_at,
-            mcap_sol=self.mcap_sol,
-            real_token_reserves=self.real_token,
-            real_sol_reserves=self.real_sol,
-            mayhem_enabled=self.mayhem,
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class CreatorFlow:
-    """Σ of the creator's fills seen since ``since`` (lamports, counts)."""
-
-    since: datetime
-    bought_lamports: int
-    sold_lamports: int
-    buys: int
-    sells: int
-    last_sell_at: datetime | None
-    covered_from_birth: bool
-    """The subscription began within :data:`COVERAGE_GRACE_S` of
-    ``first_seen_at``: a zero here is a zero the feed stated."""
-
-    @property
-    def sold_any(self) -> bool | None:
-        if self.sells > 0:
-            return True
-        return False if self.covered_from_birth else None
-
-    @property
-    def net_seller(self) -> bool | None:
-        """The plan's event-lane rule: ``True`` at the first creator sell."""
-        return self.sold_any
-
-
 @dataclass(slots=True)
 class MintEventState:
     """Everything the event gate reads about one mint, bounded in time and size."""
@@ -146,11 +101,15 @@ class MintEventState:
     creator_trades: deque[TapeTrade] = field(default_factory=lambda: deque[TapeTrade]())
     """Every creator fill since the subscription — the flow's audit trail,
     bounded by :data:`MAX_TRADES` (a creator rarely fills more than a few times)."""
+    crowd: CrowdLedger = field(init=False)
+    """T4.66 (EXP-M19): the early wallets, their fills, every wallet's firsts,
+    the last 30 s — fed by every ``apply_trade``, gapped with ``mark_gap``."""
     gaps: int = 0
     block_time_missing: int = 0
 
     def __post_init__(self) -> None:
         self.covered_since = self.subscribed_at
+        self.crowd = CrowdLedger(covered_since=self.subscribed_at, creator=self.creator)
 
     # -- feeding ---------------------------------------------------------
 
@@ -162,6 +121,7 @@ class MintEventState:
             block_time, self.block_time_missing = trade.received_at, self.block_time_missing + 1
         if self.creator is None:
             self.creator = trade.creator
+        self.crowd.creator = self.creator
         self.mayhem = trade.mayhem
         tape = TapeTrade(
             block_time=block_time,
@@ -171,6 +131,16 @@ class MintEventState:
             sol_lamports=int(trade.lamports),
         )
         self._push_trade(tape)
+        self.crowd.push(
+            CrowdTrade(
+                block_time=block_time,
+                received_at=trade.received_at,
+                trader=trade.trader,
+                side=trade.side,
+                tokens=trade.token_amount,
+                slot=trade.slot,
+            )
+        )
         if tape.trader == self.creator:
             if len(self.creator_trades) >= MAX_TRADES:
                 self.creator_trades.popleft()
@@ -230,6 +200,7 @@ class MintEventState:
         self.gaps += 1
         self.covered_since = max(self.covered_since, at)
         self.trades.clear()
+        self.crowd.mark_gap(at)
 
     # -- reading ---------------------------------------------------------
 
@@ -287,6 +258,11 @@ class MintEventState:
             return recent_drawdown(self.peaks, as_of=as_of, window_s=window_s, max_gap_s=max_gap_s)
         history = [ReservePoint(p.observed_at, p.received_at, p.real_sol) for p in self.points]
         return recent_drawdown(history, as_of=as_of, window_s=window_s, max_gap_s=max_gap_s)
+
+    def crowd_features(self, as_of: datetime) -> CrowdFeatures:
+        """EXP-M19's four readings at ``as_of``; the early set is only a
+        measurement when the feed covered the mint from birth."""
+        return self.crowd.features(as_of, covered_from_birth=self.covered_from_birth)
 
     @property
     def covered_from_birth(self) -> bool:

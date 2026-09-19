@@ -22,7 +22,8 @@ probe → scale second leg (``scale_size_sol``, ``scale_gate`` = the
 mint while the probe is open).
 
 T4.11 (EXP-M4) adds ``exit_on_migration``, ``trailing_arm_x`` and the ``dead``
-exit; T4.52b-2 (EXP-M13) the ``max_recent_drawdown_pct`` guard — all optional.
+exit; T4.52b-2 (EXP-M13) the ``max_recent_drawdown_pct`` guard; T4.66 (EXP-M19)
+the four crowd keys — all optional.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from decimal import Decimal
 from typing import Any
 
 from hunter_indicators.meme.rules import EntryGate
+from hunter_meme_worker.lab_gate_params import gate_from_params
 from hunter_meme_worker.lab_params import (
     DEFAULT_DEAD_MARK_PCT,
     DEFAULT_DEAD_STALE_S,
@@ -85,54 +87,9 @@ __all__ = [
 ]
 
 
-def _gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> EntryGate:
-    """T4.5's gate plus the T4.10 criteria, each absent = not a criterion."""
-    return EntryGate(
-        key=str(params["gate_key"]),
-        version=int(params["gate_version"]),
-        description=f"{name}/{version}: {params['gate_key']} v{params['gate_version']}",
-        min_age_s=int(params["min_age_s"]),
-        max_age_s=int(params["max_age_s"]),
-        min_progress_pct=decimal_of(params["min_progress_pct"]),
-        max_progress_pct=decimal_of(params["max_progress_pct"]),
-        max_participation_pct=decimal_of(params["max_participation_pct"]),
-        require_creator_not_net_seller=bool(params.get("require_creator_not_net_seller", True)),
-        require_progress=bool(params.get("require_progress", True)),
-        require_higher_lows=bool(params.get("require_higher_lows", False)),
-        require_breakout_15m=bool(params.get("require_breakout_15m", False)),
-        min_distance_to_support_pct=optional_decimal(params.get("min_distance_to_support_pct")),
-        max_distance_to_support_pct=optional_decimal(params.get("max_distance_to_support_pct")),
-        min_hype_score=optional_decimal(params.get("min_hype_score")),
-        max_dev_share=optional_decimal(params.get("max_dev_share")),
-        dev_share_unknown_allowed=bool(params.get("dev_share_unknown_allowed", False)),
-        max_snipers=None if params.get("max_snipers") is None else int(params["max_snipers"]),
-        # T4.23 (EXP-M5 arms 3/4): floors beside the ceilings, off unless the set says so.
-        min_snipers=None if params.get("min_snipers") is None else int(params["min_snipers"]),
-        max_top10_share=optional_decimal(params.get("max_top10_share")),
-        min_top10_share=optional_decimal(params.get("min_top10_share")),
-        # T4.16 (EXP-M5): the flow and the holders, each absent = not a criterion.
-        require_positive_flow=bool(params.get("require_positive_flow", False)),
-        min_unique_buyers=(
-            None if params.get("min_unique_buyers") is None else int(params["min_unique_buyers"])
-        ),
-        max_sells_to_buys=optional_decimal(params.get("max_sells_to_buys")),
-        require_holders_rising=bool(params.get("require_holders_rising", False)),
-        require_progress_rising=bool(params.get("require_progress_rising", False)),
-        # T4.21 (EXP-M5 arm 2): four switches, off unless the set says so.
-        min_holders=None if params.get("min_holders") is None else int(params["min_holders"]),
-        holders_rising_or_flat=bool(params.get("holders_rising_or_flat", False)),
-        creator_unknown_allowed_if_dev_measured=bool(
-            params.get("creator_unknown_allowed_if_dev_measured", False)
-        ),
-        progress_or_mcap_rising=bool(params.get("progress_or_mcap_rising", False)),
-        # T4.27: on unless the set says ``false`` — no arm wants Mayhem today.
-        exclude_mayhem=bool_or(params.get("exclude_mayhem"), True),
-        # T4.52b-2 (EXP-M13): the recent-drawdown guard, off unless the set names it.
-        max_recent_drawdown_pct=optional_decimal(params.get("max_recent_drawdown_pct")),
-        recent_drawdown_window_s=int_or(params.get("recent_drawdown_window_s"), 60),
-        recent_drawdown_max_gap_s=int_or(params.get("recent_drawdown_max_gap_s"), 30),
-    )
-
+_gate_from_params = gate_from_params
+"""The name every migration docstring and ``test_event_state`` cite (T4.66 moved
+the body to :mod:`hunter_meme_worker.lab_gate_params` for the budget)."""
 
 CLOCKS: tuple[str, ...] = ("1m", "15s")
 """``params.clock``: the series a set's gate reads — the closed minute
@@ -241,7 +198,7 @@ class RuleSetSpec:
             exp_ref=exp_ref,
             status=status,
             code_ref=code_ref,
-            gate=_gate_from_params(name, version, params),
+            gate=gate_from_params(name, version, params),
             size_sol=decimal_of(params["size_sol"]),
             target_x=decimal_of(params["target_x"]),
             trailing_pct=decimal_of(params["trailing_pct"]),

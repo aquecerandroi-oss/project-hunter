@@ -1011,6 +1011,49 @@ assume:
 > `creates_60s`, `proposals_total`, `paper_open`, `paper_closed_total`,
 > `create_to_proposal_ms_p50`/`_p95`, `born_full_60s`.
 
+> **T4.66 (19/09/2026): a multidão atrás da subida — o portão de evento passa a ler quem compra e
+> quem vende** (EXP-M19, `obsidian/05-EXPERIMENTS/EXP-M19-subida-com-gente-atras.md`). Everton, 19/09
+> 00:4x BRT: "se está subindo, vendas rápidas e mudanças rápidas de subida: compra assim que tiver alta,
+> dá para perceber". A hipótese: a subida que paga tem carteiras novas entrando e os primeiros
+> compradores (snipers, blocos 1–3) **segurando**; a que não paga é distribuição. Até aqui a porta só lia
+> números de uma foto (snipers, holders, progresso); o feed por trade (T4.52b) diz **quem**.
+>
+> **Quatro leituras puras** (`hunter_indicators.meme.crowd.CrowdLedger`, alimentado por
+> `MintEventState.apply_trade` com cada `TradeEvent`, O(1) por trade, O(n) por avaliação sobre a deque
+> limitada): `early_retention_pct` = Σ max(comprado − vendido, 0) ÷ Σ comprado sobre as **carteiras
+> iniciais** (compradores dos 3 primeiros slots do `create` quando o slot é conhecido, senão os 10
+> primeiros compradores; nunca o criador); `early_age_s` = segundos desde a primeira compra inicial;
+> `new_wallets_30s` = carteiras cujo primeiro trade no mint caiu nos últimos 30 s; `quick_flip_share_30s`
+> = fração dos trades dos últimos 30 s que são vendas de carteira que comprou há < 20 s. O `token_amount`
+> do `TradeEvent` passou a viajar em `NormalizedCurveTrade.token_amount` (subunidades cruas, como
+> `lamports`) — a retenção é uma razão, a unidade não importa.
+>
+> **Quatro chaves opcionais no portão, todas desligadas por padrão** (`EntryGate`,
+> `hunter_indicators.meme.rules_crowd`, lidas por `lab_gate_params.gate_from_params`):
+> `min_early_retention_pct` (fração) → `early_retention_below_min`; `min_early_age_s` →
+> `early_age_below_min`; `min_new_wallets_30s` → `new_wallets_below_min`; `max_quick_flip_share_30s`
+> (fração, estrito: acima recusa) → `quick_flip_above_max`. Desconhecido recusa por nome:
+> `early_retention_unknown` (uma só para retenção e idade — são a mesma medição),
+> `new_wallets_unknown`, `quick_flip_unknown`. Um set sem as chaves lê exatamente como antes
+> (`as_parameters()` não as lista; 1 428 testes do pacote de indicadores intocados).
+>
+> **Só a pista de evento mede; as outras falham fechado.** `event_gate_rows.build_event_row` preenche
+> os quatro campos novos da `GateRow`; a pista de 15 s e a do minuto deixam `None` ⇒ `*_unknown`. O
+> conjunto inicial só existe quando a assinatura cobriu o mint desde o nascimento
+> (`covered_from_birth`, `covered_since ≤ first_seen_at + 5 s`); assinatura tardia ⇒
+> `not_covered_from_birth` ⇒ `early_retention_unknown`. Um gap (`mark_gap`) torna a retenção
+> desconhecida para sempre naquele mint (uma venda no gap é uma venda que ninguém contou) e reaquece a
+> janela de 30 s. As carteiras "novas" são novas **desde a cobertura** (a janela exige ≥ 30 s de
+> cobertura, então o artefato dos primeiros 30 s nunca é julgado). A trilha `meme_gate_refusals_by_mint`
+> decodifica as quatro recusas numéricas em `(value, limit)`.
+>
+> **Braço:** `flow_v2/10` (`0054`, `research_only`, `exp_ref EXP-M19`, `docs/DATABASE.md` §61) =
+> `flow_v2/6` + `"0.70"` / 60 / 5 / `"0.20"`; controle `flow_v2/6`. Nada muda na admissão, no kill
+> switch ou no dimensionamento do executor — só uma proposta de pesquisa a mais ou a menos. O primeiro
+> número a ler depois do deploy é a fração de `early_retention_unknown` entre as recusas do braço: a
+> sincronização de assinaturas roda a cada 5 s sobre `young_mints`, e a graça de cobertura é 5 s —
+> se a maioria dos mints nasce fora dela, o braço mede a cegueira, não a multidão.
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |

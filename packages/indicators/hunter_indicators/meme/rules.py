@@ -40,6 +40,7 @@ coin is known Mayhem and ``mayhem_unknown`` when the flag was not observed.
 
 T4.52b-2 adds ``max_recent_drawdown_pct`` (EXP-M13, off by default) and moves
 the base criteria beside the optional ones in ``rules_criteria`` (the budget).
+T4.66 adds EXP-M19's four crowd keys (:mod:`hunter_indicators.meme.rules_crowd`).
 """
 
 from __future__ import annotations
@@ -75,6 +76,7 @@ from hunter_indicators.meme.rules_criteria import (
     participation_refusals,
     progress_refusals,
 )
+from hunter_indicators.meme.rules_crowd import crowd_refusals
 from hunter_indicators.meme.rules_validation import validate_entry_gate
 
 __all__ = [
@@ -123,6 +125,7 @@ GATE_INPUTS: Final = (
     "meme_features_15s.holders_prev",
     "meme_tokens.mayhem_enabled",
     "meme_curve_snapshots.real_sol_reserves",
+    "solana_rpc_ws.trade_event",
 )
 
 
@@ -189,6 +192,14 @@ class EntryGate:
     SOL may have lost from its peak of the last ``recent_drawdown_window_s``;
     ``None`` = not a criterion. An observation older than
     ``recent_drawdown_max_gap_s`` is ``recent_drawdown_unknown`` (fail closed)."""
+    min_early_retention_pct: Decimal | None = None
+    min_early_age_s: int | None = None
+    min_new_wallets_30s: int | None = None
+    max_quick_flip_share_30s: Decimal | None = None
+    """T4.66 (EXP-M19): the crowd (:mod:`hunter_indicators.meme.crowd`) — the
+    early wallets' retention (fraction) held for at least so many seconds, a
+    floor of new wallets in 30 s, a ceiling (fraction) on quick flips; each
+    ``None`` = not a criterion, each unknown refused by name."""
     inputs: tuple[str, ...] = GATE_INPUTS
 
     def __post_init__(self) -> None:
@@ -235,6 +246,10 @@ class EntryGate:
             "progress_or_mcap_rising": self.progress_or_mcap_rising or None,
             "exclude_mayhem": None if self.exclude_mayhem else False,
             "max_recent_drawdown_pct": self.max_recent_drawdown_pct,
+            "min_early_retention_pct": self.min_early_retention_pct,
+            "min_early_age_s": self.min_early_age_s,
+            "min_new_wallets_30s": self.min_new_wallets_30s,
+            "max_quick_flip_share_30s": self.max_quick_flip_share_30s,
         }
         if self.max_recent_drawdown_pct is not None:
             optional["recent_drawdown_window_s"] = self.recent_drawdown_window_s
@@ -293,6 +308,12 @@ class EntryFeatures:
     """T4.52b-2: :func:`hunter_indicators.meme.drawdown.recent_drawdown` —
     the fraction of real SOL lost from the window's peak, that peak's age and
     why both are ``None`` (``no_observation`` / ``stale``)."""
+    early_retention_pct: Decimal | None = None
+    early_age_s: Decimal | None = None
+    new_wallets_30s: int | None = None
+    quick_flip_share_30s: Decimal | None = None
+    """T4.66 (EXP-M19): :class:`hunter_indicators.meme.crowd.CrowdFeatures` —
+    only the event lane fills them; ``None`` elsewhere (refused by name)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,4 +342,5 @@ def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
     refusals.extend(hype_refusals(features, gate))
     refusals.extend(flow_refusals(features, gate))
     refusals.extend(drawdown_refusals(features, gate))
+    refusals.extend(crowd_refusals(features, gate))
     return GateDecision(allowed=not refusals, refusals=tuple(refusals))

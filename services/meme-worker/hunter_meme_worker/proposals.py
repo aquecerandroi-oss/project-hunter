@@ -158,6 +158,10 @@ def entry_features_of(
         recent_drawdown_pct=row.recent_drawdown_pct,
         recent_drawdown_peak_age_s=row.recent_drawdown_peak_age_s,
         recent_drawdown_reason=row.recent_drawdown_reason,
+        early_retention_pct=row.early_retention_pct,
+        early_age_s=row.early_age_s,
+        new_wallets_30s=row.new_wallets_30s,
+        quick_flip_share_30s=row.quick_flip_share_30s,
     )
 
 

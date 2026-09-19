@@ -21,3 +21,28 @@ Estado em memória por moeda: carteiras dos 3 primeiros blocos e seus saldos (vi
 Vira mesa se R médio do braço > controle com ≥ 60 apostas e vetar ≥ 2 dos 3 rugs reais sem vetar a única vencedora (PS).
 
 Ligações: [[KB-0119-entrada-depois-da-queda]] · [[KB-0120-piso-de-snipers]] · [[KB-0128-cadeia-vence-fita]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[EXP-M18-sniper-de-lancamento]]
+
+## Braço semeado (T4.66)
+
+**19/09/2026** — o braço existe no banco e a pista de evento passou a ler quem compra e quem vende.
+
+| item | valor |
+|---|---|
+| migração | `0054_meme_gate_crowd_arm` (sobre `0053_meme_launch_lane_arm`), `docs/DATABASE.md` §61 |
+| conjunto | **`flow_v2/10`** (`01994d00-6c1a-7000-8000-000000000018`), `research_only`, `exp_ref EXP-M19`, `status active`, relógio 15 s |
+| base / controle | `flow_v2/6` (`0044`, com `pedigree_e2b: true`) — leitura honesta é `/10` contra `/6`, nunca contra `operator/5` |
+| as quatro chaves novas | `min_early_retention_pct: "0.70"` · `min_early_age_s: 60` · `min_new_wallets_30s: 5` · `max_quick_flip_share_30s: "0.20"` (frações como string decimal; contagens como inteiro) |
+| leituras | `hunter_indicators.meme.crowd` (`CrowdLedger`, 4 `FeatureDefinition` v1); fiação em `MintEventState.crowd` → `event_gate_rows.build_event_row` → `GateRow.early_retention_pct/early_age_s/new_wallets_30s/quick_flip_share_30s` |
+| recusas | `early_retention_below_min`, `early_age_below_min`, `new_wallets_below_min`, `quick_flip_above_max`; desconhecido: `early_retention_unknown`, `new_wallets_unknown`, `quick_flip_unknown` |
+| quem mede | **só a pista de evento** (`MEME_EVENT_GATE=on`); a pista de 15 s deixa `None` ⇒ `*_unknown` (falha fechada) |
+| provas | `packages/indicators/tests/unit/test_meme_crowd.py` (13), `services/meme-worker/tests/test_event_crowd.py` (7, replay das fixtures T4.52b-1), `test_event_gate_crowd_integration.py` (Postgres: `flow_v2/10` recusa retenção 0,4 e passa 0,9; `flow_v2/6` passa as duas), `test_migration_0054.py` (8) |
+
+**Definições operacionais congeladas com o braço** (mudar uma é versão nova da feature):
+- carteiras iniciais = compradores (nunca o criador) dos 3 primeiros slots contados do `create` quando o slot é conhecido; senão os **10 primeiros compradores distintos** na ordem de chegada — hoje o slot do `create` não chega ao estado, então vale a regra dos 10;
+- retenção = Σ max(comprado − vendido, 0) ÷ Σ comprado (por carteira, saldo negativo vira 0); idade = segundos desde a primeira compra inicial;
+- carteira nova = primeiro trade **visto pela cobertura** nos últimos 30 s (a janela exige ≥ 30 s de cobertura); venda rápida = venda de carteira cuja primeira compra foi há < 20 s; a fração é sobre **todos** os trades da janela (compras, vendas, criador incluído);
+- retenção ≥ 0,70 **e** idade ≥ 60 s (o "por ≥ 60 s" da hipótese); acima do teto de 0,20 recusa (estrito), igual passa.
+
+**O que a semente sozinha não garante — a primeira leitura.** O conjunto inicial só é medido quando a assinatura cobriu o mint desde o nascimento (`covered_since ≤ first_seen_at + 5 s`). A sincronização de assinaturas do portão de evento roda a cada 5 s sobre `young_mints`, e os snipers compram nos primeiros ~1–2 s: se a maioria dos mints entra fora da graça, o braço recusa `early_retention_unknown` e mede a cegueira, não a multidão. **P0 (antes de ler R):** fração de `early_retention_unknown` entre as recusas de `flow_v2/10` ≤ 20 % nas primeiras 24 h. Se falhar, o próximo passo não é mexer no critério: é (a) assinar no instante do `create` (a pista de lançamento já recebe o `create` em ~100 ms) ou (b) preencher os primeiros slots por `getSignaturesForAddress` na assinatura — os dois fora do escopo da T4.66.
+
+**Como ler em 3 dias** (a regra de decisão acima): R médio e acerto de `flow_v2/10` contra `flow_v2/6`, `n ≥ 60`; a mesma leitura sobre as moedas que a mesa real comprou (teria vetado YOU/CITIZEN? teria deixado PS?). Um R melhor com `n` pequeno e `*_unknown` alto é cobertura, não vantagem.

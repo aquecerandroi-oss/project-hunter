@@ -141,6 +141,18 @@ _NUMERIC_REFUSALS: dict[
     "holders_below_min": (lambda f: f.holders, lambda g: g.min_holders),
     # T4.61a (EXP-M13): the fraction lost from the window's peak against the ceiling.
     "recent_drawdown": (lambda f: f.recent_drawdown_pct, lambda g: g.max_recent_drawdown_pct),
+    # T4.66 (EXP-M19): the crowd — the retention floor, the age floor, the
+    # new-wallets floor, the quick-flip ceiling.
+    "early_retention_below_min": (
+        lambda f: f.early_retention_pct,
+        lambda g: g.min_early_retention_pct,
+    ),
+    "early_age_below_min": (lambda f: f.early_age_s, lambda g: g.min_early_age_s),
+    "new_wallets_below_min": (lambda f: f.new_wallets_30s, lambda g: g.min_new_wallets_30s),
+    "quick_flip_above_max": (
+        lambda f: f.quick_flip_share_30s,
+        lambda g: g.max_quick_flip_share_30s,
+    ),
 }
 """One entry per refusal name this revision already decodes into a numeric
 pair (docs/DATABASE.md §54.2's own example, ``snipers_above_max``). A name
