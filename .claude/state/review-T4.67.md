@@ -1,0 +1,10 @@
+# Revisão de risco — T4.67a/b pista de lançamento (7dd08e74), 19/09/2026 01:5x BRT (guardião de risco; gravado pela Sexta-feira)
+
+**Veredito: BLOCK em qualquer modo** → corrigido em T4.67c (filtro `clock <> 'event'` em `lab_repo._RULE_SETS`); depois **SAFE_FOR_ON com limites**. Decisão operacional: **fica `off`** — o R60 descartou a estratégia (18/18 células negativas).
+
+- BLOCK: 0053 semeia `launch_v0/1` ativo sem `gate_key`; `load_active_rule_sets` → `KeyError` → `lab_tick`/`wallets_once` → o worker inteiro em laço no 1.º tique após a migração, com a flag off. Reproduzido: `test_lab_persistence.py` falhava; após o filtro, 14 passed.
+- Dinheiro em `on`: por compra ≤ min(0,01, teto); `MEME_LAUNCH_MAX_OPEN` antes do envio; cap diário com tesouraria e latch; `wallet_max_sol` aplica. **Escopo do teste pequeno não aplica** (`read_scope_use` só em `entries.py`) — médio; sem cap por hora (`MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR` só operator) — ~600 compras/h possíveis; único freio de taxa = cap diário 0,15 (≈ 11 rugs → latch em 2–3 min; queima máx ≈ 0,165 SOL/dia).
+- Perfil rápido: dump do criador no mesmo segundo → `below_min_sol`; **nasce cheia não chega ao executor** (só `complete` recusa; 90–99 % compra e a venda fica `blocked:curve_complete_awaiting_migration`) — médio; `processed` só na cota; `skip_simulation` default false.
+- Saídas: `time_stop_s` em segundos; `third_party_sell` ignora nossa compra/criador; sem venda dupla (lock + releitura); **com `MEME_EVENT_EXITS=off` (padrão) o `third_party_sell` nunca dispara**.
+- Papel: sem dupla abertura após o conserto; CHECK de `mark_source` alargado, não estreitado no downgrade (intencional).
+- `.env` sugerido para 1 h em `on` (se um dia for ligado): `MEME_LAUNCH_LANE=on`, `MAX_OPEN=1`, `TICKET_SOL=0.01`, `MAX_AGE_S=3`, `BUY_SLIPPAGE_PCT=10`, `MAX_PARTICIPATION_PCT=0.10`, `SKIP_SIMULATION=false`, `MEME_EVENT_EXITS=on`, `MEME_CLOSE_ATA_ON_FULL_SELL=true`. Pendências T4.67c+: `read_scope_use` na pista, cap por hora/dia, teto de progresso próprio (50 %).

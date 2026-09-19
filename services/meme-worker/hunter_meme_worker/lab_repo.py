@@ -42,7 +42,13 @@ __all__ = [
 
 _RULE_SETS = text(
     "SELECT id, name, version, kind, params, code_ref, exp_ref, status FROM meme_rule_sets "
-    "WHERE status = 'active' ORDER BY name, version"
+    "WHERE status = 'active' "
+    # T4.67c (review of 7dd08e74): the launch lane's sets (``clock = 'event'``,
+    # seeded by 0053) carry no ``gate_key`` and are loaded by the lane itself;
+    # ``RuleSetSpec.from_params`` raised ``KeyError`` on them and took the whole
+    # worker down in a loop on the first Lab tick after ``alembic upgrade``.
+    "AND COALESCE(params ->> 'clock', '') <> 'event' "
+    "ORDER BY name, version"
 )
 
 _EVENT_MATCH_LATERAL = (
