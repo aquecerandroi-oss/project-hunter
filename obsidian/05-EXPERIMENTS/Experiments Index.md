@@ -486,3 +486,4 @@ pesquisa do plantão e o índice.
 `docs/plans/SHADOW-LAB.md` (itens 9 e 11 da decisão conjunta) · `docs/plans/M2.md` (T2.8) · `.claude/state/dialogue-SHADOW.md` · `docs/decisions/0003-base-de-conhecimento-obsidian.md` · `docs/DATABASE.md` §6 e §9
 - **EXP-M18** — sniper de lançamento: **descartado** 19/09 01:4x (R60: 18/18 células negativas, −9,6 a −15,5 %, n = 885; ver [[KB-0141-sniper-de-lancamento]])
 - **EXP-M19** — subida com gente atrás (retenção dos snipers): pré-registrado 19/09 00:4x (T4.66)
+- **EXP-M20** — sinal de call (KOL/canais): pré-registrado 19/09 02:5x, condicionado à T4.68a (feed de canais); previsão descartar (R61: KOL nos boards confirma, não antecipa; ver [[KB-0142-kol-e-call-antecipam-ou-confirmam]])

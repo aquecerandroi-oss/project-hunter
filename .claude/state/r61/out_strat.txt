@@ -1,0 +1,21 @@
+ALL: n=4531 | boom 37% (of which >30s after 40%) | peak<=sighting 59% | already -20% from pre-peak 41% | r5 p50 0.94 | rmax>=2x 16% | R mean -0.071 hit 15% (n=3486) | R_opt mean -0.078 hit 21% | grad 19%
+has twitter: n=0 | boom nan% (of which >30s after nan%) | peak<=sighting nan% | already -20% from pre-peak nan% | r5 p50 nan | rmax>=2x nan% | R mean +nan hit nan% (n=0) | R_opt mean +nan hit nan% | grad nan%
+no twitter: n=0 | boom nan% (of which >30s after nan%) | peak<=sighting nan% | already -20% from pre-peak nan% | r5 p50 nan | rmax>=2x nan% | R mean +nan hit nan% (n=0) | R_opt mean +nan hit nan% | grad nan%
+twitter profile: n=668 | boom 23% (of which >30s after 35%) | peak<=sighting 52% | already -20% from pre-peak 30% | r5 p50 0.95 | rmax>=2x 17% | R mean -0.046 hit 17% (n=301) | R_opt mean -0.073 hit 20% | grad 56%
+twitter post: n=1852 | boom 51% (of which >30s after 32%) | peak<=sighting 50% | already -20% from pre-peak 39% | r5 p50 0.79 | rmax>=2x 20% | R mean -0.075 hit 19% (n=1558) | R_opt mean -0.038 hit 24% | grad 18%
+has telegram: n=0 | boom nan% (of which >30s after nan%) | peak<=sighting nan% | already -20% from pre-peak nan% | r5 p50 nan | rmax>=2x nan% | R mean +nan hit nan% (n=0) | R_opt mean +nan hit nan% | grad nan%
+holders at sighting [0,10): n=1934 | boom 28% (of which >30s after 60%) | peak<=sighting 73% | already -20% from pre-peak 48% | r5 p50 0.99 | rmax>=2x 10% | R mean -0.060 hit 8% (n=1858) | R_opt mean -0.132 hit 15% | grad 1%
+holders at sighting [10,30): n=443 | boom 25% (of which >30s after 42%) | peak<=sighting 74% | already -20% from pre-peak 59% | r5 p50 0.74 | rmax>=2x 11% | R mean -0.100 hit 14% (n=347) | R_opt mean -0.165 hit 15% | grad 3%
+holders at sighting [30,100): n=1224 | boom 55% (of which >30s after 31%) | peak<=sighting 40% | already -20% from pre-peak 30% | r5 p50 0.71 | rmax>=2x 26% | R mean -0.083 hit 23% (n=927) | R_opt mean +0.021 hit 30% | grad 16%
+holders at sighting [100,1000000): n=930 | boom 38% (of which >30s after 24%) | peak<=sighting 33% | already -20% from pre-peak 19% | r5 p50 0.87 | rmax>=2x 23% | R mean -0.062 hit 25% (n=354) | R_opt mean +0.015 hit 33% | grad 66%
+mcap SOL at sighting [0,40): n=1723 | boom 24% (of which >30s after 75%) | peak<=sighting 76% | already -20% from pre-peak 60% | r5 p50 0.98 | rmax>=2x 10% | R mean -0.068 hit 9% (n=1706) | R_opt mean -0.179 hit 12% | grad 1%
+mcap SOL at sighting [40,60): n=594 | boom 48% (of which >30s after 33%) | peak<=sighting 63% | already -20% from pre-peak 37% | r5 p50 0.79 | rmax>=2x 14% | R mean -0.057 hit 14% (n=565) | R_opt mean -0.034 hit 24% | grad 3%
+mcap SOL at sighting [60,100): n=603 | boom 67% (of which >30s after 28%) | peak<=sighting 41% | already -20% from pre-peak 29% | r5 p50 0.85 | rmax>=2x 27% | R mean -0.074 hit 22% (n=560) | R_opt mean +0.038 hit 31% | grad 10%
+mcap SOL at sighting [100,300): n=723 | boom 76% (of which >30s after 28%) | peak<=sighting 31% | already -20% from pre-peak 12% | r5 p50 0.68 | rmax>=2x 24% | R mean -0.084 hit 23% (n=644) | R_opt mean +0.022 hit 31% | grad 31%
+mcap SOL at sighting [300,1000000000): n=56 | boom 62% (of which >30s after 11%) | peak<=sighting 50% | already -20% from pre-peak 0% | r5 p50 0.78 | rmax>=2x 0% | R mean -0.214 hit 18% (n=11) | R_opt mean +0.586 hit 42% | grad 84%
+age 2-30 min AND at pre-peak (not fallen): n=213 | boom 86% (of which >30s after 3%) | peak<=sighting 27% | already -20% from pre-peak 0% | r5 p50 1.21 | rmax>=2x 20% | R mean -0.063 hit 30% (n=160) | R_opt mean +0.363 hit 54% | grad 31%
+age 2-30 min AND has twitter: n=0 | boom nan% (of which >30s after nan%) | peak<=sighting nan% | already -20% from pre-peak nan% | r5 p50 nan | rmax>=2x nan% | R mean +nan hit nan% (n=0) | R_opt mean +nan hit nan% | grad nan%
+age 2-30 min AND kol>=2 after jump: n=287 | boom 67% (of which >30s after 5%) | peak<=sighting 50% | already -20% from pre-peak 44% | r5 p50 1.14 | rmax>=2x 19% | R mean -0.075 hit 25% (n=179) | R_opt mean +0.118 hit 40% | grad 22%
+age 2-5 min R by tercile of s_vk: [(-0.0552692388100967, 81), (0.020801346540531472, 189), (-0.059331703750014515, 124)]
+age 2-5 min: R mean -0.019, bootstrap 95% CI [-0.070, +0.037], n=322
+age 2-5 min: R_opt mean +0.122, bootstrap 95% CI [+0.055, +0.194], n=370; without top 5: +0.072

@@ -1,0 +1,23 @@
+age 2-5 s_R: n=322 mean=-0.019 CI95=[-0.073,+0.036] hit=30% median=-0.190 w/o top3=-0.040 top3 share of gross=13%
+age 2-5 s_R_mid: n=359 mean=+0.033 CI95=[-0.023,+0.092] hit=36% median=-0.153 w/o top3=+0.007 top3 share of gross=13%
+age 2-5 s_R_opt: n=370 mean=+0.122 CI95=[+0.054,+0.191] hit=45% median=-0.060 w/o top3=+0.087 top3 share of gross=13%
+age 5-30 s_R: n=75 mean=-0.094 CI95=[-0.181,-0.001] hit=35% median=-0.139 w/o top3=-0.144 top3 share of gross=40%
+age 5-30 s_R_mid: n=86 mean=+0.284 CI95=[+0.024,+0.645] hit=44% median=-0.082 w/o top3=+0.058 top3 share of gross=50%
+age 5-30 s_R_opt: n=104 mean=+0.293 CI95=[+0.068,+0.561] hit=39% median=-0.090 w/o top3=+0.106 top3 share of gross=42%
+age 2-30 s_R: n=397 mean=-0.033 CI95=[-0.080,+0.017] hit=31% median=-0.189 w/o top3=-0.051 top3 share of gross=11%
+age 2-30 s_R_mid: n=445 mean=+0.081 CI95=[+0.011,+0.163] hit=38% median=-0.133 w/o top3=+0.037 top3 share of gross=18%
+age 2-30 s_R_opt: n=474 mean=+0.159 CI95=[+0.088,+0.240] hit=44% median=-0.077 w/o top3=+0.117 top3 share of gross=14%
+age 2-30 at pre-peak s_R: n=160 mean=-0.063 CI95=[-0.128,+0.007] hit=30% median=-0.203 w/o top3=-0.094 top3 share of gross=21%
+age 2-30 at pre-peak s_R_mid: n=179 mean=+0.146 CI95=[+0.008,+0.322] hit=44% median=-0.082 w/o top3=+0.040 top3 share of gross=36%
+age 2-30 at pre-peak s_R_opt: n=192 mean=+0.363 CI95=[+0.211,+0.539] hit=54% median=+0.037 w/o top3=+0.262 top3 share of gross=22%
+age 2-30 holders>=30 s_R: n=321 mean=-0.036 CI95=[-0.090,+0.019] hit=31% median=-0.207 w/o top3=-0.058 top3 share of gross=13%
+age 2-30 holders>=30 s_R_mid: n=354 mean=+0.100 CI95=[+0.014,+0.204] hit=38% median=-0.160 w/o top3=+0.045 top3 share of gross=20%
+age 2-30 holders>=30 s_R_opt: n=376 mean=+0.209 CI95=[+0.118,+0.303] hit=45% median=-0.037 w/o top3=+0.157 top3 share of gross=15%
+age 2-30 day 2026-09-17 s_R: n=149 mean=+0.022 CI95=[-0.068,+0.118] hit=31% median=-0.191 w/o top3=-0.024 top3 share of gross=22%
+age 2-30 day 2026-09-17 s_R_mid: n=168 mean=+0.051 CI95=[-0.035,+0.144] hit=36% median=-0.160 w/o top3=+0.002 top3 share of gross=22%
+age 2-30 day 2026-09-18 s_R: n=130 mean=-0.072 CI95=[-0.143,+0.003] hit=30% median=-0.179 w/o top3=-0.106 top3 share of gross=24%
+age 2-30 day 2026-09-18 s_R_mid: n=143 mean=+0.039 CI95=[-0.054,+0.139] hit=36% median=-0.131 w/o top3=-0.020 top3 share of gross=27%
+age 2-30 day 2026-09-19 s_R: n=18 mean=-0.154 CI95=[-0.261,-0.010] hit=11% median=-0.271 w/o top3=-0.256 top3 share of gross=94%
+age 2-30 day 2026-09-19 s_R_mid: n=23 mean=-0.026 CI95=[-0.163,+0.144] hit=35% median=-0.128 w/o top3=-0.135 top3 share of gross=74%
+age 2-30 day 2026-09-16 s_R: n=100 mean=-0.044 CI95=[-0.119,+0.034] hit=36% median=-0.163 w/o top3=-0.092 top3 share of gross=35%
+age 2-30 day 2026-09-16 s_R_mid: n=111 mean=+0.203 CI95=[+0.004,+0.488] hit=42% median=-0.116 w/o top3=+0.033 top3 share of gross=47%

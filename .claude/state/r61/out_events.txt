@@ -1,0 +1,249 @@
+
+##### EVENT MATCHES #####
+matches (distinct mints): 2998 | by kind: {'match_kind': ['buy', 'avoid'], 'len': [2968, 30]}
+by event kind/confidence: {'kind': ['brand_launch', 'narrative', 'brand_launch', 'narrative', 'viral_post', 'narrative', 'incident', 'incident', 'brand_launch', 'viral_post'], 'confidence': ['reported', 'confirmed', 'confirmed', 'reported', 'rumor', 'rumor', 'confirmed', 'reported', 'rumor', 'reported'], 'len': [1252, 632, 394, 274, 264, 106, 39, 32, 4, 1]}
+matched_at - created_at s: n=2998 p10=8 p25=21 p50=41 p75=909 p90=23710 | created_at - event.observed_at h: n=2998 p10=1 p25=8 p50=19 p75=34 p90=46
+share with any KOL on boards: 20% | graduated: 6.1%
+
+=== ALL event matches (t_sig = matched_at) (n=2998) ===
+age at sighting s: n=2998 p10=8 p25=21 p50=41 p75=909 p90=23710 | uncertainty s: n=2998 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=2076 p10=-44 p25=-31 p50=-14 p75=6 p90=76 | peak<=sighting 69% | peak before lower bound 69%
+[15s] boom(+50%/60s) - t_kol s: n=206 p10=24 p25=45 p50=60 p75=100 p90=178 | no boom 93% | of booms: after sighting 100%, >30s after 85%, <= 0 0%
+[15s] boom - t_prev (optimistic bound) s: n=206 p10=24 p25=45 p50=60 p75=100 p90=178 | of booms: >30s after lower bound 85%
+[15s] crash(-50% of peak) - t_kol s: n=367 p10=-24 p25=-9 p50=14 p75=47 p90=145 | no crash seen 88%
+[15s] s_r1: n=2062 mean=1.07 p25=0.99 p50=1.00 p75=1.00 p90=1.02 >=1.5x 4% >=2x 2% <=0.5x 8%
+[15s] s_r5: n=1816 mean=1.08 p25=0.89 p50=1.00 p75=1.00 p90=1.00 >=1.5x 4% >=2x 3% <=0.5x 11%
+[15s] s_rmax: n=2071 mean=1.36 p25=1.00 p50=1.00 p75=1.00 p90=1.35 >=1.5x 9% >=2x 6% <=0.5x 2%
+[15s] s_peak_over_kol: n=2076 mean=3.74 p25=1.00 p50=1.00 p75=1.17 p90=2.25 >=1.5x 16% >=2x 11% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=1851 mean=0.91 p25=0.97 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 7%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2045 mean=-0.090 median=-0.082 hit=5% sum=-184.5 p90=-0.081 max=+9.60 top3=20% of gross gains | exits: {'censored': 1191, 'time': 504, 'trail': 350}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2045 mean=-0.090 median=-0.082 hit=5% sum=-184.5 p90=-0.081 max=+9.60 top3=20% of gross gains | exits: {'censored': 1191, 'time': 504, 'trail': 350}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2045 mean=-0.090 median=-0.082 hit=5% sum=-184.5 p90=-0.081 max=+9.60 top3=20% of gross gains | exits: {'censored': 1191, 'time': 504, 'trail': 350}
+[15s] coverage after sighting s: n=2076 p10=202 p25=243 p50=280 p75=348 p90=434
+[1min boards] peak - t_kol s: n=1506 p10=-43 p25=-27 p50=-3 p75=27 p90=80 | peak<=sighting 54% | peak > 60s after 12%
+[1min boards] boom(+50%/90s) - t_kol s: n=96 p10=90 p25=111 p50=156 p75=282 p90=518 | no boom 97% | of booms: after sighting 99%
+[1min boards] crash - t_kol s: n=297 p10=10 p25=28 p50=84 p75=411 p90=979 | no crash seen 90%
+[1min boards] b_r1: n=1114 mean=1.04 p25=0.98 p50=1.00 p75=1.00 p90=1.10 >=1.5x 5% >=2x 2% <=0.5x 7%
+[1min boards] b_r5: n=160 mean=1.29 p25=0.54 p50=1.04 p75=1.63 p90=2.39 >=1.5x 29% >=2x 15% <=0.5x 23%
+[1min boards] b_r15: n=97 mean=1.19 p25=0.05 p50=0.08 p75=1.57 p90=3.00 >=1.5x 26% >=2x 20% <=0.5x 58%
+[1min boards] b_r60: n=66 mean=0.45 p25=0.04 p50=0.05 p75=0.21 p90=1.08 >=1.5x 6% >=2x 5% <=0.5x 83%
+[1min boards] b_rmax: n=1368 mean=1.35 p25=1.00 p50=1.00 p75=1.00 p90=1.58 >=1.5x 11% >=2x 7% <=0.5x 5%
+[1min boards] b_peak_over_kol: n=1506 mean=1.48 p25=1.00 p50=1.00 p75=1.01 p90=1.69 >=1.5x 12% >=2x 8% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=1065 mean=0.97 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 2%
+[1min boards] coverage after sighting s: n=1506 p10=1 p25=21 p50=48 p75=89 p90=307 | graduated share: 6%
+
+=== match_kind = buy (n=2968) ===
+age at sighting s: n=2968 p10=8 p25=21 p50=41 p75=1054 p90=23797 | uncertainty s: n=2968 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=2072 p10=-44 p25=-31 p50=-14 p75=6 p90=76 | peak<=sighting 69% | peak before lower bound 69%
+[15s] boom(+50%/60s) - t_kol s: n=206 p10=24 p25=45 p50=60 p75=100 p90=178 | no boom 93% | of booms: after sighting 100%, >30s after 85%, <= 0 0%
+[15s] boom - t_prev (optimistic bound) s: n=206 p10=24 p25=45 p50=60 p75=100 p90=178 | of booms: >30s after lower bound 85%
+[15s] crash(-50% of peak) - t_kol s: n=367 p10=-24 p25=-9 p50=14 p75=47 p90=145 | no crash seen 88%
+[15s] s_r1: n=2058 mean=1.07 p25=0.99 p50=1.00 p75=1.00 p90=1.02 >=1.5x 4% >=2x 2% <=0.5x 8%
+[15s] s_r5: n=1812 mean=1.08 p25=0.89 p50=1.00 p75=1.00 p90=1.00 >=1.5x 4% >=2x 3% <=0.5x 11%
+[15s] s_rmax: n=2067 mean=1.36 p25=1.00 p50=1.00 p75=1.00 p90=1.36 >=1.5x 9% >=2x 6% <=0.5x 2%
+[15s] s_peak_over_kol: n=2072 mean=3.74 p25=1.00 p50=1.00 p75=1.17 p90=2.26 >=1.5x 16% >=2x 11% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=1847 mean=0.91 p25=0.97 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 7%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2041 mean=-0.090 median=-0.082 hit=5% sum=-184.2 p90=-0.081 max=+9.60 top3=20% of gross gains | exits: {'censored': 1189, 'time': 502, 'trail': 350}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2041 mean=-0.090 median=-0.082 hit=5% sum=-184.2 p90=-0.081 max=+9.60 top3=20% of gross gains | exits: {'censored': 1189, 'time': 502, 'trail': 350}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2041 mean=-0.090 median=-0.082 hit=5% sum=-184.2 p90=-0.081 max=+9.60 top3=20% of gross gains | exits: {'censored': 1189, 'time': 502, 'trail': 350}
+[15s] coverage after sighting s: n=2072 p10=202 p25=243 p50=280 p75=347 p90=432
+[1min boards] peak - t_kol s: n=1484 p10=-43 p25=-27 p50=-4 p75=26 p90=72 | peak<=sighting 55% | peak > 60s after 11%
+[1min boards] boom(+50%/90s) - t_kol s: n=96 p10=90 p25=111 p50=156 p75=282 p90=518 | no boom 97% | of booms: after sighting 99%
+[1min boards] crash - t_kol s: n=291 p10=10 p25=26 p50=83 p75=395 p90=906 | no crash seen 90%
+[1min boards] b_r1: n=1096 mean=1.04 p25=0.97 p50=1.00 p75=1.00 p90=1.10 >=1.5x 5% >=2x 2% <=0.5x 7%
+[1min boards] b_r5: n=150 mean=1.31 p25=0.51 p50=1.07 p75=1.65 p90=2.44 >=1.5x 31% >=2x 16% <=0.5x 25%
+[1min boards] b_r15: n=92 mean=1.23 p25=0.05 p50=0.08 p75=1.67 p90=3.10 >=1.5x 27% >=2x 21% <=0.5x 58%
+[1min boards] b_r60: n=59 mean=0.46 p25=0.04 p50=0.05 p75=0.21 p90=1.05 >=1.5x 7% >=2x 5% <=0.5x 85%
+[1min boards] b_rmax: n=1347 mean=1.36 p25=1.00 p50=1.00 p75=1.00 p90=1.59 >=1.5x 11% >=2x 7% <=0.5x 5%
+[1min boards] b_peak_over_kol: n=1484 mean=1.49 p25=1.00 p50=1.00 p75=1.01 p90=1.69 >=1.5x 12% >=2x 8% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=1051 mean=0.97 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 2%
+[1min boards] coverage after sighting s: n=1484 p10=1 p25=21 p50=47 p75=87 p90=265 | graduated share: 5%
+
+=== match_kind = avoid (n=30) ===
+age at sighting s: n=30 p10=14 p25=27 p50=37 p75=45 p90=4025 | uncertainty s: n=30 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=4 p10=-20 p25=-15 p50=19 p75=58 p90=71 | peak<=sighting 50% | peak before lower bound 50%
+[15s] boom(+50%/60s) - t_kol s: n=0 | no boom 100% | of booms: after sighting nan%, >30s after nan%, <= 0 nan%
+[15s] boom - t_prev (optimistic bound) s: n=0 | of booms: >30s after lower bound nan%
+[15s] crash(-50% of peak) - t_kol s: n=0 | no crash seen 100%
+[15s] s_r1: n=4 mean=0.97 p25=0.96 p50=1.00 p75=1.02 p90=1.04 >=1.5x 0% >=2x 0% <=0.5x 0%
+[15s] s_r5: n=4 mean=0.95 p25=0.94 p50=0.99 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 0%
+[15s] s_rmax: n=4 mean=0.98 p25=0.96 p50=1.01 p75=1.03 p90=1.05 >=1.5x 0% >=2x 0% <=0.5x 0%
+[15s] s_peak_over_kol: n=4 mean=1.02 p25=1.00 p50=1.01 p75=1.03 p90=1.05 >=1.5x 0% >=2x 0% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=4 mean=1.00 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 0%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=4 mean=-0.084 median=-0.082 hit=0% sum=-0.3 p90=-0.082 max=-0.08 top3=-24561205057% of gross gains | exits: {'censored': 2, 'time': 2}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=4 mean=-0.084 median=-0.082 hit=0% sum=-0.3 p90=-0.082 max=-0.08 top3=-24561205057% of gross gains | exits: {'censored': 2, 'time': 2}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=4 mean=-0.084 median=-0.082 hit=0% sum=-0.3 p90=-0.082 max=-0.08 top3=-24561205057% of gross gains | exits: {'censored': 2, 'time': 2}
+[15s] coverage after sighting s: n=4 p10=280 p25=298 p50=378 p75=509 p90=621
+[1min boards] peak - t_kol s: n=22 p10=-12 p25=90 p50=233 p75=685 p90=2502 | peak<=sighting 14% | peak > 60s after 77%
+[1min boards] boom(+50%/90s) - t_kol s: n=0 | no boom 100% | of booms: after sighting nan%
+[1min boards] crash - t_kol s: n=6 p10=540 p25=712 p50=1582 p75=2405 p90=2521 | no crash seen 80%
+[1min boards] b_r1: n=18 mean=1.00 p25=1.00 p50=1.00 p75=1.01 p90=1.01 >=1.5x 0% >=2x 0% <=0.5x 0%
+[1min boards] b_r5: n=10 mean=1.03 p25=1.02 p50=1.03 p75=1.05 p90=1.05 >=1.5x 0% >=2x 0% <=0.5x 0%
+[1min boards] b_r15: n=5 mean=0.42 p25=0.00 p50=0.00 p75=1.04 p90=1.05 >=1.5x 0% >=2x 0% <=0.5x 60%
+[1min boards] b_r60: n=7 mean=0.31 p25=0.00 p50=0.00 p75=0.54 p90=1.09 >=1.5x 0% >=2x 0% <=0.5x 71%
+[1min boards] b_rmax: n=21 mean=0.94 p25=1.00 p50=1.02 p75=1.05 p90=1.08 >=1.5x 0% >=2x 0% <=0.5x 10%
+[1min boards] b_peak_over_kol: n=22 mean=1.08 p25=1.01 p50=1.02 p75=1.07 p90=1.16 >=1.5x 5% >=2x 0% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=14 mean=0.96 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 0%
+[1min boards] coverage after sighting s: n=22 p10=85 p25=184 p50=1080 p75=3357 p90=3933 | graduated share: 80%
+
+=== buy, matched at age < 2 min (n=2210) ===
+age at sighting s: n=2210 p10=6 p25=15 p50=31 p75=45 p90=54 | uncertainty s: n=2210 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=2065 p10=-44 p25=-31 p50=-14 p75=6 p90=76 | peak<=sighting 69% | peak before lower bound 69%
+[15s] boom(+50%/60s) - t_kol s: n=203 p10=25 p25=45 p50=60 p75=98 p90=172 | no boom 91% | of booms: after sighting 100%, >30s after 86%, <= 0 0%
+[15s] boom - t_prev (optimistic bound) s: n=203 p10=25 p25=45 p50=60 p75=98 p90=172 | of booms: >30s after lower bound 86%
+[15s] crash(-50% of peak) - t_kol s: n=366 p10=-24 p25=-9 p50=14 p75=47 p90=145 | no crash seen 83%
+[15s] s_r1: n=2052 mean=1.07 p25=0.98 p50=1.00 p75=1.00 p90=1.02 >=1.5x 4% >=2x 2% <=0.5x 8%
+[15s] s_r5: n=1811 mean=1.08 p25=0.89 p50=1.00 p75=1.00 p90=1.00 >=1.5x 4% >=2x 3% <=0.5x 11%
+[15s] s_rmax: n=2061 mean=1.36 p25=1.00 p50=1.00 p75=1.00 p90=1.35 >=1.5x 9% >=2x 6% <=0.5x 2%
+[15s] s_peak_over_kol: n=2065 mean=1.77 p25=1.00 p50=1.00 p75=1.16 p90=2.24 >=1.5x 16% >=2x 11% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=1840 mean=0.91 p25=0.97 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 7%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2035 mean=-0.092 median=-0.082 hit=5% sum=-187.0 p90=-0.081 max=+9.60 top3=21% of gross gains | exits: {'censored': 1185, 'time': 500, 'trail': 350}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2035 mean=-0.092 median=-0.082 hit=5% sum=-187.0 p90=-0.081 max=+9.60 top3=21% of gross gains | exits: {'censored': 1185, 'time': 500, 'trail': 350}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=2035 mean=-0.092 median=-0.082 hit=5% sum=-187.0 p90=-0.081 max=+9.60 top3=21% of gross gains | exits: {'censored': 1185, 'time': 500, 'trail': 350}
+[15s] coverage after sighting s: n=2065 p10=203 p25=243 p50=280 p75=347 p90=430
+[1min boards] peak - t_kol s: n=1478 p10=-43 p25=-27 p50=-4 p75=26 p90=72 | peak<=sighting 55% | peak > 60s after 11%
+[1min boards] boom(+50%/90s) - t_kol s: n=94 p10=90 p25=112 p50=156 p75=272 p90=524 | no boom 96% | of booms: after sighting 100%
+[1min boards] crash - t_kol s: n=287 p10=11 p25=27 p50=83 p75=395 p90=898 | no crash seen 87%
+[1min boards] b_r1: n=1093 mean=1.04 p25=0.97 p50=1.00 p75=1.00 p90=1.10 >=1.5x 5% >=2x 2% <=0.5x 8%
+[1min boards] b_r5: n=148 mean=1.31 p25=0.50 p50=1.07 p75=1.65 p90=2.46 >=1.5x 32% >=2x 16% <=0.5x 25%
+[1min boards] b_r15: n=89 mean=1.17 p25=0.05 p50=0.06 p75=1.64 p90=2.96 >=1.5x 27% >=2x 20% <=0.5x 60%
+[1min boards] b_r60: n=58 mean=0.46 p25=0.04 p50=0.05 p75=0.20 p90=1.05 >=1.5x 7% >=2x 5% <=0.5x 86%
+[1min boards] b_rmax: n=1343 mean=1.35 p25=1.00 p50=1.00 p75=1.00 p90=1.58 >=1.5x 11% >=2x 7% <=0.5x 5%
+[1min boards] b_peak_over_kol: n=1478 mean=1.45 p25=1.00 p50=1.00 p75=1.01 p90=1.67 >=1.5x 12% >=2x 8% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=1045 mean=0.97 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 2%
+[1min boards] coverage after sighting s: n=1478 p10=1 p25=21 p50=47 p75=86 p90=252 | graduated share: 5%
+
+=== buy, matched at age >= 2 min (n=758) ===
+age at sighting s: n=758 p10=5715 p25=14937 p50=21928 p75=32368 p90=54398 | uncertainty s: n=758 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=7 p10=-206 p25=-151 p50=-136 p75=247 p90=1171 | peak<=sighting 71% | peak before lower bound 71%
+[15s] boom(+50%/60s) - t_kol s: n=3 p10=-46 p25=199 p50=607 p75=1159 p90=1490 | no boom 100% | of booms: after sighting 67%, >30s after 67%, <= 0 33%
+[15s] boom - t_prev (optimistic bound) s: n=3 p10=-46 p25=199 p50=607 p75=1159 p90=1490 | of booms: >30s after lower bound 67%
+[15s] crash(-50% of peak) - t_kol s: n=1 p10=-282 p25=-282 p50=-282 p75=-282 p90=-282 | no crash seen 100%
+[15s] s_r1: n=6 mean=1.07 p25=1.00 p50=1.00 p75=1.00 p90=1.20 >=1.5x 0% >=2x 0% <=0.5x 0%
+[15s] s_r5: n=1 mean=1.70 p25=1.70 p50=1.70 p75=1.70 p90=1.70 >=1.5x 100% >=2x 0% <=0.5x 0%
+[15s] s_rmax: n=6 mean=2.35 p25=1.00 p50=1.00 p75=3.43 p90=5.05 >=1.5x 33% >=2x 33% <=0.5x 0%
+[15s] s_peak_over_kol: n=7 mean=586.65 p25=1.11 p50=1.60 p75=5.05 p90=1640.18 >=1.5x 57% >=2x 43% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=7 mean=0.65 p25=0.50 p50=0.74 p75=0.91 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 29%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=6 mean=+0.475 median=-0.082 hit=33% sum=+2.9 p90=+1.614 max=+2.80 top3=97% of gross gains | exits: {'censored': 4, 'time': 2}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=6 mean=+0.475 median=-0.082 hit=33% sum=+2.9 p90=+1.614 max=+2.80 top3=97% of gross gains | exits: {'censored': 4, 'time': 2}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=6 mean=+0.475 median=-0.082 hit=33% sum=+2.9 p90=+1.614 max=+2.80 top3=97% of gross gains | exits: {'censored': 4, 'time': 2}
+[15s] coverage after sighting s: n=7 p10=35 p25=116 p50=177 p75=405 p90=1196
+[1min boards] peak - t_kol s: n=6 p10=-1691 p25=-891 p50=-182 p75=-86 p90=729 | peak<=sighting 83% | peak > 60s after 17%
+[1min boards] boom(+50%/90s) - t_kol s: n=2 p10=-155 p25=-66 p50=82 p75=229 p90=318 | no boom 100% | of booms: after sighting 50%
+[1min boards] crash - t_kol s: n=4 p10=-1776 p25=-1317 p50=-444 p75=525 p90=1158 | no crash seen 99%
+[1min boards] b_r1: n=3 mean=0.90 p25=0.83 p50=1.00 p75=1.03 p90=1.04 >=1.5x 0% >=2x 0% <=0.5x 0%
+[1min boards] b_r5: n=2 mean=1.06 p25=1.02 p50=1.06 p75=1.11 p90=1.14 >=1.5x 0% >=2x 0% <=0.5x 0%
+[1min boards] b_r15: n=3 mean=2.89 p25=0.98 p50=1.00 p75=3.85 p90=5.57 >=1.5x 33% >=2x 33% <=0.5x 0%
+[1min boards] b_r60: n=1 mean=0.79 p25=0.79 p50=0.79 p75=0.79 p90=0.79 >=1.5x 0% >=2x 0% <=0.5x 0%
+[1min boards] b_rmax: n=4 mean=3.40 p25=0.93 p50=1.00 p75=3.47 p90=7.92 >=1.5x 25% >=2x 25% <=0.5x 0%
+[1min boards] b_peak_over_kol: n=6 mean=10.66 p25=1.08 p50=6.00 p75=18.42 p90=24.96 >=1.5x 50% >=2x 50% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=6 mean=0.58 p25=0.17 p50=0.72 p75=0.93 p90=0.97 >=1.5x 0% >=2x 0% <=0.5x 33%
+[1min boards] coverage after sighting s: n=6 p10=-62 p25=-1 p50=941 p75=2585 p90=3569 | graduated share: 5%
+
+=== symbol_hint = PAID (n=1252) ===
+age at sighting s: n=1252 p10=7 p25=18 p50=35 p75=51 p90=3353 | uncertainty s: n=1252 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=1024 p10=-43 p25=-31 p50=-12 p75=8 p90=93 | peak<=sighting 67% | peak before lower bound 67%
+[15s] boom(+50%/60s) - t_kol s: n=94 p10=27 p25=42 p50=62 p75=85 p90=147 | no boom 92% | of booms: after sighting 100%, >30s after 88%, <= 0 0%
+[15s] boom - t_prev (optimistic bound) s: n=94 p10=27 p25=42 p50=62 p75=85 p90=147 | of booms: >30s after lower bound 88%
+[15s] crash(-50% of peak) - t_kol s: n=183 p10=-24 p25=-9 p50=13 p75=40 p90=140 | no crash seen 85%
+[15s] s_r1: n=1022 mean=1.11 p25=0.98 p50=1.00 p75=1.00 p90=1.03 >=1.5x 4% >=2x 2% <=0.5x 9%
+[15s] s_r5: n=916 mean=1.14 p25=0.89 p50=1.00 p75=1.00 p90=1.00 >=1.5x 4% >=2x 3% <=0.5x 11%
+[15s] s_rmax: n=1022 mean=1.40 p25=1.00 p50=1.00 p75=1.00 p90=1.37 >=1.5x 9% >=2x 6% <=0.5x 2%
+[15s] s_peak_over_kol: n=1024 mean=1.84 p25=1.00 p50=1.00 p75=1.19 p90=2.45 >=1.5x 16% >=2x 12% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=910 mean=0.90 p25=0.97 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 9%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=1014 mean=-0.089 median=-0.082 hit=6% sum=-90.2 p90=-0.081 max=+9.60 top3=33% of gross gains | exits: {'censored': 604, 'time': 234, 'trail': 176}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=1014 mean=-0.089 median=-0.082 hit=6% sum=-90.2 p90=-0.081 max=+9.60 top3=33% of gross gains | exits: {'censored': 604, 'time': 234, 'trail': 176}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=1014 mean=-0.089 median=-0.082 hit=6% sum=-90.2 p90=-0.081 max=+9.60 top3=33% of gross gains | exits: {'censored': 604, 'time': 234, 'trail': 176}
+[15s] coverage after sighting s: n=1024 p10=208 p25=244 p50=279 p75=343 p90=420
+[1min boards] peak - t_kol s: n=775 p10=-43 p25=-25 p50=-1 p75=30 p90=95 | peak<=sighting 52% | peak > 60s after 13%
+[1min boards] boom(+50%/90s) - t_kol s: n=59 p10=100 p25=119 p50=191 p75=341 p90=586 | no boom 95% | of booms: after sighting 100%
+[1min boards] crash - t_kol s: n=175 p10=13 p25=25 p50=88 p75=456 p90=900 | no crash seen 86%
+[1min boards] b_r1: n=562 mean=1.03 p25=0.97 p50=1.00 p75=1.00 p90=1.14 >=1.5x 4% >=2x 2% <=0.5x 9%
+[1min boards] b_r5: n=97 mean=1.22 p25=0.43 p50=1.12 p75=1.65 p90=2.35 >=1.5x 32% >=2x 14% <=0.5x 28%
+[1min boards] b_r15: n=75 mean=0.90 p25=0.05 p50=0.06 p75=1.37 p90=2.70 >=1.5x 23% >=2x 16% <=0.5x 61%
+[1min boards] b_r60: n=40 mean=0.17 p25=0.04 p50=0.05 p75=0.06 p90=0.22 >=1.5x 2% >=2x 2% <=0.5x 95%
+[1min boards] b_rmax: n=711 mean=1.35 p25=1.00 p50=1.00 p75=1.00 p90=1.67 >=1.5x 13% >=2x 8% <=0.5x 7%
+[1min boards] b_peak_over_kol: n=775 mean=1.50 p25=1.00 p50=1.00 p75=1.02 p90=1.73 >=1.5x 13% >=2x 9% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=533 mean=0.98 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 2%
+[1min boards] coverage after sighting s: n=775 p10=4 p25=20 p50=45 p75=84 p90=830 | graduated share: 8%
+
+=== symbol_hint = ARC (n=394) ===
+age at sighting s: n=394 p10=27 p25=12982 p50=30747 p75=52746 p90=57238 | uncertainty s: n=394 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=75 p10=-39 p25=-25 p50=-1 p75=21 p90=89 | peak<=sighting 53% | peak before lower bound 53%
+[15s] boom(+50%/60s) - t_kol s: n=9 p10=22 p25=47 p50=56 p75=75 p90=88 | no boom 98% | of booms: after sighting 100%, >30s after 78%, <= 0 0%
+[15s] boom - t_prev (optimistic bound) s: n=9 p10=22 p25=47 p50=56 p75=75 p90=88 | of booms: >30s after lower bound 78%
+[15s] crash(-50% of peak) - t_kol s: n=13 p10=-2 p25=37 p50=44 p75=93 p90=141 | no crash seen 97%
+[15s] s_r1: n=70 mean=1.04 p25=0.98 p50=1.00 p75=1.00 p90=1.07 >=1.5x 7% >=2x 4% <=0.5x 4%
+[15s] s_r5: n=57 mean=1.10 p25=0.83 p50=0.99 p75=1.00 p90=1.00 >=1.5x 2% >=2x 2% <=0.5x 18%
+[15s] s_rmax: n=75 mean=2.05 p25=1.00 p50=1.00 p75=1.01 p90=1.66 >=1.5x 12% >=2x 8% <=0.5x 0%
+[15s] s_peak_over_kol: n=75 mean=2.11 p25=1.00 p50=1.00 p75=1.09 p90=1.66 >=1.5x 12% >=2x 9% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=61 mean=0.94 p25=0.99 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 5%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=66 mean=-0.121 median=-0.082 hit=8% sum=-8.0 p90=-0.070 max=+0.45 top3=88% of gross gains | exits: {'censored': 32, 'time': 18, 'trail': 16}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=66 mean=-0.121 median=-0.082 hit=8% sum=-8.0 p90=-0.070 max=+0.45 top3=88% of gross gains | exits: {'censored': 32, 'time': 18, 'trail': 16}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=66 mean=-0.121 median=-0.082 hit=8% sum=-8.0 p90=-0.070 max=+0.45 top3=88% of gross gains | exits: {'censored': 32, 'time': 18, 'trail': 16}
+[15s] coverage after sighting s: n=75 p10=76 p25=215 p50=282 p75=360 p90=419
+[1min boards] peak - t_kol s: n=57 p10=-35 p25=-26 p50=-1 p75=25 p90=53 | peak<=sighting 53% | peak > 60s after 4%
+[1min boards] boom(+50%/90s) - t_kol s: n=0 | no boom 100% | of booms: after sighting nan%
+[1min boards] crash - t_kol s: n=2 p10=75 p25=77 p50=80 p75=83 p90=85 | no crash seen 99%
+[1min boards] b_r1: n=43 mean=1.04 p25=1.00 p50=1.00 p75=1.00 p90=1.06 >=1.5x 9% >=2x 2% <=0.5x 2%
+[1min boards] b_r5: n=2 mean=0.54 p25=0.53 p50=0.54 p75=0.55 p90=0.56 >=1.5x 0% >=2x 0% <=0.5x 0%
+[1min boards] b_r15: n=0
+[1min boards] b_r60: n=0
+[1min boards] b_rmax: n=52 mean=1.12 p25=1.00 p50=1.00 p75=1.00 p90=1.26 >=1.5x 10% >=2x 4% <=0.5x 0%
+[1min boards] b_peak_over_kol: n=57 mean=1.11 p25=1.00 p50=1.00 p75=1.00 p90=1.21 >=1.5x 9% >=2x 4% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=38 mean=1.00 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 0%
+[1min boards] coverage after sighting s: n=57 p10=1 p25=25 p50=46 p75=74 p90=112 | graduated share: 2%
+
+=== symbol_hint = STOCKS (n=274) ===
+age at sighting s: n=274 p10=7 p25=17 p50=32 p75=45 p90=55 | uncertainty s: n=274 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=260 p10=-45 p25=-32 p50=-18 p75=-1 p90=23 | peak<=sighting 77% | peak before lower bound 77%
+[15s] boom(+50%/60s) - t_kol s: n=12 p10=30 p25=47 p50=108 p75=182 p90=195 | no boom 96% | of booms: after sighting 100%, >30s after 83%, <= 0 0%
+[15s] boom - t_prev (optimistic bound) s: n=12 p10=30 p25=47 p50=108 p75=182 p90=195 | of booms: >30s after lower bound 83%
+[15s] crash(-50% of peak) - t_kol s: n=35 p10=-17 p25=1 p50=19 p75=58 p90=166 | no crash seen 87%
+[15s] s_r1: n=259 mean=0.99 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 1% >=2x 1% <=0.5x 6%
+[15s] s_r5: n=231 mean=0.98 p25=0.99 p50=1.00 p75=1.00 p90=1.00 >=1.5x 1% >=2x 1% <=0.5x 9%
+[15s] s_rmax: n=260 mean=1.21 p25=1.00 p50=1.00 p75=1.00 p90=1.06 >=1.5x 4% >=2x 3% <=0.5x 2%
+[15s] s_peak_over_kol: n=260 mean=1.29 p25=1.00 p50=1.00 p75=1.00 p90=1.36 >=1.5x 8% >=2x 6% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=236 mean=0.96 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 4%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=258 mean=-0.101 median=-0.082 hit=3% sum=-26.0 p90=-0.082 max=+2.58 top3=97% of gross gains | exits: {'censored': 167, 'time': 63, 'trail': 28}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=258 mean=-0.101 median=-0.082 hit=3% sum=-26.0 p90=-0.082 max=+2.58 top3=97% of gross gains | exits: {'censored': 167, 'time': 63, 'trail': 28}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=258 mean=-0.101 median=-0.082 hit=3% sum=-26.0 p90=-0.082 max=+2.58 top3=97% of gross gains | exits: {'censored': 167, 'time': 63, 'trail': 28}
+[15s] coverage after sighting s: n=260 p10=205 p25=246 p50=274 p75=324 p90=396
+[1min boards] peak - t_kol s: n=142 p10=-46 p25=-32 p50=-17 p75=7 p90=38 | peak<=sighting 73% | peak > 60s after 4%
+[1min boards] boom(+50%/90s) - t_kol s: n=2 p10=104 p25=116 p50=137 p75=157 p90=169 | no boom 99% | of booms: after sighting 100%
+[1min boards] crash - t_kol s: n=18 p10=-1 p25=19 p50=43 p75=74 p90=113 | no crash seen 93%
+[1min boards] b_r1: n=104 mean=1.04 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 2% >=2x 1% <=0.5x 6%
+[1min boards] b_r5: n=5 mean=0.69 p25=0.54 p50=0.55 p75=0.97 p90=1.08 >=1.5x 0% >=2x 0% <=0.5x 20%
+[1min boards] b_r15: n=0
+[1min boards] b_r60: n=0
+[1min boards] b_rmax: n=130 mean=1.06 p25=1.00 p50=1.00 p75=1.00 p90=1.03 >=1.5x 4% >=2x 1% <=0.5x 3%
+[1min boards] b_peak_over_kol: n=142 mean=1.15 p25=1.00 p50=1.00 p75=1.00 p90=1.16 >=1.5x 6% >=2x 3% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=122 mean=0.98 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 2%
+[1min boards] coverage after sighting s: n=142 p10=2 p25=22 p50=58 p75=97 p90=146 | graduated share: 1%
+
+=== symbol_hint = GROK (n=285) ===
+age at sighting s: n=285 p10=5 p25=15 p50=30 p75=51 p90=21042 | uncertainty s: n=285 p10=0 p25=0 p50=0 p75=0 p90=0
+[15s] peak - t_kol s: n=236 p10=-42 p25=-24 p50=-8 p75=11 p90=57 | peak<=sighting 62% | peak before lower bound 62%
+[15s] boom(+50%/60s) - t_kol s: n=51 p10=22 p25=47 p50=56 p75=93 p90=146 | no boom 82% | of booms: after sighting 100%, >30s after 82%, <= 0 0%
+[15s] boom - t_prev (optimistic bound) s: n=51 p10=22 p25=47 p50=56 p75=93 p90=146 | of booms: >30s after lower bound 82%
+[15s] crash(-50% of peak) - t_kol s: n=78 p10=-30 p25=-11 p50=12 p75=39 p90=101 | no crash seen 73%
+[15s] s_r1: n=235 mean=1.15 p25=0.79 p50=1.00 p75=1.00 p90=1.46 >=1.5x 10% >=2x 6% <=0.5x 17%
+[15s] s_r5: n=212 mean=1.07 p25=0.60 p50=0.99 p75=1.00 p90=1.01 >=1.5x 7% >=2x 6% <=0.5x 21%
+[15s] s_rmax: n=235 mean=1.56 p25=1.00 p50=1.00 p75=1.07 p90=2.28 >=1.5x 16% >=2x 13% <=0.5x 5%
+[15s] s_peak_over_kol: n=236 mean=2.81 p25=1.00 p50=1.00 p75=1.64 p90=4.28 >=1.5x 28% >=2x 22% <=0.5x 0%
+[15s] s_kol_over_prepeak: n=206 mean=0.87 p25=0.95 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 12%
+[15s] paper s_R (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=234 mean=-0.082 median=-0.082 hit=8% sum=-19.1 p90=-0.077 max=+5.87 top3=45% of gross gains | exits: {'censored': 89, 'time': 83, 'trail': 62}
+[15s] paper s_R_mid (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=234 mean=-0.082 median=-0.082 hit=8% sum=-19.1 p90=-0.077 max=+5.87 top3=45% of gross gains | exits: {'censored': 89, 'time': 83, 'trail': 62}
+[15s] paper s_R_opt (entry +20s, fee 1.25%/leg, slip 3%, trail 20%/5min): n=234 mean=-0.082 median=-0.082 hit=8% sum=-19.1 p90=-0.077 max=+5.87 top3=45% of gross gains | exits: {'censored': 89, 'time': 83, 'trail': 62}
+[15s] coverage after sighting s: n=236 p10=210 p25=260 p50=326 p75=417 p90=466
+[1min boards] peak - t_kol s: n=169 p10=-37 p25=-29 p50=-1 p75=27 p90=73 | peak<=sighting 52% | peak > 60s after 12%
+[1min boards] boom(+50%/90s) - t_kol s: n=9 p10=75 p25=81 p50=141 p75=339 p90=474 | no boom 97% | of booms: after sighting 100%
+[1min boards] crash - t_kol s: n=46 p10=11 p25=28 p50=74 p75=128 p90=212 | no crash seen 84%
+[1min boards] b_r1: n=130 mean=1.13 p25=0.93 p50=1.00 p75=1.00 p90=1.25 >=1.5x 7% >=2x 3% <=0.5x 12%
+[1min boards] b_r5: n=9 mean=0.88 p25=0.46 p50=0.73 p75=1.13 p90=1.68 >=1.5x 22% >=2x 11% <=0.5x 33%
+[1min boards] b_r15: n=4 mean=4.92 p25=1.06 p50=1.61 p75=5.48 p90=11.85 >=1.5x 50% >=2x 25% <=0.5x 25%
+[1min boards] b_r60: n=5 mean=0.41 p25=0.00 p50=0.32 p75=0.54 p90=0.93 >=1.5x 0% >=2x 0% <=0.5x 60%
+[1min boards] b_rmax: n=150 mean=1.46 p25=1.00 p50=1.00 p75=1.00 p90=1.91 >=1.5x 13% >=2x 10% <=0.5x 9%
+[1min boards] b_peak_over_kol: n=169 mean=1.67 p25=1.00 p50=1.00 p75=1.05 p90=2.23 >=1.5x 17% >=2x 11% <=0.5x 0%
+[1min boards] b_kol_over_prepeak: n=114 mean=0.95 p25=1.00 p50=1.00 p75=1.00 p90=1.00 >=1.5x 0% >=2x 0% <=0.5x 4%
+[1min boards] coverage after sighting s: n=169 p10=-2 p25=25 p50=57 p75=91 p90=155 | graduated share: 5%
