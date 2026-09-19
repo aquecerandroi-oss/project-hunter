@@ -216,3 +216,44 @@ def test_a_system_transfer_when_input_is_not_wsol_is_refused() -> None:
     with pytest.raises(TreasurySwapRefused) as excinfo:
         verify_spot_swap_tx(hostile, intent=intent)
     assert excinfo.value.reason == "system_program_not_allowed"
+
+
+def test_a_create_ata_whose_mint_is_behind_a_lookup_table_is_refused() -> None:
+    """T4.73b, review finding 6: with the mint (position 3) only reachable
+    through an address lookup table, ``_key`` cannot derive the expected ATA
+    address, so the check used to be skipped. It must refuse by name instead."""
+    from hunter_exchanges.jupiter.versioned_tx import AddressTableLookup
+
+    message = _wrap_message()
+    n_static = len(message.static_account_keys)
+    hidden_mint_create = VersionedCompiledInstruction(5, (0, 3, 0, n_static, 6, 2), b"\x01")
+    instructions = list(message.instructions)
+    instructions[2] = hidden_mint_create
+    hostile = replace(
+        message,
+        instructions=tuple(instructions),
+        address_table_lookups=(AddressTableLookup("A" * 32, (), (0,)),),
+    )
+    intent = _intent(hostile, input_mint=WSOL, output_mint=WIF, in_amount=20_000_000, min_out=1)
+    with pytest.raises(TreasurySwapRefused) as excinfo:
+        verify_spot_swap_tx(hostile, intent=intent)
+    assert excinfo.value.reason == "ata_account_via_lookup_table"
+
+
+def test_a_create_ata_whose_ata_is_behind_a_lookup_table_is_refused() -> None:
+    from hunter_exchanges.jupiter.versioned_tx import AddressTableLookup
+
+    message = _wrap_message()
+    n_static = len(message.static_account_keys)
+    hidden_ata_create = VersionedCompiledInstruction(5, (0, n_static, 0, 8, 6, 2), b"\x01")
+    instructions = list(message.instructions)
+    instructions[2] = hidden_ata_create
+    hostile = replace(
+        message,
+        instructions=tuple(instructions),
+        address_table_lookups=(AddressTableLookup("A" * 32, (0,), ()),),
+    )
+    intent = _intent(hostile, input_mint=WSOL, output_mint=WIF, in_amount=20_000_000, min_out=1)
+    with pytest.raises(TreasurySwapRefused) as excinfo:
+        verify_spot_swap_tx(hostile, intent=intent)
+    assert excinfo.value.reason == "ata_account_via_lookup_table"

@@ -60,7 +60,10 @@ def test_amount_cap_refuses_above_the_default_unless_i_know() -> None:
     assert classify_amount_cap(Decimal("0.05"), i_know=False) is None
     refusal = classify_amount_cap(Decimal("0.06"), i_know=False)
     assert refusal is not None and refusal.startswith("amount_above_cap:")
-    assert classify_amount_cap(Decimal("5"), i_know=True) is None
+    assert classify_amount_cap(Decimal("0.06"), i_know=True) is None
+    # T4.73b: ``--i-know`` lifts the soft cap only; 5 SOL hits the hard cap
+    refusal = classify_amount_cap(Decimal("5"), i_know=True)
+    assert refusal is not None and refusal.startswith("amount_above_hard_cap:")
 
 
 def test_amount_cap_fails_closed_with_no_sol_leg_unless_i_know() -> None:
@@ -146,3 +149,55 @@ def test_check_sell_for_sol_catches_overspend_and_shortfall() -> None:
         )
         == "simulation_sol_short"
     )
+
+
+# --- T4.73b, review finding 4: a hard cap ``--i-know`` cannot lift, and a wallet floor
+
+
+def test_hard_cap_is_not_lifted_by_i_know() -> None:
+    from meme_spot_swap_rules import HARD_CAP_SOL_EQUIVALENT
+
+    assert HARD_CAP_SOL_EQUIVALENT == Decimal("0.10")
+    assert classify_amount_cap(Decimal("0.10"), i_know=True) is None
+    refusal = classify_amount_cap(Decimal("0.7"), i_know=True)  # the "0.07" typo of the review
+    assert refusal is not None and refusal.startswith("amount_above_hard_cap:")
+    refusal = classify_amount_cap(Decimal("0.11"), i_know=False)
+    assert refusal is not None and refusal.startswith("amount_above_hard_cap:")
+
+
+def test_wallet_floor_keeps_amount_plus_fee_allowance_above_the_floor() -> None:
+    from meme_spot_swap_rules import classify_wallet_floor
+
+    # 0.76 - 0.02 - 0.01 = 0.73 >= 0.30
+    assert (
+        classify_wallet_floor(
+            wallet_sol=Decimal("0.76"), amount_sol=Decimal("0.02"), floor=Decimal("0.30")
+        )
+        is None
+    )
+    # 0.32 - 0.02 - 0.01 = 0.29 < 0.30
+    refusal = classify_wallet_floor(
+        wallet_sol=Decimal("0.32"), amount_sol=Decimal("0.02"), floor=Decimal("0.30")
+    )
+    assert refusal == "wallet_below_floor_after_swap:0.29<0.30"
+    # exactly on the floor passes
+    assert (
+        classify_wallet_floor(
+            wallet_sol=Decimal("0.33"), amount_sol=Decimal("0.02"), floor=Decimal("0.30")
+        )
+        is None
+    )
+
+
+def test_wallet_floor_env_defaults_to_0_30_and_refuses_garbage() -> None:
+    from meme_spot_swap_rules import ENV_WALLET_MIN_SOL_AFTER_SWAP, parse_wallet_floor
+
+    assert ENV_WALLET_MIN_SOL_AFTER_SWAP == "MEME_WALLET_MIN_SOL_AFTER_SWAP"
+    assert parse_wallet_floor(None) == Decimal("0.30")
+    assert parse_wallet_floor("0.5") == Decimal("0.5")
+    with pytest.raises(ValueError):
+        parse_wallet_floor("abc")
+    with pytest.raises(ValueError):
+        parse_wallet_floor("-1")
+    with pytest.raises(ValueError):
+        parse_wallet_floor("0")

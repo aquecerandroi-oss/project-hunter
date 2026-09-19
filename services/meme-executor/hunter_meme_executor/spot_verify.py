@@ -151,9 +151,12 @@ def _create_ata(
     if token_program not in (TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID):
         raise TreasurySwapRefused("ata_token_program_mismatch")
     mint = _key(message, ix, 3)
-    if mint is not None and _key(message, ix, 1) != associated_token_address(
-        wallet, mint, token_program=token_program
-    ):
+    ata = _key(message, ix, 1)
+    if mint is None or ata is None:
+        # T4.73b (review finding 6): an address only reachable through a lookup
+        # table cannot be checked here, so it is refused — never skipped.
+        raise TreasurySwapRefused("ata_account_via_lookup_table")
+    if ata != associated_token_address(wallet, mint, token_program=token_program):
         raise TreasurySwapRefused("ata_address_mismatch")
     seen.ata_creates += 1
     if seen.ata_creates > MAX_ATA_CREATES:

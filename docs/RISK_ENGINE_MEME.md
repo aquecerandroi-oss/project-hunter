@@ -1718,7 +1718,9 @@ não é um laço automático do executor.
   `--from SOL|<mint> --to <mint>|SOL --amount <decimal> [--slippage-bps 50] [--max-impact-pct 1]
   --reason "..."` cota, mostra a rota, o impacto, a saída esperada e — com `--user <chave pública>`
   — monta e verifica a transação de verdade (sem assinar, sem chave). Tetos, recusados por nome
-  antes de montar qualquer coisa: `--amount` acima de 0,05 SOL-equivalente exige `--i-know`; um par
+  antes de montar qualquer coisa: `--amount` acima de 0,05 SOL-equivalente exige `--i-know`, e
+  acima de **0,10 SOL-equivalente é recusado sempre** (`amount_above_hard_cap`, T4.73b — o
+  `--i-know` levanta só o teto brando; "0,7" digitado no lugar de "0,07" nunca assina); um par
   sem perna em SOL não tem SOL-equivalente calculável e é recusado do mesmo jeito (fecha, não
   adivinha); impacto de preço acima de `--max-impact-pct`. `--round-trip` cota a compra e, em
   seguida, cota a venda de volta pelo valor mínimo garantido, imprimindo o custo da ida-e-volta em
@@ -1727,12 +1729,56 @@ não é um laço automático do executor.
   **exatamente** `ACTIVE` (mais estrito que o próprio executor, que ainda opera em `WARNING`) —
   lido das mesmas quatro fontes de `kill_switch.py` (`meme_spot_swap_kill.py`), antes de qualquer
   leitura de carteira. Só aceita um par com uma perna em SOL nativo (`apply_requires_a_sol_leg`
-  recusa token↔token): simula com `accounts=[carteira, ATA do outro mint]` e aplica o mesmo
-  invariante de saldos da tesouraria (`meme_spot_swap_rules.check_buy_with_sol`/
-  `check_sell_for_sol`), assina com o mesmo `MemeSigner` (`SOLANA_WALLET_SECRET_KEY`, lido uma vez,
-  nunca impresso) e grava uma linha em `meme_treasury_swaps` por perna. `--round-trip --apply`
-  compra, espera `--hold-s` (padrão 0) e vende de volta o que foi realmente preenchido — nunca o
-  valor cotado.
+  recusa token↔token, antes de abrir banco ou Redis). Uma perna de **compra com SOL** exige ainda
+  `carteira − amount − 0,01 ≥ MEME_WALLET_MIN_SOL_AFTER_SWAP` (padrão 0,30 SOL; variável nova da
+  T4.73b, valor inválido = recusa `wallet_floor_invalid`, `--i-know` não levanta) — lido da cadeia
+  antes da cotação. O veredito do verificador do plano (`verify_reason`) recusa antes do segundo
+  `POST /swap` (achado 7). Depois: simula com `accounts=[carteira, ATA do outro mint]` e aplica o
+  invariante de saldos **sobre o pós-estado simulado** — `simulation.accounts[0].lamports` e
+  `accounts[1].data.parsed.info.tokenAmount.amount`, o mesmo parser
+  `treasury_send.simulated_balances`; `None` em qualquer um = `simulation_accounts_unreadable`
+  (T4.73b, achado 1 — a versão da T4.73 comparava duas leituras ao vivo e por isso recusava toda
+  compra com `simulation_token_short`; provado contra a fixture real: 0,02 SOL, limiar 10 402 273,
+  antes `refused`, agora `confirmed`); assina com o mesmo `MemeSigner` (`SOLANA_WALLET_SECRET_KEY`,
+  lido uma vez, depois do interruptor, nunca impresso) e grava uma linha em `meme_treasury_swaps`
+  por perna. **Cada escrita da linha é um commit próprio** (T4.73b, achado 3): a conexão é
+  "commit-as-you-go", sem `begin()` envolvente — um swap que já foi para a cadeia nunca tem a
+  linha `submitted` desfeita por uma exceção posterior (RPC lenta, Jupiter 4xx na volta, Ctrl-C).
+  **A assinatura é derivada localmente e gravada antes do broadcast** (segunda opinião da Astra
+  sobre o diff da T4.73b): o id de uma transação Solana é o base58 da própria assinatura ed25519,
+  então a linha vai a `submitted` com ela **antes** de `sendTransaction`; um envio que levanta
+  exceção (timeout HTTP depois de relayed) fica `submitted` — nunca `failed` sem assinatura — e
+  o script sai com **66**. **Confirmação que estoura** (20 × 1 s ainda `pending`, ou erro ao ler
+  `getSignatureStatuses`): a linha fica `submitted`, a assinatura é impressa, o script sai com
+  código **66** e a perna de volta **nunca** dispara — reconciliar pela assinatura (T4.73b,
+  achado 2; antes virava `confirmed` com `sol_out_filled = 0` e a venda de volta cotava
+  `amount=0`). Erro on-chain = `failed`, código **67**; perna recusada = **65**. Na venda,
+  `sol_out_filled` é o SOL que pousou (lamports depois − antes, líquido de taxa), não o delta do
+  token (que é negativo numa venda e gravava 0). `--round-trip
+  --apply` compra, espera `--hold-s` (padrão 0), **relê o interruptor** (T4.73b, achado 5 — a
+  venda de volta é saída, e a tabela da §7 diz "saídas permitidas" em todo estado: ela prossegue sob
+  qualquer estado, com o estado impresso e logado) e vende de volta o que foi realmente
+  preenchido — nunca o valor cotado; `filled = 0` pula a volta em vez de cotar zero. O teto de
+  impacto (`classify_impact_cap`) roda **dentro de cada perna** (`run_apply_leg`), então a venda
+  de volta também o tem; o teto de quantia e o piso de carteira **não** se aplicam à venda de volta
+  (é saída, e SOL só entra).
+- **Verificador (T4.73b, achado 6):** `Create ATA` cujo mint (pos. 3) ou cuja ATA (pos. 1) só é
+  alcançável por address lookup table é recusado por nome (`ata_account_via_lookup_table`) — antes
+  a derivação do endereço era pulada quando `_key` devolvia `None`.
+- **Pendência ABERTA que bloqueia o primeiro `--apply` (achado da Astra na T4.73b, fora do escopo
+  de edição daquela tarefa — `hunter_meme_executor.treasury_db`):** os três leitores da tabela
+  reaproveitada não filtram por mint: `_SOL_INFLOW` soma `coalesce(sol_out_filled, sol_out_quoted)`
+  de **toda** linha `submitted|confirmed` do dia e alimenta `treasury_inflow_today_sol` do freio de
+  perda diária (§16.3) a cada tick do `reconcile`, com ou sem `MEME_TREASURY_ENABLED`; uma compra
+  spot SOL→WIF confirmada grava `sol_out_filled = 10 402 273` (átomos de WIF) e o freio passaria a
+  ler 10,4 milhões de "SOL" de entrada — `daily_loss_sol` fica negativo para sempre e a trava
+  diária nunca arma; `ensure_anchor` gravaria `equity − inflow` negativo. `_SUBMITTED` também
+  recolheria uma linha spot `submitted` e a marcaria `confirmed` com `wallet_after − wallet_before`
+  (zero numa compra), passando por cima da reconciliação manual. Correção de três cláusulas:
+  `AND input_mint IS NULL` em `_USDC_24H`, `_SOL_INFLOW` e `_SUBMITTED` (a CHECK da `0056` garante
+  `(input_mint IS NULL) = (output_mint IS NULL)`, então isso seleciona exatamente as linhas da
+  tesouraria), com um teste de que uma linha spot confirmada não entra no inflow. **Enquanto isso
+  não estiver commitado, nenhum `--apply` deste script deve rodar.**
 - **Tabela reaproveitada, sem migração para uma tabela nova**: `0056_meme_spot_swaps` acrescenta
   duas colunas `text` anuláveis, `input_mint`/`output_mint`, a `meme_treasury_swaps` (nenhum CHECK
   da `0051` nomeava USDC/SOL por valor, só por rótulo de coluna) — a tesouraria em §16.1–16.3 nunca

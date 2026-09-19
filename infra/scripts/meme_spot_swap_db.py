@@ -6,6 +6,12 @@ than through ``role_session``'s ``AsyncSession``, and because it always fills
 the ``0056`` ``input_mint``/``output_mint`` columns the executor's own rows
 leave ``NULL``. Same table, same lifecycle
 (``quoted -> simulated -> submitted -> confirmed | failed``, or ``refused``).
+
+T4.73b (review finding 3): every write here **commits on its own** — a swap
+that is already on chain must never have its ``submitted`` row rolled back by
+an exception raised later in the same process (a slow ``getSignatureStatuses``,
+a Jupiter 4xx on the sell-back quote, a Ctrl-C). The caller opens a plain
+connection, never an enclosing ``begin()``.
 """
 
 from __future__ import annotations
@@ -29,6 +35,8 @@ __all__ = [
 
 class Connection(Protocol):
     async def execute(self, statement: Any, parameters: Any = None, /) -> Any: ...
+
+    async def commit(self) -> None: ...
 
 
 _INSERT = text(
@@ -83,19 +91,23 @@ async def insert_row(
             "output_mint": output_mint,
         },
     )
+    await conn.commit()
     return swap_id
 
 
 async def mark_refused(conn: Connection, swap_id: uuid.UUID, *, refusal: str) -> None:
     await conn.execute(_UPDATE_REFUSED, {"id": swap_id, "refusal": refusal})
+    await conn.commit()
 
 
 async def mark_simulated(conn: Connection, swap_id: uuid.UUID) -> None:
     await conn.execute(_UPDATE_STATUS, {"id": swap_id, "status": "simulated"})
+    await conn.commit()
 
 
 async def mark_submitted(conn: Connection, swap_id: uuid.UUID, *, signature: str) -> None:
     await conn.execute(_UPDATE_SUBMITTED, {"id": swap_id, "signature": signature})
+    await conn.commit()
 
 
 async def mark_confirmed(
@@ -109,7 +121,9 @@ async def mark_confirmed(
             "wallet_sol_after": wallet_sol_after,
         },
     )
+    await conn.commit()
 
 
 async def mark_failed(conn: Connection, swap_id: uuid.UUID) -> None:
     await conn.execute(_UPDATE_STATUS, {"id": swap_id, "status": "failed"})
+    await conn.commit()
