@@ -5,11 +5,10 @@ service concludes anything (T4-MEME-RADAR.md §0 — the slice is monitoring onl
 ``RiskDecision``, no order). The budgets are the measured limits of the free
 sources, not preferences:
 
-- ``rest_budget_per_minute = 60`` is the ``frontend-api-v3.pump.fun`` limit read
-  off its own ``x-ratelimit-*`` headers (T4.0 §2, re-confirmed live in T4.1). It is
-  a **ceiling shared by IP**, so a second process on the same host halves it —
-  declared here because the adapter's token bucket is per instance unless Redis
-  backs it (T4.1's own stated limitation);
+- ``rest_budget_per_minute = 60`` (``MEME_PUMPFUN_REST_BUDGET_60S``, T4.75) is the
+  ``frontend-api-v3.pump.fun`` limit off its own ``x-ratelimit-*`` headers (T4.0
+  §2), a **ceiling shared by IP** (T4.1) that an operator now lowers without
+  a release — T4.75's own 429s at 34/60 after the pacote-8 deploy is why;
 - ``rpc_top_k = 20`` against a public RPC that allows ~10 req/s *and* 10 calls per
   method per window (its own header, T4.2f): until T4.2f only the largest market
   caps were reconciled. Now ``chain.py`` reads **every** tracked curve once a
@@ -303,6 +302,7 @@ def load_config(settings: Settings) -> MemeConfig:
         enabled=_bool_env("MEME_ENABLED", default=False),
         tracked_max=_int_env("MEME_TRACKED_MINTS_MAX", 120),
         track_window_minutes=_int_env("MEME_TRACK_WINDOW_MINUTES", 1440),
+        rest_budget_per_minute=_int_env("MEME_PUMPFUN_REST_BUDGET_60S", 60),
         rpc_top_k=_int_env("MEME_RPC_TOP_K", 20),
         retention_days=settings.meme_retention_days,
         lab_enabled=_bool_env("MEME_LAB_ENABLED", default=True),
