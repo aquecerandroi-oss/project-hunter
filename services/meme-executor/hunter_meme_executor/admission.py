@@ -26,7 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from zoneinfo import ZoneInfo
 
 from hunter_exchanges.pumpfun.curve import TOKEN_SUBUNITS_PER_TOKEN
@@ -45,6 +45,7 @@ from hunter_risk_meme import (
     MemeDecision,
     MemeEntryProposal,
     MemeKillSwitchInputs,
+    MemeLaunchProfile,
     MemeLimits,
     MemeWalletState,
     OpenMemePosition,
@@ -59,6 +60,7 @@ if TYPE_CHECKING:
 __all__ = [
     "AdmissionInputs",
     "admit",
+    "admit_launch",
     "creator_net_sol",
     "day_start_utc",
     "proposal_from",
@@ -123,10 +125,19 @@ def curve_from(read: CurveRead) -> CurveState:
         creator=a.creator,
         is_mayhem_mode=a.is_mayhem_mode,
         slot=read.slot,
-        commitment="confirmed",
+        commitment=_commitment(read.commitment),
         observed_at=read.observed_at,
         source="solana_rpc",
     )
+
+
+def _commitment(raw: str) -> Literal["processed", "confirmed", "finalized"]:
+    """The read's own commitment (T4.67b: ``processed`` on the launch quote); a
+    label this module does not know is handed to the engine as ``processed`` —
+    the weakest, which the full profile refuses (``commitment_too_weak``)."""
+    if raw == "finalized":
+        return "finalized"
+    return "confirmed" if raw == "confirmed" else "processed"
 
 
 def denominator_subunits(tokens: int | Decimal | None) -> int | None:
@@ -236,6 +247,10 @@ def context_from(
     )
 
 
+def _lane(raw: Any) -> str | None:
+    return raw if isinstance(raw, str) and raw else None
+
+
 def wallet_from(
     *,
     wallet_id: str,
@@ -264,11 +279,14 @@ def wallet_from(
                 token_amount=max(1, p.tokens),
                 mark_sol=p.mark_sol,
                 migrated=p.migrated,
+                lane=_lane(p.params.get("lane")),  # T4.67b: the launch's own cap reads it
             )
             for p in positions
         ),
         pending_intents=tuple(
-            PendingMemeIntent(proposal_id=i.proposal_id, mint=i.mint, reserved_sol=i.reserved_sol)
+            PendingMemeIntent(
+                proposal_id=i.proposal_id, mint=i.mint, reserved_sol=i.reserved_sol, lane=i.lane
+            )
             for i in pending
         ),
         day_start_sol_equity=anchor.day_start_sol_equity,
@@ -306,6 +324,25 @@ def admit(inputs: AdmissionInputs, limits: MemeLimits, *, live_enabled: bool) ->
         curve_fee_pct=inputs.curve_fee_pct,
         creates_ata=inputs.creates_ata,
         conviction=inputs.conviction,
+    )
+
+
+def admit_launch(
+    inputs: AdmissionInputs, limits: MemeLimits, launch: MemeLaunchProfile, *, live_enabled: bool
+) -> MemeDecision:
+    """T4.67b: the same engine under the launch profile (``hunter_risk_meme.profile``)."""
+    return evaluate_meme_entry(
+        inputs.proposal,
+        inputs.wallet,
+        limits,
+        inputs.curve,
+        inputs.context,
+        inputs.kill_switch,
+        live_enabled=live_enabled,
+        curve_fee_pct=inputs.curve_fee_pct,
+        creates_ata=inputs.creates_ata,
+        conviction=None,
+        launch=launch,
     )
 
 

@@ -14,10 +14,32 @@ from hunter_core.db.session import role_session
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.pdas import bonding_curve_address
 from hunter_meme_executor.event_exits_runtime import EventExitsRuntime, Watched
+from hunter_meme_executor.exit_common import is_launch_position
 from hunter_meme_executor.journal_db import WORKER_ROLE
+from hunter_meme_executor.launch_admission import str_list
 from hunter_meme_executor.repo import OpenPosition, open_positions, token_context
 
-__all__ = ["sync_watch"]
+__all__ = ["launch_watch_fields", "sync_watch"]
+
+
+def launch_watch_fields(position: OpenPosition, creator: str | None) -> dict[str, object]:
+    """T4.67b: what a launch position's ``params`` (``launch_admission``) tell
+    the watcher — the third-party-sell rule, the creation-slot buyers and the
+    creator from the curve account (``meme_tokens`` may not have the row yet)."""
+    params = position.params
+    if not is_launch_position(params):
+        return {"creator": creator}
+    raw_slot = params.get("creation_slot")
+    known = set(str_list(params.get("known_buyers")))
+    hinted = params.get("creator")
+    return {
+        "creator": creator or (hinted if isinstance(hinted, str) and hinted else None),
+        "launch": True,
+        "third_party_rule": bool(params.get("exit_on_first_third_party_sell", True)),
+        "known_buyers": known,
+        "creation_slot": int(raw_slot) if isinstance(raw_slot, int) else None,
+    }
+
 
 logger = get_logger(__name__)
 
@@ -47,13 +69,13 @@ async def _watch(rt: EventExitsRuntime, position: OpenPosition) -> None:
         return
     rt.watched[position.id] = Watched(
         position=position,
-        creator=token.creator,
         tape_creator_sold=token.creator_sold,
         logs_id=logs_id,
         account_id=account_id,
         high_water=position.high_water_sol or Decimal(0),
         creator_initial_tokens=token.creator_initial_tokens,
         creator_sold=position.creator_sold_seen_at is not None,
+        **launch_watch_fields(position, token.creator),  # type: ignore[arg-type]
     )
     rt.by_logical[logs_id] = position.id
     rt.by_logical[account_id] = position.id

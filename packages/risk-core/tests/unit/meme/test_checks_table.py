@@ -15,6 +15,7 @@ from hunter_risk_meme import (
     REFUSAL_NAMES,
     MemeConviction,
     MemeKillSwitchInputs,
+    MemeLaunchProfile,
     OpenMemePosition,
     PendingMemeIntent,
 )
@@ -156,6 +157,28 @@ FAILING = {
         "conv": MemeConviction(
             enabled=True, multiplier=Decimal("0.25"), sol_sized=Decimal("0.0005")
         )
+    },
+    # T4.67b — check 27, the launch profile's own cap (``test_launch_profile.py``
+    # has the profile's table; this row keeps the doctrine's "every name has a case").
+    "launch_max_open_reached": {
+        "launch": MemeLaunchProfile(
+            ticket_sol=Decimal("0.01"),
+            max_open=1,
+            max_participation_pct=Decimal("0.5"),
+            max_token_age_s=600,
+        ),
+        "w": wallet(
+            positions=(
+                OpenMemePosition(
+                    position_id="l1",
+                    mint=OTHER,
+                    sol_spent=Decimal("0.01"),
+                    token_amount=10,
+                    mark_sol=Decimal("0.01"),
+                    lane="launch",
+                ),
+            )
+        ),
     },
 }
 

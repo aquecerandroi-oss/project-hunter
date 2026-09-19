@@ -3,8 +3,10 @@
 Pure: a position, its honest mark, the instant and the parameters in; the name
 of the rule that fires (or ``None``) out. Precedence, highest first: the
 operator's ``sell_now`` (a human order is not a rule to be outranked), a rug
-signal, a creator dump, the curve leaving the venue (complete/migrated), the
-target, the trailing stop, the time stop. The kill switch is **not** a rule
+signal, a creator dump, (T4.67b, launch lane) the first third-party sell, the
+curve leaving the venue (complete/migrated), the target, the trailing stop, the
+time stop — ``time_stop_s`` is **seconds** (a 6 s launch stop is ``6``). The
+kill switch is **not** a rule
 here — ``TRADING_DISABLED``/``EMERGENCY`` never close a position by themselves
 (§7); the executor's optional ``auto_close_on_emergency`` is a separate,
 owner-decided trigger it names as such.
@@ -26,6 +28,7 @@ EXIT_REASONS: Final[tuple[str, ...]] = (
     "sell_now",
     "rug_signal",
     "creator_dump",
+    "third_party_sell",
     "migrated",
     "curve_complete",
     "target",
@@ -62,10 +65,14 @@ def decide_exit(
     rug_signal: bool = False,
     creator_dump: bool = False,
     emergency_auto_close: bool = False,
+    third_party_sell: bool = False,
 ) -> str | None:
     """The exit reason that fires now, or ``None``. ``mark_sol`` ``None`` (no usable
     curve state) fires only the rules that do not need a mark: the sale itself
-    then waits, degraded, never priced by a fabricated mark (§6)."""
+    then waits, degraded, never priced by a fabricated mark (§6).
+    ``third_party_sell`` (T4.67b): the caller saw a sell by a wallet that is
+    neither the creator nor a creation-slot buyer — the launch set's
+    ``exit_on_first_third_party_sell``; the caller decides whether the rule is on."""
     if sell_now:
         return "sell_now"
     if emergency_auto_close:
@@ -74,6 +81,8 @@ def decide_exit(
         return "rug_signal"
     if creator_dump:
         return "creator_dump"
+    if third_party_sell:
+        return "third_party_sell"
     if position.migrated:
         return "migrated"
     if position.curve_complete:

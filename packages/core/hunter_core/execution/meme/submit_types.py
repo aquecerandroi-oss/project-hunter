@@ -71,6 +71,13 @@ class SubmitPolicy:
     resend_interval_s: float = 2.0
     """T4.55: how often the same signed bytes are sent again while unconfirmed;
     ``0`` keeps the single send. Never applies to a Jito bundle."""
+    skip_simulation: bool = False
+    """T4.67b (launch lane, ``MEME_LAUNCH_SKIP_SIMULATION``): skip the executor's
+    own ``simulateTransaction`` before signing. The node's preflight
+    (``skipPreflight: false``) still runs on send, so a transaction that would
+    fail is still refused **before** landing — but only after it was signed and
+    its signature journaled, and the ~100 ms saved is the one RPC round trip.
+    Default ``False``: the doctrine's "simulate always" (§9.2)."""
 
 
 @dataclass(frozen=True, slots=True)

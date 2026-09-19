@@ -963,6 +963,54 @@ assume:
 > `event_exits_restarts_total`, `event_exits_reconnects`, `event_exits_dropped`,
 > `event_exits_creator_sells_seen`, `event_exits_marks_written`, `event_exits_sell_errors`.
 
+> **T4.67a (19/09/2026): a pista de lançamento — comprar no `create`, vender em segundos**
+> (EXP-M18, `obsidian/05-EXPERIMENTS/EXP-M18-sniper-de-lancamento.md`). Everton, 19/09 00:3x BRT:
+> "assim que a moeda é criada dá um pico; se comprarmos assim que começa a subir conseguimos
+> comprar no lançamento e vender na alta rápida?" Diferente do portão de evento acima (que julga
+> um mint **já rastreado**, com uma linha de 15 s por baixo), a pista de lançamento julga o
+> instante do próprio `create` — não existe linha de 15 s, holders, fita ou pedigree ainda.
+> **Gatilho: o próprio stream `create` do PumpPortal** (`discovery.py`, já em produção, ~100 ms
+> medidos em `plan-T4.52b.md` §1) — não um novo `logsSubscribe` program-wide no programa pump.
+> Este último exigiria decodificar um `CreateEvent` nunca antes visto, sobre uma assinatura de
+> altíssimo volume e sem fixture/medição própria; o transporte já testado e mais barato venceu
+> (`hunter_meme_worker.launch_lane.py`, docstring do módulo). `launch_lane.on_create` é chamado
+> por `discovery._handle` no mesmo instante em que o frame vira linha durável, antes até da sua
+> própria sessão abrir.
+>
+> **Critério, só o que o próprio `create` e a memória do processo respondem**
+> (`hunter_indicators.meme.launch_lane.evaluate_launch`): `is_mayhem` falso (desconhecido recusa
+> por nome, `mayhem_unknown`); a compra inicial do criador (`creator_initial_sol`) até
+> `max_creator_initial_sol` (parâmetro, "2"); `initial_real_token_reserves` reconstruído do
+> próprio frame (`initial_virtual_token_reserves + creator_initial_tokens −` o gap fixo do
+> programa) e são (dentro de 1 % da constante `INITIAL_REAL_TOKEN_RESERVES`, 793,1 M); o símbolo
+> não repetir um `create` dos últimos 60 s (`launch_lane_symbols.RecentSymbols`, em memória — o
+> `symbol_dup_24h` de `pedigree.py` é a versão de 24 h com leitura no banco, cara demais para este
+> orçamento). Uma proposta para `launch_v0/1` (`0053`, `research_only`, `exp_ref EXP-M18`) sai em
+> menos de 200 ms, com `reasons[0].series = meme_launch_lane_v1` (`docs/DATABASE.md` §43.2) —
+> nunca à espera de um `snapshot` (`quote.reason = no_snapshot_at_create`).
+>
+> **Papel precificado por evento, não pelo preenchimento de 15 s do Lab.** Uma proposta que passa
+> abre, atrás de `MEME_LAUNCH_LANE=paper|on` (`off` por padrão), uma assinatura própria
+> (`logsSubscribe`/`accountSubscribe` da PDA da curva, o mesmo `SolanaWsClient` do T4.52b-1) e
+> alimenta um `MintEventState` novo — a mesma série que o portão de evento usa
+> (`launch_lane_pricing.py`). O primeiro preço observado em `t ≥ create + 1 s` abre a aposta
+> (`launch_lane_bets.open_launch_bet`, reaproveitando `BetEntry`/`mark_filled` do Lab — a mesma
+> forma de `entry`/`exit` que ele escreve, taxa 1,25 %/perna); o primeiro dos três gatilhos fecha
+> (`launch_lane_bets.close_launch_bet`, reaproveitando `paper_engine.close_bet`): o `time_stop_s`
+> (6 s), o primeiro `sell` de um endereço que não é o criador (`first_third_party_sell`), ou uma
+> queda de `max_drawdown_from_peak_pct` (20 %) desde o pico — reaproveitando
+> `hunter_indicators.meme.drawdown.recent_drawdown`, a mesma guarda do EXP-M13. "Nasce cheia"
+> (KB-0123: progresso ≥ 90 % dentro de 2 s do `create`) aborta a aposta pendente sem abrir posição
+> — contado (`born_full_60s`), a proposta em si permanece (é o registro do que a pista decidiu no
+> instante do `create`, antes de qualquer preço existir).
+>
+> **Nunca derruba o worker.** Cada `create`, cada notificação e cada avaliação de saída correm sob
+> `try`/`except` isolado (`launch_lane_eval.py`); `run_launch_lane_forever` reinicia a pista
+> inteira 5 s depois de qualquer exceção sem tocar o `TaskGroup` do `main.py` — a mesma disciplina
+> F2 do portão de evento. Heartbeat (`hb:meme:radar`, prefixo `launch_lane_`): `mode`,
+> `creates_60s`, `proposals_total`, `paper_open`, `paper_closed_total`,
+> `create_to_proposal_ms_p50`/`_p95`, `born_full_60s`.
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |
@@ -1655,3 +1703,123 @@ cabe numa consulta. Provas: `packages/risk-core/tests/unit/meme/test_conviction_
 A5, off byte a byte) e `test_checks_table.py` (os quatro nomes na tabela);
 `services/meme-executor/tests/test_conviction.py` (cada degrau, A1 com exceção e timeout, A2 uma
 foto, carência), `test_conviction_db.py` (a leitura contra Postgres).
+
+## 18. Perfil de lançamento (T4.67b, EXP-M18)
+
+**A mesma máquina, uma moeda com um segundo de vida.** A EXP-M18
+(`obsidian/05-EXPERIMENTS/EXP-M18-sniper-de-lancamento.md`) aposta que comprar em ≤ 1 s depois do
+`create` e vender em segundos paga. A pista de lançamento do radar (T4.67a) escreve propostas
+`launch_v0/*` (`research_only`, nascidas `approved` por `rules`, `mode = 'paper'`,
+`reasons[0].series = 'meme_launch_lane_v1'`, `features_end_time` = o instante do `create`). Com
+`MEME_LAUNCH_LANE=on` **e** `ENABLE_MEME_LIVE_TRADING=true` o executor lê essas propostas
+(`launch_repo.py`: só as do conjunto com **nome** `launch_v0`, qualquer versão, e só com o rótulo da
+série) e as admite por um **perfil rápido** — o mesmo `evaluate_meme_entry`, com `launch=` preenchido
+(`hunter_risk_meme.profile.MemeLaunchProfile`), `decision.profile = "launch"`. Em `off` e `paper` o
+executor **não consulta** essas propostas: nenhuma linha, nenhum RPC, `launch_lane_mode` no heartbeat
+diz qual é o modo. Em `on` sem a flag de real o laço é inerte (`meme_live_disabled`, nada escrito).
+
+**O que não muda de lugar.** A doutrina "insumo que não existe não vira zero" continua: o perfil não
+afrouxa check nenhum em silêncio — ele **declara**, por nome, o que não roda e por quê, e grava isso na
+linha da ordem (`admission.checks[].state = "skipped"`, um quarto estado ao lado de `passed`/
+`failed`/`unavailable`, **nunca** rotulado `passed`; `admission.launch.skipped_checks` e
+`admission.launch.skipped_reads`). Uma auditoria distingue "medido e bom" de "não medido por desenho"
+lendo só a linha. Tudo o que não está nas duas tabelas abaixo roda **exatamente** como na §4: kill
+switch (efetivo, latch diário), estado da carteira, `live_gate`, programa, quote, identidade, Mayhem,
+histórico de rug, posição duplicada, teto global de posições, teto da carteira, **perda do dia com a
+entrada da tesouraria** (T4.60), slippage, tetos de taxa, participação, impacto, disponível,
+exposição depois.
+
+### 18.1 Checks pulados (gravados `skipped`, com o motivo)
+
+| # | Check | Por que não roda em t+1 s |
+|---|---|---|
+| 10 | `creator_behaviour` | não existe fluxo do criador em t+1 s; a leitura sob demanda da ATA (T4.45) não é feita — é latência no caminho crítico; a venda dele é vista pelo evento (`creator_dump`) |
+| 11 | `bundled_share` | não existe linha do `/in-memory-coin` em t+1 s; a leitura sob demanda (T4.45) não é feita |
+| 12 | `top10_share` | não existe leitura de holders em t+1 s (a primeira chega +114 s ou depois) |
+| 26 | `conviction` | a escada (T4.61c) precisa de 60 s de fotos e uma linha de 15 s; nenhuma existe |
+
+E as **leituras** que o executor não faz (`admission.launch.skipped_reads`): o retrato de risco sob
+demanda, a ATA do criador, a ATA do comprador (um mint com segundos de vida não pode estar nesta
+carteira: `creates_ata = true`), a leitura de convicção; a linha de `meme_tokens` é lida **se
+existir** — ausente não é recusa, porque a proposta carrega o carimbo.
+
+### 18.2 Checks relaxados (rodam sob a regra do lançamento, dizem isso na `message`)
+
+| # | Check | Regra do lançamento | O que continua recusando |
+|---|---|---|---|
+| 7 | `state_freshness` | a cota é lida **`processed`** (os bytes da conta no slot em construção) e admitida — `min_commitment` do perfil não vale aqui | sem carimbo, idade > `max_state_age_s`, relógio à frente > 2 s. **O fill nunca vem da cota**: é o `TradeEvent` da transação **`confirmed`** (§9.6), como sempre |
+| 8 | `token_age` | sem mínimo (a moeda tem segundos por construção); o máximo é o da pista, `MEME_LAUNCH_MAX_AGE_S` (5 s), medido do carimbo do `create` que a proposta traz (`reasons[0].created_at` › `quote.created_at` › `features_end_time` › `meme_tokens.created_at` › `proposed_at`, este rotulado como **limite inferior** da idade) | `token_too_old`, `token_age_unknown` |
+| 9 | `curve_progress` | sem mínimo (a curva virgem é 0 %); o denominador vem de `meme_tokens`, senão de `reasons[0].initial_real_token_reserves` (T4.67a reconstrói do frame), senão do `Global` da pump.fun **só** numa curva padrão (`token_total_supply` igual ao do `Global` e não Mayhem) | `curve_complete` (KB-0123: 46 % das graduações nascem cheias), `progress_above_window`, `progress_denominator_missing` |
+| 21 | `participation` | a vida inteira da moeda é a janela: volume = `real_sol_reserves` da cota; teto `MEME_LAUNCH_MAX_PARTICIPATION_PCT` (10 %) em vez do 1 % do perfil — um bilhete de 0,01 exige 0,1 SOL comprados antes do nosso | `participation_above_cap` |
+| 23 | `sizing` | o piso segue o bilhete quando `MEME_MIN_TRADE_SOL` (0,02) está acima dele — senão nenhum lançamento sairia; **o custo fixo fica visível** em `sizing.fixed_costs_sol` (≈ 0,0025 SOL de rent + rede + prioridade 0,0004 = ~29 % de um bilhete de 0,01) | `below_min_sol` abaixo do bilhete |
+
+### 18.3 O que o perfil acrescenta
+
+- **Check 27 `launch_open_cap`** (`launch_max_open_reached`): conta só posições e intenções pendentes
+  com `lane = launch` contra `MEME_LAUNCH_MAX_OPEN` (2). O teto global (check 16) continua contando
+  **todas** as vagas — as posições da mesa competem com as do lançamento por ele.
+- **Teto `launch_ticket`** no sizing (logo depois de `requested`, §5): `MEME_LAUNCH_TICKET_SOL` (0,01),
+  nunca acima de `max_sol_per_trade`; o pedido é o `size_sol` do conjunto (ou o bilhete).
+- **Taxa de prioridade**: `min(max(p75, MEME_LAUNCH_PRIORITY_FLOOR_MICRO_LAMPORTS = 1 000 000), teto)`
+  sobre a escolha da T4.55, com o teto `MEME_PRIORITY_FEE_MAX_SOL`; o check 20 continua julgando a
+  taxa **escolhida** — a 5 % de um bilhete de 0,01 (0,0005 SOL) o teto relativo prende antes do
+  absoluto: 1 000 000 µL/CU × 400 000 CU = 0,0004 SOL passa; p75 acima de 1 250 000 recusa
+  `priority_fee_above_cap`.
+- **Tolerância da compra** `MEME_LAUNCH_BUY_SLIPPAGE_PCT` (10 %, teto 20 % da T4.59) na instrução;
+  o check 19 segue julgando o `max_slippage_pct` do perfil (o precedente da T4.59); o `intent` grava
+  `max_slippage_bps = 1000` e o `max_sol_cost_sol` real (a reserva da intenção pendente é honesta).
+- **Blockhash pré-buscado** (`launch_send.BlockhashCache`): renovado a cada 5 s pelo próprio laço e
+  pelo tique do kill switch; a compra assina sem `getLatestBlockhash`; com mais de 30 s no cache a
+  compra busca um na hora e conta (`launch_blockhash_fetched_on_path`). Um blockhash vive ~60 s.
+- **Simulação**: mantida por padrão (~100 ms). `MEME_LAUNCH_SKIP_SIMULATION=true` pula o
+  `simulateTransaction` do executor **antes de assinar** — o preflight do nó (`skipPreflight: false`)
+  continua: uma transação que falharia é recusada antes de pousar (`preflight_failed`, sem taxa), mas
+  **já assinada e com a assinatura no journal**; a economia é uma ida ao RPC. O risco declarado: uma
+  falha que só o nosso simulador pegaria (verificação da mensagem antes da assinatura fica) vira uma
+  assinatura gasta e, se o preflight passar e pousar com erro, uma taxa de rede paga (T4.59 registra).
+- **Reenvio** dos mesmos bytes (T4.55) igual; o poll de confirmação é de 0,5 s (uma posição de 6 s não
+  pode esperar 1 s para saber que existe).
+- **Reserva da proposta**: a proposta é **reclamada** (`mode = 'live'`, guardada por `mode = 'paper'`)
+  na **mesma transação** que grava a ordem (`admitted` ou `refused`); o laço normal de entradas lê
+  `mode = 'live'` sem ordem de compra, logo nunca vê um lançamento reclamado sem a ordem. `decided_by`
+  fica `rules`; a decisão do executor é o `admission` da ordem. Uma proposta mais velha que
+  `MEME_LAUNCH_MAX_AGE_S` é recusada `launch_proposal_stale` **antes** de qualquer leitura da cadeia.
+- **A releitura do kill switch entre a admissão e a assinatura** (§7, §9.5) e o `client_order_id =
+  meme:{proposal_id}` (§9.4) são os mesmos: idempotente na proposta, um envio por proposta.
+
+### 18.4 Saídas em segundos
+
+A posição nasce com `params` do conjunto: `lane = launch`, `time_stop_s` (6, **segundos** — o
+`max_hold_s` de sempre também é em segundos), `max_drawdown_from_peak_pct` (20, a regra `trailing`
+da §6 com o número do conjunto), `exit_on_first_third_party_sell` (true), o `creator` lido da conta
+da curva (a linha de `meme_tokens` pode não existir), `creation_slot` e `known_buyers` quando a
+proposta os traz. Três caminhos, uma trava por posição (`exit_common.exit_lock`), um envio:
+
+1. **Evento** (T4.63, `MEME_EVENT_EXITS=on`): cada `TradeEvent` da curva é julgado; uma venda cujo
+   `user` ≠ criador, ≠ esta carteira e ∉ `known_buyers` levanta `third_party_sell` (motivo novo em
+   `EXIT_REASONS`, precedência logo depois de `creator_dump`); um `buy` num slot ≤ `creation_slot`
+   entra em `known_buyers`. Hoje a T4.67a não escreve `creation_slot`/`known_buyers`, então **toda**
+   venda que não é do criador nem nossa é "de terceiro" — a regra mais conservadora para o dinheiro.
+   A venda do criador continua `creator_dump` (tolerância de pânico); `third_party_sell`, `trailing` e
+   `time_stop` usam a tolerância normal (5 %).
+2. **Tique de lançamento** (`launch_exits.py`, 2 s): só posições `lane = launch`, pela mesma
+   `manage_position` — cobre o `time_stop` de uma curva que ninguém negocia (sem frame, sem evento).
+3. **Tique da mesa** (`mark_s`) continua como reserva.
+
+### 18.5 Heartbeat e variáveis
+
+`hb:meme:executor`: `launch_lane_mode`, `launch_open`, `launch_seen_total`, `launch_buys_total`,
+`launch_sells_total`, `launch_claim_lost_total`, `proposal_to_submit_ms_p50`/`_p95`
+(`proposed_at` → `submitted_at` da compra, só lançamentos), `launch_refusals` (JSON por motivo),
+`launch_config`, `launch_blockhash_age_s`/`_refreshes`/`_refresh_failures`/`_fetched_on_path`,
+`event_exits_third_party_sells_seen`. Variáveis: `docs/ACTIVATION.md` 9h.
+
+**O que não foi medido.** Nada disto rodou em produção. A T4.67a mede em papel se a tese paga; este
+perfil só existe para que, **se** pagar, a mesa real chegue ao bloco seguinte ao `create` com os
+mesmos livros, a mesma trava e as mesmas recusas por nome. Provas:
+`packages/risk-core/tests/unit/meme/test_launch_profile.py` (cada check pulado gravado `skipped`,
+cada relaxado com sua recusa, cada mantido recusando por nome, o teto 27, o bilhete, o piso);
+`services/meme-executor/tests/test_launch_{config,send,admission,entries}.py`,
+`test_event_exits_launch.py` (as três regras em frames gravados, a trava contra venda dupla),
+`test_launch_integration.py` (Postgres real: proposta `launch_v0/1` em `on` ⇒ uma compra com
+`admission.profile = launch` ⇒ venda de terceiro reproduzida ⇒ uma venda; `paper`/`off` ⇒ nada).

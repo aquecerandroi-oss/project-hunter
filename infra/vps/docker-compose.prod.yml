@@ -398,6 +398,9 @@ services:
       SOLANA_RPC_WS_URL: ${SOLANA_RPC_WS_URL:-}
       MEME_EVENT_COMMITMENT: ${MEME_EVENT_COMMITMENT:-confirmed}
       MEME_EVENT_GATE_MAX_MINTS: ${MEME_EVENT_GATE_MAX_MINTS:-150}
+      # T4.67a: a pista de lançamento (EXP-M18), off por padrão; usa o mesmo
+      # SOLANA_RPC_WS_URL/MEME_EVENT_COMMITMENT acima (docs/RISK_ENGINE_MEME.md §9).
+      MEME_LAUNCH_LANE: ${MEME_LAUNCH_LANE:-off}
       DB_POOL_SIZE: "2"
       DB_MAX_OVERFLOW: "2"
     logging: *prod-logging
@@ -424,6 +427,16 @@ services:
       # (docs/RISK_ENGINE_MEME.md §9 "Saída por evento"); off = the 10 s tick only.
       MEME_EVENT_EXITS: ${MEME_EVENT_EXITS:-off}
       SOLANA_RPC_WS_URL: ${SOLANA_RPC_WS_URL:-}
+      # T4.67b: the launch profile (EXP-M18) - the SAME variable the radar reads;
+      # the executor acts only in `on` (docs/RISK_ENGINE_MEME.md §18, ACTIVATION 9h).
+      MEME_LAUNCH_LANE: ${MEME_LAUNCH_LANE:-off}
+      MEME_LAUNCH_MAX_OPEN: ${MEME_LAUNCH_MAX_OPEN:-2}
+      MEME_LAUNCH_TICKET_SOL: ${MEME_LAUNCH_TICKET_SOL:-0.01}
+      MEME_LAUNCH_PRIORITY_FLOOR_MICRO_LAMPORTS: ${MEME_LAUNCH_PRIORITY_FLOOR_MICRO_LAMPORTS:-1000000}
+      MEME_LAUNCH_BUY_SLIPPAGE_PCT: ${MEME_LAUNCH_BUY_SLIPPAGE_PCT:-10}
+      MEME_LAUNCH_SKIP_SIMULATION: ${MEME_LAUNCH_SKIP_SIMULATION:-false}
+      MEME_LAUNCH_MAX_PARTICIPATION_PCT: ${MEME_LAUNCH_MAX_PARTICIPATION_PCT:-0.10}
+      MEME_LAUNCH_MAX_AGE_S: ${MEME_LAUNCH_MAX_AGE_S:-5}
       # T4.28 estagio 1 ("liga sozinho"): so com a flag live ligada E o teste
       # pequeno escrito nos portoes; default false, nunca "true" aqui (docs/ACTIVATION.md 9b.9).
       MEME_LIVE_AUTO_APPROVE: ${MEME_LIVE_AUTO_APPROVE:-false}

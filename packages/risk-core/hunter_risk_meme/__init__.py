@@ -58,6 +58,13 @@ from hunter_risk_meme.limits import (
     MemePolicyMissing,
     limits_from_env,
 )
+from hunter_risk_meme.profile import (
+    LAUNCH_LANE,
+    LAUNCH_RELAXED_CHECKS,
+    LAUNCH_SKIPPED_CHECKS,
+    MemeLaunchProfile,
+    launch_open_cap_check,
+)
 from hunter_risk_meme.sizing import CAP_ORDER, size_entry
 
 __all__ = [
@@ -65,6 +72,9 @@ __all__ = [
     "CONVICTION_REFUSALS",
     "EXIT_REASONS",
     "LADDER_REFUSALS",
+    "LAUNCH_LANE",
+    "LAUNCH_RELAXED_CHECKS",
+    "LAUNCH_SKIPPED_CHECKS",
     "MEME_PAPER_V0",
     "POLICY_ENV",
     "PUMPSWAP_PROGRAM",
@@ -84,6 +94,7 @@ __all__ = [
     "MemeExitProposal",
     "MemeKillSwitchAssessment",
     "MemeKillSwitchInputs",
+    "MemeLaunchProfile",
     "MemeLimits",
     "MemePolicyMissing",
     "MemeResumeAuthorization",
@@ -100,6 +111,7 @@ __all__ = [
     "evaluate_meme_entry",
     "evaluate_meme_exit",
     "exit_route",
+    "launch_open_cap_check",
     "limits_from_env",
     "most_restrictive",
     "resume",

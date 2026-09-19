@@ -31,6 +31,7 @@ __all__ = [
     "MemeExitPlan",
     "MemeSizing",
     "check",
+    "skipped",
     "unavailable",
 ]
 
@@ -39,6 +40,10 @@ class CheckState(StrEnum):
     PASSED = "passed"
     FAILED = "failed"
     UNAVAILABLE = "unavailable"
+    SKIPPED = "skipped"
+    """T4.67b — the launch profile (``profile.py``) did **not** run this check:
+    recorded with the reason, counts as not-blocking, never labelled ``passed``
+    (an audit must tell "measured and fine" from "not measured by design")."""
 
 
 class MemeCheck(MemeModel):
@@ -53,14 +58,17 @@ class MemeCheck(MemeModel):
 
     @property
     def passed(self) -> bool:
-        return self.state is CheckState.PASSED
+        """Does not block the approval: ``passed`` or (launch profile) ``skipped``."""
+        return self.state in (CheckState.PASSED, CheckState.SKIPPED)
 
     @model_validator(mode="after")
     def _named(self) -> MemeCheck:
-        if self.state is CheckState.PASSED and self.refusal is not None:
-            raise ValueError(f"{self.name}: a passed check carries no refusal")
-        if self.state is not CheckState.PASSED and not self.refusal:
+        if self.passed and self.refusal is not None:
+            raise ValueError(f"{self.name}: a passed or skipped check carries no refusal")
+        if not self.passed and not self.refusal:
             raise ValueError(f"{self.name}: a refusal needs a name")
+        if self.state is CheckState.SKIPPED and not self.message:
+            raise ValueError(f"{self.name}: a skipped check needs its reason")
         return self
 
 
@@ -105,6 +113,14 @@ def unavailable(
         input_ts=input_ts,
         message=message,
     )
+
+
+def skipped(name: str, reason: str, *, profile: str = "launch") -> MemeCheck:
+    """T4.67b: a check the profile does not run — recorded, with the reason, so the
+    row says *which* checks were not measured and why (never silently absent)."""
+    if not reason:
+        raise ValueError(f"{name}: a skipped check needs its reason")
+    return MemeCheck(name=name, state=CheckState.SKIPPED, message=f"skipped:{profile}:{reason}")
 
 
 class LimitCap(MemeModel):
@@ -162,6 +178,9 @@ class MemeDecision(MemeModel):
     checks: tuple[MemeCheck, ...]
     sizing: MemeSizing | None = None
     exit_plan: MemeExitPlan | None = None
+    profile: Literal["full", "launch"] = "full"
+    """T4.67b: which admission profile produced ``checks`` — ``launch`` records
+    skipped and relaxed checks by name (``profile.py``); ``full`` is §4 as is."""
 
     @model_validator(mode="after")
     def _consistent(self) -> MemeDecision:

@@ -36,8 +36,15 @@ from hunter_risk_meme import PositionForExit, decide_exit
 
 if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.rpc_ws_models import Notification
+    from hunter_exchanges.pumpfun.trade_event import TradeEvent
 
-__all__ = ["MARK_SOURCE", "TRIGGER_MIN_INTERVAL_S", "creator_sold_fraction", "handle_notification"]
+__all__ = [
+    "MARK_SOURCE",
+    "TRIGGER_MIN_INTERVAL_S",
+    "creator_sold_fraction",
+    "handle_notification",
+    "note_third_party_sells",
+]
 
 logger = get_logger(__name__)
 
@@ -134,7 +141,31 @@ def _decide(
         emergency_auto_close=(
             ctx.kill.effective is KillSwitchState.EMERGENCY and ctx.config.auto_close_on_emergency
         ),
+        third_party_sell=w.third_party_rule and w.third_party_sell_seen,
     )
+
+
+def note_third_party_sells(
+    w: Watched, events: list[TradeEvent], *, slot: int, ours: str | None
+) -> str | None:
+    """T4.67b (launch only): learn creation-slot buyers from the frame (a buy at
+    ``slot <= creation_slot``) and flag the first sell by anyone who is not the
+    creator, not this wallet (``ours``) and not one of them. Pure over the
+    frame; the seller when the flag was raised by this frame, else ``None``."""
+    if not w.launch or not w.third_party_rule:
+        return None
+    raised: str | None = None
+    for event in events:
+        if event.is_buy:
+            if w.creation_slot is not None and slot <= w.creation_slot:
+                w.known_buyers.add(event.user)
+            continue
+        if event.user == w.creator or event.user == ours or event.user in w.known_buyers:
+            continue
+        if not w.third_party_sell_seen:
+            w.third_party_sell_seen = True
+            raised = event.user
+    return raised
 
 
 async def _evaluate(
@@ -229,6 +260,18 @@ async def _on_logs(rt: EventExitsRuntime, notif: LogsNotification, now: datetime
     if not events:
         return None
     rt.stats.record_update(now)
+    ours = None if rt.ctx.signer is None else rt.ctx.signer.pubkey
+    seller = note_third_party_sells(w, events, slot=notif.slot, ours=ours)
+    if seller is not None:
+        rt.stats.record_third_party_sell()
+        logger.warning(
+            "meme_event_exit_third_party_sell",
+            position_id=w.position.id,
+            mint=w.position.mint,
+            signature=notif.signature,
+            slot=notif.slot,
+            seller=seller,
+        )
     for event in events:
         if event.is_buy or w.creator is None or event.user != w.creator or w.creator_sold:
             continue

@@ -63,6 +63,17 @@ class Watched:
     last_mark_write_at: datetime | None = None
     last_trigger_at: datetime | None = None
     selling: asyncio.Task[None] | None = None
+    launch: bool = False
+    """T4.67b: opened by the launch profile (``params.lane = launch``)."""
+    third_party_rule: bool = False
+    """The set's ``exit_on_first_third_party_sell`` — only a launch position has it."""
+    third_party_sell_seen: bool = False
+    """A sell by a wallet that is neither the creator, nor this wallet, nor a
+    creation-slot buyer, seen in a ``TradeEvent`` of this curve."""
+    known_buyers: set[str] = field(default_factory=set[str])
+    """Creation-slot buyers: from the proposal (``params.known_buyers``) plus any
+    buy this runtime sees at ``slot <= creation_slot``. Their sells are not third-party."""
+    creation_slot: int | None = None
 
 
 @dataclass

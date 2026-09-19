@@ -52,6 +52,8 @@ class EventExitsStats:
     marks_written_total: int = 0
     sell_errors_total: int = 0
     """Sell tasks that raised (RPC, DB) — the tick retries; counted, never hidden."""
+    third_party_sells_seen_total: int = 0
+    """T4.67b: first third-party sells seen on watched launch curves."""
 
     def record_update(self, now: datetime) -> None:
         self.updates.append(now)
@@ -81,6 +83,9 @@ class EventExitsStats:
     def record_creator_sell(self) -> None:
         self.creator_sells_seen_total += 1
 
+    def record_third_party_sell(self) -> None:
+        self.third_party_sells_seen_total += 1
+
 
 def heartbeat_fields(stats: EventExitsStats, *, now: datetime, enabled: bool) -> dict[str, str]:
     """The ``event_exits_*`` fields of ``hb:meme:executor``. With the flag off
@@ -106,4 +111,5 @@ def heartbeat_fields(stats: EventExitsStats, *, now: datetime, enabled: bool) ->
         "event_exits_creator_sells_seen": str(stats.creator_sells_seen_total),
         "event_exits_marks_written": str(stats.marks_written_total),
         "event_exits_sell_errors": str(stats.sell_errors_total),
+        "event_exits_third_party_sells_seen": str(stats.third_party_sells_seen_total),
     }

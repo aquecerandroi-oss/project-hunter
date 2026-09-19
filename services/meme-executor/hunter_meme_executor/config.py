@@ -49,6 +49,7 @@ from hunter_meme_executor.config_env import (
 )
 from hunter_meme_executor.conviction import ConvictionConfig
 from hunter_meme_executor.event_exits_config import EventExitsConfig
+from hunter_meme_executor.launch_config import LaunchConfig
 from hunter_meme_executor.send_tuning import SendTuning
 from hunter_risk_meme import MEME_PAPER_V0, MemeLimits, MemePolicyMissing, limits_from_env
 
@@ -151,6 +152,9 @@ class ExecutorConfig:
     event_exits: EventExitsConfig = EventExitsConfig()
     """T4.63 — ``MEME_EVENT_EXITS`` (default off): exits decided on every curve
     update over the executor's own WS (``event_exits.py``); the tick stays."""
+    launch: LaunchConfig = LaunchConfig()
+    """T4.67b — ``MEME_LAUNCH_LANE`` (default off): the launch profile
+    (``launch_entries.py``); acts only in ``on``, and only with the live flag."""
 
     @property
     def base_limits(self) -> MemeLimits:
@@ -289,6 +293,7 @@ def boot(
         send=SendTuning.from_env(env),
         conviction=ConvictionConfig.from_env(env),
         event_exits=EventExitsConfig.from_env(env),
+        launch=LaunchConfig.from_env(env),
     )
     return config, mode, signer
 

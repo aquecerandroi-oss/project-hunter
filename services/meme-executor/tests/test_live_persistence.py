@@ -180,7 +180,7 @@ class FakeChain(ChainReader):
         otherwise) — real pool bytes when it did (T4.29a)."""
         return self.pool_read
 
-    def curve(self, mint: str) -> CurveRead | None:
+    def curve(self, mint: str, *, commitment: str | None = None) -> CurveRead | None:
         if self.migrated:
             # A migrated curve is emptied; the exit loop routes on
             # ``position.migrated`` alone, never on this read (T4.29a).
@@ -197,7 +197,7 @@ class FakeChain(ChainReader):
             is_cashback_coin=False,
             quote_mint="11111111111111111111111111111111",
         )
-        return CurveRead(mint, account, TOKEN_2022, 1, datetime.now(UTC))
+        return CurveRead(mint, account, TOKEN_2022, 1, datetime.now(UTC), commitment or "confirmed")
 
     def wallet(self, pubkey: str) -> WalletRead:
         return WalletRead(pubkey, self.lamports, 1, datetime.now(UTC))

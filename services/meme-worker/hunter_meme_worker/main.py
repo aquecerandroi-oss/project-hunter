@@ -60,6 +60,8 @@ from hunter_meme_worker.events import spawn_events_match
 from hunter_meme_worker.fast_lane import fast_once
 from hunter_meme_worker.graduation import GlobalParamsStore
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
+from hunter_meme_worker.launch_lane import run_launch_lane_forever
+from hunter_meme_worker.launch_lane_wiring import build_launch_lane, register_launch_lane_health
 from hunter_meme_worker.mayhem import mayhem_once
 from hunter_meme_worker.status_wiring import register_health, register_lab_health
 from hunter_meme_worker.tracker import MintTracker
@@ -83,6 +85,7 @@ from hunter_meme_worker.wiring import (
 if TYPE_CHECKING:
     from hunter_core.runtime import WorkerRuntime
     from hunter_exchanges.pumpfun.trenches import TrenchesWsClient
+    from hunter_meme_worker.launch_lane_runtime import LaunchLaneRuntime
 
 logger = get_logger(__name__)
 
@@ -93,7 +96,7 @@ curve poller's 60 — and the Lab reads it at most once a minute anyway."""
 
 
 def build_context(
-    runtime: WorkerRuntime, config: MemeConfig
+    runtime: WorkerRuntime, config: MemeConfig, *, launch_lane: LaunchLaneRuntime | None
 ) -> tuple[RadarContext, dict[str, TrenchesWsClient]]:
     """Wire the clients, the tracked set, the shared state and the T4.2c sources."""
     tracker = MintTracker(
@@ -124,6 +127,7 @@ def build_context(
         # curve read not made, once an hour (T4.2d).
         params=GlobalParamsStore(curves, refresh_s=config.global_params_refresh_s),
         wallets=build_wallets(config, sources),
+        launch_lane=launch_lane,
     ), board_clients
 
 
@@ -177,7 +181,12 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         await asyncio.Event().wait()
         return
 
-    ctx, boards = build_context(runtime, config)
+    write = _heartbeat_writer(runtime)
+    launch_lane = build_launch_lane(
+        create_session_factory(runtime.engine), wake_publisher(runtime), write
+    )
+    register_launch_lane_health(runtime, launch_lane)
+    ctx, boards = build_context(runtime, config, launch_lane=launch_lane)
     register_health(runtime, ctx, boards)
     event_gate_config = load_event_gate_config()
     lab = (
@@ -186,7 +195,6 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         else None
     )
     register_lab_health(runtime, lab)
-    write = _heartbeat_writer(runtime)
     if lab is None:
         logger.warning("meme_lab_disabled", reason="MEME_LAB_ENABLED is false")
         await write_lab_heartbeat(
@@ -288,9 +296,15 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                 # here; ``_forever`` (F2) restarts the gate on its own crash
                 # instead of ever taking this ``TaskGroup`` down with it.
                 group.create_task(run_event_gate_forever(event_gate), name="meme-event-gate")
+            if ctx.launch_lane is not None:
+                # T4.67a: restart-safe on its own crash (F2 discipline),
+                # exactly like the event gate above.
+                group.create_task(run_launch_lane_forever(ctx.launch_lane), name="meme-launch-lane")
     finally:
         await close_clients(ctx, boards)
         if lab is not None and isinstance(lab.quotes, PumpFunRestClient):
             await lab.quotes.aclose()
         if event_gate is not None:
             await event_gate.ws.aclose()
+        if ctx.launch_lane is not None:
+            await ctx.launch_lane.ws.aclose()

@@ -28,11 +28,13 @@ from hunter_risk_meme.decision import (
 )
 from hunter_risk_meme.inputs import CurveState, MemeContext, MemeEntryProposal, MemeWalletState
 from hunter_risk_meme.limits import MemeLimits
+from hunter_risk_meme.profile import LAUNCH_RELAXED_CHECKS, MemeLaunchProfile, launch_floor
 
 __all__ = ["CAP_ORDER", "LAMPORTS_PER_SOL", "size_entry"]
 
 CAP_ORDER: Final[tuple[str, ...]] = (
     "requested",
+    "launch_ticket",
     "trade_cap",
     "conviction",
     "daily_cap",
@@ -45,7 +47,8 @@ CAP_ORDER: Final[tuple[str, ...]] = (
 """Stable tie-break order (§5): the first name wins, the rest are ``tied_limits``.
 ``conviction`` (T4.61c, §17) sits right after ``trade_cap``: a full-conviction
 ladder ties with it and the policy's name still wins; a discounted one binds by
-its own name, never as ``requested``."""
+its own name, never as ``requested``. ``launch_ticket`` (T4.67b) is the launch
+profile's ceiling, right after the request — absent in the full profile."""
 
 LAMPORTS_PER_SOL = Decimal(1_000_000_000)
 _ZERO = Decimal(0)
@@ -72,9 +75,13 @@ def _caps(
     costs: Decimal,
     curve_fee_pct: Decimal,
     conviction: MemeConviction | None,
+    launch: MemeLaunchProfile | None = None,
 ) -> tuple[list[LimitCap], MemeCheck]:
     """Every ceiling in SOL, and the participation check that may be unavailable."""
     committed = sum((p.sol_spent for p in wallet.positions), _ZERO) + wallet.reserved_sol
+    participation_pct = (
+        limits.max_participation_pct if launch is None else launch.max_participation_pct
+    )
     caps = [
         LimitCap(name="requested", sol=proposal.requested_sol, limit=proposal.requested_sol),
         LimitCap(name="trade_cap", sol=limits.max_sol_per_trade, limit=limits.max_sol_per_trade),
@@ -98,12 +105,14 @@ def _caps(
             limit=limits.wallet_max_sol,
         ),
     ]
+    if launch is not None:
+        caps.append(LimitCap(name="launch_ticket", sol=launch.ticket_sol, limit=launch.ticket_sol))
     if context.organic_volume_1m_sol is None or context.volume_ts is None:
         participation = unavailable(
             "participation",
             "volume_unavailable",
             "organic 1m volume unavailable",
-            limit=limits.max_participation_pct,
+            limit=participation_pct,
         )
         caps.append(LimitCap(name="participation", sol=None, detail="volume_unavailable"))
     elif context.volume_window_complete is not True:
@@ -111,19 +120,18 @@ def _caps(
             "participation",
             "volume_window_incomplete",
             "1m window incomplete",
-            limit=limits.max_participation_pct,
+            limit=participation_pct,
         )
         caps.append(LimitCap(name="participation", sol=None, detail="volume_window_incomplete"))
     else:
         budget = _quantize(
-            limits.max_participation_pct * context.organic_volume_1m_sol
-            - context.participation_used_sol
+            participation_pct * context.organic_volume_1m_sol - context.participation_used_sol
         )
         caps.append(
             LimitCap(
                 name="participation",
                 sol=budget,
-                limit=limits.max_participation_pct,
+                limit=participation_pct,
                 detail=f"volume_1m={context.organic_volume_1m_sol} used={context.participation_used_sol}",
             )
         )
@@ -132,7 +140,7 @@ def _caps(
             True,
             "participation_above_cap",
             value=budget,
-            limit=limits.max_participation_pct,
+            limit=participation_pct,
             input_ts=context.volume_ts.isoformat(),
         )
     # Impact: pre-fee spend s moves the average price by s/v; the buy's total is s×(1+fee).
@@ -160,8 +168,11 @@ def size_entry(
     curve_fee_pct: Decimal,
     creates_ata: bool,
     conviction: MemeConviction | None = None,
+    launch: MemeLaunchProfile | None = None,
 ) -> tuple[MemeSizing | None, list[MemeCheck]]:
-    """The §5 formula plus checks 21–25. ``None`` sizing when a ceiling is unavailable."""
+    """The §5 formula plus checks 21–25. ``None`` sizing when a ceiling is unavailable.
+    ``launch`` (T4.67b): the ticket as a ceiling, the launch participation cap and
+    a floor that follows the ticket (``profile.launch_floor``)."""
     costs = fixed_costs(proposal, limits, creates_ata=creates_ata)
     caps, participation = _caps(
         proposal,
@@ -172,6 +183,7 @@ def size_entry(
         costs=costs,
         curve_fee_pct=curve_fee_pct,
         conviction=conviction,
+        launch=launch,
     )
     checks: list[MemeCheck] = [participation]
     if participation.refusal is not None:
@@ -220,7 +232,8 @@ def size_entry(
     # ceiling admit at least the minimum tradeable size? A budget that fits no
     # admissible buy is the refusal, named; the size is never rounded up to it.
     by_name = {c.name: c.sol or _ZERO for c in ordered}
-    floor = limits.min_trade_sol
+    floor = limits.min_trade_sol if launch is None else launch_floor(limits, launch)
+    note = "" if launch is None else "launch:" + LAUNCH_RELAXED_CHECKS["participation"]
     if participation.passed:
         budget = by_name["participation"]
         checks[0] = check(
@@ -230,6 +243,7 @@ def size_entry(
             value=final,
             limit=budget,
             input_ts=participation.input_ts,
+            message=note,
         )
     checks.append(
         check(
@@ -240,6 +254,7 @@ def size_entry(
             limit=limits.max_price_impact_pct,
         )
     )
+    floor_note = "" if launch is None else " launch:" + LAUNCH_RELAXED_CHECKS["sizing"]
     checks.append(
         check(
             "sizing",
@@ -247,7 +262,7 @@ def size_entry(
             "below_min_sol",
             value=final,
             limit=floor,
-            message=f"binding={binding.name}",
+            message=f"binding={binding.name}{floor_note}",
         )
     )
     checks.append(

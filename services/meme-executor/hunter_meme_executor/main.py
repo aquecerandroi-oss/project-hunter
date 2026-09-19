@@ -32,6 +32,12 @@ T4.63: with ``MEME_EVENT_EXITS=on`` a seventh task, ``meme-event-exits``
 the instant its curve update says so — through the tick's own lock and sell
 path; the tick stays as fallback. It restarts itself after any failure and
 never takes this ``TaskGroup`` down.
+
+T4.67b: with ``MEME_LAUNCH_LANE=on`` (and the live flag) two more tasks:
+``meme-launch-entries`` (``launch_entries.py``, the fast profile, woken by the
+same proposal wake-up) and ``meme-launch-exits`` (``launch_exits.py``, the 2 s
+fallback tick of launch positions). The cached blockhash they sign with is also
+refreshed on the kill-switch tick.
 """
 
 from __future__ import annotations
@@ -65,6 +71,9 @@ from hunter_meme_executor.gates_reload import gates_reload_once, prime_gates
 from hunter_meme_executor.heartbeat import heartbeat_once
 from hunter_meme_executor.journal_db import WORKER_ROLE, PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
+from hunter_meme_executor.launch_config import LAUNCH_EXIT_TICK_S
+from hunter_meme_executor.launch_entries import launch_entries_once
+from hunter_meme_executor.launch_exits import launch_exits_once
 from hunter_meme_executor.priority_fee import PriorityFeeReader
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
@@ -158,6 +167,10 @@ async def kill_switch_once(ctx: ExecutorContext) -> None:
     # just landed is in the daily-loss brake on this same tick (never raises:
     # a failed read keeps the last known inflow).
     await treasury_inflow_once(ctx, now=utcnow())
+    # T4.67b: the launch lane's blockhash rides this tick too (the launch loop
+    # refreshes it every 5 s on its own; this is the second writer, never raises).
+    if ctx.config.launch.enabled and ctx.signer is not None:
+        await asyncio.to_thread(ctx.launch.blockhash.refresh_if_stale, ctx.chain, now=utcnow())
 
 
 def build_context(
@@ -264,6 +277,7 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
         auto_approve=config.auto_approve,
         auto_approve_max_per_hour=config.auto_approve_max_per_hour,
         event_exits=config.event_exits.enabled,
+        launch_lane=config.launch.mode,
     )
     wake_listener = ProposalWakeListener(runtime.redis, ctx.wake_event)
     event_ws = event_exits_client(config.event_exits)  # None with the flag off
@@ -277,6 +291,21 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
                 name="meme-entries",
             )
             group.create_task(wake_listener.run(), name="meme-proposal-wake")
+            if config.launch.enabled and config.live:
+                group.create_task(
+                    forever(
+                        "launch_entries",
+                        config.loop_s,
+                        launch_entries_once,
+                        ctx,
+                        wake_event=ctx.wake_event,
+                    ),
+                    name="meme-launch-entries",
+                )
+                group.create_task(
+                    forever("launch_exits", LAUNCH_EXIT_TICK_S, launch_exits_once, ctx),
+                    name="meme-launch-exits",
+                )
             group.create_task(forever("exits", config.mark_s, exits_once, ctx), name="meme-exits")
             group.create_task(
                 forever("kill_switch", config.kill_switch_poll_s, kill_switch_once, ctx),

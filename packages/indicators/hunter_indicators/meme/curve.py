@@ -52,6 +52,7 @@ from hunter_core.strategies.numeric import CONTEXT
 
 __all__ = [
     "CURVE_TRADE_FEE_PCT",
+    "INITIAL_REAL_TOKEN_RESERVES",
     "INITIAL_VIRTUAL_SOL_RESERVES",
     "INITIAL_VIRTUAL_TOKEN_RESERVES",
     "BuyQuote",
@@ -81,6 +82,14 @@ the T4.1 capture ``vSolInBondingCurve = 30``). Never read by a formula here."""
 
 INITIAL_VIRTUAL_TOKEN_RESERVES: Final = Decimal(1_073_000_000)
 """Token side of a brand-new curve (``vTokensInBondingCurve = 1073000000``)."""
+
+INITIAL_REAL_TOKEN_RESERVES: Final = Decimal(793_100_000)
+"""The **real** side of a brand-new standard curve — the program's own
+``/global-params`` record (``docs/PUMPFUN-ONCHAIN.md`` §1, row 6: 793,1 M
+tokens; confirmed again in ``docs/PUMPFUN.md`` and ``mayhem_state.py``). Read
+here only as a **sanity constant** (T4.67a's launch lane, before any curve
+read exists for a brand-new mint) — never as the denominator
+:func:`curve_progress_pct` uses, which stays the *observed* value."""
 
 CURVE_TRADE_FEE_PCT: Final = Decimal("1.25")
 """Documented total fee per curve trade, creator fee included. A **default for

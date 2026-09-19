@@ -6645,7 +6645,7 @@ pré-registro: `obsidian/05-EXPERIMENTS/EXP-M4-moonshot.md`.
 
 | coluna | tipo | definição |
 |---|---|---|
-| `mark_source` | `text` ∈ {`curve`, `pool_tape`} | o que precificou `mark_sol`: a fotografia da curva (toda marca de hoje — **backfill** `'curve'` onde `mark_sol IS NOT NULL`, porque era isso que era) ou o último trade da pool PumpSwap depois de `meme_tokens.migrated_at` |
+| `mark_source` | `text` ∈ {`curve`, `pool_tape`, `solana_ws`} | o que precificou `mark_sol`: a fotografia da curva (toda marca de hoje — **backfill** `'curve'` onde `mark_sol IS NOT NULL`, porque era isso que era), o último trade da pool PumpSwap depois de `meme_tokens.migrated_at`, ou a reconstrução da pista de lançamento a partir de um evento da cadeia (`solana_ws`, `0053`, T4.67a — o CHECK só alarga, nunca estreita) |
 | `mark_stale_s` | `integer` ≥ 0 | segundos que a fita da pool estava muda quando a marca foi atualizada (o tick − o último trade recebido até o tick, ou a migração se a pool nunca imprimiu); a mesa mostra "marca envelhecida há Ns"; a saída `dead` lê |
 
 CHECKs: `mark_source_is_a_known_label`; `a_mark_names_its_source` = `(mark_sol IS NULL) = (mark_source IS
@@ -6819,6 +6819,12 @@ evento em memória sabe agora. Uma proposta nascida do evento leva `features_end
 próprio evento e `reasons[0].series = meme_event_gate_v1` — a terceira série que `reasons[0].series`
 pode carregar, ao lado de `meme_features_1m` (implícito, minuto fechado) e `meme_features_15s_v1`.
 `docs/RISK_ENGINE_MEME.md` §9 tem o desenho completo.
+
+**T4.67a (19/09/2026): a pista de lançamento não lê esta tabela — nem nenhuma outra série.** Uma
+proposta de `launch_v0/1` (§60) leva `reasons[0].series = meme_launch_lane_v1`, a quarta série, mas
+sua `GateRow` nunca existe: o critério é só o próprio frame de `create` (`is_mayhem`, a compra
+inicial do criador, `initial_real_token_reserves` reconstruído, o símbolo recente em memória) —
+`meme_features_15s`/`meme_features_1m` continuam intocadas por ela.
 
 ### 43.3 A vista reescrita — `meme_lab_scoreboard_v1`
 
@@ -7757,3 +7763,40 @@ tem de continuar vazia). Os testes da `0051` passaram a se posicionar em `0051_m
 reverter, e o seu `alembic check` roda num banco próprio no `head` — o mesmo formato que a `0050` adotou
 quando a `0051` chegou. **Trava, pooler:** um `INSERT ... ON CONFLICT DO NOTHING` e nada de estado de
 sessão; a revisão não abre janela de manutenção.
+
+## 60. A pista de lançamento, como conjunto de regras — M18 (`0053_meme_launch_lane_arm`)
+
+**O que a `0053` faz:** semeia **um** conjunto, `launch_v0/1` (`…0017`, `research_only`, `exp_ref
+EXP-M18`, `clock = "event"`) — um relógio novo que `hunter_meme_worker.lab_models.CLOCKS` nunca lista,
+então as pistas de 15 s e de 1 min pulam esta linha por construção; não existe `gate_key`/
+`gate_version` nem janela de idade/progresso/participação, porque a pista de lançamento nunca lê
+`meme_features_15s`/`meme_features_1m` (`docs/RISK_ENGINE_MEME.md` §9, bloco T4.67a). Seis
+parâmetros, exatamente os números do pré-registro
+(`obsidian/05-EXPERIMENTS/EXP-M18-sniper-de-lancamento.md`): `size_sol: "0.01"`,
+`max_creator_initial_sol: "2"`, `exit_key: "lancamento_6s_ou_primeiro_sell"`, `time_stop_s: 6`,
+`exit_on_first_third_party_sell: true`, `max_drawdown_from_peak_pct: "20"`. Nada aposentado, a mesa
+(`operator/5`) não é tocada — paper por construção, como nas §57–§59. A única mudança de schema é
+o CHECK de `mark_source` alargado (abaixo); tudo em `ddl/meme_launch_lane_arm.py`; a contagem de
+conjuntos ativos vai a 19.
+
+**A quarta série de `reasons[0].series`.** Uma proposta de `launch_v0/1` leva `features_end_time =
+meme_tokens.created_at` (o próprio `create`, único por mint — a mesma coluna que já dá o índice
+`(rule_set_id, mint, features_end_time)` sua dedupe) e `reasons[0].series = meme_launch_lane_v1`,
+ao lado de `meme_features_1m` (implícito), `meme_features_15s_v1` (§43.2) e `meme_event_gate_v1`
+(§43.2). A aposta de papel que a pista abre/fecha (`launch_lane_bets.py`, reaproveitando
+`BetEntry`/`BetExit`/`mark_filled`/`close_bet_row`/`paper_engine.close_bet` do Lab) grava
+`mark_source = 'solana_ws'` (§41.1 — a `0053` **alarga**, nunca estreita, o CHECK
+`mark_source_is_a_known_label`: `{curve, pool_tape}` → `{curve, pool_tape, solana_ws}`, e o
+downgrade não a reverte, porque uma aposta fechada sob o valor novo não pode ficar sem CHECK que a
+explique) e dois motivos de saída novos em `meme_paper_bets.exit ->> 'reason'`:
+`first_third_party_sell` e `max_drawdown_from_peak` (`time_stop` já existe desde a `0022`) —
+listados também em `BET_EXIT_REASONS` (`packages/core/hunter_core/db/models/meme_bets.py`) e
+`paper_engine.EXIT_REASONS`, nenhum dos dois imposto por `CHECK` (documentação de vocabulário, como
+sempre foram — só `mark_source` tem CHECK).
+
+**Downgrade guardado (§17.7).** `refuse_a_downgrade_that_would_orphan_a_launch_lane_row` recusa
+enquanto existir linha referenciando o conjunto em `meme_proposals`, `meme_paper_bets`,
+`meme_rule_set_param_history` e `meme_gate_refusals_by_mint`, como na `0049`/`0050`/`0052`.
+`packages/core/tests/integration/test_migration_0053.py` prova as duas pontas contra um Postgres
+real, mais o `alembic check` num banco levado ao `head`. **Trava, pooler:** um `INSERT ... ON
+CONFLICT DO NOTHING` e nada de estado de sessão; a revisão não abre janela de manutenção.

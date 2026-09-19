@@ -36,6 +36,7 @@ from hunter_meme_worker.graduation import (
     CompletionSignals,
     earliest_completion,
 )
+from hunter_meme_worker.launch_lane import on_create as launch_lane_on_create
 from hunter_meme_worker.metrics import (
     meme_events_total,
     meme_gaps_total,
@@ -181,6 +182,11 @@ async def _handle(ctx: RadarContext, event: MemeEvent) -> None:
         meme_events_total.labels(kind="rejected").inc()
         return
     ctx.tracker.observe(_tracked_from_row(row))
+    if ctx.launch_lane is not None and isinstance(event, NormalizedMemeTokenCreated):
+        # T4.67a: the launch lane's own decision, right after this frame is
+        # durable — never awaited by anything downstream of it, and never
+        # allowed to raise into this loop (``on_create``'s own contract).
+        await launch_lane_on_create(ctx.launch_lane, event, utcnow())
     ctx.state.last_event_at = row.last_seen_at
     if ctx.sources is not None:
         ctx.sources[PUMPPORTAL_WS].record_ok(

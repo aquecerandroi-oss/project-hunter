@@ -125,14 +125,17 @@ class MemeSubmitter:
             self._verify(approval.message)
         except Exception as exc:  # the verifier's own exception type is the adapter's
             return self._fail(pid, f"unverified_transaction:{getattr(exc, 'reason', exc)}")
-        try:
-            simulation = self._rpc.simulate_transaction(
-                _serialize(b"\0" * 64, approval.message), sig_verify=False, replace_blockhash=True
-            )
-        except Exception as exc:
-            return self._fail(pid, f"simulation_unavailable:{type(exc).__name__}")
-        if not simulation.ok:
-            return self._fail(pid, f"simulation_failed:{simulation.err}")
+        if not self._policy.skip_simulation:  # T4.67b: the launch lane may skip it
+            try:
+                simulation = self._rpc.simulate_transaction(
+                    _serialize(b"\0" * 64, approval.message),
+                    sig_verify=False,
+                    replace_blockhash=True,
+                )
+            except Exception as exc:
+                return self._fail(pid, f"simulation_unavailable:{type(exc).__name__}")
+            if not simulation.ok:
+                return self._fail(pid, f"simulation_failed:{simulation.err}")
         if not self._policy.allow_send:
             self._journal.record_state(pid, SubmitState.FAILED, "meme_live_disabled", None)
             raise MemeLiveTradingDisabled("allow_send is false: simulated only, nothing signed")

@@ -11,9 +11,15 @@ from decimal import Decimal
 from typing import Final
 
 from hunter_core.domain.enums import KillSwitchState
-from hunter_risk_meme.decision import MemeCheck, check, unavailable
+from hunter_risk_meme.decision import MemeCheck, check, skipped, unavailable
 from hunter_risk_meme.inputs import CurveState, MemeContext, MemeEntryProposal, MemeWalletState
 from hunter_risk_meme.limits import MemeLimits
+from hunter_risk_meme.profile import (
+    LAUNCH_MAX_OPEN_REACHED,
+    LAUNCH_RELAXED_CHECKS,
+    LAUNCH_SKIPPED_CHECKS,
+    MemeLaunchProfile,
+)
 
 __all__ = ["REFUSAL_NAMES", "coin_checks"]
 
@@ -73,9 +79,11 @@ REFUSAL_NAMES: Final[frozenset[str]] = frozenset(
         "entry_after_drop_unknown",
         "conviction_too_low",
         "conviction_too_small",
+        # T4.67b — check 27 ``launch_open_cap`` (``hunter_risk_meme.profile``).
+        LAUNCH_MAX_OPEN_REACHED,
     }
 )
-"""Every refusal name of §4, checks 1–26. ``test_checks_table.py`` proves each is
+"""Every refusal name of §4, checks 1–27. ``test_checks_table.py`` proves each is
 produced by at least one case of the table."""
 
 
@@ -120,10 +128,18 @@ def identity_match_check(
 
 
 def state_freshness_check(
-    wallet: MemeWalletState, curve: CurveState, limits: MemeLimits
+    wallet: MemeWalletState,
+    curve: CurveState,
+    limits: MemeLimits,
+    *,
+    min_commitment: str | None = None,
+    note: str = "",
 ) -> MemeCheck:
+    """``min_commitment`` (T4.67b, launch: ``processed``) overrides the profile's;
+    ``note`` says so in the message."""
     name = "state_freshness"
     limit = Decimal(limits.max_state_age_s)
+    floor = _COMMITMENT_RANK[min_commitment or limits.min_commitment]
     if curve.observed_at is None:
         return unavailable(name, "curve_state_undated", "curve state has no stamp", limit=limit)
     age = wallet.age_s(curve.observed_at)
@@ -132,46 +148,46 @@ def state_freshness_check(
         return check(name, False, "curve_state_clock_skew", value=age, limit=limit, input_ts=stamp)
     if age > limit:
         return unavailable(name, "curve_state_stale", f"age={age}s > {limit}s", limit=limit)
-    if _COMMITMENT_RANK[curve.commitment] < _COMMITMENT_RANK[limits.min_commitment]:
+    if _COMMITMENT_RANK[curve.commitment] < floor:
         return check(name, False, "commitment_too_weak", value=age, limit=limit, input_ts=stamp)
-    return check(name, True, "curve_state_stale", value=age, limit=limit, input_ts=stamp)
+    return check(
+        name, True, "curve_state_stale", value=age, limit=limit, input_ts=stamp, message=note
+    )
 
 
-def token_age_check(wallet: MemeWalletState, context: MemeContext, limits: MemeLimits) -> MemeCheck:
+def token_age_check(
+    wallet: MemeWalletState,
+    context: MemeContext,
+    limits: MemeLimits,
+    *,
+    window_s: tuple[int, int] | None = None,
+    note: str = "",
+) -> MemeCheck:
+    """``window_s`` (T4.67b, launch: ``(0, max_token_age_s)``) overrides the profile's."""
     name = "token_age"
     if context.token_created_at is None or not context.token_age_source:
         return unavailable(name, "token_age_unknown", "created_at without provenance")
     age = wallet.age_s(context.token_created_at)
     stamp = context.token_created_at.isoformat()
-    if age < limits.token_age_min_s:
-        return check(
-            name,
-            False,
-            "token_too_young",
-            value=age,
-            limit=Decimal(limits.token_age_min_s),
-            input_ts=stamp,
-        )
-    if age > limits.token_age_max_s:
-        return check(
-            name,
-            False,
-            "token_too_old",
-            value=age,
-            limit=Decimal(limits.token_age_max_s),
-            input_ts=stamp,
-        )
+    low, high = window_s or (limits.token_age_min_s, limits.token_age_max_s)
+    if age < low:
+        return check(name, False, "token_too_young", value=age, limit=Decimal(low), input_ts=stamp)
+    if age > high:
+        return check(name, False, "token_too_old", value=age, limit=Decimal(high), input_ts=stamp)
     return check(
-        name,
-        True,
-        "token_too_old",
-        value=age,
-        limit=Decimal(limits.token_age_max_s),
-        input_ts=stamp,
+        name, True, "token_too_old", value=age, limit=Decimal(high), input_ts=stamp, message=note
     )
 
 
-def curve_progress_check(curve: CurveState, context: MemeContext, limits: MemeLimits) -> MemeCheck:
+def curve_progress_check(
+    curve: CurveState,
+    context: MemeContext,
+    limits: MemeLimits,
+    *,
+    min_pct: Decimal | None = None,
+    note: str = "",
+) -> MemeCheck:
+    """``min_pct`` (T4.67b, launch: ``0``) overrides the profile's lower bound only."""
     name = "curve_progress"
     if curve.complete:
         return check(name, False, "curve_complete")
@@ -179,7 +195,7 @@ def curve_progress_check(curve: CurveState, context: MemeContext, limits: MemeLi
     if denominator is None or denominator <= 0:
         return unavailable(name, "progress_denominator_missing", "initial_real_token_reserves")
     progress = Decimal(denominator - curve.real_token_reserves) / Decimal(denominator)
-    if progress < limits.curve_progress_min_pct:
+    if progress < (limits.curve_progress_min_pct if min_pct is None else min_pct):
         return check(
             name,
             False,
@@ -195,9 +211,8 @@ def curve_progress_check(curve: CurveState, context: MemeContext, limits: MemeLi
             value=progress,
             limit=limits.curve_progress_max_pct,
         )
-    return check(
-        name, True, "progress_above_window", value=progress, limit=limits.curve_progress_max_pct
-    )
+    limit = limits.curve_progress_max_pct
+    return check(name, True, "progress_above_window", value=progress, limit=limit, message=note)
 
 
 def creator_behaviour_check(context: MemeContext, limits: MemeLimits) -> MemeCheck:
@@ -209,28 +224,18 @@ def creator_behaviour_check(context: MemeContext, limits: MemeLimits) -> MemeChe
 
 
 def _unknown_creator(context: MemeContext, limits: MemeLimits) -> MemeCheck:
-    """T4.28h — the owner's allowance, and the three ways it does **not** apply.
-
-    ``creator_sold`` lands +123 to +441 s after a coin is created (R5, 16/09/2026)
-    while the entry happens at 30–300 s, so 11 of 22 real orders that day were
-    refused ``creator_flow_unknown``. With
-    ``creator_unknown_allowed_if_dev_measured`` on, a **measured** dev share
-    within the cap vouches for the unknown creator — the desk's own ``operator/5``
-    rule (E1 arm 2), now sayable by the executor. Off (the default), unmeasured,
-    or above the cap: the same refusal name as before, never a new one, with the
-    cap published so the admission says *why*.
-    """
+    """T4.28h — the owner's allowance, and the three ways it does **not** apply:
+    with ``creator_unknown_allowed_if_dev_measured`` on, a **measured** dev share
+    within the cap vouches for the unknown creator (the desk's ``operator/5`` rule);
+    off (the default), unmeasured, or above the cap: the same refusal name, with
+    the cap published so the admission says *why*."""
     name, cap = "creator_behaviour", limits.creator_unknown_max_dev_share_pct
+    refusal = "creator_flow_unknown"
     if not limits.creator_unknown_allowed_if_dev_measured:
-        return unavailable(name, "creator_flow_unknown", "creator net flow not measured")
+        return unavailable(name, refusal, "creator net flow not measured")
     dev = context.dev_share_pct
     if dev is None:
-        return unavailable(
-            name,
-            "creator_flow_unknown",
-            "creator net flow and dev share both unmeasured",
-            limit=cap,
-        )
+        return unavailable(name, refusal, "creator net flow and dev share unmeasured", limit=cap)
     stamp = None if context.dev_share_ts is None else context.dev_share_ts.isoformat()
     if dev > cap:
         return unavailable(
@@ -299,8 +304,32 @@ def coin_checks(
     effective: KillSwitchState,
     latched: bool,
     live_enabled: bool,
+    launch: MemeLaunchProfile | None = None,
 ) -> list[MemeCheck]:
-    """Checks 1–13, in the order of §4."""
+    """Checks 1–13, in the order of §4. With ``launch`` (T4.67b) checks 7–9 run
+    under the launch rule and 10–12 are recorded ``skipped`` — same names, same
+    positions, so the table reads the same in both profiles."""
+    if launch is None:
+        freshness = state_freshness_check(wallet, curve, limits)
+        age = token_age_check(wallet, context, limits)
+        progress = curve_progress_check(curve, context, limits)
+        creator = creator_behaviour_check(context, limits)
+        bundled = bundled_share_check(context, limits)
+        top10 = top10_share_check(context, limits)
+    else:
+        note = {k: f"launch:{v}" for k, v in LAUNCH_RELAXED_CHECKS.items()}
+        freshness = state_freshness_check(
+            wallet, curve, limits, min_commitment="processed", note=note["state_freshness"]
+        )
+        age = token_age_check(
+            wallet, context, limits, window_s=(0, launch.max_token_age_s), note=note["token_age"]
+        )
+        progress = curve_progress_check(
+            curve, context, limits, min_pct=Decimal(0), note=note["curve_progress"]
+        )
+        creator = skipped("creator_behaviour", LAUNCH_SKIPPED_CHECKS["creator_behaviour"])
+        bundled = skipped("bundled_share", LAUNCH_SKIPPED_CHECKS["bundled_share"])
+        top10 = skipped("top10_share", LAUNCH_SKIPPED_CHECKS["top10_share"])
     return [
         kill_switch_check(effective, latched),
         wallet_status_check(wallet, proposal),
@@ -308,11 +337,11 @@ def coin_checks(
         program_allowed_check(proposal, context),
         quote_supported_check(proposal),
         identity_match_check(proposal, curve, context),
-        state_freshness_check(wallet, curve, limits),
-        token_age_check(wallet, context, limits),
-        curve_progress_check(curve, context, limits),
-        creator_behaviour_check(context, limits),
-        bundled_share_check(context, limits),
-        top10_share_check(context, limits),
+        freshness,
+        age,
+        progress,
+        creator,
+        bundled,
+        top10,
         mayhem_policy_check(curve, context),
     ]

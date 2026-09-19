@@ -35,6 +35,7 @@ __all__ = [
     "close_ata_on_full_sell",
     "exit_lock",
     "exit_params",
+    "is_launch_position",
     "mark_blocked",
     "mark_sol",
 ]
@@ -56,13 +57,26 @@ def close_ata_on_full_sell(env: Mapping[str, str]) -> bool:
 
 def exit_params(params: Mapping[str, Any], lim: MemeLimits) -> ExitParams:
     """The rule-set's ``target_x``/``trailing_pct``/``max_hold_s`` as the
-    position carries them, the profile's numbers for whatever is missing."""
-    trailing = Decimal(str(params.get("trailing_pct", lim.trailing_from_peak_pct * 100))) / 100
+    position carries them, the profile's numbers for whatever is missing.
+    T4.67b: the launch set's own names win when present —
+    ``max_drawdown_from_peak_pct`` (per cent, the trailing rule) and
+    ``time_stop_s`` (**seconds**; ``max_hold_s`` always was seconds too)."""
+    drawdown = params.get("max_drawdown_from_peak_pct")
+    raw_trailing = params.get("trailing_pct", lim.trailing_from_peak_pct * 100)
+    trailing = Decimal(str(raw_trailing if drawdown is None else drawdown)) / 100
+    hold = params.get("time_stop_s")
+    if hold is None:
+        hold = params.get("max_hold_s", lim.time_stop_s)
     return ExitParams(
         target_multiple=Decimal(str(params.get("target_x", lim.target_multiple))),
         trailing_from_peak_pct=trailing if 0 < trailing < 1 else lim.trailing_from_peak_pct,
-        time_stop_s=int(params.get("max_hold_s", lim.time_stop_s)),
+        time_stop_s=max(1, int(hold)),
     )
+
+
+def is_launch_position(params: Mapping[str, Any]) -> bool:
+    """T4.67b: a position the launch profile opened (``params.lane = launch``)."""
+    return params.get("lane") == "launch"
 
 
 def mark_sol(ctx: ExecutorContext, reserves: CurveReserves, tokens: int) -> Decimal | None:

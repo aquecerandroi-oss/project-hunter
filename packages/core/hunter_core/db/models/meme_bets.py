@@ -28,6 +28,8 @@ BET_EXIT_REASONS = (
     "max_loss",
     "line_broken",
     "dead",
+    "first_third_party_sell",
+    "max_drawdown_from_peak",
 )
 """The contract's seven plus ``max_loss`` (Emendas 1): EXP-M1 pre-registered a
 50 % loss floor as an exit rule, and a floor that closed a bet under another name
@@ -35,16 +37,22 @@ would be a lie in the diary. Plus ``line_broken`` (``0026``, T4.10): the market
 cap closed below the support line for two snapshots in a row — EXP-M2's own
 invalidation, named as such. Plus ``dead`` (``0029``, T4.11): the pool's tape
 silent for 15 min with the mark at or below half the cost — the market gone,
-for a bet that held through the migration."""
+for a bet that held through the migration. Plus ``first_third_party_sell`` and
+``max_drawdown_from_peak`` (T4.67a, EXP-M18): the launch lane's own two exits,
+priced by chain events rather than a snapshot — ``time_stop`` (already listed
+above) is its third."""
 
 BET_LEGS = ("probe", "scale", "single")
 """``meme_paper_bets.leg`` (``0026``): the hype probe ("semi-comprado (sonda)"),
 the second leg that scales it ("escalado (perna 2)", which names its
 ``parent_bet_id``) and the one-leg bet of every other rule set."""
 
-MARK_SOURCES = ("curve", "pool_tape")
+MARK_SOURCES = ("curve", "pool_tape", "solana_ws")
 """``meme_paper_bets.mark_source`` (``0029``): what priced the last mark — the
-curve's snapshot, or the PumpSwap pool's last trade after the migration."""
+curve's snapshot, or the PumpSwap pool's last trade after the migration. Plus
+``solana_ws`` (``0053``, T4.67a): the launch lane's own reconstruction of the
+curve from a chain event, never a ``meme_curve_snapshots`` row — the CHECK
+below only ever widens, so a bet closed under the old two values still reads."""
 
 OUTCOME_QUALITIES = ("measured", "indeterminate")
 """``meme_paper_bets.outcome_quality`` (``0030``, T4.16): ``measured`` is a
@@ -91,7 +99,7 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
         ),
         # 0029 — the mark's source and its staleness (T4.11).
         CheckConstraint(
-            "mark_source IS NULL OR mark_source IN ('curve', 'pool_tape')",
+            "mark_source IS NULL OR mark_source IN ('curve', 'pool_tape', 'solana_ws')",
             name="mark_source_is_a_known_label",
         ),
         CheckConstraint(

@@ -40,16 +40,19 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0052_meme_gate_after_drop_arm"
-"""``0052`` (T4.61a) lands on ``0051`` (T4.54), which lands on ``0050`` (T4.49),
-which lands on ``0049`` (T4.48), which lands on ``0048`` (T4.45), which lands on
-``0047`` (T4.39), which lands on ``0046`` (T4.35), which lands on ``0044`` (T4.31),
-which lands on ``0043`` (T4.26b), which lands on ``0042`` (T4.27),
-which lands on ``0041`` (T4.26), which lands on ``0040`` (T4.24b); bumped here
-so the shared fixtures agree with the repository's actual chain rather than any
-one task's private assumption. ``0051`` adds one table (``meme_treasury_swaps``)
-and seeds no rule set; ``0052`` seeds one research set (``flow_v2/9``, EXP-M13)
-and changes no schema, so the active-rule-set count goes 17 → 18."""
+HEAD_REVISION = "0053_meme_launch_lane_arm"
+"""``0053`` (T4.67a) lands on ``0052`` (T4.61a), which lands on ``0051``
+(T4.54), which lands on ``0050`` (T4.49), which lands on ``0049`` (T4.48),
+which lands on ``0048`` (T4.45), which lands on ``0047`` (T4.39), which lands
+on ``0046`` (T4.35), which lands on ``0044`` (T4.31), which lands on ``0043``
+(T4.26b), which lands on ``0042`` (T4.27), which lands on ``0041`` (T4.26),
+which lands on ``0040`` (T4.24b); bumped here so the shared fixtures agree
+with the repository's actual chain rather than any one task's private
+assumption. ``0051`` adds one table (``meme_treasury_swaps``) and seeds no
+rule set; ``0052`` seeds one research set (``flow_v2/9``, EXP-M13) and
+changes no schema, so the active-rule-set count went 17 → 18; ``0053`` seeds
+one more (``launch_v0/1``, EXP-M18) and changes no schema, so it goes 18 →
+19."""
 EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
 E2B_ARM_REVISION = "0044_meme_gate_e2b_arm"
 """Where the ``0044`` tests stage now that ``0046``/``0047`` sit on top (T4.44):
@@ -4504,9 +4507,10 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     # ``0049`` seeds flow_v2/7 (the floor of 25 buyers), nothing retired (+1 = 16) — T4.48.
     # ``0050`` seeds flow_v2/8 (the 1.0 sells/buys ceiling), nothing retired (+1 = 17) — T4.49.
     # ``0052`` seeds flow_v2/9 (no entry after the fall), nothing retired (+1 = 18) — T4.61a.
+    # ``0053`` seeds launch_v0/1 (the launch lane), nothing retired (+1 = 19) — T4.67a.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["18"]
+    ) == ["19"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",

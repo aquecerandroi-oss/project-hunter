@@ -17,6 +17,7 @@ from hunter_core.execution.meme.submit import MemeSubmitter, SubmitPolicy
 from hunter_core.logging import get_logger
 from hunter_meme_executor.build import FillRecord, decode_fills
 from hunter_meme_executor.context import ExecutorContext
+from hunter_meme_executor.exit_common import is_launch_position
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.repo import OpenPosition, close_position
 from hunter_meme_executor.send_path import record_failed_onchain_fee
@@ -71,6 +72,8 @@ async def close_from_fill(
         )
     if closed:
         ctx.state.exits_confirmed += 1
+        if is_launch_position(position.params):
+            ctx.launch.sells_total += 1  # T4.67b: the lane's own count
         ctx.state.blocked_exits.pop(position.id, None)
         if (fill.ata_rent_refund_lamports or 0) > 0:
             ctx.state.ata_closed += 1

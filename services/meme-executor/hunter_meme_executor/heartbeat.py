@@ -27,6 +27,8 @@ from hunter_meme_executor.auto_approve import auto_approved_last_hour, auto_refu
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.event_exits_stats import heartbeat_fields as event_exits_fields
 from hunter_meme_executor.journal_db import WORKER_ROLE
+from hunter_meme_executor.launch_exits import launch_positions
+from hunter_meme_executor.launch_stats import launch_heartbeat_fields
 from hunter_meme_executor.repo import open_positions, orders_by_state
 from hunter_meme_executor.scope import read_scope_use
 from hunter_meme_executor.send_tuning import SendTuning
@@ -236,6 +238,16 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     fields["treasury"] = _treasury_field(ctx)
     fields.update(_send_fields(ctx))
     fields.update(event_exits_fields(ctx.event_exits, now=now, enabled=cfg.event_exits.enabled))
+    # T4.67b: the launch lane, published in every mode (``off`` is a value).
+    fields.update(
+        launch_heartbeat_fields(
+            ctx.launch,
+            cfg.launch,
+            now=now,
+            open_launch=len(launch_positions(positions)),
+            limits=limits,
+        )
+    )
     return fields
 
 

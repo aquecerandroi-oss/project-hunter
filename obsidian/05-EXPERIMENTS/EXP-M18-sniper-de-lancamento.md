@@ -27,3 +27,33 @@ Conjunto `launch_v0/1` (`research_only`): sem porta de saúde (não existe dado)
 Vira mesa só se: R médio líquido > 0 com ≥ 300 moedas, top-3 < 50 % do lucro, e o custo de prioridade cabe. Se negativo a +1 s, o jogo do lançamento é dos bots colocados no bloco: descartar e registrar.
 
 Ligações: [[KB-0123-graduacoes-born-full]] · [[KB-0138-explosao-de-compradores-nao-tem-vantagem]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]]
+
+## Braço semeado (T4.67a, 19/09/2026)
+
+`launch_v0/1` (`0053_meme_launch_lane_arm`, `research_only`, `01994d00-6c1a-7000-8000-000000000017`)
+está semeado e ativo, atrás de `MEME_LAUNCH_LANE=off|paper|on` (padrão `off` — ninguém liga sozinho).
+Parâmetros exatamente os do pré-registro acima: `size_sol "0.01"`, `max_creator_initial_sol "2"`,
+`exit_key "lancamento_6s_ou_primeiro_sell"`, `time_stop_s 6`, `exit_on_first_third_party_sell true`,
+`max_drawdown_from_peak_pct "20"`.
+
+**Gatilho escolhido: o stream `create` do PumpPortal** (já em produção, `discovery.py`), não um novo
+`logsSubscribe` program-wide no programa pump — `plan-T4.52b.md` §1 já media esse transporte em
+~100 ms e nunca escolheu o caminho program-wide para nada além de uma PDA já conhecida; construir e
+decodificar um `CreateEvent` novo, sem fixture e sem medição própria, gastaria o orçamento da tarefa
+num transporte provavelmente não mais rápido que o já testado. Não houve nova medição ao vivo —
+decisão de engenharia declarada, não um resultado de bancada.
+
+**"Nasce cheia" (KB-0123), leitura declarada**: como a proposta sai em < 200 ms do `create` — antes
+de existir qualquer preço —, ela **não pode** ser condicionada ao progresso de +2 s. O que a pista
+faz é abandonar a *entrada em papel pendente* se o progresso atingir 90 % dentro de 2 s antes do
+preço de +1 s existir (contado em `born_full_60s`); a proposta em si (o registro de que a pista
+decidiu, no instante do `create`) permanece. Uma leitura, não uma certeza — sinalizada para quem
+julgar os resultados.
+
+A aposta de papel é precificada por evento (não pelo preenchimento de 15 s do Lab): entra no
+primeiro preço observado em `create + 1 s`, sai no primeiro de três gatilhos (`time_stop_s`, a
+primeira venda de um endereço que não é o criador, ou 20 % de queda do pico) — reaproveitando as
+mesmas peças do Lab (`BetEntry`/`BetExit`/`mark_filled`/`close_bet_row`/`paper_engine.close_bet`).
+Nada disto decide ainda: `kind = 'research_only'`, papel por construção. Detalhes técnicos e as
+simplificações declaradas em `.claude/state/notes-T4.67a.md`; braço executável real (T4.67b,
+`docs/RISK_ENGINE_MEME.md` §18) semeado em paralelo, ainda sem dado medido.

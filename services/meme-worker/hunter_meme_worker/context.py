@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from hunter_meme_worker.boards import BoardCollector
     from hunter_meme_worker.config import MemeConfig
     from hunter_meme_worker.graduation import GlobalParamsStore
+    from hunter_meme_worker.launch_lane_runtime import LaunchLaneRuntime
     from hunter_meme_worker.risk import RiskReader
     from hunter_meme_worker.sources import SourcesState
     from hunter_meme_worker.tracker import MintTracker
@@ -166,6 +167,9 @@ class RadarContext:
     """The tape by batch (T4.2g, ``activity.py``): ``None`` when
     ``MEME_ACTIVITY_ENABLED`` or the ``swap-api`` itself is off — the folds
     then read only the per-mint tape, and every row without one says why."""
+    launch_lane: LaunchLaneRuntime | None = None
+    """T4.67a's own runtime: ``None`` when ``MEME_LAUNCH_LANE=off`` — then
+    ``discovery.py`` calls nothing extra per create."""
     creator: CreatorWatchStats = field(default_factory=CreatorWatchStats)
     """The creator watch's own gauges and its measured sale → exit latency
     (T4.2h-b, ``creator_stats.py``). Defaulted rather than wired in ``main.py``

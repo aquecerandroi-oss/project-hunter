@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from hunter_exchanges.jupiter import JupiterClient
 from hunter_meme_executor.creator_flow import CreatorSoldMemory
 from hunter_meme_executor.event_exits_stats import EventExitsStats
+from hunter_meme_executor.launch_stats import LaunchStats
 from hunter_meme_executor.treasury_inflow import TreasuryInflowReader
 
 if TYPE_CHECKING:
@@ -173,3 +174,6 @@ class ExecutorContext:
     start (``meme_treasury_swaps``), cached 10 s, the last known value on a
     failed read — the input that keeps the daily-loss brake from being refilled
     by USDC top-ups (``daily_loss = day_start + inflow - equity``)."""
+    launch: LaunchStats = field(default_factory=LaunchStats)
+    """T4.67b: the launch lane's counters and its blockhash cache
+    (``launch_stats.py``, ``launch_send.py``), published by the heartbeat in every mode."""

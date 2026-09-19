@@ -130,12 +130,16 @@ class OpenMemePosition(MemeModel):
     mark_sol: Decimal | None = None
     """What a full sell would net now, fees included (§6); ``None`` = unmarked."""
     migrated: bool = False
+    lane: str | None = None
+    """T4.67b: ``launch`` for a position the launch profile opened (the row's
+    ``params.lane``); ``None`` for the desk's. Only the launch's own open cap reads it."""
 
 
 class PendingMemeIntent(MemeModel):
     proposal_id: str = Field(min_length=1)
     mint: str = Field(min_length=32)
     reserved_sol: Decimal = Field(gt=0)
+    lane: str | None = None
 
 
 class MemeWalletState(MemeModel):

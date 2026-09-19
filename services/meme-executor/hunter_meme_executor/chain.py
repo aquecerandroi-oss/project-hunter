@@ -55,6 +55,9 @@ class CurveRead:
     observed_at: datetime
     """Wall-clock instant of the read (the RPC does not stamp ``getAccountInfo``
     with a block time); the slot is the chain's own clock."""
+    commitment: str = "confirmed"
+    """T4.67b: the commitment the account was read at — ``processed`` only on the
+    launch lane's quote; ``admission.curve_from`` hands it to the engine as is."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,12 +109,15 @@ class ChainReader:
         self._global = (time.monotonic(), decoded)
         return decoded
 
-    def curve(self, mint: str) -> CurveRead | None:
-        """The bonding curve now, or ``None`` when the account does not exist."""
-        snapshot = self._rpc.get_account(bonding_curve_address(mint), commitment=self._commitment)
+    def curve(self, mint: str, *, commitment: str | None = None) -> CurveRead | None:
+        """The bonding curve now, or ``None`` when the account does not exist.
+        ``commitment`` (T4.67b, launch: ``processed``) overrides the reader's; the
+        read carries it so the admission judges the commitment it was given."""
+        level = commitment or self._commitment
+        snapshot = self._rpc.get_account(bonding_curve_address(mint), commitment=level)
         if snapshot is None:
             return None
-        mint_account = self._rpc.get_account(mint, commitment=self._commitment)
+        mint_account = self._rpc.get_account(mint, commitment=level)
         if mint_account is None:
             return None
         account = decode_bonding_curve_account(snapshot.data_base64, owner=snapshot.owner)
@@ -121,6 +127,7 @@ class ChainReader:
             token_program=mint_account.owner,
             slot=snapshot.slot,
             observed_at=datetime.now(UTC),
+            commitment=level,
         )
 
     def wallet(self, pubkey: str) -> WalletRead:

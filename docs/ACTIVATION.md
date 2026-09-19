@@ -992,6 +992,38 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
    ou `event_exits_dropped` crescendo é o sinal de que o WS do provedor não aguenta — a mesa continua
    protegida pelo tique. **Desligar:** `MEME_EVENT_EXITS=off` + `update`; nada mais precisa mudar.
 
+9h. **Perfil de lançamento no executor (T4.67b, EXP-M18) — a flag é a mesma do radar, padrão
+   desligado; o executor só age em `on`.** A pista de lançamento (T4.67a) escreve propostas
+   `launch_v0/1` a cada `create`; em `paper` ela mede no papel e o executor **não toca** nessas
+   propostas (nenhuma consulta, nenhuma linha); em `on`, com `ENABLE_MEME_LIVE_TRADING=true`, o
+   executor as admite pelo perfil rápido (`docs/RISK_ENGINE_MEME.md` §18: checks 10, 11, 12 e 26
+   gravados `skipped` por nome; 7, 8, 9, 21 e 23 sob a regra do lançamento; o resto igual à §4),
+   compra com blockhash pré-buscado, piso de prioridade próprio e tolerância de 10 %, e sai em segundos
+   (`time_stop_s` 6, queda de 20 % do pico, primeiro sell de terceiro — pelo evento, T4.63, e por um
+   tique de 2 s). **Custo fixo declarado:** rent da ATA + rede + prioridade ≈ 0,003 SOL por bilhete de
+   0,01 (~29 %); `MEME_CLOSE_ATA_ON_FULL_SELL=1` recupera o rent na venda cheia.
+
+   | Variável | Padrão | O que faz |
+   |---|---|---|
+   | `MEME_LAUNCH_LANE` | `off` | `off` \| `paper` \| `on` — compartilhada com o radar; o executor age **só** em `on` (e só com a flag de real); outro valor lê como `off` com aviso. `launch_lane_mode` no heartbeat |
+   | `MEME_LAUNCH_MAX_OPEN` | `2` | teto de posições de lançamento (abertas + pendentes com `lane = launch`), separado do global `MEME_MAX_OPEN_POSITIONS`, que continua contando todas |
+   | `MEME_LAUNCH_TICKET_SOL` | `0.01` | o bilhete (teto `launch_ticket` do sizing); nunca acima de `MEME_MAX_SOL_PER_TRADE`; abaixo de `MEME_MIN_TRADE_SOL` o piso segue o bilhete |
+   | `MEME_LAUNCH_PRIORITY_FLOOR_MICRO_LAMPORTS` | `1000000` | piso da taxa de prioridade do lançamento (0,0004 SOL com 400 k CU); `max(p75, piso)` limitado por `MEME_PRIORITY_FEE_MAX_SOL` e pelo check 20 (5 % do bilhete) |
+   | `MEME_LAUNCH_BUY_SLIPPAGE_PCT` | `10` | tolerância da **instrução** de compra, em por cento, faixa (0, 20] |
+   | `MEME_LAUNCH_SKIP_SIMULATION` | `false` | `true` pula o `simulateTransaction` do executor antes de assinar (≈ 100 ms); o preflight do nó continua. Risco: uma assinatura gasta (journal) por transação que só o simulador pegaria; se pousar com erro, taxa de rede paga |
+   | `MEME_LAUNCH_MAX_PARTICIPATION_PCT` | `0.10` | fração do SOL real já na curva que o bilhete pode ser (o 1 % do perfil exigiria 1 SOL no primeiro segundo) |
+   | `MEME_LAUNCH_MAX_AGE_S` | `5` | idade máxima da moeda na admissão (do carimbo do `create` da proposta); mais velha ⇒ `launch_proposal_stale`/`token_too_old`, sem RPC |
+
+   **Ligar:** `MEME_LAUNCH_LANE=on` no `.env` da VPS (o radar passa a `on` junto — é a mesma
+   variável), `MEME_EVENT_EXITS=on` (sem ele só o tique de 2 s vende), `compose.sh update
+   meme-worker meme-executor`. **Conferir** no `hb:meme:executor`: `launch_lane_mode = on`,
+   `launch_blockhash_age_s < 10`, depois da primeira compra `proposal_to_submit_ms_p50` (alvo:
+   < 1 000 ms; acima disso a tese da EXP-M18 já não é a que está sendo medida), `launch_refusals`
+   (esperado: `participation_above_cap` e `launch_proposal_stale` dominando), `launch_open ≤ 2`,
+   `launch_buys_total` × `launch_sells_total` (devem andar juntos: uma posição de 6 s que não vendeu
+   é `blocked_exits`). **Desligar:** `MEME_LAUNCH_LANE=paper` (o radar continua medindo) ou `off` +
+   `update`; as posições abertas continuam sendo vendidas pelos tiques.
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca

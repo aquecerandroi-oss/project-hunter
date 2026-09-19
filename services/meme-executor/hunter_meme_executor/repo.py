@@ -101,6 +101,8 @@ class PendingAttempt:
     proposal_id: str
     mint: str
     reserved_sol: Decimal
+    lane: str | None = None
+    """T4.67b: ``launch`` when the attempt is the launch lane's (``intent.lane``)."""
 
 
 _CANDIDATES = text(
@@ -245,8 +247,16 @@ async def pending_attempts(session: AsyncSession) -> list[PendingAttempt]:
     for r in (await session.execute(_PENDING)).mappings():
         intent = dict(r["intent"] or {})
         reserved = _decimal(intent.get("max_sol_cost_sol")) or Decimal(0)
+        lane = intent.get("lane")
         if reserved > 0:
-            out.append(PendingAttempt(str(r["proposal_id"]), str(r["mint"]), reserved))
+            out.append(
+                PendingAttempt(
+                    str(r["proposal_id"]),
+                    str(r["mint"]),
+                    reserved,
+                    lane=lane if isinstance(lane, str) and lane else None,
+                )
+            )
     return out
 
 

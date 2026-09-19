@@ -17,7 +17,7 @@ from hunter_core.domain.enums import KillSwitchState
 from hunter_risk_meme.checks import coin_checks
 from hunter_risk_meme.checks_wallet import wallet_checks
 from hunter_risk_meme.conviction import MemeConviction, conviction_check
-from hunter_risk_meme.decision import MemeCheck, MemeDecision, MemeExitPlan, check
+from hunter_risk_meme.decision import MemeCheck, MemeDecision, MemeExitPlan, check, skipped
 from hunter_risk_meme.inputs import (
     CurveState,
     MemeContext,
@@ -29,6 +29,7 @@ from hunter_risk_meme.inputs import (
 )
 from hunter_risk_meme.kill_switch import assess, most_restrictive
 from hunter_risk_meme.limits import MemeLimits
+from hunter_risk_meme.profile import LAUNCH_SKIPPED_CHECKS, MemeLaunchProfile, launch_open_cap_check
 from hunter_risk_meme.sizing import size_entry
 
 __all__ = ["evaluate_meme_entry", "evaluate_meme_exit"]
@@ -48,11 +49,15 @@ def evaluate_meme_entry(
     curve_fee_pct: Decimal,
     creates_ata: bool = True,
     conviction: MemeConviction | None = None,
+    launch: MemeLaunchProfile | None = None,
 ) -> MemeDecision:
     """§4 checks 1–26 and §5 sizing. ``curve_fee_pct`` is the curve's fee tier as the
     caller last read it (a ``TradeEvent`` or ``Global``), never a constant of this
     module; ``conviction`` (T4.61c, §17) is the ladder's verdict the caller computed —
-    absent or off, check 26 passes and the ``conviction`` ceiling does not constrain."""
+    absent or off, check 26 passes and the ``conviction`` ceiling does not constrain.
+    ``launch`` (T4.67b, ``profile.py``) selects the launch profile: the skipped checks
+    are recorded ``skipped``, the relaxed ones say so, check 27 (the launch's own open
+    cap) is appended, the ticket is a ceiling and ``decision.profile = "launch"``."""
     ks = assess(wallet, limits, kill_switch)
     checks: list[MemeCheck] = coin_checks(
         proposal,
@@ -63,6 +68,7 @@ def evaluate_meme_entry(
         effective=ks.effective,
         latched=kill_switch.daily_loss_latched,
         live_enabled=live_enabled,
+        launch=launch,
     )
     checks.extend(wallet_checks(proposal, wallet, limits, context))
     sizing, sizing_checks = size_entry(
@@ -74,10 +80,15 @@ def evaluate_meme_entry(
         kill_switch_multiplier=ks.entry_size_multiplier,
         curve_fee_pct=curve_fee_pct,
         creates_ata=creates_ata,
-        conviction=conviction,
+        conviction=None if launch is not None else conviction,
+        launch=launch,
     )
     checks.extend(sizing_checks)
-    checks.append(conviction_check(conviction, limits))
+    if launch is None:
+        checks.append(conviction_check(conviction, limits))
+    else:
+        checks.append(skipped("conviction", LAUNCH_SKIPPED_CHECKS["conviction"]))
+        checks.append(launch_open_cap_check(wallet, launch))
     approved = all(c.passed for c in checks) and sizing is not None
     return MemeDecision(
         approved=approved,
@@ -92,6 +103,7 @@ def evaluate_meme_entry(
         # The sizing is published whether or not the entry was approved: the desk
         # shows the size the refusal was measured against (§4, "every check recorded").
         sizing=sizing,
+        profile="full" if launch is None else "launch",
     )
 
 

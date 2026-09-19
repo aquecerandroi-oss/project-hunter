@@ -82,8 +82,13 @@ EXIT_REASONS: Final = frozenset(
         "max_loss",
         "line_broken",
         "dead",
+        "first_third_party_sell",
+        "max_drawdown_from_peak",
     }
 )
+"""T4.67a: the launch lane's own two exits (``time_stop`` is already listed
+above) — priced by chain events via ``launch_lane_bets.py``, never through
+this module's own :func:`decide_exit`."""
 
 _RULE_TO_REASON: Final[Mapping[str, str]] = {
     "target_multiple": "target",
