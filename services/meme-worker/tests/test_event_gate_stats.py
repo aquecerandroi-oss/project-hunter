@@ -45,3 +45,13 @@ def test_early_retention_unknown_share_is_over_the_same_60s_window() -> None:
 def test_early_retention_unknown_share_is_blank_with_nothing_judged() -> None:
     fields = heartbeat_fields(EventGateStats(), now=NOW, enabled=True)
     assert fields["event_gate_early_retention_unknown_share_60s"] == ""
+
+
+def test_subscribe_at_create_failed_is_counted_and_on_the_heartbeat() -> None:
+    """T4.70b: a transient RPC error in ``subscribe_at_create`` — counted
+    next to ``subscribed_at_create_total``, never a crash."""
+    stats = EventGateStats()
+    assert stats.record_subscribe_at_create_failed(NOW) is True  # first: log it
+    assert stats.record_subscribe_at_create_failed(NOW) is False  # repeat: rate-limited
+    fields = heartbeat_fields(stats, now=NOW, enabled=True)
+    assert fields["event_gate_subscribe_at_create_failed_total"] == "2"

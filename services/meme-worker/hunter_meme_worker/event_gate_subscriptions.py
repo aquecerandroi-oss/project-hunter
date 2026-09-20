@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from hunter_core.domain.types import utcnow
+from hunter_core.logging import get_logger
 from hunter_exchanges.base import ExchangeUnavailable
 from hunter_exchanges.pumpfun.pdas import bonding_curve_address
 from hunter_meme_worker.event_gate_caches import MAX_CACHE_AGE_S, prune_event_gate_caches
@@ -32,6 +33,8 @@ if TYPE_CHECKING:
     from hunter_meme_worker.event_gate_runtime import EventGateRuntime
 
 __all__ = ["subscribe_at_create", "sync_subscriptions"]
+
+logger = get_logger(__name__)
 
 
 async def _subscribe_mint(
@@ -64,7 +67,19 @@ async def subscribe_at_create(
     now = now or utcnow()
     if event.mint in rt.subs or len(rt.subs) >= rt.config.max_mints:
         return
-    await _subscribe_mint(rt, event.mint, first_seen_at=event.observed_at, now=now)
+    try:
+        await _subscribe_mint(rt, event.mint, first_seen_at=event.observed_at, now=now)
+    except (ConnectionError, TimeoutError, OSError) as exc:
+        # T4.70b (incident 2026-09-19 18:05:32 UTC): a transient RPC WS error
+        # here must never escape into discovery's own TaskGroup — the mint
+        # is picked up by sync_subscriptions's own 5 s pass instead.
+        if rt.stats.record_subscribe_at_create_failed(now):
+            logger.warning(
+                "meme_event_gate_subscribe_at_create_failed",
+                mint8=event.mint[:8],
+                error_type=type(exc).__name__,
+            )
+        return
     state = rt.book.get(event.mint)
     if state is None:
         return  # ExchangeUnavailable inside _subscribe_mint, or the book is full

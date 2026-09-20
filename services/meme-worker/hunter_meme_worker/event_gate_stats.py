@@ -17,6 +17,9 @@ __all__ = ["EventGateStats", "heartbeat_fields"]
 HEARTBEAT_PREFIX = "event_gate_"
 WINDOW_S = 60
 LATENCY_SAMPLE = 500
+SUBSCRIBE_AT_CREATE_FAILED_LOG_INTERVAL_S = 30
+"""T4.70b: minimum gap between two ``meme_event_gate_subscribe_at_create_failed``
+log lines — the counter below still counts every one of them."""
 
 
 def _trim(window: deque[datetime], now: datetime) -> None:
@@ -85,6 +88,14 @@ class EventGateStats:
     """``at`` of every judged evaluation whose row measured
     ``early_retention_pct is None`` — the heartbeat's share is this over
     ``evaluations_window`` (same 60 s), the P0 acceptance number itself."""
+    subscribe_at_create_failed_total: int = 0
+    """T4.70b (incident 2026-09-19): a transient WS error
+    (``ConnectionError``/``TimeoutError``/``OSError``) inside
+    ``subscribe_at_create`` — counted and degraded to the periodic sync
+    picking the mint up instead, never a crash of the discovery task."""
+    _subscribe_at_create_failed_last_logged_at: datetime | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def record_event(self, now: datetime) -> None:
         self.events_total += 1
@@ -146,6 +157,20 @@ class EventGateStats:
         self.early_retention_unknown_window.append(now)
         _trim(self.early_retention_unknown_window, now)
 
+    def record_subscribe_at_create_failed(self, now: datetime) -> bool:
+        """Counts every failure; returns whether *this one* should be logged
+        — at most once every :data:`SUBSCRIBE_AT_CREATE_FAILED_LOG_INTERVAL_S`,
+        so a repeating RPC outage never floods the logs while the counter
+        keeps an exact tally."""
+        self.subscribe_at_create_failed_total += 1
+        last = self._subscribe_at_create_failed_last_logged_at
+        if last is not None and (now - last).total_seconds() < (
+            SUBSCRIBE_AT_CREATE_FAILED_LOG_INTERVAL_S
+        ):
+            return False
+        self._subscribe_at_create_failed_last_logged_at = now
+        return True
+
 
 def heartbeat_fields(
     stats: EventGateStats,
@@ -199,6 +224,7 @@ def heartbeat_fields(
         "no_base_row_60s": str(len(stats.no_base_row_window)),
         "unsubscribed_total": str(stats.unsubscribed_total),
         "subscribed_at_create_total": str(stats.subscribed_at_create_total),
+        "subscribe_at_create_failed_total": str(stats.subscribe_at_create_failed_total),
         "create_to_subscribe_ms_p50": "" if subscribe_p50 is None else str(subscribe_p50),
         "create_to_subscribe_ms_p95": "" if subscribe_p95 is None else str(subscribe_p95),
         "early_retention_unknown_share_60s": unknown_share,
