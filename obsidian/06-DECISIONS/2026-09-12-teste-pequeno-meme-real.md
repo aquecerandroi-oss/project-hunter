@@ -206,3 +206,7 @@ Papel 72 h: flow_v2/2 +0,105 (mas −0,084 nas últimas 24 h), **flow_v2/1 +0,05
 ## Adendo 19/09/2026 23:2x BRT — recuperar o aluguel das ATAs Token-2022 (T4.77b)
 
 R64 mostrou que 75 % da perda de 19/09 foi aluguel de ATA não devolvido (`MEME_CLOSE_ATA_ON_FULL_SELL` desligada): 35 contas vazias do pump.fun (Token-2022) = 0,0515 SOL parados. **Everton: "pode"** — estender o script auditado `meme_close_atas.py` com `--token-2022` sob as guardas da Astra (só conta de token, extensões ⊆ `immutableOwner`, ATA derivada com o programa certo, lotes homogêneos, 1 conta na primeira execução). Ligar `MEME_CLOSE_ATA_ON_FULL_SELL=1` no `.env` fica como ato dele.
+
+## Adendo 20/09/2026 00:3x BRT — pausa por mint após perda na mesa real (T4.78)
+
+**Everton:** "eu exijo que mexa pelo menos um pouco na estratégia". Sexta-feira e Astra tinham recomendado não mexer na mesa real hoje (R64: saída atual venceu 52 variantes; pausa por mint tiraria o NARKY#2 nas 24). **Decisão dele: aplicar.** Mudança escolhida = a de maior amostra a favor e menor risco: **recusar recompra do mesmo mint por 300 s após uma saída com perda** (papel 19/09: 19 recompras, 0 acertos, −0,338; real: Musepaid). Contraponto registrado (NARKY#2 +0,014). `MEME_MINT_COOLDOWN_AFTER_LOSS_S` no `.env` (0 desliga). Medição em sombra por 3 dias; se bloquear mais vencedoras que perdedoras, cai. Nada mais muda (alvo, recuo, tempo, ficha, saídas por evento).
