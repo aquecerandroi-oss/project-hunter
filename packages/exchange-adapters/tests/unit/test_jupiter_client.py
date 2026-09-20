@@ -151,6 +151,29 @@ def test_swap_posts_the_whole_quote_response_back() -> None:
     assert result.prioritization_fee_lamports == 5000
 
 
+def test_swap_with_a_priority_fee_cap_sends_the_capped_medium_level() -> None:
+    """T4.74-4: the spot desk caps the priority fee per leg; ``None`` stays ``"auto"``."""
+    quote_body = _load("quote_usdc_to_sol.json")
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/quote"):
+            return httpx.Response(200, json=quote_body)
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json={"swapTransaction": "AA=="})
+
+    with _client(handler) as client:
+        quote = client.quote(
+            input_mint=USDC_MINT, output_mint=WRAPPED_SOL_MINT, amount=5_000_000, slippage_bps=50
+        )
+        client.swap(quote=quote, user_public_key="A" * 32, max_priority_fee_lamports=100_000)
+        assert seen["prioritizationFeeLamports"] == {
+            "priorityLevelWithMaxLamports": {"maxLamports": 100_000, "priorityLevel": "medium"}
+        }
+        with pytest.raises(ValueError):
+            client.swap(quote=quote, user_public_key="A" * 32, max_priority_fee_lamports=-1)
+
+
 def test_the_default_base_url_is_the_live_keyless_endpoint() -> None:
     # T4.54b (18/09/2026): quote-api.jup.ag/v6 no longer resolves; the same
     # /quote and /swap live under lite-api.jup.ag/swap/v1 (keyless).

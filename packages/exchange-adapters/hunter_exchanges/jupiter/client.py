@@ -92,14 +92,38 @@ class JupiterClient:
             ) from exc
 
     # ------------------------------------------------------------------- swap
-    def swap(self, *, quote: JupiterQuote, user_public_key: str) -> JupiterSwapTransaction:
-        """``POST /swap`` — the unsigned versioned transaction for ``quote``."""
+    def swap(
+        self,
+        *,
+        quote: JupiterQuote,
+        user_public_key: str,
+        max_priority_fee_lamports: int | None = None,
+    ) -> JupiterSwapTransaction:
+        """``POST /swap`` — the unsigned versioned transaction for ``quote``.
+
+        ``max_priority_fee_lamports`` (T4.74-4) caps what Jupiter may put in the
+        compute-budget instructions (``priorityLevelWithMaxLamports``, level
+        ``medium``); ``None`` keeps the treasury's ``"auto"``. The caller still
+        verifies ``limit × price`` on the transaction it gets back — this is a
+        request, not a proof."""
+        if max_priority_fee_lamports is not None and max_priority_fee_lamports < 0:
+            raise ValueError("max_priority_fee_lamports must not be negative")
+        fee: str | dict[str, Any] = (
+            "auto"
+            if max_priority_fee_lamports is None
+            else {
+                "priorityLevelWithMaxLamports": {
+                    "maxLamports": max_priority_fee_lamports,
+                    "priorityLevel": "medium",
+                }
+            }
+        )
         body = {
             "quoteResponse": quote.raw,
             "userPublicKey": user_public_key,
             "wrapAndUnwrapSol": True,
             "dynamicComputeUnitLimit": True,
-            "prioritizationFeeLamports": "auto",
+            "prioritizationFeeLamports": fee,
         }
         payload = self._post("/swap", body)
         try:
