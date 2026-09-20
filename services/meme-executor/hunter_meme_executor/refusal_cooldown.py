@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING, Final
 from sqlalchemy import text
 
 from hunter_core.execution.meme.approval import AUTO_STAGE1_DECIDED_BY
+from hunter_risk_meme import MINT_COOLDOWN_AFTER_LOSS
+from hunter_risk_meme.limits_env import DEFAULT_MINT_COOLDOWN_AFTER_LOSS_S
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -85,9 +87,23 @@ are the *radar gate*'s refusals (``hunter_meme_worker.rules_criteria``), never
 written to ``meme_live_orders.reason``; a mint refused by the gate never reaches
 the executor at all."""
 
-SHORT_COOLDOWNS: Final[Mapping[str, float]] = {"entry_after_drop": 30.0}
+SHORT_COOLDOWNS: Final[Mapping[str, float]] = {
+    "entry_after_drop": 30.0,
+    MINT_COOLDOWN_AFTER_LOSS: float(DEFAULT_MINT_COOLDOWN_AFTER_LOSS_S),
+}
 """T4.61c — refusals the **clock** clears, but not on the next tick: each cools
 its mint for its own window, never longer than the owner's cooldown.
+
+``mint_cooldown_after_loss`` (T4.78, check 28; the row's reason carries the
+seconds left, ``mint_cooldown_after_loss:240``, matched by its **base** name):
+the mint's last live close lost and the engine refuses it for up to 300 s. The
+desk re-proposes every ~20 s; without this entry each re-proposal would be
+opened, cost three RPC reads and be refused with a smaller number — the same
+"cost without information" of T4.28f. The wait is the **announced remainder**
+(``:10`` cools 10 s, never the 300 s ceiling — Astra, review T4.78: a fixed
+window restarted at ``t = 290`` would hold the mint past ``t = 410`` while the
+engine had freed it at 300), capped by the owner's cooldown like every short
+one; a reason without a readable remainder uses the ceiling.
 
 ``entry_after_drop`` (check 26, §17): the real SOL fell ≥ 50 % from the peak of
 the last 60 s. The desk re-proposes in ~20 s and every retry costs three RPC
@@ -132,8 +148,11 @@ def cooling_mints_by_window(
     by ``cooldown_s``, so the owner's number is always the longest wait."""
     out: set[str] = set()
     for mint, reason, refused_at in rows:
-        short = SHORT_COOLDOWNS.get(reason)
-        window = cooldown_s if reason in DETERMINISTIC_REFUSALS else short
+        base, _, remainder = reason.partition(":")  # T4.78: ``mint_cooldown_after_loss:<left>``
+        short = SHORT_COOLDOWNS.get(base)
+        if short is not None and base == MINT_COOLDOWN_AFTER_LOSS and remainder.isdigit():
+            short = min(short, float(remainder))
+        window = cooldown_s if base in DETERMINISTIC_REFUSALS else short
         if window is None:
             continue
         if refused_at >= now - timedelta(seconds=min(window, cooldown_s)):

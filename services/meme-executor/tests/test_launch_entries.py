@@ -28,6 +28,7 @@ from hunter_core.execution.meme.submit import SubmitResult
 from hunter_exchanges.pumpfun.decode import BondingCurveAccount
 from hunter_exchanges.pumpfun.global_state import decode_global_account
 from hunter_exchanges.pumpfun.solana_codec import TOKEN_PROGRAM_ID
+from hunter_meme_executor.admission import day_start_utc
 from hunter_meme_executor.build import decode_fills
 from hunter_meme_executor.chain import CurveRead, WalletRead
 from hunter_meme_executor.config import ExecutorConfig
@@ -46,7 +47,6 @@ pytestmark = pytest.mark.unit
 
 FIXTURES = Path(__file__).resolve().parents[3] / "packages/exchange-adapters/tests/fixtures/pumpfun"
 NOW = datetime(2026, 9, 19, 15, 0, 1, tzinfo=UTC)
-DAY_START = datetime(2026, 9, 19, 3, 0, tzinfo=UTC)
 
 
 @dataclass
@@ -190,6 +190,9 @@ class Db:
     refused_admitted: list[str] = field(default_factory=lambda: list[str]())
     queried: int = 0
     submitted_at: datetime | None = None
+    losses: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
+    """T4.78: what ``recent_losses`` answers (mint → exit_at of the last losing close)."""
+    losses_windows: list[int] = field(default_factory=lambda: list[int]())
 
 
 @dataclass
@@ -246,13 +249,21 @@ def _wire(monkeypatch: pytest.MonkeyPatch, db: Db, submitter: FakeSubmitter) -> 
     async def zero(_session: Any, *_a: Any, **_k: Any) -> Decimal:
         return Decimal(0)
 
+    async def recent_losses(
+        _session: Any, mint: str, *, now: datetime, cooldown_s: int
+    ) -> dict[str, datetime]:
+        db.losses_windows.append(cooldown_s)
+        return {} if cooldown_s <= 0 else {m: t for m, t in db.losses.items() if m == mint}
+
     async def token_context(_session: Any, *_a: Any, **_k: Any) -> Any:
         raise RuntimeError("no row yet")
 
     async def ensure_anchor(ctx: Any, now: Any, equity: Decimal) -> DayAnchor | None:
         if ctx.treasury_inflow.inflow_sol is None:
             return None
-        return DayAnchor(DAY_START, Decimal("0.3"), Decimal("0.3"), now)
+        # The rig runs on the real clock: the anchor must be *today's* São Paulo
+        # midnight (a fixed date failed the day after it was written).
+        return DayAnchor(day_start_utc(now), Decimal("0.3"), Decimal("0.3"), now)
 
     async def priority_fee_for(_ctx: Any, _addresses: Any) -> PriorityFeeChoice:
         return PriorityFeeChoice.static(100_000)
@@ -276,6 +287,7 @@ def _wire(monkeypatch: pytest.MonkeyPatch, db: Db, submitter: FakeSubmitter) -> 
     monkeypatch.setattr(le, "pending_attempts", nothing)
     monkeypatch.setattr(le, "spot_pending_intents", nothing)  # T4.74: one brake
     monkeypatch.setattr(le, "participation_used_sol", zero)
+    monkeypatch.setattr(le, "recent_losses", recent_losses)  # T4.78: check 28
     monkeypatch.setattr(le, "token_context", token_context)
     monkeypatch.setattr(le, "ensure_anchor", ensure_anchor)
     monkeypatch.setattr(le, "priority_fee_for", priority_fee_for)
@@ -438,6 +450,32 @@ async def test_the_launch_cap_refuses_the_third_launch_position(
         db.orders[0]["status"] == "refused" and db.orders[0]["reason"] == "launch_max_open_reached"
     )
     assert submitter.calls == []
+
+
+async def test_a_mint_that_just_lost_is_refused_on_the_launch_lane_too(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.78: a launch on a mint whose live position closed with a loss 40 s ago
+    is a re-entry — refused ``mint_cooldown_after_loss:260`` with the window
+    read from the limits (300), nothing signed, and counted by base name."""
+    db, submitter = Db(candidates=[_fresh_candidate()]), FakeSubmitter()
+    db.losses = {MINT: datetime.now(UTC) - timedelta(seconds=40)}
+    _wire(monkeypatch, db, submitter)
+    ctx = FakeContext(config=_config())
+    await le.launch_entries_once(ctx)  # type: ignore[arg-type]
+    assert db.losses_windows == [300]
+    assert len(db.orders) == 1 and db.orders[0]["status"] == "refused"
+    reason = db.orders[0]["reason"]
+    assert (
+        reason.startswith("mint_cooldown_after_loss:") and 255 <= int(reason.split(":")[1]) <= 260
+    )
+    recorded = next(
+        c for c in db.orders[0]["admission"]["checks"] if c["name"] == "mint_cooldown_after_loss"
+    )
+    assert recorded["state"] == "failed" and Decimal(recorded["limit"]) == 300
+    assert submitter.calls == [] and db.positions == []
+    assert ctx.state.refusals == {"mint_cooldown_after_loss": 1}
+    assert ctx.launch.refusals == {reason: 1}
 
 
 async def test_an_unreadable_treasury_inflow_refuses_day_anchor_unavailable(

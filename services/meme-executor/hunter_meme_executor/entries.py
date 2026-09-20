@@ -85,8 +85,7 @@ async def _refuse(
             now=now,
         )
         await reject_if_auto(ctx, session, candidate, reason, now=now)
-    ctx.state.entries_refused += 1
-    ctx.state.last_refusal = reason
+    ctx.state.record_refusal(reason)
     logger.warning(
         "meme_live_entry_refused", proposal_id=candidate.id, mint=candidate.mint, reason=reason
     )
@@ -178,6 +177,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             anchor=anchor,
             limits=cfg.limits,
             treasury_inflow_today_sol=inflow,
+            recent_losses=built.recent_losses,  # T4.78: check 28
         ),
         curve=curve_from(reads.curve),
         context=built.context,
@@ -244,8 +244,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             refused_at = utcnow()
             await refuse_admitted_order(session, key, reason=reason, now=refused_at)
             await reject_if_auto(ctx, session, candidate, reason, now=refused_at)
-        ctx.state.entries_refused += 1
-        ctx.state.last_refusal = reason
+        ctx.state.record_refusal(reason)
         logger.warning(
             "meme_live_entry_refused",
             proposal_id=candidate.id,

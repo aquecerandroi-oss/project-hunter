@@ -1,6 +1,7 @@
 """The two pure entry points of ``docs/RISK_ENGINE_MEME.md`` §2.
 
-``evaluate_meme_entry`` runs the 26 checks of §4 in order, **records every one**
+``evaluate_meme_entry`` runs the checks of §4 (1–26, 27 under the launch profile,
+28 last) in order, **records every one**
 (even after the first refusal), sizes only when the admissibility checks passed
 and publishes the binding ceiling. ``evaluate_meme_exit`` runs no entry check
 and always approves: it decides the quantity (never more than the position) and
@@ -15,7 +16,7 @@ from decimal import Decimal
 
 from hunter_core.domain.enums import KillSwitchState
 from hunter_risk_meme.checks import coin_checks
-from hunter_risk_meme.checks_wallet import wallet_checks
+from hunter_risk_meme.checks_wallet import mint_cooldown_after_loss_check, wallet_checks
 from hunter_risk_meme.conviction import MemeConviction, conviction_check
 from hunter_risk_meme.decision import MemeCheck, MemeDecision, MemeExitPlan, check, skipped
 from hunter_risk_meme.inputs import (
@@ -89,6 +90,10 @@ def evaluate_meme_entry(
     else:
         checks.append(skipped("conviction", LAUNCH_SKIPPED_CHECKS["conviction"]))
         checks.append(launch_open_cap_check(wallet, launch))
+    # T4.78, check 28, deliberately **last** in both profiles: a refused order
+    # whose ``reason`` is this one had passed everything else — the number the
+    # shadow measurement of the cooldown (EXP-M21) needs to be honest.
+    checks.append(mint_cooldown_after_loss_check(wallet, proposal, limits))
     approved = all(c.passed for c in checks) and sizing is not None
     return MemeDecision(
         approved=approved,

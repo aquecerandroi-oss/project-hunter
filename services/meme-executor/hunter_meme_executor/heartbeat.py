@@ -166,6 +166,8 @@ def policy_fields(
         "creator_unknown_max_dev_share_pct": str(limits.creator_unknown_max_dev_share_pct),
         "curve_progress_min_pct": str(limits.curve_progress_min_pct),
         "curve_progress_max_pct": str(limits.curve_progress_max_pct),
+        # T4.78: check 28's window (0 = off) — a fact about how this process admits.
+        "mint_cooldown_after_loss_s": limits.mint_cooldown_after_loss_s,
         "buy_max_slippage_pct": str(buy_pct),
         # T4.61b: whether the buy is sized by the conviction ladder or flat.
         "conviction_sizing": "on" if conviction is not None and conviction.enabled else "off",
@@ -215,6 +217,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         "last_refusal": state.last_refusal or "",
         "entries_seen": str(state.entries_seen),
         "entries_refused": str(state.entries_refused),
+        "refusals": json.dumps(state.refusals),  # T4.78: by base name, desk + launch
         "entries_confirmed": str(state.entries_confirmed),
         "exits_confirmed": str(state.exits_confirmed),
         "ata_closed": str(state.ata_closed),

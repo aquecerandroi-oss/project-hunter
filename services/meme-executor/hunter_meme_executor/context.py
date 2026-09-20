@@ -47,6 +47,11 @@ class ExecutorState:
     last_refusal: str | None = None
     entries_seen: int = 0
     entries_refused: int = 0
+    refusals: dict[str, int] = field(default_factory=lambda: dict[str, int]())
+    """T4.78: entry refusals of this process by **base** name — the ``reason``
+    before its first ``:`` (``mint_cooldown_after_loss:240`` counts as
+    ``mint_cooldown_after_loss``; ``build_failed:KeyError`` as ``build_failed``).
+    Published as ``refusals`` on the heartbeat; desk and launch lane both feed it."""
     entries_confirmed: int = 0
     exits_confirmed: int = 0
     exits_blocked: int = 0
@@ -129,6 +134,13 @@ class ExecutorState:
     exit_locks: dict[str, asyncio.Lock] = field(default_factory=lambda: dict[str, asyncio.Lock]())
     """T4.63: one lock per open position (``exit_common.exit_lock``) — the tick
     and the event path never both sell it; pruned by the event runtime's sync."""
+
+    def record_refusal(self, reason: str) -> None:
+        """One refused entry: the total, the last reason and the count by base name."""
+        self.entries_refused += 1
+        self.last_refusal = reason
+        base = reason.split(":", 1)[0]
+        self.refusals[base] = self.refusals.get(base, 0) + 1
 
 
 @dataclass(slots=True)

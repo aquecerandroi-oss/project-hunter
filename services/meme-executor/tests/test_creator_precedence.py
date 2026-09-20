@@ -52,6 +52,7 @@ from hunter_meme_executor.creator_flow import (
 )
 from hunter_meme_executor.refusal_cooldown import DETERMINISTIC_REFUSALS, cooling_mints_of
 from hunter_meme_executor.repo import TokenContext
+from hunter_risk_meme import MEME_PAPER_V0, MemeLimits
 from hunter_risk_meme.checks import REFUSAL_NAMES
 
 if TYPE_CHECKING:
@@ -261,6 +262,7 @@ class FakeChainReader:
 class FakeConfig:
     risk_read_timeout_s: float = 1.0
     creator_sell_tolerance_pct: Decimal = Decimal("0.02")
+    limits: MemeLimits = MEME_PAPER_V0  # T4.78: ``recent_losses`` reads the window from it
 
 
 @dataclass
@@ -297,6 +299,10 @@ def rows(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     async def no_read(*args: Any, **kwargs: Any) -> bool:
         return False
 
+    async def no_losses(*args: Any, **kwargs: Any) -> dict[str, datetime]:
+        return {}
+
+    monkeypatch.setattr(admission_context, "recent_losses", no_losses)  # T4.78
     monkeypatch.setattr(admission_context, "role_session", fake_role_session)
     monkeypatch.setattr(admission_context, "token_context", fake_token_context)
     monkeypatch.setattr(admission_context, "brake_positions", none_list)  # T4.74: one brake

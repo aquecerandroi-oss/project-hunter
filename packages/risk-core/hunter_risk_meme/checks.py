@@ -11,6 +11,7 @@ from decimal import Decimal
 from typing import Final
 
 from hunter_core.domain.enums import KillSwitchState
+from hunter_risk_meme.checks_wallet import MINT_COOLDOWN_AFTER_LOSS
 from hunter_risk_meme.decision import MemeCheck, check, skipped, unavailable
 from hunter_risk_meme.inputs import CurveState, MemeContext, MemeEntryProposal, MemeWalletState
 from hunter_risk_meme.limits import MemeLimits
@@ -81,9 +82,10 @@ REFUSAL_NAMES: Final[frozenset[str]] = frozenset(
         "conviction_too_small",
         # T4.67b — check 27 ``launch_open_cap`` (``hunter_risk_meme.profile``).
         LAUNCH_MAX_OPEN_REACHED,
+        MINT_COOLDOWN_AFTER_LOSS,  # T4.78 — check 28, produced as ``<name>:<seconds_left>``
     }
 )
-"""Every refusal name of §4, checks 1–27. ``test_checks_table.py`` proves each is
+"""Every refusal name of §4, checks 1–28. ``test_checks_table.py`` proves each is
 produced by at least one case of the table."""
 
 

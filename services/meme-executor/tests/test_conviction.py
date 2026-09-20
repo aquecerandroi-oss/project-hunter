@@ -708,7 +708,8 @@ class TestTheDropCooldown:
     OTHER = "2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump"
 
     def test_the_short_cooldowns_are_real_refusals_and_not_deterministic_ones(self) -> None:
-        assert SHORT_COOLDOWNS == {"entry_after_drop": 30.0}
+        # T4.78 added ``mint_cooldown_after_loss`` (300 s, matched by base name).
+        assert SHORT_COOLDOWNS == {"entry_after_drop": 30.0, "mint_cooldown_after_loss": 300.0}
         assert set(SHORT_COOLDOWNS) <= REFUSAL_NAMES
         assert not set(SHORT_COOLDOWNS) & DETERMINISTIC_REFUSALS
         assert "entry_after_drop_unknown" not in SHORT_COOLDOWNS, "the next photo can answer"

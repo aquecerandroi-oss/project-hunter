@@ -54,6 +54,7 @@ from hunter_meme_executor.repo import (
     TokenContext,
     participation_used_sol,
     pending_attempts,
+    recent_losses,
     token_context,
 )
 from hunter_meme_executor.risk_read import read_risk_snapshot_on_demand
@@ -77,6 +78,9 @@ class AdmissionContext:
     extras: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
     """What goes into the order's ``admission`` JSON beside the decision: the
     provenance of anything this module read itself."""
+    recent_losses: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
+    """T4.78: ``{mint: exit_at}`` of this mint's newest losing live close inside
+    the cooldown (``repo_positions.recent_losses``) — ``MemeWalletState.recent_losses``."""
 
 
 async def read_creator_flow(
@@ -129,6 +133,9 @@ async def build_admission_context(
         pending = await pending_attempts(session)
         pending.extend(await spot_pending_intents(session))  # a spot buy in flight reserves too
         used = await participation_used_sol(session, mint, now=now)
+        losses = await recent_losses(
+            session, mint, now=now, cooldown_s=ctx.config.limits.mint_cooldown_after_loss_s
+        )
     extras: dict[str, Any] = {}
     if token.bundled_share is None and await read_risk_snapshot_on_demand(ctx, mint, now=now):
         # The row is in the database now; re-read it rather than hand-building a
@@ -174,4 +181,5 @@ async def build_admission_context(
         positions=positions,
         pending=pending,
         extras=extras,
+        recent_losses=losses,
     )

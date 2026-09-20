@@ -60,6 +60,7 @@ CHECK_NAMES = (
     "sol_available",
     "exposure_after",
     "conviction",
+    "mint_cooldown_after_loss",
 )
 
 OTHER = "So11111111111111111111111111111111111111112"
@@ -158,6 +159,9 @@ FAILING = {
             enabled=True, multiplier=Decimal("0.25"), sol_sized=Decimal("0.0005")
         )
     },
+    # T4.78 — check 28: the wallet's last live close on this mint lost, 100 s ago
+    # (the produced refusal is ``mint_cooldown_after_loss:200`` — matched by prefix).
+    "mint_cooldown_after_loss": {"w": wallet(recent_losses={MINT: AS_OF - timedelta(seconds=100)})},
     # T4.67b — check 27, the launch profile's own cap (``test_launch_profile.py``
     # has the profile's table; this row keeps the doctrine's "every name has a case").
     "launch_max_open_reached": {
@@ -194,7 +198,8 @@ def test_the_healthy_case_passes_every_check_and_is_approved() -> None:
 def test_each_refusal_is_produced_by_its_case(refusal: str) -> None:
     decision = decide(**FAILING[refusal])  # type: ignore[arg-type]
     assert not decision.approved
-    assert refusal in decision.refusals, decision.refusals
+    produced = {r.split(":", 1)[0] for r in decision.refusals}
+    assert refusal in produced, decision.refusals
 
 
 def test_every_refusal_name_of_the_doctrine_has_a_case() -> None:

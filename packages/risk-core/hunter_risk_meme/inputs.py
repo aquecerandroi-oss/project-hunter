@@ -11,6 +11,7 @@ is a wrong quote. A missing input is ``None`` **with** its reason elsewhere, and
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Literal
@@ -165,6 +166,12 @@ class MemeWalletState(MemeModel):
     lost, so the cap never trips (YOU, 18/09/2026: −0.0395 SOL, +0.0516 SOL
     of USDC, ``daily_loss_sol = 0``). A caller that cannot read it must hand in
     the **last** value it knew, never zero (§7)."""
+    recent_losses: Mapping[str, datetime] = Field(default_factory=dict)
+    """T4.78 (check 28): ``mint → exit_at`` of the newest **live** close on that
+    mint with ``pnl_sol < 0`` inside the cooldown window — read by the executor
+    from ``meme_live_positions`` for the mint being admitted, never derived
+    here. Empty means no recent loss on that mint (or the check disabled); a
+    positive close is never listed."""
 
     @model_validator(mode="after")
     def _anchored_to_the_sao_paulo_day(self) -> MemeWalletState:

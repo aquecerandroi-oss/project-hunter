@@ -23,6 +23,7 @@ What each input is built from, so the provenance is one place:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -54,18 +55,15 @@ from hunter_risk_meme import (
 )
 
 if TYPE_CHECKING:
-    from hunter_meme_executor.chain import CurveRead, TokenAccountRead, WalletRead
+    from hunter_meme_executor.chain import CurveRead, WalletRead
     from hunter_meme_executor.kill_switch import DayAnchor
 
+# fmt: off
 __all__ = [
-    "AdmissionInputs",
-    "admit",
-    "admit_launch",
-    "creator_net_sol",
-    "day_start_utc",
-    "proposal_from",
-    "wallet_from",
+    "AdmissionInputs", "admit", "admit_launch", "creator_net_sol", "day_start_utc",
+    "proposal_from", "wallet_from",
 ]
+# fmt: on
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 LAMPORTS = Decimal(1_000_000_000)
@@ -262,10 +260,12 @@ def wallet_from(
     limits: MemeLimits,
     unrecognized: tuple[str, ...] = (),
     treasury_inflow_today_sol: Decimal = _ZERO,
+    recent_losses: Mapping[str, datetime] | None = None,
 ) -> MemeWalletState:
     """T4.60: ``treasury_inflow_today_sol`` is what the treasury added since
     ``anchor.day_start_utc`` (``treasury_inflow.py``) — check 18 measures the
-    day's loss against ``day_start + inflow``, not against the refilled equity."""
+    day's loss against ``day_start + inflow``, not against the refilled equity.
+    T4.78: ``recent_losses`` (``repo_positions.recent_losses``) feeds check 28."""
     return MemeWalletState(
         wallet_id=wallet_id,
         as_of=now,
@@ -296,6 +296,7 @@ def wallet_from(
         is_active=True,
         rent_reserved_sol=limits.ata_rent_sol,
         treasury_inflow_today_sol=treasury_inflow_today_sol,
+        recent_losses={} if recent_losses is None else dict(recent_losses),
     )
 
 
@@ -344,7 +345,3 @@ def admit_launch(
         conviction=None,
         launch=launch,
     )
-
-
-def creates_ata(token_account: TokenAccountRead) -> bool:
-    return not token_account.exists

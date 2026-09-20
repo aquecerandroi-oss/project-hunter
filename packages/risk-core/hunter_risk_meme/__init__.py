@@ -7,6 +7,7 @@ the whole spend, caps in SOL, a latched daily kill switch, no book and no beta).
 """
 
 from hunter_risk_meme.checks import REFUSAL_NAMES
+from hunter_risk_meme.checks_wallet import MINT_COOLDOWN_AFTER_LOSS
 from hunter_risk_meme.conviction import (
     CONVICTION_REFUSALS,
     LADDER_REFUSALS,
@@ -81,6 +82,7 @@ __all__ = [
     "CONVICTION_REFUSALS",
     "EXIT_REASONS",
     "LADDER_REFUSALS",
+    "MINT_COOLDOWN_AFTER_LOSS",
     "LAUNCH_LANE",
     "LAUNCH_RELAXED_CHECKS",
     "LAUNCH_SKIPPED_CHECKS",

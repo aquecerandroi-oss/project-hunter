@@ -54,6 +54,7 @@ from hunter_meme_executor.repo import (
     order_key,
     participation_used_sol,
     pending_attempts,
+    recent_losses,
     refuse_admitted_order,
     token_context,
 )
@@ -100,8 +101,7 @@ async def _refuse(
             now=now,
         )
     ctx.launch.record_refusal(reason)
-    ctx.state.entries_refused += 1
-    ctx.state.last_refusal = reason
+    ctx.state.record_refusal(reason)
     logger.warning(
         "meme_launch_entry_refused", proposal_id=candidate.id, mint=candidate.mint, reason=reason
     )
@@ -149,6 +149,9 @@ async def handle_launch_candidate(
         pending = await pending_attempts(session)
         pending.extend(await spot_pending_intents(session))  # a spot buy in flight reserves too
         used = await participation_used_sol(session, candidate.mint, now=now)
+        losses = await recent_losses(  # T4.78: a launch on a mint that just lost is a re-entry
+            session, candidate.mint, now=now, cooldown_s=cfg.limits.mint_cooldown_after_loss_s
+        )
     token = None
     try:  # the row is optional here (its own session: a failure must not poison the rest)
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
@@ -190,6 +193,7 @@ async def handle_launch_candidate(
             anchor=anchor,
             limits=cfg.limits,
             treasury_inflow_today_sol=inflow,
+            recent_losses=losses,
         ),
         curve=curve_from(curve),
         context=context,
@@ -259,8 +263,7 @@ async def handle_launch_candidate(
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
             await refuse_admitted_order(session, key, reason=reason, now=utcnow())
         ctx.launch.record_refusal(reason)
-        ctx.state.entries_refused += 1
-        ctx.state.last_refusal = reason
+        ctx.state.record_refusal(reason)
         return
     submitter = MemeSubmitter(
         rpc=ctx.chain.rpc,

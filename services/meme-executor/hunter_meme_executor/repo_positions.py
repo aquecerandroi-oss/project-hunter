@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -26,6 +26,7 @@ __all__ = [
     "insert_position",
     "open_position",
     "open_positions",
+    "recent_losses",
     "set_exit_intent",
     "stamp_creator_sold",
     "update_mark",
@@ -95,6 +96,17 @@ _EXIT_INTENT = text(
     "UPDATE meme_live_positions SET exit_intent = CAST(:intent AS jsonb), updated_at = :now "
     "WHERE id = :id AND status = 'open'"
 )
+_RECENT_LOSS = text(
+    "SELECT max(exit_at) AS exit_at FROM meme_live_positions "
+    "WHERE mint = :mint AND status = 'closed' AND pnl_sol < 0 AND exit_at >= :since"
+)
+"""T4.78 (check 28): the **newest losing** live close of the candidate's mint
+inside the cooldown — ``pnl_sol < 0`` only (a positive close never counts), one
+row, keyed by the mint the admission is about. Astra (review T4.78): a global
+"last 50 losing mints" read could omit exactly the candidate on a saturated
+window and hand the engine an empty map, which reads as "no loss" — so the
+read is per mint and cannot lose it. Every lane's rows count: a launch loss
+blocks a desk re-entry on the same mint and vice versa."""
 _CLOSE = text(
     "UPDATE meme_live_positions SET status = 'closed', exit_order_id = :order_id, "
     "  exit_at = :exit_at, exit = CAST(:exit AS jsonb), sol_received_lamports = :received, "
@@ -129,6 +141,22 @@ def _position(r: Any) -> OpenPosition:
 
 async def open_positions(session: AsyncSession) -> list[OpenPosition]:
     return [_position(r) for r in (await session.execute(_OPEN_POSITIONS)).mappings()]
+
+
+async def recent_losses(
+    session: AsyncSession, mint: str, *, now: datetime, cooldown_s: int
+) -> dict[str, datetime]:
+    """``{mint: exit_at}`` of the newest losing close of ``mint`` inside
+    ``cooldown_s`` (empty when none) — the engine's
+    ``MemeWalletState.recent_losses``. ``0`` (disabled) runs no query."""
+    if cooldown_s <= 0:
+        return {}
+    stamp = (
+        await session.execute(
+            _RECENT_LOSS, {"mint": mint, "since": now - timedelta(seconds=cooldown_s)}
+        )
+    ).scalar()
+    return {} if stamp is None else {mint: stamp}
 
 
 async def open_position(session: AsyncSession, position_id: str) -> OpenPosition | None:

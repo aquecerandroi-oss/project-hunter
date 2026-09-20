@@ -131,7 +131,12 @@ def _check(decision: MemeDecision, name: str) -> MemeCheck:
 def test_the_launch_case_is_approved_with_every_check_recorded() -> None:
     decision = decide()
     assert decision.approved, decision.refusals
-    assert tuple(c.name for c in decision.checks) == (*CHECK_NAMES, "launch_open_cap")
+    # T4.78: check 28 (``mint_cooldown_after_loss``) closes both profiles, after the cap.
+    assert tuple(c.name for c in decision.checks) == (
+        *CHECK_NAMES[:-1],
+        "launch_open_cap",
+        CHECK_NAMES[-1],
+    )
     assert decision.profile == "launch"
     assert decision.sizing is not None and decision.sizing.sol_final == Decimal("0.01")
     assert decision.sizing.binding_constraint == "requested"
