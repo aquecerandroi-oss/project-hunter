@@ -78,6 +78,9 @@ from hunter_meme_executor.priority_fee import PriorityFeeReader
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
 from hunter_meme_executor.send_path import record_failed_onchain_fee
+from hunter_meme_executor.spot_entries import spot_entries_once
+from hunter_meme_executor.spot_exits import spot_exits_once
+from hunter_meme_executor.spot_reconcile import spot_reconcile_once
 from hunter_meme_executor.treasury import treasury_once
 from hunter_meme_executor.treasury_inflow import treasury_inflow_once
 from hunter_meme_executor.wake import ProposalWakeListener
@@ -125,6 +128,9 @@ async def forever[ContextT](
 
 async def reconcile_once(ctx: ExecutorContext) -> None:
     """Settle every ``submitted_unconfirmed`` row — a restart or a timeout never re-sends."""
+    # T4.74-5: the spot desk's rows ride this tick (settled by signature, never
+    # re-sent; a buy that landed late opens its position). Never raises.
+    await spot_reconcile_once(ctx)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         pending = await unconfirmed_orders(session)
     if not pending:
@@ -278,6 +284,7 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
         auto_approve_max_per_hour=config.auto_approve_max_per_hour,
         event_exits=config.event_exits.enabled,
         launch_lane=config.launch.mode,
+        spot1=config.spot.as_json(config.limits)["mode"],
     )
     wake_listener = ProposalWakeListener(runtime.redis, ctx.wake_event)
     event_ws = event_exits_client(config.event_exits)  # None with the flag off
@@ -305,6 +312,14 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
                 group.create_task(
                     forever("launch_exits", LAUNCH_EXIT_TICK_S, launch_exits_once, ctx),
                     name="meme-launch-exits",
+                )
+            if config.spot.enabled:  # T4.74: flag + live + signer, else not one query
+                group.create_task(
+                    forever("spot_entries", 15.0, spot_entries_once, ctx), name="spot-entries"
+                )
+                group.create_task(
+                    forever("spot_exits", float(config.spot.mark_s), spot_exits_once, ctx),
+                    name="spot-exits",
                 )
             group.create_task(forever("exits", config.mark_s, exits_once, ctx), name="meme-exits")
             group.create_task(

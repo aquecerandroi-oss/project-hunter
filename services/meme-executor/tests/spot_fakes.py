@@ -70,6 +70,12 @@ class FakeRpc:
     transaction: dict[str, Any] | None = None
     """What ``getTransaction`` serves for ``SIGNATURE``; ``None`` = not indexed yet."""
     transaction_error: Exception | None = None
+    block_height: int = 0
+    """T4.74-5: what ``getBlockHeight`` answers the reconcile."""
+
+    def get_block_height(self, *, commitment: str = "confirmed") -> int:
+        self.log.append("get_block_height")
+        return self.block_height
 
     def get_transaction(self, signature: str, *, commitment: str = "confirmed") -> Any:
         assert signature == SIGNATURE

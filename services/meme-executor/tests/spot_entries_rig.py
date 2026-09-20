@@ -132,7 +132,7 @@ def _wire(monkeypatch: pytest.MonkeyPatch, store: Store) -> None:
     def session(*_a: Any, **_k: Any) -> _Session:
         return _Session()
 
-    async def closed_stats(_s: Any, *, since: datetime) -> ClosedStats:
+    async def closed_stats(_s: Any, *, since: datetime, min_trades: int = 20) -> ClosedStats:
         store.queries.append("closed_stats")
         return store.closed
 

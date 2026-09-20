@@ -52,12 +52,12 @@ from hunter_meme_executor.repo import (
     OpenPosition,
     PendingAttempt,
     TokenContext,
-    open_positions,
     participation_used_sol,
     pending_attempts,
     token_context,
 )
 from hunter_meme_executor.risk_read import read_risk_snapshot_on_demand
+from hunter_meme_executor.spot_brake import brake_positions, spot_pending_intents
 
 if TYPE_CHECKING:
     from hunter_meme_executor.chain import CurveRead
@@ -125,8 +125,9 @@ async def build_admission_context(
     from becoming a refusal the market did not earn."""
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         token = await token_context(session, mint, now=now)
-        positions = await open_positions(session)
+        positions = await brake_positions(session)  # T4.74: memes + launch + spot, one brake
         pending = await pending_attempts(session)
+        pending.extend(await spot_pending_intents(session))  # a spot buy in flight reserves too
         used = await participation_used_sol(session, mint, now=now)
     extras: dict[str, Any] = {}
     if token.bundled_share is None and await read_risk_snapshot_on_demand(ctx, mint, now=now):

@@ -159,3 +159,27 @@ def test_a_devnet_url_with_cluster_mainnet_is_refused(tmp_path: Path) -> None:
     with pytest.raises(MemeLiveTradingRefused) as info:
         _boot(env)
     assert info.value.reason == "rpc_url_cluster_mismatch"
+
+
+# ------------------------------------------------------------ T4.74-5: spot/1
+def test_the_spot_lane_is_inert_without_the_live_flag_even_when_requested() -> None:
+    config, _mode, signer = _boot({"SPOT1_ENABLED": "true"})
+    assert signer is None
+    assert config.spot.requested and not config.spot.enabled
+    assert config.spot.inert_reason == "meme_live_disabled"
+    assert config.spot.as_json(config.limits)["mode"] == "inert:meme_live_disabled"
+
+
+def test_the_spot_lane_is_on_only_with_flag_live_and_signer(tmp_path: Path) -> None:
+    env = {
+        "ENABLE_MEME_LIVE_TRADING": "true",
+        "MEME_GATES_FILE": _gates(tmp_path),
+        **POLICY,
+        "SOLANA_RPC_URL": "https://rpc.example",
+        ENV_SECRET_KEY: _test_key(),
+    }
+    config, _mode, signer = _boot({**env, "SPOT1_ENABLED": "true", "SPOT1_TICKET_SOL": "0.05"})
+    assert signer is not None and config.spot.enabled
+    assert config.spot.ticket(config.limits) == Decimal("0.02"), "clamped by max_sol_per_trade"
+    off, _mode, _signer = _boot({**env, ENV_SECRET_KEY: _test_key()})
+    assert off.spot.inert_reason == "disabled", "SPOT1_ENABLED is born false"

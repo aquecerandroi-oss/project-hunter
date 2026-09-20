@@ -46,6 +46,34 @@ class SpotStats:
     last_exits_tick_at: datetime | None = None
     tick_failures: int = 0
     """Entries ticks that raised (logged, counted, never propagated)."""
+    exit_attempts: dict[str, int] = field(default_factory=lambda: dict[str, int]())
+    """``position_id -> sell attempts so far`` (seeded from the rows on first sight)."""
+    exit_hard_failures: dict[str, int] = field(default_factory=lambda: dict[str, int]())
+    """``position_id -> sells that failed for a non-transient reason`` (seeded from
+    the rows); ``MAX_EXIT_ATTEMPTS`` of them block the position."""
+    exit_backoff_until: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
+    """``position_id -> not before`` after a failed sell (``backoff_s``)."""
+    mark_failures: dict[str, int] = field(default_factory=lambda: dict[str, int]())
+    """``position_id -> consecutive quote failures``; three ⇒ ``mark_stale_s`` (design §4)."""
+    mark_ok_at: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
+    """``position_id -> last good mark of this process`` (the first failure pins
+    the floor of the staleness when none was seen — a lower bound, never a guess)."""
+    reconciled_buys: int = 0
+    """Buys the reconcile confirmed late and opened (T4.74-5)."""
+    reconciled_expired: int = 0
+    """Rows the reconcile settled ``failed:blockhash_expired_never_landed``."""
+
+    def forget_position(self, position_id: str) -> None:
+        """A closed position leaves every per-position memory."""
+        for memory in (
+            self.exit_attempts,
+            self.exit_hard_failures,
+            self.exit_backoff_until,
+            self.mark_failures,
+            self.mark_ok_at,
+            self.blocked_exits,
+        ):
+            memory.pop(position_id, None)
 
     def record_refusal(self, reason: str) -> None:
         self.refused_by_reason[reason] = self.refused_by_reason.get(reason, 0) + 1

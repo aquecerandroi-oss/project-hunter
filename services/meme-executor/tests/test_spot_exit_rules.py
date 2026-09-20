@@ -259,3 +259,16 @@ def test_a_quote_for_another_pair_or_a_zero_out_is_a_mismatch() -> None:
     assert spot_send_rules.quote_mismatch(good, WSOL, WIF, TICKET + 1) == "quote_mismatch:in_amount"
     zero = replace(good, out_amount=Decimal(0), other_amount_threshold=Decimal(0))
     assert spot_send_rules.quote_mismatch(zero, WSOL, WIF, TICKET) == "quote_mismatch:out_amount"
+
+
+def test_a_refutation_once_crossed_never_undoes_itself_by_a_later_win() -> None:
+    """T4.74-5 (Astra): Σ pnl hit −0,151 (refuted), then an already-open position
+    closed +0,020 — the current sum is −0,131, the lane stays refuted; only
+    ``SPOT1_REFUTATION_RESET_AT`` (a new ``since``) reopens it."""
+    crossed = replace(_closed(6, "-0.131", "-3"), min_run_pnl_sol=Decimal("-0.151"))
+    assert _state(crossed).state == "refuted"
+    assert _state(_closed(6, "-0.131", "-3")).state == "on", "never crossed: on"
+    # The same for the expectancy rule: seen ≤ 0 at the 20th exit, a 21st win changes nothing.
+    lifted = replace(_closed(21, "-0.02", "0.5"), min_expectancy_r_net=Decimal("-0.001"))
+    assert _state(lifted).state == "refuted"
+    assert _state(_closed(21, "-0.02", "0.5")).state == "on"

@@ -255,8 +255,10 @@ async def mark_submitted(
     last_valid_block_height: int | None,
     now: datetime,
 ) -> bool:
-    """The signature is written **before** the broadcast (T4.73b); a failed send
-    then moves the row to ``failed`` and the reconcile settles by signature."""
+    """The signature is written **before** the broadcast (T4.73b). The row then
+    stays ``submitted_unconfirmed`` — a send that raises is ambiguous (the RPC
+    may have relayed it) — and ``spot_reconcile`` settles it by signature; only
+    ``SendDisabled`` (never relayed by construction) is ``failed``."""
     params = {
         "id": order_id,
         "signature": signature,

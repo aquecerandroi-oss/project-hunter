@@ -29,9 +29,13 @@ from hunter_meme_executor.event_exits_stats import heartbeat_fields as event_exi
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.launch_exits import launch_positions
 from hunter_meme_executor.launch_stats import launch_heartbeat_fields
-from hunter_meme_executor.repo import open_positions, orders_by_state
+from hunter_meme_executor.repo import orders_by_state
 from hunter_meme_executor.scope import read_scope_use
 from hunter_meme_executor.send_tuning import SendTuning
+from hunter_meme_executor.spot_brake import brake_positions
+from hunter_meme_executor.spot_exit_repo import enabled_market_count
+from hunter_meme_executor.spot_heartbeat import spot1_fields
+from hunter_risk_meme.spot_profile import SPOT_LANE
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -173,11 +177,14 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     now = utcnow()
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         by_state = await orders_by_state(session)
-        positions = await open_positions(session)
+        all_positions = await brake_positions(session)  # T4.74: memes + launch + spot
         auto = await _auto_fields(ctx, session, now)
+        markets = await enabled_market_count(session) if cfg.spot.enabled else None
     limits = cfg.limits
     anchor = ctx.kill.anchor
-    marks = sum((p.mark_sol or Decimal(0) for p in positions), Decimal(0))
+    spots = [p for p in all_positions if p.params.get("lane") == SPOT_LANE]
+    positions = [p for p in all_positions if p.params.get("lane") != SPOT_LANE]
+    marks = sum((p.mark_sol or Decimal(0) for p in all_positions), Decimal(0))
     equity = (
         None if state.wallet_lamports is None else Decimal(state.wallet_lamports) / LAMPORTS + marks
     )
@@ -202,6 +209,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         "policy": json.dumps(policy_fields(limits, cfg.send, cfg.conviction)),
         "orders_by_state": json.dumps(by_state),
         "positions_open": str(len(positions)),
+        "spot1_positions_open": str(len(spots)),
         "blocked_exits": json.dumps(state.blocked_exits),
         "last_signature": state.last_signature or "",
         "last_refusal": state.last_refusal or "",
@@ -237,6 +245,9 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     fields.update(_pickup_lag_fields(ctx))
     fields["treasury"] = _treasury_field(ctx)
     fields.update(_send_fields(ctx))
+    fields["spot1"] = json.dumps(
+        spot1_fields(ctx, cfg.spot, now, positions=spots, markets_enabled=markets)
+    )
     fields.update(event_exits_fields(ctx.event_exits, now=now, enabled=cfg.event_exits.enabled))
     # T4.67b: the launch lane, published in every mode (``off`` is a value).
     fields.update(

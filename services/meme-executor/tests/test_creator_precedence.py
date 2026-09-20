@@ -299,8 +299,9 @@ def rows(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     monkeypatch.setattr(admission_context, "role_session", fake_role_session)
     monkeypatch.setattr(admission_context, "token_context", fake_token_context)
-    monkeypatch.setattr(admission_context, "open_positions", none_list)
+    monkeypatch.setattr(admission_context, "brake_positions", none_list)  # T4.74: one brake
     monkeypatch.setattr(admission_context, "pending_attempts", none_list)
+    monkeypatch.setattr(admission_context, "spot_pending_intents", none_list)  # T4.74
     monkeypatch.setattr(admission_context, "participation_used_sol", zero)
     monkeypatch.setattr(admission_context, "read_risk_snapshot_on_demand", no_read)
     return rows

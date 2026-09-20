@@ -69,6 +69,13 @@ class ClosedStats:
     expectancy_r_net: Decimal | None
     consecutive_stops: int
     last_exit_at: datetime | None
+    min_run_pnl_sol: Decimal | None = None
+    """T4.74-5 (Astra): the **lowest running** Σ pnl over the exits in order —
+    "Σ pnl ≤ −0,15 at any moment" (design §8) must not undo itself when a later
+    win lifts the current sum back above the line."""
+    min_expectancy_r_net: Decimal | None = None
+    """The lowest running mean R over the prefixes of ``≥ min_trades`` exits —
+    a refutation seen at the 20th exit stays seen at the 21st."""
 
 
 _INSERT = text(
@@ -104,8 +111,13 @@ _CLOSED_STATS = text(
     "SELECT count(*) AS n, coalesce(sum(pnl_sol), 0) AS sum_pnl_sol, "
     "  coalesce(sum(r_multiple), 0) AS sum_r_net, "
     "  (array_agg(exit->>'reason' ORDER BY exit_at DESC))[1:20] AS recent_reasons, "
-    "  max(exit_at) AS last_exit_at "
-    "FROM spot_positions WHERE status = 'closed' AND exit_at >= :since"
+    "  max(exit_at) AS last_exit_at, min(run_pnl) AS min_run_pnl_sol, "
+    "  min(CASE WHEN k >= :min_trades THEN run_r / k END) AS min_expectancy_r_net "
+    "FROM (SELECT exit_at, exit, pnl_sol, r_multiple, "
+    "        sum(pnl_sol) OVER w AS run_pnl, sum(r_multiple) OVER w AS run_r, "
+    "        row_number() OVER w AS k "
+    "      FROM spot_positions WHERE status = 'closed' AND exit_at >= :since "
+    "      WINDOW w AS (ORDER BY exit_at, id)) t"
 )
 
 
@@ -226,10 +238,14 @@ async def close_position(
     return closed.scalar() is not None
 
 
-async def closed_stats(session: AsyncSession, *, since: datetime) -> ClosedStats:
+async def closed_stats(
+    session: AsyncSession, *, since: datetime, min_trades: int = 20
+) -> ClosedStats:
     """§8's numbers over the exits since ``since`` (``SPOT1_REFUTATION_RESET_AT`` or the
-    epoch): one aggregate; the stop streak is counted from the latest exit backwards."""
-    r = (await session.execute(_CLOSED_STATS, {"since": since})).mappings().one()
+    epoch): one aggregate; the stop streak is counted from the latest exit backwards;
+    the two ``min_*`` are the worst prefixes (``min_trades`` bounds the expectancy one)."""
+    params = {"since": since, "min_trades": min_trades}
+    r = (await session.execute(_CLOSED_STATS, params)).mappings().one()
     n = int(r["n"] or 0)
     sum_r = Decimal(str(r["sum_r_net"] or 0))
     streak = 0
@@ -244,4 +260,6 @@ async def closed_stats(session: AsyncSession, *, since: datetime) -> ClosedStats
         expectancy_r_net=None if n == 0 else sum_r / Decimal(n),
         consecutive_stops=streak,
         last_exit_at=r["last_exit_at"],
+        min_run_pnl_sol=_decimal(r.get("min_run_pnl_sol")),
+        min_expectancy_r_net=_decimal(r.get("min_expectancy_r_net")),
     )

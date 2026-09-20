@@ -19,6 +19,7 @@ from hunter_exchanges.jupiter import JupiterClient
 from hunter_meme_executor.creator_flow import CreatorSoldMemory
 from hunter_meme_executor.event_exits_stats import EventExitsStats
 from hunter_meme_executor.launch_stats import LaunchStats
+from hunter_meme_executor.spot_stats import SpotStats
 from hunter_meme_executor.treasury_inflow import TreasuryInflowReader
 
 if TYPE_CHECKING:
@@ -177,3 +178,6 @@ class ExecutorContext:
     launch: LaunchStats = field(default_factory=LaunchStats)
     """T4.67b: the launch lane's counters and its blockhash cache
     (``launch_stats.py``, ``launch_send.py``), published by the heartbeat in every mode."""
+    spot: SpotStats = field(default_factory=SpotStats)
+    """T4.74: the ``spot/1`` desk's counters (``spot_stats.py``), published as the
+    heartbeat's ``spot1`` field in every mode (``inert:<reason>`` is a value)."""

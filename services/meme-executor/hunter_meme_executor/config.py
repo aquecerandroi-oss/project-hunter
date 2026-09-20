@@ -51,6 +51,7 @@ from hunter_meme_executor.conviction import ConvictionConfig
 from hunter_meme_executor.event_exits_config import EventExitsConfig
 from hunter_meme_executor.launch_config import LaunchConfig
 from hunter_meme_executor.send_tuning import SendTuning
+from hunter_meme_executor.spot_config import SpotConfig
 from hunter_risk_meme import MEME_PAPER_V0, MemeLimits, MemePolicyMissing, limits_from_env
 
 __all__ = [
@@ -155,6 +156,9 @@ class ExecutorConfig:
     launch: LaunchConfig = LaunchConfig()
     """T4.67b — ``MEME_LAUNCH_LANE`` (default off): the launch profile
     (``launch_entries.py``); acts only in ``on``, and only with the live flag."""
+    spot: SpotConfig = SpotConfig()
+    """T4.74 — ``SPOT1_*`` (``spot_config.py``): the ``spot/1`` desk; ``enabled``
+    only with the flag, the live flag **and** a signer — ``inert:<reason>`` otherwise."""
 
     @property
     def base_limits(self) -> MemeLimits:
@@ -294,6 +298,7 @@ def boot(
         conviction=ConvictionConfig.from_env(env),
         event_exits=EventExitsConfig.from_env(env),
         launch=LaunchConfig.from_env(env),
+        spot=SpotConfig.from_env(env, signer_present=signer is not None),
     )
     return config, mode, signer
 

@@ -253,10 +253,34 @@ async def test_closed_stats_counts_the_streak_of_stops_from_the_latest_exit() ->
     assert params["since"] == NOW - timedelta(days=30)
     assert (stats.n, stats.sum_pnl_sol, stats.sum_r_net) == (4, Decimal("-0.0012"), Decimal("-1.6"))
     assert stats.expectancy_r_net == Decimal("-0.4") and stats.consecutive_stops == 2
+    assert stats.min_run_pnl_sol is None and stats.min_expectancy_r_net is None
     none = {"n": 0, "sum_pnl_sol": 0, "sum_r_net": 0, "recent_reasons": None, "last_exit_at": None}
     _, session = _session([none])
     empty = await spot_repo.closed_stats(session, since=NOW)
     assert empty.expectancy_r_net is None and empty.consecutive_stops == 0 and empty.n == 0
+
+
+async def test_closed_stats_reads_the_worst_prefixes_for_a_durable_refutation() -> None:
+    """T4.74-5: the running Σ pnl and the running mean R over ``≥ min_trades``
+    exits, in exit order, so a refutation once crossed is read back as such."""
+    row = {
+        "n": 21,
+        "sum_pnl_sol": Decimal("-0.131"),
+        "sum_r_net": Decimal("0.5"),
+        "recent_reasons": ["target"],
+        "last_exit_at": NOW,
+        "min_run_pnl_sol": Decimal("-0.151"),
+        "min_expectancy_r_net": Decimal("-0.001"),
+    }
+    fake, session = _session([row])
+    stats = await spot_repo.closed_stats(session, since=NOW, min_trades=20)
+    sql, params = _only(fake)
+    assert params == {"since": NOW, "min_trades": 20}
+    assert "sum(pnl_sol) OVER w AS run_pnl" in sql and "row_number() OVER w AS k" in sql
+    assert "WINDOW w AS (ORDER BY exit_at, id)" in sql
+    assert "CASE WHEN k >= :min_trades THEN run_r / k END" in sql
+    assert stats.min_run_pnl_sol == Decimal("-0.151")
+    assert stats.min_expectancy_r_net == Decimal("-0.001")
 
 
 async def test_market_decimals_are_read_once_and_written_back_only_when_null() -> None:

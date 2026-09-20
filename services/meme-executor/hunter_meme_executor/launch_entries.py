@@ -51,7 +51,6 @@ from hunter_meme_executor.launch_send import launch_priority_fee, launch_submit_
 from hunter_meme_executor.repo import (
     insert_order,
     insert_position,
-    open_positions,
     order_key,
     participation_used_sol,
     pending_attempts,
@@ -59,6 +58,7 @@ from hunter_meme_executor.repo import (
     token_context,
 )
 from hunter_meme_executor.send_path import curve_fee_accounts, priority_fee_for, record_send_result
+from hunter_meme_executor.spot_brake import brake_positions, spot_pending_intents
 from hunter_meme_executor.treasury_inflow import ensure_anchor
 
 __all__ = ["handle_launch_candidate", "launch_entries_once", "launch_inert_reason"]
@@ -145,8 +145,9 @@ async def handle_launch_candidate(
         return
     ctx.state.wallet_lamports, ctx.state.wallet_read_at = wallet.lamports, wallet.observed_at
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        positions = await open_positions(session)
+        positions = await brake_positions(session)  # T4.74: memes + launch + spot, one brake
         pending = await pending_attempts(session)
+        pending.extend(await spot_pending_intents(session))  # a spot buy in flight reserves too
         used = await participation_used_sol(session, candidate.mint, now=now)
     token = None
     try:  # the row is optional here (its own session: a failure must not poison the rest)

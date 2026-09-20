@@ -272,8 +272,9 @@ def _wire(monkeypatch: pytest.MonkeyPatch, db: Db, submitter: FakeSubmitter) -> 
     monkeypatch.setattr(le, "insert_order", insert_order)
     monkeypatch.setattr(le, "insert_position", insert_position)
     monkeypatch.setattr(le, "refuse_admitted_order", refuse_admitted_order)
-    monkeypatch.setattr(le, "open_positions", nothing)
+    monkeypatch.setattr(le, "brake_positions", nothing)  # T4.74: one brake
     monkeypatch.setattr(le, "pending_attempts", nothing)
+    monkeypatch.setattr(le, "spot_pending_intents", nothing)  # T4.74: one brake
     monkeypatch.setattr(le, "participation_used_sol", zero)
     monkeypatch.setattr(le, "token_context", token_context)
     monkeypatch.setattr(le, "ensure_anchor", ensure_anchor)
@@ -430,7 +431,7 @@ async def test_the_launch_cap_refuses_the_third_launch_position(
     async def two_open(_session: Any, *_a: Any, **_k: Any) -> list[Any]:
         return [_launch_position(1), _launch_position(2)]
 
-    monkeypatch.setattr(le, "open_positions", two_open)
+    monkeypatch.setattr(le, "brake_positions", two_open)
     ctx = FakeContext(config=_config())
     await le.launch_entries_once(ctx)  # type: ignore[arg-type]
     assert (

@@ -143,13 +143,21 @@ def lane_state(
     ``Σ pnl ≤ −max_loss`` at any count ⇒ ``refuted``; ``≥ 3`` stops in a row
     ⇒ ``cooldown`` for ``pause_s`` after the last exit. Refutation is checked
     first: a cooldown never hides it."""
-    if stats.sum_pnl_sol <= -refute_max_loss_sol:
-        reason = f"sum_pnl_sol={stats.sum_pnl_sol}<=-{refute_max_loss_sol}"
+    # T4.74-5 (Astra): the worst prefix decides, so a later win never re-opens
+    # a refuted lane — only ``SPOT1_REFUTATION_RESET_AT`` does (design §8).
+    worst_pnl = stats.sum_pnl_sol
+    if stats.min_run_pnl_sol is not None:
+        worst_pnl = min(worst_pnl, stats.min_run_pnl_sol)
+    if worst_pnl <= -refute_max_loss_sol:
+        reason = f"sum_pnl_sol={worst_pnl}<=-{refute_max_loss_sol}"
         return LaneState("refuted", reason, "spot1_refuted")
     expectancy = stats.expectancy_r_net
-    if stats.n >= refute_min_trades and expectancy is not None and expectancy <= _ZERO:
-        reason = f"n={stats.n} expectancy_r_net={expectancy}<=0"
-        return LaneState("refuted", reason, "spot1_refuted")
+    if stats.n >= refute_min_trades and expectancy is not None:
+        if stats.min_expectancy_r_net is not None:
+            expectancy = min(expectancy, stats.min_expectancy_r_net)
+        if expectancy <= _ZERO:
+            reason = f"n={stats.n} expectancy_r_net={expectancy}<=0"
+            return LaneState("refuted", reason, "spot1_refuted")
     if stats.consecutive_stops >= 3 and stats.last_exit_at is not None:
         elapsed = (now - stats.last_exit_at).total_seconds()
         if elapsed < consecutive_stops_pause_s:

@@ -85,7 +85,9 @@ async def spot_entries_once(ctx: ExecutorContext) -> None:
 async def _tick(ctx: ExecutorContext, cfg: SpotConfig, stats: SpotStats, now: datetime) -> None:
     await ctx.kill.refresh()
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        closed = await closed_stats(session, since=cfg.refutation_reset_at or _EPOCH)
+        closed = await closed_stats(
+            session, since=cfg.refutation_reset_at or _EPOCH, min_trades=cfg.refute_min_trades
+        )
     state = lane_state(
         closed,
         now=now,
