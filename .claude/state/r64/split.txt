@@ -1,0 +1,20 @@
+== L = 1.5 | real -0.0404
+   sell 50% at 1.15, trail rest 10%   | -0.1424 |  6 | {'trailing': 11, 'trail2': 7, 'real(no tape)': 5, 'event': 1}
+   sell 50% at 1.15, trail rest 20%   | -0.1554 |  6 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+   sell 50% at 1.15, trail rest 30%   | -0.1618 |  5 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+       {'Cupsey#1': (0.0076, 'trail2'), 'CYBER': (0.0042, 'trail2'), 'NARKY#2': (-0.0018, 'trail2'), 'KODA#1': (-0.0234, 'trail2'), 'KODA#2': (-0.0265, 'trail2'), 'WIFTIGRINO': (0.0175, 'time'), 'NOOP': (-0.02, 'trail2')}
+   sell 50% at 1.15, trail rest 50%   | -0.1759 |  4 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+   sell 70% at 1.15, trail rest 10%   | -0.1015 |  6 | {'trailing': 11, 'trail2': 7, 'real(no tape)': 5, 'event': 1}
+   sell 70% at 1.15, trail rest 20%   | -0.1092 |  6 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+   sell 70% at 1.15, trail rest 30%   | -0.1131 |  6 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+   sell 70% at 1.15, trail rest 50%   | -0.1216 |  6 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+== L = 5.0 | real -0.0404
+   sell 50% at 1.15, trail rest 10%   | -0.1308 |  7 | {'trailing': 11, 'trail2': 7, 'real(no tape)': 5, 'event': 1}
+   sell 50% at 1.15, trail rest 20%   | -0.1457 |  7 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+   sell 50% at 1.15, trail rest 30%   | -0.1543 |  6 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+       {'Cupsey#1': (0.0069, 'trail2'), 'CYBER': (0.0032, 'trail2'), 'NARKY#2': (-0.0047, 'trail2'), 'KODA#1': (-0.0229, 'trail2'), 'KODA#2': (-0.0262, 'trail2'), 'WIFTIGRINO': (0.0183, 'time'), 'NOOP': (-0.019, 'trail2')}
+   sell 50% at 1.15, trail rest 50%   | -0.1654 |  5 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+   sell 70% at 1.15, trail rest 10%   | -0.0923 |  7 | {'trailing': 11, 'trail2': 7, 'real(no tape)': 5, 'event': 1}
+   sell 70% at 1.15, trail rest 20%   | -0.1012 |  7 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+   sell 70% at 1.15, trail rest 30%   | -0.1064 |  6 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}
+   sell 70% at 1.15, trail rest 50%   | -0.1131 |  6 | {'trailing': 11, 'trail2': 6, 'real(no tape)': 5, 'time': 1, 'event': 1}

@@ -1,0 +1,61 @@
+tag | entry BRT | set | reason | pnl% | held s | mark0% | MFE% (s) | MFE pre-exit% | hw(db)% | MAE% (s) | hold300% | post-exit max% | source | last pt s
+XCrypto     | 02:54:06 | 5 | trailing     |   -2.4 |  27 |  -4.6 | +137.9 (281) |  +11.9 |  +11.9 |   -6.7 ( 99) | +134.4 | +137.9 | tape+photos | 297
+EQUITITTY   | 04:03:24 | 5 | trailing     |  -24.5 |  15 |  -4.6 |   -4.6 (  0) |   -4.6 |   -7.1 |  -71.2 (299) |  -71.2 | -18.8 | tape+photos | 299
+FЕРЕ        | 05:11:39 | 5 | trailing     |  -13.7 |  10 |  -4.6 |  +54.5 (234) |   -1.6 |   -1.6 |  -13.7 ( 11) |  +50.8 | +54.5 | tape+photos | 300
+Cupsey#1    | 05:45:44 | 5 | target       |  +18.3 |  40 |  -4.6 |  +65.3 ( 76) |  +13.5 |  +20.1 |  -35.6 (268) |  -35.6 | +65.3 | tape+photos | 268
+Cupsey#2    | 05:48:41 | 5 | trailing     |  -10.8 |  28 |  -2.5 |   +1.0 ( 11) |   +1.0 |   +2.2 |  -62.2 (193) |  -62.2 | -29.2 | photos | 193
+CYBER       | 07:57:47 | 5 | target       |  +26.7 |  34 |  -9.3 |  +43.9 ( 39) |  +26.9 |  +37.9 |  -35.6 (287) |  -35.6 | +43.9 | tape+photos | 300
+NARKY#1     | 08:21:53 | 5 | trailing     |   -4.6 |  31 |  -4.6 | +137.6 (250) |   +7.3 |   +7.3 |  -15.0 ( 44) |  +64.0 | +137.6 | tape+photos | 300
+NARKY#2     | 08:24:53 | 5 | target       |  +20.3 |   7 |  -2.5 |  +22.0 ( 70) |  +19.7 |  +20.4 |  -39.3 (204) |  -20.9 | +22.0 | tape+photos | 298
+shitcoin    | 10:11:41 | 5 | trailing     |  -31.1 |  21 |  -7.7 |   -7.7 (  0) |   -7.7 |  -16.5 |  -52.3 (284) |  -52.3 | -31.0 | tape+photos | 284
+KODA#1      | 10:57:04 | 5 | target       |  +14.3 |  12 |  -4.6 | +139.3 (257) |  +14.1 |  +17.0 |  -80.2 (290) |  -79.0 | +139.3 | tape+photos | 300
+KODA#2      | 11:00:10 | 5 | target       |  +11.6 |  65 |  -2.5 |  +16.1 ( 71) |  +12.0 |  +15.0 |  -90.7 (135) |  -90.7 | +16.1 | tape+photos | 135
+LAJAK       | 14:03:22 | 5 | trailing     |   -7.7 |  33 |  -4.6 |   +0.2 (  8) |   +0.2 |   +3.1 |  -46.0 (160) |  -46.0 | -7.1 | photos | 222
+ARGUSACT    | 14:17:56 | 5 | trailing     |  -13.3 |  23 |  -4.6 |   +8.0 ( 19) |   +8.0 |   +8.0 |  -83.7 (148) |  -83.7 | +2.7 | tape+photos | 151
+Musepaid#1  | 14:28:06 | 6 | trailing     |  -14.9 |   9 |  -4.6 |   +9.0 ( 50) |   -3.2 |   -3.2 |  -83.5 (121) |  -83.5 | +9.0 | tape+photos | 281
+Musepaid#2  | 14:28:40 | 5 | trailing     |   -2.5 |  25 |  -2.5 |  +10.5 ( 16) |  +10.5 |  +10.5 |  -83.2 ( 87) |  -83.2 | +5.5 | tape+photos | 247
+WIFTIGRINO  | 14:41:29 | 5 | target       |  +16.5 |  44 |  -4.6 |  +43.0 (299) |  +13.7 |  +16.5 |   -4.6 (  0) |  +39.5 | +43.0 | tape+photos | 299
+CHARLI      | 15:20:42 | 5 | trailing     |  -14.9 |  38 |  -4.6 |   +4.4 (163) |   -4.6 |   -4.6 |  -23.3 ( 84) |  -10.7 | +4.4 | tape+photos | 277
+nikita      | 15:25:14 | 5 | trailing     |  -29.2 |   8 |  -4.6 |   -4.6 (  0) |   -4.6 |   -5.7 |  -43.3 (105) |  -39.1 | -38.8 | photos | 189
+Drillers    | 16:52:23 | 5 | creator_dump |   +6.2 |  11 |  -4.6 | +115.0 (271) |   -4.6 |   +7.5 |   -5.7 (  1) |  +85.2 | +115.0 | tape+photos | 290
+BASK        | 16:55:28 | 5 | trailing     |   -5.2 |  36 |  -6.0 |   +7.2 ( 32) |   +7.2 |   +7.2 |  -43.9 (104) |  -42.5 | -5.0 | tape+photos | 294
+NOOP        | 17:24:38 | 5 | target       |  +16.7 |  63 |  -4.6 |  +40.2 (126) |  +16.8 |  +16.8 |  -73.3 (132) |  -73.2 | +40.2 | tape+photos | 202
+GTA         | 20:13:48 | 5 | trailing     |  -10.4 | 105 |  -4.6 |   +1.9 ( 56) |   +1.9 |   +1.9 |  -23.0 (136) |  -23.0 | -11.3 | tape+photos | 136
+JEANJACKET  | 20:33:01 | 6 | target       |  +24.4 |  37 |  -5.0 |  +24.8 ( 51) |   +3.0 |  +34.6 |  -24.8 (  7) |   -8.1 | +24.8 | photos | 253
+MILK        | 20:42:38 | 5 | trailing     |  -25.1 |   7 |  -4.6 |   -4.6 (  0) |   -4.6 |   -8.7 |  -70.4 (139) |  -70.3 | -47.8 | photos | 238
+TOTAL real -0.0404 SOL | hold-to-300s -0.3998 SOL | wins 9/24
+-- by_hour
+    {'key': 2, 'n': 1, 'wins': 0, 'hit': '0%', 'pnl_sol': '-0.0017', 'mfe_med': '+137.9%', 'mfe_avg': '+137.9%', 'hold300_sol': '+0.0961'}
+    {'key': 4, 'n': 1, 'wins': 0, 'hit': '0%', 'pnl_sol': '-0.0171', 'mfe_med': '-4.6%', 'mfe_avg': '-4.6%', 'hold300_sol': '-0.0499'}
+    {'key': 5, 'n': 3, 'wins': 1, 'hit': '33%', 'pnl_sol': '-0.0042', 'mfe_med': '+54.5%', 'mfe_avg': '+40.3%', 'hold300_sol': '-0.0329'}
+    {'key': 7, 'n': 1, 'wins': 1, 'hit': '100%', 'pnl_sol': '+0.0060', 'mfe_med': '+43.9%', 'mfe_avg': '+43.9%', 'hold300_sol': '-0.0079'}
+    {'key': 8, 'n': 2, 'wins': 1, 'hit': '50%', 'pnl_sol': '+0.0109', 'mfe_med': '+137.6%', 'mfe_avg': '+79.8%', 'hold300_sol': '+0.0318'}
+    {'key': 10, 'n': 2, 'wins': 1, 'hit': '50%', 'pnl_sol': '+0.0013', 'mfe_med': '+139.3%', 'mfe_avg': '+65.8%', 'hold300_sol': '-0.0722'}
+    {'key': 11, 'n': 1, 'wins': 1, 'hit': '100%', 'pnl_sol': '+0.0083', 'mfe_med': '+16.1%', 'mfe_avg': '+16.1%', 'hold300_sol': '-0.0646'}
+    {'key': 14, 'n': 5, 'wins': 1, 'hit': '20%', 'pnl_sol': '-0.0156', 'mfe_med': '+9.0%', 'mfe_avg': '+14.1%', 'hold300_sol': '-0.1822'}
+    {'key': 15, 'n': 2, 'wins': 0, 'hit': '0%', 'pnl_sol': '-0.0315', 'mfe_med': '+4.4%', 'mfe_avg': '-0.1%', 'hold300_sol': '-0.0357'}
+    {'key': 16, 'n': 2, 'wins': 1, 'hit': '50%', 'pnl_sol': '+0.0022', 'mfe_med': '+115.0%', 'mfe_avg': '+61.1%', 'hold300_sol': '+0.0429'}
+    {'key': 17, 'n': 1, 'wins': 1, 'hit': '100%', 'pnl_sol': '+0.0121', 'mfe_med': '+40.2%', 'mfe_avg': '+40.2%', 'hold300_sol': '-0.0527'}
+    {'key': 20, 'n': 3, 'wins': 1, 'hit': '33%', 'pnl_sol': '-0.0109', 'mfe_med': '+1.9%', 'mfe_avg': '+7.4%', 'hold300_sol': '-0.0725'}
+-- by_set
+    {'key': 'operator/5', 'n': 22, 'wins': 8, 'hit': '36%', 'pnl_sol': '-0.0446', 'mfe_med': '+16.1%', 'mfe_avg': '+37.6%', 'hold300_sol': '-0.3351'}
+    {'key': 'operator/6', 'n': 2, 'wins': 1, 'hit': '50%', 'pnl_sol': '+0.0041', 'mfe_med': '+24.8%', 'mfe_avg': '+16.9%', 'hold300_sol': '-0.0646'}
+-- by_reason
+    {'key': 'creator_dump', 'n': 1, 'wins': 1, 'hit': '100%', 'pnl_sol': '+0.0045', 'mfe_med': '+115.0%', 'mfe_avg': '+115.0%', 'hold300_sol': '+0.0617'}
+    {'key': 'target', 'n': 8, 'wins': 8, 'hit': '100%', 'pnl_sol': '+0.0905', 'mfe_med': '+43.0%', 'mfe_avg': '+49.3%', 'hold300_sol': '-0.1993'}
+    {'key': 'trailing', 'n': 15, 'wins': 0, 'hit': '0%', 'pnl_sol': '-0.1355', 'mfe_med': '+4.4%', 'mfe_avg': '+23.4%', 'hold300_sol': '-0.2622'}
+-- cooldown on the 24 (after trailing exit)
+    5 min: skip 2 ['NARKY#2', 'Musepaid#2'] pnl of skipped +0.0124
+   15 min: skip 2 ['NARKY#2', 'Musepaid#2'] pnl of skipped +0.0124
+   60 min: skip 2 ['NARKY#2', 'Musepaid#2'] pnl of skipped +0.0124
+-- cooldown on the 24 (after any exit)
+    5 min: skip 4 ['Cupsey#2', 'NARKY#2', 'KODA#2', 'Musepaid#2'] pnl of skipped +0.0131
+   15 min: skip 4 ['Cupsey#2', 'NARKY#2', 'KODA#2', 'Musepaid#2'] pnl of skipped +0.0131
+   60 min: skip 4 ['Cupsey#2', 'NARKY#2', 'KODA#2', 'Musepaid#2'] pnl of skipped +0.0131
+-- cooldown on today's paper bets
+    {'minutes': 5, 'after': 'trailing', 'n_bets': 294, 'n_skipped': 19, 'pnl_skipped': '-0.3382626984', 'r_avg_skipped': '-0.5836', 'r_avg_all': '-0.1250', 'wins_skipped': 0, 'skipped_tags': ['EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'Cupsey @05:48:36', 'Cupsey @05:48:36', 'Cupsey @05:48:36', 'Cupsey @05:48:50', 'NARKY@08:24:16', 'NARKY@08:24:16', 'NARKY@08:25:04', 'NARKY@08:25:16', 'Musepaid@14:28:43']}
+    {'minutes': 15, 'after': 'trailing', 'n_bets': 294, 'n_skipped': 19, 'pnl_skipped': '-0.3382626984', 'r_avg_skipped': '-0.5836', 'r_avg_all': '-0.1250', 'wins_skipped': 0, 'skipped_tags': ['EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'Cupsey @05:48:36', 'Cupsey @05:48:36', 'Cupsey @05:48:36', 'Cupsey @05:48:50', 'NARKY@08:24:16', 'NARKY@08:24:16', 'NARKY@08:25:04', 'NARKY@08:25:16', 'Musepaid@14:28:43']}
+    {'minutes': 60, 'after': 'trailing', 'n_bets': 294, 'n_skipped': 19, 'pnl_skipped': '-0.3382626984', 'r_avg_skipped': '-0.5836', 'r_avg_all': '-0.1250', 'wins_skipped': 0, 'skipped_tags': ['EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'Cupsey @05:48:36', 'Cupsey @05:48:36', 'Cupsey @05:48:36', 'Cupsey @05:48:50', 'NARKY@08:24:16', 'NARKY@08:24:16', 'NARKY@08:25:04', 'NARKY@08:25:16', 'Musepaid@14:28:43']}
+    {'minutes': 5, 'after': 'trailing|max_loss|line_broken|creator_dump', 'n_bets': 294, 'n_skipped': 54, 'pnl_skipped': '-0.4761042306', 'r_avg_skipped': '-0.2813', 'r_avg_all': '-0.1250', 'wins_skipped': 9, 'skipped_tags': ['CTCA1@00:22:35', 'CTCA1@00:22:35', 'CTCA1@00:22:35', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:29', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'STREAMED@04:53:16', 'STREAMED@04:53:16']}
+    {'minutes': 15, 'after': 'trailing|max_loss|line_broken|creator_dump', 'n_bets': 294, 'n_skipped': 54, 'pnl_skipped': '-0.4761042306', 'r_avg_skipped': '-0.2813', 'r_avg_all': '-0.1250', 'wins_skipped': 9, 'skipped_tags': ['CTCA1@00:22:35', 'CTCA1@00:22:35', 'CTCA1@00:22:35', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:29', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'STREAMED@04:53:16', 'STREAMED@04:53:16']}
+    {'minutes': 60, 'after': 'trailing|max_loss|line_broken|creator_dump', 'n_bets': 294, 'n_skipped': 54, 'pnl_skipped': '-0.4761042306', 'r_avg_skipped': '-0.2813', 'r_avg_all': '-0.1250', 'wins_skipped': 9, 'skipped_tags': ['CTCA1@00:22:35', 'CTCA1@00:22:35', 'CTCA1@00:22:35', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:14', 'EQUITITTY@04:03:29', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'EQUITITTY@04:04:16', 'STREAMED@04:53:16', 'STREAMED@04:53:16']}

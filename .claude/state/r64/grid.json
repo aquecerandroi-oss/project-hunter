@@ -1,0 +1,11780 @@
+{
+ "1.5": [
+  {
+   "name": "trail 10% / arm entry / target none",
+   "trailing": 0.1,
+   "arm": 0,
+   "target": null,
+   "total": -0.2452,
+   "wins": 6,
+   "reasons": {
+    "trailing": 18,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0017,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0184,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0312,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0049,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0033,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0054,
+     "trailing"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0106,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0106,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0081,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0079,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm entry / target 1.15",
+   "trailing": 0.1,
+   "arm": 0,
+   "target": 1.15,
+   "total": -0.0402,
+   "wins": 9,
+   "reasons": {
+    "trailing": 11,
+    "target": 7,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0017,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0184,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0033,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0054,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0106,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0106,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0081,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0079,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm entry / target 1.30",
+   "trailing": 0.1,
+   "arm": 0,
+   "target": 1.3,
+   "total": -0.0773,
+   "wins": 8,
+   "reasons": {
+    "trailing": 14,
+    "target": 4,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0017,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0184,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0033,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0054,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0106,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0106,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0081,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0079,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm entry / target 1.50",
+   "trailing": 0.1,
+   "arm": 0,
+   "target": 1.5,
+   "total": -0.1399,
+   "wins": 7,
+   "reasons": {
+    "trailing": 16,
+    "target": 2,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0017,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0184,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0049,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0033,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0054,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0106,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0106,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0081,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0079,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +10% / target none",
+   "trailing": 0.1,
+   "arm": 0.1,
+   "target": null,
+   "total": -0.3784,
+   "wins": 7,
+   "reasons": {
+    "trailing": 11,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0017,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0312,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0049,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0124,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +10% / target 1.15",
+   "trailing": 0.1,
+   "arm": 0.1,
+   "target": 1.15,
+   "total": -0.1632,
+   "wins": 10,
+   "reasons": {
+    "trailing": 3,
+    "time": 5,
+    "target": 8,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0017,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +10% / target 1.30",
+   "trailing": 0.1,
+   "arm": 0.1,
+   "target": 1.3,
+   "total": -0.2003,
+   "wins": 9,
+   "reasons": {
+    "trailing": 6,
+    "time": 5,
+    "target": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0017,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +10% / target 1.50",
+   "trailing": 0.1,
+   "arm": 0.1,
+   "target": 1.5,
+   "total": -0.2731,
+   "wins": 8,
+   "reasons": {
+    "trailing": 9,
+    "time": 5,
+    "target": 2,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0017,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0049,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0124,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +20% / target none",
+   "trailing": 0.1,
+   "arm": 0.2,
+   "target": null,
+   "total": -0.4253,
+   "wins": 9,
+   "reasons": {
+    "trailing": 9,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0034,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0036,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0312,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0049,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0124,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +20% / target 1.15",
+   "trailing": 0.1,
+   "arm": 0.2,
+   "target": 1.15,
+   "total": -0.1938,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0108,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +20% / target 1.30",
+   "trailing": 0.1,
+   "arm": 0.2,
+   "target": 1.3,
+   "total": -0.2261,
+   "wins": 11,
+   "reasons": {
+    "trailing": 3,
+    "time": 5,
+    "target": 6,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0034,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0246,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +20% / target 1.50",
+   "trailing": 0.1,
+   "arm": 0.2,
+   "target": 1.5,
+   "total": -0.2877,
+   "wins": 10,
+   "reasons": {
+    "trailing": 6,
+    "time": 5,
+    "target": 3,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0034,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0359,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0049,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0124,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm entry / target none",
+   "trailing": 0.15,
+   "arm": 0,
+   "target": null,
+   "total": -0.3919,
+   "wins": 5,
+   "reasons": {
+    "trailing": 18,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0184,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0269,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0045,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0088,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0065,
+     "trailing"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0165,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0157,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm entry / target 1.15",
+   "trailing": 0.15,
+   "arm": 0,
+   "target": 1.15,
+   "total": -0.1758,
+   "wins": 9,
+   "reasons": {
+    "trailing": 11,
+    "target": 7,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0184,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0088,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0065,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0165,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0157,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm entry / target 1.30",
+   "trailing": 0.15,
+   "arm": 0,
+   "target": 1.3,
+   "total": -0.2193,
+   "wins": 7,
+   "reasons": {
+    "trailing": 14,
+    "target": 4,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0184,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0088,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0065,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0165,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0157,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm entry / target 1.50",
+   "trailing": 0.15,
+   "arm": 0,
+   "target": 1.5,
+   "total": -0.2823,
+   "wins": 6,
+   "reasons": {
+    "trailing": 16,
+    "target": 2,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0184,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0045,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0088,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0065,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0165,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0157,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +10% / target none",
+   "trailing": 0.15,
+   "arm": 0.1,
+   "target": null,
+   "total": -0.4452,
+   "wins": 6,
+   "reasons": {
+    "trailing": 11,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0269,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0045,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0233,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +10% / target 1.15",
+   "trailing": 0.15,
+   "arm": 0.1,
+   "target": 1.15,
+   "total": -0.2297,
+   "wins": 10,
+   "reasons": {
+    "trailing": 3,
+    "time": 5,
+    "target": 8,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +10% / target 1.30",
+   "trailing": 0.15,
+   "arm": 0.1,
+   "target": 1.3,
+   "total": -0.2732,
+   "wins": 8,
+   "reasons": {
+    "trailing": 6,
+    "time": 5,
+    "target": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +10% / target 1.50",
+   "trailing": 0.15,
+   "arm": 0.1,
+   "target": 1.5,
+   "total": -0.3222,
+   "wins": 7,
+   "reasons": {
+    "trailing": 8,
+    "time": 5,
+    "target": 3,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0045,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0368,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +20% / target none",
+   "trailing": 0.15,
+   "arm": 0.2,
+   "target": null,
+   "total": -0.4255,
+   "wins": 8,
+   "reasons": {
+    "trailing": 9,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0034,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0036,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0269,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0045,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0233,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +20% / target 1.15",
+   "trailing": 0.15,
+   "arm": 0.2,
+   "target": 1.15,
+   "total": -0.1938,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0108,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +20% / target 1.30",
+   "trailing": 0.15,
+   "arm": 0.2,
+   "target": 1.3,
+   "total": -0.2326,
+   "wins": 10,
+   "reasons": {
+    "trailing": 3,
+    "time": 5,
+    "target": 6,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0034,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0246,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +20% / target 1.50",
+   "trailing": 0.15,
+   "arm": 0.2,
+   "target": 1.5,
+   "total": -0.2702,
+   "wins": 9,
+   "reasons": {
+    "trailing": 5,
+    "time": 5,
+    "target": 4,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0034,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0359,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0045,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0368,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm entry / target none",
+   "trailing": 0.2,
+   "arm": 0,
+   "target": null,
+   "total": -0.4327,
+   "wins": 4,
+   "reasons": {
+    "trailing": 16,
+    "real(no tape)": 5,
+    "time": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0177,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0002,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0093,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.009,
+     "trailing"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0444,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0157,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm entry / target 1.15",
+   "trailing": 0.2,
+   "arm": 0,
+   "target": 1.15,
+   "total": -0.1875,
+   "wins": 10,
+   "reasons": {
+    "target": 8,
+    "trailing": 9,
+    "real(no tape)": 5,
+    "time": 1,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0177,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0093,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.009,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0444,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0157,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm entry / target 1.30",
+   "trailing": 0.2,
+   "arm": 0,
+   "target": 1.3,
+   "total": -0.2351,
+   "wins": 7,
+   "reasons": {
+    "trailing": 12,
+    "target": 5,
+    "real(no tape)": 5,
+    "time": 1,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0177,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0093,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.009,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0444,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0234,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0157,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm entry / target 1.50",
+   "trailing": 0.2,
+   "arm": 0,
+   "target": 1.5,
+   "total": -0.296,
+   "wins": 6,
+   "reasons": {
+    "trailing": 14,
+    "target": 2,
+    "real(no tape)": 5,
+    "time": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0177,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0093,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.009,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0444,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0157,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +10% / target none",
+   "trailing": 0.2,
+   "arm": 0.1,
+   "target": null,
+   "total": -0.4262,
+   "wins": 5,
+   "reasons": {
+    "trailing": 10,
+    "time": 6,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0002,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0548,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +10% / target 1.15",
+   "trailing": 0.2,
+   "arm": 0.1,
+   "target": 1.15,
+   "total": -0.2131,
+   "wins": 11,
+   "reasons": {
+    "target": 9,
+    "time": 5,
+    "trailing": 2,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +10% / target 1.30",
+   "trailing": 0.2,
+   "arm": 0.1,
+   "target": 1.3,
+   "total": -0.2608,
+   "wins": 8,
+   "reasons": {
+    "trailing": 5,
+    "time": 5,
+    "target": 6,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0234,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +10% / target 1.50",
+   "trailing": 0.2,
+   "arm": 0.1,
+   "target": 1.5,
+   "total": -0.3076,
+   "wins": 7,
+   "reasons": {
+    "trailing": 7,
+    "time": 6,
+    "target": 3,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0093,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0368,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +20% / target none",
+   "trailing": 0.2,
+   "arm": 0.2,
+   "target": null,
+   "total": -0.4144,
+   "wins": 6,
+   "reasons": {
+    "trailing": 8,
+    "time": 6,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0036,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0002,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0548,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +20% / target 1.15",
+   "trailing": 0.2,
+   "arm": 0.2,
+   "target": 1.15,
+   "total": -0.1938,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0108,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +20% / target 1.30",
+   "trailing": 0.2,
+   "arm": 0.2,
+   "target": 1.3,
+   "total": -0.2279,
+   "wins": 9,
+   "reasons": {
+    "trailing": 2,
+    "time": 5,
+    "target": 7,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0246,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0234,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +20% / target 1.50",
+   "trailing": 0.2,
+   "arm": 0.2,
+   "target": 1.5,
+   "total": -0.2634,
+   "wins": 8,
+   "reasons": {
+    "trailing": 4,
+    "time": 6,
+    "target": 4,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0359,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0368,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm entry / target none",
+   "trailing": 0.3,
+   "arm": 0,
+   "target": null,
+   "total": -0.3019,
+   "wins": 6,
+   "reasons": {
+    "time": 3,
+    "trailing": 14,
+    "real(no tape)": 5,
+    "event": 1,
+    "censored": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0961,
+     "time"
+    ],
+    "EQUITITTY": [
+     -0.0278,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0063,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0002,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0001,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0328,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0106,
+     "trailing"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0444,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm entry / target 1.15",
+   "trailing": 0.3,
+   "arm": 0,
+   "target": 1.15,
+   "total": -0.1479,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "trailing": 6,
+    "real(no tape)": 5,
+    "time": 1,
+    "event": 1,
+    "censored": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0278,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0108,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0106,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0444,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm entry / target 1.30",
+   "trailing": 0.3,
+   "arm": 0,
+   "target": 1.3,
+   "total": -0.1611,
+   "wins": 10,
+   "reasons": {
+    "target": 8,
+    "trailing": 8,
+    "real(no tape)": 5,
+    "time": 1,
+    "event": 1,
+    "censored": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0294,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0278,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0246,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0106,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0444,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0234,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm entry / target 1.50",
+   "trailing": 0.3,
+   "arm": 0,
+   "target": 1.5,
+   "total": -0.192,
+   "wins": 8,
+   "reasons": {
+    "target": 5,
+    "trailing": 10,
+    "real(no tape)": 5,
+    "time": 2,
+    "event": 1,
+    "censored": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0278,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0359,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0001,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0368,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0106,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0444,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.059,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0165,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +10% / target none",
+   "trailing": 0.3,
+   "arm": 0.1,
+   "target": null,
+   "total": -0.3471,
+   "wins": 6,
+   "reasons": {
+    "time": 7,
+    "trailing": 9,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0961,
+     "time"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0063,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0002,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0001,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0328,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +10% / target 1.15",
+   "trailing": 0.3,
+   "arm": 0.1,
+   "target": 1.15,
+   "total": -0.1931,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "trailing": 1,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0108,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +10% / target 1.30",
+   "trailing": 0.3,
+   "arm": 0.1,
+   "target": 1.3,
+   "total": -0.2063,
+   "wins": 10,
+   "reasons": {
+    "target": 8,
+    "time": 5,
+    "real(no tape)": 5,
+    "trailing": 3,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0294,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0246,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0234,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +10% / target 1.50",
+   "trailing": 0.3,
+   "arm": 0.1,
+   "target": 1.5,
+   "total": -0.2371,
+   "wins": 8,
+   "reasons": {
+    "target": 5,
+    "time": 6,
+    "real(no tape)": 5,
+    "trailing": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0359,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0001,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0368,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0644,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0576,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +20% / target none",
+   "trailing": 0.3,
+   "arm": 0.2,
+   "target": null,
+   "total": -0.3481,
+   "wins": 6,
+   "reasons": {
+    "time": 7,
+    "trailing": 7,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0961,
+     "time"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0063,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0002,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0001,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0328,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.058,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +20% / target 1.15",
+   "trailing": 0.3,
+   "arm": 0.2,
+   "target": 1.15,
+   "total": -0.1938,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0108,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +20% / target 1.30",
+   "trailing": 0.3,
+   "arm": 0.2,
+   "target": 1.3,
+   "total": -0.2072,
+   "wins": 10,
+   "reasons": {
+    "target": 8,
+    "time": 5,
+    "real(no tape)": 5,
+    "trailing": 1,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0294,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0246,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0234,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +20% / target 1.50",
+   "trailing": 0.3,
+   "arm": 0.2,
+   "target": 1.5,
+   "total": -0.2381,
+   "wins": 8,
+   "reasons": {
+    "target": 5,
+    "time": 6,
+    "real(no tape)": 5,
+    "trailing": 3,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0359,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0001,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0368,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0178,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0521,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail none / arm - / target none",
+   "trailing": null,
+   "arm": null,
+   "target": null,
+   "total": -0.3341,
+   "wins": 6,
+   "reasons": {
+    "time": 13,
+    "real(no tape)": 5,
+    "censored": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0961,
+     "time"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0364,
+     "time"
+    ],
+    "Cupsey#1": [
+     -0.0256,
+     "time"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0079,
+     "time"
+    ],
+    "NARKY#1": [
+     0.0464,
+     "time"
+    ],
+    "NARKY#2": [
+     -0.0146,
+     "time"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "time"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0527,
+     "censored"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail none / arm - / target 1.15",
+   "trailing": null,
+   "arm": null,
+   "target": 1.15,
+   "total": -0.1938,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0122,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0108,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0152,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0084,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0142,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0066,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0121,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail none / arm - / target 1.30",
+   "trailing": null,
+   "arm": null,
+   "target": 1.3,
+   "total": -0.204,
+   "wins": 10,
+   "reasons": {
+    "target": 8,
+    "time": 6,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0294,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0246,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0353,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0095,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0227,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0146,
+     "time"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0258,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0234,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0233,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail none / arm - / target 1.50",
+   "trailing": null,
+   "arm": null,
+   "target": 1.5,
+   "total": -0.2433,
+   "wins": 8,
+   "reasons": {
+    "target": 5,
+    "time": 8,
+    "real(no tape)": 5,
+    "censored": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0499,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0359,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0378,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0079,
+     "time"
+    ],
+    "NARKY#1": [
+     0.0368,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0146,
+     "time"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0407,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0282,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0527,
+     "censored"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  }
+ ],
+ "5.0": [
+  {
+   "name": "trail 10% / arm entry / target none",
+   "trailing": 0.1,
+   "arm": 0,
+   "target": null,
+   "total": -0.2354,
+   "wins": 6,
+   "reasons": {
+    "trailing": 18,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0171,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0098,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0403,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0019,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0054,
+     "trailing"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0106,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0106,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     0.0021,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0081,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm entry / target 1.15",
+   "trailing": 0.1,
+   "arm": 0,
+   "target": 1.15,
+   "total": -0.0346,
+   "wins": 10,
+   "reasons": {
+    "trailing": 11,
+    "target": 7,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0171,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0098,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0019,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0054,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0106,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0106,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     0.0021,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0081,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm entry / target 1.30",
+   "trailing": 0.1,
+   "arm": 0,
+   "target": 1.3,
+   "total": -0.1342,
+   "wins": 7,
+   "reasons": {
+    "trailing": 14,
+    "target": 4,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0171,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0098,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0019,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0054,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0106,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0106,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     0.0021,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0081,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm entry / target 1.50",
+   "trailing": 0.1,
+   "arm": 0,
+   "target": 1.5,
+   "total": -0.1331,
+   "wins": 7,
+   "reasons": {
+    "trailing": 16,
+    "target": 2,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0171,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0098,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0019,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0054,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0106,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0106,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     0.0021,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0081,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +10% / target none",
+   "trailing": 0.1,
+   "arm": 0.1,
+   "target": null,
+   "total": -0.3829,
+   "wins": 6,
+   "reasons": {
+    "trailing": 11,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0011,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0403,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0109,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +10% / target 1.15",
+   "trailing": 0.1,
+   "arm": 0.1,
+   "target": 1.15,
+   "total": -0.1754,
+   "wins": 10,
+   "reasons": {
+    "trailing": 3,
+    "time": 5,
+    "target": 8,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0011,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +10% / target 1.30",
+   "trailing": 0.1,
+   "arm": 0.1,
+   "target": 1.3,
+   "total": -0.275,
+   "wins": 7,
+   "reasons": {
+    "trailing": 6,
+    "time": 5,
+    "target": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0011,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +10% / target 1.50",
+   "trailing": 0.1,
+   "arm": 0.1,
+   "target": 1.5,
+   "total": -0.2807,
+   "wins": 7,
+   "reasons": {
+    "trailing": 9,
+    "time": 5,
+    "target": 2,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0044,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.0011,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0109,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0017,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +20% / target none",
+   "trailing": 0.1,
+   "arm": 0.2,
+   "target": null,
+   "total": -0.4355,
+   "wins": 7,
+   "reasons": {
+    "trailing": 9,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0403,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0109,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +20% / target 1.15",
+   "trailing": 0.1,
+   "arm": 0.2,
+   "target": 1.15,
+   "total": -0.1977,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0114,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +20% / target 1.30",
+   "trailing": 0.1,
+   "arm": 0.2,
+   "target": 1.3,
+   "total": -0.3057,
+   "wins": 8,
+   "reasons": {
+    "trailing": 3,
+    "time": 5,
+    "target": 6,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0232,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 10% / arm +20% / target 1.50",
+   "trailing": 0.1,
+   "arm": 0.2,
+   "target": 1.5,
+   "total": -0.2956,
+   "wins": 8,
+   "reasons": {
+    "trailing": 6,
+    "time": 5,
+    "target": 3,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.039,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0109,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0006,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm entry / target none",
+   "trailing": 0.15,
+   "arm": 0,
+   "target": null,
+   "total": -0.3928,
+   "wins": 6,
+   "reasons": {
+    "trailing": 18,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0081,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0171,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0254,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0093,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.009,
+     "trailing"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0166,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0159,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm entry / target 1.15",
+   "trailing": 0.15,
+   "arm": 0,
+   "target": 1.15,
+   "total": -0.1708,
+   "wins": 10,
+   "reasons": {
+    "trailing": 11,
+    "target": 7,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0081,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0171,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0093,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.009,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0166,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0159,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm entry / target 1.30",
+   "trailing": 0.15,
+   "arm": 0,
+   "target": 1.3,
+   "total": -0.2768,
+   "wins": 7,
+   "reasons": {
+    "trailing": 14,
+    "target": 4,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0081,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0171,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0093,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.009,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0166,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0159,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm entry / target 1.50",
+   "trailing": 0.15,
+   "arm": 0,
+   "target": 1.5,
+   "total": -0.2757,
+   "wins": 7,
+   "reasons": {
+    "trailing": 16,
+    "target": 2,
+    "real(no tape)": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0081,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0171,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0093,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.009,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0096,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0166,
+     "trailing"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0159,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +10% / target none",
+   "trailing": 0.15,
+   "arm": 0.1,
+   "target": null,
+   "total": -0.4404,
+   "wins": 7,
+   "reasons": {
+    "trailing": 11,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0081,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0254,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0267,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +10% / target 1.15",
+   "trailing": 0.15,
+   "arm": 0.1,
+   "target": 1.15,
+   "total": -0.2274,
+   "wins": 11,
+   "reasons": {
+    "trailing": 3,
+    "time": 5,
+    "target": 8,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0081,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +10% / target 1.30",
+   "trailing": 0.15,
+   "arm": 0.1,
+   "target": 1.3,
+   "total": -0.3334,
+   "wins": 8,
+   "reasons": {
+    "trailing": 6,
+    "time": 5,
+    "target": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0081,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +10% / target 1.50",
+   "trailing": 0.15,
+   "arm": 0.1,
+   "target": 1.5,
+   "total": -0.307,
+   "wins": 8,
+   "reasons": {
+    "trailing": 8,
+    "time": 5,
+    "target": 3,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0081,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.043,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +20% / target none",
+   "trailing": 0.15,
+   "arm": 0.2,
+   "target": null,
+   "total": -0.441,
+   "wins": 7,
+   "reasons": {
+    "trailing": 9,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0254,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0267,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +20% / target 1.15",
+   "trailing": 0.15,
+   "arm": 0.2,
+   "target": 1.15,
+   "total": -0.1977,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0114,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +20% / target 1.30",
+   "trailing": 0.15,
+   "arm": 0.2,
+   "target": 1.3,
+   "total": -0.3121,
+   "wins": 8,
+   "reasons": {
+    "trailing": 3,
+    "time": 5,
+    "target": 6,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0232,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 15% / arm +20% / target 1.50",
+   "trailing": 0.15,
+   "arm": 0.2,
+   "target": 1.5,
+   "total": -0.27,
+   "wins": 8,
+   "reasons": {
+    "trailing": 5,
+    "time": 5,
+    "target": 4,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0022,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.039,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0018,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.043,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0069,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0067,
+     "trailing"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm entry / target none",
+   "trailing": 0.2,
+   "arm": 0,
+   "target": null,
+   "total": -0.4363,
+   "wins": 4,
+   "reasons": {
+    "trailing": 16,
+    "real(no tape)": 5,
+    "time": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0166,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0023,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.004,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0073,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0101,
+     "trailing"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0538,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0159,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm entry / target 1.15",
+   "trailing": 0.2,
+   "arm": 0,
+   "target": 1.15,
+   "total": -0.1955,
+   "wins": 10,
+   "reasons": {
+    "target": 8,
+    "trailing": 9,
+    "real(no tape)": 5,
+    "time": 1,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0166,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0073,
+     "trailing"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0101,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0538,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0159,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm entry / target 1.30",
+   "trailing": 0.2,
+   "arm": 0,
+   "target": 1.3,
+   "total": -0.2994,
+   "wins": 6,
+   "reasons": {
+    "trailing": 12,
+    "target": 5,
+    "real(no tape)": 5,
+    "time": 1,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0166,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     -0.0073,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0101,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0538,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0252,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0159,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm entry / target 1.50",
+   "trailing": 0.2,
+   "arm": 0,
+   "target": 1.5,
+   "total": -0.2914,
+   "wins": 6,
+   "reasons": {
+    "trailing": 14,
+    "target": 2,
+    "real(no tape)": 5,
+    "time": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0166,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.004,
+     "trailing"
+    ],
+    "NARKY#1": [
+     -0.0073,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0101,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0538,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0159,
+     "trailing"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +10% / target none",
+   "trailing": 0.2,
+   "arm": 0.1,
+   "target": null,
+   "total": -0.4186,
+   "wins": 5,
+   "reasons": {
+    "trailing": 10,
+    "time": 6,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0023,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.004,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.058,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +10% / target 1.15",
+   "trailing": 0.2,
+   "arm": 0.1,
+   "target": 1.15,
+   "total": -0.2181,
+   "wins": 11,
+   "reasons": {
+    "target": 9,
+    "time": 5,
+    "trailing": 2,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +10% / target 1.30",
+   "trailing": 0.2,
+   "arm": 0.1,
+   "target": 1.3,
+   "total": -0.3221,
+   "wins": 7,
+   "reasons": {
+    "trailing": 5,
+    "time": 5,
+    "target": 6,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0252,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +10% / target 1.50",
+   "trailing": 0.2,
+   "arm": 0.1,
+   "target": 1.5,
+   "total": -0.2888,
+   "wins": 7,
+   "reasons": {
+    "trailing": 7,
+    "time": 6,
+    "target": 3,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     -0.009,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.004,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.043,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +20% / target none",
+   "trailing": 0.2,
+   "arm": 0.2,
+   "target": null,
+   "total": -0.4089,
+   "wins": 6,
+   "reasons": {
+    "trailing": 8,
+    "time": 6,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0023,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.004,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.058,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +20% / target 1.15",
+   "trailing": 0.2,
+   "arm": 0.2,
+   "target": 1.15,
+   "total": -0.1977,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0114,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +20% / target 1.30",
+   "trailing": 0.2,
+   "arm": 0.2,
+   "target": 1.3,
+   "total": -0.2905,
+   "wins": 8,
+   "reasons": {
+    "trailing": 2,
+    "time": 5,
+    "target": 7,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0232,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0252,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 20% / arm +20% / target 1.50",
+   "trailing": 0.2,
+   "arm": 0.2,
+   "target": 1.5,
+   "total": -0.2414,
+   "wins": 8,
+   "reasons": {
+    "trailing": 4,
+    "time": 6,
+    "target": 4,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     -0.0007,
+     "trailing"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.039,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.004,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.043,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0054,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm entry / target none",
+   "trailing": 0.3,
+   "arm": 0,
+   "target": null,
+   "total": -0.3181,
+   "wins": 6,
+   "reasons": {
+    "time": 3,
+    "trailing": 14,
+    "real(no tape)": 5,
+    "event": 1,
+    "censored": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0962,
+     "time"
+    ],
+    "EQUITITTY": [
+     -0.0325,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0023,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0032,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0378,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0108,
+     "trailing"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0538,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm entry / target 1.15",
+   "trailing": 0.3,
+   "arm": 0,
+   "target": 1.15,
+   "total": -0.1672,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "trailing": 6,
+    "real(no tape)": 5,
+    "time": 1,
+    "event": 1,
+    "censored": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0325,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0114,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0108,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0538,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm entry / target 1.30",
+   "trailing": 0.3,
+   "arm": 0,
+   "target": 1.3,
+   "total": -0.2327,
+   "wins": 9,
+   "reasons": {
+    "target": 8,
+    "trailing": 8,
+    "real(no tape)": 5,
+    "time": 1,
+    "event": 1,
+    "censored": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0325,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0232,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0108,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0538,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0252,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm entry / target 1.50",
+   "trailing": 0.3,
+   "arm": 0,
+   "target": 1.5,
+   "total": -0.1907,
+   "wins": 8,
+   "reasons": {
+    "target": 5,
+    "trailing": 10,
+    "real(no tape)": 5,
+    "time": 2,
+    "event": 1,
+    "censored": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0325,
+     "trailing"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.039,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0032,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.043,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0108,
+     "trailing"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0538,
+     "trailing"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "trailing"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.017,
+     "trailing"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +10% / target none",
+   "trailing": 0.3,
+   "arm": 0.1,
+   "target": null,
+   "total": -0.3486,
+   "wins": 6,
+   "reasons": {
+    "time": 7,
+    "trailing": 9,
+    "real(no tape)": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0962,
+     "time"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0023,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0032,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0378,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +10% / target 1.15",
+   "trailing": 0.3,
+   "arm": 0.1,
+   "target": 1.15,
+   "total": -0.1977,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 2,
+    "trailing": 1,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0114,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +10% / target 1.30",
+   "trailing": 0.3,
+   "arm": 0.1,
+   "target": 1.3,
+   "total": -0.2632,
+   "wins": 9,
+   "reasons": {
+    "target": 8,
+    "time": 5,
+    "real(no tape)": 5,
+    "trailing": 3,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0232,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0252,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +10% / target 1.50",
+   "trailing": 0.3,
+   "arm": 0.1,
+   "target": 1.5,
+   "total": -0.2212,
+   "wins": 8,
+   "reasons": {
+    "target": 5,
+    "time": 6,
+    "real(no tape)": 5,
+    "trailing": 5,
+    "censored": 2,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.039,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0032,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.043,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0639,
+     "trailing"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "trailing"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +20% / target none",
+   "trailing": 0.3,
+   "arm": 0.2,
+   "target": null,
+   "total": -0.3493,
+   "wins": 6,
+   "reasons": {
+    "time": 7,
+    "trailing": 7,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0962,
+     "time"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0013,
+     "trailing"
+    ],
+    "Cupsey#1": [
+     -0.0023,
+     "trailing"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0032,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.0378,
+     "trailing"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "trailing"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +20% / target 1.15",
+   "trailing": 0.3,
+   "arm": 0.2,
+   "target": 1.15,
+   "total": -0.1977,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0114,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +20% / target 1.30",
+   "trailing": 0.3,
+   "arm": 0.2,
+   "target": 1.3,
+   "total": -0.2639,
+   "wins": 9,
+   "reasons": {
+    "target": 8,
+    "time": 5,
+    "real(no tape)": 5,
+    "trailing": 1,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0232,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0252,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail 30% / arm +20% / target 1.50",
+   "trailing": 0.3,
+   "arm": 0.2,
+   "target": 1.5,
+   "total": -0.2219,
+   "wins": 8,
+   "reasons": {
+    "target": 5,
+    "time": 6,
+    "real(no tape)": 5,
+    "trailing": 3,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.039,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0032,
+     "trailing"
+    ],
+    "NARKY#1": [
+     0.043,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0153,
+     "trailing"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0528,
+     "trailing"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail none / arm - / target none",
+   "trailing": null,
+   "arm": null,
+   "target": null,
+   "total": -0.3225,
+   "wins": 6,
+   "reasons": {
+    "time": 13,
+    "real(no tape)": 5,
+    "censored": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0962,
+     "time"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0393,
+     "time"
+    ],
+    "Cupsey#1": [
+     -0.0256,
+     "time"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0079,
+     "time"
+    ],
+    "NARKY#1": [
+     0.0491,
+     "time"
+    ],
+    "NARKY#2": [
+     -0.0098,
+     "time"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     -0.0571,
+     "time"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0527,
+     "censored"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail none / arm - / target 1.15",
+   "trailing": null,
+   "arm": null,
+   "target": 1.15,
+   "total": -0.1977,
+   "wins": 12,
+   "reasons": {
+    "target": 10,
+    "time": 5,
+    "real(no tape)": 5,
+    "censored": 3,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0174,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0114,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0161,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0096,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     0.0059,
+     "target"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0111,
+     "target"
+    ],
+    "KODA#2": [
+     0.0114,
+     "target"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0063,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     0.0148,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail none / arm - / target 1.30",
+   "trailing": null,
+   "arm": null,
+   "target": 1.3,
+   "total": -0.2583,
+   "wins": 9,
+   "reasons": {
+    "target": 8,
+    "time": 6,
+    "real(no tape)": 5,
+    "censored": 4,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.0232,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     0.0098,
+     "target"
+    ],
+    "NARKY#1": [
+     0.0177,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0098,
+     "time"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.03,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0252,
+     "target"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0515,
+     "target"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  },
+  {
+   "name": "trail none / arm - / target 1.50",
+   "trailing": null,
+   "arm": null,
+   "target": 1.5,
+   "total": -0.2211,
+   "wins": 8,
+   "reasons": {
+    "target": 5,
+    "time": 8,
+    "real(no tape)": 5,
+    "censored": 5,
+    "event": 1
+   },
+   "cells": {
+    "XCrypto": [
+     0.0359,
+     "target"
+    ],
+    "EQUITITTY": [
+     -0.0506,
+     "time"
+    ],
+    "F\u0415\u0420\u0415": [
+     0.039,
+     "target"
+    ],
+    "Cupsey#1": [
+     0.0452,
+     "target"
+    ],
+    "Cupsey#2": [
+     -0.0075,
+     "real(no tape)"
+    ],
+    "CYBER": [
+     -0.0079,
+     "time"
+    ],
+    "NARKY#1": [
+     0.043,
+     "target"
+    ],
+    "NARKY#2": [
+     -0.0098,
+     "time"
+    ],
+    "shitcoin": [
+     -0.0152,
+     "time"
+    ],
+    "KODA#1": [
+     0.0403,
+     "target"
+    ],
+    "KODA#2": [
+     -0.0646,
+     "censored"
+    ],
+    "LAJAK": [
+     -0.0054,
+     "real(no tape)"
+    ],
+    "ARGUSACT": [
+     -0.0599,
+     "censored"
+    ],
+    "Musepaid#1": [
+     -0.0597,
+     "time"
+    ],
+    "Musepaid#2": [
+     -0.0583,
+     "censored"
+    ],
+    "WIFTIGRINO": [
+     0.0301,
+     "time"
+    ],
+    "CHARLI": [
+     -0.0077,
+     "time"
+    ],
+    "nikita": [
+     -0.0208,
+     "real(no tape)"
+    ],
+    "Drillers": [
+     0.0045,
+     "event"
+    ],
+    "BASK": [
+     -0.0189,
+     "time"
+    ],
+    "NOOP": [
+     -0.0527,
+     "censored"
+    ],
+    "GTA": [
+     -0.0164,
+     "censored"
+    ],
+    "JEANJACKET": [
+     0.0148,
+     "real(no tape)"
+    ],
+    "MILK": [
+     -0.0183,
+     "real(no tape)"
+    ]
+   }
+  }
+ ]
+}
