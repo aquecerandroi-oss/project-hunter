@@ -11,10 +11,18 @@ three in a row publish ``mark_stale_s``. A sell that fails backs off
 ``(2,4,8,16,32,60) s``, re-quotes on the next attempt, uses the panic
 tolerance from the 3rd attempt (from the 1st for ``stop``/``emergency``), and
 after ``MAX_EXIT_ATTEMPTS`` the position is ``blocked_exits[id]`` — still
-marked, sold by hand (``meme_spot_swap.py``). A sell left
+marked, sold by hand (``meme_spot_swap.py`` + ``spot_desk_markets.py
+--close-manual``). A refusal that is transient (Jupiter/RPC did not answer)
+never spends that budget, but ``STUCK_AFTER_TRANSIENT`` of them in a row
+publish ``stuck_exits[id]`` in the heartbeat (T4.74-7, A2). A sell left
 ``submitted_unconfirmed`` pins ``exit_order_id`` on the position: nothing else
-is sold until ``spot_reconcile`` settles it by signature. Inert without
-``config.spot.enabled``; a tick that raises is counted, never propagated.
+is sold until ``spot_reconcile`` settles it by signature.
+
+**The loop runs whenever the executor is live with its signer, whatever
+``SPOT1_ENABLED`` says** (T4.74-7, A1): the flag gates entries only — a
+position the reconcile opened after the flag went off is still marked and
+sold (RISK_ENGINE §10). Inert without live or signer; a tick that raises is
+counted, never propagated.
 """
 
 from __future__ import annotations
@@ -28,6 +36,7 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.jupiter import WRAPPED_SOL_MINT
+from hunter_meme_executor import spot_repo
 from hunter_meme_executor.exit_common import exit_lock
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.spot_config import SPOT_DECIDED_BY, SpotConfig
@@ -56,19 +65,36 @@ from hunter_risk_meme.spot_profile import SPOT_LANE
 if TYPE_CHECKING:
     from hunter_meme_executor.context import ExecutorContext
 
-__all__ = ["MARK_SLIPPAGE_BPS", "STALE_AFTER_FAILURES", "manage_position", "spot_exits_once"]
+__all__ = [
+    "MARK_SLIPPAGE_BPS",
+    "STALE_AFTER_FAILURES",
+    "STUCK_AFTER_TRANSIENT",
+    "exits_active",
+    "manage_position",
+    "spot_exits_once",
+]
 
 logger = get_logger(__name__)
 LAMPORTS = Decimal(1_000_000_000)
 MARK_SLIPPAGE_BPS = 50
 """Design §4: the mark is the quote of the whole lot at the exit's own tolerance."""
 STALE_AFTER_FAILURES = 3
+STUCK_AFTER_TRANSIENT = 30
+"""Consecutive transient sell refusals after which the position is published
+as ``stuck_exits[id]`` (≈ 30 min at the 60 s rung) and logged once per 30."""
+
+
+def exits_active(cfg: SpotConfig) -> bool:
+    """Exits need the live executor and its signer — never ``SPOT1_ENABLED``
+    (that flag gates entries only; ``main.py`` creates the task by this)."""
+    return cfg.live and cfg.signer_present
 
 
 async def spot_exits_once(ctx: ExecutorContext) -> None:
-    """One pass (``main.py``, ``SPOT1_MARK_S``): no query, no quote unless enabled."""
+    """One pass (``main.py``, ``SPOT1_MARK_S``): one read of the open positions,
+    no quote without one; nothing at all unless live with a signer."""
     cfg = spot_config_of(ctx)
-    if not cfg.enabled or ctx.signer is None:
+    if not exits_active(cfg) or ctx.signer is None:
         return
     stats = spot_stats_of(ctx)
     now = utcnow()
@@ -230,9 +256,17 @@ async def _sell(
     # process dies between, the reconcile finds the pair (order, position) by
     # ``exit_order_id`` and settles it from the row — never a second sell.
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await set_exit_pending(
+        taken = await set_exit_pending(
             session, position.id, order_id=order_id, reason=reason, attempt=attempt, now=now
         )
+    if not taken:
+        # The row is no longer ``open`` (closed by the reconcile or by
+        # ``--close-manual`` since the read): nothing is sold on its behalf —
+        # a second lot of the same mint in the wallet is not this position.
+        logger.warning("meme_spot_exit_position_gone", position_id=position.id, order_id=order_id)
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            await spot_repo.mark_refused(session, order_id, reason="position_not_open", now=now)
+        return
     logger.info(
         "meme_spot_exit_decided",
         position_id=position.id,
@@ -283,6 +317,13 @@ async def _sell(
     transient = (result.reason or "").startswith(TRANSIENT_EXIT_REFUSALS)
     hard = stats.exit_hard_failures.get(position.id, 0) + (0 if transient else 1)
     stats.exit_hard_failures[position.id] = hard
+    streak = stats.record_transient_refusal(
+        position.id, result.reason or "", transient=transient, stuck_after=STUCK_AFTER_TRANSIENT
+    )
+    if streak and streak % STUCK_AFTER_TRANSIENT == 0:  # rate-limited: once per 30
+        logger.error(
+            "meme_spot_exit_stuck", position_id=position.id, streak=streak, reason=result.reason
+        )
     logger.warning(
         "meme_spot_exit_failed",
         position_id=position.id,
@@ -291,6 +332,7 @@ async def _sell(
         reason=result.reason,
         transient=transient,
         hard_failures=hard,
+        transient_streak=streak,
     )
     if hard >= MAX_EXIT_ATTEMPTS:
         _block(stats, position.id, reason, attempt)

@@ -153,7 +153,7 @@ admissão e a assinatura**, `signer.sign` só aqui. `JupiterClient.swap` ganha `
 ## 6. Flags e o que nunca liga sozinho
 | Variável | Padrão | Nota |
 |---|---|---|
-| `SPOT1_ENABLED` | `false` | lida só com `ENABLE_MEME_LIVE_TRADING` ligada e signer presente; senão `spot1.mode = inert:<motivo>` |
+| `SPOT1_ENABLED` | `false` | lida só com `ENABLE_MEME_LIVE_TRADING` ligada e signer presente; senão `spot1.mode = inert:<motivo>`. **Trava só entradas** (T4.74-7): a tarefa `spot-exits` (marca + venda) roda sempre que o executor está live com signer, com a flag em qualquer valor — uma posição aberta pelo reconcile com a flag desligada continua gerida (RISK_ENGINE §10) |
 | `SPOT1_STRATEGY_VERSION` | `v14` | qualquer versão de `mean_reversion`; outra estratégia = boot recusa `spot1_strategy_unsupported` |
 | `SPOT1_TICKET_SOL` / `SPOT1_MAX_OPEN` | `0.05` / `3` | ficha clampada por `MEME_MAX_SOL_PER_TRADE` e pelo escopo |
 | `SPOT1_MAX_SIGNAL_AGE_S` / `SPOT1_MAX_HOLD_S` | `180` / `14400` | `max_entry_delay_s` do sinal (120) + uma vela |
@@ -172,7 +172,7 @@ hoje — consequência declarada, não somamos gasto spot ao escopo. Desligar: `
 **Heartbeat `hb:meme:executor`, campo JSON `spot1`:** `mode` (`on`/`inert:<motivo>`/`refuted`/`cooldown`),
 `strategy_version`, `ticket_sol`, `max_open`, `markets_enabled`, `open` (≤ 3: `market`, `mint8`, `entry_at`, `sol_spent`,
 `mark_sol`, `r_now`, `age_s`, `horizon_s`, `mark_stale_s`), `signals_seen`, `admitted`, `refused_by_reason` (top 8),
-`exits_by_reason`, `blocked_exits`, `closed` (n, `sum_r_gross`, `sum_r_net`, `sum_pnl_sol`, `expectancy_r_net`),
+`exits_by_reason`, `blocked_exits`, `stuck_exits` (`id → última recusa` após 30 recusas transitórias seguidas na venda — visível, ainda tentada, nunca bloqueio; T4.74-7), `exits_active` (`true` = a tarefa de saídas roda; `mode = inert:disabled` continua significando "sem entradas"), `closed` (n, `sum_r_gross`, `sum_r_net`, `sum_pnl_sol`, `expectancy_r_net`),
 `refutation` (`trades`, `threshold`, `state`), `last_signature`, `last_refusal`, `last_entries_tick_at`,
 `last_exits_tick_at`. `equity_sol`/`daily_loss_sol` passam a incluir as marcas spot (§3). `positions_open` continua só
 memes; `spot1_positions_open` separado.

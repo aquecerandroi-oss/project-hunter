@@ -36,6 +36,9 @@ class SpotStats:
     exits_by_reason: dict[str, int] = field(default_factory=lambda: dict[str, int]())
     blocked_exits: dict[str, str] = field(default_factory=lambda: dict[str, str]())
     """``position_id -> reason`` after ``MAX_EXIT_ATTEMPTS`` failed sells (design §4)."""
+    stuck_exits: dict[str, str] = field(default_factory=lambda: dict[str, str]())
+    """``position_id -> last refusal`` after ``STUCK_AFTER_TRANSIENT`` transient
+    refusals in a row (T4.74-7, A2): visible, still retried, never a block."""
     closed: ClosedStats | None = None
     """§8's numbers as last read (``closed_stats``)."""
     lane: LaneState | None = None
@@ -53,6 +56,9 @@ class SpotStats:
     the rows); ``MAX_EXIT_ATTEMPTS`` of them block the position."""
     exit_backoff_until: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
     """``position_id -> not before`` after a failed sell (``backoff_s``)."""
+    exit_transient_streak: dict[str, int] = field(default_factory=lambda: dict[str, int]())
+    """``position_id -> consecutive transient refusals`` (memory only: a restart
+    starts the count again, never at a guess); reset by a hard refusal or a sell."""
     mark_failures: dict[str, int] = field(default_factory=lambda: dict[str, int]())
     """``position_id -> consecutive quote failures``; three ⇒ ``mark_stale_s`` (design §4)."""
     mark_ok_at: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
@@ -69,9 +75,11 @@ class SpotStats:
             self.exit_attempts,
             self.exit_hard_failures,
             self.exit_backoff_until,
+            self.exit_transient_streak,
             self.mark_failures,
             self.mark_ok_at,
             self.blocked_exits,
+            self.stuck_exits,
         ):
             memory.pop(position_id, None)
 
@@ -81,3 +89,19 @@ class SpotStats:
 
     def record_exit(self, reason: str) -> None:
         self.exits_by_reason[reason] = self.exits_by_reason.get(reason, 0) + 1
+
+    def record_transient_refusal(
+        self, position_id: str, reason: str, *, transient: bool, stuck_after: int
+    ) -> int:
+        """A2: the transient refusals in a row; at ``stuck_after`` the position is
+        ``stuck_exits[id] = <last reason>`` (kept current, still retried); a hard
+        refusal ends the streak and the flag. Returns the streak (0 after a hard one)."""
+        if not transient:
+            self.exit_transient_streak.pop(position_id, None)
+            self.stuck_exits.pop(position_id, None)
+            return 0
+        streak = self.exit_transient_streak.get(position_id, 0) + 1
+        self.exit_transient_streak[position_id] = streak
+        if streak >= stuck_after:
+            self.stuck_exits[position_id] = reason
+        return streak

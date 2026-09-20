@@ -7,7 +7,10 @@ Pure over what the caller already holds — no query, no quote: the open
 positions come from the heartbeat's own ``brake_positions`` read (the spot
 rows are money on the chain and are read in every mode), the counters from
 ``ctx.spot``. With ``SPOT1_ENABLED=false`` this publishes ``inert:disabled``
-and touches nothing else. Every ``Decimal`` is a string.
+(no entries) next to ``exits_active`` (T4.74-7: the exits loop runs on any
+live executor with a signer) and touches nothing else. ``stuck_exits`` names
+the positions whose sell keeps being refused transiently (A2). Every
+``Decimal`` is a string.
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from hunter_meme_executor.spot_entries import spot_stats_of
-from hunter_meme_executor.spot_exits import STALE_AFTER_FAILURES
+from hunter_meme_executor.spot_exits import STALE_AFTER_FAILURES, exits_active
 
 if TYPE_CHECKING:
     from hunter_meme_executor.context import ExecutorContext
@@ -53,6 +56,7 @@ def spot1_fields(
     stale = [row["mark_stale_s"] for row in open_rows if row["mark_stale"] is True]
     return {
         "mode": mode,
+        "exits_active": exits_active(config),
         "lane_reason": None if lane is None else lane.reason,
         "strategy_version": config.strategy_version,
         "ticket_sol": str(config.ticket(limits)),
@@ -69,6 +73,7 @@ def spot1_fields(
         "refused_by_reason": _top(stats.refused_by_reason),
         "exits_by_reason": dict(sorted(stats.exits_by_reason.items())),
         "blocked_exits": dict(sorted(stats.blocked_exits.items())),
+        "stuck_exits": dict(sorted(stats.stuck_exits.items())),
         "closed": {
             "n": 0 if closed is None else closed.n,
             "sum_r_gross": None,

@@ -79,6 +79,7 @@ from hunter_meme_executor.program_check import check_program_at_boot, program_ch
 from hunter_meme_executor.repo import unconfirmed_orders
 from hunter_meme_executor.send_path import record_failed_onchain_fee
 from hunter_meme_executor.spot_entries import spot_entries_once
+from hunter_meme_executor.spot_exits import exits_active as spot_exits_active
 from hunter_meme_executor.spot_exits import spot_exits_once
 from hunter_meme_executor.spot_reconcile import spot_reconcile_once
 from hunter_meme_executor.treasury import treasury_once
@@ -317,6 +318,7 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
                 group.create_task(
                     forever("spot_entries", 15.0, spot_entries_once, ctx), name="spot-entries"
                 )
+            if spot_exits_active(config.spot):  # T4.74-7 A1: live + signer, never the flag
                 group.create_task(
                     forever("spot_exits", float(config.spot.mark_s), spot_exits_once, ctx),
                     name="spot-exits",

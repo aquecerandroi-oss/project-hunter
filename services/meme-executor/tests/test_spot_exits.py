@@ -268,6 +268,8 @@ async def test_a_pending_sell_pins_the_position_until_the_reconcile(
 
 
 # ---------------------------------------------------------------- inert lane
+# T4.74-7 (A1): only "not live" / "no signer" make the exits inert; the flag
+# alone does not (``test_spot_exits_always_on.py``).
 @pytest.mark.parametrize(
     "spot",
     [

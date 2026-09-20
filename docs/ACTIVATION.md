@@ -1183,6 +1183,15 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
     # pedir a venda manual de uma posição aberta (o executor vende no próximo tique de saída)
     uv run python infra/scripts/spot_desk_markets.py --sell-now <POSITION_ID> --apply \
         --reason "Everton pediu para fechar na mão"
+
+    # fechar a linha de uma posição vendida FORA da pista (meme_spot_swap.py, outra DEX) — T4.74-7:
+    # lê o meta da assinatura pelo RPC (só leitura), exige o lote inteiro (delta de tokens = -tokens),
+    # SOL recebido e blockTime depois da entrada; grava a linha spot_orders da venda, fecha a posição
+    # com pnl ao lamport e deixa system_events (closed_manually). Dry-run primeiro, depois --apply.
+    uv run python infra/scripts/spot_desk_markets.py --close-manual <POSITION_ID> \
+        --tx <ASSINATURA> --wallet <PUBKEY_DA_CARTEIRA> --reason "vendida na mão: Jupiter sem rota"
+    uv run python infra/scripts/spot_desk_markets.py --close-manual <POSITION_ID> --apply \
+        --tx <ASSINATURA> --wallet <PUBKEY_DA_CARTEIRA> --reason "vendida na mão: Jupiter sem rota"
     ```
 
     **Ficha por operação no vault (regra de 18/09: toda compra real vira ficha no mesmo dia)** —
@@ -1207,7 +1216,10 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
 
     **Desligar:** `SPOT1_ENABLED=false` + reiniciar, ou `touch
     /opt/project-hunter/run/meme/meme.kill` (o mesmo arquivo do item 8 — entradas param em ≤ 10 s;
-    saídas continuam sob qualquer estado).
+    saídas continuam sob qualquer estado). Desde a T4.74-7 a flag trava **só entradas**: com ela
+    em `false` o executor live com signer continua marcando e vendendo as posições spot abertas
+    (heartbeat `spot1.exits_active = true`, `mode = inert:disabled`); `spot1.stuck_exits` nomeia
+    uma posição cuja venda a Jupiter recusa de forma transitória há 30 tentativas seguidas.
 
 9k. **Recuperar o aluguel das contas de token VAZIAS da carteira (T4.77)** — R64 (19/09/2026): 34
     ATAs abertas = 0,0514 SOL parados, porque `MEME_CLOSE_ATA_ON_FULL_SELL` estava desligada e

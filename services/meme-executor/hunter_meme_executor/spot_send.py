@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
+from hunter_exchanges.base import ExchangeError
 from hunter_exchanges.jupiter import WRAPPED_SOL_MINT, decode_versioned_transaction
 from hunter_exchanges.pumpfun.solana_codec import (
     TOKEN_PROGRAM_ID,
@@ -121,6 +122,12 @@ async def spot_leg(
                 amount=amount_atoms,
                 slippage_bps=slippage_bps,
             )
+        except ExchangeError as exc:
+            # T4.74-7 A2, as ``spot_entry_reads`` does: a 4xx (no route, unknown
+            # mint) is a hard ``quote_refused`` that spends the exit budget; only
+            # "Jupiter did not answer" is the transient ``quote_failed``.
+            prefix = "quote_failed" if exc.retryable else "quote_refused"
+            return await _refuse(ctx, order_id, f"{prefix}:{type(exc).__name__}", None)
         except Exception as exc:
             return await _refuse(ctx, order_id, f"quote_failed:{type(exc).__name__}", None)
     mismatch = quote_mismatch(quote, input_mint, output_mint, amount_atoms)
@@ -146,6 +153,9 @@ async def spot_leg(
         verified = verify_spot_swap_tx(decoded.message, intent=intent)
     except TreasurySwapRefused as exc:
         return await _refuse(ctx, order_id, exc.reason, quote)
+    except ExchangeError as exc:
+        prefix = "swap_build_failed" if exc.retryable else "swap_refused"
+        return await _refuse(ctx, order_id, f"{prefix}:{type(exc).__name__}", quote)
     except Exception as exc:
         return await _refuse(ctx, order_id, f"swap_build_failed:{type(exc).__name__}", quote)
     fee = verified.priority_fee_lamports
