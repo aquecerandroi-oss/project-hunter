@@ -79,8 +79,18 @@ def raw_account(
     native: bool = False,
     mint: str | None = None,
     pubkey: str | None = None,
+    kind: str = "account",
+    extensions: list[dict[str, Any]] | None = None,
+    space: int | None = None,
 ) -> dict[str, Any]:
-    """One ``value[]`` entry as the RPC returns it with ``encoding: jsonParsed``."""
+    """One ``value[]`` entry as the RPC returns it with ``encoding: jsonParsed``.
+    A Token-2022 row carries the ``extensions`` list the account decoder
+    emits (``[{"extension": "immutableOwner"}]`` for the desk's pump.fun ATAs,
+    170 bytes, 1 513 840 lamports — T4.77b) unless the test says otherwise."""
+    if extensions is None and program == TOKEN_2022_PROGRAM_ID:
+        extensions = [{"extension": "immutableOwner"}]
+    if space is None:
+        space = 165 if program == TOKEN_PROGRAM_ID else 170
     info: dict[str, Any] = {
         "isNative": native,
         "mint": mint or _mint(i),
@@ -100,6 +110,8 @@ def raw_account(
         info["delegatedAmount"] = {"amount": "1", "decimals": 6}
     if close_authority is not None:
         info["closeAuthority"] = close_authority
+    if extensions:
+        info["extensions"] = extensions
     return {
         "pubkey": pubkey or _ata(i, program, owner, mint),
         "account": {
@@ -107,11 +119,11 @@ def raw_account(
             "owner": program,
             "executable": False,
             "rentEpoch": 18446744073709551615,
-            "space": 165,
+            "space": space,
             "data": {
                 "program": "spl-token" if program == TOKEN_PROGRAM_ID else "spl-token-2022",
-                "parsed": {"type": "account", "info": info},
-                "space": 165,
+                "parsed": {"type": kind, "info": info},
+                "space": space,
             },
         },
     }
@@ -137,6 +149,9 @@ def test_parse_reads_every_field_the_verdict_needs() -> None:
         delegate=OTHER,
         close_authority=OTHER,
         state="initialized",
+        kind="account",
+        extensions=(),
+        space=165,
     )
 
 
@@ -255,7 +270,11 @@ def test_the_table_names_the_token_2022_rent_this_script_never_touches() -> None
 def test_the_batch_message_is_budget_plus_closes_to_the_wallet() -> None:
     accounts = tuple(_ata(i) for i in range(8))
     message = build_batch_message(
-        wallet=WALLET, accounts=accounts, blockhash=BLOCKHASH, priority_fee_lamports=10_000
+        wallet=WALLET,
+        accounts=accounts,
+        blockhash=BLOCKHASH,
+        priority_fee_lamports=10_000,
+        token_program=TOKEN_PROGRAM_ID,
     )
     assert message.account_keys[0] == WALLET
     assert message.num_required_signatures == 1
@@ -281,10 +300,15 @@ def test_the_batch_message_refuses_more_than_a_batch_or_nothing() -> None:
             accounts=tuple(_ata(i) for i in range(9)),
             blockhash=BLOCKHASH,
             priority_fee_lamports=1,
+            token_program=TOKEN_PROGRAM_ID,
         )
     with pytest.raises(ValueError, match="batch_size"):
         build_batch_message(
-            wallet=WALLET, accounts=(), blockhash=BLOCKHASH, priority_fee_lamports=1
+            wallet=WALLET,
+            accounts=(),
+            blockhash=BLOCKHASH,
+            priority_fee_lamports=1,
+            token_program=TOKEN_PROGRAM_ID,
         )
 
 

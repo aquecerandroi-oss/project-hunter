@@ -7,10 +7,13 @@ the wallet.
 
 Order, and why it is this order:
 
-1. build (``meme_close_atas_plan.build_batch_message``) → verify
-   (``meme_close_atas_verify``) on the compiled message: anything but
-   ComputeBudget + ``CloseAccount`` to the wallet is refused by name, and the
-   signer has not been asked for anything yet;
+0. the batch must be **one** token program (Token or Token-2022, T4.77b);
+   a mixed batch is refused before anything is built (``batch_programs_mixed``);
+1. build (``meme_close_atas_plan.build_batch_message``) on that program →
+   verify (``meme_close_atas_verify``) on the compiled message against
+   ``{account: program}`` from the plan: anything but ComputeBudget +
+   ``CloseAccount`` to the wallet, on the recorded program, is refused by
+   name, and the signer has not been asked for anything yet;
 2. ``simulateTransaction`` of the **unsigned** bytes (``sigVerify=false``)
    with ``accounts=(wallet,)``: the simulated wallet balance must grow by at
    least ``Σ rent − (base fee + priority fee)`` or the batch is refused
@@ -20,19 +23,16 @@ Order, and why it is this order:
    the ``system_events`` row ``close_atas_submitted`` carrying it is
    **committed before** ``sendTransaction`` — an RPC that relays and then
    times out can never leave a broadcast without a trail;
-4. confirm, ``CONFIRM_ATTEMPTS × CONFIRM_INTERVAL_S``; still pending, or an
-   unreadable status, or an exception from the send ⇒ ``submitted`` (exit
-   66 upstream: reconcile by the printed signature); a verdict — success
-   **or** error — only counts at ``confirmed``/``finalized`` (Astra, T4.77
-   review: an error seen at ``processed`` may sit on a fork that is dropped;
-   until the chosen commitment says so the batch stays ``submitted``);
-   landed ⇒ ``confirmed`` with ``lamports_recovered`` read from **this
-   transaction's** ``meta.postBalances[0] − meta.preBalances[0]``
-   (``getTransaction``, the wallet is account 0 as the payer) — never from
-   two live balance reads, which a concurrent deposit or buy would
-   contaminate; a meta that cannot be read after ``TX_META_ATTEMPTS`` leaves
-   the batch ``submitted`` (``confirmed_recovery_unmeasured``): a number this
-   process did not measure is not written as recovered.
+4. confirm, ``CONFIRM_ATTEMPTS × CONFIRM_INTERVAL_S``; still pending, an
+   unreadable status, or an exception from the send ⇒ ``submitted`` (exit 66
+   upstream: reconcile by the printed signature); a verdict — success **or**
+   error — only counts at ``confirmed``/``finalized`` (Astra, T4.77 review:
+   an error seen at ``processed`` may sit on a dropped fork); landed ⇒
+   ``confirmed`` with ``lamports_recovered`` read from **this transaction's**
+   ``meta.postBalances[0] − meta.preBalances[0]`` (``getTransaction``, the
+   wallet is account 0 as the payer) — never from two live balance reads,
+   which a concurrent deposit or buy would contaminate; a meta unreadable
+   after ``TX_META_ATTEMPTS`` ⇒ ``submitted`` (``confirmed_recovery_unmeasured``).
 
 Each audit row is committed on its own (commit-as-you-go, T4.73b finding 3).
 """
@@ -157,12 +157,15 @@ async def run_batch(
 ) -> BatchResult:
     wallet = signer.pubkey
     accounts = tuple(row.address for row in batch)
+    programs = {row.program for row in batch}
+    token_program = next(iter(programs)) if len(programs) == 1 else None
     expected_rent = sum(row.lamports for row in batch)
     fee_allowance = BASE_FEE_LAMPORTS + priority_fee_lamports
     base: dict[str, Any] = {
         "actor": actor,
         "reason": reason,
         "wallet": wallet,
+        "token_program": token_program,
         "accounts": list(accounts),
         "mints": [row.mint for row in batch],
         "expected_rent_lamports": expected_rent,
@@ -181,15 +184,20 @@ async def run_batch(
         return BatchResult("refused", None, 0, 0, expected_rent, refusal)
 
     # --- build and verify; nothing has been signed
+    if token_program is None:
+        return await refuse("batch_programs_mixed")
     blockhash, _ = rpc.get_latest_blockhash()
     message = build_batch_message(
         wallet=wallet,
         accounts=accounts,
         blockhash=blockhash,
         priority_fee_lamports=priority_fee_lamports,
+        token_program=token_program,
     )
     try:
-        verify_close_atas_message(message, wallet=wallet, allowed_accounts=frozenset(accounts))
+        verify_close_atas_message(
+            message, wallet=wallet, allowed_accounts={row.address: row.program for row in batch}
+        )
     except CloseAtasRefused as exc:
         return await refuse(exc.reason)
     message_bytes = serialize_message(message)

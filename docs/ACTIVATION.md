@@ -1229,16 +1229,18 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
     # opcional: --limit N (só as N primeiras contas), --max-batches 2, --priority-fee-lamports 10000
     ```
 
-    **O que o dry-run tem de mostrar:** uma tabela `mint8  ata8  rent_lamports  verdict`, uma linha
-    por conta listada, com os vereditos `close` (vazia, Token program, dono/delegado/autoridade de
-    fechamento = carteira) ou `skipped:token_2022` / `skipped:nonzero_balance` (pó **nunca** é
-    fechado) / `skipped:authority_mismatch` / `skipped:frozen` / `skipped:wsol_holds_lamports` (a
-    conta WSOL com SOL além do aluguel) / `skipped:not_ata` (conta de token da carteira que não é
-    a ATA daquele mint — pode ser de outra integração) / `skipped:no_rent`; depois `listed=… selected=… skipped=…
+    **O que o dry-run tem de mostrar:** uma tabela `mint8  ata8  rent_lamports  program  verdict`,
+    uma linha por conta listada (`program` = `token` ou `token-2022`), com os vereditos `close`
+    (vazia, Token program, dono/delegado/autoridade de fechamento = carteira) ou
+    `skipped:token_2022` / `skipped:nonzero_balance` (pó **nunca** é fechado) /
+    `skipped:authority_mismatch` / `skipped:frozen` / `skipped:wsol_holds_lamports` (a conta WSOL
+    com SOL além do aluguel) / `skipped:not_ata` (conta de token da carteira que não é a ATA
+    daquele mint — pode ser de outra integração) / `skipped:not_token_account:<tipo>` (um mint ou
+    um multisig) / `skipped:no_rent`; depois `listed=… selected=… skipped=…
     total_recoverable_lamports=… total_recoverable_sol=…`, `batches=… batch_size=8
     this_run_max_batches=1 accounts_this_run=…` e a última linha **`dry-run: nothing written (add
     --apply)`**. Se aparecer `token_2022_rent_not_touched_lamports=…`, esse é o aluguel que **este
-    script não toca** (ver a nota abaixo).
+    script não toca sem `--token-2022`** (ver a nota e o passo 9k-2022 abaixo).
 
     **O que o `--apply` faz, nesta ordem, por lote:** interruptor de emergência tem de ler
     **exatamente `ACTIVE`** (`kill_switch_not_active:<estado>` recusa antes de carregar a chave) →
@@ -1275,12 +1277,70 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
     2 contas do Token program vazias (`close`, 2 976 880 lamports) e **34 Token-2022** (pump.fun
     cria as ATAs no Token-2022), todas com `amount=0`, 1 513 840 lamports cada = **51 470 560
     lamports (0,0515 SOL) — exatamente o número do R64 —, e só a extensão `immutableOwner`**
-    (35 e 0,0530 SOL numa segunda leitura, horas depois). Por
-    decisão do brief da T4.77 este script **lista e não fecha** Token-2022
-    (`skipped:token_2022`). Fechar essas 34 é uma extensão a decidir separadamente (o `CloseAccount`
-    é byte-idêntico nos dois programas e o executor já o usa no Token-2022 desde a T4.46; a guarda
-    seria: só contas cujas extensões ⊆ {`immutableOwner`}, e o verificador exigindo que o programa
-    de cada `CloseAccount` seja o que a listagem registrou para aquela conta).
+    (35 e 0,0530 SOL numa segunda leitura, horas depois). Sem `--token-2022` este script **lista e
+    não fecha** Token-2022 (`skipped:token_2022`) — o comportamento da T4.77, inalterado.
+
+    **9k-2022 — fechar as Token-2022 vazias (T4.77b; Everton autorizou por escrito em 19/09/2026,
+    "pode").** É opt-in (`--token-2022`) e vem com as guardas que a Astra pediu na revisão da
+    T4.77, todas provadas com fakes (`infra/scripts/tests/test_meme_close_atas_token_2022.py`):
+
+    - **veredito `close` numa Token-2022 só quando tudo isto vale junto:** o `type` decodificado é
+      `account` (um mint ou um multisig é `skipped:not_token_account:<tipo>` — o `CloseAccount` do
+      Token-2022 sabe fechar mint, e este script nunca pede isso), `amount == "0"`, `state !=
+      frozen`, dono = carteira, sem `delegate`, `closeAuthority` ausente ou = carteira, extensões
+      ⊆ {`immutableOwner`} (qualquer outra — `transferFeeAmount`, `confidentialTransferAccount`,
+      `memoTransfer`, `cpiGuard`, `permanentDelegate`, `transferHookAccount`,
+      `unparseableExtension`… — é `skipped:token_2022_extension:<nome>`: `amount=0` sozinho não
+      prova que não há saldo confidencial ou taxa retida), o **tamanho on-chain bate com as
+      extensões declaradas** (`space` = 165 sem extensão, 170 com só `immutableOwner`; qualquer
+      outro valor é `skipped:space_mismatch:<bytes>` — a Astra mostrou na re-revisão que o decoder
+      do RPC devolve a lista **vazia**, e não `unparseableExtension`, quando encontra uma extensão
+      que não conhece; o `space` é um fato da conta que o decoder não encolhe) e o endereço é **a
+      ATA derivada com o Token-2022 nas seeds** (a ATA do programa clássico para o mesmo mint é
+      outro endereço e dá `skipped:not_ata`);
+    - **o plano grava o programa de cada conta** (coluna `program` da tabela) e os **lotes são
+      homogêneos** — primeiro os do Token program, depois os do Token-2022, nunca os dois numa
+      mesma transação;
+    - **o verificador** aceita `CloseAccount` no Token program **ou** no Token-2022, mas **só no
+      programa que o plano registrou para aquela conta** (`close_account_program_mismatch` se um
+      `CloseAccount` do Token-2022 aponta para uma conta julgada no clássico, ou o inverso);
+      `data == 0x09` exato nos dois, 3 contas, destino = autoridade = carteira, uma assinatura,
+      teto de taxa — tudo o mais igual; uma mensagem com os dois programas é `batch_programs_mixed`;
+    - **a primeira execução real fecha exatamente UMA conta Token-2022** (modo-prova: `--limit 1
+      --max-batches 1` forçados; passar outros valores é erro de uso 64; os `close` do Token
+      program aparecem como `skipped:proof_run_token_2022_only` nessa rodada) — o Everton prova
+      **uma** na mainnet antes do resto; `--i-know-2022` destrava os lotes de 8 depois disso;
+    - a simulação continua exigindo saldo simulado ≥ Σ aluguel − taxas, e o `lamports_recovered`
+      continua vindo do meta da própria transação; a linha `system_events` ganha `token_program`.
+
+    ```bash
+    # 1) dry-run com a flag: a tabela inteira, 1 selecionada (modo-prova), nada escrito
+    bash infra/vps/compose.sh ops python infra/scripts/meme_close_atas.py \
+        --user ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4 --token-2022
+
+    # 2) aplicar a PROVA: exatamente 1 conta Token-2022 (limit 1 / max-batches 1 forçados)
+    bash infra/vps/compose.sh ops python infra/scripts/meme_close_atas.py --apply \
+        --token-2022 --reason "T4.77b prova 1 conta Token-2022"
+
+    # 3) conferir a assinatura impressa na Solscan (1 CloseAccount do Token-2022, +1 513 840
+    #    lamports menos a taxa) e SÓ ENTÃO o resto, em lotes de 8 (5 lotes para 35 contas)
+    bash infra/vps/compose.sh ops python infra/scripts/meme_close_atas.py --apply \
+        --token-2022 --i-know-2022 --max-batches 5 --reason "T4.77b aluguel Token-2022 R64"
+    ```
+
+    **O que a saída tem de mostrar.** No passo 1: cada Token-2022 vazia com `program=token-2022`
+    e verdict `close`; as do Token program (se ainda houver) com `skipped:proof_run_token_2022_only`;
+    `selected=1`, `total_recoverable_lamports=1513840`, `batches=1 batch_size=8
+    this_run_max_batches=1 accounts_this_run=1`, a linha `proof_run=token_2022: …` e `dry-run:
+    nothing written (add --apply)`. No passo 2: a mesma tabela, uma linha JSON `{"batch": 0,
+    "status": "confirmed", "signature": "…", "n_closed": 1, "lamports_recovered": ≈1498840,
+    "sol_recovered": "0.0014…", "expected_rent_lamports": 1513840, "reason": null}` e `done:
+    closed=1 lamports_recovered=…`; qualquer outro `status` segue os códigos de saída acima (65/66/67)
+    e o passo 3 **não** roda antes de reconciliar. No passo 3: `selected=34` (ou o que restar),
+    `batches=5`, cinco linhas JSON `confirmed` com `n_closed` 8/8/8/8/2 e o `done:` final; a
+    listagem seguinte não mostra mais essas contas. Depois disso, ligar
+    `MEME_CLOSE_ATA_ON_FULL_SELL=1` no `.env` (ato do Everton) é o que impede o aluguel de voltar a
+    acumular.
 
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*

@@ -4,8 +4,10 @@ Every bad transaction here is hand-built the way an attacker (or a bug in the
 builder) would build it: a System ``Transfer``, a ``CloseAccount`` whose
 refund goes to a foreign destination, a foreign program, a Token
 ``Transfer`` disguised inside the allowed program, a close of an account the
-plan never listed, Token-2022, more than one signer, a priority fee above the
-cap. The good transaction is the builder's own output.
+plan never listed, a Token-2022 close of an account the plan judged on the
+classic program, more than one signer, a priority fee above the cap. The
+good transaction is the builder's own output. The Token-2022 positive and
+negative cases of T4.77b live in ``test_meme_close_atas_token_2022.py``.
 """
 
 from __future__ import annotations
@@ -72,16 +74,25 @@ def _budget() -> list[Instruction]:
     return [set_compute_unit_limit(50_000), set_compute_unit_price(200_000)]
 
 
+def _plan(allowed: tuple[str, ...]) -> dict[str, str]:
+    """What the plan records: account -> the token program it was judged on."""
+    return {account: TOKEN_PROGRAM_ID for account in allowed}
+
+
 def _verify(instructions: list[Instruction], *, allowed: tuple[str, ...] = ATAS[:8]) -> None:
     message = compile_message(WALLET, instructions, BLOCKHASH)
-    verify_close_atas_message(message, wallet=WALLET, allowed_accounts=frozenset(allowed))
+    verify_close_atas_message(message, wallet=WALLET, allowed_accounts=_plan(allowed))
 
 
 def test_the_builders_own_batch_verifies() -> None:
     message = build_batch_message(
-        wallet=WALLET, accounts=ATAS[:8], blockhash=BLOCKHASH, priority_fee_lamports=10_000
+        wallet=WALLET,
+        accounts=ATAS[:8],
+        blockhash=BLOCKHASH,
+        priority_fee_lamports=10_000,
+        token_program=TOKEN_PROGRAM_ID,
     )
-    closed = verify_close_atas_message(message, wallet=WALLET, allowed_accounts=frozenset(ATAS[:8]))
+    closed = verify_close_atas_message(message, wallet=WALLET, allowed_accounts=_plan(ATAS[:8]))
     assert closed == ATAS[:8]
 
 
@@ -124,9 +135,11 @@ def test_a_foreign_program_is_refused_by_name() -> None:
         _verify([*_budget(), _close(ATAS[0]), route])
 
 
-def test_token_2022_is_refused_even_for_a_close() -> None:
+def test_a_token_2022_close_of_an_account_the_plan_judged_as_classic_is_refused() -> None:
+    """T4.77b: the program is allowed, but only on the accounts the plan
+    recorded under it — a classic verdict is not a Token-2022 verdict."""
     close_2022 = Instruction(TOKEN_2022_PROGRAM_ID, _close(ATAS[0]).accounts, CLOSE)
-    with pytest.raises(CloseAtasRefused, match="program_not_allowed:Tokenz"):
+    with pytest.raises(CloseAtasRefused, match="close_account_program_mismatch"):
         _verify([*_budget(), close_2022])
 
 

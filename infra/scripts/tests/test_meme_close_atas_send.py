@@ -271,7 +271,7 @@ def test_the_verifier_runs_on_the_built_message_before_anything_is_signed(
 
     other = "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"
 
-    def _bad_builder(*, wallet: str, accounts: Any, blockhash: str, priority_fee_lamports: int):
+    def _bad_builder(*, wallet: str, accounts: Any, blockhash: str, **_: Any):
         close = Instruction(
             TOKEN_PROGRAM_ID,
             (

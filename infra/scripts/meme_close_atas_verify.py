@@ -10,18 +10,21 @@ What is allowed, and nothing else:
 - ComputeBudget ``SetComputeUnitLimit`` (index 2) and ``SetComputeUnitPrice``
   (index 3), at most one of each, no accounts, and ``limit × price`` at or
   under ``MAX_PRIORITY_FEE_LAMPORTS``;
-- SPL **Token program** (classic) ``CloseAccount`` — ``data == b"\\x09"``
-  exactly (a ``Transfer`` is 3, ``Approve`` 4, ``SetAuthority`` 6, ``Burn``
-  8; a padded ``\\x09\\x00`` is not a ``CloseAccount``), three accounts:
-  ``[account (writable, in the plan), destination == wallet (writable),
-  authority == wallet (signer)]``, no account closed twice, at most
-  ``MAX_CLOSES_PER_BATCH`` and at least one.
+- SPL Token ``CloseAccount`` on the **Token program or Token-2022**, and
+  only on the program the plan recorded for that very account
+  (``allowed_accounts`` maps account → program; T4.77b, Astra item 3) —
+  ``data == b"\\x09"`` exactly on both programs (a ``Transfer`` is 3,
+  ``Approve`` 4, ``SetAuthority`` 6, ``Burn`` 8; a padded ``\\x09\\x00`` is
+  not a ``CloseAccount``), three accounts: ``[account (writable, in the
+  plan), destination == wallet (writable), authority == wallet (signer)]``,
+  no account closed twice, at most ``MAX_CLOSES_PER_BATCH`` and at least
+  one, and **one** token program per message (``batch_programs_mixed``).
 
-Token-2022 is refused by name here on purpose: the script lists Token-2022
-accounts as ``skipped:token_2022`` and never builds a close for them, so a
-Token-2022 ``CloseAccount`` in the message can only mean the builder was
-changed under the verifier. Anything else — System ``Transfer``, an
-Associated Token ``Create``, any DEX — is ``program_not_allowed:<id>``.
+Anything else — System ``Transfer``, an Associated Token ``Create``, any
+DEX — is ``program_not_allowed:<id>``. A Token-2022 close of an account the
+plan listed under the classic program (or the reverse) is
+``close_account_program_mismatch``: the plan's verdicts are per program,
+and a close the plan did not judge on that program was never judged.
 
 No I/O, no clock, no network: ``(message, wallet, allowed_accounts) ->
 tuple[closed accounts]`` or :class:`CloseAtasRefused`.
@@ -30,15 +33,18 @@ tuple[closed accounts]`` or :class:`CloseAtasRefused`.
 from __future__ import annotations
 
 import struct
+from collections.abc import Mapping
 
 from hunter_exchanges.pumpfun.solana_codec import (
     COMPUTE_BUDGET_PROGRAM_ID,
+    TOKEN_2022_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
     CompiledInstruction,
     Message,
 )
 
 __all__ = [
+    "ALLOWED_TOKEN_PROGRAMS",
     "CLOSE_ACCOUNT_DATA",
     "MAX_CLOSES_PER_BATCH",
     "MAX_PRIORITY_FEE_LAMPORTS",
@@ -48,6 +54,7 @@ __all__ = [
 ]
 
 CLOSE_ACCOUNT_DATA = bytes([9])
+ALLOWED_TOKEN_PROGRAMS = frozenset({TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID})
 MAX_CLOSES_PER_BATCH = 8
 MAX_PRIORITY_FEE_LAMPORTS = 100_000
 _CU_LIMIT_INDEX = 2
@@ -68,13 +75,15 @@ def priority_fee_lamports(*, compute_unit_limit: int, micro_lamports_per_cu: int
 
 
 def verify_close_atas_message(
-    message: Message, *, wallet: str, allowed_accounts: frozenset[str]
+    message: Message, *, wallet: str, allowed_accounts: Mapping[str, str]
 ) -> tuple[str, ...]:
-    """Return the accounts the message closes, in order, or raise."""
+    """Return the accounts the message closes, in order, or raise.
+    ``allowed_accounts``: account → the token program the plan recorded."""
     if message.num_required_signatures != 1 or message.account_keys[0] != wallet:
         raise CloseAtasRefused("signers_not_exactly_wallet")
     keys = message.account_keys
     closed: list[str] = []
+    programs: set[str] = set()
     cu_limit: int | None = None
     cu_price: int | None = None
     for ix in message.instructions:
@@ -90,15 +99,20 @@ def verify_close_atas_message(
                     raise CloseAtasRefused("compute_budget_instruction_duplicated")
                 cu_price = value
             continue
-        if program == TOKEN_PROGRAM_ID:
-            account = _close_account(message, ix, wallet=wallet, allowed=allowed_accounts)
+        if program in ALLOWED_TOKEN_PROGRAMS:
+            account = _close_account(
+                message, ix, wallet=wallet, allowed=allowed_accounts, program=program
+            )
             if account in closed:
                 raise CloseAtasRefused("close_account_duplicated")
             closed.append(account)
+            programs.add(program)
             continue
         raise CloseAtasRefused(f"program_not_allowed:{program}")
     if not closed:
         raise CloseAtasRefused("no_close_account_instruction")
+    if len(programs) != 1:
+        raise CloseAtasRefused("batch_programs_mixed")
     if len(closed) > MAX_CLOSES_PER_BATCH:
         raise CloseAtasRefused(f"too_many_close_instructions:{len(closed)}>{MAX_CLOSES_PER_BATCH}")
     if cu_limit is not None and cu_price is not None:
@@ -123,7 +137,12 @@ def _compute_budget(ix: CompiledInstruction) -> tuple[int, int]:
 
 
 def _close_account(
-    message: Message, ix: CompiledInstruction, *, wallet: str, allowed: frozenset[str]
+    message: Message,
+    ix: CompiledInstruction,
+    *,
+    wallet: str,
+    allowed: Mapping[str, str],
+    program: str,
 ) -> str:
     if ix.data != CLOSE_ACCOUNT_DATA:
         raise CloseAtasRefused("token_instruction_not_close_account")
@@ -138,8 +157,11 @@ def _close_account(
     account = keys[account_ix]
     if account == wallet:
         raise CloseAtasRefused("close_account_is_wallet")
-    if account not in allowed:
+    planned = allowed.get(account)
+    if planned is None:
         raise CloseAtasRefused(f"close_account_not_in_plan:{account[:8]}")
+    if planned != program:
+        raise CloseAtasRefused(f"close_account_program_mismatch:{account[:8]}")
     if not message.is_writable(account_ix):
         raise CloseAtasRefused("close_account_not_writable")
     return account

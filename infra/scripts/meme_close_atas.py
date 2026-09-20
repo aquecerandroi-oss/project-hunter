@@ -19,11 +19,23 @@ built by us (no Jupiter), refund and authority both the wallet.
     # own SOLANA_WALLET_SECRET_KEY (read inside the apply path only, never printed)
     bash infra/vps/compose.sh ops python infra/scripts/meme_close_atas.py --apply
 
-Never closed, always listed: Token-2022 accounts (``skipped:token_2022``),
-any account with a balance (``skipped:nonzero_balance`` — dust stays),
-the WSOL account when it holds lamports beyond its rent reserve
-(``skipped:wsol_holds_lamports``), accounts whose owner / delegate / close
-authority is not the wallet (``skipped:authority_mismatch``), frozen ones.
+    # T4.77b — Token-2022 (the 35 pump.fun ATAs, ``immutableOwner`` only):
+    # opt-in, and the FIRST run is a proof run: exactly ONE Token-2022
+    # account (``--limit 1 --max-batches 1`` forced, classic closes deferred
+    # as ``skipped:proof_run_token_2022_only``). After it confirms on
+    # mainnet, ``--i-know-2022`` unlocks the batches of 8.
+    ... meme_close_atas.py --apply --token-2022
+    ... meme_close_atas.py --apply --token-2022 --i-know-2022 --max-batches 5
+
+Never closed, always listed: Token-2022 accounts without ``--token-2022``
+(``skipped:token_2022``) and, with it, any Token-2022 account carrying an
+extension other than ``immutableOwner`` (``skipped:token_2022_extension:<name>``)
+or that is not the ATA derived with Token-2022 in the seeds (``skipped:not_ata``);
+mints and multisigs (``skipped:not_token_account:<type>``); any account
+with a balance (``skipped:nonzero_balance`` — dust stays), the WSOL account
+when it holds lamports beyond its rent reserve (``skipped:wsol_holds_lamports``),
+accounts whose owner / delegate / close authority is not the wallet
+(``skipped:authority_mismatch``), frozen ones. Batches never mix programs.
 
 ``--apply`` (same discipline as ``meme_spot_swap.py``, T4.73b): the kill
 switch must read exactly ``ACTIVE``; the signer is loaded after that check
@@ -122,6 +134,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=DEFAULT_PRIORITY_FEE_LAMPORTS,
         help=f"per batch, capped at {MAX_PRIORITY_FEE_LAMPORTS}",
     )
+    parser.add_argument(
+        "--token-2022",
+        action="store_true",
+        help="also close EMPTY Token-2022 accounts (immutableOwner only); first run = 1 account",
+    )
+    parser.add_argument(
+        "--i-know-2022",
+        action="store_true",
+        help="after one Token-2022 close confirmed on mainnet: lift the 1-account proof run",
+    )
     parser.add_argument("--reason", default="T4.77 recover empty ATA rent")
     parser.add_argument("--actor", default="everton", help="who is running it (audit row)")
     parser.add_argument("--rpc", default=MAINNET_PUBLIC_RPC_URL)
@@ -137,32 +159,56 @@ def usage_error(args: argparse.Namespace) -> str | None:
         return "--limit must be >= 1"
     if not 0 <= args.priority_fee_lamports <= MAX_PRIORITY_FEE_LAMPORTS:
         return f"--priority-fee-lamports must be in 0..{MAX_PRIORITY_FEE_LAMPORTS}"
+    if args.i_know_2022 and not args.token_2022:
+        return "--i-know-2022 only makes sense with --token-2022"
+    if _proof_run(args) and (args.limit not in (None, 1) or args.max_batches != 1):
+        return (
+            "the first --token-2022 run closes exactly 1 account (--limit 1 --max-batches 1); "
+            "drop those flags, or add --i-know-2022 after one Token-2022 close confirmed"
+        )
     return None
 
 
-def _plan(rpc: Any, wallet: str, limit: int | None) -> Plan:
+def _proof_run(args: argparse.Namespace) -> bool:
+    return bool(args.token_2022 and not args.i_know_2022)
+
+
+def _plan(rpc: Any, wallet: str, args: argparse.Namespace) -> Plan:
     try:
         rows = list_token_accounts(rpc, wallet)
     except ValueError as exc:
         raise Refused(f"listing_unparsable:{exc}") from exc
-    return build_plan(rows, wallet=wallet, limit=limit)
+    proof = _proof_run(args)
+    return build_plan(
+        rows,
+        wallet=wallet,
+        limit=1 if proof else args.limit,
+        token_2022=bool(args.token_2022),
+        proof_run=proof,
+    )
 
 
-def _print_plan(plan: Plan, *, max_batches: int) -> tuple[tuple[Any, ...], ...]:
+def _print_plan(plan: Plan, *, args: argparse.Namespace) -> tuple[tuple[Any, ...], ...]:
     print(format_table(plan))
     parts = batches(plan)
+    max_batches = 1 if _proof_run(args) else args.max_batches
     print(
         f"batches={len(parts)} batch_size={BATCH_SIZE} this_run_max_batches={max_batches} "
         f"accounts_this_run={sum(len(p) for p in parts[:max_batches])}"
     )
-    return parts
+    if _proof_run(args):
+        print(
+            "proof_run=token_2022: this run closes at most 1 Token-2022 account; once it is "
+            "confirmed on mainnet, re-run with --i-know-2022 for the batches of 8"
+        )
+    return parts[:max_batches]
 
 
 def _dry_run(args: argparse.Namespace) -> int:
     rpc = SolanaTxRpcClient(args.rpc)  # no allow_send: this client cannot broadcast
     try:
-        plan = _plan(rpc, args.user, args.limit)
-        _print_plan(plan, max_batches=args.max_batches)
+        plan = _plan(rpc, args.user, args)
+        _print_plan(plan, args=args)
     finally:
         rpc.close()
     print("dry-run: nothing written (add --apply)")
@@ -194,8 +240,8 @@ async def apply_with(
     wallet = signer.pubkey
     if args.user and args.user != wallet:
         raise Refused(f"user_mismatch:{args.user[:8]}!={wallet[:8]}")
-    plan = _plan(rpc, wallet, args.limit)
-    parts = _print_plan(plan, max_batches=args.max_batches)[: args.max_batches]
+    plan = _plan(rpc, wallet, args)
+    parts = _print_plan(plan, args=args)
     if not parts:
         print("nothing to close")
         return 0
