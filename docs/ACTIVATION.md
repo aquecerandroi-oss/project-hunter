@@ -1209,6 +1209,79 @@ Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
     /opt/project-hunter/run/meme/meme.kill` (o mesmo arquivo do item 8 — entradas param em ≤ 10 s;
     saídas continuam sob qualquer estado).
 
+9k. **Recuperar o aluguel das contas de token VAZIAS da carteira (T4.77)** — R64 (19/09/2026): 34
+    ATAs abertas = 0,0514 SOL parados, porque `MEME_CLOSE_ATA_ON_FULL_SELL` estava desligada e
+    nenhuma venda fechou a sua ATA (T4.46). `infra/scripts/meme_close_atas.py`: lista as contas de
+    token da carteira (`getTokenAccountsByOwner`, Token program **e** Token-2022), dá um veredito por
+    conta e, só com `--apply`, fecha as vazias do Token program em lotes de ≤ 8 `CloseAccount`
+    (transação **nossa**, sem Jupiter; reembolso e autoridade = a própria carteira). Dry-run por
+    padrão, mesma disciplina do item 9i.
+
+    ```bash
+    # 1) dry-run (chave pública só; sem banco, sem Redis, sem assinatura, cliente RPC sem envio)
+    bash infra/vps/compose.sh ops python infra/scripts/meme_close_atas.py \
+        --user ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4
+
+    # 2) aplicar UM lote (padrão --max-batches 1; rodar de novo para o próximo lote)
+    bash infra/vps/compose.sh ops python infra/scripts/meme_close_atas.py --apply \
+        --reason "T4.77 aluguel R64"
+
+    # opcional: --limit N (só as N primeiras contas), --max-batches 2, --priority-fee-lamports 10000
+    ```
+
+    **O que o dry-run tem de mostrar:** uma tabela `mint8  ata8  rent_lamports  verdict`, uma linha
+    por conta listada, com os vereditos `close` (vazia, Token program, dono/delegado/autoridade de
+    fechamento = carteira) ou `skipped:token_2022` / `skipped:nonzero_balance` (pó **nunca** é
+    fechado) / `skipped:authority_mismatch` / `skipped:frozen` / `skipped:wsol_holds_lamports` (a
+    conta WSOL com SOL além do aluguel) / `skipped:not_ata` (conta de token da carteira que não é
+    a ATA daquele mint — pode ser de outra integração) / `skipped:no_rent`; depois `listed=… selected=… skipped=…
+    total_recoverable_lamports=… total_recoverable_sol=…`, `batches=… batch_size=8
+    this_run_max_batches=1 accounts_this_run=…` e a última linha **`dry-run: nothing written (add
+    --apply)`**. Se aparecer `token_2022_rent_not_touched_lamports=…`, esse é o aluguel que **este
+    script não toca** (ver a nota abaixo).
+
+    **O que o `--apply` faz, nesta ordem, por lote:** interruptor de emergência tem de ler
+    **exatamente `ACTIVE`** (`kill_switch_not_active:<estado>` recusa antes de carregar a chave) →
+    carrega `SOLANA_WALLET_SECRET_KEY` (uma vez, dentro do `--apply`, nunca impressa; se `--user` for
+    passado e não bater com a chave, `user_mismatch`) → lista pela chave pública **do signer** →
+    monta `[cu limit, cu price, CloseAccount × n]` → **verifica antes de assinar**
+    (`meme_close_atas_verify.py`: só ComputeBudget + `CloseAccount` do Token program para a
+    carteira, contas do plano, ≤ 8, taxa de prioridade ≤ 100 000 lamports; qualquer outra coisa é
+    recusada por nome) → `simulateTransaction` com `accounts=[carteira]` e recusa
+    `simulation_lamports_short` se o saldo simulado não subir ≥ Σ aluguel − taxas → assina **uma
+    vez** → grava `system_events` (`component=meme_close_atas`, `event=close_atas_submitted`,
+    com `actor`, `signature`, contas) **e commita antes** do `sendTransaction` → envia → confirma
+    (20 × 1 s; sucesso **ou** erro só contam em `confirmed`/`finalized` — um erro visto em
+    `processed` pode estar num fork descartado e fica `submitted`) → `close_atas_confirmed` com
+    `n_closed` e `lamports_recovered` lidos do **meta desta transação**
+    (`getTransaction`: `postBalances[0] − preBalances[0]`, líquido de taxa — nunca de duas leituras
+    de saldo, que um depósito ou uma compra concorrente contaminariam; meta ilegível ⇒ fica
+    `submitted` com `confirmed_recovery_unmeasured`, código 66). Com mais de um lote, o interruptor é
+    relido **antes de cada lote**. Uma linha JSON por lote no stdout:
+    `{"batch": 0, "status": "confirmed", "signature": "…", "n_closed": 8, "lamports_recovered": …,
+    "sol_recovered": "0.0…", "expected_rent_lamports": …, "reason": null}` e, no fim, `done:
+    closed=… lamports_recovered=…`.
+
+    **Códigos de saída:** 0 feito (ou dry-run limpo); 64 uso (`--user` faltando no dry-run,
+    `--max-batches`/`--limit` < 1, taxa fora de 0..100 000); 65 recusado por nome (interruptor,
+    `user_mismatch`, listagem ilegível, lote recusado pelo verificador/simulação — nada assinado);
+    **66** lote enviado e **não confirmado** em 20 s — a assinatura está impressa e em
+    `system_events`; os lotes seguintes **não** rodaram; conferir na Solscan antes de rodar de novo
+    (se confirmou, a próxima listagem já não mostra essas contas; se não, nada saiu além da taxa);
+    67 lote falhou na cadeia (só a taxa de rede foi gasta; as contas continuam lá). Num wrapper,
+    só o 0 é sucesso.
+
+    **Medido em 19/09/2026 (dry-run real, chave pública; o número cresce enquanto a mesa opera):**
+    2 contas do Token program vazias (`close`, 2 976 880 lamports) e **34 Token-2022** (pump.fun
+    cria as ATAs no Token-2022), todas com `amount=0`, 1 513 840 lamports cada = **51 470 560
+    lamports (0,0515 SOL) — exatamente o número do R64 —, e só a extensão `immutableOwner`**
+    (35 e 0,0530 SOL numa segunda leitura, horas depois). Por
+    decisão do brief da T4.77 este script **lista e não fecha** Token-2022
+    (`skipped:token_2022`). Fechar essas 34 é uma extensão a decidir separadamente (o `CloseAccount`
+    é byte-idêntico nos dois programas e o executor já o usa no Token-2022 desde a T4.46; a guarda
+    seria: só contas cujas extensões ⊆ {`immutableOwner`}, e o verificador exigindo que o programa
+    de cada `CloseAccount` seja o que a listagem registrou para aquela conta).
+
 10. **Simular uma venda numa curva com *holder rewards* antes de confiar nela (T4.29c)** — só ele pode
     rodar (o agente não tem carteira nem posição). A T4.8c provou por simulação de mainnet uma *compra*
     numa moeda `is_holder_reward = true` e *vendas* só em curvas normais; a venda numa curva HR nunca
