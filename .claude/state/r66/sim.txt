@@ -1,0 +1,62 @@
+== R66 Q3 - simulacao pos-graduacao (monitorizacao discreta ~60 s) ==
+ticket 0.07 SOL | rede 0.000091 SOL/op | rent ATA 0.00151384 SOL | impacto 0.10 %/perna | taxa = faixa real do FeeConfig do PumpSwap
+
+taxa por perna nas 4400 entradas: mediana 1.20 %, p10 0.65 %, p90 1.25 % -> ida-e-volta mediana 2.40 %
+
+entrada na graduacao | mesa 1,15x / trail 10 % / 300 s | rent devolvido
+  censuradas (excluidas do PnL): 1229 de 4400 (27.9 %) {"censurado_fim": 404, "censurado_lacuna": 825}
+  custo de taxa REALIZADO ida-e-volta (entrada+saida, %): mediana 2.40 | media 2.26
+entrada na graduacao | mesa 1,15x / trail 10 % / 300 s | rent devolvido
+  n=3171  total=-11.7036 SOL  por operacao=-0.003691 SOL (-5.27 % do ticket)
+  acerto (PnL>0)=50.3 %  hold mediano=73 s  pior=-0.0701  melhor=+1.1815
+  saidas={"target": 1149, "time_stop": 480, "trailing": 1542}
+  dias verdes=0/8  por dia={'2026-09-15': '-0.426', '2026-09-16': '-1.568', '2026-09-17': '-2.103', '2026-09-18': '-1.614', '2026-09-19': '-2.018', '2026-09-20': '-3.131', '2026-09-21': '-0.837', '2026-09-22': '-0.007'}
+
+entrada na graduacao | mesa 1,15x / trail 10 % / 300 s | rent perdido
+  censuradas (excluidas do PnL): 1229 de 4400 (27.9 %) {"censurado_fim": 404, "censurado_lacuna": 825}
+  custo de taxa REALIZADO ida-e-volta (entrada+saida, %): mediana 2.40 | media 2.26
+entrada na graduacao | mesa 1,15x / trail 10 % / 300 s | rent perdido
+  n=3171  total=-16.5040 SOL  por operacao=-0.005205 SOL (-7.44 % do ticket)
+  acerto (PnL>0)=45.8 %  hold mediano=73 s  pior=-0.0716  melhor=+1.1800
+  saidas={"target": 1149, "time_stop": 480, "trailing": 1542}
+  dias verdes=0/8  por dia={'2026-09-15': '-0.527', '2026-09-16': '-2.414', '2026-09-17': '-3.031', '2026-09-18': '-2.344', '2026-09-19': '-2.722', '2026-09-20': '-3.977', '2026-09-21': '-1.305', '2026-09-22': '-0.184'}
+
+entrada na graduacao | lenta 1,30x / trail 15 % / 3600 s | rent devolvido
+  censuradas (excluidas do PnL): 1637 de 4400 (37.2 %) {"censurado_fim": 646, "censurado_lacuna": 991}
+  custo de taxa REALIZADO ida-e-volta (entrada+saida, %): mediana 2.45 | media 2.39
+entrada na graduacao | lenta 1,30x / trail 15 % / 3600 s | rent devolvido
+  n=2763  total=-17.0274 SOL  por operacao=-0.006163 SOL (-8.80 % do ticket)
+  acerto (PnL>0)=36.5 %  hold mediano=120 s  pior=-0.0701  melhor=+1.1815
+  saidas={"target": 945, "time_stop": 48, "trailing": 1770}
+  dias verdes=0/8  por dia={'2026-09-15': '-0.649', '2026-09-16': '-1.901', '2026-09-17': '-1.676', '2026-09-18': '-3.282', '2026-09-19': '-2.357', '2026-09-20': '-4.423', '2026-09-21': '-2.015', '2026-09-22': '-0.725'}
+
+entrada na graduacao | lenta 1,30x / trail 15 % / 3600 s | rent perdido
+  censuradas (excluidas do PnL): 1637 de 4400 (37.2 %) {"censurado_fim": 646, "censurado_lacuna": 991}
+  custo de taxa REALIZADO ida-e-volta (entrada+saida, %): mediana 2.45 | media 2.39
+entrada na graduacao | lenta 1,30x / trail 15 % / 3600 s | rent perdido
+  n=2763  total=-21.2102 SOL  por operacao=-0.007676 SOL (-10.97 % do ticket)
+  acerto (PnL>0)=36.0 %  hold mediano=120 s  pior=-0.0716  melhor=+1.1800
+  saidas={"target": 945, "time_stop": 48, "trailing": 1770}
+  dias verdes=0/8  por dia={'2026-09-15': '-0.738', '2026-09-16': '-2.615', '2026-09-17': '-2.477', '2026-09-18': '-3.939', '2026-09-19': '-2.987', '2026-09-20': '-5.184', '2026-09-21': '-2.406', '2026-09-22': '-0.864'}
+
+== entrada no pullback (primeira leitura -10 % do maximo pos-graduacao, ate +15 min) ==
+mints com pullback observado: 2713 de 4400 (61.7 %)
+
+entrada no pullback | mesa 1,15x / trail 10 % / 300 s | rent devolvido
+  censuradas (excluidas do PnL): 111 de 2713 (4.1 %) {"censurado_fim": 13, "censurado_lacuna": 98}
+  custo de taxa REALIZADO ida-e-volta (entrada+saida, %): mediana 2.45 | media 2.45
+entrada no pullback | mesa 1,15x / trail 10 % / 300 s | rent devolvido
+  n=2602  total=-8.7915 SOL  por operacao=-0.003379 SOL (-4.83 % do ticket)
+  acerto (PnL>0)=44.9 %  hold mediano=60 s  pior=-0.0701  melhor=+0.3694
+  saidas={"target": 1146, "time_stop": 120, "trailing": 1336}
+  dias verdes=0/8  por dia={'2026-09-15': '-0.303', '2026-09-16': '-0.262', '2026-09-17': '-0.495', '2026-09-18': '-1.534', '2026-09-19': '-1.796', '2026-09-20': '-2.441', '2026-09-21': '-1.131', '2026-09-22': '-0.828'}
+
+entrada no pullback | lenta 1,30x / trail 15 % / 3600 s | rent devolvido
+  censuradas (excluidas do PnL): 194 de 2713 (7.2 %) {"censurado_fim": 66, "censurado_lacuna": 128}
+  custo de taxa REALIZADO ida-e-volta (entrada+saida, %): mediana 2.45 | media 2.45
+entrada no pullback | lenta 1,30x / trail 15 % / 3600 s | rent devolvido
+  n=2519  total=-12.4314 SOL  por operacao=-0.004935 SOL (-7.05 % do ticket)
+  acerto (PnL>0)=37.0 %  hold mediano=120 s  pior=-0.0701  melhor=+0.3694
+  saidas={"target": 908, "time_stop": 34, "trailing": 1577}
+  dias verdes=0/8  por dia={'2026-09-15': '-0.497', '2026-09-16': '-0.751', '2026-09-17': '-0.410', '2026-09-18': '-2.584', '2026-09-19': '-2.564', '2026-09-20': '-3.090', '2026-09-21': '-1.476', '2026-09-22': '-1.058'}
+

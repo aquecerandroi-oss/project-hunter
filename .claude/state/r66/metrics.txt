@@ -1,0 +1,35 @@
+== R66 Q1 - cobertura ==
+tokens com migrated_at nos 7 dias: 6384
+com serie do board 'graduated' pos-migracao: 4400 (68.9 %)
+com ponto de entrada (1a leitura >= migrated_at): 4400
+atraso da 1a leitura (s) p10/p50/p90: 4 / 29 / 54
+market cap na entrada (SOL) p10/p50/p90: 344 / 708 / 42631
+faixa de taxa do PumpSwap na entrada (% por perna): {"0.30": 256, "0.325": 2, "0.35": 12, "0.375": 6, "0.40": 10, "0.425": 4, "0.45": 5, "0.475": 63, "0.50": 24, "0.525": 14, "0.55": 20, "0.60": 8, "0.65": 32, "0.70": 9, "0.75": 14, "0.80": 16, "0.85": 38, "0.90": 46, "0.95": 103, "1.00": 754, "1.05": 242, "1.10": 160, "1.15": 86, "1.20": 1522, "1.25": 954}
+
+== R66 Q1 - cobertura por janela (leitura a +-90 s do alvo) ==
+ +1 min:  4077 mints (92.7 % dos 4400)
+ +5 min:  3276 mints (74.5 % dos 4400)
++15 min:  2714 mints (61.7 % dos 4400)
+   +1 h:  1964 mints (44.6 % dos 4400)
+   +4 h:     0 mints (0.0 % dos 4400)
+
+== R66 Q2 - retorno bruto (%) desde a 1a leitura pos-graduacao ==
+ janela     n      p10      p25  mediana      p75      p90  >=+15%  <=-30%
+ +1 min  4077    -35.6     -9.6      0.9      5.7     23.6   14.6%   11.9%
+ +5 min  3276    -79.7    -54.4      1.2     22.1     68.6   29.5%   35.3%
++15 min  2714    -95.8    -94.8    -79.9      5.1     66.3   20.6%   64.8%
+   +1 h  1964    -99.7    -99.4    -95.1    -86.9      4.6    5.2%   86.8%
+   +4 h     0  (sem amostra)
+
+== R66 Q2 - MFE / MAE dentro da janela (%, so fecho de barra de 60 s) ==
+ janela     n  MFE p25  MFE med  MFE p75  MFE p90  MAE p10  MAE med  toca+15  toca-10
+ +1 min  2264      0.0      1.0      4.8     20.6    -31.7      0.0    12.8%    21.6%
+ +5 min  4102      0.3      5.4     26.1     70.2    -76.9     -0.0    34.2%    43.3%
++15 min  4133      1.0     12.3     49.5    133.0    -95.8    -46.7    47.8%    59.9%
+   +1 h  4275      0.8     12.3     55.9    159.2    -99.6    -92.8    47.8%    75.3%
+   +4 h  4288      0.7     12.3     56.0    159.4    -99.7    -93.8    47.9%    77.6%
+
+== R66 - censura: o token sai do board (30 posicoes) ==
+ultima posicao vista p10/p50/p90: 3 / 28 / 29
+span da serie (s) p10/p50/p90: 361 / 3488 / 5277
+retorno +15 min mediano | span curto (<=p50): -66.5 % (n=1357) | span longo: -88.3 % (n=1357)

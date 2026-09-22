@@ -1,0 +1,37 @@
+== R66 - validacao do board contra a fita do pool (pump_amm) ==
+mints com fita a <= 30 s da 1a leitura do board: 834
+razao (market cap do board) / (preco da fita x 1e9 supply): p10 0.852 | mediana 1.002 | p90 1.212
+dentro de +-10 %: 68.2 %
+
+== R66 Q4 - selecao: 3171 entradas, desfecho = PnL da regra da mesa (1,15x / trail 10 % / 300 s, rent devolvido) ==
+PnL medio global: -0.003691 SOL | taxa de alvo: 36.2 %
+
+variavel                               n baixo  n alto  PnL baixo   PnL alto        dif               IC95 dia   p perm
+market cap na entrada (SOL)               1058    1058  -0.002608  -0.004817  -0.002210 [-0.004019,-0.000557]   0.0734
+volume acumulado da curva (SOL)           1058    1058  -0.004894  -0.002522   0.002373 [-0.001311,+0.006080]   0.1408
+volume 5 min (SOL)                        1058    1058  -0.005008  -0.002390   0.002617 [-0.000612,+0.005353]   0.0986
+transacoes                                1064    1059  -0.003916  -0.003231   0.000685 [-0.003878,+0.004730]   0.6933
+compras                                   1064    1060  -0.003776  -0.002808   0.000968 [-0.003996,+0.004966]   0.5851
+vendas                                    1074    1058  -0.003983  -0.003231   0.000752 [-0.004143,+0.004564]   0.6669
+vendas / compras                          1058    1058  -0.004114  -0.003062   0.001052 [-0.004692,+0.005549]   0.5423
+holders                                   1065    1061  -0.004721  -0.002685   0.002037 [-0.001576,+0.005359]   0.2152
+participantes                          (sem variancia util: tercos iguais)
+top-10 share                              1058    1058  -0.003555  -0.004282  -0.000728 [-0.005163,+0.001869]   0.6770
+dev share                              (sem variancia util: tercos iguais)
+snipers                                   1112    1073  -0.003531  -0.005025  -0.001494 [-0.003801,+0.001202]   0.2501
+KOLs                                   (sem variancia util: tercos iguais)
+idade da criacao ate a graduacao (s)      1057    1057  -0.003584  -0.001882   0.001702 [-0.003356,+0.005042]   0.3066
+
+== Benjamini-Hochberg, FDR 10 %, sobre os contrastes acima ==
+   1. market cap na entrada (SOL)            p=0.0734  limiar BH=0.0091  -
+   2. volume 5 min (SOL)                     p=0.0986  limiar BH=0.0182  -
+   3. volume acumulado da curva (SOL)        p=0.1408  limiar BH=0.0273  -
+   4. holders                                p=0.2152  limiar BH=0.0364  -
+   5. snipers                                p=0.2501  limiar BH=0.0455  -
+   6. idade da criacao ate a graduacao (s)   p=0.3066  limiar BH=0.0545  -
+   7. vendas / compras                       p=0.5423  limiar BH=0.0636  -
+   8. compras                                p=0.5851  limiar BH=0.0727  -
+   9. vendas                                 p=0.6669  limiar BH=0.0818  -
+  10. top-10 share                           p=0.6770  limiar BH=0.0909  -
+  11. transacoes                             p=0.6933  limiar BH=0.1000  -
+sobreviventes: NENHUM
