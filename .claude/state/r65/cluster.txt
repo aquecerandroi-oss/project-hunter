@@ -1,0 +1,9 @@
+corte buys_1m <= 25 (mediana da amostra), PnL ajustado pelo rent devolvido
+  <=25 : n=41  media=+0.00034  soma=-0.0419 SOL
+  > 25 : n=46  media=-0.00539  soma=-0.3054 SOL
+  dif observada = +0.00573 SOL/op
+  bootstrap por mint (76 clusters): dif IC95 = [-0.00034, +0.01207]  P(dif<=0) = 0.032
+  bootstrap por mint: soma do braco <=25  IC95 = [-0.1736, +0.1946] SOL (ponto +0.0141)
+  bootstrap por dia (6 clusters): dif IC95 = [+0.00348, +0.00901]  P(dif<=0) = 0.006
+  bootstrap por dia: soma do braco <=25  IC95 = [-0.0912, +0.0900] SOL (ponto +0.0141)
+  mints com mais de uma entrada: 10 de 76
