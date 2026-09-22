@@ -210,3 +210,9 @@ R64 mostrou que 75 % da perda de 19/09 foi aluguel de ATA não devolvido (`MEME_
 ## Adendo 20/09/2026 00:3x BRT — pausa por mint após perda na mesa real (T4.78)
 
 **Everton:** "eu exijo que mexa pelo menos um pouco na estratégia". Sexta-feira e Astra tinham recomendado não mexer na mesa real hoje (R64: saída atual venceu 52 variantes; pausa por mint tiraria o NARKY#2 nas 24). **Decisão dele: aplicar.** Mudança escolhida = a de maior amostra a favor e menor risco: **recusar recompra do mesmo mint por 300 s após uma saída com perda** (papel 19/09: 19 recompras, 0 acertos, −0,338; real: Musepaid). Contraponto registrado (NARKY#2 +0,014). `MEME_MINT_COOLDOWN_AFTER_LOSS_S` no `.env` (0 desliga). Medição em sombra por 3 dias; se bloquear mais vencedoras que perdedoras, cai. Nada mais muda (alvo, recuo, tempo, ficha, saídas por evento).
+
+## Adendo 22/09/2026 18:2x BRT — "pode ligar": fecho de ATA + mesa `spot/1` no real
+
+Depois do R65 (72 % do prejuízo é custo; sem o aluguel o acerto de equilíbrio cai de 27 % para 19 % e a mesa fez 26 %) e da pergunta "e se sairmos da pump.fun?", **Everton autorizou ligar**: (a) `MEME_CLOSE_ATA_ON_FULL_SELL=1` na mesa de memes e a recuperação das 75 ATAs abertas (T4.77/b, prova de 1 conta antes do resto); (b) a mesa **`spot/1`** no real com `SPOT1_ENABLED=true` e `SPOT1_MAX_OPEN=1` (revisão T4.74 = aprovado com ressalvas, as duas fechadas na T4.74-7, já implantada).
+
+**Ordem imposta pela realidade, não por cautela:** nada disso funciona enquanto o RPC da Solana estiver em *rate limit* (desde 21/09 12:08 BRT) — a `spot/1` usa o mesmo RPC para simular e enviar. Sequência: RPC → deploy da T4.78 → linhas no `.env` → recriar → prova de 1 ATA → `spot/1` com 1 posição. Refutação da `spot/1` continua no código (20 operações com expectância ≤ 0 ou Σ ≤ −0,15 SOL ⇒ mesa recusa sozinha).
