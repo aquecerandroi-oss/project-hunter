@@ -118,3 +118,12 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** uma política de giros — vender a cada repique de X % e recomprar a cada queda de X %, dentro dos mesmos 5 min e com o mesmo teto de exposição — rende **mais +0,05 por SOL** que a regra atual (alvo 1,15× / recuo 10 % / 5 min) nas mesmas moedas, **já descontados 2,23 % por ida e volta e 1,6 s de atraso por perna**
 - **refutação:** limite superior do IC 95 % (bootstrap por mint) abaixo de +0,01 por SOL em **todas** as combinações de X e N; ou o número mediano de giros líquidos por posição < 2 (sem oscilação suficiente, a política não tem o que capturar)
 - **status:** aberta
+
+## H-010 — Concentração do maior comprador (o dono que pode afundar)
+
+- **origem:** perda real `AIRAA` 23/09/2026 17:03 BRT (−0,0556 SOL, −77,6 %): a carteira `HTkSYn` comprou **8,89 SOL às 17:01:02** e vendeu **21,33 SOL às 17:03:55** numa curva de ~25–30 SOL. **Nós compramos às 17:03:19, com essa compra já na nossa própria fita há 2 minutos.** As duas mesas reais estão com `max_top10_share` **vazio** — o teto de concentração existe no código e nunca foi configurado
+- **variável:** `maior_comprador_pct` — maior soma de compras de uma única carteira desde o nascimento, em fração do SOL real da curva no instante da decisão (da fita `meme_trades`, não de fotos de holders); direção `low`
+- **população:** as 89 posições reais e as apostas de papel com fita completa desde o nascimento até a decisão; uma por mint
+- **previsão:** decisões com `maior_comprador_pct` no tercil alto rendem **menos −0,05 por SOL** que o tercil baixo — isto é, comprar onde um dono concentra o estoque é pior
+- **refutação:** limite inferior do IC 95 % (bootstrap por mint) acima de −0,01 por SOL; ou cobertura da fita desde o nascimento < 60 % da população (sem fita completa não dá para medir o maior comprador, e isso é limite de dado, não resultado)
+- **status:** aberta
