@@ -1,0 +1,16 @@
+C:\dev\project-hunter\.claude\state\r69\run_b.py:57: RuntimeWarning: Mean of empty slice
+  lo=lo, up=up, p=ptwo, ret_hot=float(hot.mean()), ret_cold=float(cold.mean()),
+C:\dev\project-hunter\.venv\Lib\site-packages\numpy\_core\_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+baldes de 5 min com >= 1 entrada: 456 (de 456 baldes com entrada); entradas cobertas 520 de 520
+entradas por balde: media 1.14, max 4
+ret medio por balde (peso igual) -0.0186; ponderado por entradas -0.0216
+blocos de 60 min: 168
+
+estado da coorte                     nb    corte  ret_quente  ret_frio        D                 IC95      p  entradas cortadas
+nascimentos/min                     456   20.400     +0.0110   -0.0492  +0.0601 [-0.0281,+0.1536]  0.193    254/520   
+fracao com fluxo positivo           456    0.224     -0.0188   -0.0183  -0.0005 [-0.0899,+0.0936]  0.979    260/520   
+progresso mediano 60-300 s          456    0.001     -0.0458   +0.0087  -0.0545 [-0.1455,+0.0339]  0.236    261/520   
+graduacoes/h                        456   31.000     +0.0039   -0.0471  +0.0510 [-0.0360,+0.1399]  0.252    230/520   
+tamanho da coorte (controle)        456  129.000     -0.0059   -0.0313  +0.0255 [-0.0628,+0.1202]  0.572    255/520   
+compras medianas da coorte (controle)  456    0.000     -0.0186      +nan     +nan [   +nan,   +nan]    nan      0/520   

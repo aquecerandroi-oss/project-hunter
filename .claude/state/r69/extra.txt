@@ -1,0 +1,33 @@
+== (c) concordancia percentil x absoluto (amostra corrigida) ==
+  idade                      n= 520 rho=+0.929
+  progresso da curva         n= 520 rho=+0.773
+  delta de progresso 60s     n= 449 rho=+0.790
+  market cap                 n= 520 rho=+0.856
+  delta de mcap 60s          n= 449 rho=+0.751
+  compras 60s                n= 507 rho=+0.861
+  vendas 60s                 n= 507 rho=+0.895
+  vendas/compras             n= 486 rho=+0.716
+  compradores unicos 60s     n= 507 rho=+0.809
+  fluxo liquido SOL 60s      n= 507 rho=+0.750
+  volume 60s                 n= 507 rho=+0.812
+  snipers                    n= 520 rho=+0.911
+  dev share                  n= 520 rho=+0.606
+  faixa +0.61 a +0.93, mediana +0.81
+
+== (b) indice composto (media dos percentis de progresso, mcap, fluxo, volume) ==
+  corte q=0.2 (valor 0.923): D=-0.0195
+  corte q=0.3 (valor 0.939): D=-0.0067
+  corte q=0.4 (valor 0.949): D=-0.0191
+  corte q=0.5 (valor 0.958): D=+0.0079
+  corte q=0.6 (valor 0.965): D=-0.0383
+  corte q=0.7 (valor 0.973): D=-0.0691
+  corte q=0.8 (valor 0.980): D=-0.0827
+  corte mediana: D=+0.0079 IC95 [-0.0773,+0.1011] p=0.865 (n=507)
+  split: D ajuste +0.0112 | D teste -0.1062 (n teste 90)
+
+== (a) teste B ponderado por ENTRADA ==
+  births_min         corte   20.400 | quente +0.007252 (n=266) | frio -0.051830 (n=254) | D=+0.059082
+  frac_pos_flow      corte    0.224 | quente -0.023504 (n=260) | frio -0.019712 (n=260) | D=-0.003792
+  med_prog_60_300    corte    0.001 | quente -0.040986 (n=259) | frio -0.002378 (n=261) | D=-0.038607
+  grads_h            corte   31.000 | quente -0.001350 (n=290) | frio -0.047150 (n=230) | D=+0.045800
+  live_n             corte  129.000 | quente -0.014100 (n=265) | frio -0.029410 (n=255) | D=+0.015310

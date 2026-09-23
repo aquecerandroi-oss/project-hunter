@@ -1,0 +1,53 @@
+== FAMILIA CONGELADA: 17 hipoteses, FDR 10% ==
+  1. vendas/compras                     p=0.014  limiar BH=0.0059  BH=nao  BY=nao
+  2. volume 60s                         p=0.102  limiar BH=0.0118  BH=nao  BY=nao
+  3. idade                              p=0.113  limiar BH=0.0176  BH=nao  BY=nao
+  4. progresso da curva                 p=0.169  limiar BH=0.0235  BH=nao  BY=nao
+  5. nascimentos/min                    p=0.193  limiar BH=0.0294  BH=nao  BY=nao
+  6. compradores unicos 60s             p=0.199  limiar BH=0.0353  BH=nao  BY=nao
+  7. progresso mediano 60-300 s         p=0.236  limiar BH=0.0412  BH=nao  BY=nao
+  8. fluxo liquido SOL 60s              p=0.247  limiar BH=0.0471  BH=nao  BY=nao
+  9. graduacoes/h                       p=0.252  limiar BH=0.0529  BH=nao  BY=nao
+ 10. delta de mcap 60s                  p=0.282  limiar BH=0.0588  BH=nao  BY=nao
+ 11. market cap                         p=0.402  limiar BH=0.0647  BH=nao  BY=nao
+ 12. compras 60s                        p=0.472  limiar BH=0.0706  BH=nao  BY=nao
+ 13. snipers                            p=0.495  limiar BH=0.0765  BH=nao  BY=nao
+ 14. dev share                          p=0.772  limiar BH=0.0824  BH=nao  BY=nao
+ 15. delta de progresso 60s             p=0.795  limiar BH=0.0882  BH=nao  BY=nao
+ 16. vendas 60s                         p=0.824  limiar BH=0.0941  BH=nao  BY=nao
+ 17. fracao com fluxo positivo          p=0.979  limiar BH=0.1000  BH=nao  BY=nao
+
+menor p = 0.014; limiar BH do primeiro posto (o mais restritivo) = 0.0059
+sobrevivem BH: 0   sobrevivem BY: 0
+
+== SPLIT TEMPORAL: ajuste n=428 (12-19/09), teste n=92 (20-23/09) ==
+variavel                   melhor corte no ajuste  D ajuste   D teste           IC95 teste
+idade                                       0.277   +0.0750   +0.1394 [-0.1402,+0.4794]
+progresso da curva                          0.981   -0.0618   -0.1744 [-0.3739,-0.0055]
+delta de progresso 60s                      0.957   +0.0669   +0.0004 [-0.2465,+0.2714]
+market cap                                  0.952   -0.1008   +0.2448 [-0.1685,+0.9041]
+delta de mcap 60s                           1.000   -0.0553   -0.2484 [-0.4571,-0.0712]
+compras 60s                                 0.985   -0.0764   -0.0175 [-0.5814,+0.3126]
+vendas 60s                                  0.962   -0.0804   +0.1478 [-0.1864,+0.3809]
+vendas/compras                              0.386   +0.0635   -0.0732 [-0.2494,+0.0835]
+compradores unicos 60s                      0.963   -0.0601   -0.1231 [-0.3581,+0.1400]
+fluxo liquido SOL 60s                       1.000   -0.0630   -0.2684 [-0.4661,-0.0724]
+volume 60s                                  0.991   +0.0289   -0.1645 [-0.3289,-0.0128]
+snipers                                     0.767   +0.0628   -0.1406 [-0.3575,+0.0733]
+dev share                                   0.455   +0.0445   +0.0497 [-0.1840,+0.2985]
+
+== PLANALTO vs PICO (D por corte, so descritivo) ==
+variavel                      0.20    0.30    0.40    0.50    0.60    0.70    0.80
+idade                       +0.054  +0.001  +0.051  +0.068  +0.069  +0.067  +0.062
+progresso da curva          +0.042  +0.038  +0.023  -0.052  -0.054  -0.081  -0.093
+delta de progresso 60s      +0.048  +0.038  +0.023  -0.013  -0.017  -0.034  -0.034
+market cap                  +0.029  +0.023  +0.065  -0.036  -0.089  -0.082  -0.116
+delta de mcap 60s           +0.033  +0.037  +0.029  +0.050  -0.026  -0.028  -0.081
+compras 60s                 +0.036  -0.002  -0.029  -0.032  -0.045  -0.030  -0.053
+vendas 60s                  +0.001  +0.009  +0.036  -0.011  -0.051  -0.046  -0.039
+vendas/compras              +0.038  +0.068  +0.068  +0.106  +0.059  +0.029  +0.004
+compradores unicos 60s      +0.014  +0.015  -0.056  -0.054  -0.016  -0.036  -0.034
+fluxo liquido SOL 60s       -0.031  -0.002  -0.055  -0.049  -0.035  -0.085  -0.096
+volume 60s                  -0.038  -0.002  +0.017  -0.069  -0.038  +0.022  -0.013
+snipers                     +0.045  +0.049  +0.041  +0.030  +0.019  +0.023  +0.024
+dev share                   +0.025  -0.017  +0.004  -0.011  +0.013  +0.003  +0.045

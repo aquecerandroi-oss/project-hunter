@@ -1,0 +1,26 @@
+n = 520 moedas (uma aposta por mint, flow_v2, medidas, idade <= 300 s)
+ret medio -0.0216  mediana -0.0599  positivas 34.6%
+blocos de 60 min: 169; dias: 11
+
+== TESTE A: percentil na coorte (alto >= P50) vs absoluto (mediana da amostra) ==
+variavel                      n  corte    D_pct             IC95 pct  p_boot  p_perm     D_t3    D_abs   p_abs
+idade                       520  0.269  +0.0680 [-0.0164,+0.1561]   0.113   0.114  +0.0641  +0.1048   0.019
+progresso da curva          520  0.963  -0.0523 [-0.1303,+0.0215]   0.169   0.215  -0.0312  -0.0217   0.613
+delta de progresso 60s      449  0.985  -0.0129 [-0.1063,+0.0790]   0.795   0.788  +0.0337  -0.0099   0.814
+market cap                  520  0.946  -0.0362 [-0.1182,+0.0468]   0.402   0.390  -0.0142  -0.0217   0.607
+delta de mcap 60s           449  0.982  +0.0504 [-0.0401,+0.1448]   0.282   0.331  +0.0100  -0.0650   0.153
+compras 60s                 507  0.935  -0.0321 [-0.1181,+0.0552]   0.472   0.423  -0.0332  -0.0480   0.258
+vendas 60s                  507  0.879  -0.0107 [-0.0998,+0.0801]   0.824   0.792  -0.0238  -0.0285   0.507
+vendas/compras              486  0.300  +0.1056 [+0.0217,+0.1946]   0.014   0.013  +0.0461  +0.0293   0.510
+compradores unicos 60s      507  0.966  -0.0543 [-0.1415,+0.0280]   0.199   0.183  -0.0322  -0.0302   0.486
+fluxo liquido SOL 60s       507  0.986  -0.0486 [-0.1307,+0.0339]   0.247   0.246  -0.0759  -0.0787   0.051
+volume 60s                  507  0.958  -0.0693 [-0.1529,+0.0129]   0.102   0.088  +0.0050  +0.0059   0.886
+snipers                     520  0.776  +0.0301 [-0.0554,+0.1131]   0.495   0.438  +0.0388  -0.0426   0.339
+dev share                   520  0.437  -0.0111 [-0.0895,+0.0679]   0.772   0.795  +0.0127  -0.0285   0.548
+
+controles aleatorios (estaveis por mint, mesma maquina):
+  p_rnd1: D=+0.0074 IC95 [-0.0738,+0.0897] p=0.862
+  p_rnd2: D=+0.0376 IC95 [-0.0444,+0.1225] p=0.379
+
+BH 10% sobre a familia de 17 (13 percentis + 4 estados; estados no run_b):
+  (a decisao BH/BY final e tomada em run_family.py com os 17 p juntos)

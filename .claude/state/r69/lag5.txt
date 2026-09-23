@@ -1,0 +1,15 @@
+idade                      D0=+0.0680 D5=+0.0652 p5=0.127 rho=0.9908
+progresso da curva         D0=-0.0523 D5=-0.0397 p5=0.309 rho=0.9076
+delta de progresso 60s     D0=-0.0129 D5=-0.0457 p5=0.369 rho=0.8243
+market cap                 D0=-0.0362 D5=-0.0671 p5=0.081 rho=0.9021
+delta de mcap 60s          D0=+0.0504 D5=+0.0314 p5=0.546 rho=0.8352
+compras 60s                D0=-0.0321 D5=-0.0751 p5=0.080 rho=0.8609
+vendas 60s                 D0=-0.0107 D5=-0.0189 p5=0.667 rho=0.8671
+vendas/compras             D0=+0.1056 D5=+0.0809 p5=0.046 rho=0.8963
+compradores unicos 60s     D0=-0.0543 D5=-0.0621 p5=0.151 rho=0.8645
+fluxo liquido SOL 60s      D0=-0.0486 D5=-0.0871 p5=0.033 rho=0.8757
+volume 60s                 D0=-0.0693 D5=-0.0364 p5=0.399 rho=0.8803
+snipers                    D0=+0.0301 D5=+0.0245 p5=0.572 rho=0.9990
+dev share                  D0=-0.0111 D5=-0.0390 p5=0.382 rho=0.9685
+menor p com atraso: 0.033199999999999896
+faixa rho: 0.8243347053433355 0.9989828939724579
