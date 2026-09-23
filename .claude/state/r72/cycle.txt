@@ -1,0 +1,16 @@
+REAIS  X=3   atraso 0.0s | ciclos=  83 | mult. de tokens por ciclo: p25=1.0169 mediana=1.0330 p75=1.0900 | > 1 em 96 %
+REAIS  X=3   atraso 1.6s | ciclos=  85 | mult. de tokens por ciclo: p25=1.0170 mediana=1.0448 p75=1.1011 | > 1 em 91 %
+REAIS  X=5   atraso 0.0s | ciclos=  62 | mult. de tokens por ciclo: p25=1.0346 mediana=1.0539 p75=1.1237 | > 1 em 97 %
+REAIS  X=5   atraso 1.6s | ciclos=  66 | mult. de tokens por ciclo: p25=1.0361 mediana=1.0529 p75=1.1242 | > 1 em 95 %
+REAIS  X=8   atraso 0.0s | ciclos=  37 | mult. de tokens por ciclo: p25=1.0727 mediana=1.0975 p75=1.2274 | > 1 em 97 %
+REAIS  X=8   atraso 1.6s | ciclos=  41 | mult. de tokens por ciclo: p25=1.0734 mediana=1.0974 p75=1.2421 | > 1 em 98 %
+REAIS  X=12  atraso 0.0s | ciclos=  34 | mult. de tokens por ciclo: p25=1.1250 mediana=1.1936 p75=1.5409 | > 1 em 100 %
+REAIS  X=12  atraso 1.6s | ciclos=  37 | mult. de tokens por ciclo: p25=1.1118 mediana=1.1669 p75=1.3560 | > 1 em 100 %
+PAPEL  X=3   atraso 0.0s | ciclos= 561 | mult. de tokens por ciclo: p25=1.0144 mediana=1.0328 p75=1.0744 | > 1 em 93 %
+PAPEL  X=3   atraso 1.6s | ciclos= 596 | mult. de tokens por ciclo: p25=1.0143 mediana=1.0350 p75=1.0832 | > 1 em 88 %
+PAPEL  X=5   atraso 0.0s | ciclos= 435 | mult. de tokens por ciclo: p25=1.0344 mediana=1.0551 p75=1.1043 | > 1 em 96 %
+PAPEL  X=5   atraso 1.6s | ciclos= 458 | mult. de tokens por ciclo: p25=1.0351 mediana=1.0631 p75=1.1216 | > 1 em 94 %
+PAPEL  X=8   atraso 0.0s | ciclos= 310 | mult. de tokens por ciclo: p25=1.0691 mediana=1.0904 p75=1.1467 | > 1 em 99 %
+PAPEL  X=8   atraso 1.6s | ciclos= 295 | mult. de tokens por ciclo: p25=1.0717 mediana=1.0942 p75=1.1534 | > 1 em 96 %
+PAPEL  X=12  atraso 0.0s | ciclos= 188 | mult. de tokens por ciclo: p25=1.1171 mediana=1.1536 p75=1.2192 | > 1 em 99 %
+PAPEL  X=12  atraso 1.6s | ciclos= 199 | mult. de tokens por ciclo: p25=1.1131 mediana=1.1535 p75=1.2558 | > 1 em 99 %

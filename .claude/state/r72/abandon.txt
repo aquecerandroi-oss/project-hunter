@@ -1,0 +1,12 @@
+REAIS  X=3   N=30   | abandonou  47 (62 %) braco   +8.21% D   +3.44% | girou  17 braco   -3.68% D   +5.62% | nunca vendeu  12 braco  -31.82% D  -13.36%
+REAIS  X=3   N=120  | abandonou  28 (37 %) braco   +3.83% D   -2.72% | girou  35 braco   -5.74% D   -2.90% | nunca vendeu  13 braco  -29.55% D  -11.16%
+REAIS  X=8   N=30   | abandonou  46 (61 %) braco  +11.67% D   +4.61% | girou  15 braco   -9.52% D   +4.96% | nunca vendeu  15 braco  -27.56% D  -10.04%
+REAIS  X=8   N=120  | abandonou  28 (37 %) braco  +11.79% D   +3.87% | girou  30 braco   -4.51% D   -1.38% | nunca vendeu  18 braco  -21.62% D   -5.89%
+REAIS  X=12  N=30   | abandonou  42 (55 %) braco  +17.95% D  +10.15% | girou  12 braco   -4.43% D   +3.81% | nunca vendeu  22 braco  -23.55% D   -6.10%
+REAIS  X=12  N=120  | abandonou  23 (30 %) braco  +16.25% D   +6.40% | girou  29 braco   +2.65% D   +2.49% | nunca vendeu  24 braco  -20.07% D   -3.98%
+PAPEL  X=3   N=30   | abandonou 253 (55 %) braco  +13.28% D   +8.98% | girou 111 braco  -14.97% D   -8.73% | nunca vendeu  99 braco  -28.96% D  -11.10%
+PAPEL  X=3   N=120  | abandonou 137 (30 %) braco  +10.28% D   +6.32% | girou 219 braco   -2.76% D   -2.10% | nunca vendeu 107 braco  -26.43% D   -9.88%
+PAPEL  X=8   N=30   | abandonou 243 (52 %) braco  +14.57% D  +10.17% | girou  76 braco   -5.18% D   -6.08% | nunca vendeu 144 braco  -28.97% D  -11.54%
+PAPEL  X=8   N=120  | abandonou 133 (29 %) braco  +14.79% D  +10.30% | girou 171 braco   +4.47% D   +1.50% | nunca vendeu 159 braco  -25.36% D   -9.77%
+PAPEL  X=12  N=30   | abandonou 244 (53 %) braco  +18.17% D  +12.49% | girou  50 braco   -3.39% D   -6.06% | nunca vendeu 169 braco  -28.90% D  -11.78%
+PAPEL  X=12  N=120  | abandonou 134 (29 %) braco  +18.97% D  +14.10% | girou 141 braco   +9.87% D   +3.72% | nunca vendeu 188 braco  -24.59% D   -9.20%

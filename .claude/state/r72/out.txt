@@ -1,0 +1,116 @@
+
+================================================================================================
+POPULACAO REAIS: n=89 | so fotos (excluidas)=13 | sem reservas=0 | resolviveis=76
+  maior buraco entre pontos na janela de 300 s: p25=16 s mediana=45 s p75=62 s | com buraco > 30 s: 44 de 76
+  regressoes de relogio corrigidas pelo carimbo monotono: 183
+
+  PASSO 1 — oscilacoes completas na janela de 5 min (queda >= X % da maxima
+  corrente, seguida de recuperacao >= X % em N s). Uma linha por (X, N).
+  X%    N s       p25    med    p75     >=1     >=2    media
+  3     30        1.0    3.5    9.0   78.9%   69.7%     6.67
+  3     60        1.0    3.5    9.2   81.6%   69.7%     6.78
+  3     120       1.0    4.0    9.2   81.6%   71.1%     6.83
+  5     30        0.0    2.0    5.0   71.1%   60.5%     4.30
+  5     60        0.0    3.0    5.0   73.7%   61.8%     4.49
+  5     120       0.8    3.0    5.0   75.0%   65.8%     4.58
+  8     30        0.0    1.0    3.0   60.5%   43.4%     2.46
+  8     60        0.0    1.0    3.0   65.8%   48.7%     2.68
+  8     120       0.0    2.0    3.0   68.4%   51.3%     2.76
+  12    30        0.0    0.0    2.0   47.4%   28.9%     1.25
+  12    60        0.0    1.0    2.0   53.9%   34.2%     1.49
+  12    120       0.0    1.0    2.0   59.2%   39.5%     1.63
+  ==> maior mediana de giros em qualquer celula: 4.0  (regra de refutacao da fila: < 2 em TODAS as celulas)
+
+  PASSOS 2-4 — politica de giros x regra atual (alvo 1,15x / trailing 10 % / 300 s), mesma moeda, custo 2.23 % por ida e volta, 1.6 s de atraso por perna
+  X%    N s        n   giros   recomp    drenos      D/SOL   IC95 inf  IC sup  p perm   media
+  3     30        76      73       73         8     +1.27%     -4.97%   +7.62%  0.6848   -0.77%
+  3     60        76      85       85        10     -1.63%     -7.54%   +4.29%  0.5993   -3.67%
+  3     120       76     103      103        12     -4.24%    -10.51%   +1.88%  0.1876   -6.29%
+  5     30        76      53       53         5     +1.89%     -4.40%   +8.03%  0.5356   -0.15%
+  5     60        76      66       66         7     -1.58%     -7.55%   +4.31%  0.5956   -3.62%
+  5     120       76      77       77         9     -3.48%     -9.39%   +2.41%  0.2443   -5.53%
+  8     30        76      33       33         5     +1.78%     -3.39%   +6.98%  0.4824   -0.26%
+  8     60        76      41       41         6     +0.75%     -4.59%   +6.13%  0.7796   -1.30%
+  8     120       76      56       56         8     -0.51%     -6.23%   +4.97%  0.8571   -2.56%
+  12    30        76      27       27         3     +4.44%     -1.27%  +10.34%  0.1203   +2.40%
+  12    60        76      37       37         4     +3.67%     -2.04%   +9.61%  0.2123   +1.62%
+  12    120       76      51       51         6     +1.63%     -5.16%   +8.17%  0.6117   -0.41%
+
+  regra atual, media por SOL nesta populacao:   -2.04%
+  ==> maior limite SUPERIOR do IC em qualquer celula:  +10.34% (refuta se <   +1.00% em todas)
+  ==> celulas que CONFIRMAM (D >= MRE, IC inf > 0, p < 0,05): 0 de 12
+
+  planalto x pico (D por X, media sobre N):
+    X=3    D medio =   -1.53%
+    X=5    D medio =   -1.06%
+    X=8    D medio =   +0.67%
+    X=12   D medio =   +3.25%
+
+  CONTROLO DE FUGA: braco batoteiro (vende no maximo da janela, olhando o futuro) =  +47.96% por SOL; regra atual =   -2.04%. A distancia e o que a guarda protege.
+
+  PASSO 5 — oscilacao de equilibrio: multiplicador de tokens por ciclo = (1-c/2)^2/(1-X); equilibrio em X = c - c^2/4 = 2.2176 %
+    c=2.23 % -> X equilibrio 2.218 % | giros desse tamanho em N=60 s: mediana 5.0, p75 12.0, >=2 em 72 % das posicoes
+    c=2.50 % -> X equilibrio 2.484 % | giros desse tamanho em N=60 s: mediana 4.5, p75 12.0, >=2 em 71 % das posicoes
+    c=3.00 % -> X equilibrio 2.978 % | giros desse tamanho em N=60 s: mediana 3.5, p75 9.2, >=2 em 70 % das posicoes
+
+================================================================================================
+POPULACAO PAPEL: n=545 | so fotos (excluidas)=62 | sem reservas=0 | resolviveis=463
+  maior buraco entre pontos na janela de 300 s: p25=18 s mediana=54 s p75=82 s | com buraco > 30 s: 309 de 463
+  regressoes de relogio corrigidas pelo carimbo monotono: 1070
+
+  PASSO 1 — oscilacoes completas na janela de 5 min (queda >= X % da maxima
+  corrente, seguida de recuperacao >= X % em N s). Uma linha por (X, N).
+  X%    N s       p25    med    p75     >=1     >=2    media
+  3     30        1.0    3.0   10.0   75.4%   62.4%     6.62
+  3     60        1.0    3.0   10.0   78.2%   65.9%     6.86
+  3     120       1.0    3.0   10.0   80.1%   66.5%     6.93
+  5     30        0.0    2.0    7.0   71.3%   56.6%     4.42
+  5     60        0.0    2.0    7.0   74.3%   59.2%     4.65
+  5     120       1.0    3.0    7.0   76.2%   61.6%     4.74
+  8     30        0.0    1.0    4.0   62.2%   45.8%     2.70
+  8     60        0.0    2.0    5.0   66.1%   50.5%     2.95
+  8     120       0.0    2.0    5.0   67.6%   52.3%     3.04
+  12    30        0.0    1.0    2.0   51.6%   32.6%     1.45
+  12    60        0.0    1.0    3.0   56.2%   38.7%     1.71
+  12    120       0.0    1.0    3.0   58.7%   41.3%     1.81
+  ==> maior mediana de giros em qualquer celula: 3.0  (regra de refutacao da fila: < 2 em TODAS as celulas)
+
+  PASSOS 2-4 — politica de giros x regra atual (alvo 1,15x / trailing 10 % / 300 s), mesma moeda, custo 2.23 % por ida e volta, 1.6 s de atraso por perna
+  X%    N s        n   giros   recomp    drenos      D/SOL   IC95 inf  IC sup  p perm   media
+  3     30       463     472      472        71     +0.44%     -2.22%   +3.17%  0.7552   -2.53%
+  3     60       463     596      596        83     -0.37%     -3.34%   +2.70%  0.8144   -3.33%
+  3     120      463     689      689        91     -1.41%     -4.46%   +1.74%  0.3869   -4.37%
+  5     30       463     329      329        49     +0.99%     -1.71%   +3.74%  0.4934   -1.98%
+  5     60       463     458      458        64     +1.06%     -2.14%   +4.47%  0.5449   -1.90%
+  5     120      463     536      536        71     +0.15%     -3.12%   +3.70%  0.9340   -2.82%
+  8     30       463     228      228        42     +0.75%     -2.00%   +3.56%  0.6063   -2.21%
+  8     60       463     295      295        48     +0.71%     -2.23%   +3.65%  0.6402   -2.26%
+  8     120      463     383      383        55     +0.15%     -3.04%   +3.42%  0.9271   -2.81%
+  12    30       463     131      131        15     +1.63%     -0.86%   +4.12%  0.2052   -1.34%
+  12    60       463     199      199        18     +2.27%     -0.46%   +5.06%  0.1124   -0.70%
+  12    120      463     278      278        24     +1.48%     -1.35%   +4.38%  0.3239   -1.49%
+
+  regra atual, media por SOL nesta populacao:   -2.97%
+  ==> maior limite SUPERIOR do IC em qualquer celula:   +5.06% (refuta se <   +1.00% em todas)
+  ==> celulas que CONFIRMAM (D >= MRE, IC inf > 0, p < 0,05): 0 de 12
+
+  planalto x pico (D por X, media sobre N):
+    X=3    D medio =   -0.45%
+    X=5    D medio =   +0.73%
+    X=8    D medio =   +0.54%
+    X=12   D medio =   +1.79%
+
+  CONTROLO DE FUGA: braco batoteiro (vende no maximo da janela, olhando o futuro) =  +45.83% por SOL; regra atual =   -2.97%. A distancia e o que a guarda protege.
+
+  PASSO 5 — oscilacao de equilibrio: multiplicador de tokens por ciclo = (1-c/2)^2/(1-X); equilibrio em X = c - c^2/4 = 2.2176 %
+    c=2.23 % -> X equilibrio 2.218 % | giros desse tamanho em N=60 s: mediana 4.0, p75 12.0, >=2 em 69 % das posicoes
+    c=2.50 % -> X equilibrio 2.484 % | giros desse tamanho em N=60 s: mediana 3.0, p75 12.0, >=2 em 68 % das posicoes
+    c=3.00 % -> X equilibrio 2.978 % | giros desse tamanho em N=60 s: mediana 3.0, p75 10.0, >=2 em 66 % das posicoes
+
+================================================================================================
+SENSIBILIDADE (populacao REAIS, X=3 %, N=120 s - a celula com mais giros)
+  custo 2.23 % | atraso 1.6 s -> D =   -4.24%  IC95 [ -10.51%,   +1.88%]  n=76
+  custo 2.23 % | atraso 5.0 s -> D =   -2.80%  IC95 [ -11.10%,   +5.67%]  n=76
+  custo 2.50 % | atraso 1.6 s -> D =   -4.59%  IC95 [ -10.84%,   +1.49%]  n=76
+  custo 3.00 % | atraso 1.6 s -> D =   -5.22%  IC95 [ -11.41%,   +0.81%]  n=76
+  custo 3.00 % | atraso 5.0 s -> D =   -3.79%  IC95 [ -11.96%,   +4.55%]  n=76

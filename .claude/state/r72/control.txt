@@ -1,0 +1,28 @@
+
+REAIS (n=76)
+  regra atual ..............   -2.04% por SOL
+  SEGURAR 300 s (sem trailing)   -0.48% por SOL
+  D (segurar - regra) ......   +1.56%  IC95 [ -14.58%,  +18.48%]  p=0.8444
+  X=12% N=30s: girou em 24 de 76 posicoes
+      girou  n= 24 | braco  +13.11% | vs regra  +17.90% | vs SEGURAR  +10.57%
+      parado n= 52 | braco   -2.54% | vs regra   -1.77% | vs SEGURAR   -0.66%
+  X=8% N=30s: girou em 26 de 76 posicoes
+      girou  n= 26 | braco   +3.87% | vs regra  +12.95% | vs SEGURAR   +3.47%
+      parado n= 50 | braco   -2.40% | vs regra   -4.02% | vs SEGURAR   -1.46%
+  X=3% N=30s: girou em 41 de 76 posicoes
+      girou  n= 41 | braco   +6.49% | vs regra  +10.59% | vs SEGURAR  +10.10%
+      parado n= 35 | braco   -9.27% | vs regra   -9.64% | vs SEGURAR  -12.46%
+
+PAPEL (n=463)
+  regra atual ..............   -2.97% por SOL
+  SEGURAR 300 s (sem trailing)   +1.58% por SOL
+  D (segurar - regra) ......   +4.54%  IC95 [  -1.17%,  +10.48%]  p=0.1360
+  X=12% N=30s: girou em 101 de 463 posicoes
+      girou  n=101 | braco  +15.25% | vs regra  +13.99% | vs SEGURAR  +14.17%
+      parado n=362 | braco   -5.97% | vs regra   -1.82% | vs SEGURAR   -7.69%
+  X=8% N=30s: girou em 149 de 463 posicoes
+      girou  n=149 | braco  +11.13% | vs regra  +11.94% | vs SEGURAR   +8.65%
+      parado n=314 | braco   -8.54% | vs regra   -4.56% | vs SEGURAR   -9.69%
+  X=3% N=30s: girou em 238 de 463 posicoes
+      girou  n=238 | braco   +4.72% | vs regra   +6.99% | vs SEGURAR   +3.43%
+      parado n=225 | braco  -10.19% | vs regra   -6.49% | vs SEGURAR  -12.08%
