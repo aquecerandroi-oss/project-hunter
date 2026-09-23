@@ -1,0 +1,51 @@
+U2 profundo  h=  1 n= 2378230 |r| p25=0.016% med=0.045% p75=0.094% p90=0.170% | MFE med=0.036% p90=0.165% | mean=+0.05bp pos=45.1% a=0.083% b=0.083%
+U2 profundo  h=  5 n=  475616 |r| p25=0.042% med=0.099% p75=0.206% p90=0.377% | MFE med=0.095% p90=0.387% | mean=+0.23bp pos=47.4% a=0.179% b=0.171%
+U2 profundo  h= 15 n=  158521 |r| p25=0.073% med=0.171% p75=0.354% p90=0.651% | MFE med=0.175% p90=0.692% | mean=+0.70bp pos=48.5% a=0.305% b=0.288%
+U2 profundo  h= 60 n=   39612 |r| p25=0.145% med=0.340% p75=0.699% p90=1.307% | MFE med=0.365% p90=1.435% | mean=+2.80bp pos=49.5% a=0.613% b=0.561%
+U2 profundo  h=240 n=    9878 |r| p25=0.284% med=0.688% p75=1.412% p90=2.579% | MFE med=0.786% p90=3.038% | mean=+11.39bp pos=49.6% a=1.277% b=1.043%
+U1 mesa sem  h=  1 n=  923988 |r| p25=0.033% med=0.073% p75=0.150% p90=0.264% | MFE med=0.063% p90=0.264% | mean=+0.08bp pos=44.8% a=0.132% b=0.129%
+U1 mesa sem  h=  5 n=  184748 |r| p25=0.071% med=0.171% p75=0.344% p90=0.602% | MFE med=0.167% p90=0.622% | mean=+0.38bp pos=47.6% a=0.289% b=0.276%
+U1 mesa sem  h= 15 n=   61546 |r| p25=0.129% med=0.304% p75=0.603% p90=1.054% | MFE med=0.309% p90=1.107% | mean=+1.13bp pos=49.0% a=0.497% b=0.476%
+U1 mesa sem  h= 60 n=   15353 |r| p25=0.264% med=0.615% p75=1.213% p90=2.140% | MFE med=0.658% p90=2.291% | mean=+4.47bp pos=49.5% a=1.011% b=0.922%
+U1 mesa sem  h=240 n=    3782 |r| p25=0.495% med=1.137% p75=2.335% p90=4.140% | MFE med=1.365% p90=4.926% | mean=+19.41bp pos=49.1% a=2.066% b=1.632%
+
+U2 profundo  h=  1 c=0.14%                  p*_modelo=2.051 p*_a/b=1.342 P(r>c)= 7.04% P(MFE>c)=13.04% long_liq=-14.0bp
+U2 profundo  h=  1 c=0.30%                  p*_modelo=3.824 p*_a/b=2.307 P(r>c)= 1.61% P(MFE>c)= 3.22% long_liq=-30.0bp
+U2 profundo  h=  1 c=0.50%                  p*_modelo=6.040 p*_a/b=3.513 P(r>c)= 0.47% P(MFE>c)= 1.01% long_liq=-50.0bp
+U2 profundo  h=  1 c=0.54% (0,14% + rede)   p*_modelo=6.484 p*_a/b=3.754 P(r>c)= 0.39% P(MFE>c)= 0.84% long_liq=-54.0bp
+U2 profundo  h=  5 c=0.14%                  p*_modelo=1.204 p*_a/b=0.889 P(r>c)=19.07% P(MFE>c)=37.23% long_liq=-13.8bp
+U2 profundo  h=  5 c=0.30%                  p*_modelo=2.008 p*_a/b=1.346 P(r>c)= 7.56% P(MFE>c)=15.09% long_liq=-29.8bp
+U2 profundo  h=  5 c=0.50%                  p*_modelo=3.013 p*_a/b=1.917 P(r>c)= 3.09% P(MFE>c)= 6.34% long_liq=-49.8bp
+U2 profundo  h=  5 c=0.54% (0,14% + rede)   p*_modelo=3.214 p*_a/b=2.031 P(r>c)= 2.65% P(MFE>c)= 5.47% long_liq=-53.8bp
+U2 profundo  h= 15 c=0.14%                  p*_modelo=0.910 p*_a/b=0.722 P(r>c)=28.38% P(MFE>c)=57.23% long_liq=-13.3bp
+U2 profundo  h= 15 c=0.30%                  p*_modelo=1.379 p*_a/b=0.992 P(r>c)=15.35% P(MFE>c)=31.58% long_liq=-29.3bp
+U2 profundo  h= 15 c=0.50%                  p*_modelo=1.964 p*_a/b=1.329 P(r>c)= 8.02% P(MFE>c)=16.71% long_liq=-49.3bp
+U2 profundo  h= 15 c=0.54% (0,14% + rede)   p*_modelo=2.082 p*_a/b=1.397 P(r>c)= 7.15% P(MFE>c)=14.92% long_liq=-53.3bp
+U2 profundo  h= 60 c=0.14%                  p*_modelo=0.706 p*_a/b=0.597 P(r>c)=38.05% P(MFE>c)=77.31% long_liq=-11.2bp
+U2 profundo  h= 60 c=0.30%                  p*_modelo=0.942 p*_a/b=0.733 P(r>c)=27.29% P(MFE>c)=56.78% long_liq=-27.2bp
+U2 profundo  h= 60 c=0.50%                  p*_modelo=1.236 p*_a/b=0.904 P(r>c)=18.36% P(MFE>c)=39.14% long_liq=-47.2bp
+U2 profundo  h= 60 c=0.54% (0,14% + rede)   p*_modelo=1.295 p*_a/b=0.938 P(r>c)=17.04% P(MFE>c)=36.48% long_liq=-51.2bp
+U2 profundo  h=240 c=0.14%                  p*_modelo=0.602 p*_a/b=0.510 P(r>c)=44.08% P(MFE>c)=89.70% long_liq=-2.6bp
+U2 profundo  h=240 c=0.30%                  p*_modelo=0.718 p*_a/b=0.579 P(r>c)=37.06% P(MFE>c)=77.84% long_liq=-18.6bp
+U2 profundo  h=240 c=0.50%                  p*_modelo=0.863 p*_a/b=0.665 P(r>c)=29.99% P(MFE>c)=64.83% long_liq=-38.6bp
+U2 profundo  h=240 c=0.54% (0,14% + rede)   p*_modelo=0.893 p*_a/b=0.682 P(r>c)=28.97% P(MFE>c)=62.74% long_liq=-42.6bp
+U1 mesa sem  h=  1 c=0.14%                  p*_modelo=1.453 p*_a/b=1.029 P(r>c)=13.97% P(MFE>c)=25.65% long_liq=-13.9bp
+U1 mesa sem  h=  1 c=0.30%                  p*_modelo=2.543 p*_a/b=1.641 P(r>c)= 4.04% P(MFE>c)= 7.89% long_liq=-29.9bp
+U1 mesa sem  h=  1 c=0.50%                  p*_modelo=3.905 p*_a/b=2.407 P(r>c)= 1.28% P(MFE>c)= 2.70% long_liq=-49.9bp
+U1 mesa sem  h=  1 c=0.54% (0,14% + rede)   p*_modelo=4.177 p*_a/b=2.560 P(r>c)= 1.06% P(MFE>c)= 2.26% long_liq=-53.9bp
+U1 mesa sem  h=  5 c=0.14%                  p*_modelo=0.908 p*_a/b=0.737 P(r>c)=28.39% P(MFE>c)=56.00% long_liq=-13.6bp
+U1 mesa sem  h=  5 c=0.30%                  p*_modelo=1.375 p*_a/b=1.020 P(r>c)=15.03% P(MFE>c)=29.51% long_liq=-29.6bp
+U1 mesa sem  h=  5 c=0.50%                  p*_modelo=1.958 p*_a/b=1.374 P(r>c)= 7.38% P(MFE>c)=14.56% long_liq=-49.6bp
+U1 mesa sem  h=  5 c=0.54% (0,14% + rede)   p*_modelo=2.075 p*_a/b=1.445 P(r>c)= 6.48% P(MFE>c)=12.83% long_liq=-53.6bp
+U1 mesa sem  h= 15 c=0.14%                  p*_modelo=0.730 p*_a/b=0.633 P(r>c)=36.68% P(MFE>c)=72.51% long_liq=-12.9bp
+U1 mesa sem  h= 15 c=0.30%                  p*_modelo=0.994 p*_a/b=0.798 P(r>c)=25.56% P(MFE>c)=51.05% long_liq=-28.9bp
+U1 mesa sem  h= 15 c=0.50%                  p*_modelo=1.323 p*_a/b=1.003 P(r>c)=16.15% P(MFE>c)=32.81% long_liq=-48.9bp
+U1 mesa sem  h= 15 c=0.54% (0,14% + rede)   p*_modelo=1.389 p*_a/b=1.044 P(r>c)=14.73% P(MFE>c)=30.12% long_liq=-52.9bp
+U1 mesa sem  h= 60 c=0.14%                  p*_modelo=0.614 p*_a/b=0.549 P(r>c)=43.13% P(MFE>c)=85.70% long_liq=-9.5bp
+U1 mesa sem  h= 60 c=0.30%                  p*_modelo=0.744 p*_a/b=0.632 P(r>c)=36.34% P(MFE>c)=72.68% long_liq=-25.5bp
+U1 mesa sem  h= 60 c=0.50%                  p*_modelo=0.906 p*_a/b=0.735 P(r>c)=29.33% P(MFE>c)=58.98% long_liq=-45.5bp
+U1 mesa sem  h= 60 c=0.54% (0,14% + rede)   p*_modelo=0.939 p*_a/b=0.756 P(r>c)=27.96% P(MFE>c)=56.54% long_liq=-49.5bp
+U1 mesa sem  h=240 c=0.14%                  p*_modelo=0.562 p*_a/b=0.479 P(r>c)=45.11% P(MFE>c)=94.74% long_liq=+5.4bp
+U1 mesa sem  h=240 c=0.30%                  p*_modelo=0.632 p*_a/b=0.522 P(r>c)=41.12% P(MFE>c)=88.45% long_liq=-10.6bp
+U1 mesa sem  h=240 c=0.50%                  p*_modelo=0.720 p*_a/b=0.577 P(r>c)=36.91% P(MFE>c)=80.51% long_liq=-30.6bp
+U1 mesa sem  h=240 c=0.54% (0,14% + rede)   p*_modelo=0.737 p*_a/b=0.587 P(r>c)=36.14% P(MFE>c)=78.45% long_liq=-34.6bp
