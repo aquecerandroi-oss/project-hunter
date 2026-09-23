@@ -77,3 +77,22 @@ Escrevo o que espero, para poder estar errado por escrito:
 ## Relacionado
 
 [[KB-0151-a-coorte-nao-respira]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[KB-0147-custo-e-o-prejuizo-e-buys-1m-e-a-unica-pista]] · [[EXP-M22-absorcao-de-venda]] · [[Registro de Tentativas]]
+
+## Emenda 1 — 23/09/2026 13:2x BRT, ANTES de qualquer dado (amostragem estratificada)
+
+**O erro que a emenda corrige (achado pelo implementador da T4.85, aritmética verificada):** o desenho congelou três coisas incompatíveis — população "≥ 1 recusa" (larga), taxa "10 % base" e alvo "50–80 mints/dia". O censo de 3 593 mints em 6 dias que justificou os 10 % vem de `meme_gate_refusals_by_mint`, tabela que **só guarda quase-falhas** (`is_trail_candidate` exige `refusal_count ≤ 1`) ≈ 600 mints/dia. A população larga é outra ordem de grandeza: ~379 000 linhas julgadas/dia ≈ **19 000 mints distintos/dia**, e 10 % disso seriam ~1 900 apostas/dia — 25 a 38× o alvo, e a própria pré-registação diz que se a pista rápida perder tique por causa do experimento, **o experimento morre**.
+
+**Decisão (dona do pré-registo, Sexta-feira): amostragem ESTRATIFICADA, nenhuma das três opções puras.** Motivo: as duas populações respondem a perguntas diferentes e o experimento precisa das duas.
+
+| estrato | população | taxa | esperado/dia | responde |
+|---|---|---:|---:|---|
+| **A — quase-falha** | recusada por **exatamente um** critério, não admitida no tique | **10 %** base, **50 %** nos motivos com < 30 mints/semana (como congelado) | ~60 | "**este critério** separa?" — é onde vive o "passaria em tudo e só tropeçou aqui", e é o único estrato válido para o teste de não-inferioridade por critério |
+| **B — recusa múltipla** | recusada por **≥ 2** critérios, não admitida no tique | **0,1 %** base; **0,5 %** se o conjunto de motivos incluir algum com < 30 mints/semana | ~19 | "o portão **como um todo** seleciona ou só aposta menos vezes?" — sem este estrato a resposta global fica cega para as piores moedas, que são justamente as que falham em vários critérios |
+
+**Total esperado ≈ 79/dia**, dentro do alvo congelado de 50–80 e do orçamento de infra.
+
+**O que NÃO muda:** semente congelada; **probabilidade de inclusão gravada em cada aposta** (agora junto com o `estrato`), com ponderação pelo inverso na análise; um mint entra uma vez; todos os motivos gravados; parâmetros de saída da mesa real; braço de controlo contemporâneo; guarda anti-antecipação; família de 12 hipóteses com Benjamini-Hochberg; regra de parada.
+
+**O que muda na análise:** o contraste global usa **A + B ponderados pelo inverso da probabilidade** (estimador não enviesado da população recusada inteira) e é reportado **também por estrato**; os 11 contrastes por critério usam **só o estrato A**. Se B render menos de 30 mints na janela, fica declarado **não testável** — não é substituído nem fundido em A.
+
+**Por que não a opção "população estreita + 10 % literal":** naquela tabela há exatamente um motivo por linha, então o requisito "gravar todos os motivos" ficaria vazio e a pergunta global ("seleciona ou aposta menos?") ficaria sem resposta. **Por que não "larga + taxa baixa uniforme":** diluiria o estrato A, que é o único onde o teste por critério tem sentido, para pagar amostra de um estrato onde a resposta é quase certa.
