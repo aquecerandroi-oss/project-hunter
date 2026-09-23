@@ -838,6 +838,30 @@ assume:
 > (49 556 CU) — o `sell` de uma moeda HR não foi obtido nesta tarefa (a única com atividade real era
 > cotada num token custom, recusada por nome antes de simular; a mais barata ainda não tinha comprador
 > real na cadeia — `t48c_simulation_proof_mainnet_raw.json`).
+>
+> **T4.8d (23/09/2026, `.claude/state/notes-T4.8d.md`):** terceiro deploy (slot **449734335**,
+> `getBlockTime` = 14:45:19 UTC / 11:45:19 BRT) — o executor entrou em *crash loop* no VPS (64
+> reinícios) porque o guarda do boot fez exatamente o que devia. **A conta da IDL on-chain NÃO foi
+> republicada**: os bytes são, byte a byte, os da T4.8c (sha `c7ca9566…` inalterado, 47 instruções) —
+> o padrão da T4.8b, e a razão de o detector ter de manter os **dois** campos: quem olhasse só o hash
+> teria dito "não mudou" sobre um programa cujo *bytecode* acabara de ser trocado. Como a IDL nada
+> diz, a prova é outra: paridade byte a byte de `buy` (18 contas, moeda Mayhem) e `sell` (16 contas)
+> com trades reais de terceiros que aterraram no programa novo
+> (`t48d_rpc_tx_{buy,sell}_nonmayhem_raw.json`, 2 h 53 depois do deploy), `TradeEvent` no mesmo layout
+> (375/374 bytes, `holder_rewards` 0), `Global` idêntico e `GetFeesWithQuoteMint` ainda em 95/30 bps;
+> mais simulação mainnet pelo caminho do executor (`t48d_simulation_proof_mainnet_raw.json`, nada
+> assinado, nada enviado): `buy` clássica 89 601 CU, `buy` Mayhem 91 801 CU, `sell` clássica 56 042 CU.
+> `EXPECTED_PUMP_PROGRAM` passa a T4.8d (só o slot muda), T4.8c vai para `PREVIOUS_PUMP_PROGRAM` e
+> `PUMP_PROGRAM_HISTORY` guarda os três. **Armadilha desta rodada, registada em teste:** o programa
+> Mayhem (`MAyhSmzXz…`) faz CPI de `buy`/`sell` para o seu próprio agente **sem taxa**, marca
+> `global_volume_accumulator` como *writable* e passa, no lugar de `bonding_curve_v2`, a PDA das mesmas
+> sementes derivada **sob o programa Mayhem** — três diferenças que parecem mudança de layout e não
+> são (é caminho do chamador; o nosso builder nunca passa por lá, e um trade normal na *mesma* moeda
+> Mayhem carrega a PDA derivada sob o pump). Não provado: `sell` legado numa moeda Mayhem (nenhum
+> aterrou na janela amostrada; o único detentor restante era o cofre do agente numa curva com
+> `real_sol_reserves = 1` — `Overflow`/6024, económico, idêntico com as duas PDAs e em três tamanhos).
+> Mitigação: `mayhem_policy_check` recusa toda entrada Mayhem hoje (`mayhem_policy_approved` nunca é
+> ligado em código de produção) e a simulação obrigatória da §9.2 continua a ser o guarda da saída.
 
 > **T4.29c (16/09/2026):** as taxas deixaram de ser uma constante datada. `fee_config.py` decodifica
 > a conta `FeeConfig` do **programa de taxas** (`pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ`, PDA

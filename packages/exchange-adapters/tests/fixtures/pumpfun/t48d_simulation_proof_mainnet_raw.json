@@ -1,0 +1,625 @@
+{
+ "sent": false,
+ "sig_verify": false,
+ "program_deploy_slot": 449734335,
+ "calls": [
+  "getBalance",
+  "getLatestBlockhash",
+  "getAccountInfo(global)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "simulateTransaction(buy)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "simulateTransaction(buy)",
+  "getTokenAccountsByOwner",
+  "getTokenAccountsByOwner",
+  "getLatestBlockhash",
+  "getAccountInfo(global)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "getSignaturesForAddress",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTokenAccountsByOwner",
+  "getTokenAccountsByOwner",
+  "simulateTransaction(sell)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "getSignaturesForAddress",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTokenAccountsByOwner",
+  "getTokenAccountsByOwner",
+  "simulateTransaction(sell)",
+  "getLatestBlockhash",
+  "getAccountInfo(global)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "simulateTransaction(sell)",
+  "simulateTransaction(sell)",
+  "getSignaturesForAddress",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getLatestBlockhash",
+  "getAccountInfo(global)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "getTokenAccountsByOwner",
+  "getLatestBlockhash",
+  "getAccountInfo(global)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "getSignaturesForAddress",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getTransaction",
+  "getLatestBlockhash",
+  "getAccountInfo(global)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "getLatestBlockhash",
+  "getAccountInfo(global)",
+  "getAccountInfo(mint)",
+  "getAccountInfo(curve)",
+  "simulateTransaction",
+  "simulateTransaction",
+  "simulateTransaction",
+  "simulateTransaction",
+  "simulateTransaction",
+  "simulateTransaction"
+ ],
+ "results": {
+  "payer": {
+   "pubkey": "4DLnmkD9wdQKH1Mx7WgJjBtsB1Ja1iF8VmnkoQz8zKH3",
+   "lamports": 30332684
+  },
+  "buy_classic": {
+   "mint": "Cqtq1i2muYZcQbAZC3GR5KnyMjvAhPxb9fTFS9fpump",
+   "ok": true,
+   "err": null,
+   "units_consumed": 89601,
+   "slot": 449774766,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+    "Program log: CreateIdempotent",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: GetAccountDataSize",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1523 of 142936 compute units",
+    "Program return: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb qgAAAAAAAAA=",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program log: Initialize the associated token account",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: InitializeImmutableOwner",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 736 of 136591 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: InitializeAccount3",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2153 of 133520 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 18616 of 149700 compute units",
+    "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Buy",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 90972 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: TransferChecked",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2562 of 84122 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program data: vdt/007mYe4DCKxNAcBLiKtdCGesnRda0J9jmnCS+/VmdK5pIoGlbz60lgAAAAAAIUxx9zEAAAABL7xn+oCzrXH+Vk3Af5eluBQXVPPlJ142QXOkTgw83uIjELRqAAAAADnUc/YIAAAAWaAvTYr4AgA5KFD6AQAAAFkIHQH5+QEASsL40N1cvJfjKJwZfLUGKlTz2Va5zm5RFfllZ6pcs+ZfAAAAAAAAAIRuAQAAAAAALsrdzNBEsEtnNAOtqhSDpInXkiR5KPOLU2lxuSsudQseAAAAAAAAAL5zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAGJ1eQAAAAAAAAAAAAAAAAAAAAAAiBMAAAAAAABCtwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD60lgAAAAAAOdRz9ggAAAA5KFD6AQAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [2]",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 2149 of 64582 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 70685 of 131084 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"
+   ],
+   "is_mayhem_mode": false,
+   "is_holder_reward": false,
+   "quote": {
+    "side": "buy",
+    "mint": "Cqtq1i2muYZcQbAZC3GR5KnyMjvAhPxb9fTFS9fpump",
+    "token_amount": 214604794913,
+    "sol_limit": 10500000,
+    "blockhash": "AbBjHz5QW6vgGLV2KVpLAjb5FjqAmTFVfz4vfFpCrdht",
+    "last_valid_block_height": 427815106,
+    "compute_unit_limit": 150000,
+    "compute_unit_price_micro_lamports": 1,
+    "creates_ata": true,
+    "closes_ata": false,
+    "price_impact_bps": 2,
+    "max_slippage_bps": 500,
+    "total_cost_lamports": 10000000,
+    "max_sol_cost": 10500000
+   }
+  },
+  "buy_mayhem": {
+   "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+   "ok": true,
+   "err": null,
+   "units_consumed": 91801,
+   "slot": 449774782,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+    "Program log: CreateIdempotent",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: GetAccountDataSize",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1523 of 144436 compute units",
+    "Program return: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb qgAAAAAAAAA=",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program log: Initialize the associated token account",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: InitializeImmutableOwner",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 736 of 138091 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: InitializeAccount3",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2153 of 135020 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 17116 of 149700 compute units",
+    "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Buy",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 86567 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: TransferChecked",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2562 of 79717 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program data: vdt/007mYe5NK7O38DjAIW6FNlyof+UF7hSM7XEW1KvonJd1vLFNnz60lgAAAAAAGSnTk3MEAAABL7xn+oCzrXH+Vk3Af5eluBQXVPPlJ142QXOkTgw83uIoELRqAAAAAEvXB2EAAAAA2i9vmEPZAgA/tJYAAAAAANqXXEyy2gEA6JMUH7GOnxV02BDheOGeMGBOMXWqLkoy38hgByfRBwlfAAAAAAAAAIRuAQAAAAAA/dMEgbBQc67KwbUlwAwOc/uW9Aw0MvHMNCKEvq9iFJ8eAAAAAAAAAL5zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAGJ1eQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD60lgAAAAAAS9cHYQAAAAA/tJYAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [2]",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 2149 of 62382 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 74385 of 132584 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"
+   ],
+   "is_mayhem_mode": true,
+   "is_holder_reward": false,
+   "quote": {
+    "side": "buy",
+    "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+    "token_amount": 4894447839513,
+    "sol_limit": 10500000,
+    "blockhash": "AbBjHz5QW6vgGLV2KVpLAjb5FjqAmTFVfz4vfFpCrdht",
+    "last_valid_block_height": 427815106,
+    "compute_unit_limit": 150000,
+    "compute_unit_price_micro_lamports": 1,
+    "creates_ata": true,
+    "closes_ata": false,
+    "price_impact_bps": 61,
+    "max_slippage_bps": 500,
+    "total_cost_lamports": 10000000,
+    "max_sol_cost": 10500000
+   }
+  },
+  "sell_classic": {
+   "mint": "Cqtq1i2muYZcQbAZC3GR5KnyMjvAhPxb9fTFS9fpump",
+   "seller": "4i2Ekmd2UyHphGMjvUKoAJqaktSGt2nAqCL3zn8zvYx9",
+   "token_amount": 4580239941772,
+   "ok": true,
+   "err": null,
+   "units_consumed": 56042,
+   "slot": 449775008,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 116438 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+    "Program log: Instruction: TransferChecked",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2562 of 109633 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program data: vdt/007mYe4DCKxNAcBLiKtdCGesnRda0J9jmnCS+/VmdK5pIoGlb2MqIQwAAAAAjCCTayoEAAAANxVF1jiDH9EQyYfzFGzVLa9utAjwvQlPzZ4pp+qwadJkELRqAAAAALGcEsgIAAAAMPUUGjsIAwCx8O7LAQAAADBdAs6pCQIASsL40N1cvJfjKJwZfLUGKlTz2Va5zm5RFfllZ6pcs+ZfAAAAAAAAAMR/HQAAAAAALsrdzNBEsEtnNAOtqhSDpInXkiR5KPOLU2lxuSsudQseAAAAAAAAAMVQCQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAHNlbGwAAAAAAAAAAAAAAAAAAAAAAIgTAAAAAAAA4r8OAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABjKiEMAAAAALGcEsgIAAAAsfDuywEAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [2]",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 2149 of 97388 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 55742 of 149700 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"
+   ],
+   "quote": {
+    "side": "sell",
+    "mint": "Cqtq1i2muYZcQbAZC3GR5KnyMjvAhPxb9fTFS9fpump",
+    "token_amount": 4580239941772,
+    "sol_limit": 190908559,
+    "blockhash": "8ihe1GR96ypjBqmoe9whGPNDeSioXMCqgQPvGwhc28qA",
+    "last_valid_block_height": 427815308,
+    "compute_unit_limit": 150000,
+    "compute_unit_price_micro_lamports": 1,
+    "creates_ata": false,
+    "closes_ata": false,
+    "price_impact_bps": 54,
+    "max_slippage_bps": 500,
+    "net_proceeds_lamports": 200956378,
+    "min_sol_output": 190908559
+   }
+  },
+  "sell_mayhem": {
+   "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+   "seller": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+   "token_amount": 126627125527937,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45633,
+   "slot": 449775061,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110542 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45333 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ],
+   "quote": {
+    "side": "sell",
+    "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+    "token_amount": 126627125527937,
+    "sol_limit": 205933040,
+    "blockhash": "8ihe1GR96ypjBqmoe9whGPNDeSioXMCqgQPvGwhc28qA",
+    "last_valid_block_height": 427815308,
+    "compute_unit_limit": 150000,
+    "compute_unit_price_micro_lamports": 1,
+    "creates_ata": false,
+    "closes_ata": false,
+    "price_impact_bps": 1357,
+    "max_slippage_bps": 500,
+    "net_proceeds_lamports": 216771622,
+    "min_sol_output": 205933040
+   }
+  },
+  "sell_mayhem_0.01%": {
+   "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+   "seller": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+   "token_amount": 126627125527,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45632,
+   "slot": 449775299,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110543 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45332 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ],
+   "quote": {
+    "side": "sell",
+    "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+    "token_amount": 126627125527,
+    "sol_limit": 238218,
+    "blockhash": "4e5JLNc27SAcLdfgEVwEgMnFQsTBN2J5TMuF3grevxjU",
+    "last_valid_block_height": 427815639,
+    "compute_unit_limit": 150000,
+    "compute_unit_price_micro_lamports": 1,
+    "creates_ata": false,
+    "closes_ata": false,
+    "price_impact_bps": 2,
+    "max_slippage_bps": 500,
+    "net_proceeds_lamports": 250756,
+    "min_sol_output": 238218
+   }
+  },
+  "sell_mayhem_0.1%": {
+   "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+   "seller": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+   "token_amount": 1266271255279,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45632,
+   "slot": 449775305,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110543 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45332 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ],
+   "quote": {
+    "side": "sell",
+    "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+    "token_amount": 1266271255279,
+    "sol_limit": 2378835,
+    "blockhash": "4e5JLNc27SAcLdfgEVwEgMnFQsTBN2J5TMuF3grevxjU",
+    "last_valid_block_height": 427815639,
+    "compute_unit_limit": 150000,
+    "compute_unit_price_micro_lamports": 1,
+    "creates_ata": false,
+    "closes_ata": false,
+    "price_impact_bps": 16,
+    "max_slippage_bps": 500,
+    "net_proceeds_lamports": 2504037,
+    "min_sol_output": 2378835
+   }
+  },
+  "sell_mayhem_real_holder": {
+   "ok": null,
+   "reason": "holder_sold_out",
+   "mint": "DNjQ1DFJ6j1xWQpa9ecJiBZbPBKFuuzXtXTnMgjxpump",
+   "holder": "B9LwKidP6Tg1w9zqvTkACK2UKGwZYatGv7FqkqvLUSLE"
+  },
+  "sell_ours_pump_pda_755493416085": {
+   "amount": 755493416085,
+   "min_sol_output": 1420177,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45632,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110543 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45332 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ]
+  },
+  "sell_mayhem_pda_755493416085": {
+   "amount": 755493416085,
+   "min_sol_output": 1420177,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45632,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110543 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45332 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ]
+  },
+  "sell_ours_pump_pda_100000000000": {
+   "amount": 100000000000,
+   "min_sol_output": 188131,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45633,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110542 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45333 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ]
+  },
+  "sell_mayhem_pda_100000000000": {
+   "amount": 100000000000,
+   "min_sol_output": 188131,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45633,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110542 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45333 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ]
+  },
+  "sell_ours_pump_pda_10000000000": {
+   "amount": 10000000000,
+   "min_sol_output": 18813,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45478,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110697 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45178 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ]
+  },
+  "sell_mayhem_pda_10000000000": {
+   "amount": 10000000000,
+   "min_sol_output": 18813,
+   "ok": false,
+   "err": {
+    "InstructionError": [
+     2,
+     {
+      "Custom": 6024
+     }
+    ]
+   },
+   "units_consumed": 45478,
+   "logs": [
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: Sell",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ invoke [2]",
+    "Program log: Instruction: GetFeesWithQuoteMint",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ consumed 3360 of 110697 compute units",
+    "Program return: pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ success",
+    "Program log: AnchorError thrown in programs/pump/src/lib.rs:930. Error Code: Overflow. Error Number: 6024. Error Message: Overflow.",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 45178 of 149700 compute units",
+    "Program return: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1788"
+   ]
+  }
+ }
+}

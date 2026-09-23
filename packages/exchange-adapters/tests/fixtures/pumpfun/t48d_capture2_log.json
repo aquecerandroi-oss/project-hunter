@@ -1,0 +1,93 @@
+{
+ "started_at": "2026-09-23T17:42:36.587619+00:00",
+ "seen": [
+  {
+   "signature": "5EpHwV2y1J9dhifzjp7DbpA3M8WzbiEgpNKbkFt39kDXWpmrFqSWE2R8qvXMcu6ZMh8z5zi2VsBrryshJ4Nsu179",
+   "outer": [
+    "11111111111111111111111111111111",
+    "FLASHX8DrLbgeR8FcfNV1F5krxYcYMUdBkrP1EPBtxB9",
+    "11111111111111111111111111111111"
+   ],
+   "trades": 1,
+   "via_mayhem": false
+  },
+  {
+   "signature": "4FeYMSrw31cgvDX1WvjmgsUt7JRVCV3fLMJUgWQVk35CoHoBcbmYkrJd9drFvN4NESbsWf6xjw81AX1jhDjQdFHU",
+   "outer": [
+    "ComputeBudget111111111111111111111111111111",
+    "ComputeBudget111111111111111111111111111111",
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+    "GMgnVFR8Jb39LoXsEVzb3DvBy3ywCmdmJquHUy1Lrkqb",
+    "11111111111111111111111111111111",
+    "11111111111111111111111111111111"
+   ],
+   "trades": 1,
+   "via_mayhem": false
+  },
+  {
+   "signature": "42ZPS2rdC92oE2QwBps2NTvRmAnY9m1Gz82fyYcq9qX1TqWVBPuJwmTsr7kJfBvvWdw8KBn5R9Ci3atsZxf9t2XX",
+   "outer": [
+    "ComputeBudget111111111111111111111111111111",
+    "ComputeBudget111111111111111111111111111111",
+    "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+   ],
+   "trades": 0,
+   "via_mayhem": false
+  },
+  {
+   "signature": "25KGoTpe1EbguH5V79A36XypHDxEF5Av9NjFAMxP4vG8yrNhDmmFYBm38dyFhLQDjNrNDo5JNpMj4RyJ8EG52DDM",
+   "outer": [
+    "ComputeBudget111111111111111111111111111111",
+    "ComputeBudget111111111111111111111111111111",
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+    "96Gg7RxLjqDoWMMpStiGx1XNmBKkvyY5TgQ4E57r1nxf"
+   ],
+   "trades": 1,
+   "via_mayhem": false
+  },
+  {
+   "signature": "4JHXzmwqNuL1mKr7h6VJ1NzSsV5Mky9FWbjEVWRQ7HxGHW2qFSmoVf8RqG2cLVRzbp5pdwBqvG9fsCdnHAtct4nZ",
+   "outer": [
+    "ComputeBudget111111111111111111111111111111",
+    "ComputeBudget111111111111111111111111111111",
+    "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+   ],
+   "trades": 1,
+   "via_mayhem": false
+  }
+ ],
+ "found": {
+  "buy": "5EpHwV2y1J9dhifzjp7DbpA3M8WzbiEgpNKbkFt39kDXWpmrFqSWE2R8qvXMcu6ZMh8z5zi2VsBrryshJ4Nsu179",
+  "sell": "4JHXzmwqNuL1mKr7h6VJ1NzSsV5Mky9FWbjEVWRQ7HxGHW2qFSmoVf8RqG2cLVRzbp5pdwBqvG9fsCdnHAtct4nZ"
+ },
+ "calls": [
+  {
+   "n": 1,
+   "method": "getTransaction",
+   "label": "tx"
+  },
+  {
+   "n": 2,
+   "method": "getTransaction",
+   "label": "tx"
+  },
+  {
+   "n": 3,
+   "method": "getTransaction",
+   "label": "tx"
+  },
+  {
+   "n": 4,
+   "method": "getTransaction",
+   "label": "tx"
+  },
+  {
+   "n": 5,
+   "method": "getTransaction",
+   "label": "tx"
+  }
+ ]
+}

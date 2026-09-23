@@ -926,8 +926,9 @@ async def test_the_kill_switch_from_redis_blocks_and_the_daily_latch_persists(
         p=proposal_id,
     )
     assert orders[0]["status"] == "refused" and orders[0]["reason"] == "kill_switch_blocked"
-    assert len(orders[0]["admission"]["checks"]) == 26, (
-        "every check recorded after the first refusal (T4.61c: 26 with ``conviction``)"
+    assert len(orders[0]["admission"]["checks"]) == 27, (
+        "every check recorded after the first refusal "
+        "(T4.61c: 26 with ``conviction``; T4.78 added ``mint_cooldown_after_loss``)"
     )
     assert orders[0]["admission"]["conviction"] == {"enabled": False, "evaluated": False}
     assert harness.rpc.sent == []

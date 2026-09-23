@@ -29,6 +29,17 @@ again, unchanged byte for byte (``test_pumpfun_tx_parity.py``); what changed is
 one more instruction (``sell_v2``) our builder does not construct. Both fields
 of :data:`EXPECTED_PUMP_PROGRAM` moved this time; :data:`PREVIOUS_PUMP_PROGRAM`
 keeps T4.8b's values so the history is not lost.
+
+Lesson of 2026-09-23 (T4.8d, ``.claude/state/notes-T4.8d.md``): a **third** deploy
+(slot 449734335, 11:45:19 BRT) that left the IDL account byte-for-byte untouched —
+T4.8b's pattern again, and the reason both fields stay in the detector: a check
+that watched only the hash would have called this program "unchanged" while its
+bytecode was being replaced under a desk holding real positions. ``buy``/``sell``
+and ``TradeEvent`` were, for the third time, proven unchanged (18 / 16 accounts,
+24-byte data, 375-byte event) against third-party trades that landed on the new
+program and against a mainnet simulation of our own bytes. Only
+:attr:`ProgramExpectation.last_deploy_slot` moves this time: the hash of T4.8c and
+of T4.8d are the same string on purpose.
 """
 
 from __future__ import annotations
@@ -73,7 +84,7 @@ _IDL_ACCOUNT_DISCRIMINATOR = bytes.fromhex("184662bf3a907b9e")
 the same 8 bytes head the pump program's IDL account on chain (``t48b_rpc_idl_account_raw``)."""
 _PROGRAMDATA_TAG = 3
 _PROGRAMDATA_HEADER_LEN = 45
-UPGRADE_MESSAGE = "programa mudou: regravar T4.8d"
+UPGRADE_MESSAGE = "programa mudou: regravar T4.8e"
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +98,7 @@ class ProgramExpectation:
     task: str
 
 
-PREVIOUS_PUMP_PROGRAM = ProgramExpectation(
+_T48B_PUMP_PROGRAM = ProgramExpectation(
     idl_sha256="fd48d9891733c30d167691b08ca5e5996e3723db58801db889b5a253f8d3e969",
     last_deploy_slot=446462760,
     captured_at="2026-09-12T17:52:36Z",
@@ -96,28 +107,48 @@ PREVIOUS_PUMP_PROGRAM = ProgramExpectation(
 """``t48b_idl_pump_onchain_raw.json`` (40 instructions, ``TradeEvent`` 32 fields —
 the IDL account still predated *that* upgrade) and ``t48b_rpc_programdata_raw.json``
 (deploy slot 446462760 = 2026-09-12 15:24:04 UTC, ``t48b_rpc_deploy_block_time_raw``).
-Kept for history — :func:`program_divergence` only compares against the current
-:data:`EXPECTED_PUMP_PROGRAM`."""
+Reachable through :data:`PUMP_PROGRAM_HISTORY`."""
 
-EXPECTED_PUMP_PROGRAM = ProgramExpectation(
+PREVIOUS_PUMP_PROGRAM = ProgramExpectation(
     idl_sha256="c7ca9566370b9351df9472adb7667dcc77695c49d0b1cc21b953f77567e2dc12",
     last_deploy_slot=447228373,
     captured_at="2026-09-15T19:53:52Z",
     task="T4.8c",
 )
 """``t48c_idl_pump_onchain_raw.json`` (47 instructions, ``TradeEvent`` 34 fields —
-the IDL account *was* republished this time, matching the count T4.14 read from
+the IDL account *was* republished that time, matching the count T4.14 read from
 GitHub's "main") and ``t48c_rpc_programdata_raw.json`` (deploy slot 447228373 =
 2026-09-15 10:34:32 UTC / 07:34:32 BRT, ``t48c_rpc_deploy_block_time_raw`` — also
-the value the plantão's run 19 read independently, KB-0096). The upgrade
-authority (``6348fb82…``) did not change from :data:`PREVIOUS_PUMP_PROGRAM`."""
+the value the plantão's run 19 read independently, KB-0096). Kept for history —
+:func:`program_divergence` only compares against the current
+:data:`EXPECTED_PUMP_PROGRAM`."""
+
+EXPECTED_PUMP_PROGRAM = ProgramExpectation(
+    idl_sha256="c7ca9566370b9351df9472adb7667dcc77695c49d0b1cc21b953f77567e2dc12",
+    last_deploy_slot=449734335,
+    captured_at="2026-09-23T17:37:58Z",
+    task="T4.8d",
+)
+"""``t48d_rpc_programdata_raw.json`` (deploy slot 449734335 = 2026-09-23 14:45:19 UTC
+/ 11:45:19 BRT, ``t48d_rpc_deploy_block_time_raw``) and ``t48d_rpc_idl_account_raw.json``
+— whose bytes are, to the byte, :data:`PREVIOUS_PUMP_PROGRAM`'s: **this deploy did not
+republish the IDL**, so the hash below is deliberately the same string as T4.8c's and
+the slot is the only field that moved. The IDL fixture is not duplicated; the identity
+test asserts the T4.8d account decodes to ``t48c_idl_pump_onchain_raw.json`` exactly.
+The upgrade authority (``6348fb82…``) did not change. What *was* re-proven, since an
+unchanged IDL proves nothing about the bytecode: byte-for-byte parity of ``buy`` /
+``sell`` / ``TradeEvent`` with third-party trades that landed on this program
+(``test_pumpfun_tx_parity_t48d.py``) and a mainnet simulation of our own bytes
+(``t48d_simulation_proof_mainnet_raw.json``)."""
 
 PUMP_PROGRAM_HISTORY: tuple[ProgramExpectation, ...] = (
+    _T48B_PUMP_PROGRAM,
     PREVIOUS_PUMP_PROGRAM,
     EXPECTED_PUMP_PROGRAM,
 )
 """Every deploy this package has been proven against, oldest first — for docs
-and tests that want to show the program has moved more than once."""
+and tests that want to show the program has moved more than once. Three deploys
+in twelve days; two of them left the IDL account untouched."""
 
 
 @dataclass(frozen=True, slots=True)

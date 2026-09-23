@@ -1,0 +1,128 @@
+{
+ "started_at": "2026-09-23T17:37:58.764852+00:00",
+ "programdata": {
+  "slot": 449734335,
+  "t48c_slot": 447228373,
+  "authority": "6348fb820231fbab73dc3083e1f3f149ff125b718820f32eb1a15bfefcd61b09",
+  "t48c_authority": "6348fb820231fbab73dc3083e1f3f149ff125b718820f32eb1a15bfefcd61b09",
+  "authority_changed": false
+ },
+ "idl": {
+  "sha256_canonical": "c7ca9566370b9351df9472adb7667dcc77695c49d0b1cc21b953f77567e2dc12",
+  "sha256_canonical_t48c": "c7ca9566370b9351df9472adb7667dcc77695c49d0b1cc21b953f77567e2dc12",
+  "changed": false,
+  "instructions": 47,
+  "instructions_t48c": 47,
+  "account_slot": 449773161
+ },
+ "deploy_block_time": {
+  "slot": 449734335,
+  "unix": 1790174719
+ },
+ "global": {
+  "len": 1087,
+  "t48c_len": 1087,
+  "same_decoded": true
+ },
+ "transactions": {
+  "buy_legacy": {
+   "signature": "5xcNGazkAe5YeWNEijYCfBt9b2qhPW1TZYnsMGEzXDcd9WG1FQ3cFJACCWGMCnLjuT3RoTDgvs74bq2HvU73zUdE",
+   "slot": 449773177,
+   "blockTime": 1790185083,
+   "info": {
+    "side": "buy",
+    "mint": "B3qDtXXbo3BTTHSJqRUrYz8gs3bfLR7Y8g32U8Cipump",
+    "user": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+    "remaining": [
+     {
+      "index": 0,
+      "address": "6crqvby8M5LuxvifvdP87wKMngmwe3Vpf8BXj3zaPDan",
+      "writable": false,
+      "tag": "?"
+     },
+     {
+      "index": 1,
+      "address": "A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW",
+      "writable": true,
+      "tag": "Global.buyback_fee_recipients[7]"
+     }
+    ]
+   }
+  },
+  "sell": {
+   "signature": "2cyu285ABKuJ81mCeDH4mGCAHPRJ6xy2dDvp2uHMZv28QLCV4V1yYqDbT6DmAbdrStH3v18UECMFPxc9fZsnFvrv",
+   "slot": 449773177,
+   "blockTime": 1790185083,
+   "info": {
+    "side": "sell",
+    "mint": "6CF3ViohgfTBLe8rdwVoaSZqXZU72T49vsmxcVyNpump",
+    "user": "BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s",
+    "remaining": [
+     {
+      "index": 0,
+      "address": "E6s36fNRPAC7xozyYcrVmW1gLVUgHQ5pvV55M7SNHR9t",
+      "writable": false,
+      "tag": "?"
+     },
+     {
+      "index": 1,
+      "address": "5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6",
+      "writable": true,
+      "tag": "Global.buyback_fee_recipients[4]"
+     }
+    ]
+   }
+  }
+ },
+ "calls": [
+  {
+   "n": 1,
+   "method": "getAccountInfo",
+   "label": "programdata_header",
+   "at": "2026-09-23T17:37:58.765872+00:00"
+  },
+  {
+   "n": 2,
+   "method": "getAccountInfo",
+   "label": "idl_account",
+   "at": "2026-09-23T17:38:00.458270+00:00"
+  },
+  {
+   "n": 3,
+   "method": "getBlockTime",
+   "label": "deploy_block_time",
+   "at": "2026-09-23T17:38:01.883012+00:00"
+  },
+  {
+   "n": 4,
+   "method": "getAccountInfo",
+   "label": "global",
+   "at": "2026-09-23T17:38:03.246723+00:00"
+  },
+  {
+   "n": 5,
+   "method": "getSignaturesForAddress",
+   "label": "signatures_pump",
+   "at": "2026-09-23T17:38:04.617742+00:00"
+  },
+  {
+   "n": 6,
+   "method": "getTransaction",
+   "label": "tx_pump",
+   "at": "2026-09-23T17:38:06.073771+00:00"
+  },
+  {
+   "n": 7,
+   "method": "getTransaction",
+   "label": "tx_pump",
+   "at": "2026-09-23T17:38:07.524856+00:00"
+  },
+  {
+   "n": 8,
+   "method": "getTransaction",
+   "label": "tx_pump",
+   "at": "2026-09-23T17:38:08.912969+00:00"
+  }
+ ],
+ "finished_at": "2026-09-23T17:38:09.234034+00:00"
+}
