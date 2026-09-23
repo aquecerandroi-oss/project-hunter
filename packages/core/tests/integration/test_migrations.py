@@ -7778,9 +7778,10 @@ def test_0041_seeds_event_v0_as_research_only_and_does_not_touch_the_desk(upgrad
         )
     )
     assert seeded == ["event_v0/1:research_only:EXP-M8:active:true"]
-    assert len(asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {}))) == 1, (
-        "event_v0 seeds no operator row; the desk's single active set is untouched"
-    )
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+        "operator/5",
+        "operator/6",
+    ], "event_v0 seeds no operator row; the desks are 0039's operator/5 and 0055's operator/6"
     command.check(alembic_config(upgraded))
 
 

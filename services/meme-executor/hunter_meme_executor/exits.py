@@ -17,7 +17,8 @@ the curve — or say by name why it cannot.
   mint whose canonical pool cannot be found is ``blocked:pumpswap_pool_not_found``
   — never sold quietly, never silently retried into the old blanket refusal.
 - **A ``submitted_unconfirmed`` sell is reconciled before any new one** (VM5); a
-  ``failed`` one is retried with backoff under a new ``:exit:{n}`` key, never re-signed.
+  ``failed`` one is retried with backoff under a new ``:exit:{n}`` key, never re-signed
+  — **even when no rule fires again** (T4.88, ``exit_common.pending_sell_retry``).
 - **T4.63 — two paths, one sell.** ``manage_position`` is the tick; ``sell_on_event``
   is the event runtime's door (``event_exits.py``) when ``decide_exit`` fired on a
   WS curve update. Both take the position's ``exit_lock``, re-read the row inside
@@ -54,6 +55,8 @@ from hunter_meme_executor.exit_common import (
     exit_params,
     mark_blocked,
     mark_sol,
+    pending_sell_retry,
+    sell_slippage_bps,
 )
 from hunter_meme_executor.exit_settle import close_from_fill, reconcile_sell
 from hunter_meme_executor.journal_db import WORKER_ROLE
@@ -157,6 +160,8 @@ async def _manage_locked(ctx: ExecutorContext, position: OpenPosition, *, now: d
             ctx.kill.effective is KillSwitchState.EMERGENCY and ctx.config.auto_close_on_emergency
         ),
     )
+    if reason is None:  # T4.88: a venda decidida que falhou continua devida
+        reason = await pending_sell_retry(ctx, position, now=now)
     if reason is None:
         return
     await route_exit(ctx, position, read, reason, migrated=migrated, complete=complete, now=now)
@@ -249,14 +254,15 @@ async def _sell(
         await mark_blocked(ctx, position, reason, "reconciliation_mismatch:no_tokens_on_chain", now)
         return
     # T4.55: a sell tolerates more than a buy (5 %; 15 % on a creator dump / rug —
-    # R56 §2, ``6003 TooLittleSolReceived`` at 1 %).
+    # R56 §2, ``6003 TooLittleSolReceived`` at 1 %). T4.88: and, when the owner
+    # asks for it (``MEME_EXIT_PANIC_FROM_ATTEMPT``), from the n-th attempt on.
     try:
         built = build_sell(
             read,
             global_account,
             user=pubkey,
             token_amount=tokens,
-            max_slippage_bps=cfg.send.exit_slippage_bps(reason),
+            max_slippage_bps=sell_slippage_bps(cfg.send, reason, attempt=attempt, env=os.environ),
             blockhash=blockhash,
             last_valid_block_height=last_valid,
             compute_unit_limit=cfg.compute_unit_limit,

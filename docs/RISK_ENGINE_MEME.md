@@ -640,6 +640,36 @@ configurado; a diferença fica registrada no `intent` (`max_slippage_bps`, `max_
 | compra | `MEME_BUY_MAX_SLIPPAGE_PCT` | 1 % | (0, 20] | `max_sol_cost` da instrução `buy` |
 | venda normal | `MEME_EXIT_MAX_SLIPPAGE_PCT` | 5 % | (0, 50] | `min_sol_output` de `sell` (curva e PumpSwap) |
 | venda de pânico | `MEME_PANIC_EXIT_MAX_SLIPPAGE_PCT` | 15 % | (0, 50] | idem, motivos `creator_dump` / `rug_signal` |
+| escada por tentativa (T4.88) | `MEME_EXIT_PANIC_FROM_ATTEMPT` | 0 (desligada) | inteiro ≥ 0 | `n > 0`: a tentativa `n` em diante usa **exatamente** a tolerância de pânico, qualquer motivo; só na curva (a PumpSwap segue por motivo) |
+
+**A venda que falhou continua devida; a escada por tentativa é do dono (T4.88).** Medido nas 101
+vendas reais de 17 a 23/09 (leitura read-only; fita `meme_trades` reconstruída a partir das reservas
+exatas do fill da compra, método do R62/R64; líquido da curva contra líquido da curva, fora o
+reembolso de rent da ATA): 10 ordens falhadas em 8 posições — 2 `blockhash_expired_never_landed` e 8
+`6003 TooLittleSolReceived` (6 na cadeia, 2 na simulação). Taxa de rede queimada pelas falhas que
+pousaram: 0,00027 SOL no período. Pânico já na 1.ª tentativa teria valido **+0,0002 SOL** no balde
+"violento" (o `creator_dump` já é pânico; nos dois `trailing` +0,0001 cada) e +0,0138 SOL somando
+tudo, dos quais +0,0110 num só caso — GAMON, motivo `target`. Na AIRAA (23/09, −77,6 %) o prejuízo
+aconteceu **antes** da 1.ª tentativa: um bloco de 14 vendas levou a marca de 0,0760 para 0,0160 num
+segundo, e daí a marca ficou parada em ~0,0145 por 70 s; os 6,4 s entre tentativas custaram
+0,00008 SOL. O dinheiro de GAMON não era a tolerância: a tentativa 1 falhou às 12:31:02,58, o preço
+parou na **banda morta** (abaixo do alvo, 9,5 % abaixo do pico com trailing de 10 %), `decide_exit`
+— sem memória — deixou de pedir a saída e o `next_attempt_at` escrito pela falha ficou sem leitor:
+17,4 s até a tentativa 2, marca de 0,0803 para 0,0724. Com retentativa no prazo e a **mesma** tolerância
+de 5 % a venda teria pousado a 0,0803 (+0,0110 SOL). Por isso:
+
+- **Intenção pendente (padrão ligado).** No tick, se nenhuma regra dispara mas a última ordem de
+  venda da posição está `failed` (a linha durável — a reconciliação de 30 s descobre falhas sem
+  tocar na intenção), a venda é reenviada com o **motivo original**, respeitando o
+  `next_attempt_at` (ausente = devida agora), chave nova `:exit:{n}`, cotação nova.
+  `MEME_EXIT_RETRY_MAX_ATTEMPTS` (padrão 6 = comprimento do backoff) limita só esse reenvio
+  automático: no teto a posição vira `blocked_exits = exit_retry_exhausted` — **ainda exposta**, e
+  uma regra que dispare continua vendendo. `0` volta ao comportamento anterior.
+- **Escada por tentativa (padrão desligado).** Dois casos de retentativa (+0,0031 GAMON, −0,0001 PS),
+  e o de GAMON já é resolvido pela intenção pendente — os ganhos não se somam. Ligar é decisão de
+  política: `2` = pânico na retentativa, `1` = pânico já na 1.ª tentativa. A tolerância é contra a
+  cotação **de cada tentativa**, não um limite de perda desde a entrada: recotar em série admite
+  perdas acumuladas maiores.
 
 **A taxa de uma transação que pousou com erro é registrada (T4.59).** Um `failed`
 `onchain_error:…` depois do envio (ou na reconciliação de um `submitted_unconfirmed`) pagou a taxa
