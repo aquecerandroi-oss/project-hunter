@@ -128,3 +128,12 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** decisões com `maior_comprador_pct` no tercil alto rendem **menos −0,05 por SOL** que o tercil baixo — isto é, comprar onde um dono concentra o estoque é pior
 - **refutação:** limite inferior do IC 95 % (bootstrap por mint) acima de −0,01 por SOL; ou cobertura da fita desde o nascimento < 60 % da população (sem fita completa não dá para medir o maior comprador, e isso é limite de dado, não resultado)
 - **status:** aberta
+
+## H-011 — Onde deve ficar o alvo (vender o primeiro repique e não voltar)
+
+- **origem:** R72/[[KB-0152-a-oscilacao-existe-o-giro-nao-paga]] — a política de giros perdeu, mas **um pedaço dela ganhou**: "vender o primeiro repique e **não voltar**" rendeu **+3,44 pontos percentuais em 62 % das posições** contra a regra atual. Isso não é giro: é hipótese sobre **o alvo**. Everton, 23/09/2026 17:5x BRT: "manda medir essa do alvo então"
+- **variável:** política de saída — alvo em múltiplos de `{1,08 · 1,12 · 1,15 (atual) · 1,20 · 1,30 · primeiro repique de X % após uma queda}` cruzado com o recuo atual de 10 % armado na entrada e o tempo máximo de 300 s; o contraste é **política × política na mesma posição** (diferença emparelhada), não seleção de moedas
+- **população:** as 89+ posições reais com fita (17–24/09) e as apostas de papel com fita completa; uma por mint; reconstrução trade a trade do R62/R64, pouso = gatilho + 1,6 s, custo 2,23 % por ida e volta, **sem recobrar a entrada**
+- **previsão:** existe um alvo diferente de 1,15× que rende **mais +0,05 por SOL arriscado** que a regra atual, com IC 95 % (bootstrap por mint) inteiramente acima de zero e **patamar** (dois limiares vizinhos no mesmo sentido), não pico isolado
+- **refutação:** nenhum alvo da grade tem limite inferior do IC acima de +0,01 por SOL; **ou** o melhor alvo fica na borda da grade (indica extrapolação, não ótimo); **ou** o ganho desaparece ao cobrar 5 s de atraso em vez de 1,6 s
+- **status:** aberta
