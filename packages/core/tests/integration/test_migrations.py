@@ -40,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0061_spot_desk_r71"
+HEAD_REVISION = "0062_meme_decision_tapes"
 ABSORB_ARM_REVISION = "0058_meme_gate_absorb_arm"
 """``0059`` (T4.82) lands on ``0058`` (T4.79), which lands on ``0057`` (T4.74-1), which lands on ``0056`` (T4.73), which lands on ``0055`` (T4.71), which lands on ``0054`` (T4.66), which lands on ``0053`` (T4.67a), which lands on ``0052``
 (T4.61a), which lands on ``0051`` (T4.54), which lands on ``0050`` (T4.49),

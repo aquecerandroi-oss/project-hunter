@@ -71,6 +71,7 @@ O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) —
 | `meme_features_1m` | mensal | idem | idem |
 | `meme_trades` | mensal | idem | idem |
 | `meme_features_15s` | mensal | **7 d** (T4.16, `0030`: a série de 15 s das moedas jovens — em partições mensais o mês cai quando o seu fim tem mais de 7 dias) | idem — T4.33: uma moeda **fixada** (aposta/posição/proposta) segue na via rápida até 1 800 s (`MEME_FAST_LANE_PINNED_MAX_AGE_S`), não só 300 s; +2 % de linhas/dia medido, ~83 mints/dia |
+| `meme_decision_tapes` | — | **7 d** a fita que só explica uma linha da trilha; **90 d** a que tem `proposal_ids` (T4.89, `0062`, §64) | poda por linha, diária UTC, em lotes de 5 mil, no laço de descarga da própria pista de eventos (`decision_tape_writer.maybe_prune`) |
 | `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `infra/scripts/prune_outbox_events.py` diário (cron `hunter-outbox`, `infra/vps/README.md`), DELETE em lotes de 5 mil via `prune_dispatched`. Até 18/09/2026 **nenhum job rodava**: 19,57 M linhas despachadas (17 GB) na VPS, +2,1 M/dia — 3× os 700 mil/dia estimados abaixo; com 7 d a população estabiliza em ~15 M linhas (estimativa); apagar linha libera espaço para reuso dentro da tabela, **não** no `df` |
 | `shadow_outbox` | — | idem, enquanto a fila existir (§17.5 a absorve) | idem |
 
@@ -8015,3 +8016,128 @@ de sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão.
 | `packages/risk-core` (T4.74-2) | **nada nesta revisão**: o perfil é puro; a posição `lane = spot` entra em `MemeWalletState.positions` por leitura do executor |
 | `infra/scripts/spot_desk_markets.py` (T4.74-6) | o único editor do mapa (`--enable/--disable/--set-mint --reason`, dry-run padrão, `system_events` componente `spot_desk`); `--sell-now` grava `sell_requested_at/by` |
 | `apps/**` (T4.74-6) | só leitura (`hunter_app` `SELECT`); o `sell-now` da mesa, se vier, usa o grant de coluna |
+
+## 64. O que a mesa viu no instante da decisão — `meme_decision_tapes` — M19 (`0062_meme_decision_tapes`)
+
+**Por quê (T4.89, R73/KB-0153).** A mesa real decide pela pista de eventos (`meme_event_gate_v1`), que lê uma fita WS
+**mantida em memória** (`event_state.py`, `event_book.py`) e nunca gravada troca a troca. A única fita gravada,
+`meme_trades`, é uma cópia por *polling* do `swap_api` que chega com **mediana de 43,6 s de atraso (p90 ≈ 129 s)**: no
+`AIRAA`, as 87 trocas anteriores à decisão chegaram num único poll **6 s depois** da compra. O R73 só conseguiu
+reconstruir a cobertura do instante da decisão em **1 de 91** posições reais, e a H-010 morreu por esse limite de dado.
+Esta revisão grava, em cada decisão que a pista registra (proposta **e** linha da trilha de recusas), o que a memória
+tinha naquele instante.
+
+**O que a `0062` faz:** **uma tabela nova**, um índice, grants. Nenhuma coluna em tabela existente, nenhuma vista, enum,
+política ou partição. Global e sem RLS (§1.1), como `meme_trades`. DDL em `ddl/meme_decision_tapes.py`, ORM em
+`hunter_core/db/models/meme_decision_tapes.py`; `0062_meme_decision_tapes` tem 24 caracteres (§17.6). Encadeada em
+`0061_spot_desk_r71`.
+
+```
+meme_decision_tapes              sem partição, retenção 7 d / 90 d (poda por linha, diária)
+  id uuid PK DEFAULT gen_random_uuid()
+  mint text, as_of timestamptz        -- o instante da avaliação (= features_end_time da proposta
+                                      --   = as_of da trilha); NÃO é o decided_at da aprovação
+  series text                         -- 'meme_event_gate_v1'
+  proposal_ids uuid[] DEFAULT '{}'    -- as propostas que ESTE instante inseriu (confirmadas); vazio = só trilha
+  trades jsonb                        -- array, as ≤ 50 trocas mais novas do minuto julgado
+  trades_in_window integer            -- quantas havia no minuto (o corte nunca é silencioso)
+  derived jsonb                       -- o bloco derivado (abaixo), o mesmo que vai em reasons
+  recorded_at timestamptz DEFAULT now()
+  UNIQUE (mint, as_of), INDEX (as_of)
+  CHECK trades é array, derived é objeto, jsonb_array_length(trades) <= trades_in_window e <= 200, mint/series não vazios
+  autovacuum_vacuum_scale_factor = 0.05 (tabela e TOAST): a poda diária por linha libera espaço reusado antes do dia seguinte
+```
+
+**Desvio declarado em relação ao §1:** a PK é `gen_random_uuid()` (UUID **v4**, gerado no banco), não UUID v7 gerado na
+aplicação — o precedente de `meme_gate_refusals_by_mint` (§54.2). Ninguém ordena nem pagina por `id`: a identidade de
+leitura é `(mint, as_of)` (UNIQUE) e a poda anda pelo índice de `as_of`.
+
+**Uma troca** (`trades[]`): `block_time`, `received_at` (quando **nós** a recebemos), `side`, `sol`, `tokens` (tokens
+inteiros; `null` quando a fonte não disse), `trader` — texto decimal, nunca `float`. **O derivado** (`derived`, versão 1):
+`as_of`; `coverage` (`subscribed_at`, `first_seen_at`, `covered_since`, `gaps`); `curve` (o `real_sol` e o
+`total_supply` que dividem as frações, com o `observed_at`/`received_at` da foto lida); `windows` `10s`/`30s`/`60s`
+(`buys`, `sells`, `buy_sol`, `sell_sol`, `net_sol`, `unique_buyers` sem o criador — a de 60 s é o próprio minuto de
+`tape_for` que o portão julgou; `{"reason": "window_not_covered"}` quando a assinatura não cobre a janela);
+`largest_net_buyer` e `largest_holder` (o maior comprador líquido em SOL e o maior saldo líquido **negociado** em tokens
+desde a assinatura, com `share_of_real_sol` e `share_of_supply`, `is_creator`, compras/vendas — H-010); `creator` (a
+posição líquida do criador); `ledger` (`since`, `known_at`, `wallets`, `net_sol_total`, `reconcile_real_sol`,
+`reconcile_gap_sol`, `creator_initial_buy_seeded`, `gapped`, `overflow`, `tokens_missing`, `reason`); `slice` (`trades`, `in_window`, `max`).
+
+**"Desde o nascimento" é provado, não presumido.** O livro por carteira (`event_wallets.py`) começa na assinatura; a
+compra do criador **dentro** da transação de criação chega do quadro do `create` (`creator_initial_sol/_tokens`, T4.45),
+deduplicada pela `signature` da transação se a mesma troca vier pelo WS. `ledger.reason` é `null` só quando Σ SOL líquido de todas
+as carteiras bate a **1 %** com o `real_sol` pós-troca da **última troca** recebida (o mesmo fluxo de logs que o livro
+soma; uma foto de conta pode correr à frente ou atrás dele, e as frações continuam divididas pela foto mais nova). O
+R73 aceitou 2 %; a diferença vai gravada em `reconcile_gap_sol` para quem quiser outro limiar. Senão `not_covered_from_birth`, com os valores ainda gravados.
+`coverage_gap` (houve lacuna), `wallets_overflow` (mais de 20 000 carteiras: o máximo é parcial) e `tokens_unknown`
+(uma troca sem quantidade: somas de tokens `null`, nunca zero) têm precedência. Transferências entre carteiras não são
+trocas: o "saldo" é o líquido negociado aqui.
+
+**Sem antecipação.** A captura é síncrona, no instante da decisão, **antes do primeiro `await`**, e cada valor leva o
+seu instante. Uma captura pedida para um instante que o estado já ultrapassou é recusada por nome
+(`derived.reason = state_ahead_of_decision`, sem trocas nem derivados) em vez de responder com um deque que pode ter
+expulsado o que aquele instante via. Provado em `services/meme-worker/tests/test_decision_tape.py` (uma troca que
+chega depois — mesmo com `block_time` anterior — não entra; a captura já feita não muda).
+
+**Duas gravações, duas garantias.**
+
+- **Na proposta, durável:** o bloco derivado vai em `meme_proposals.reasons` como o último elemento
+  `{"feature": "decision_tape", "kind": "evidence", "used_by_gate": false, ...}` — **evidência, não critério**: nenhum
+  portão o leu, e só a pista de eventos o anexa (a decomposição congelada dos conjuntos não muda de significado; a via
+  de 15 s não é tocada). Entra na mesma transação da proposta, sem ida e volta a mais.
+- **Na tabela, complementar e assíncrona:** a pista só *oferece* a fita a um buffer em memória (O(1), sem `await`,
+  nunca levanta; `decision_tape_writer.py`, 2 000 fitas, lote de 200, descarga a cada 2 s num laço do `TaskGroup` do
+  `event_gate`). Uma decisão **nunca espera nem falha** por isto: buffer cheio descarta a fita nova, `INSERT` que falha
+  perde o lote, captura que levanta é contada — tudo no heartbeat `hb:meme:radar` (`event_gate_tapes_offered`,
+  `_written`, `_dropped`, `_failed`, `_capture_failed`, `_unlinked`, `_pending`, `_pruned`, `_prune_failed`,
+  `_last_prune_ok_at`). Um processo que morre perde no máximo um ciclo de descarga. **Chave de desligar:**
+  `MEME_DECISION_TAPE=off` (padrão `on`) pula a captura e a escrita — seguro para o disco, sem mudar o que o portão
+  decide.
+
+**Uma fita por instante gravado, não por avaliação.** A captura da trilha fica pareada com os candidatos da mesma
+avaliação (`EventGateRuntime.pending_tapes`), substituída e retirada junto; só a linha da trilha que de fato é gravada
+(no máximo uma por moeda por minuto, F7) leva fita, com o `as_of` dela. A proposta leva a sua depois do *commit*, com
+os ids realmente inseridos; se a linha da trilha do mesmo instante for gravada depois, a fita já está lá. Enquanto a
+transação da proposta de uma moeda está aberta (`EventGateRuntime.proposing`), a descarga periódica da trilha **pula
+essa moeda** — senão ofereceria a fita sem ids primeiro e o `ON CONFLICT DO NOTHING` a guardaria desligada da proposta
+(podada em 7 d em vez de 90 d; revisão do database-architect, provado em `test_decision_tape_integration.py`). Uma
+captura que nenhuma linha confirmada explica (todo insert perdeu o `ON CONFLICT` e não há trilha do instante na fila)
+é contada em `_unlinked`. `shadow` não
+grava nada. A via de 15 s (`lab_fast`) **não** grava fita: ela decide pela linha imutável de `meme_features_15s`
+(`ON CONFLICT DO NOTHING`), e `reasons` já registra o que o portão leu — ela nunca teve fita WS para gravar.
+
+**Custo medido no caminho quente** (captura + bloco + oferta, por decisão registrada; estado sintético, Windows,
+Python 3.12, duas medições em máquina ociosa): típica (60 trocas no minuto, 100 carteiras) **p50 0,15–0,17 ms / p95
+0,21–0,30 ms**; quente (600 trocas, 1 500 carteiras) **p50 1,0–1,2 ms / p95 2,2–2,7 ms**; nos tetos (3 900 trocas,
+20 000 carteiras) p50 11–16 ms. As dobras que a pista já
+faz em **toda** avaliação custam 0,26 / 3,1 / 23 ms nos mesmos estados; a captura só roda quando há algo a registrar.
+A serialização da fatia (~0,6 ms) roda na descarga, fora do caminho da decisão.
+
+**Retenção e volume.** Poda por linha, uma vez por dia UTC, em lotes de 5 000, no mesmo laço da descarga: **7 d** para
+a fita que só explica uma linha da trilha (a própria trilha morre em 7 d, §54.2) e **90 d** quando `proposal_ids` não é
+vazio (o derivado da proposta é durável em `reasons`; a fatia é o complemento). Sem partição mensal: nenhuma partição
+expressa "7 d, a menos que uma proposta aponte para ela". Linha ≈ 10 KB antes da compressão TOAST (fatia ~8,8 KB +
+derivado ~1,8 KB). **Teto teórico**, não medido: 150 moedas × 1 linha de trilha por minuto = 216 mil linhas/dia ≈ 2 GB/dia
+≈ 14 GB em 7 d; o real depende de quantas moedas ficam como quase-passou, e ainda não foi medido — ler
+`event_gate_tapes_written` e `pg_total_relation_size('meme_decision_tapes')` nas primeiras 24 h. O CHECK de 200 trocas
+impede que uma fatia mal configurada vire a próxima tabela de 17 GB.
+
+**Grants.** `hunter_worker`: `SELECT`, `INSERT`, `DELETE` — **sem `UPDATE`**: uma fita nunca é reescrita.
+`hunter_app`: `SELECT`. **Downgrade** recusa enquanto houver linha (§17.7). Provado em
+`packages/core/tests/integration/test_migration_0062.py` (inclusive `alembic check` no `head`).
+
+**Como a pesquisa lê** (`docs/RESEARCH.md`, regra 6):
+
+```sql
+-- a proposta e o que a mesa viu (usa o UNIQUE (mint, as_of); medido 146 ms contra 993 ms de p.id = ANY(proposal_ids))
+SELECT p.id, p.mint, t.as_of, t.derived -> 'largest_net_buyer' AS maior, t.trades
+FROM meme_proposals p
+JOIN meme_decision_tapes t ON t.mint = p.mint AND t.as_of = p.features_end_time;
+-- a linha da trilha e o que a mesa viu
+SELECT r.*, t.derived FROM meme_gate_refusals_by_mint r
+JOIN meme_decision_tapes t ON t.mint = r.mint AND t.as_of = r.as_of;
+-- as trocas como linhas
+SELECT x.* FROM meme_decision_tapes t,
+  jsonb_to_recordset(t.trades) AS x(block_time timestamptz, received_at timestamptz, side text,
+                                    sol numeric, tokens numeric, trader text);
+```

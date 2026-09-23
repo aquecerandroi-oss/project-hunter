@@ -558,6 +558,11 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     treasury_read_only = (
         cast(str, migration_ddl("meme_treasury_swaps").MEME_TREASURY_SWAPS_TABLE),
     )
+    # T4.89 (0062): what the event lane saw at the decision — read-only for the app.
+    decision_tapes_read_only = cast(
+        tuple[str, ...],
+        migration_ddl("meme_decision_tapes").MEME_DECISION_TAPES_APP_READ_ONLY_TABLES,
+    )
 
     classified = (
         list(write)
@@ -592,6 +597,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(spot_desk_read_only)
         + list(spot_desk_sell_request)
         + list(treasury_read_only)
+        + list(decision_tapes_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

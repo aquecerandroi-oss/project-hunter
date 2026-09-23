@@ -11,7 +11,8 @@ since the subscription; (d) ``subscribed_at``, ``last_event_at``, ``slot``;
 the last 60 s; (f) since T4.66, the crowd ledger of EXP-M19
 (:class:`hunter_indicators.meme.crowd.CrowdLedger`: early wallets and their
 retention, new wallets and quick flips of the last 30 s); (g) since T4.79,
-EXP-M22's absorption tracker (:class:`hunter_meme_worker.absorb.AbsorbTracker`).
+EXP-M22's absorption tracker (:class:`hunter_meme_worker.absorb.AbsorbTracker`);
+(h) since T4.89, every wallet's flow (:class:`~.event_wallets.WalletLedger`).
 The bounded dict of them is :mod:`hunter_meme_worker.event_book`.
 
 **Reuse, not reimplementation.** ``tape_minute`` folds the trades with
@@ -60,6 +61,7 @@ from hunter_indicators.meme.drawdown import (
 from hunter_indicators.meme.fast import WINDOW_S, FastPoint
 from hunter_meme_worker.absorb import AbsorbFeatures, AbsorbTracker, AbsorbTrade
 from hunter_meme_worker.event_state_values import CreatorFlow, CurvePoint
+from hunter_meme_worker.event_wallets import WalletLedger
 from hunter_meme_worker.features_tape import TapeMinute, TapeTrade, tape_for
 
 __all__ = [
@@ -109,6 +111,8 @@ class MintEventState:
     absorb: AbsorbTracker = field(default_factory=AbsorbTracker)
     """T4.79 (EXP-M22): the large sell, its recovery and the hold — fed by
     every ``apply_trade``, made unknown for good by ``mark_gap``."""
+    wallets: WalletLedger = field(default_factory=WalletLedger)
+    """T4.89: every wallet's flow since the subscription (``decision_tape``)."""
     expects_create_slot: bool = False
     """T4.70 (notes-T4.66.md §7, P0): ``True`` only when
     ``event_gate_subscriptions.subscribe_at_create`` opened this
@@ -154,8 +158,10 @@ class MintEventState:
             trader=trade.trader,
             side=trade.side,
             sol_lamports=int(trade.lamports),
+            token_subunits=None if trade.token_amount is None else int(trade.token_amount),
         )
         self._push_trade(tape)
+        self.wallets.push(trade)
         self.crowd.push(
             CrowdTrade(
                 block_time=block_time,
@@ -228,6 +234,7 @@ class MintEventState:
         self.trades.clear()
         self.crowd.mark_gap(at)
         self.absorb.mark_gap(at)
+        self.wallets.mark_gap()
 
     # -- reading ---------------------------------------------------------
 

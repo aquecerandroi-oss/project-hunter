@@ -95,6 +95,21 @@ operacional** é decisão de fila e pode cair sobre qualquer um dos dois. Leia s
 5. **Antecipação mente com convicção** (KB-0149 §5, item 24). A guarda de `guards.py` é
    obrigatória; a dispensa (`ObservabilityWaiver`) é permitida, escrita e aparece como
    ressalva — ela **não certifica** causalidade, declara que a guarda não correu.
+6. **O que a mesa sabia na decisão se lê de `meme_decision_tapes`, nunca de `meme_trades`**
+   (T4.89, R73/KB-0153, `docs/DATABASE.md` §64). `meme_trades` é cópia por *polling*
+   ~44 s atrasada (p90 ≈ 129 s): reconstruir dela as features do instante da decisão mede a
+   fita retrospetiva, não a que a pista de eventos leu — com a guarda de chegada, o R73 ficou
+   com 1 de 91 posições. Para decisões da pista `meme_event_gate_v1` desde a `0062`: a fatia
+   de trocas e o derivado (janelas 10/30/60 s, maior comprador e maior saldo desde a
+   assinatura com as frações, posição do criador) estão na tabela, ligados por
+   `t.mint = p.mint AND t.as_of = p.features_end_time` (proposta — usa o índice único; não
+   `p.id = ANY(t.proposal_ids)`, ~7× mais lento) ou `(mint, as_of)` (trilha); o derivado da proposta também está
+   em `reasons` (`feature = decision_tape`, `used_by_gate = false`: é evidência, nenhum
+   portão o leu). "Desde o nascimento" só quando `derived.ledger.reason IS NULL` (o livro
+   bate com o `real_sol` da curva a 1 %); `derived.reason = state_ahead_of_decision` é
+   captura recusada, não zero. Decisões da via de 15 s leem a linha de `meme_features_15s`
+   do `features_end_time` (imutável, 7 d) — ela nunca teve fita WS. Decisões anteriores à
+   `0062` não têm fita do instante: declare o limite, não a reconstrua de `meme_trades`.
 
 ## Numerário
 

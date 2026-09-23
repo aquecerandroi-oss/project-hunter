@@ -10,7 +10,15 @@ least one spec produced a draft to insert; the per-mint refusal trail is
 queued (``EventGateRuntime.pending_trail``) rather than written every
 evaluation, flushed either piggybacked on that same insert's session (this
 module) or by the periodic ``flush_pending_trail`` (``event_gate.py``'s own
-15-second loop) — never more than once per mint per minute either way.
+15-second loop) — never more than once per mint per minute either way
+(``event_gate_trail.py``, re-exported here).
+
+**T4.89 — the decision tape.** When an evaluation has something to record (a
+draft or a trail candidate), ``decision_tape.capture_decision_tape`` snapshots
+the in-memory tape at ``now``, synchronously and before the first ``await``;
+a proposal carries its derived block in ``reasons`` (evidence, not a
+criterion) and the tape itself is offered to the background writer after the
+transaction commits — the decision never waits on it and never fails for it.
 """
 
 from __future__ import annotations
@@ -26,17 +34,22 @@ from hunter_exchanges.pumpfun.decode import decode_bonding_curve_account
 from hunter_exchanges.pumpfun.rpc_ws_models import AccountNotification, LogsNotification
 from hunter_exchanges.pumpfun.trade_event import normalized_curve_trade, trade_events_from_logs
 from hunter_meme_worker.event_gate_config import GATE_SHADOW
-from hunter_meme_worker.event_gate_rows import EventReserves, build_event_row
+from hunter_meme_worker.event_gate_rows import SERIES_EVENT, EventReserves, build_event_row
+from hunter_meme_worker.event_gate_trail import (
+    capture_tape,
+    flush_pending_trail,
+    queue_trail,
+    record_tapes,
+    with_evidence,
+    write_pending_trail,
+)
 from hunter_meme_worker.lab_fast import _trail_row  # pyright: ignore[reportPrivateUsage]
-from hunter_meme_worker.lab_trail import write_refusal_trail
 from hunter_meme_worker.proposal_race import insert_proposals_reserved, reserve_all
 from hunter_meme_worker.proposals import evaluate_gate
 from hunter_meme_worker.repo import record_gap
 from hunter_meme_worker.repo_rows import GapRow
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-
     from hunter_exchanges.pumpfun.rpc_ws_models import Notification
     from hunter_indicators.meme.pedigree import PedigreeFeatures
     from hunter_indicators.meme.pedigree_e2b import E2bFeatures
@@ -52,8 +65,6 @@ logger = get_logger(__name__)
 
 WORKER_ROLE = "hunter_worker"
 GAP_STREAM = "solana_ws"
-TRAIL_COOLDOWN_S = 60
-"""F7: at most one refusal-trail write per mint in this window."""
 
 __all__ = ["apply_notification", "evaluate_mint", "flush_pending_trail", "handle_reconnect"]
 
@@ -189,39 +200,6 @@ def _record_shadow(
     )
 
 
-async def _write_pending_trail(
-    rt: EventGateRuntime, session: AsyncSession, mint: str, now: datetime
-) -> None:
-    last = rt.trail_last_written.get(mint)
-    if last is not None and now - last < timedelta(seconds=TRAIL_COOLDOWN_S):
-        return
-    candidates = rt.pending_trail.pop(mint, None)
-    if not candidates:
-        return
-    await write_refusal_trail(session, rt.lab.state.trail, candidates)
-    rt.trail_last_written[mint] = now
-
-
-async def flush_pending_trail(rt: EventGateRuntime, now: datetime) -> None:
-    """The periodic path (``event_gate.py``'s own 15-second loop): every mint
-    whose cooldown has elapsed and still has something queued, written once,
-    in one shared session — the other half of F6/F7's "never per evaluation"."""
-    due = [
-        mint
-        for mint, candidates in rt.pending_trail.items()
-        if candidates
-        and (
-            (last := rt.trail_last_written.get(mint)) is None
-            or now - last >= timedelta(seconds=TRAIL_COOLDOWN_S)
-        )
-    ]
-    if not due:
-        return
-    async with role_session(rt.lab.session_factory, db_role=WORKER_ROLE) as session:
-        for mint in due:
-            await _write_pending_trail(rt, session, mint, now)
-
-
 async def evaluate_mint(rt: EventGateRuntime, mint: str, now: datetime) -> None:
     """Build the row and judge it against every cached 15-second set.
     ``shadow`` never opens a session (F6); ``on`` opens one only when a spec
@@ -272,27 +250,45 @@ async def evaluate_mint(rt: EventGateRuntime, mint: str, now: datetime) -> None:
             trail_candidates.append(candidate)
     if shadow:
         return
+    # T4.89: the tape at ``now``, before the first ``await`` — only when this
+    # evaluation has something to record.
+    tape = (
+        capture_tape(rt, state, as_of=now, series=SERIES_EVENT)
+        if rt.config.decision_tape and (to_insert or trail_candidates)
+        else None
+    )
     if trail_candidates:
-        rt.pending_trail[mint] = trail_candidates
+        queue_trail(rt, mint, trail_candidates, tape)
     if not to_insert:
         return  # F6: nothing to insert — never open a session for the trail alone
+    to_insert = [(spec, with_evidence(drafts, tape)) for spec, drafts in to_insert]
     for spec, drafts in to_insert:  # re-review 9d3c72a1: reserve BEFORE the session await
         ttl = rt.lab.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
         reserve_all(caches, spec.id, drafts, now=now, ttl_s=ttl)
     proposed = False
-    async with role_session(rt.lab.session_factory, db_role=WORKER_ROLE) as session:
-        for spec, drafts in to_insert:
-            ttl = rt.lab.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
-            inserted = await insert_proposals_reserved(
-                session, caches, spec.id, drafts, now=now, ttl_s=ttl
-            )
-            if inserted:
-                latency = _event_to_proposal_s(rt, mint, now)
-                rt.stats.record_proposals(
-                    inserted, latencies=[latency] if latency is not None else None
+    proposal_ids: list[str] = []
+    rt.proposing.add(mint)  # T4.89: the periodic trail flush leaves this mint alone
+    try:
+        async with role_session(rt.lab.session_factory, db_role=WORKER_ROLE) as session:
+            for spec, drafts in to_insert:
+                ttl = rt.lab.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
+                inserted = await insert_proposals_reserved(
+                    session, caches, spec.id, drafts, now=now, ttl_s=ttl
                 )
-                proposed = True
-        await _write_pending_trail(rt, session, mint, now)
+                if inserted:
+                    latency = _event_to_proposal_s(rt, mint, now)
+                    rt.stats.record_proposals(
+                        inserted, latencies=[latency] if latency is not None else None
+                    )
+                    proposed = True
+                    # One row judged: at most one draft per set, so "all inserted"
+                    # names exactly the ids that landed (a partial batch names none).
+                    if inserted == len(drafts):
+                        proposal_ids.extend(d.id for d in drafts)
+            trail_tape = await write_pending_trail(rt, session, mint, now)
+    finally:
+        rt.proposing.discard(mint)
+    record_tapes(rt, mint, tape, proposal_ids, trail_tape)
     if proposed and rt.lab.wake is not None:
         await rt.lab.wake()
 

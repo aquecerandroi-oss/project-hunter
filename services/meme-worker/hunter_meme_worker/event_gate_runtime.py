@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
 
+from hunter_meme_worker.decision_tape_writer import DecisionTapeWriter
 from hunter_meme_worker.event_book import EventBook
 from hunter_meme_worker.event_gate_rows import EventReserves
 from hunter_meme_worker.event_gate_stats import EventGateStats
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 
     from hunter_exchanges.pumpfun.rpc_ws_models import Notification
     from hunter_meme_worker.context import RadarContext
+    from hunter_meme_worker.decision_tape import DecisionTape
     from hunter_meme_worker.event_gate_config import EventGateConfig
     from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
     from hunter_meme_worker.lab import LabContext
@@ -134,6 +136,15 @@ class EventGateRuntime:
     trail_last_written: dict[str, datetime] = field(default_factory=dict[str, "datetime"])
     """The last time this mint's trail was actually written — the 60-second
     per-mint cooldown F7 wants."""
+    pending_tapes: dict[str, DecisionTape] = field(default_factory=dict[str, "DecisionTape"])
+    """T4.89: the capture taken with ``pending_trail[mint]``'s candidates,
+    replaced and popped together (``event_gate_trail.py``)."""
+    proposing: set[str] = field(default_factory=set[str])
+    """T4.89 (review): mints whose proposal transaction is open right now —
+    ``flush_pending_trail`` skips them (``event_gate_trail.py``)."""
+    tapes: DecisionTapeWriter = field(default_factory=DecisionTapeWriter)
+    """T4.89: the bounded buffer of decision tapes and its counters — on the
+    runtime, so a gate restart keeps what was not flushed yet."""
 
     def __post_init__(self) -> None:
         self.book = EventBook(max_mints=self.config.max_mints)

@@ -19,7 +19,9 @@ rest of the adapter already uses.
 ``MEME_EVENT_COMMITMENT`` (default ``confirmed``, doctrine §8.2 of
 ``RISK_ENGINE_MEME.md``: ``processed`` never decides) and
 ``MEME_EVENT_GATE_MAX_MINTS`` (default 150, plan §4's "raio de explosão")
-round out what a restart needs to read fresh; the queue size and the debounce
+round out what a restart needs to read fresh; ``MEME_DECISION_TAPE``
+(``on`` | ``off``, default ``on``, T4.89) turns the decision-tape capture and
+write off — insurance for the disk, never a change to what the gate decides; the queue size and the debounce
 window are declared constants, not knobs — plan §5 fixes both numbers.
 """
 
@@ -40,6 +42,7 @@ __all__ = [
     "MAX_MINTS_DEFAULT",
     "SUBSCRIPTION_SYNC_S",
     "EventGateConfig",
+    "decision_tape_enabled",
     "event_gate_commitment",
     "event_gate_max_mints",
     "event_gate_mode",
@@ -117,6 +120,18 @@ def event_gate_commitment() -> str:
     return COMMITMENT_DEFAULT
 
 
+def decision_tape_enabled() -> bool:
+    """``MEME_DECISION_TAPE``: only ``off`` turns it off; an unknown value
+    warns and stays on (the evidence is the default, the disk the exception)."""
+    raw = _str_env("MEME_DECISION_TAPE").lower()
+    if raw in ("", "on"):
+        return True
+    if raw == "off":
+        return False
+    logger.warning("meme_event_gate_config_invalid", variable="MEME_DECISION_TAPE", value=raw)
+    return True
+
+
 def event_gate_max_mints() -> int:
     return _int_env("MEME_EVENT_GATE_MAX_MINTS", MAX_MINTS_DEFAULT)
 
@@ -132,6 +147,8 @@ class EventGateConfig:
     queue_size: int = EVENT_QUEUE_SIZE
     debounce_ms: int = EVENT_DEBOUNCE_MS
     subscription_sync_s: int = SUBSCRIPTION_SYNC_S
+    decision_tape: bool = True
+    """T4.89: capture and write the decision tapes (``MEME_DECISION_TAPE``)."""
 
     @property
     def enabled(self) -> bool:
@@ -148,4 +165,5 @@ def load_event_gate_config() -> EventGateConfig:
         ws_url=solana_rpc_ws_url(),
         commitment=event_gate_commitment(),
         max_mints=event_gate_max_mints(),
+        decision_tape=decision_tape_enabled(),
     )

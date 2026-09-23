@@ -87,6 +87,15 @@ async def subscribe_at_create(
     state.crowd.creator = event.creator
     state.expects_create_slot = True
     state.creation_block_buyers = frozenset({event.creator}) if event.creator else frozenset()
+    if event.creator_initial_sol is not None and event.creator_initial_tokens is not None:
+        # T4.89: the create's own buy never reaches the logs subscription opened
+        # after it — the ledger takes it from the frame (deduped by signature).
+        state.wallets.seed_initial_buy(
+            event.creator,
+            sol=event.creator_initial_sol,
+            tokens=event.creator_initial_tokens,
+            signature=event.signature,
+        )
     latency_ms = max(0.0, (now - event.received_at).total_seconds() * 1000)
     rt.stats.record_subscribed_at_create(latency_ms)
 
@@ -103,6 +112,7 @@ async def _unsubscribe_mint(rt: EventGateRuntime, mint: str) -> None:
     rt.reserves.pop(mint, None)
     rt.debouncer.forget(mint)  # F1: no per-mint seat left behind on unsubscribe
     rt.pending_trail.pop(mint, None)
+    rt.pending_tapes.pop(mint, None)
     rt.trail_last_written.pop(mint, None)
     rt.stats.record_unsubscribed()
 

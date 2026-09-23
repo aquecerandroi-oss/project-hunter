@@ -73,6 +73,9 @@ class TapeTrade:
     trader: str
     side: str
     sol_lamports: int
+    token_subunits: int | None = None
+    """T4.89: the fill's raw token amount, when the source says (the event
+    lane's ``TradeEvent`` does; the fold never reads it)."""
 
 
 @dataclass(frozen=True, slots=True)

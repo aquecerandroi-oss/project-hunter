@@ -91,6 +91,7 @@ from hunter_core.db.models.markets import Asset, Exchange, Market
 from hunter_core.db.models.meme import MemeIngestGap, MemeToken
 from hunter_core.db.models.meme_activity import MemeMarketActivity1m
 from hunter_core.db.models.meme_boards import MemeBoardObservation, MemeRiskSnapshot
+from hunter_core.db.models.meme_decision_tapes import MemeDecisionTape
 from hunter_core.db.models.meme_event_matches import MemeEventMatch
 from hunter_core.db.models.meme_events import MemeEvent
 from hunter_core.db.models.meme_features import MemeFeatures1m
@@ -220,6 +221,7 @@ __all__ = [
     "MarketSnapshot",
     "MemeBoardObservation",
     "MemeCurveSnapshot",
+    "MemeDecisionTape",
     "MemeEvent",
     "MemeEventMatch",
     "MemeFeatures15s",

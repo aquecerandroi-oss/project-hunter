@@ -13,7 +13,7 @@ lane already writes through (``event_gate_eval.py``). Nothing here opens a
 session to *read*: every input is ``LabContext.caches``, filled by the Lab's
 own tick (``lab_fast.fast_gate_step``).
 
-**Shape.** Six concurrent loops share one
+**Shape.** Eight concurrent loops share one
 ``event_gate_runtime.EventGateRuntime``: (1) :func:`_sync_loop` keeps the WS
 subscriptions equal to ``fast_lane.young_mints`` every
 ``subscription_sync_s`` (``event_gate_subscriptions.py``), which also prunes
@@ -31,7 +31,9 @@ uses. (5) :func:`_slot_subscribe_loop` subscribes once to ``slotSubscribe``
 so ``rt.slot`` is set (``event_to_proposal_s``, metrics §5) and the
 connection is never idle with zero subscriptions (F2). (6)
 :func:`_trail_flush_loop` writes the per-mint refusal trail queued by
-``event_gate_eval.py`` at most once a minute per mint (F6/F7).
+``event_gate_eval.py`` at most once a minute per mint (F6/F7). (7) since
+T4.89, :func:`_tape_flush_loop` writes the decision tapes the evaluations
+offered (``decision_tape_writer.py``) and prunes them once a UTC day.
 
 :func:`run_event_gate_forever` (F2) is what ``main.py`` actually runs: any
 exception out of :func:`run_event_gate` — including one that killed its own
@@ -64,6 +66,7 @@ logger = get_logger(__name__)
 
 HEARTBEAT_CYCLE_S = 5
 TRAIL_FLUSH_CYCLE_S = 15
+TAPE_FLUSH_CYCLE_S = 2
 RESTART_DELAY_S = 5
 
 __all__ = ["EventGateRuntime", "run_event_gate", "run_event_gate_forever"]
@@ -143,6 +146,15 @@ async def _trail_flush_loop(rt: EventGateRuntime) -> None:
             logger.warning("meme_event_gate_trail_flush_failed")
 
 
+async def _tape_flush_loop(rt: EventGateRuntime) -> None:
+    """T4.89: the background half of the decision tapes — the writer never
+    raises (a failed batch is counted), so this loop never stops the gate."""
+    while True:
+        await asyncio.sleep(TAPE_FLUSH_CYCLE_S)
+        await rt.tapes.flush(rt.lab.session_factory)
+        await rt.tapes.maybe_prune(rt.lab.session_factory, utcnow())
+
+
 async def _slot_subscribe_loop(rt: EventGateRuntime) -> None:
     """Metrics §5: ``slotSubscribe`` once, retried until it sticks — sets
     ``rt.slot`` (``event_to_proposal_s``) and keeps at least one subscription
@@ -170,10 +182,12 @@ async def _heartbeat_loop(rt: EventGateRuntime) -> None:
             "e2b": len(caches.e2b) if caches is not None else 0,
             "debounce": rt.debouncer.size,
         }
+        fields = event_gate_heartbeat_fields(
+            rt.stats, now=utcnow(), enabled=True, cache_sizes=sizes
+        )
+        fields.update(rt.tapes.heartbeat_fields())
         try:
-            await rt.heartbeat(
-                event_gate_heartbeat_fields(rt.stats, now=utcnow(), enabled=True, cache_sizes=sizes)
-            )
+            await rt.heartbeat(fields)
         except Exception:  # a heartbeat that cannot be written must not stop the gate
             logger.warning("meme_event_gate_heartbeat_write_failed")
 
@@ -191,6 +205,7 @@ async def run_event_gate(rt: EventGateRuntime) -> None:
         group.create_task(_evaluate_loop(rt, queue), name="meme-event-gate-evaluate")
         group.create_task(_flush_loop(rt), name="meme-event-gate-flush")
         group.create_task(_trail_flush_loop(rt), name="meme-event-gate-trail-flush")
+        group.create_task(_tape_flush_loop(rt), name="meme-event-gate-tape-flush")
         group.create_task(_heartbeat_loop(rt), name="meme-event-gate-heartbeat")
 
 
