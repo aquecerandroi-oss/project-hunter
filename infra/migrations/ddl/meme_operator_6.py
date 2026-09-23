@@ -189,11 +189,12 @@ says what was about to be lost and how to copy it out first."""
 
 def _refuse(table: str, predicate: str, why: str) -> None:
     safe_predicate = predicate.replace("'", "''")
+    safe_why = why.replace("'", "''")
     op.execute(
         f"DO $$ DECLARE offenders bigint; BEGIN "  # noqa: S608
         f"SELECT count(*) INTO offenders FROM {table} {predicate}; "
         f"IF offenders > 0 THEN RAISE EXCEPTION USING "
-        f"MESSAGE = 'PROJECT HUNTER: ' || offenders || ' {table} rows exist - {why}', "
+        f"MESSAGE = 'PROJECT HUNTER: ' || offenders || ' {table} rows exist - {safe_why}', "
         f"HINT = 'COPY (SELECT * FROM {table} {safe_predicate}) TO ... before reversing'; "
         f"END IF; END $$;"
     )

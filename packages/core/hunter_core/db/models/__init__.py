@@ -86,6 +86,7 @@ from hunter_core.db.models.market_data import (
     MarketSnapshot,
     OpenInterestHistory,
 )
+from hunter_core.db.models.market_events import MarketEvent
 from hunter_core.db.models.markets import Asset, Exchange, Market
 from hunter_core.db.models.meme import MemeIngestGap, MemeToken
 from hunter_core.db.models.meme_activity import MemeMarketActivity1m
@@ -214,6 +215,7 @@ __all__ = [
     "MarketBeta",
     "MarketBreadth",
     "MarketDispersion",
+    "MarketEvent",
     "MarketRegimeRow",
     "MarketSnapshot",
     "MemeBoardObservation",

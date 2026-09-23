@@ -40,8 +40,9 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0057_spot_desk"
-"""``0056`` (T4.73) lands on ``0055`` (T4.71), which lands on ``0054`` (T4.66), which lands on ``0053`` (T4.67a), which lands on ``0052``
+HEAD_REVISION = "0060_meme_refused_probe_arm"
+ABSORB_ARM_REVISION = "0058_meme_gate_absorb_arm"
+"""``0059`` (T4.82) lands on ``0058`` (T4.79), which lands on ``0057`` (T4.74-1), which lands on ``0056`` (T4.73), which lands on ``0055`` (T4.71), which lands on ``0054`` (T4.66), which lands on ``0053`` (T4.67a), which lands on ``0052``
 (T4.61a), which lands on ``0051`` (T4.54), which lands on ``0050`` (T4.49),
 which lands on ``0049`` (T4.48),
 which lands on ``0048`` (T4.45), which lands on ``0047`` (T4.39), which lands
@@ -57,7 +58,12 @@ one more (``launch_v0/1``, EXP-M18) and changes no schema, so it goes 18 →
 so it goes 19 → 20; ``0055`` seeds a **second active operator set**
 (``operator/6``, the desk that buys where ``flow_v2/1`` buys), retires
 nothing and changes no schema, so it goes 20 → 21 — and every assertion below
-that read the desk as ``operator/5`` alone at ``head`` now reads two."""
+that read the desk as ``operator/5`` alone at ``head`` now reads two; ``0056``
+and ``0057`` seed no rule set; ``0058`` seeds **two** research sets
+(``absorb_v0/1`` + ``absorb_v0/2``, EXP-M22) and changes no schema, so it goes
+21 → 23; ``0059`` (T4.82) adds one table (``market_events``) and seeds no
+rule set; ``0060`` seeds one research set (``refused_probe_v0/1``, EXP-M23,
+on its own clock ``refused``) and changes no schema, so it goes 23 → 24."""
 EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
 E2B_ARM_REVISION = "0044_meme_gate_e2b_arm"
 """Where the ``0044`` tests stage now that ``0046``/``0047`` sit on top (T4.44):
@@ -4515,9 +4521,12 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     # ``0053`` seeds launch_v0/1 (the launch lane), nothing retired (+1 = 19) — T4.67a.
     # ``0054`` seeds flow_v2/10 (the crowd behind the rise), nothing retired (+1 = 20) — T4.66.
     # ``0055`` seeds operator/6 (the second real desk), nothing retired (+1 = 21) — T4.71.
+    # ``0058`` seeds absorb_v0/1 + absorb_v0/2 (EXP-M22), nothing retired (+2 = 23) — T4.79.
+    # ``0060`` seeds refused_probe_v0/1 (EXP-M23, the refused coins' own arm,
+    # clock ``refused``), nothing retired (+1 = 24) — T4.85.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["21"]
+    ) == ["24"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",
@@ -8528,4 +8537,153 @@ def test_0044_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
             {"e": _FLOW_V2_E2B_RULE_SET},
         )
     ) == ["active"]
+    command.check(config)
+
+
+# --- 0059_market_events (T4.82) ---------------------------------------------
+#
+# The confluence screen's news row. One table, global and RLS-free, three
+# indexes, grants by subtraction, no seed. What is asserted here is what the
+# model's unit test cannot see: the catalogue.
+
+_A_MARKET_EVENT = (
+    "INSERT INTO market_events (id, symbol, source, kind, title, url, observed_at, "
+    "  confidence, recorded_by) "
+    "VALUES (:id, 'ZECUSDT', 'baha', 'listing', 'T4.82 test headline', :url, now(), "
+    "  'reported', 'test')"
+)
+
+
+def test_0059_creates_market_events_global_with_its_grants(upgraded: str) -> None:
+    columns = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'market_events' ORDER BY column_name",
+            {},
+        )
+    )
+    assert set(columns) == {
+        "id",
+        "market_id",
+        "exchange",
+        "symbol",
+        "source",
+        "kind",
+        "title",
+        "url",
+        "published_at",
+        "observed_at",
+        "ingested_at",
+        "confidence",
+        "notes",
+        "recorded_by",
+    }
+    # Global, like meme_events: no organization column, therefore nothing an
+    # RLS policy could key on. The gate is the API's (require_org(VIEWER)).
+    assert "organization_id" not in set(columns)
+    assert (
+        asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT policyname FROM pg_policies WHERE tablename = 'market_events'",
+                {},
+            )
+        )
+        == []
+    )
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT relrowsecurity::text FROM pg_class WHERE relname = 'market_events'",
+            {},
+        )
+    ) == ["false"]
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "market_events")) == {"SELECT"}
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "market_events")) == {
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+    }
+    command.check(alembic_config(upgraded))
+
+
+def test_0059_the_partial_unique_makes_a_re_registration_idempotent(upgraded: str) -> None:
+    """Design §7a item 4: the plantão re-running the same link writes one row.
+    A row with no url has nothing to be idempotent on and is never blocked.
+
+    The key carries ``symbol`` (Astra's review of T4.82): one announcement can
+    name ZECUSDT *and* BTCUSDT, and on ``(source, url)`` alone the second
+    filing would be swallowed and never reach the BTCUSDT screen."""
+    definition = asyncio.run(_index_definition(upgraded, "uq_market_events_source_url_symbol"))
+    assert "UNIQUE" in definition and "WHERE (url IS NOT NULL)" in definition
+    first = "00000000-0000-4000-8000-000000005901"
+    second = "00000000-0000-4000-8000-000000005902"
+    url = "https://example.test/t482-idempotence"
+    asyncio.run(_write(upgraded, [(_A_MARKET_EVENT, {"id": first, "url": url})]))
+    try:
+        with pytest.raises(DBAPIError, match="uq_market_events_source_url_symbol"):
+            asyncio.run(_write(upgraded, [(_A_MARKET_EVENT, {"id": second, "url": url})]))
+        # The same link filed for a *different* symbol is a different row.
+        other = "00000000-0000-4000-8000-000000005906"
+        asyncio.run(
+            _write(
+                upgraded,
+                [(_A_MARKET_EVENT.replace("'ZECUSDT'", "'BTCUSDT'"), {"id": other, "url": url})],
+            )
+        )
+        asyncio.run(_write(upgraded, [("DELETE FROM market_events WHERE id = :id", {"id": other})]))
+        # Two url-less rows from the same source are two distinct headlines.
+        third = "00000000-0000-4000-8000-000000005903"
+        fourth = "00000000-0000-4000-8000-000000005904"
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (_A_MARKET_EVENT, {"id": third, "url": None}),
+                    (_A_MARKET_EVENT, {"id": fourth, "url": None}),
+                ],
+            )
+        )
+        asyncio.run(
+            _write(
+                upgraded,
+                [("DELETE FROM market_events WHERE id IN (:a, :b)", {"a": third, "b": fourth})],
+            )
+        )
+    finally:
+        asyncio.run(_write(upgraded, [("DELETE FROM market_events WHERE id = :id", {"id": first})]))
+
+
+def test_0059_refuses_a_downgrade_that_would_lose_a_recorded_headline(upgraded: str) -> None:
+    """§17.7: the rows were read off a page by a human and typed in; the
+    database holds no second copy of them."""
+    config = alembic_config(upgraded)
+    event_id = "00000000-0000-4000-8000-000000005905"
+    asyncio.run(
+        _write(upgraded, [(_A_MARKET_EVENT, {"id": event_id, "url": "https://example.test/guard"})])
+    )
+    try:
+        # 0060 (T4.85) landed after this test was written: ``-1`` would only
+        # reverse the probe arm and never reach 0059's guard. Name the target.
+        with pytest.raises(DBAPIError, match="market_events rows were recorded by hand"):
+            command.downgrade(config, ABSORB_ARM_REVISION)
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(
+            _write(upgraded, [("DELETE FROM market_events WHERE id = :id", {"id": event_id})])
+        )
+    command.check(config)
+
+
+def test_0059_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    config = alembic_config(upgraded)
+    command.downgrade(config, ABSORB_ARM_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == ABSORB_ARM_REVISION
+        assert not asyncio.run(_relation_exists(upgraded, "market_events"))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_relation_exists(upgraded, "market_events"))
     command.check(config)
