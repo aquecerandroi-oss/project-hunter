@@ -573,6 +573,6 @@ produção. As limitações são de **janela** (16 h de sinais; 40 h de velas; u
 **instante** (os livros são de 11 segundos), não de acesso.
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Experiments Index]] ·
+[[Strategy Backlog]] · [[Fila de Hipoteses]] · [[Registro de Tentativas]] · [[Experiments Index]] ·
 [[EXP-0001-momentum-v1]] · [[EXP-0002-volume-anomaly-v1]] · [[Strategy Performance]] ·
 [[Features]] · [[00-HOME]] · [[_TEMPLATE-NOTE|template de nota]]
