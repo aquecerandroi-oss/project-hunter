@@ -51,3 +51,18 @@ Pendente.
 ## Relacionados
 
 [[KB-0143-o-que-antecede-o-dump]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] · [[KB-0133-papel-vs-real-custo-fixo-e-atraso-de-30s]] · [[KB-0135-a-vantagem-nao-esta-na-saida]] · [[Strategy Backlog]] · `.claude/state/notes-R63.md` (mapa completo em JSON no §6)
+
+## Atualização R71 (23/09/2026) — ampliar o mapa da `spot/1` sem afrouxar critério
+
+A pergunta foi quais mercados em que a família `mean_reversion` disparou em 14 dias ainda faltam no mapa. São **68**, e só **6** têm token na Solana que passa no filtro do R63 (paridade ≤ 3 % com a Binance, medida pelo oráculo e pelo preço executável de 0,05 SOL; rota; ida-e-volta < 1 %). **DASHUSDT, o maior buraco (94 sinais da família em 7 d, 11 do v14), não tem representação validada**: os "DASH" da Jupiter são memecoins a −100 %. O mesmo vale para PROM, EGLD, KAS e mais 57: 51 não têm token, 10 têm só homônimo falso, e SOL fica fora por desenho.
+
+A migração `0061_spot_desk_r71` semeia os 6:
+- **ligados:** NEAR (wNEAR da **NEAR OmniBridge**, identidade confirmada no contrato `omni.bridge.near`, custo 0,144 %), BTC (**WBTC Portal**, 0,004 %) e ORCA (0,110 %);
+- **desligado pela regra:** SLX (tier C);
+- **retidos por nome:** XRP (wXRP da Hex Trust com **freeze authority ativa**, que pode impedir a venda do stop) e BIRB (90,9 % do supply nos maiores detentores).
+
+Ganho: **+3 sinais v14 long por semana** sobre os 41 atuais (+7 %). Liberando XRP, +5 (+12 %). DASH valeria +11 e não é executável.
+
+Lição nova: **wrappers com outro ticker (wNEAR, wXRP) escapam do casamento por símbolo exato**. Também não basta paridade, porque oráculo e cotação da Jupiter olham as mesmas pools. A identidade de uma ponte se fecha na fonte: registro da ponte, PDA da mint authority, site do custodiante. E a regra `enabled` não enxerga freeze authority nem concentração de supply.
+
+Detalhes: `.claude/state/notes-R71.md` · revisão da Astra: `.claude/state/astra-review-r71.md`.
