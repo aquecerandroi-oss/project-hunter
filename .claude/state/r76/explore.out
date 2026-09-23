@@ -1,0 +1,34 @@
+n 272
+mediana de compradoras 44.0
+poucas compradoras (≤ mediana): n=137 rede=0: 60 média -0.0586 | rede>0: 77 média -0.0976 | D(0 − >0) +0.0390 IC [-0.0362, +0.1150]
+muitas compradoras (> mediana): n=135 rede=0: 31 média -0.0120 | rede>0: 104 média -0.0734 | D(0 − >0) +0.0614 IC [-0.0107, +0.1335]
+Spearman(n_buyers, rede) -0.118 Spearman(n_buyers, ret) 0.035
+perdas >= 50 % (simulador): 12 de 272 | despejos: 36
+AUC p_bundle_sol perda>=50%: 0.740 IC95 [0.558, 0.885]
+AUC p_bundle_sol despejo: 0.675 IC95 [0.577, 0.762]
+AUC p_bundle perda>=50%: 0.519 IC95 [0.361, 0.681]
+AUC p_bundle despejo: 0.640 IC95 [0.548, 0.732]
+AUC p_holders_frac perda>=50%: 0.659 IC95 [0.524, 0.788]
+AUC p_holders_frac despejo: 0.575 IC95 [0.488, 0.665]
+WEENY compradoras 33 maior grupo 7 financiador AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51 rede 0.219 s1 0 criador 0.03225806451612903 pnl 0.0206921260
+RESERVED compradoras 36 maior grupo 6 financiador H7sWT7eP83vkim7Gp81qsPwQzuzJK3E6Ps9KLbUezoCc rede 0.171 s1 0 criador 0.0 pnl 0.0117776020
+AIRAA compradoras 33 maior grupo 5 financiador H7sWT7eP83vkim7Gp81qsPwQzuzJK3E6Ps9KLbUezoCc rede 0.152 s1 0 criador 0.59375 pnl -0.0555624620
+tercil alto: 91 mints; financiadores distintos a encabeçar: 36
+   ('sem rótulo', 'desconhecido (15 págs.)') 52
+   ('Individual', 'desconhecido (15 págs.)') 14
+   ('Authority', 'desconhecido (15 págs.)') 11
+   ('sem rótulo', 'esgotado ≤1000') 10
+   ('Cross-chain Bridge', 'desconhecido (15 págs.)') 3
+   ('Treasury', 'desconhecido (15 págs.)') 1
+financiadores que encabeçam >= 3 mints do tercil alto:
+   H7sWT7eP 29 None None ['Jup.ag User'] xfers distintos 403 págs 15 esgotado False
+   AgmLJBMD 11 FOMO Co-signer Authority [] xfers distintos 598 págs 15 esgotado False
+   E2QHuNLn 7 "taxed" on Pump.fun Individual [] xfers distintos 77 págs 15 esgotado False
+   Dv34prGm 4 None None [] xfers distintos 893 págs 15 esgotado False
+   5pUgxQGg 4 "nowayitsjamal" on Pump.fun Individual ['Pump.fun User'] xfers distintos 269 págs 15 esgotado False
+   F7p3dFrj 3 Relay Solver Cross-chain Bridge [] xfers distintos 1068 págs 13 esgotado False
+   WLZG31XN 2 None None [] xfers distintos 421 págs 15 esgotado False
+   CPQrwJR1 2 None None [] xfers distintos 25 págs 1 esgotado True
+alto, só H7sWT7eP/FOMO: n alto 40 média -0.1035; D(baixo − este) +0.0608 IC [-0.0189, +0.1507]; despejos 2
+alto, sem eles: n alto 51 média -0.0906; D(baixo − este) +0.0478 IC [-0.0175, +0.1174]; despejos 6
+dias dos mints H7sWT7eP: Counter({'2026-09-18': 7, '2026-09-19': 6, '2026-09-23': 5, '2026-09-15': 3, '2026-09-14': 2, '2026-09-17': 2, '2026-09-13': 1, '2026-09-16': 1, '2026-09-20': 1, '2026-09-21': 1})
