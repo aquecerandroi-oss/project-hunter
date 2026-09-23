@@ -194,6 +194,46 @@ async def test_trailing_arm_x_null_passes() -> None:
     assert code == 0 and "applied: 1 row(s) updated" in report
 
 
+async def test_t480_max_buys_1m_accepts_an_int_and_refuses_a_decimal_or_a_negative() -> None:
+    """T4.80: the buy-count ceiling is a **count** — ``25`` is written,
+    ``25.5`` is refused by type (never truncated to 25 by ``int()``) and
+    ``-1`` by the gate's own validation. Nothing written in either refusal."""
+    script = _load("meme_rule_set")
+    good = FakeConn([_set("operator", "5", kind="operator")])
+    code, report = await script.run(
+        good,
+        deprecate=None,
+        apply=True,
+        reason="T4.80: R65 (KB-0147) — teto de compras no minuto, em sombra",
+        set_param="max_buys_1m=25",
+        rule_sets=["operator/5"],
+    )
+    assert code == 0 and "applied: 1 row(s) updated" in report
+
+    for bad_value, message in (("25.5", "is a count"), ("-1", "cannot be negative")):
+        conn = FakeConn([_set("operator", "5", kind="operator")])
+        with pytest.raises(script.WouldNotLoad, match=message):
+            await script.run(
+                conn,
+                deprecate=None,
+                apply=True,
+                reason=REASON,
+                set_param=f"max_buys_1m={bad_value}",
+                rule_sets=["operator/5"],
+            )
+        assert conn.writes() == [], f"max_buys_1m={bad_value} must write nothing"
+
+
+async def test_t480_a_row_without_the_key_still_validates() -> None:
+    """Absent = today's behaviour: the seeded document loads untouched."""
+    script = _load("meme_rule_set")
+    conn = FakeConn([_set("flow_v2", "6")])
+    code, report = await script.run(
+        conn, deprecate=None, apply=False, reason=None, validate="flow_v2/6"
+    )
+    assert code == 0 and "OK: flow_v2/6" in report
+
+
 async def test_validate_reports_ok_for_a_good_row_and_error_for_a_bad_one() -> None:
     script = _load("meme_rule_set")
     good = FakeConn([_set("flow_v2", "6")])

@@ -35,6 +35,7 @@ __all__ = [
     "arm_multiple_or_none",
     "decimal_of",
     "effective_params",
+    "optional_count",
 ]
 
 REFUSAL_EXCEEDS_MAX_SOL_PER_BET = "exceeds_max_sol_per_bet"
@@ -80,6 +81,27 @@ def int_or(value: Any, default: int) -> int:
 
 def optional_int(value: Any) -> int | None:
     return None if value is None else int(value)
+
+
+def optional_count(name: str, value: Any) -> int | None:
+    """T4.80: an optional **count** parameter — a bare JSON integer, or absent.
+
+    Deliberately stricter than :func:`optional_int`, in both directions:
+
+    - a decimal is refused instead of truncated (``int(25.5)`` is 25, and a
+      ceiling typed ``25.5`` would silently become a different rule than the
+      one the operator wrote — KB-0140's own lesson);
+    - a **string** is refused too, even ``"25"``. The decimals-are-strings
+      convention does not apply to counts (``min_new_wallets_30s: 5``), and a
+      count once stored as a string would make the next ``--set-param`` of
+      the same key be refused by ``_check_decimal_convention``'s "decimals are
+      strings" advice, which is exactly the wrong fix.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{name} is a count: a bare JSON integer (25), never {value!r}")
+    return value
 
 
 def bool_or(value: Any, default: bool) -> bool:

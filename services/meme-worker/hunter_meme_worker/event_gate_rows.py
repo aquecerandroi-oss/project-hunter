@@ -168,4 +168,6 @@ def build_event_row(
         early_age_s=crowd.early_age_s,
         new_wallets_30s=crowd.new_wallets_30s,
         quick_flip_share_30s=crowd.quick_flip_share_30s,
+        # T4.79 (EXP-M22): the large sell and its absorption, from the same trades.
+        absorb=state.absorb_features(as_of),
     )

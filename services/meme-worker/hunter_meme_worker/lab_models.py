@@ -23,7 +23,7 @@ mint while the probe is open).
 
 T4.11 (EXP-M4) adds ``exit_on_migration``, ``trailing_arm_x`` and the ``dead``
 exit; T4.52b-2 (EXP-M13) the ``max_recent_drawdown_pct`` guard; T4.66 (EXP-M19)
-the four crowd keys — all optional.
+the four crowd keys; T4.79 (EXP-M22) the two absorption switches — all optional.
 """
 
 from __future__ import annotations
@@ -168,6 +168,11 @@ class RuleSetSpec:
     ttl_s: int | None = None
     """T4.19: how long this set's proposals wait for the desk (``operator/3``:
     180 s, a buy by hand); ``None`` = the loop's ``lab_proposal_ttl_s``."""
+    require_absorb_confirmed: bool = False
+    require_absorb_sell_seen: bool = False
+    """T4.79 (EXP-M22): refuse until the event lane saw a sell ≥ 5 % of the real
+    reserve recovered and held (``absorb_v0/1``) / until it saw the sell at all
+    (``absorb_v0/2``, the control); off by default in every frozen set."""
 
     @property
     def label(self) -> str:
@@ -230,6 +235,8 @@ class RuleSetSpec:
             require_event=bool_or(params.get("require_event"), False),
             declares_mayhem="exclude_mayhem" in params,
             ttl_s=None if params.get("ttl_s") is None else int(params["ttl_s"]),
+            require_absorb_confirmed=bool_or(params.get("require_absorb_confirmed"), False),
+            require_absorb_sell_seen=bool_or(params.get("require_absorb_sell_seen"), False),
         )
 
     def suggested(self) -> dict[str, Any]:

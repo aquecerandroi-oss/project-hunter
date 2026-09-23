@@ -45,30 +45,38 @@ n por balde 29–35; **6 dias de um único regime**; 13 das 87 só com fotos de 
 
 ## Como ligar (acrescentado 23/09/2026, T4.80)
 
+> **Ler primeiro a secção "Fora de amostra (R67)" no fim desta nota: o veredito de hoje é NÃO
+> LIGAR.** O que segue é só a mecânica do interruptor, entregue pela T4.80 para o dia em que
+> houver evidência.
+
 O interruptor do P1 existe desde a T4.80 e **nasce ausente** — nada mudou na mesa ao entregá-lo.
 É `max_buys_1m` em `meme_rule_sets.params`, um **inteiro JSON puro** (a regra "decimais são
 strings" não vale para contagens): recusa `buys_1m_above_max` quando a contagem do último minuto
 **excede** o teto (inclusivo — 25 passa, 26 recusa) e `buys_1m_unknown` quando a fita não cobriu o
 minuto (falha fechada). Vale nas duas pistas (15 s/mesa e evento), sempre com o valor do instante
-da decisão; a recusa aparece em `lab_gate_refusals` por conjunto, que é como se mede em sombra
-quantas entradas o teto bloquearia antes de ligar. Detalhe em `docs/RISK_ENGINE_MEME.md` §9.
+da decisão. Detalhe em `docs/RISK_ENGINE_MEME.md` §9.
+
+**Escrever a chave em `operator/5`/`/6` não é sombra — é ligar o filtro na mesa real**: a proposta
+deixa de nascer, os contadores de `lab_gate_refusals` só existem depois de ligado e não há braço
+contrafactual. Medir sem mexer na mesa é pôr a chave num conjunto `research_only` (um braço
+`flow_v2` paralelo) ou ler o portão de evento em `MEME_EVENT_GATE=shadow`.
 
 ```bash
 # ensaio (não escreve nada), depois o mesmo comando com --apply
 uv run python infra/scripts/meme_rule_set.py --set-param max_buys_1m=25 \
   --rule-set operator/5 --rule-set operator/6 --apply \
-  --reason "T4.80/R65 (KB-0147 §4): teto de compras no minuto, 3 dias em sombra"
+  --reason "T4.80/R65 (KB-0147 §4): teto de compras no minuto na mesa real"
 
-# desligar (volta a não ser critério)
+# desligar (a chave fica com valor null, que o leitor trata como ausente)
 uv run python infra/scripts/meme_rule_set.py --set-param max_buys_1m=null \
   --rule-set operator/5 --rule-set operator/6 --apply \
   --reason "T4.80: desligar o teto de compras no minuto"
 ```
 
-Ressalva que continua de pé: o corte 25 foi escolhido nestes mesmos dados (§4 e Ressalvas). A R65
-recomenda o **percentil 50 móvel de 3 dias**, não um número congelado — `max_buys_1m` é um valor
-fixo por conjunto, então quem o usar como P50 móvel tem de reescrevê-lo diariamente com o comando
-acima (e cada escrita fica em `meme_rule_set_param_history`).
+Ressalva que continua de pé: o corte 25 foi escolhido nestes mesmos dados (§4 e Ressalvas), e a
+R67 não o confirmou fora da amostra. A R65 pedia o **percentil 50 móvel de 3 dias**, não um número
+congelado — `max_buys_1m` é um valor fixo por conjunto, então quem o usar como P50 móvel tem de
+reescrevê-lo diariamente com o comando acima (cada escrita fica em `meme_rule_set_param_history`).
 
 ## Relacionado
 

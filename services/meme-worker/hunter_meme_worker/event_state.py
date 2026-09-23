@@ -10,8 +10,9 @@ since the subscription; (d) ``subscribed_at``, ``last_event_at``, ``slot``;
 (e) a monotonic deque of ``real_sol`` (:class:`PeakDeque`) for the peak of
 the last 60 s; (f) since T4.66, the crowd ledger of EXP-M19
 (:class:`hunter_indicators.meme.crowd.CrowdLedger`: early wallets and their
-retention, new wallets and quick flips of the last 30 s). The bounded dict of
-them is :mod:`hunter_meme_worker.event_book`.
+retention, new wallets and quick flips of the last 30 s); (g) since T4.79,
+EXP-M22's absorption tracker (:class:`hunter_meme_worker.absorb.AbsorbTracker`).
+The bounded dict of them is :mod:`hunter_meme_worker.event_book`.
 
 **Reuse, not reimplementation.** ``tape_minute`` folds the trades with
 :func:`hunter_meme_worker.features_tape.tape_for` — the same function, the same
@@ -57,6 +58,7 @@ from hunter_indicators.meme.drawdown import (
     recent_drawdown,
 )
 from hunter_indicators.meme.fast import WINDOW_S, FastPoint
+from hunter_meme_worker.absorb import AbsorbFeatures, AbsorbTracker, AbsorbTrade
 from hunter_meme_worker.event_state_values import CreatorFlow, CurvePoint
 from hunter_meme_worker.features_tape import TapeMinute, TapeTrade, tape_for
 
@@ -104,6 +106,9 @@ class MintEventState:
     crowd: CrowdLedger = field(init=False)
     """T4.66 (EXP-M19): the early wallets, their fills, every wallet's firsts,
     the last 30 s — fed by every ``apply_trade``, gapped with ``mark_gap``."""
+    absorb: AbsorbTracker = field(default_factory=AbsorbTracker)
+    """T4.79 (EXP-M22): the large sell, its recovery and the hold — fed by
+    every ``apply_trade``, made unknown for good by ``mark_gap``."""
     expects_create_slot: bool = False
     """T4.70 (notes-T4.66.md §7, P0): ``True`` only when
     ``event_gate_subscriptions.subscribe_at_create`` opened this
@@ -161,6 +166,7 @@ class MintEventState:
                 slot=trade.slot,
             )
         )
+        self.absorb.push(AbsorbTrade.from_curve_trade(trade, block_time=block_time))
         if tape.trader == self.creator:
             if len(self.creator_trades) >= MAX_TRADES:
                 self.creator_trades.popleft()
@@ -221,6 +227,7 @@ class MintEventState:
         self.covered_since = max(self.covered_since, at)
         self.trades.clear()
         self.crowd.mark_gap(at)
+        self.absorb.mark_gap(at)
 
     # -- reading ---------------------------------------------------------
 
@@ -283,6 +290,10 @@ class MintEventState:
         """EXP-M19's four readings at ``as_of``; the early set is only a
         measurement when the feed covered the mint from birth."""
         return self.crowd.features(as_of, covered_from_birth=self.covered_from_birth)
+
+    def absorb_features(self, as_of: datetime) -> AbsorbFeatures:
+        """EXP-M22's two readings at ``as_of`` (T4.79)."""
+        return self.absorb.features(as_of)
 
     @property
     def covered_from_birth(self) -> bool:

@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from hunter_meme_worker.absorb import AbsorbFeatures
     from hunter_meme_worker.lab_values import Snapshot
 
 
@@ -116,6 +117,10 @@ class GateRow:
     filled by the event lane only (``event_gate_rows.build_event_row``); the
     15-second and closed-minute rows leave them ``None`` — ``*_unknown`` for a
     set that asks, fail closed."""
+    absorb: AbsorbFeatures | None = None
+    """T4.79 (EXP-M22): :class:`hunter_meme_worker.absorb.AbsorbFeatures`, filled
+    by the event lane only; ``None`` elsewhere — ``absorb_unknown`` for a set
+    that asks, fail closed."""
 
 
 __all__ = ["GateRow"]

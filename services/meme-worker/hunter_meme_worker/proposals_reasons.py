@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from hunter_indicators.meme.pedigree_e2b import E2B_V1
 from hunter_indicators.meme.rules import EntryFeatures, participation_pct
+from hunter_meme_worker.absorb_rules import absorb_reason_block
 from hunter_meme_worker.lab_models import RuleSetSpec, money_str, optional_money_str
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from hunter_indicators.meme.identity import IdentityFeatures
     from hunter_indicators.meme.pedigree import PedigreeFeatures, PedigreeGate
     from hunter_indicators.meme.pedigree_e2b import E2bFeatures
+    from hunter_meme_worker.absorb import AbsorbFeatures
 
 __all__ = ["gate_reasons"]
 
@@ -38,6 +40,7 @@ def gate_reasons(
     identity: IdentityFeatures | None = None,
     event: EventFeatures | None = None,
     e2b: E2bFeatures | None = None,
+    absorb: AbsorbFeatures | None = None,
 ) -> list[dict[str, Any]]:
     """Which rule fired and the value of every feature it read — the decomposition."""
     gate = spec.gate
@@ -93,26 +96,30 @@ def gate_reasons(
         or gate.max_sells_to_buys is not None
         or gate.require_holders_rising
         or gate.require_progress_rising
+        or gate.max_buys_1m is not None  # T4.80: the ceiling belongs beside the count
     )
     if asks_flow:
-        reasons.append(
-            {
-                "feature": "flow",
-                "net_sol_flow_1m": optional_money_str(features.net_sol_flow_1m),
-                "mcap_delta_60s": optional_money_str(features.mcap_delta_60s),
-                "buys_1m": features.buys_1m,
-                "sells_1m": features.sells_1m,
-                "unique_buyers_1m": features.unique_buyers_1m,
-                "tape_reason": features.tape_reason,
-                "holders_rising": features.holders_rising,
-                "holders_reason": features.holders_reason,
-                "progress_rising": features.progress_rising,
-                "min_unique_buyers": gate.min_unique_buyers,
-                "max_sells_to_buys": optional_money_str(gate.max_sells_to_buys),
-                "snipers": features.snipers,
-                "dev_share": optional_money_str(features.dev_share),
-            }
-        )
+        flow: dict[str, Any] = {
+            "feature": "flow",
+            "net_sol_flow_1m": optional_money_str(features.net_sol_flow_1m),
+            "mcap_delta_60s": optional_money_str(features.mcap_delta_60s),
+            "buys_1m": features.buys_1m,
+            "sells_1m": features.sells_1m,
+            "unique_buyers_1m": features.unique_buyers_1m,
+            "tape_reason": features.tape_reason,
+            "holders_rising": features.holders_rising,
+            "holders_reason": features.holders_reason,
+            "progress_rising": features.progress_rising,
+            "min_unique_buyers": gate.min_unique_buyers,
+            "max_sells_to_buys": optional_money_str(gate.max_sells_to_buys),
+            "snipers": features.snipers,
+            "dev_share": optional_money_str(features.dev_share),
+        }
+        if gate.max_buys_1m is not None:
+            # T4.80: only when the set asks it — a frozen decomposition keeps
+            # exactly the keys it was written with.
+            flow["max_buys_1m"] = gate.max_buys_1m
+        reasons.append(flow)
     if pedigree is not None and pedigree_gate is not None:
         reasons.append(
             {
@@ -178,4 +185,7 @@ def gate_reasons(
                 "match_kind": event.match_kind,
             }
         )
+    # T4.79 (EXP-M22): the absorption block, only for a set that asks.
+    if spec.require_absorb_confirmed or spec.require_absorb_sell_seen:
+        reasons.append(absorb_reason_block(absorb))
     return reasons

@@ -41,6 +41,9 @@ coin is known Mayhem and ``mayhem_unknown`` when the flag was not observed.
 T4.52b-2 adds ``max_recent_drawdown_pct`` (EXP-M13, off by default) and moves
 the base criteria beside the optional ones in ``rules_criteria`` (the budget).
 T4.66 adds EXP-M19's four crowd keys (:mod:`hunter_indicators.meme.rules_crowd`).
+T4.80 adds R65's ``max_buys_1m`` (:mod:`hunter_indicators.meme.rules_buys`),
+also off by default, and moves ``as_parameters``'s document into
+:mod:`hunter_indicators.meme.rules_parameters` (the 350-line budget).
 """
 
 from __future__ import annotations
@@ -64,6 +67,7 @@ from hunter_indicators.meme.exits import (
     hit_time_stop,
     hit_trailing,
 )
+from hunter_indicators.meme.rules_buys import buys_refusals
 from hunter_indicators.meme.rules_criteria import (
     age_refusals,
     creator_refusals,
@@ -77,6 +81,7 @@ from hunter_indicators.meme.rules_criteria import (
     progress_refusals,
 )
 from hunter_indicators.meme.rules_crowd import crowd_refusals
+from hunter_indicators.meme.rules_parameters import gate_parameters
 from hunter_indicators.meme.rules_validation import validate_entry_gate
 
 __all__ = [
@@ -200,6 +205,11 @@ class EntryGate:
     early wallets' retention (fraction) held for at least so many seconds, a
     floor of new wallets in 30 s, a ceiling (fraction) on quick flips; each
     ``None`` = not a criterion, each unknown refused by name."""
+    max_buys_1m: int | None = None
+    """T4.80 (R65/KB-0147): a ceiling on the buy **count** of the 60 s ending
+    at the decision instant (:mod:`hunter_indicators.meme.rules_buys`) — an
+    ``int``, never a decimal. ``None`` = not a criterion; an unmeasured count
+    refuses ``buys_1m_unknown``."""
     inputs: tuple[str, ...] = GATE_INPUTS
 
     def __post_init__(self) -> None:
@@ -211,51 +221,9 @@ class EntryGate:
 
         A criterion the gate does not ask is not listed: EXP-M1's registered
         parameters must read today exactly as they did the day they were frozen.
+        The document itself is built in ``rules_parameters`` (the 350-line budget).
         """
-        parameters = {
-            "min_age_s": str(self.min_age_s),
-            "max_age_s": str(self.max_age_s),
-            "min_progress_pct": str(self.min_progress_pct),
-            "max_progress_pct": str(self.max_progress_pct),
-            "max_participation_pct": str(self.max_participation_pct),
-            "require_creator_not_net_seller": str(self.require_creator_not_net_seller),
-        }
-        optional: dict[str, object] = {
-            "require_progress": None if self.require_progress else False,
-            "require_higher_lows": self.require_higher_lows or None,
-            "require_breakout_15m": self.require_breakout_15m or None,
-            "min_distance_to_support_pct": self.min_distance_to_support_pct,
-            "max_distance_to_support_pct": self.max_distance_to_support_pct,
-            "min_hype_score": self.min_hype_score,
-            "max_dev_share": self.max_dev_share,
-            "dev_share_unknown_allowed": self.dev_share_unknown_allowed or None,
-            "max_snipers": self.max_snipers,
-            "min_snipers": self.min_snipers,
-            "max_top10_share": self.max_top10_share,
-            "min_top10_share": self.min_top10_share,
-            "require_positive_flow": self.require_positive_flow or None,
-            "min_unique_buyers": self.min_unique_buyers,
-            "max_sells_to_buys": self.max_sells_to_buys,
-            "require_holders_rising": self.require_holders_rising or None,
-            "require_progress_rising": self.require_progress_rising or None,
-            "min_holders": self.min_holders,
-            "holders_rising_or_flat": self.holders_rising_or_flat or None,
-            "creator_unknown_allowed_if_dev_measured": (
-                self.creator_unknown_allowed_if_dev_measured or None
-            ),
-            "progress_or_mcap_rising": self.progress_or_mcap_rising or None,
-            "exclude_mayhem": None if self.exclude_mayhem else False,
-            "max_recent_drawdown_pct": self.max_recent_drawdown_pct,
-            "min_early_retention_pct": self.min_early_retention_pct,
-            "min_early_age_s": self.min_early_age_s,
-            "min_new_wallets_30s": self.min_new_wallets_30s,
-            "max_quick_flip_share_30s": self.max_quick_flip_share_30s,
-        }
-        if self.max_recent_drawdown_pct is not None:
-            optional["recent_drawdown_window_s"] = self.recent_drawdown_window_s
-            optional["recent_drawdown_max_gap_s"] = self.recent_drawdown_max_gap_s
-        parameters.update({k: str(v) for k, v in optional.items() if v is not None})
-        return parameters
+        return gate_parameters(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -343,4 +311,5 @@ def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
     refusals.extend(flow_refusals(features, gate))
     refusals.extend(drawdown_refusals(features, gate))
     refusals.extend(crowd_refusals(features, gate))
+    refusals.extend(buys_refusals(features, gate))
     return GateDecision(allowed=not refusals, refusals=tuple(refusals))

@@ -48,6 +48,7 @@ def validate_entry_gate(gate: EntryGate) -> None:
     _validate_top10_band(gate)
     _validate_drawdown(gate)
     _validate_crowd(gate)
+    _validate_buys(gate)
 
 
 def _validate_sniper_band(gate: EntryGate) -> None:
@@ -94,3 +95,12 @@ def _validate_crowd(gate: EntryGate) -> None:
         raise ValueError("min_new_wallets_30s cannot be negative")
     if gate.max_quick_flip_share_30s is not None and not 0 <= gate.max_quick_flip_share_30s <= 1:
         raise ValueError("max_quick_flip_share_30s is a fraction in [0, 1]")
+
+
+def _validate_buys(gate: EntryGate) -> None:
+    """T4.80 (R65): the buy-count ceiling is a count, so ``>= 0``. Its *type*
+    is guarded where JSON enters the system, not here — ``lab_params
+    .optional_count`` refuses a decimal or a string instead of truncating it
+    with ``int()`` (KB-0140: a bad value must never reach the table)."""
+    if gate.max_buys_1m is not None and gate.max_buys_1m < 0:
+        raise ValueError("max_buys_1m cannot be negative")

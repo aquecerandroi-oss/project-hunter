@@ -1102,6 +1102,57 @@ assume:
 > abre. Provado com Postgres real (`test_event_gate_crowd_integration.py`): um `create` seguido de
 > trades faz a retenção sair conhecida (`0,9`), não `early_retention_unknown`.
 
+> **T4.80 (23/09/2026): um teto opcional de compras no minuto — `max_buys_1m`** (R65,
+> `KB-0147` §4; fora do caminho de admissão do executor, é critério do **portão de entrada**).
+> A medição: nas 87 operações reais de 16–21/09, a metade com **`buys_1m ≤ 25`** fez 34 % de alvos
+> com MFE mediano **+28,1 %**, contra 20 % e **+8,2 %** acima disso — "quem entra em lançamento
+> menos disputado ganha mais". O corte foi escolhido olhando para os mesmos dados (crédito zero
+> como estimativa de lucro) e a **R67 (23/09, 473 mints fora da amostra) não o confirmou**
+> (D = +0,0358, IC 95 % [−0,0575, +0,1355], p = 0,43 — *não confirmado*, não *refutado*). Por isso
+> o critério **nasce ausente**: nada muda na mesa até alguém escrever o parâmetro, e hoje o
+> `KB-0147` diz para não escrever.
+>
+> | Critério | Chave (`meme_rule_sets.params`) | Tipo | Recusa |
+> |---|---|---|---|
+> | Teto de compras do último minuto no instante da decisão | `max_buys_1m` (ausente ⇒ **não é critério**) | inteiro JSON puro (`25`), `≥ 0`; decimal, texto (`"25"`), booleano ou negativo **não carregam** (`meme_rule_set.py --validate` / `--set-param` recusam antes de escrever) | `buys_1m_above_max` quando a contagem **excede** o teto (inclusivo: 25 passa, 26 recusa); `buys_1m_unknown` quando a fita não cobriu o minuto (falha fechada — `event_feed_warming`, `no_trade_feed`, `not_polled` nunca são "ninguém comprou") |
+>
+> **As duas pistas leem a mesma fonte, cada uma no seu instante de decisão** — não há segunda
+> contagem inventada: a pista de 15 s/mesa usa `meme_features_15s.buys_60s`
+> (`lab_repo_fast.load_fast_gate_rows`), a do minuto fechado `meme_features_1m.buys_1m`, e a de
+> evento a mesma dobra `MintEventState.tape_minute(as_of)` que os critérios de fluxo já usam
+> (`event_gate_rows.build_event_row`). Nenhuma olha para depois do instante julgado. O critério
+> vive em `hunter_indicators.meme.rules_buys`, lido por `lab_gate_params.gate_from_params`; a
+> recusa entra em `lab_gate_refusals` por conjunto, a trilha `meme_gate_refusals_by_mint` decodifica
+> `(value, limit)` e a decomposição da proposta ganha `max_buys_1m` no bloco `flow` **só** quando o
+> conjunto pede o critério. Nada muda na admissão, no kill switch, no dimensionamento nem na
+> pista de lançamento.
+>
+> **Escrever a chave em `operator/5`/`operator/6` NÃO é sombra — é ligar o filtro na mesa real.**
+> O portão recusa e a proposta não nasce; os contadores só existem depois de ligado, e não há braço
+> contrafactual. Medir sem mexer na mesa é pôr a chave num conjunto `research_only` (um braço
+> `flow_v2` paralelo) ou ler o portão de evento em `MEME_EVENT_GATE=shadow`. **Veredito de hoje:
+> R67 (23/09/2026, 473 mints fora da amostra) não confirmou `buys_1m ≤ 25` — `KB-0147` diz "não
+> ligar".** O interruptor está entregue para o dia em que houver evidência, não porque há.
+>
+> Ligar mesmo assim (`operator/5` e `operator/6`, o valor como inteiro puro — a regra "decimais são
+> strings" **não** vale para contagens). Rodar primeiro **sem** `--apply`: o ensaio valida os dois
+> documentos pelo mesmo caminho que o worker usa e não escreve nada.
+>
+> ```bash
+> uv run python infra/scripts/meme_rule_set.py --set-param max_buys_1m=25 \
+>   --rule-set operator/5 --rule-set operator/6 --apply \
+>   --reason "T4.80/R65 (KB-0147 §4): teto de compras no minuto na mesa real"
+> ```
+>
+> Desligar: o mesmo comando com `max_buys_1m=null` (a chave fica no documento com valor `null`, que
+> o leitor trata como ausente — volta a "não é critério").
+>
+> **Defasagem, não antecipação (parecer da Astra, T4.80).** Nas pistas do minuto e de 15 s a janela
+> escolhida é a do lote `activity_1m` quando ele cobriu o mint (`fold.py`/`fast_lane.py`, KB-0116),
+> e essa janela pode terminar até `max_age_s` antes do instante julgado — `activity_for` exige
+> `received_at <= at`, então nunca é informação do futuro, mas também nem sempre são "os 60 s
+> exatos terminados na decisão". A pista de evento não tem essa defasagem.
+
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 
 | | **A — PumpPortal Local Transaction API** | **B — instruções próprias pela IDL** |

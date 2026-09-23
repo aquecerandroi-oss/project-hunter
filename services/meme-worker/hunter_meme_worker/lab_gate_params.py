@@ -16,6 +16,7 @@ from hunter_meme_worker.lab_params import (
     bool_or,
     decimal_of,
     int_or,
+    optional_count,
     optional_decimal,
     optional_int,
 )
@@ -72,4 +73,8 @@ def gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> Entr
         min_early_age_s=optional_int(params.get("min_early_age_s")),
         min_new_wallets_30s=optional_int(params.get("min_new_wallets_30s")),
         max_quick_flip_share_30s=optional_decimal(params.get("max_quick_flip_share_30s")),
+        # T4.80 (R65/KB-0147): the buy-count ceiling of the judged minute, off
+        # unless the set names it. A **count**, so a decimal is refused here
+        # rather than truncated by ``int()`` — see ``optional_count``.
+        max_buys_1m=optional_count("max_buys_1m", params.get("max_buys_1m")),
     )

@@ -51,6 +51,7 @@ from hunter_indicators.meme.pedigree_e2b import (
     evaluate_e2b,
 )
 from hunter_indicators.meme.rules import EntryFeatures, evaluate_entry
+from hunter_meme_worker.absorb_rules import absorb_refusals
 from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot, money_str, optional_money_str
 from hunter_meme_worker.proposals_identity import event_features_of, identity_features_of
 from hunter_meme_worker.proposals_plan import manual_plan, ticker_of
@@ -256,6 +257,11 @@ def evaluate_gate(
         excluded += evaluate_identity_gate(identity, require_twitter=spec.require_twitter)
         event = event_features_of(row)
         excluded += evaluate_event_gate(event, require_event=spec.require_event)
+        excluded += absorb_refusals(  # T4.79 (EXP-M22): only the event lane can answer
+            row.absorb,
+            require_confirmed=spec.require_absorb_confirmed,
+            require_sell_seen=spec.require_absorb_sell_seen,
+        )
         features = entry_features_of(row, spec)
         decision = evaluate_entry(features, spec.gate)
         if excluded or not decision.allowed:
@@ -283,6 +289,7 @@ def evaluate_gate(
                     series=row.series,
                     identity=identity,
                     event=event,
+                    absorb=row.absorb,
                 ),
                 suggested=suggested,
                 now=now,

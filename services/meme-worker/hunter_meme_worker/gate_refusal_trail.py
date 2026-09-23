@@ -153,6 +153,8 @@ _NUMERIC_REFUSALS: dict[
         lambda f: f.quick_flip_share_30s,
         lambda g: g.max_quick_flip_share_30s,
     ),
+    # T4.80 (R65/KB-0147): the judged minute's buy count against the ceiling.
+    "buys_1m_above_max": (lambda f: f.buys_1m, lambda g: g.max_buys_1m),
 }
 """One entry per refusal name this revision already decodes into a numeric
 pair (docs/DATABASE.md §54.2's own example, ``snipers_above_max``). A name
