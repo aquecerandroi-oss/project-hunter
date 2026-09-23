@@ -41,6 +41,7 @@ from hunter_exchanges.pumpfun.solana_codec import (
 from hunter_exchanges.pumpfun.tx_rpc import SendDisabled
 from hunter_meme_executor import spot_repo
 from hunter_meme_executor.journal_db import WORKER_ROLE
+from hunter_meme_executor.spot_alt import account_keys_for
 from hunter_meme_executor.spot_send_rules import (
     ATA_RENT_LAMPORTS,
     LegResult,
@@ -150,7 +151,13 @@ async def spot_leg(
         )
         raw_tx = base64.b64decode(swap_tx.swap_transaction_b64)
         decoded = decode_versioned_transaction(raw_tx)
-        verified = verify_spot_swap_tx(decoded.message, intent=intent)
+        # T4.81: Jupiter reaches the route's accounts — and the mint/ATA of a
+        # Create-ATA — through address lookup tables. Resolve them here (IO,
+        # one ``getMultipleAccounts`` at ``finalized``, off the loop) and hand
+        # the resolved list to the pure verifier, which then checks a loaded
+        # address exactly like a static one.
+        account_keys = await asyncio.to_thread(account_keys_for, ctx.chain.rpc, decoded.message)
+        verified = verify_spot_swap_tx(decoded.message, intent=intent, account_keys=account_keys)
     except TreasurySwapRefused as exc:
         return await _refuse(ctx, order_id, exc.reason, quote)
     except ExchangeError as exc:

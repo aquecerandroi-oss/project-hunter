@@ -185,7 +185,8 @@ def test_a_token_to_token_swap_with_both_atas_created_is_accepted() -> None:
 
 def test_a_foreign_destination_token_transfer_is_refused() -> None:
     message = _token_to_token_message()
-    transfer = VersionedCompiledInstruction(2, (3, 10, 0), b"\x03" + struct.pack("<Q", 1_000_000))
+    # destination = JUP6 (index 1), an account that is not one of our own ATAs
+    transfer = VersionedCompiledInstruction(2, (3, 1, 0), b"\x03" + struct.pack("<Q", 1_000_000))
     hostile = replace(message, instructions=(*message.instructions, transfer))
     intent = _intent(
         hostile, input_mint=USDC_MINT, output_mint=WIF, in_amount=1_000_000, min_out=800_000
@@ -218,10 +219,12 @@ def test_a_system_transfer_when_input_is_not_wsol_is_refused() -> None:
     assert excinfo.value.reason == "system_program_not_allowed"
 
 
-def test_a_create_ata_whose_mint_is_behind_a_lookup_table_is_refused() -> None:
-    """T4.73b, review finding 6: with the mint (position 3) only reachable
-    through an address lookup table, ``_key`` cannot derive the expected ATA
-    address, so the check used to be skipped. It must refuse by name instead."""
+def test_a_message_with_lookup_tables_is_refused_when_the_caller_resolved_nothing() -> None:
+    """T4.81: the verifier is pure, so a message whose accounts live in a lookup
+    table can only be verified against the caller's resolved key list. Without
+    one it is refused by name — never verified against the static keys alone
+    (T4.73b finding 6, where the mint at position 3 escaped the derivation).
+    ``test_spot_verify_alt.py`` covers the resolved case, pass and fail."""
     from hunter_exchanges.jupiter.versioned_tx import AddressTableLookup
 
     message = _wrap_message()
@@ -237,23 +240,19 @@ def test_a_create_ata_whose_mint_is_behind_a_lookup_table_is_refused() -> None:
     intent = _intent(hostile, input_mint=WSOL, output_mint=WIF, in_amount=20_000_000, min_out=1)
     with pytest.raises(TreasurySwapRefused) as excinfo:
         verify_spot_swap_tx(hostile, intent=intent)
-    assert excinfo.value.reason == "ata_account_via_lookup_table"
+    assert excinfo.value.reason == "lookup_tables_unresolved"
 
 
-def test_a_create_ata_whose_ata_is_behind_a_lookup_table_is_refused() -> None:
-    from hunter_exchanges.jupiter.versioned_tx import AddressTableLookup
-
+def test_an_account_index_past_the_resolved_keys_is_refused_by_name() -> None:
+    """A message with no lookup table whose instruction still points past the
+    keys: unresolvable, refused before any check can read the wrong account."""
     message = _wrap_message()
     n_static = len(message.static_account_keys)
     hidden_ata_create = VersionedCompiledInstruction(5, (0, n_static, 0, 8, 6, 2), b"\x01")
     instructions = list(message.instructions)
     instructions[2] = hidden_ata_create
-    hostile = replace(
-        message,
-        instructions=tuple(instructions),
-        address_table_lookups=(AddressTableLookup("A" * 32, (0,), ()),),
-    )
+    hostile = replace(message, instructions=tuple(instructions))
     intent = _intent(hostile, input_mint=WSOL, output_mint=WIF, in_amount=20_000_000, min_out=1)
     with pytest.raises(TreasurySwapRefused) as excinfo:
         verify_spot_swap_tx(hostile, intent=intent)
-    assert excinfo.value.reason == "ata_account_via_lookup_table"
+    assert excinfo.value.reason == f"account_index_out_of_range:{n_static}"

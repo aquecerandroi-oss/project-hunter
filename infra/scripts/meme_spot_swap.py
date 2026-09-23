@@ -146,6 +146,7 @@ async def _dry_run(args: argparse.Namespace) -> int:
             max_impact_pct=Decimal(args.max_impact_pct),
             i_know=args.i_know,
             wallet_pubkey=args.user,
+            rpc=rpc,
         )
         print(format_plan(plan, in_decimals=in_decimals, out_decimals=out_decimals))
         if args.round_trip:
@@ -159,6 +160,7 @@ async def _dry_run(args: argparse.Namespace) -> int:
                 max_impact_pct=Decimal(args.max_impact_pct),
                 i_know=True,
                 wallet_pubkey=args.user,
+                rpc=rpc,
             )
             print("round-trip sell-back:")
             print(format_plan(back, in_decimals=out_decimals, out_decimals=in_decimals))
@@ -213,6 +215,7 @@ async def apply_with(
         max_impact_pct=max_impact_pct,
         i_know=args.i_know,
         wallet_pubkey=signer.pubkey,
+        rpc=chain.rpc,
     )
     for refusal in (plan.amount_cap_refusal, plan.impact_refusal, plan.verify_reason):
         if refusal:

@@ -21,6 +21,7 @@ from hunter_exchanges.pumpfun.tx_rpc import SimulationResult
 from hunter_meme_executor import spot_send
 from hunter_meme_executor.chain import TokenAccountRead, WalletRead
 from hunter_meme_executor.context import ExecutorState
+from hunter_meme_executor.spot_alt import ALT_PROGRAM_ID
 from hunter_meme_executor.treasury_rules import JUP_PROGRAM_ID
 
 from .spot_tx_fixtures import (
@@ -72,6 +73,29 @@ class FakeRpc:
     transaction_error: Exception | None = None
     block_height: int = 0
     """T4.74-5: what ``getBlockHeight`` answers the reconcile."""
+    lookup_tables: dict[str, str] = field(default_factory=lambda: dict[str, str]())
+    """T4.81: ``table address -> base64 account data`` for ``getMultipleAccounts``."""
+    lookup_table_owner: str = ALT_PROGRAM_ID
+    call_error: Exception | None = None
+
+    def call(self, method: str, params: list[Any]) -> Any:
+        """The read-only JSON-RPC door — only the lookup-table read uses it."""
+        assert method == "getMultipleAccounts"
+        self.log.append("get_multiple_accounts")
+        if self.call_error is not None:
+            raise self.call_error
+        value = [
+            None
+            if address not in self.lookup_tables
+            else {
+                "data": [self.lookup_tables[address], "base64"],
+                "owner": self.lookup_table_owner,
+                "lamports": 1_000_000,
+                "executable": False,
+            }
+            for address in params[0]
+        ]
+        return {"context": {"slot": 1}, "value": value}
 
     def get_block_height(self, *, commitment: str = "confirmed") -> int:
         self.log.append("get_block_height")

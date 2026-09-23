@@ -57,6 +57,7 @@ from hunter_exchanges.pumpfun.solana_codec import (
     serialize_transaction,
 )
 from hunter_meme_executor.chain import ChainReader
+from hunter_meme_executor.spot_alt import account_keys_for
 from hunter_meme_executor.spot_verify import SpotSwapIntent, verify_spot_swap_tx
 from hunter_meme_executor.treasury_rules import TreasurySwapRefused, classify_submitted
 from hunter_meme_executor.treasury_send import simulated_balances
@@ -144,7 +145,10 @@ async def run_apply_leg(
         swap_tx = client.swap(quote=quote, user_public_key=wallet)
         raw_tx = base64.b64decode(swap_tx.swap_transaction_b64)
         decoded = decode_versioned_transaction(raw_tx)
-        verify_spot_swap_tx(decoded.message, intent=intent)
+        # T4.81: resolve the address lookup tables from the chain, then verify
+        # the real addresses — an account behind a table is never skipped.
+        keys = account_keys_for(chain.rpc, decoded.message)
+        verify_spot_swap_tx(decoded.message, intent=intent, account_keys=keys)
     except TreasurySwapRefused as exc:
         return await _refuse(conn, swap_id, exc.reason)
     except Exception as exc:

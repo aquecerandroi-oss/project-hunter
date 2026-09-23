@@ -1817,8 +1817,32 @@ não é um laço automático do executor.
   de volta também o tem; o teto de quantia e o piso de carteira **não** se aplicam à venda de volta
   (é saída, e SOL só entra).
 - **Verificador (T4.73b, achado 6):** `Create ATA` cujo mint (pos. 3) ou cuja ATA (pos. 1) só é
-  alcançável por address lookup table é recusado por nome (`ata_account_via_lookup_table`) — antes
-  a derivação do endereço era pulada quando `_key` devolvia `None`.
+  alcançável por address lookup table era recusado por nome (`ata_account_via_lookup_table`) —
+  antes a derivação do endereço era pulada quando `_key` devolvia `None`. **Substituído na T4.81**
+  pela resolução de verdade (abaixo): fechar os olhos deixava a mesa incapaz de comprar.
+- **Address lookup tables resolvidas (T4.81, 23/09/2026 — a primeira compra real do `spot/1`,
+  ZECUSDT 11:45 BRT, foi recusada com `ata_account_via_lookup_table`):** toda rota da Jupiter usa
+  ALT, então recusar o que não se enxerga é fechado *e* inerte. `hunter_meme_executor.spot_alt` lê
+  as tabelas (um `getMultipleAccounts`, **`finalized`** — `confirmed` não fixa o fork, e uma
+  extensão que só existe num fork abandonado poderia pôr outro endereço no índice verificado) e
+  monta a lista completa de chaves **na ordem do runtime**: estáticas, depois todos os `writable`
+  de todas as tabelas (na ordem das tabelas), depois todos os `readonly` — `AccountKeys::new` do
+  agave / `MessageAccountKeys` do web3.js. A ordem é provada contra a captura real
+  (`jupiter_swap_usdc_to_sol_real.json`: o mint do `CreateIdempotent` é o índice 18 = o primeiro
+  `readonly`, slot 11 da tabela) e com duas tabelas. Resolução é IO no chamador (`spot_send`,
+  `meme_spot_swap_send`, `meme_spot_swap_plan`); `verify_spot_swap_tx` continua **puro** e recebe
+  `account_keys` — um endereço vindo de tabela passa exatamente pelos mesmos testes de um estático
+  (derivação da ATA, origem/destino da rota, allow-list de programas, System só para a WSOL ATA
+  própria). Recusas novas por nome: `lookup_tables_unresolved`, `account_keys_not_the_messages_own`,
+  `account_index_out_of_range:<i>`, `lookup_table_read_failed:<Tipo>`, `lookup_table_read_unreadable`,
+  `lookup_table_missing:<addr>`, `lookup_table_unreadable:<addr>`, `lookup_table_bad_owner:<addr>`,
+  `lookup_table_uninitialized:<addr>`, `lookup_table_malformed:<addr>`,
+  `lookup_table_deactivated:<addr>` (qualquer `deactivation_slot != u64::MAX`, mais estrito que o
+  runtime), `lookup_table_empty:<addr>`, `lookup_table_index_out_of_range:<addr>#<i>`,
+  `too_many_lookup_tables:<n>` (8), `too_many_loaded_addresses:<n>` (128), `too_many_account_keys:<n>`
+  (256). `program_via_lookup_table` **continua**: no v0 o `program_id_index` de uma instrução de topo
+  tem de ser chave estática (o `sanitize` do runtime exige). A tesouraria (`treasury_verify.py`)
+  **não** foi tocada e mantém a limitação — ver a ressalva no fim desta seção.
 - **Fechado na T4.73c (era a pendência que bloqueava o primeiro `--apply`; achado da Astra na
   T4.73b — `hunter_meme_executor.treasury_db`):** os três leitores da tabela
   reaproveitada não filtram por mint: `_SOL_INFLOW` soma `coalesce(sol_out_filled, sol_out_quoted)`
@@ -1853,6 +1877,17 @@ não é um laço automático do executor.
   da T4.54 (`.claude/state/review-T4.54.md`) para o par escolhido — cotação real, transação real
   não assinada com a chave pública da carteira, `simulateTransaction` com `accounts` conferindo o
   invariante — e só então uma primeira troca pequena (0,02 SOL) com `--i-know` se necessário.
+- **Ressalva aberta depois da T4.81 — a tesouraria (`treasury_verify.py`) não foi tocada.** Ela é
+  o caminho USDC → SOL já revisado e em produção, e a T4.81 não mexeu nele de propósito (o risco
+  de tocar no verificador que assina hoje é maior que o ganho, e a mesa `spot/1` é o que estava
+  parado). Consequência **conhecida**, a fechar numa tarefa própria reaproveitando `spot_alt`:
+  em `treasury_verify._create_ata` a derivação `ata == associated_token_address(...)` é pulada
+  quando o mint está atrás de ALT (`if mint is not None and ...`) — é exatamente o caso da captura
+  real, cujo mint é o índice 18. Cenário de falha: uma `/swap` adulterada faz a carteira pagar o
+  rent (~0,002 SOL) de uma ATA de outro mint que ela possui; o programa Associated Token deriva o
+  endereço on-chain, então **não** é desvio de fundos, mas é uma verificação que não verifica. O
+  resto da tesouraria (rota, origem/destino, System, Token) usa só chaves estáticas e continua
+  recusando o que não enxerga.
 
 ## 17. Tamanho por convicção (T4.61b, corrigido na T4.61c)
 

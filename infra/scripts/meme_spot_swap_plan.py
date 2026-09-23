@@ -21,6 +21,7 @@ from meme_spot_swap_rules import (
 from hunter_exchanges.jupiter.models import WRAPPED_SOL_MINT, JupiterQuote, JupiterSwapTransaction
 from hunter_exchanges.jupiter.versioned_tx import decode_versioned_transaction
 from hunter_exchanges.pumpfun.tx_rpc import SolanaTxRpcClient
+from hunter_meme_executor.spot_alt import account_keys_for
 from hunter_meme_executor.spot_verify import SpotSwapIntent, verify_spot_swap_tx
 from hunter_meme_executor.treasury_rules import TreasurySwapRefused
 
@@ -90,6 +91,7 @@ def build_plan(
     max_impact_pct: Decimal,
     i_know: bool,
     wallet_pubkey: str | None,
+    rpc: SolanaTxRpcClient | None = None,
 ) -> Plan:
     quote = client.quote(
         input_mint=input_mint,
@@ -113,6 +115,7 @@ def build_plan(
         verify_reason = _verify(
             client,
             quote,
+            rpc=rpc,
             wallet_pubkey=wallet_pubkey,
             input_mint=input_mint,
             output_mint=output_mint,
@@ -134,6 +137,7 @@ def _verify(
     client: JupiterClientLike,
     quote: JupiterQuote,
     *,
+    rpc: SolanaTxRpcClient | None,
     wallet_pubkey: str,
     input_mint: str,
     output_mint: str,
@@ -151,7 +155,10 @@ def _verify(
             min_quoted_out=int(quote.out_amount),
             max_slippage_bps=slippage_bps,
         )
-        verify_spot_swap_tx(decoded.message, intent=intent)
+        # T4.81: the lookup tables are resolved from the chain first — without
+        # an RPC a route that uses them can only be reported unverifiable.
+        keys = None if rpc is None else account_keys_for(rpc, decoded.message)
+        verify_spot_swap_tx(decoded.message, intent=intent, account_keys=keys)
         return ""
     except TreasurySwapRefused as exc:
         return exc.reason
