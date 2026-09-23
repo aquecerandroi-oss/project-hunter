@@ -1,0 +1,160 @@
+## 1. Cobertura
+
+| recorte | n | fita começa no nascimento | reconcilia com a foto | **nasce E reconcilia** | elegível p/ contraste com guarda (+ pct observável) |
+|---|---:|---:|---:|---:|---:|
+| posições reais | 91 | 70 (76.9%) | 49 (53.8%) | **49 (53.8%)** | 16 (17.6%) |
+| apostas de papel | 1475 | 947 (64.2%) | 711 (48.2%) | **698 (47.3%)** | 223 (15.1%) |
+| uma por mint | 694 | 459 (66.1%) | 337 (48.6%) | **331 (47.7%)** | 79 (11.4%) |
+
+
+## 2. Tercis — população elegível, variável medida com a guarda (n=79)
+
+Cortes dos tercis de `pct`: baixo < 0.217 ≤ meio < 0.662 ≤ alto
+
+| tercil | n | mediana da variável | ret médio (SOL/SOL) | mediana | **cauda: perda ≥ 50 %** | vitórias > 0 | PnL total (SOL) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| baixo | 26 | 0.130 | -0.1947 | -0.1596 | **8 (30.8%)** | 5 (19.2%) | -0.3202 |
+| meio | 26 | 0.311 | -0.1842 | -0.0823 | **5 (19.2%)** | 5 (19.2%) | -0.2132 |
+| alto | 27 | 0.973 | -0.1461 | -0.0413 | **4 (14.8%)** | 7 (25.9%) | -0.1272 |
+
+
+## 3. Tercis — fita retrospetiva (ORÁCULO, não era nossa na decisão) n=562
+
+Cortes dos tercis de `pct_retro`: baixo < 0.143 ≤ meio < 0.257 ≤ alto
+
+| tercil | n | mediana da variável | ret médio (SOL/SOL) | mediana | **cauda: perda ≥ 50 %** | vitórias > 0 | PnL total (SOL) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| baixo | 187 | 0.109 | -0.0729 | -0.0907 | **22 (11.8%)** | 64 (34.2%) | -0.6471 |
+| meio | 187 | 0.187 | -0.0351 | -0.0610 | **21 (11.2%)** | 66 (35.3%) | -0.4120 |
+| alto | 188 | 0.523 | -0.0868 | -0.0531 | **28 (14.9%)** | 51 (27.1%) | -0.7354 |
+
+
+## 3b. Sensibilidade — compras BRUTAS (a letra da fila), fita retrospetiva
+
+Cortes dos tercis de `pct_retro_bruto`: baixo < 0.198 ≤ meio < 0.397 ≤ alto
+
+| tercil | n | mediana da variável | ret médio (SOL/SOL) | mediana | **cauda: perda ≥ 50 %** | vitórias > 0 | PnL total (SOL) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| baixo | 187 | 0.137 | -0.0703 | -0.0763 | **23 (12.3%)** | 58 (31.0%) | -0.7360 |
+| meio | 187 | 0.262 | -0.0232 | -0.0614 | **24 (12.8%)** | 76 (40.6%) | -0.2308 |
+| alto | 188 | 0.881 | -0.1012 | -0.0550 | **24 (12.8%)** | 47 (25.0%) | -0.8276 |
+
+
+## 3c. Sensibilidade — ESTOQUE de tokens, fita retrospetiva
+
+Cortes dos tercis de `pct_retro_estoque`: baixo < 0.144 ≤ meio < 0.272 ≤ alto
+
+| tercil | n | mediana da variável | ret médio (SOL/SOL) | mediana | **cauda: perda ≥ 50 %** | vitórias > 0 | PnL total (SOL) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| baixo | 184 | 0.107 | -0.0697 | -0.0717 | **20 (10.9%)** | 65 (35.3%) | -0.6282 |
+| meio | 184 | 0.195 | -0.0381 | -0.0736 | **18 (9.8%)** | 62 (33.7%) | -0.4046 |
+| alto | 185 | 0.452 | -0.0910 | -0.0524 | **33 (17.8%)** | 52 (28.1%) | -0.7772 |
+
+
+## 4. Contrafactual do teto — posições reais, variável OBSERVÁVEL na decisão
+
+Base: 91 posições reais, PnL total **-0.3480 SOL**. Variável: `pct`.
+
+| teto | bloqueadas | das quais VENCEDORAS | PnL removido | PnL que sobra | Δ vs hoje | mede? |
+|---:|---:|---:|---:|---:|---:|---:|
+| > 10% | 26 | **7** | -0.1510 | -0.1970 | +0.1510 | 31/91 |
+| > 15% | 17 | **4** | -0.1073 | -0.2407 | +0.1073 | 31/91 |
+| > 20% | 11 | **2** | -0.0632 | -0.2848 | +0.0632 | 31/91 |
+| > 25% | 7 | **1** | -0.0564 | -0.2916 | +0.0564 | 31/91 |
+| > 30% | 6 | **1** | -0.0458 | -0.3022 | +0.0458 | 31/91 |
+| > 40% | 2 | **1** | -0.0033 | -0.3447 | +0.0033 | 31/91 |
+| > 50% | 2 | **1** | -0.0033 | -0.3447 | +0.0033 | 31/91 |
+
+
+## 5. Contrafactual do teto — posições reais, fita retrospetiva (oráculo)
+
+Base: 91 posições reais, PnL total **-0.3480 SOL**. Variável: `pct_retro`.
+
+| teto | bloqueadas | das quais VENCEDORAS | PnL removido | PnL que sobra | Δ vs hoje | mede? |
+|---:|---:|---:|---:|---:|---:|---:|
+| > 10% | 63 | **20** | -0.2494 | -0.0986 | +0.2494 | 74/91 |
+| > 15% | 42 | **16** | -0.0714 | -0.2766 | +0.0714 | 74/91 |
+| > 20% | 24 | **10** | -0.0060 | -0.3420 | +0.0060 | 74/91 |
+| > 25% | 12 | **5** | -0.0254 | -0.3226 | +0.0254 | 74/91 |
+| > 30% | 10 | **4** | +0.0255 | -0.3735 | -0.0255 | 74/91 |
+| > 40% | 4 | **2** | +0.0280 | -0.3760 | -0.0280 | 74/91 |
+| > 50% | 3 | **2** | +0.0319 | -0.3799 | -0.0319 | 74/91 |
+
+
+## 6. Moinho — tercil alto × tercil baixo, fita retrospetiva
+
+# H-010 — concentração do maior comprador (tercil alto × tercil baixo) — NÃO CONFIRMA
+
+> Origem: perda real AIRAA 23/09/2026 17:03 BRT; max_top10_share vazio nas duas mesas  ·  impressão digital do pré-registo: `bc9a7974ed81`
+> Limiar congelado: **0.142285**  ·  efeito mínimo relevante (MRE): **+0.0500**
+
+## Pré-registo (escrito antes de correr)
+
+- **Previsão:** decisões com maior_comprador_pct no tercil alto rendem menos −0,05 por SOL que o tercil baixo — isto é, comprar onde um dono concentra o estoque é pior
+- **Refutação:** limite inferior do IC 95 % (bootstrap por mint) acima de −0,01 por SOL; ou cobertura da fita desde o nascimento < 60 % da população (sem fita completa não dá para medir o maior comprador, e isso é limite de dado, não resultado)
+- **Regra de decisão:** CONFIRMA com D>0 (baixo−alto), IC inferior>0, p<0,05, D≥MRE, braço selecionado lucrativo em nível e planalto. Sinal espelhado: o bloco escreve o contraste alto−baixo, o moinho corre baixo−alto (direction='low').
+- **Política de limiar:** tercis da amostra elegível, fixados antes de olhar desfechos
+- **Congelado em:** 2026-09-23
+
+## Os números
+
+| # | o quê | valor |
+|---|---|---|
+| 1 | população usada (de 375 linhas lidas) | **375** em 375 clusters |
+| 2 | selecionados / resto no limiar congelado | 187 / 188 |
+| 3 | média do desfecho: selecionados / resto | -0.0729 / -0.0868 |
+| 4 | **D = média(selecionados) − média(resto)** | **+0.0139** |
+| 5 | IC 95 % de D (bootstrap de cluster por `mint`) | [-0.0731, +0.0993]  P(D≤0) = 0.372 |
+| 6 | IC 95 % de D (bootstrap de blocos) | [-0.0775, +0.1050] em 161 blocos |
+| 7 | p de permutação (estratificada por `dia`) | 0.7959 |
+| 8 | dinheiro somado na população (Decimal) | `-1.3824901387` |
+
+Censura: 0 linhas sem desfecho, 0 sem a variável, 0 recusadas pela guarda anti-antecipação. Ausente nunca virou zero.
+
+## VEREDITO: NÃO CONFIRMA
+
+- D = +0.0139 abaixo do MRE +0.0500
+- IC 95 % inferior -0.0731 não está acima de zero
+- p de permutação 0.7959 não é < 0,05
+- o braço selecionado perde em nível (-0.0729); perder menos que o resto não é vantagem
+- a curva de limiares é pico, não planalto (7 limiares avaliáveis; maior corrida positiva 6 (1 com IC acima de zero))
+- há dependência temporal declarada e o IC 95 % por blocos [-0.0775, +0.1050] cobre zero
+
+## Curva de limiares — planalto ou pico?
+
+Diagnóstico: **pico** (7 limiares avaliáveis; maior corrida positiva 6 (1 com IC acima de zero)).
+
+| limiar | n sel/resto | D | IC 95 % |
+|---|---|---|---|
+| 0.1 | 69/306 | -0.0298 | [-0.1188, +0.0587] |
+| 0.15 | 187/188 | +0.0139 | [-0.0742, +0.1006] |
+| 0.2 | 187/188 | +0.0139 | [-0.0733, +0.0968] |
+| 0.25 | 187/188 | +0.0139 | [-0.0753, +0.0990] |
+| 0.3 | 209/166 | +0.0291 | [-0.0620, +0.1148] |
+| 0.4 | 253/122 | +0.0938 | [+0.0049, +0.1826] |
+| 0.5 | 277/98 | +0.0595 | [-0.0380, +0.1560] |
+
+## Baldes por tercis (descritivo, não decide nada)
+
+| balde | n | média | mediana |
+|---|---|---|---|
+| -0.121822 | 126 | -0.0766 | -0.0769 |
+| 0.121822-0.395032 | 125 | -0.0236 | -0.0744 |
+| 0.395032-inf | 124 | -0.1399 | -0.0483 |
+
+## A ressalva que mais importa
+
+a guarda não correu (dispensa declarada: a guarda da T4.80 corre dentro do carregador (`load.concentration`, `received_at <= decisão`), não nas colunas do moinho; e o contrafactual usa de propósito a fita retrospetiva, declarada como oráculo) — causalidade é afirmação do operador, não do moinho
+
+Outras ressalvas:
+
+- sem fatia de teste reservada: o resultado é dentro da amostra
+
+## Suposições numéricas declaradas
+
+- ficha de 0,05–0,07 SOL; custo de ida-e-volta já dentro do pnl persistido
+- desfecho = pnl_sol / tamanho, sob a saída que cada mesa realmente usou
+
+Estatística em `float` (contrastes de retorno); dinheiro publicado em `Decimal`. Tempo em UTC.
+
+> Nada aqui autoriza dinheiro real. Um CONFIRMA é candidato a **braço de papel pré-registado**, nunca parâmetro de mesa.
