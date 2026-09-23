@@ -22,7 +22,6 @@ from hunter_core.execution.meme.submit import (
     ApprovedSubmission,
     MemeLiveTradingDisabled,
     MemeSubmitter,
-    SubmitPolicy,
 )
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.solana_codec import TOKEN_PROGRAM_ID
@@ -30,16 +29,16 @@ from hunter_exchanges.pumpswap.decode import PUMPSWAP_PROGRAM_ID, WSOL_MINT
 from hunter_meme_executor.chain import PoolRead
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.exit_common import BACKOFF_S, mark_blocked
-from hunter_meme_executor.exit_settle import no_tokens_on_chain
+from hunter_meme_executor.exit_settle import no_tokens_on_chain, settle_latest
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.pumpswap_build import (
     PumpSwapFillRecord,
     build_pumpswap_sell,
     decode_pumpswap_fills,
 )
+from hunter_meme_executor.pumpswap_settle import close_pumpswap
 from hunter_meme_executor.repo import (
     OpenPosition,
-    close_position,
     insert_order,
     latest_sell_order,
     order_key,
@@ -63,8 +62,9 @@ async def handle_migrated_position(
         return
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         latest = await latest_sell_order(session, position.proposal_id)
-    if latest is not None and latest.status in ("admitted", "simulated", "submitted_unconfirmed"):
-        await _reconcile(ctx, position, latest.client_order_id, latest.id)
+    # T4.90b: a pending sell is read with ITS venue's decoder (a curve sell sent
+    # before the migration stays a curve sale); a confirmed one closes, never resold.
+    if latest is not None and await settle_latest(ctx, position, latest, reason, now):
         return
     intent = position.exit_intent or {}
     raw_next = intent.get("next_attempt_at")
@@ -110,7 +110,7 @@ async def _sell(
         return
     tokens = min(position.tokens, base_account.amount)
     if tokens <= 0:  # T4.90: our own "expired" sell may have landed — ask the chain first
-        await no_tokens_on_chain(ctx, position, reason, now, reconcile=_reconcile)
+        await no_tokens_on_chain(ctx, position, reason, now)
         return
     try:
         built = build_pumpswap_sell(
@@ -180,7 +180,7 @@ async def _sell(
         reason=result.reason,
     )
     if result.state is SubmitState.CONFIRMED and isinstance(result.fill, PumpSwapFillRecord):
-        await _close(ctx, position, order_id, result.fill, reason)
+        await close_pumpswap(ctx, position, order_id, result.fill, reason)
     elif result.state is SubmitState.FAILED:
         delay = BACKOFF_S[min(attempt - 1, len(BACKOFF_S) - 1)]
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
@@ -196,51 +196,3 @@ async def _sell(
                 },
                 now=utcnow(),
             )
-
-
-async def _reconcile(ctx: ExecutorContext, position: OpenPosition, key: str, order_id: str) -> bool:
-    submitter = MemeSubmitter(
-        rpc=ctx.chain.rpc,
-        signer=None,
-        journal=ctx.journal,
-        verify=lambda _raw: None,
-        decode_fill=decode_pumpswap_fills,
-        policy=SubmitPolicy(allow_send=False, cluster=ctx.config.cluster),
-        now=utcnow,
-    )
-    result = await asyncio.to_thread(submitter.reconcile, key)
-    if (
-        result is not None
-        and result.state is SubmitState.CONFIRMED
-        and isinstance(result.fill, PumpSwapFillRecord)
-    ):
-        reason = str((position.exit_intent or {}).get("reason", "reconciled"))
-        return await _close(ctx, position, order_id, result.fill, reason)
-    return False
-
-
-async def _close(
-    ctx: ExecutorContext,
-    position: OpenPosition,
-    order_id: str,
-    fill: PumpSwapFillRecord,
-    reason: str,
-) -> bool:
-    payload = fill.as_json()
-    payload["reason"] = reason
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        closed = await close_position(
-            session,
-            position.id,
-            exit_order_id=order_id,
-            exit_at=fill.block_time or utcnow(),
-            exit_payload=payload,
-            sol_received_lamports=fill.sell_net_lamports,
-            sol_spent_lamports=position.sol_spent_lamports,
-            initial_risk_sol=position.initial_risk_sol,
-            now=utcnow(),
-        )
-    if closed:
-        ctx.state.exits_confirmed += 1
-        ctx.state.blocked_exits.pop(position.id, None)
-    return closed

@@ -60,6 +60,9 @@ class ExecutorState:
     refund of the mint's ATA rent — the desk's count of rent actually recovered,
     not merely attempted."""
     rpc_errors: int = 0
+    settle_errors: int = 0
+    """T4.90b: closes from a confirmed sell that raised (the position is then
+    blocked by name) — isolated per position, never a crashed loop."""
     wallet_lamports: int | None = None
     wallet_read_at: datetime | None = None
     blocked_exits: dict[str, str] = field(default_factory=lambda: dict[str, str]())

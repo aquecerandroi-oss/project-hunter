@@ -173,7 +173,11 @@ async def _settle_by_signature(
                 ctx.state.rpc_errors += 1
                 logger.warning("meme_spot_reconcile_unreadable", error_type=type(exc).__name__)
                 continue
-            if again and again[0] is not None:
+            if len(again) != 1:  # T4.90b: a short second answer is not absence either
+                ctx.state.rpc_errors += 1
+                logger.warning("meme_spot_reconcile_short_answer", asked=1, got=len(again))
+                continue
+            if again[0] is not None:
                 continue  # it did land: settled on the next tick from its real status
             await _settle_failed(ctx, stats, row, EXPIRED_REASON, now)
             stats.reconciled_expired += 1

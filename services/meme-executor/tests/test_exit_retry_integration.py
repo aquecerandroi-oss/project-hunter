@@ -24,15 +24,21 @@ import pytest_asyncio
 from sqlalchemy import text
 
 from hunter_core.execution.meme.base58 import b58encode
+from hunter_exchanges.pumpswap.decode import decode_pool_account
+from hunter_meme_executor.build import decode_fills
+from hunter_meme_executor.chain import PoolRead
 from hunter_meme_executor.entries import entries_once
 from hunter_meme_executor.exit_common import (
     ENV_EXIT_PANIC_FROM_ATTEMPT,
     ENV_EXIT_RETRY_MAX_ATTEMPTS,
 )
 from hunter_meme_executor.exits import exits_once
+from hunter_meme_executor.journal_db import fill_jsonable
+from hunter_meme_executor.main import reconcile_once
 
 from .test_live_persistence import (
     MINT,
+    PUMPSWAP_FIXTURES,
     FakeRedis,
     Harness,
     _context,
@@ -415,3 +421,215 @@ async def test_an_expired_sell_hidden_behind_a_later_failed_retry_closes_the_pos
     assert position["exit"]["reason"] == "sell_now"
     assert live.rpc.sent == [], "nothing was signed or sent to settle it"
     assert not live.ctx.state.blocked_exits
+
+
+# --- T4.90b: a confirmed sell closes its position; the ORDER's venue picks the decoder ---
+
+
+async def _position_row(db_engine: AsyncEngine, proposal_id: str) -> dict[str, Any]:
+    return (
+        await _rows(
+            db_engine, "SELECT * FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+        )
+    )[0]
+
+
+async def _confirmed_sell_left_open(
+    db_engine: AsyncEngine, live: Harness, proposal_id: str
+) -> None:
+    """Attempt 1 ``confirmed`` with its fill in the row — exactly what
+    ``PostgresOrderJournal.record_state`` writes — and the position still open:
+    the 30 s reconcile confirmed it, or the process died before the close."""
+    await _signed_sell(db_engine, proposal_id, status="submitted_unconfirmed", reason="timeout")
+    tx = live.rpc.get_transaction(LANDED_SIG)
+    assert tx is not None
+    fill = json.dumps(fill_jsonable(decode_fills(tx)[0]), default=str)
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_orders SET status = 'confirmed', reason = 'trade_event', "
+                "  fill = CAST(:fill AS jsonb), settled_at = now() "
+                "WHERE proposal_id = :p AND side = 'sell' AND attempt = 1"
+            ),
+            {"p": proposal_id, "fill": fill},
+        )
+
+
+async def test_a_sell_the_30s_reconcile_confirms_closes_its_position(
+    live_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """HIGH (T4.90 audit): the sell overran its 30 s window; ``reconcile_once``
+    confirmed it and, before T4.90b, left the position open until some rule
+    fired and ``_sell`` found zero tokens (``blocked:no_tokens_on_chain``)."""
+    live, proposal_id = await _failed_first_attempt(live_harness, db_engine, db_session_factory)
+    await _signed_sell(
+        db_engine, proposal_id, status="submitted_unconfirmed", reason="confirmation_timeout"
+    )
+    live.chain.tokens_on_chain = 0
+    await reconcile_once(live.ctx)
+    sells = await _sells(db_engine, proposal_id)
+    assert len(sells) == 1 and sells[0]["status"] == "confirmed", sells
+    position = await _position_row(db_engine, proposal_id)
+    assert position["status"] == "closed", "the reconcile that confirmed the sell closes it"
+    assert position["exit_order_id"] == sells[0]["id"]
+    assert position["sol_received_lamports"] == sells[0]["fill"]["sell_net_lamports"]
+    assert position["exit"]["reason"] == "sell_now"
+    assert live.rpc.sent == [], "reconciliation never sends"
+
+
+async def test_a_confirmed_sell_left_by_a_crash_is_closed_by_the_next_reconcile(
+    live_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The fill comes back from JSONB as a dict; it is parsed into a typed
+    ``StoredSellFill`` — never trusted loose, never refused for being JSON."""
+    live, proposal_id = await _failed_first_attempt(live_harness, db_engine, db_session_factory)
+    await _confirmed_sell_left_open(db_engine, live, proposal_id)
+    restarted = _context(db_session_factory, _signer(), live.redis)
+    await reconcile_once(restarted.ctx)
+    position = await _position_row(db_engine, proposal_id)
+    sells = await _sells(db_engine, proposal_id)
+    assert position["status"] == "closed" and position["exit_order_id"] == sells[0]["id"]
+    assert position["sol_received_lamports"] == sells[0]["fill"]["sell_net_lamports"]
+    assert position["exit"]["settled_from"] == "stored_fill"
+    assert position["pnl_sol"] is not None and position["r_multiple"] is not None
+    await reconcile_once(restarted.ctx)  # idempotent: nothing left to repair
+    assert (await _position_row(db_engine, proposal_id))["exit_order_id"] == sells[0]["id"]
+
+
+async def test_a_close_the_check_refuses_is_a_named_block_and_the_reconcile_survives(
+    live_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Review M1: ``entry_at`` from the wall clock (microseconds) and the sell's
+    second-precision ``block_time`` in the same second —
+    ``ck_meme_live_positions_an_exit_is_after_the_entry`` refuses the close.
+    The reconcile tick must not raise (``forever`` would take every loop down,
+    every 30 s): the position stays open, blocked by name, no time invented."""
+    live, proposal_id = await _failed_first_attempt(live_harness, db_engine, db_session_factory)
+    await _confirmed_sell_left_open(db_engine, live, proposal_id)
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_positions p SET entry_at = "
+                "  CAST(o.fill->>'block_time' AS timestamptz) + interval '500 milliseconds' "
+                "FROM meme_live_orders o WHERE o.proposal_id = p.proposal_id "
+                "  AND o.side = 'sell' AND p.proposal_id = :p"
+            ),
+            {"p": proposal_id},
+        )
+    await reconcile_once(live.ctx)  # does not raise
+    await reconcile_once(live.ctx)  # nor the next tick; the block is not recounted
+    position = await _position_row(db_engine, proposal_id)
+    block = "reconciliation_mismatch:confirmed_sell_close_failed:IntegrityError"
+    assert position["status"] == "open" and position["exit_intent"]["blocked"] == block
+    assert live.ctx.state.blocked_exits[str(position["id"])] == block
+    assert live.ctx.state.settle_errors == 2 and live.ctx.state.exits_blocked == 1
+    assert live.rpc.sent == []
+
+
+async def test_an_exit_over_a_confirmed_sell_closes_from_it_and_sends_nothing(
+    live_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A rule fires on a position whose sell already confirmed, on a STALE
+    balance that still shows the tokens. Before T4.90b the tick built, signed
+    and sent attempt 2 over a sale that had already happened."""
+    live, proposal_id = await _failed_first_attempt(live_harness, db_engine, db_session_factory)
+    await _confirmed_sell_left_open(db_engine, live, proposal_id)
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_positions SET sell_requested_at = now(), "
+                "sell_requested_by = 'everton' WHERE proposal_id = :p"
+            ),
+            {"p": proposal_id},
+        )
+    await _rewind_backoff(db_engine, proposal_id)
+    live.chain.tokens_on_chain = 10**9  # the RPC has not caught up with the sale
+    await exits_once(live.ctx)
+    sells = await _sells(db_engine, proposal_id)
+    assert len(sells) == 1, "no second sell over a confirmed one"
+    assert live.rpc.sent == []
+    position = await _position_row(db_engine, proposal_id)
+    assert position["status"] == "closed" and position["exit_order_id"] == sells[0]["id"]
+    assert not live.ctx.state.blocked_exits
+
+
+def _migrate(live: Harness) -> None:
+    """The coin graduated after attempt 1 (a CURVE sell) was sent: real F5Mk
+    pool bytes (T4.29a fixture), the curve account gone."""
+    pools = json.loads((PUMPSWAP_FIXTURES / "t429a_rpc_pools_raw.json").read_text(encoding="utf-8"))
+    value = pools["result"]["value"][2]
+    live.chain.migrated = True
+    live.chain.pool_read = PoolRead(
+        address="F5MkE4Yf73TkeSKLv3Mr3yrGJpFg3g7sspaCosVYyxaQ",
+        pool=decode_pool_account(value["data"][0], owner=value["owner"]),
+        base_token_amount=964_405_811_222_437,
+        quote_token_amount=751_101_815,
+        slot=447586178,
+        observed_at=datetime.now(UTC),
+    )
+
+
+async def _mark_migrated(db_engine: AsyncEngine, proposal_id: str) -> None:
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text("UPDATE meme_live_positions SET migrated = true WHERE proposal_id = :p"),
+            {"p": proposal_id},
+        )
+
+
+def _assert_booked_as_a_curve_sale(position: dict[str, Any], sell_id: str) -> None:
+    assert position["status"] == "closed" and position["exit_order_id"] == sell_id
+    exit_payload = position["exit"]
+    assert exit_payload.get("venue") != "pumpswap", "a curve sale booked as a PumpSwap one"
+    assert exit_payload["is_buy"] is False and exit_payload["token_amount"] > 0
+
+
+async def test_a_curve_sell_pending_when_the_coin_migrates_is_read_as_a_curve_sale(
+    live_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """MEDIUM (T4.90 audit): the migrated path chose the decoder by the
+    position's CURRENT venue; ``decode_pumpswap_fills``' payer-delta fallback
+    then 'decoded' the curve transaction as a PumpSwap sale."""
+    live, proposal_id = await _failed_first_attempt(live_harness, db_engine, db_session_factory)
+    await _signed_sell(
+        db_engine, proposal_id, status="submitted_unconfirmed", reason="confirmation_timeout"
+    )
+    await _mark_migrated(db_engine, proposal_id)
+    _migrate(live)
+    await exits_once(live.ctx)
+    sells = await _sells(db_engine, proposal_id)
+    assert len(sells) == 1 and sells[0]["status"] == "confirmed", sells
+    _assert_booked_as_a_curve_sale(await _position_row(db_engine, proposal_id), sells[0]["id"])
+    assert live.rpc.sent == []
+
+
+async def test_an_expired_curve_sell_found_after_migration_is_read_as_a_curve_sale(
+    live_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The T4.90 empty-wallet check on the PumpSwap side asked every expired
+    sell with the PumpSwap decoder — including the curve one that sold."""
+    live, proposal_id = await _failed_first_attempt(live_harness, db_engine, db_session_factory)
+    await _signed_sell(
+        db_engine, proposal_id, status="failed", reason="blockhash_expired_never_landed"
+    )
+    await _mark_migrated(db_engine, proposal_id)
+    await _rewind_backoff(db_engine, proposal_id)
+    _migrate(live)
+    live.chain.tokens_on_chain = 0
+    await exits_once(live.ctx)
+    sells = await _sells(db_engine, proposal_id)
+    assert [s["status"] for s in sells] == ["confirmed"], sells
+    _assert_booked_as_a_curve_sale(await _position_row(db_engine, proposal_id), sells[0]["id"])
+    assert live.rpc.sent == []

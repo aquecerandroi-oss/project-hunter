@@ -66,6 +66,7 @@ from hunter_meme_executor.event_exits import (
     event_exits_client,
     run_event_exits_forever,
 )
+from hunter_meme_executor.exit_settle import repair_confirmed_sells
 from hunter_meme_executor.exits import exits_once
 from hunter_meme_executor.gates_reload import gates_reload_once, prime_gates
 from hunter_meme_executor.heartbeat import heartbeat_once
@@ -134,8 +135,6 @@ async def reconcile_once(ctx: ExecutorContext) -> None:
     await spot_reconcile_once(ctx)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         pending = await unconfirmed_orders(session)
-    if not pending:
-        return
     submitter = MemeSubmitter(
         rpc=ctx.chain.rpc,
         signer=None,
@@ -156,6 +155,8 @@ async def reconcile_once(ctx: ExecutorContext) -> None:
         if result is not None:
             logger.info("meme_live_reconciled", order=key, state=result.state, reason=result.reason)
         await record_failed_onchain_fee(ctx, key, result)  # T4.59: a landed error paid its fee
+    # T4.90b: a sell confirmed above (or before a crash) closes its position now.
+    await repair_confirmed_sells(ctx)
 
 
 async def kill_switch_once(ctx: ExecutorContext) -> None:

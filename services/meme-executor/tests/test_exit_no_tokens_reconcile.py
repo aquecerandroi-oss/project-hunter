@@ -129,6 +129,10 @@ class Rig:
     blocked: list[str] = field(default_factory=lambda: list[str]())
 
 
+async def _no_confirmed_sell(_session: Any, _proposal_id: str) -> list[Any]:
+    return []
+
+
 def _rig(
     monkeypatch: pytest.MonkeyPatch,
     statuses: dict[str, list[dict[str, Any] | None]],
@@ -159,6 +163,7 @@ def _rig(
 
     monkeypatch.setattr(exit_settle, "role_session", _Sessions())
     monkeypatch.setattr(exit_settle, "expired_sell_orders", expired_sell_orders)
+    monkeypatch.setattr(exit_settle, "confirmed_sells", _no_confirmed_sell)  # T4.90b
     monkeypatch.setattr(exit_settle, "close_position", close_position)
     monkeypatch.setattr(exit_settle, "mark_blocked", mark_blocked)
     return rig
@@ -272,12 +277,14 @@ def test_the_curve_sell_routes_an_empty_wallet_to_the_chain_check(
     assert args[2:] == ("time_stop", NOW) and kwargs == {}
 
 
-def test_the_pumpswap_sell_routes_an_empty_wallet_to_the_chain_check_with_its_decoder(
+def test_the_pumpswap_sell_routes_an_empty_wallet_to_the_chain_check(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """T4.90b: no decoder is passed any more — each expired sell is read with
+    the decoder of the venue it was SENT to (``exit_settle.reconcile_order``),
+    so a curve sell from before the migration is not booked as a PumpSwap one."""
     seen = _record_helper(monkeypatch, pumpswap_exit)
     pool: Any = SimpleNamespace(address="Pool111")
     asyncio.run(pumpswap_exit._sell(_empty_wallet_ctx(), _position(), pool, "time_stop", 3, NOW))
     ((args, kwargs),) = seen
-    assert args[2:] == ("time_stop", NOW)
-    assert kwargs == {"reconcile": pumpswap_exit._reconcile}
+    assert args[2:] == ("time_stop", NOW) and kwargs == {}

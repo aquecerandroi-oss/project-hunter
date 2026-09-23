@@ -141,6 +141,28 @@ async def test_a_transaction_that_lands_between_the_status_and_the_height_is_not
     assert rig.stats.reconciled_expired == 0
 
 
+async def test_a_short_answer_on_the_second_look_is_not_absence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.90b: the height is past ``last_valid``, the first read said ``None``
+    and the second look came back ``[]``. That proves nothing — before the fix
+    the landed buy became ``failed:blockhash_expired_never_landed``, its
+    reservation was released and the tokens sat in the wallet with no position."""
+    rig = exits_rig(monkeypatch)
+    rig.store.unconfirmed = [order_row(last_valid_block_height=100)]
+    answers: list[list[Any]] = [[None], []]
+
+    def first_none_then_short(signatures: list[str]) -> list[Any]:
+        return answers.pop(0)
+
+    monkeypatch.setattr(rig.ctx.chain.rpc, "get_signature_statuses", first_none_then_short)
+    rig.ctx.chain.rpc.block_height = 101
+    await spot_reconcile.spot_reconcile_once(rig.ctx)
+    assert answers == [], "both looks were taken"
+    assert rig.store.failed == [], "a short answer never becomes failed"
+    assert rig.stats.reconciled_expired == 0 and rig.ctx.state.rpc_errors == 1
+
+
 async def test_a_short_status_answer_settles_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     rig = exits_rig(monkeypatch)
     rig.store.unconfirmed = [order_row(last_valid_block_height=1), order_row(id="o2")]

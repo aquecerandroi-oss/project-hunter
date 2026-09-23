@@ -21,11 +21,14 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = [
+    "ConfirmedSell",
     "OpenPosition",
     "close_position",
+    "confirmed_sells",
     "insert_position",
     "open_position",
     "open_positions",
+    "positions_with_confirmed_sell",
     "recent_losses",
     "set_exit_intent",
     "stamp_creator_sold",
@@ -63,6 +66,29 @@ class OpenPosition:
         return self.creator_sold_seen_at is not None or tape_creator_sold is True
 
 
+@dataclass(frozen=True, slots=True)
+class ConfirmedSell:
+    """T4.90b: a ``confirmed`` sell whose position is still ``open`` — the fill
+    as the row holds it (JSON; ``stored_fill`` parses it) and the ORDER's intent."""
+
+    order_id: str
+    proposal_id: str
+    position_id: str
+    tx_signature: str | None
+    intent: dict[str, Any]
+    fill: object
+
+
+_CONFIRMED_ON_OPEN = (
+    "FROM meme_live_orders o JOIN meme_live_positions p ON p.proposal_id = o.proposal_id "
+    "WHERE o.side = 'sell' AND o.status = 'confirmed' AND p.status = 'open' "
+)
+_CONFIRMED_SELLS = text(
+    "SELECT o.id, o.proposal_id, p.id AS position_id, o.tx_signature, o.intent, o.fill "
+    + _CONFIRMED_ON_OPEN
+    + "AND o.proposal_id = :p ORDER BY o.attempt"
+)
+_WITH_CONFIRMED_SELL = text("SELECT DISTINCT p.id " + _CONFIRMED_ON_OPEN)
 _POSITION_COLUMNS = (
     "SELECT id, proposal_id, mint, entry_at, tokens, sol_spent_lamports, initial_risk_sol, "
     "       params, mark_sol, high_water_sol, exit_intent, sell_requested_at, "
@@ -141,6 +167,27 @@ def _position(r: Any) -> OpenPosition:
 
 async def open_positions(session: AsyncSession) -> list[OpenPosition]:
     return [_position(r) for r in (await session.execute(_OPEN_POSITIONS)).mappings()]
+
+
+async def confirmed_sells(session: AsyncSession, proposal_id: str) -> list[ConfirmedSell]:
+    """T4.90b: this proposal's confirmed sells while its position is still open, oldest first."""
+    rows = await session.execute(_CONFIRMED_SELLS, {"p": proposal_id})
+    return [
+        ConfirmedSell(
+            order_id=str(r["id"]),
+            proposal_id=str(r["proposal_id"]),
+            position_id=str(r["position_id"]),
+            tx_signature=r["tx_signature"],
+            intent=dict(r["intent"] or {}),
+            fill=r["fill"],
+        )
+        for r in rows.mappings()
+    ]
+
+
+async def positions_with_confirmed_sell(session: AsyncSession) -> list[str]:
+    """T4.90b: every open position that a confirmed sell already emptied."""
+    return [str(pid) for pid in (await session.execute(_WITH_CONFIRMED_SELL)).scalars()]
 
 
 async def recent_losses(

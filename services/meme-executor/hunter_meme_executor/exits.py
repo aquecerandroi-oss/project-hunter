@@ -58,7 +58,7 @@ from hunter_meme_executor.exit_common import (
     pending_sell_retry,
     sell_slippage_bps,
 )
-from hunter_meme_executor.exit_settle import close_from_fill, no_tokens_on_chain, reconcile_sell
+from hunter_meme_executor.exit_settle import close_from_fill, no_tokens_on_chain, settle_latest
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.pumpswap_exit import handle_migrated_position
 from hunter_meme_executor.repo import (
@@ -215,9 +215,8 @@ async def route_exit(
         return
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         latest = await latest_sell_order(session, position.proposal_id)
-    if latest is not None and latest.status in ("admitted", "simulated", "submitted_unconfirmed"):
-        await reconcile_sell(ctx, position, latest.client_order_id, latest.id)
-        return
+    if latest is not None and await settle_latest(ctx, position, latest, reason, now):
+        return  # T4.90b: pending ⇒ reconciled by its venue; confirmed ⇒ closed, never resold
     if latest is not None and not _retry_due(position, now):
         return
     attempt = 1 if latest is None else latest.attempt + 1
