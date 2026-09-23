@@ -57,6 +57,14 @@ updated: 2026-09-23
 - **H-009** — giro rápido na oscilação (ideia do Everton): vender o repique e recomprar a queda, com 2,23 % de custo por giro.
 - **T4.88** — a escada de saída: no `AIRAA` a primeira tentativa a 5 % **falhou** e os 6,4 s até a segunda tentativa custaram a maior parte da perda.
 
+## Perda da noite — `SIMFTR` (19:05 BRT, −0,0284 SOL, −40,2 %)
+
+- **Entrada:** 75 compras × 43 vendas no minuto, 74 compradores únicos, fluxo +3,9 SOL/min, curva 30,9 %, dono com 4,0 %, 1 sniper — tudo dentro da porta.
+- **O que aconteceu:** 18 s depois, **73 carteiras distintas venderam no mesmo bloco** (slot 449833635), o criador entre elas; o preço caiu 44 % num bloco. As 75 carteiras tinham comprado **aos pingos durante 80 s** antes — o fluxo que a porta leu como demanda **era a própria rede do golpe**.
+- **A saída fez o que podia:** decidiu 15 ms depois de ver a venda do criador e vendeu na primeira tentativa; não havia bloco antes do despejo. **Perda de entrada, não de saída.**
+- **Padrão:** o mesmo aparece em `CITIZEN` (154 vendedores num slot, −80 %), `WAVECOREE` (76, −51 %) e `RHOS` (262, −25 %) — 4 das 14 piores do histórico.
+- **Em medição:** [[Fila de Hipoteses|H-014]] (rede financiadora comum das compradoras antes da decisão, via Helius) — R76.
+
 ## Relacionado
 
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[Fila de Hipoteses]] · [[Mesa-operator-6]] · [[2026-09-12-teste-pequeno-meme-real]]
