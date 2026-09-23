@@ -138,3 +138,21 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** existe um alvo diferente de 1,15× que rende **mais +0,05 por SOL arriscado** que a regra atual, com IC 95 % (bootstrap por mint) inteiramente acima de zero e **patamar** (dois limiares vizinhos no mesmo sentido), não pico isolado
 - **refutação:** nenhum alvo da grade tem limite inferior do IC acima de +0,01 por SOL; **ou** o melhor alvo fica na borda da grade (indica extrapolação, não ótimo); **ou** o ganho desaparece ao cobrar 5 s de atraso em vez de 1,6 s
 - **status:** aberta
+
+## H-012 — Tempo máximo curto ("o que não sobe logo não sobe mais")
+
+- **origem:** mesa real de 23/09/2026 — as **4 vitórias** bateram o alvo aos **190 s, 24 s, 2 s e 29 s** de posição (três abaixo de 30 s), e a única perda (`AIRAA`) caiu aos **36 s**. Pedido do coordenador ao R74 (23/09, ~17:45 BRT), registado **antes** de correr este eixo; a fita do R72 (`.claude/state/r72/`, corte 23/09 19:31 UTC) já foi vista para a H-011, mas nenhum `max_hold` < 300 s foi simulado até este registo
+- **variável:** tempo máximo de permanência `max_hold ∈ {30, 60, 120, 300 (atual)} s`, cruzado com o alvo atual 1,15× (**linha principal**) e com o melhor alvo da grade da H-011 no R74 (linha secundária, descritiva); recuo de 10 % armado na entrada e tudo o resto congelado na regra da mesa; contraste **política × política na mesma posição** contra a regra atual (1,15× / 10 % / 300 s)
+- **população:** a mesma da H-011 no R74 — posições reais e apostas de papel resolvíveis (≥ 3 trades da fita dentro dos 300 s), uma por mint (a primeira no tempo); a elegibilidade é medida na janela de 300 s para todas as células (encurtar o tempo não muda a população); pouso = gatilho + 1,6 s, custo 2,23 % por ida e volta, sem recobrar a entrada
+- **previsão:** existe um `max_hold` < 300 s que, com o alvo 1,15×, rende **mais +0,05 por SOL arriscado** que a regra atual, com IC 95 % (bootstrap por mint, 10 000) inteiramente acima de zero e **patamar** (um vizinho da grade, que não o próprio controlo, com diferença no mesmo sentido), e sem cortar a cauda à custa de matar as vitórias (reporta-se quantas saídas por alvo da regra atual seriam cortadas)
+- **refutação:** nenhum `max_hold` da grade tem limite inferior do IC acima de +0,01 por SOL; **ou** o melhor valor fica na borda da grade (30 s ou 300 s); **ou** o ganho desaparece (D ≤ 0) ao cobrar 5 s de atraso em vez de 1,6 s
+- **status:** aberta
+
+## H-013 — Moeda em equilíbrio, não em subida (fluxo fraco + vendas ≈ compras + curva rasa)
+
+- **origem:** perda real `SHORT` 23/09/2026 17:39 BRT (−0,0134 SOL, −18,7 %): comprada com **39 compras × 36 vendas** no minuto (vendas ÷ compras 0,92), **fluxo líquido +0,4 SOL/min** e **progresso da curva 13,7 %**; o recuo de 10 % disparou **1,6 s** depois da compra, a venda saiu na primeira tentativa. As quatro vitórias do dia tinham em média 54 × 7 (≈ 0,13), fluxo +14,5 SOL/min e progresso 67 %. Everton: "manda medir essa também". O `operator/5` aceita vendas ÷ compras até **1,0** (afrouxado em 18/09); R65 e R69 testaram a variável **sozinha** sem confirmar — esta hipótese é sobre a **conjunção**, não sobre uma variável
+- **variável:** indicador `equilibrio` = (vendas ÷ compras no minuto ≥ 0,6) **e** (fluxo líquido do minuto < 2 SOL) **e** (progresso da curva < 25 %), lidos de `meme_proposals.reasons` — o que a porta **gravou no instante da decisão**, não de `meme_trades` (cópia por polling com ~44 s de atraso, R73); direção `low` (a tese é que `equilibrio = verdadeiro` é pior)
+- **população:** as posições reais e as apostas de papel dos braços com a mesma porta (`fluxo_e_holders`), com o bloco `flow` presente em `reasons`; uma por mint
+- **previsão:** decisões com `equilibrio = verdadeiro` rendem **menos −0,05 por SOL** que as demais, e concentram a fração de perdas ≥ 15 % em até 3 s de posição (saída imediata pelo recuo)
+- **refutação:** limite inferior do IC 95 % (bootstrap por mint) acima de −0,01 por SOL; **ou** menos de 20 decisões com `equilibrio = verdadeiro` (poucas demais para julgar — registrar como limite de dado); **ou** os três limiares escolhidos não formam patamar quando cada um é deslocado ±1 degrau
+- **status:** aberta
