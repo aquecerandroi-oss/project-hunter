@@ -25,7 +25,7 @@ from typing import Literal
 
 from hunter_core.execution.meme.submit_types import LANDED, ResendStats, SubmitPolicy, TxRpc
 
-__all__ = ["Settled", "poll_until_settled"]
+__all__ = ["Settled", "expired_or_landed", "poll_until_settled"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,16 +71,17 @@ def poll_until_settled(
                 # that gap. Ask once more before calling it never landed — a
                 # wrong ``failed`` is never reconciled and leaves tokens in the
                 # wallet with no position and no stop.
-                return _expired_or_landed(rpc, signature, stats)
+                return expired_or_landed(rpc, signature, stats)
             _resend(rpc, resend, stats)
             next_resend = now + interval
         sleep(policy.poll_interval_s)
 
 
-def _expired_or_landed(rpc: TxRpc, signature: str, stats: ResendStats) -> Settled:
+def expired_or_landed(rpc: TxRpc, signature: str, stats: ResendStats) -> Settled:
     """The height passed ``last_valid``: re-read the status once. Landed wins;
     an error is an error; unreadable stays ``unconfirmed`` so the reconcile
-    (which searches history) decides — never ``failed`` on a guess."""
+    (which searches history) decides — never ``failed`` on a guess. Public
+    since T4.90: ``MemeSubmitter.reconcile`` asks the same second question."""
     try:
         status = rpc.get_signature_statuses([signature])[0]
     except Exception as exc:

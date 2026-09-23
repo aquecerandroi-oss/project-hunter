@@ -23,6 +23,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import text
 
+from hunter_core.execution.meme.base58 import b58encode
 from hunter_meme_executor.entries import entries_once
 from hunter_meme_executor.exit_common import (
     ENV_EXIT_PANIC_FROM_ATTEMPT,
@@ -299,3 +300,118 @@ async def test_a_failure_found_by_the_reconciliation_is_retried_too(
     sells = await _sells(db_engine, proposal_id)
     assert len(sells) == 2 and sells[1]["status"] == "confirmed", sells
     assert sells[1]["intent"]["exit_reason"] == "sell_now"
+
+
+# --- T4.90: a sell that landed in its last valid block is a closed position ---
+
+LANDED_SIG = b58encode(b"\x07" * 64)
+
+
+async def _signed_sell(
+    db_engine: AsyncEngine, proposal_id: str, *, status: str, reason: str
+) -> None:
+    """Turn attempt 1 into a sell that was signed and sent (``last_valid`` 50,
+    below the fake chain's height of 100) and left in ``status``."""
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_orders SET status = :status, reason = :reason, "
+                "  signatures = CAST(:sigs AS jsonb), tx_signature = :sig, "
+                "  last_valid_block_height = 50, submitted_at = now() "
+                "WHERE proposal_id = :p AND side = 'sell' AND attempt = 1"
+            ),
+            {
+                "p": proposal_id,
+                "status": status,
+                "reason": reason,
+                "sigs": json.dumps([LANDED_SIG]),
+                "sig": LANDED_SIG,
+            },
+        )
+
+
+def _seen_on_the_second_look(live: Harness) -> list[str]:
+    """``getSignatureStatuses``: not visible on the first read, ``confirmed`` after."""
+    calls: list[str] = []
+
+    def statuses(signatures: list[str]) -> list[dict[str, Any] | None]:
+        calls.append("status")
+        if len(calls) == 1:
+            return [None]
+        return [{"confirmationStatus": "confirmed", "err": None} for _ in signatures]
+
+    live.rpc.get_signature_statuses = statuses  # type: ignore[method-assign]
+    return calls
+
+
+async def test_a_sell_that_landed_in_its_last_valid_block_closes_the_position(
+    live_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The reconcile read the status (``None``), then the height (past
+    ``last_valid``) and wrote ``failed`` — the transaction had landed in between.
+    Now the second look finds it: ``confirmed`` with the chain's fill, the
+    position closed, nothing sent."""
+    live, proposal_id = await _failed_first_attempt(live_harness, db_engine, db_session_factory)
+    await _signed_sell(
+        db_engine, proposal_id, status="submitted_unconfirmed", reason="confirmation_timeout"
+    )
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_positions SET sell_requested_at = now(), "
+                "sell_requested_by = 'everton' WHERE proposal_id = :p"
+            ),
+            {"p": proposal_id},
+        )
+    live.chain.tokens_on_chain = 0
+    calls = _seen_on_the_second_look(live)
+    await exits_once(live.ctx)
+    sells = await _sells(db_engine, proposal_id)
+    assert len(sells) == 1 and sells[0]["status"] == "confirmed", sells
+    assert sells[0]["fill"]["signature"] == LANDED_SIG
+    assert len(calls) == 2, "status, height, status: the second look decided"
+    position = (
+        await _rows(
+            db_engine, "SELECT * FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+        )
+    )[0]
+    assert position["status"] == "closed" and position["exit_order_id"] == sells[0]["id"]
+    assert live.rpc.sent == [], "reconciliation never sends"
+
+
+async def test_an_expired_sell_hidden_behind_a_later_failed_retry_closes_the_position(
+    live_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Attempt 1 was written ``failed:blockhash_expired_never_landed`` but had
+    landed; attempt 2 was built on a stale balance and failed. With the wallet
+    empty, the tick asks the chain about attempt 1 — not only the newest row —
+    and closes with its fill instead of ``blocked:no_tokens_on_chain``."""
+    live, proposal_id = await _failed_first_attempt(live_harness, db_engine, db_session_factory)
+    await _signed_sell(
+        db_engine, proposal_id, status="failed", reason="blockhash_expired_never_landed"
+    )
+    await _rewind_backoff(db_engine, proposal_id)
+    live.rpc.simulate_transaction = _simulate_6003  # type: ignore[method-assign]
+    await exits_once(live.ctx)
+    sells = await _sells(db_engine, proposal_id)
+    assert [s["status"] for s in sells] == ["failed", "failed"], sells
+
+    live.chain.tokens_on_chain = 0  # the balance catches up: attempt 1 sold everything
+    live.rpc.simulate_transaction = _simulate_ok  # type: ignore[method-assign]
+    await _rewind_backoff(db_engine, proposal_id)
+    await exits_once(live.ctx)
+    sells = await _sells(db_engine, proposal_id)
+    assert [s["status"] for s in sells] == ["confirmed", "failed"], sells
+    position = (
+        await _rows(
+            db_engine, "SELECT * FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+        )
+    )[0]
+    assert position["status"] == "closed" and position["exit_order_id"] == sells[0]["id"]
+    assert position["exit"]["reason"] == "sell_now"
+    assert live.rpc.sent == [], "nothing was signed or sent to settle it"
+    assert not live.ctx.state.blocked_exits

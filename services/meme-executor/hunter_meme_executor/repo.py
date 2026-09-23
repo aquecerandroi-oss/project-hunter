@@ -51,6 +51,7 @@ __all__ = [
     "TokenContext",
     "close_position",
     "count_live_buys",
+    "expired_sell_orders",
     "insert_order",
     "insert_position",
     "latest_sell_order",
@@ -147,6 +148,11 @@ _LATEST_SELL = text(
     "SELECT id, proposal_id, side, client_order_id, attempt, status, reason, intent, admission "
     "FROM meme_live_orders WHERE proposal_id = :proposal_id AND side = 'sell' "
     "ORDER BY attempt DESC LIMIT 1"
+)
+_EXPIRED_SELLS = text(  # T4.90: the only failure that can hide a sell that landed
+    "SELECT id, proposal_id, side, client_order_id, attempt, status, reason, intent, admission "
+    "FROM meme_live_orders WHERE proposal_id = :p AND side = 'sell' AND status = 'failed' "
+    "AND reason = 'blockhash_expired_never_landed' ORDER BY attempt DESC LIMIT 3"
 )
 _LATEST_SELL_SUBMITTED = text(
     "SELECT submitted_at FROM meme_live_orders WHERE proposal_id = :proposal_id AND side = 'sell' "
@@ -278,8 +284,16 @@ async def count_live_buys(session: AsyncSession) -> int:
 
 async def latest_sell_order(session: AsyncSession, proposal_id: str) -> OrderRow | None:
     r = (await session.execute(_LATEST_SELL, {"proposal_id": proposal_id})).mappings().first()
-    if r is None:
-        return None
+    return None if r is None else _order_row(r)
+
+
+async def expired_sell_orders(session: AsyncSession, proposal_id: str) -> list[OrderRow]:
+    """T4.90: sells written ``failed:blockhash_expired_never_landed``, newest first."""
+    rows = await session.execute(_EXPIRED_SELLS, {"p": proposal_id})
+    return [_order_row(r) for r in rows.mappings()]
+
+
+def _order_row(r: Any) -> OrderRow:
     return OrderRow(
         id=str(r["id"]),
         proposal_id=str(r["proposal_id"]),

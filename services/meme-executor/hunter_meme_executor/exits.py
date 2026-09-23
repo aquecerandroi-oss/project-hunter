@@ -58,7 +58,7 @@ from hunter_meme_executor.exit_common import (
     pending_sell_retry,
     sell_slippage_bps,
 )
-from hunter_meme_executor.exit_settle import close_from_fill, reconcile_sell
+from hunter_meme_executor.exit_settle import close_from_fill, no_tokens_on_chain, reconcile_sell
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.pumpswap_exit import handle_migrated_position
 from hunter_meme_executor.repo import (
@@ -250,8 +250,8 @@ async def _sell(
         )
         return
     tokens = min(position.tokens, account.amount)
-    if tokens <= 0:
-        await mark_blocked(ctx, position, reason, "reconciliation_mismatch:no_tokens_on_chain", now)
+    if tokens <= 0:  # T4.90: our own "expired" sell may have landed — ask the chain first
+        await no_tokens_on_chain(ctx, position, reason, now)
         return
     # T4.55: a sell tolerates more than a buy (5 %; 15 % on a creator dump / rug —
     # R56 §2, ``6003 TooLittleSolReceived`` at 1 %). T4.88: and, when the owner

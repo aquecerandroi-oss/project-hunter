@@ -30,6 +30,7 @@ from hunter_exchanges.pumpswap.decode import PUMPSWAP_PROGRAM_ID, WSOL_MINT
 from hunter_meme_executor.chain import PoolRead
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.exit_common import BACKOFF_S, mark_blocked
+from hunter_meme_executor.exit_settle import no_tokens_on_chain
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.pumpswap_build import (
     PumpSwapFillRecord,
@@ -108,8 +109,8 @@ async def _sell(
         )
         return
     tokens = min(position.tokens, base_account.amount)
-    if tokens <= 0:
-        await mark_blocked(ctx, position, reason, "reconciliation_mismatch:no_tokens_on_chain", now)
+    if tokens <= 0:  # T4.90: our own "expired" sell may have landed — ask the chain first
+        await no_tokens_on_chain(ctx, position, reason, now, reconcile=_reconcile)
         return
     try:
         built = build_pumpswap_sell(
@@ -197,7 +198,7 @@ async def _sell(
             )
 
 
-async def _reconcile(ctx: ExecutorContext, position: OpenPosition, key: str, order_id: str) -> None:
+async def _reconcile(ctx: ExecutorContext, position: OpenPosition, key: str, order_id: str) -> bool:
     submitter = MemeSubmitter(
         rpc=ctx.chain.rpc,
         signer=None,
@@ -214,7 +215,8 @@ async def _reconcile(ctx: ExecutorContext, position: OpenPosition, key: str, ord
         and isinstance(result.fill, PumpSwapFillRecord)
     ):
         reason = str((position.exit_intent or {}).get("reason", "reconciled"))
-        await _close(ctx, position, order_id, result.fill, reason)
+        return await _close(ctx, position, order_id, result.fill, reason)
+    return False
 
 
 async def _close(
@@ -223,7 +225,7 @@ async def _close(
     order_id: str,
     fill: PumpSwapFillRecord,
     reason: str,
-) -> None:
+) -> bool:
     payload = fill.as_json()
     payload["reason"] = reason
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
@@ -241,3 +243,4 @@ async def _close(
     if closed:
         ctx.state.exits_confirmed += 1
         ctx.state.blocked_exits.pop(position.id, None)
+    return closed

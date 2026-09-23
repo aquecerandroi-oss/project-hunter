@@ -39,7 +39,9 @@ async def test_every_statement_runs_on_the_real_schema(
         # T4.86: the widened ``_REFUSED`` predicate parses on the real schema.
         assert await mark_refused(session, NO_ROW, reason="x", now=NOW) is False
         assert await repo.open_position_by_id(session, NO_ROW) is None
-        assert await repo.enabled_market_count(session) == 35, "the 0057 seed"
+        assert await repo.enabled_market_count(session) == 38, (
+            "0057 seeds 35 enabled; 0061 (R71) enables NEAR, BTC and ORCA"
+        )
         assert (
             await repo.set_exit_pending(
                 session, NO_ROW, order_id=NO_ROW, reason="stop", attempt=1, now=NOW

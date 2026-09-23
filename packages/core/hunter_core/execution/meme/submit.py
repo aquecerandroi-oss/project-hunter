@@ -39,7 +39,7 @@ from datetime import datetime
 from typing import Any
 
 from hunter_core.execution.meme.base58 import b58encode
-from hunter_core.execution.meme.confirm import poll_until_settled
+from hunter_core.execution.meme.confirm import Settled, expired_or_landed, poll_until_settled
 from hunter_core.execution.meme.journal import (
     OrderJournal,
     OrderRecord,
@@ -171,6 +171,9 @@ class MemeSubmitter:
             sleep=self._sleep,
             monotonic=self._monotonic,
         )
+        return self._conclude(pid, signature, settled)
+
+    def _conclude(self, pid: str, signature: str, settled: Settled) -> SubmitResult:
         if settled.outcome == "landed":
             return self._settle_landed(pid, signature, settled.stats)
         if settled.outcome == "failed":
@@ -234,7 +237,12 @@ class MemeSubmitter:
                         signature,
                     )
                 if height > row.last_valid_block_height:
-                    return self._fail(proposal_id, "blockhash_expired_never_landed", signature)
+                    # T4.90: the status was read BEFORE the height — a sell that
+                    # landed in the last valid block sits in that gap. Same second
+                    # look as the confirmation loop; a wrong ``failed`` is re-sent
+                    # by T4.88's retry and leaves the position open on no tokens.
+                    settled = expired_or_landed(self._rpc, signature, ResendStats())
+                    return self._conclude(proposal_id, signature, settled)
             return self._unconfirmed(proposal_id, "not_found_yet", signature)
         if status.get("err") is not None:
             return self._fail(proposal_id, f"onchain_error:{status.get('err')}", signature)
