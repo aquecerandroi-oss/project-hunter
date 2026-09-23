@@ -45,8 +45,12 @@ def test_the_real_queue_file_loads() -> None:
     assert {h.id for h in queue} >= {"H-001", "H-002", "H-003", "H-004"}
 
 
-def test_the_seeded_hypotheses_are_the_open_ones() -> None:
-    names = " ".join(h.name for h in open_hypotheses())
+def test_the_seeded_hypotheses_are_readable() -> None:
+    """R70 (23/09/2026): rodar a fila torna ``open_hypotheses`` errado como
+    âncora — a H-003 saiu de ``aberta`` no primeiro uso real. O que este teste
+    protege é que os oito blocos existem e são legíveis, não que nunca foram
+    julgados; o estado de cada um é asserido pelo teste acima."""
+    names = " ".join(h.name for h in load_queue())
     assert "Absorção" in names  # EXP-M22
     assert "primeiros compradores" in names  # EXP-M19
     assert "1 a 4 h" in names  # R68 deixou h=240 inconclusivo

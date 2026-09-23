@@ -38,6 +38,7 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** apostas em que o preço reabsorve ≥ 60 % da venda grande em 30 s rendem mais +0,05 por SOL arriscado que as demais
 - **refutação:** limite superior do IC 95 % (bootstrap por mint) abaixo de +0,01 — abaixo disso a absorção não paga a ida-e-volta
 - **status:** aberta
+- **veredito (R70, 23/09/2026):** **aberta** — R70 (23/09) **não rodou: amostra insuficiente**. Os braços `absorb_v0/1` e `absorb_v0/2` nasceram hoje (primeira entrada 18:54 UTC) e tinham **14 apostas medidas** (10 + 4) no corte das 19:2x UTC, contra o mínimo de 20 **por lado** do moinho. Um estudo sobre 14 apostas seria ruído com relatório. Se forçado a um dos três rótulos, seria `NÃO CONFIRMA` por falta de potência — nunca refutação. Reabrir quando houver ≥ 40 medidas com pelo menos uma venda ≥ 5 %.
 
 ## H-002 — Retenção dos primeiros compradores (EXP-M19)
 
@@ -47,6 +48,7 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** decisões no tercil alto de retenção rendem mais +0,05 por SOL que o tercil baixo
 - **refutação:** limite superior do IC 95 % abaixo de +0,01. Curva em pico (e não planalto) é **não confirmação**, não refutação
 - **status:** aberta
+- **veredito (R70, 23/09/2026):** **aberta** — R70 (23/09) **não rodou: população vazia**. O braço `flow_v2/10`, que semeia a retenção dos primeiros compradores, tem **0 apostas** (`meme_rule_sets` × `meme_paper_bets`, corte 23/09 19:2x UTC). Se forçado a um dos três rótulos, seria `NÃO CONFIRMA` por população vazia. Reabrir quando o braço tiver registo.
 
 ## H-003 — Horizontes de 1 a 4 h no lado à vista
 
@@ -55,7 +57,8 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **população:** velas de 1 min dos mercados do universo U2, agregadas em barras completas; bootstrap de blocos de 3 dias, purga de `h` minutos
 - **previsão:** pelo menos uma célula rende ≥ +0,10 % líquido por operação com Holm < 0,05 ao custo medido de 0,14 %
 - **refutação:** limite superior do IC 95 % abaixo do MRE de +0,10 % em todas as células
-- **status:** aberta
+- **status:** concluída
+- **veredito (R70, 23/09/2026):** **concluída — NÃO CONFIRMA** (R70, 23/09, relatório em `.claude/state/r70/H-003.md`). 15 células (5 preditores × h ∈ {60, 120, 240}), 16 perpétuos do U2, velas 1 min `is_final` de 25/07 a 23/09, custo 0,14 % já descontado. **CONFIRMA: 0 de 15.** Menor p de permutação da família = 0,1478; **menor Holm ajustado = 1,0000** — a previsão pedia Holm < 0,05 e nenhuma célula chega perto. A refutação da fila (*IC superior abaixo do MRE em **todas** as células*) **não** foi atingida: só 5 de 15. Célula mais próxima: `P3_vol_surge` em h=120, D = **+0,25 %** líquido, IC de cluster [+0,16 %, +0,34 %], IC de blocos [+0,01 %, +0,40 %], braço selecionado lucrativo em nível (+0,16 %) e a fatia de teste repete (+0,16 %) — **cai só na permutação** (p = 0,1478). A distância entre um IC de cluster apertado e uma permutação larga é o aviso: o contraste é carregado por poucas barras extremas. **Limite do moinho, declarado:** o walk-forward de várias dobras do R68 (treino 14 d / teste 7 d, passo 7 d) e o baseline "sempre dentro" **não** foram reproduzidos — correu uma fronteira única com purga de 1 bloco de 3 dias.
 
 ## H-004 — Percentil de `sells/buys` dentro da coorte viva
 
@@ -64,7 +67,8 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **população:** decisões do Lab meme com coorte viva de ≥ 20 mints observáveis; bootstrap de blocos de 60 min
 - **previsão:** metade alta do percentil rende mais +0,05 por SOL que a metade baixa, e a curva de limiares é planalto
 - **refutação:** limite superior do IC 95 % abaixo de +0,01 na população nova. Curva em pico é **não confirmação**
-- **status:** aberta
+- **status:** concluída
+- **veredito (R70, 23/09/2026):** **concluída — NÃO CONFIRMA** (R70, 23/09, relatório em `.claude/state/r70/H-004.md`). n = 486 de 520 (34 sem a variável), 486 mints, 158 blocos de 60 min, 0 linhas recusadas pela guarda. D = **+0,1060** SOL por SOL arriscado, IC 95 % de cluster [+0,0187, +0,1948], IC de blocos [+0,0219, +0,1929], p de permutação = 0,0145 — reproduz o R69 (+0,1056, p = 0,014) sob protocolo congelado. **Cai exatamente onde a fila disse que cairia: a curva é PICO, não planalto** — de 7 limiares, **só um exclui zero** (o 0,300, que é a mediana); os vizinhos não são "zero", são **incertos**, e o D encolhe monotonamente a partir dali (+0,038 em 0,19; +0,029 em 0,38; −0,008 em 0,43), com 1 só limiar de 7 com IC acima de zero. Refutação da fila **não** atingida (IC superior +0,1948 ≫ +0,01): não sabemos, não é falso. Dinheiro da população: `-0.5138304193` SOL.
 
 ## H-005 — Piso de impulso recente (`momentum_15m ≤ 2,0`)
 
@@ -74,6 +78,7 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** decisões com `momentum_15m ≤ 2,0` rendem mais +0,10 R que as demais
 - **refutação:** limite superior do IC 95 % abaixo de +0,02 R. O efeito sumir ao estratificar por ATR% é **não confirmação**
 - **status:** aberta
+- **veredito (R70, 23/09/2026):** **aberta — pré-registo NÃO testado; o que correu é exploratório** (R70, 23/09, relatório em `.claude/state/r70/H-005.md`). A população pré-registada pede a variável **no envelope da decisão**, e `momentum_15m` não está no envelope de **nenhum** dos 7 728 sinais terminais: a população verbatim tem 0 linhas. O que se segue mediu uma **população substituta** (snapshot do minuto da decisão) com 51,7 % de censura, e por isso **não encerra** a hipótese — achado da Astra na revisão dos vereditos. **NÃO CONFIRMA no desenho executado:** n = 3 160 decisões, 240 mercados, 18 dias. D = **+0,0374 R**, IC 95 % [−0,1237, +0,1860], p de permutação = 0,5795, curva em pico. **O braço selecionado perde em nível** (−0,2592 R contra −0,2966 R do resto): "perder menos" não é vantagem. Refutação da fila **não** atingida (IC superior +0,186 ≫ +0,02): ignorância, não refutação. Na população substituta: guarda de instantes a correr (0 recusas), censura de 51,7 % (3 378 de 6 538). Para fechar: pôr `momentum_15m` no envelope imutável do sinal e voltar em ~2 semanas.
 
 ## H-006 — Desequilíbrio agressor na barra do sinal
 
@@ -82,7 +87,8 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **população:** decisões do Lab com velas de 1 min agregadas a 5 min (só barras completas); cluster por mercado, blocos de 3 dias
 - **previsão:** o tercil alto rende ≥ +0,10 % líquido por operação acima do tercil baixo, ao custo medido de 0,14 %
 - **refutação:** limite superior do IC 95 % abaixo do MRE
-- **status:** aberta
+- **status:** concluída
+- **veredito (R70, 23/09/2026):** **concluída — NÃO CONFIRMA** (R70, 23/09, relatório em `.claude/state/r70/H-006.md`). n = 7 547 decisões, 282 mercados, 7 blocos de 3 dias, 0 recusas da guarda. D = **+0,0009** (+0,09 % líquido), IC 95 % de cluster [−0,0008, +0,0025], IC de blocos [−0,0005, +0,0032], p de permutação = **0,0543**. **A célula que mais chegou perto de toda a fila** — e falha em **seis** condições ao mesmo tempo: D fica **um ponto-base abaixo** do MRE de +0,10 %, o IC inferior cobre zero, o p passa de 0,05 por três milésimos, a curva é pico, o IC de blocos cobre zero e **o braço selecionado perde em nível** (−0,23 % contra −0,32 % do resto). Refutação da fila **não** atingida (IC superior +0,0025 > +0,0010). **Desvio declarado, e é o que mais importa aqui (achado da Astra):** a fila pediu **tercil alto × tercil baixo** e o moinho só contrasta **selecionados × resto**. Eu tinha escrito que a substituição era conservadora ("menor, nunca maior") — **está errado**, e a própria tabela de tercis do relatório mostra porquê: baixo −0,46 %, **meio −0,19 %**, alto −0,23 %. O tercil do meio é o **melhor** dos três, logo pô-lo no "resto" **encolhe** o contraste: alto − baixo = **+0,23 %** (acima do MRE de +0,10 %) contra os +0,09 % de alto − resto que o moinho mediu. O contraste pré-registado **não tem IC** neste estudo — o moinho não o sabe exprimir. Portanto: `NÃO CONFIRMA` **no desenho executado**, e a hipótese **não está encerrada** no desenho que ela pediu.
 
 ## H-007 — Teto de volume relativo (exaustão)
 
@@ -91,7 +97,8 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **população:** decisões do Lab acima do piso de volume atual (4×), para o contraste ser sobre o teto e não sobre o piso
 - **previsão:** decisões com `volume_ratio_5m ≤ 12` rendem mais +0,10 R que as acima de 12, com planalto entre 8 e 16
 - **refutação:** limite superior do IC 95 % abaixo de +0,02 R. Curva em pico é **não confirmação**
-- **status:** aberta
+- **status:** concluída
+- **veredito (R70, 23/09/2026):** **concluída — REFUTA** (R70, 23/09, relatório em `.claude/state/r70/H-007.md`). n = 2 631 decisões acima do piso de 4×, 253 mercados, 0 censura. D = **−0,1114 R**, IC 95 % [−0,2465, **+0,0155**], p de permutação = 0,1523. **O limite superior do IC fica muito abaixo do MRE de +0,10 R**, e é essa a refutação que se sustenta. **Fragilidade encontrada pela Astra e confirmada:** contra a barra menor da fila (+0,02 R) o resultado depende de ruído de Monte Carlo — o **mesmo corte 12** aparece duas vezes no relatório, com IC superior **+0,0155** no contraste decisório (semente 70) e **+0,0205** na varredura (semente 70+2), lados opostos de +0,02 R. Fica dito, sem escolher o número conveniente: refutada uma vantagem de **+0,10 R**; quanto aos +0,02 R, não decide. A direção medida é o **inverso** da prevista — decisões com `volume_ratio_5m` ≤ 12 rendem −0,35 R contra −0,24 R das acima de 12 — mas o IC contém zero, logo isto **não prova inversão**, só que não há a vantagem prevista (ressalva da Astra). A curva é **ausente** (D negativo nos 5 limiares), não pico. Refutada uma vantagem **desse tamanho** para o teto em 12, não a exaustão como fenómeno. **Ressalva:** dispensa escrita da guarda — o envelope guarda `volume_ratio_5m` sem instante próprio (`source_ts` nulo); a dispensa declara que a guarda não correu, não certifica causalidade.
 
 ## H-008 — Portão de tendência de 4 h
 
@@ -101,3 +108,4 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** decisões com `return_4h > 0` rendem mais +0,10 R que as demais
 - **refutação:** limite superior do IC 95 % abaixo de +0,02 R. Fração censurada acima de 20 % invalida o estudo (população diferente), não refuta nada
 - **status:** aberta
+- **veredito (R70, 23/09/2026):** **aberta — estudo inválido pela própria regra da fila** (R70, 23/09, relatórios em `.claude/state/r70/H-008-envelope.md` e `.claude/state/r70/H-008-snapshot.md`). Na população **verbatim** — decisões com `return_4h` **presente no envelope** — há **0 linhas**: nenhum dos 7 728 sinais terminais da janela carrega `return_4h` no envelope. Corri também o desvio declarado (`return_4h` do `feature_snapshots`): n = 3 179, D = **−0,1592 R**, IC 95 % [−0,3068, −0,0246], p = 0,0001 — o portão seria **ativamente pior** que o seu complemento. **Isto NÃO é a refutação**: a censura é de 51,4 % (3 359 de 6 538) e a fila pré-registou que acima de 20 % o estudo é inválido por ser outra população. Fica `aberta`. Para fechar: pôr `return_4h` no envelope imutável do sinal (sem mudar a decisão) e voltar em ~2 semanas.
