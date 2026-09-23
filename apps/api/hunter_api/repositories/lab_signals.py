@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ColumnElement, Numeric, Text, case, cast, func, select
+from sqlalchemy import ColumnElement, func, select
 
 from hunter_api.repositories.lab_common import (
     COHORT,
@@ -20,6 +20,7 @@ from hunter_api.repositories.lab_common import (
     encode_lab_cursor,
     tracking_states_for_lab_state,
 )
+from hunter_api.repositories.lab_signals_identity import IDENTITY_KEY_TEXT
 from hunter_core.db.models.agents import AgentSignal, SignalOutcome
 from hunter_core.db.models.markets import Market
 from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState
@@ -27,67 +28,12 @@ from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["SignalRow", "SignalsPageResult", "LabSignalsRepository"]
-
-_SOURCE_BAR_CLOSE_TEXT = func.coalesce(
-    AgentSignal.supporting_features["observation_ts"].astext,
-    cast(DECISION_AT, Text),
-)
-"""T3.38a: same fallback ``services/lab_signals.py``'s ``_to_out`` applies in
-Python (``observation_ts``, else ``decision_at``) -- an SQL text expression so
-``COUNT(DISTINCT ...)`` can group by it without pulling every row home."""
-
-_EXIT_REASON_TEXT = case(
-    (SignalOutcome.tracking_state == ShadowTrackingState.NO_ENTRY, SignalOutcome.no_entry_reason),
-    (SignalOutcome.tracking_state == ShadowTrackingState.CENSORED, SignalOutcome.censored_reason),
-    else_=cast(SignalOutcome.result, Text),
-)
-"""Mirrors ``services/lab_signals.py``'s ``_exit_reason``: the specific
-no-entry/censored reason when there is one, ``result`` otherwise."""
-
-_IDENTITY_NUMERIC = Numeric(28, 10)
-"""Same scale as ``lab_signal_identity._DECIMAL_SCALE`` (``1e-10``, ten
-decimal places) -- casting through this before ``::text`` (T3.38c finding 3)
-means two numerically equal prices with a different number of trailing
-zeros (``"1.16930116"`` vs ``"1.169301160"``) render identically here, the
-same as ``Decimal.quantize`` does on the Python side."""
-
-_IDENTITY_SEP = chr(31)
-"""ASCII unit separator -- the SQL-side twin of
-``lab_signal_identity._FIELD_SEP`` (T3.38c finding 4). Was ``"|"``, which
-could not collide with the fields hashed here (none of them can contain a
-pipe) but made this expression's raw text byte-different from the Python
-hash input for no reason; ``chr(31)`` makes the two identical for a given
-row, provable directly (``test_lab_signals_identity_api.py``)."""
-
-_IDENTITY_KEY_TEXT = func.concat(
-    Market.symbol,
-    _IDENTITY_SEP,
-    _SOURCE_BAR_CLOSE_TEXT,
-    _IDENTITY_SEP,
-    cast(cast(SignalOutcome.virtual_entry, _IDENTITY_NUMERIC), Text),
-    _IDENTITY_SEP,
-    cast(cast(SignalOutcome.virtual_stop, _IDENTITY_NUMERIC), Text),
-    _IDENTITY_SEP,
-    cast(cast(SignalOutcome.exit_price, _IDENTITY_NUMERIC), Text),
-    _IDENTITY_SEP,
-    _EXIT_REASON_TEXT,
-    _IDENTITY_SEP,
-    cast(SignalOutcome.result, Text),
-)
-"""The SQL-side twin of ``lab_signal_identity.compute_identity_key`` -- same
-seven-field tuple (T3.38c finding 2 adds ``virtual_stop``), concatenated (not
-hashed: ``distinct_operations`` only needs to group rows, not reproduce the
-API's opaque ``identity_key`` string) so it can be one indexed-free aggregate
-instead of a Python fetch-and-hash of the whole filtered dataset. ``NULL``
-handling is intentionally not symmetric with the Python side's ``_NULL``
-sentinel here -- Postgres's ``concat()`` silently drops ``NULL`` arguments,
-so a ``NULL`` price shifts the remaining text rather than leaving a visible
-gap; that is fine for grouping (two rows with the same ``NULL`` pattern still
-concatenate to the same text) but is why this expression is never hashed and
-compared to the API's ``identity_key`` as anything other than the same raw
-text for the *same* row (see the finding-4 integration test, which seeds a
-row with every field populated precisely so no ``NULL`` is on the path)."""
+__all__ = [
+    "LabSignalsRepository",
+    "SignalRow",
+    "SignalsPageResult",
+    "emitted_window_filters",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +80,27 @@ class SignalsPageResult:
     page_to: int
 
 
+def emitted_window_filters(
+    *, emitted_from: datetime | None, emitted_to: datetime | None
+) -> list[ColumnElement[bool]]:
+    """T4.82: the half-open ``[emitted_from, emitted_to)`` cut, or nothing.
+
+    On ``DECISION_AT`` (``agent_signals.emitted_at``), which is the column
+    ``0014_lab_signals_indexes`` serves — the ``decision_at`` copy inside
+    ``supporting_features`` is a ``text -> timestamptz`` cast, STABLE rather
+    than IMMUTABLE, and can never be indexed (``lab_common.py``).
+
+    Both bounds absent returns an empty list, so the listing without a window
+    — totals included — is exactly the query that shipped before T4.82.
+    """
+    filters: list[ColumnElement[bool]] = []
+    if emitted_from is not None:
+        filters.append(DECISION_AT >= emitted_from)
+    if emitted_to is not None:
+        filters.append(DECISION_AT < emitted_to)
+    return filters
+
+
 class LabSignalsRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -146,6 +113,8 @@ class LabSignalsRepository:
         tracking_state: ShadowTrackingState | None,
         result: OutcomeResult | None,
         cohort: str,
+        emitted_from: datetime | None = None,
+        emitted_to: datetime | None = None,
     ) -> list[ColumnElement[bool]]:
         filters: list[ColumnElement[bool]] = [COHORT == cohort]
         if strategy_version_id is not None:
@@ -156,6 +125,11 @@ class LabSignalsRepository:
             filters.append(SignalOutcome.tracking_state == tracking_state)
         if result is not None:
             filters.append(SignalOutcome.result == result)
+        # The window belongs to the *base* filters, not to the segment ones:
+        # the tab totals must count the window the caller asked about, or the
+        # screen would show "3 sinais" over fifteen minutes next to a total
+        # taken over the market's whole history.
+        filters.extend(emitted_window_filters(emitted_from=emitted_from, emitted_to=emitted_to))
         return filters
 
     async def _count_totals(self, filters: list[ColumnElement[bool]]) -> dict[str, int]:
@@ -193,7 +167,7 @@ class LabSignalsRepository:
         sibling versions that decided on the exact same operation count once,
         not once per version.
         """
-        distinct_identity = func.count(func.distinct(_IDENTITY_KEY_TEXT))
+        distinct_identity = func.count(func.distinct(IDENTITY_KEY_TEXT))
         stmt = (
             select(
                 distinct_identity.filter(
@@ -250,6 +224,8 @@ class LabSignalsRepository:
         state: LabSignalState,
         cursor: str | None,
         page_size: int,
+        emitted_from: datetime | None = None,
+        emitted_to: datetime | None = None,
     ) -> SignalsPageResult:
         after = decode_lab_cursor(cursor)
         base_filters = self._base_filters(
@@ -258,6 +234,8 @@ class LabSignalsRepository:
             tracking_state=tracking_state,
             result=result,
             cohort=cohort,
+            emitted_from=emitted_from,
+            emitted_to=emitted_to,
         )
         totals: dict[str, Any] = await self._count_totals(base_filters)
         totals["distinct_operations"] = await self._count_distinct_operations(base_filters)

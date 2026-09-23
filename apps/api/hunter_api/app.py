@@ -40,6 +40,7 @@ from hunter_api.routers import lab_daily_goal as lab_daily_goal_router
 from hunter_api.routers import lab_replays as lab_replays_router
 from hunter_api.routers import lab_scoreboard as lab_scoreboard_router
 from hunter_api.routers import lab_strategies as lab_strategies_router
+from hunter_api.routers import market_desk as market_desk_router
 from hunter_api.routers import markets as markets_router
 from hunter_api.routers import me as me_router
 from hunter_api.routers import members as members_router
@@ -194,6 +195,7 @@ def create_app(settings: ApiSettings) -> FastAPI:
     app.include_router(workspaces_router.router)
     app.include_router(audit_router.router)
     app.include_router(markets_router.router)
+    app.include_router(market_desk_router.router)
     app.include_router(radar_router.router)
     app.include_router(opportunities_router.router)
     app.include_router(anomalies_router.router)

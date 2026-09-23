@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from fastapi import status
-from sqlalchemy import any_, bindparam, func, select
+from sqlalchemy import Select, any_, bindparam, func, select
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import aliased
 
@@ -265,6 +265,47 @@ class MarketRepository:
         return {code: count for code, count in rows}
 
 
+def build_candles_statement(
+    market_id: uuid.UUID,
+    timeframe: Timeframe,
+    *,
+    limit: int,
+    before: datetime | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> Select[tuple[Candle]]:
+    """The newest ``limit`` final candles of ``market_id`` inside the window.
+
+    ``since``/``until`` (T4.82) are a **half-open** ``[since, until)`` window,
+    so two adjacent windows never render the same bar twice. ``before`` is the
+    pre-T4.82 cursor and stays exactly what it was; it and ``until`` are both
+    upper bounds and are simply ANDed, which makes the effective cut the
+    earlier of the two without anybody having to remember a precedence rule.
+
+    Ordering is always newest-first with ``limit`` applied, and the caller
+    reverses: with a window wider than ``limit`` bars the caller gets the
+    **newest** slice of it, which is why the router caps the span
+    (``candle_window_max_span``) instead of letting the truncation pass
+    unannounced.
+
+    A module-level function rather than a method so the predicates can be
+    asserted by compiling the statement, with no database
+    (``tests/unit/test_candles_window.py``).
+    """
+    statement = select(Candle).where(
+        Candle.market_id == market_id,
+        Candle.timeframe == timeframe,
+        Candle.is_final.is_(True),
+    )
+    if since is not None:
+        statement = statement.where(Candle.open_time >= since)
+    if until is not None:
+        statement = statement.where(Candle.open_time < until)
+    if before is not None:
+        statement = statement.where(Candle.open_time < before)
+    return statement.order_by(Candle.open_time.desc()).limit(limit)
+
+
 class CandleRepository:
     """``candles`` — ``is_final = true`` only (DATABASE.md §4 anti-look-ahead)."""
 
@@ -278,17 +319,14 @@ class CandleRepository:
         *,
         limit: int,
         before: datetime | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> Sequence[Candle]:
-        """The ``limit`` most recent final candles strictly before ``before``
-        (or the newest ``limit`` overall), returned oldest-first — chart order.
+        """The ``limit`` most recent final candles inside the window, returned
+        oldest-first — chart order. See :func:`build_candles_statement`.
         """
-        statement = select(Candle).where(
-            Candle.market_id == market_id,
-            Candle.timeframe == timeframe,
-            Candle.is_final.is_(True),
+        statement = build_candles_statement(
+            market_id, timeframe, limit=limit, before=before, since=since, until=until
         )
-        if before is not None:
-            statement = statement.where(Candle.open_time < before)
-        statement = statement.order_by(Candle.open_time.desc()).limit(limit)
         rows = (await self.session.execute(statement)).scalars().all()
         return list(reversed(rows))

@@ -11,7 +11,7 @@ leitura para tenants."
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -24,7 +24,9 @@ from hunter_api.repositories.markets import CandleRepository, MarketRepository
 from hunter_api.schemas.markets import CandleOut, MarketDetailOut, MarketListPage
 from hunter_api.services.market_shards import summarize_collectors
 from hunter_api.services.markets import build_market_detail, build_market_list_page
+from hunter_api.time_window import check_window
 from hunter_core.domain.enums import MarketType, Timeframe
+from hunter_core.domain.market import timeframe_seconds
 from hunter_core.domain.types import ensure_utc, utcnow
 
 if TYPE_CHECKING:
@@ -115,6 +117,24 @@ async def get_market(
     )
 
 
+def candle_window_max_span(timeframe: Timeframe) -> timedelta:
+    """The widest ``[since, until)`` this route answers: ``MAX_CANDLES_LIMIT``
+    bars **of the requested timeframe** (T4.82).
+
+    Expressed in bars rather than in days because a fixed number of days means
+    something different at ``1m`` (1 440 bars) and at ``1d`` (1 bar). This is
+    exactly the span one call can return in full, so a window past it is
+    refused (422, ``time-window-too-wide``) instead of silently answering its
+    newest slice — the confluence screen draws what it is given, and a
+    truncation it cannot see would become a period it believes it holds.
+
+    Note the *other*, older bound is still the caller's own ``limit``: asking
+    for a 1 500-bar window with ``limit=500`` returns the newest 500 of it, as
+    it always has. The cap is the server's bound; ``limit`` is the caller's.
+    """
+    return timedelta(seconds=timeframe_seconds(timeframe) * MAX_CANDLES_LIMIT)
+
+
 @router.get(
     "/{exchange}/{symbol}/candles", response_model=list[CandleOut], summary="Read final candles"
 )
@@ -125,11 +145,19 @@ async def get_candles(
     timeframe: Timeframe = Timeframe.M1,
     limit: Annotated[int, Query(ge=1, le=MAX_CANDLES_LIMIT)] = DEFAULT_CANDLES_LIMIT,
     before: UtcDatetime | None = None,
+    since: UtcDatetime | None = None,
+    until: UtcDatetime | None = None,
 ) -> list[CandleOut]:
+    """T4.82 adds the optional half-open window ``[since, until)``; every
+    pre-existing parameter keeps its meaning, and a call with neither bound is
+    byte-for-byte the query that shipped before. ``before`` (the cursor) and
+    ``until`` are both upper bounds and are ANDed, so the earlier one wins
+    without a precedence rule. Still ``is_final = true`` only."""
+    check_window(since=since, until=until, now=utcnow(), max_span=candle_window_max_span(timeframe))
     market = await MarketRepository(session).get_market(exchange, symbol)
     if market is None:
         raise MarketNotFoundError
     candles = await CandleRepository(session).list_candles(
-        market.id, timeframe, limit=limit, before=before
+        market.id, timeframe, limit=limit, before=before, since=since, until=until
     )
     return CandleOut.from_candles(candles, timeframe)

@@ -22,9 +22,7 @@ from typing import TYPE_CHECKING
 import pytest
 from sqlalchemy import select
 
-from hunter_api.repositories.lab_signals import (
-    _IDENTITY_KEY_TEXT,  # pyright: ignore[reportPrivateUsage]
-)
+from hunter_api.repositories.lab_signals_identity import IDENTITY_KEY_TEXT
 from hunter_core.db.models.agents import AgentSignal, SignalOutcome
 from hunter_core.db.models.markets import Market
 from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState
@@ -217,14 +215,14 @@ async def test_python_identity_key_matches_the_sql_side_text_for_a_seeded_row(
     session_factory: async_sessionmaker[AsyncSession],
     make_actor: Callable[[str], Actor],
 ) -> None:
-    """T3.38c finding 4: the SQL-side ``_IDENTITY_KEY_TEXT`` expression
+    """T3.38c finding 4: the SQL-side ``IDENTITY_KEY_TEXT`` expression
     (``repositories/lab_signals.py``, backing ``distinct_operations``) and the
     Python-side ``compute_identity_key`` (backing the API's ``identity_key``
     field) must build the exact same bytes for the same row -- same field
     order (finding 2's ``stop`` included on both sides), same separator
     (``chr(31)``, finding 4), same decimal normalization (finding 3). Every
     field on this row's identity path is non-null, so Postgres's ``concat()``
-    NULL-dropping (documented on ``_IDENTITY_KEY_TEXT``) is not on the path --
+    NULL-dropping (documented on ``IDENTITY_KEY_TEXT``) is not on the path --
     this reads back the *actual* SQL text Postgres produced for the row
     rather than re-deriving it in the test, so a future edit that drifts one
     side from the other fails here.
@@ -261,7 +259,7 @@ async def test_python_identity_key_matches_the_sql_side_text_for_a_seeded_row(
 
     async with session_factory() as session:
         stmt = (
-            select(_IDENTITY_KEY_TEXT)
+            select(IDENTITY_KEY_TEXT)
             .select_from(AgentSignal)
             .join(SignalOutcome, SignalOutcome.signal_id == AgentSignal.id)
             .join(Market, Market.id == AgentSignal.market_id)

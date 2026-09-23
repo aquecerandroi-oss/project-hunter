@@ -149,7 +149,7 @@ regime anterior a este instante".
 2. **Sinais por janela.** `GET /api/v1/lab/signals` já filtra `market` por símbolo exato
    (`repositories/lab_signals.py:154`), mas **não tem recorte de tempo**. Acrescentar `emitted_from`/`emitted_to`.
    Sem isso a tela pagina o histórico inteiro do mercado para achar 15 minutos.
-3. **NOVO `GET /api/v1/markets/{exchange}/{symbol}/desk`** — a trilha da mesa `spot/1` neste símbolo. **Hoje
+3. **NOVO `GET /api/v1/orgs/{org_id}/markets/{exchange}/{symbol}/desk`** — a trilha da mesa `spot/1` neste símbolo. **Hoje
    `spot_orders`/`spot_positions`/`spot_desk_markets` não têm nenhum endpoint** (só o worker
    `services/meme-executor` os lê e escreve). Payload: `{ as_of, desk_market: {enabled, tier, kind, mint,
    round_trip_cost_pct_at_seed, note} | null, orders: [{id, signal_id, side, status, reason, admission, quote,
@@ -160,7 +160,17 @@ regime anterior a este instante".
    uma consulta pontual esconderia a posição aberta desde as 10:00. **Atenção de segurança:** estas três tabelas são
    **globais, sem `organization_id` e sem RLS** (como as `meme_live_*`); o endpoint precisa da mesma porta que o
    roteador `meme_live` já usa, e o `security-reviewer` revisa antes do merge.
-4. **NOVA tabela `market_events` + `GET /api/v1/markets/{exchange}/{symbol}/events`.**
+
+   **Emenda de 23/09/2026 (T4.82, decisão do Everton): o portão venceu o caminho.** Os dois endpoints (itens 3 e 4)
+   nasceram sob `/api/v1/orgs/{org_id}/markets/...`, e não sob `/api/v1/markets/...` como escrito acima. Motivo: o
+   portão do `meme_live` é `require_org(OrganizationRole.VIEWER)`, que **só existe se houver `{org_id}` no caminho**
+   — `get_org_context` resolve a associação a partir dele. O prefixo `/api/v1/markets` usa `PrincipalSession`, que é
+   autenticação e **não** associação: um principal sem nenhuma organização passa por ele. Como `spot_orders`,
+   `spot_positions` e `market_events` são globais e sem RLS, essa dependência declarada *é* a autorização inteira — e o
+   registro do que a mesa fez com dinheiro real não pode ficar atrás de um portão mais fraco que o do livro de memes.
+   O par (rota, portão) é asseverado em `apps/api/tests/unit/test_market_desk_guard.py`, que lê o mínimo de dentro do
+   *closure* do `require_org` e o compara com o do `meme_live`. Os itens 1 e 2 não mudaram de lugar.
+4. **NOVA tabela `market_events` + `GET /api/v1/orgs/{org_id}/markets/{exchange}/{symbol}/events`.**
    **Recomendação: tabela nova, não reusar `meme_events`.** Justificativa com cenário concreto: `meme_events.mint` é
    **FK para `meme_tokens.mint`**, e o job de casamento (`services/meme-worker/hunter_meme_worker/events_repo.py`,
    1×/min) varre por `observed_at` — **não filtra `mint IS NULL`** — e casa o evento com um `meme_token` pelo

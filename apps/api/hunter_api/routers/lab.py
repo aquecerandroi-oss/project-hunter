@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -30,6 +30,7 @@ from hunter_api.schemas.lab_versions import VersionsOut
 from hunter_api.services.lab_signals import build_signals_page
 from hunter_api.services.lab_summary import build_summary, build_version_summary, window_since
 from hunter_api.services.lab_versions import build_versions
+from hunter_api.time_window import UtcDatetime, check_window
 from hunter_core.db.session import user_session
 from hunter_core.domain.enums import (
     SHADOW_COHORT_PATTERN,
@@ -117,6 +118,14 @@ async def lab_session(
 LabSession = Annotated["AsyncSession", Depends(lab_session)]
 CohortParam = Annotated[str, Query(pattern=SHADOW_COHORT_PATTERN)]
 
+SIGNALS_WINDOW_MAX_SPAN = timedelta(days=31)
+"""The widest ``[emitted_from, emitted_to)`` this route answers in one call.
+A month covers the ``30d`` window the Lab summary already offers, so nothing
+the product asks for today needs splitting; past it the caller is told the cap
+(422) instead of receiving the newest ``page_size`` rows of a period it
+believes it holds in full. Wider histories are what the keyset cursor is
+for."""
+
 
 def resolve_as_of(as_of: datetime | None) -> datetime:
     """``utcnow()`` by default; a caller-supplied ``as_of`` must be tz-aware.
@@ -173,7 +182,18 @@ async def list_signals(
     cursor: str | None = None,
     page_size: _PageSize = 200,
     include: Annotated[list[str] | None, Query()] = None,
+    emitted_from: UtcDatetime | None = None,
+    emitted_to: UtcDatetime | None = None,
 ) -> SignalsPage:
+    """T4.82 adds the optional half-open window ``[emitted_from, emitted_to)``
+    on ``agent_signals.emitted_at``. It narrows the segment **totals** too, not
+    just the page: the confluence screen asks about fifteen minutes, and a tab
+    counting the market's whole history next to three rows would read as a
+    pager, not as a period. Neither bound given is the pre-T4.82 listing,
+    unchanged. The cap is :data:`SIGNALS_WINDOW_MAX_SPAN`."""
+    check_window(
+        since=emitted_from, until=emitted_to, now=utcnow(), max_span=SIGNALS_WINDOW_MAX_SPAN
+    )
     page = await LabSignalsRepository(session).list_page(
         strategy_version_id=strategy_version_id,
         market=market,
@@ -183,6 +203,8 @@ async def list_signals(
         state=state,
         cursor=cursor,
         page_size=page_size,
+        emitted_from=emitted_from,
+        emitted_to=emitted_to,
     )
     include_envelope = include is not None and "envelope" in include
     return build_signals_page(page, include_envelope=include_envelope)

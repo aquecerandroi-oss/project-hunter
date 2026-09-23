@@ -99,6 +99,13 @@ ROUTES: list[tuple[str, str, OrganizationRole]] = [
     ("orders.create", "POST", OrganizationRole.TRADER),
     ("orders.read", "GET", OrganizationRole.VIEWER),
     ("orders.list", "GET", OrganizationRole.VIEWER),
+    # T4.82 (`routers/market_desk.py`) — the confluence screen's two reads.
+    # Both are VIEWER, the floor ``meme_live`` declares, and that is the whole
+    # point: ``spot_orders``/``spot_positions`` (0057) and ``market_events``
+    # (0059) are global and RLS-free, so this declaration *is* the
+    # authorisation. They live under ``/orgs/{org_id}`` for no other reason.
+    ("markets.desk", "GET", OrganizationRole.VIEWER),
+    ("markets.events", "GET", OrganizationRole.VIEWER),
 ]
 
 
@@ -296,6 +303,14 @@ async def _call(
         return await client.get(
             f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/order-requests",
             headers=caller.headers,
+        )
+    if kind == "markets.desk":
+        return await client.get(
+            f"/api/v1/orgs/{org_id}/markets/binance/RBACUSDT/desk", headers=caller.headers
+        )
+    if kind == "markets.events":
+        return await client.get(
+            f"/api/v1/orgs/{org_id}/markets/binance/RBACUSDT/events", headers=caller.headers
         )
     raise AssertionError(f"unhandled route kind {kind!r}")  # pragma: no cover
 
