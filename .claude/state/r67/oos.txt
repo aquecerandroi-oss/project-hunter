@@ -1,0 +1,98 @@
+====================================================================================================
+R67 - `buys_1m <= 25` fora de amostra. Desfecho primario: ret = pnl_sol / size_sol (liquido de taxa).
+Fatia PRINCIPAL: apostas de papel flow_v2 (0,05 SOL / 3x / 1800 s / trailing 35 %), 12-21/09,
+fechadas e 'measured', sem os 76 mints do R65, UMA aposta por mint.
+====================================================================================================
+cobertura: papel elegivel 1143 | flow_v2 1069 | apos excluir mints do R65 971 | apos dedup por mint 473
+distribuicao de buys_1m na fatia principal: p10=13 p25=20 mediana=31 p75=57 p90=97
+fracao com buys_1m <= 25: 37.2 %
+
+--- 1. TESTE PRIMARIO CONGELADO (corte 25, fatia principal) ---
+fatia principal: n=473 mints=473 dias=10  ret medio -0.0225  mediano -0.0601  hit15 29.8%  hold med 82s
+  corte 25 (ret liquido)       n= 176/ 297  media -0.0000 / -0.0358  D=+0.0358  IC95[-0.0575,+0.1355] P(D<=0)=0.232  p=0.4273
+
+--- 2. Baldes por tercis (descritivo; hit15 = high_water_x >= 1,15, descritivo) ---
+  baldes de buys_1m (tercis 23 / 43):
+    -23          n= 159  hit15  30.2%  ret medio +0.0068  mediano -0.0610  hold med 99s
+    23-43        n= 157  hit15  24.2%  ret medio -0.0217  mediano -0.0588  hold med 79s
+    43-inf       n= 157  hit15  35.0%  ret medio -0.0530  mediano -0.0601  hold med 75s
+
+--- 3. Curva de limiares: planalto ou pico? ---
+  varredura de limiares fixos (D = media<=X menos media>X, ret liquido por SOL):
+    <=10   n=  10/ 463  (amostra insuficiente)
+    <=15   n=  67/ 406  D=+0.1550  IC95[+0.0040,+0.3305]  P(D<=0)=0.022
+    <=20   n= 125/ 348  D=+0.0779  IC95[-0.0269,+0.1946]  P(D<=0)=0.075
+    <=25   n= 176/ 297  D=+0.0358  IC95[-0.0553,+0.1324]  P(D<=0)=0.235
+    <=30   n= 236/ 237  D=+0.0390  IC95[-0.0479,+0.1285]  P(D<=0)=0.193
+    <=40   n= 298/ 175  D=+0.0331  IC95[-0.0506,+0.1191]  P(D<=0)=0.223
+    <=60   n= 362/ 111  D=-0.0037  IC95[-0.1044,+0.0932]  P(D<=0)=0.529
+    <=80   n= 413/  60  D=+0.0843  IC95[-0.0297,+0.1920]  P(D<=0)=0.073
+  percentil movel de 3 dias (corte do dia = percentil das decisoes dos 3 dias ANTERIORES):
+    P30  cortes [21, 22, 24, 25]  n= 149/ 281  D=+0.0278
+    P40  cortes [26, 28, 30]  n= 191/ 239  D=+0.0181
+    P50  cortes [28, 29, 31, 32, 35]  n= 228/ 202  D=+0.0105
+    P60  cortes [32, 34, 36, 37, 41, 43]  n= 263/ 167  D=+0.0082
+
+--- 4. Confundimento: estratificar (nao ajustar) ---
+    idade (s)        estrato (-inf, 80]  n= 53/107  D=+0.0405
+    idade (s)        estrato (80, 138]  n= 67/ 89  D=+0.0202
+    idade (s)        estrato (138, inf]  n= 56/101  D=+0.0331
+    idade (s)        D ponderado dentro de estratos = +0.0314
+    progresso %      estrato (-inf, 39.07]  n= 77/ 81  D=+0.0666
+    progresso %      estrato (39.07, 56.48]  n= 46/112  D=+0.1101
+    progresso %      estrato (56.48, inf]  n= 53/104  D=-0.0568
+    progresso %      D ponderado dentro de estratos = +0.0402
+    SOL real curva   estrato (-inf, 11.26]  n= 66/ 92  D=+0.0582
+    SOL real curva   estrato (11.26, 21.28]  n= 54/104  D=+0.0717
+    SOL real curva   estrato (21.28, inf]  n= 56/101  D=-0.0101
+    SOL real curva   D ponderado dentro de estratos = +0.0400
+    compradores unicos estrato (-inf, 21]  n=150/ 16  D=+0.1035
+    compradores unicos estrato (21, 37]  n= 26/128  D=-0.1976
+    compradores unicos estrato (37, inf]  n=0/153 insuficiente
+    compradores unicos D ponderado dentro de estratos = -0.0414
+
+--- 5. Sensibilidades pre-definidas ---
+  (a) sem dedup (todas as apostas flow_v2 fora dos mints do R65; bootstrap por mint):
+  sem dedup                    n= 335/ 636  media -0.0101 / -0.0160  D=+0.0059  IC95[-0.0938,+0.1062] P(D<=0)=0.460  p=0.8518
+  (b) com os mints do R65 dentro (dedup):
+  com mints do R65             n= 202/ 317  media -0.0060 / -0.0315  D=+0.0255  IC95[-0.0634,+0.1169] P(D<=0)=0.295  p=0.5510
+  (c) leave-one-day-out (fatia principal):
+      sem 2026-09-12  n= 174/ 290  D=+0.0289
+      sem 2026-09-13  n= 164/ 275  D=+0.0079
+      sem 2026-09-14  n= 168/ 284  D=+0.0419
+      sem 2026-09-15  n= 161/ 274  D=+0.0430
+      sem 2026-09-16  n= 163/ 274  D=+0.0407
+      sem 2026-09-17  n= 143/ 222  D=+0.0520
+      sem 2026-09-18  n= 155/ 244  D=+0.0226
+      sem 2026-09-19  n= 142/ 242  D=+0.0361
+      sem 2026-09-20  n= 151/ 280  D=+0.0560
+      sem 2026-09-21  n= 163/ 288  D=+0.0326
+  (d) por dia (fatia principal):
+      2026-09-12  n=  2/  7  D=+0.3111  media<= -0.0195  media> -0.3306
+      2026-09-13  n= 12/ 22  D=+0.4133  media<= +0.3379  media> -0.0754
+      2026-09-14  n=  8/ 13  D=-0.0877  media<= -0.2419  media> -0.1542
+      2026-09-15  n= 15/ 23  D=-0.0361  media<= -0.1304  media> -0.0943
+      2026-09-16  n= 13/ 23  D=-0.0279  media<= -0.1195  media> -0.0916
+      2026-09-17  n= 33/ 75  D=-0.0035  media<= +0.0273  media> +0.0308
+      2026-09-18  n= 21/ 53  D=+0.1358  media<= +0.1040  media> -0.0318
+      2026-09-19  n= 34/ 55  D=+0.0367  media<= -0.0439  media> -0.0806
+      2026-09-20  n= 25/ 17  D=-0.2439  media<= -0.0301  media> +0.2138
+      2026-09-21  n= 13/  9  D=+0.0685  media<= +0.0450  media> -0.0234
+
+--- 6. Split temporal: ajustar em 19-20/09, testar em 21/09 ---
+  ajuste (19-20/09, n=131): D por limiar = {15: -0.0128, 20: -0.0539, 25: -0.027, 30: 0.0501, 40: 0.1055, 60: 0.0609}
+  melhor limiar no ajuste: 40 (D=+0.1055)
+  teste (21/09, n=22) melhor do ajuste <=40: n=16/6  D=+0.0856
+  teste (21/09, n=22) corte congelado 25 <=25: n=13/9  D=+0.0685
+
+--- 7. Fatias secundarias (declaradas NAO-holdout ou pequenas demais) ---
+  hype_probe_v0/2 (0,01 / 3x / 600 s): n=44 mints=44 dias=8  ret medio -0.0310  mediano -0.0379  hit15 36.4%  hold med 297s
+  hype_probe corte 25          n=  13/  31  media -0.0286 / -0.0320  D=+0.0035  IC95[-0.3540,+0.3868] P(D<=0)=0.499  p=0.9845
+  operator papel (sobra apos excluir as partilhadas com o real): n=14 mints=14 dias=5  ret medio +0.0013  mediano -0.0825  hit15 28.6%  hold med 75s
+  operator papel corte 25      n=   3/  11  media +0.4816 / -0.1297  D=+0.6113  IC95[+0.1397,+1.2520] P(D<=0)=0.000  p=-
+  REAIS 16-18/09 (NAO e holdout: entraram nas 87 do R65): n=15 mints=15 dias=3  ret medio -0.1631  mediano -0.0915  hit15 0.0%  hold med 152s
+  reais 16-18 corte 25         n=   4/  11  media -0.1060 / -0.1838  D=+0.0778  IC95[-0.5156,+0.7965] P(D<=0)=0.414  p=-
+
+--- 8. Exclusoes (risco de selecao apontado pela Astra) ---
+  apostas 'indeterminate' com buys_1m: 33
+  buys_1m das indeterminadas: mediana 41 | <=25: 39.4 %  (na fatia principal: <=25 37.2 %)

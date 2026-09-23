@@ -1,7 +1,7 @@
 ---
-tags: [knowledge, meme, custo, rent, ata, gate, entrada, buys-1m, mesa-real, r65, m4]
+tags: [knowledge, meme, custo, rent, ata, gate, entrada, buys-1m, mesa-real, r65, r67, fora-de-amostra, m4]
 tema: 87 operações reais em 6 dias — 72 % do prejuízo é custo (e 33 % é rent de ATA parado); das 13 variáveis de decisão testadas nenhuma sobrevive à correção de múltiplas comparações, e `buys_1m` é a única pista
-fonte: .claude/state/notes-R65.md (87 posições reais 16–21/09/2026, fita reconstruída + decomposição de custo por ordem)
+fonte: .claude/state/notes-R65.md (87 posições reais 16–21/09/2026, fita reconstruída + decomposição de custo por ordem) · .claude/state/notes-R67.md (teste fora de amostra de `buys_1m`, 473 mints de papel, 23/09/2026)
 fonte_url:
 lido_em: 2026-09-22
 evidencia: medição própria — 87 posições fechadas, 174 ordens confirmadas com fill decomposto ao lamport (86 de 87 reconciliam exato), 22 868 trades de fita, 2 938 fotos de 15 s; bootstrap por cluster de mint e de dia (10 000), permutação (10 000), Benjamini-Hochberg FDR 10 %
@@ -9,7 +9,7 @@ hipotese_testavel: sim
 astra: revisto — 8 correções aceites, 1 discordância registada (ver §7 do R65)
 status: vivo
 owner: sexta-feira
-updated: 2026-09-22
+updated: 2026-09-23
 confiança: "?"
 ---
 
@@ -43,6 +43,74 @@ Mesa real de memecoins, 16–21/09/2026, VPS (leitura `SELECT`/`COPY`). `meme_li
 
 n por balde 29–35; **6 dias de um único regime**; 13 das 87 só com fotos de 15 s; a fita tem buracos e as moedas que morreram mais depressa têm menos fita (sobrevivência); o caminho "segurar" ignora os nossos trades mas ressincroniza com fotos que já contêm a nossa venda, e a ordem intra-slot é por assinatura, não por execução; os contrafactuais filtram posições e reaproveitam o PnL realizado — **não re-simulam saídas**; o corte `buys_1m` foi escolhido nestes dados entre 13 variáveis. A mesa parou 21/09 12:08 BRT por rate-limit de RPC; 22/09 não tem dados.
 
+## Como ligar (acrescentado 23/09/2026, T4.80)
+
+O interruptor do P1 existe desde a T4.80 e **nasce ausente** — nada mudou na mesa ao entregá-lo.
+É `max_buys_1m` em `meme_rule_sets.params`, um **inteiro JSON puro** (a regra "decimais são
+strings" não vale para contagens): recusa `buys_1m_above_max` quando a contagem do último minuto
+**excede** o teto (inclusivo — 25 passa, 26 recusa) e `buys_1m_unknown` quando a fita não cobriu o
+minuto (falha fechada). Vale nas duas pistas (15 s/mesa e evento), sempre com o valor do instante
+da decisão; a recusa aparece em `lab_gate_refusals` por conjunto, que é como se mede em sombra
+quantas entradas o teto bloquearia antes de ligar. Detalhe em `docs/RISK_ENGINE_MEME.md` §9.
+
+```bash
+# ensaio (não escreve nada), depois o mesmo comando com --apply
+uv run python infra/scripts/meme_rule_set.py --set-param max_buys_1m=25 \
+  --rule-set operator/5 --rule-set operator/6 --apply \
+  --reason "T4.80/R65 (KB-0147 §4): teto de compras no minuto, 3 dias em sombra"
+
+# desligar (volta a não ser critério)
+uv run python infra/scripts/meme_rule_set.py --set-param max_buys_1m=null \
+  --rule-set operator/5 --rule-set operator/6 --apply \
+  --reason "T4.80: desligar o teto de compras no minuto"
+```
+
+Ressalva que continua de pé: o corte 25 foi escolhido nestes mesmos dados (§4 e Ressalvas). A R65
+recomenda o **percentil 50 móvel de 3 dias**, não um número congelado — `max_buys_1m` é um valor
+fixo por conjunto, então quem o usar como P50 móvel tem de reescrevê-lo diariamente com o comando
+acima (e cada escrita fica em `meme_rule_set_param_history`).
+
 ## Relacionado
 
 `obsidian/11-KNOWLEDGE/KB-0146-trailing-apertado-e-rent-de-ata.md` (o rent e a grade de saídas, n = 24) · `KB-0143` · `.claude/state/notes-R64.md` · `.claude/state/notes-R62.md` · `obsidian/05-EXPERIMENTS/EXP-M21`, `EXP-M22`
+
+---
+
+## Fora de amostra (R67, 23/09/2026) — `buys_1m ≤ 25` **não se confirmou**
+
+*Secção acrescentada, não reescreve nada acima. Fonte: `.claude/state/notes-R67.md`, desenho pré-registado em `.claude/state/r67/preregistro.md`.*
+
+**O que foi testado.** O ponto 4 acima (`buys_1m ≤ 25` como a única pista de entrada) foi escolhido **dentro** das 87 operações reais, entre 13 variáveis. O R67 levou-o a uma população independente: **473 moedas** — uma aposta de papel por mint, braços `flow_v2`, 12–21/09, fechadas e `measured`, **sem nenhum dos 76 mints do R65** e sem as propostas que também viraram posição real. O desfecho é retorno líquido por SOL arriscado; o teste foi **um só, congelado antes de correr** (corte fixo 25), com bootstrap por cluster de mint e permutação estratificada por dia (10 000 cada).
+
+**Resultado.**
+
+| | `≤ 25` | `> 25` |
+|---|---|---|
+| n | 176 | 297 |
+| ret médio por SOL | **−0,0000** | **−0,0358** |
+| ret **mediano** | −0,0620 | −0,0597 |
+| apostas positivas | 36,9 % | 33,0 % |
+| tocou 1,15× de máximo | 29,5 % | 30,0 % |
+
+**D = +0,0358 · IC 95 % [−0,0575, +0,1355] · p = 0,43.** O critério pré-registado (D > 0 **e** IC todo positivo **e** p < 0,05) falha em dois dos três braços.
+
+**Por que o achado do R65 não se sustenta como parâmetro:**
+
+1. **A mediana não se move** (−0,0024, do sinal errado). A diferença de médias vem da cauda: a soma do braço `≤25` é −0,001 SOL/SOL e **sem as suas 3 maiores observações é −7,53**.
+2. **A curva de limiares é um pico, não um planalto:** `≤15` +0,155 → `≤25` +0,036 → `≤60` **−0,004** → `≤80` +0,084. Percentil móvel de 3 dias: P30 +0,028, P40 +0,018, P50 +0,011, P60 +0,008.
+3. **Ajustando só em 19–20/09 — os dias onde o 25 foi descoberto — o 25 tem sinal negativo (−0,027)** e o "melhor" limiar do ajuste é 40.
+4. **O MFE não replica.** No R65 era +28,1 % vs +8,2 % de MFE mediano; aqui, 29,5 % vs 30,0 % de apostas que tocam 1,15×.
+5. **5 de 10 dias com D negativo**; 18 apostas excluídas por `outcome_quality='indeterminate'` (3,7 % da amostra) chegam, no pior caso, para zerar o efeito (D = −0,0006).
+
+**O que sobrevive:** condicionando (por estratificação, não por regressão) em idade, progresso da curva e SOL real na curva no instante da decisão, a diferença mantém sinal e tamanho (D ponderado +0,031, +0,040 e +0,040). **`buys_1m` não é proxy dessas três.** `unique_buyers_1m` é quase colinear e não serve de controlo.
+
+**Formulação exata do veredito (acordada com a Astra):** *não confirmado*, **não** *refutado*. O IC 95 % contém o efeito estimado no R65 (+0,00573 SOL/operação ÷ 0,07 ≈ **+0,082 por SOL**) e este teste tem **~38 % de poder** para o detectar; seria preciso algo da **ordem de 1,3 mil mints** (aproximação normal, independência entre mints). E o teste mede a associação **sob a saída `flow_v2`** (0,05 SOL / 3× / 1800 s / trailing 35 %): **não confirma nem refuta benefício sob a saída real de 1,15× / 300 s**. Este holdout é de **mints**, não de período futuro — 9 dos 10 dias são os mesmos do R65, porque a mesa esteve parada em 22/09.
+
+**O que muda para nós:**
+
+- **Não ligar `max_buys_1m`** — nem 25 fixo, nem P50 móvel, nem o `≤15` que brilhou na varredura (esse vai para backlog, com pré-registo próprio e **dados futuros**).
+- A **sombra** do P1 do R65 pode continuar (é barata e o efeito não foi excluído), mas **não é candidata a promoção** com esta evidência.
+- **O P0 do R65 — recuperar o rent da ATA — continua a ser a única mudança que os dados sustentam.**
+- **Um D positivo compara dois grupos; não demonstra estratégia lucrativa.** A média do braço selecionado é −0,0000 por SOL: "menos negativo" passa no contraste e continua a não ganhar dinheiro.
+
+**O que mudaria a opinião:** ~1,3 mil mints independentes medidos **sob a política de saída real**, com D > 0 e IC 95 % inteiramente positivo; uma curva de limiares com planalto de ≥ 4 limiares; e a **mediana** a mover-se. Isso é sombra prospectiva, não mais análise retrospectiva destes mesmos dias.

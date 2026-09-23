@@ -1,0 +1,29 @@
+fatia principal n=473 (<=25: 176, >25: 297)
+mediana do ret: <=25 -0.0620 | >25 -0.0597  (diferenca de MEDIANAS -0.0024)
+as 10 maiores observacoes da fatia (ret, buys_1m, dia):
+  ret +3.757  buys_1m  13  2026-09-13  flow_v2/2
+  ret +3.670  buys_1m  28  2026-09-20  flow_v2/1
+  ret +2.357  buys_1m  17  2026-09-17  flow_v2/2
+  ret +1.907  buys_1m  67  2026-09-17  flow_v2/2
+  ret +1.440  buys_1m  32  2026-09-20  flow_v2/1
+  ret +1.411  buys_1m 109  2026-09-19  flow_v2/3
+  ret +1.409  buys_1m  14  2026-09-18  flow_v2/2
+  ret +1.403  buys_1m  12  2026-09-20  flow_v2/1
+  ret +1.341  buys_1m  72  2026-09-17  flow_v2/7
+  ret +1.334  buys_1m  21  2026-09-17  flow_v2/3
+  delas, 5 estao no balde <=25
+  soma do ret do balde <=25 = -0.001; sem as suas 3 maiores = -7.525
+
+D com aparagem simetrica das caudas (k de cada lado, sobre a fatia inteira):
+  k=0   n= 176/ 297  D=+0.0358  IC95[-0.0575,+0.1313]  P(D<=0)=0.233  p=0.4390
+  k=1   n= 174/ 297  D=+0.0195  IC95[-0.0661,+0.1067]  P(D<=0)=0.333  p=0.6454
+  k=2   n= 173/ 296  D=+0.0371  IC95[-0.0431,+0.1206]  P(D<=0)=0.188  p=0.3453
+  k=3   n= 172/ 295  D=+0.0205  IC95[-0.0571,+0.0987]  P(D<=0)=0.306  p=0.5771
+  k=5   n= 171/ 292  D=+0.0344  IC95[-0.0391,+0.1090]  P(D<=0)=0.189  p=0.3409
+  k=10  n= 166/ 287  D=+0.0208  IC95[-0.0466,+0.0899]  P(D<=0)=0.277  p=0.5366
+
+desfecho binario (descritivo): fracao de apostas com ret > 0
+  <=25   36.9 %  (n=176)
+  >25    33.0 %  (n=297)
+  p de permutacao sobre 'ret>0' = 0.4085
+hit15 (descritivo, depende da politica de saida): <=25 29.5 % | >25 30.0 %
