@@ -24,6 +24,7 @@ from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
 from hunter_meme_worker.lab_repo_drawdown import with_recent_drawdown
 from hunter_meme_worker.lab_rows import snapshot_from_row
 from hunter_meme_worker.proposals import SERIES_15S, GateRow
+from hunter_meme_worker.refused_probe import PROBE_RULE_SET_ID
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +51,10 @@ _FAST_ROWS = text(
     "       f.buys_60s, f.sells_60s, f.unique_buyers_60s, "
     "       f.net_sol_flow_60s, f.curve_volume_60s_sol, f.tape_reason, f.creator_net_seller, "
     "       f.dev_share, f.dev_share_reason, f.snipers, "
+    # T4.85 (EXP-M23): the row's own provenance — when it was written and
+    # where its tape window ends. Read by ``refused_probe.is_readable_at``;
+    # no gate reads them, so no judgement changes.
+    "       f.computed_at, f.tape_as_of, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
     "       t.symbol, t.mayhem_enabled, t.mayhem_state, "
     "       t.twitter, t.twitter_kind, t.twitter_post_at, t.twitter_reuse_count, "
@@ -103,9 +108,11 @@ _PEDIGREE = text(
     "             EXISTS (SELECT 1 FROM meme_features_1m pf WHERE pf.mint = o.mint "
     "                       AND pf.creator_sold = true AND pf.end_time < t.created_at)"
     "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb WHERE pb.mint = o.mint "
+    "                          AND pb.rule_set_id <> :probe_rule_set_id "
     "                          AND pb.creator_sold_seen_at IS NOT NULL "
     "                          AND pb.creator_sold_seen_at < t.created_at)"
     "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb2 WHERE pb2.mint = o.mint "
+    "                          AND pb2.rule_set_id <> :probe_rule_set_id "
     "                          AND pb2.exit ->> 'reason' = 'creator_dump' "
     "                          AND pb2.exit_at < t.created_at)"
     "           )"
@@ -190,6 +197,8 @@ async def load_fast_gate_rows(
                 holders_rising=r["holders_rising"],
                 holders_reason=r["holders_reason"],
                 progress_rising=r["progress_rising"],
+                computed_at=r["computed_at"],
+                tape_as_of=r["tape_as_of"],
                 series=SERIES_15S,
                 initial_real_token_reserves=r["initial_real_token_reserves"],
                 symbol=None if r["symbol"] is None else str(r["symbol"]),
@@ -231,6 +240,14 @@ async def pedigree_for(
         "creator_window_s": gate.creator_window_s,
         "symbol_window_s": gate.symbol_window_s,
         "prior_window_s": PRIOR_WINDOW_S,
+        # T4.85 (EXP-M23): the probe's own paper bets are evidence the desk
+        # would never have had — it follows coins the desk REFUSED, so its
+        # bets make the creator watcher stamp ``creator_sold_seen_at`` on
+        # mints nobody was watching. Counting them here would let the
+        # experiment change the real desk's ``creator_repeat_dumper``
+        # refusals. Excluded by id, so the desk reads exactly what it read
+        # before this arm existed.
+        "probe_rule_set_id": PROBE_RULE_SET_ID,
     }
     try:
         async with session.begin_nested():

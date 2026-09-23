@@ -91,7 +91,12 @@ _gate_from_params = gate_from_params
 """The name every migration docstring and ``test_event_state`` cite (T4.66 moved
 the body to :mod:`hunter_meme_worker.lab_gate_params` for the budget)."""
 
-CLOCKS: tuple[str, ...] = ("1m", "15s")
+CLOCKS: tuple[str, ...] = ("1m", "15s", "refused")
+"""T4.85 (EXP-M23): ``refused`` is ``refused_probe_v0/1``'s own clock —
+a set no gate step selects (``lab._gate_step`` takes ``1m``,
+``lab_fast.fast_gate_step`` and ``event_gate_caches`` take ``15s``), still
+loaded by ``lab_repo.load_active_rule_sets`` so its fills, marks and exits
+are the Lab's own. Its population is what the desk REFUSED, not a series."""
 """``params.clock``: the series a set's gate reads — the closed minute
 (``meme_features_1m``, the default and every set frozen before T4.16) or the
 15-second series of the young mints (``meme_features_15s``). One clock per
@@ -144,7 +149,8 @@ class RuleSetSpec:
     dead_stale_s: int = DEFAULT_DEAD_STALE_S
     dead_mark_pct: Decimal = DEFAULT_DEAD_MARK_PCT
     clock: str = "1m"
-    """T4.16: ``1m`` | ``15s`` (:data:`CLOCKS`) — which series this set's gate reads."""
+    """T4.16: ``1m`` | ``15s`` | ``refused`` (:data:`CLOCKS`) — which series
+    this set's gate reads (``refused`` reads none: T4.85's own lane)."""
     pedigree_exclusions: bool = True
     """T4.16 (EXP-M6): the cross-cutting pedigree refusals apply to this set;
     ``false`` is the falsification arm's word, never the default."""

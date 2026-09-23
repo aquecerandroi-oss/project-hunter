@@ -73,6 +73,12 @@ def heartbeat_fields(state: LabState, *, enabled: bool = True) -> dict[str, str]
         # T4.43: the per-mint refusal trail, since boot.
         "refusal_trail_rows": str(state.trail.rows_total),
         "refusal_trail_capped": str(state.trail.capped_total),
+        # T4.85 (EXP-M23): the refused probe, since boot — the two numbers the
+        # pre-registration's first refutation rule is written in terms of
+        # ("abandonar se o braço produzir < 20 mints medidos/dia").
+        "refused_probe_considered": str(state.probe.considered_total),
+        "refused_probe_proposals": str(state.probe.proposals_total),
+        "refused_probe_unquotable": str(state.probe.unquotable_total),
     }
     return {HEARTBEAT_PREFIX + key: str(value) for key, value in fields.items()}
 

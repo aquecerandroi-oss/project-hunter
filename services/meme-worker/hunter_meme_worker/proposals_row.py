@@ -117,6 +117,16 @@ class GateRow:
     filled by the event lane only (``event_gate_rows.build_event_row``); the
     15-second and closed-minute rows leave them ``None`` — ``*_unknown`` for a
     set that asks, fail closed."""
+    computed_at: datetime | None = None
+    """T4.85 (EXP-M23): ``meme_features_15s.computed_at`` — when the row was
+    written, which is not when it claims to describe. The anti-look-ahead
+    guard of ``refused_probe.is_readable_at`` refuses a row written after
+    the tick even when its ``as_of`` is inside the window (R69's own trap);
+    ``None`` on a closed-minute row, which that guard reads as "unreadable"."""
+    tape_as_of: datetime | None = None
+    """T4.85 (EXP-M23): ``meme_features_15s.tape_as_of`` (``0032``) — the end
+    of the tape window folded into the row. ``tape_as_of > as_of`` is tape
+    from the future of its own row and is refused; ``None`` is no tape."""
     absorb: AbsorbFeatures | None = None
     """T4.79 (EXP-M22): :class:`hunter_meme_worker.absorb.AbsorbFeatures`, filled
     by the event lane only; ``None`` elsewhere — ``absorb_unknown`` for a set

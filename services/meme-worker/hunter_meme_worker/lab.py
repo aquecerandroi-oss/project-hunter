@@ -63,6 +63,7 @@ from hunter_meme_worker.lab_scale_step import scale_step
 from hunter_meme_worker.lab_ticks import record_tick
 from hunter_meme_worker.lab_trail import RefusalTrailState
 from hunter_meme_worker.proposals import evaluate_gate
+from hunter_meme_worker.refused_probe_step import RefusedProbeState
 
 __all__ = [
     "HEARTBEAT_PREFIX",
@@ -127,6 +128,9 @@ class LabState:
     never the cadence assumed)."""
     bets_indeterminate_total: int | None = None
     trail: RefusalTrailState = field(default_factory=RefusalTrailState)
+    probe: RefusedProbeState = field(default_factory=RefusedProbeState)
+    """T4.85 (EXP-M23): which refused mints the probe has already decided
+    the lottery for — so a mint gets one draw, not one every 15 s."""
 
     def record_fill_delay(self, seconds: int) -> None:
         self.fill_delays.append(seconds)

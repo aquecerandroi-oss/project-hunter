@@ -22,7 +22,24 @@ gate reads a single criterion (an open position, not a judgement), so an
 open bet re-evaluated every tick would not teach "why not" and would drown
 the cap in a name that is not a gate refusal at all. All the candidates of
 the tick — every set, every row — are written once, capped, at the end
-(``lab_trail.write_refusal_trail``)."""
+(``lab_trail.write_refusal_trail``).
+
+**T4.85 (EXP-M23) — the refused probe rides on the same loop.** The same
+per-row ``evaluate_gate`` that feeds the trail also feeds
+``refused_probe_step``: for an ``operator`` set, every refusal **by a
+criterion** becomes an opportunity, and the mints any arm admitted this
+instant are collected beside them, **with the instant** (an admission that
+came later than a refusal cannot cancel it — that would be look-ahead, and
+it would make the population depend on how the backlog was batched). Both
+are known here and nowhere else, so the probe costs the tick one bounded
+read and, on the rare tick that draws a mint, one insert per draw.
+
+``_probe_step`` runs in its **own** transaction, opened after the desk's has
+committed, and swallows its own failure: ``role_session`` is one
+transaction, so a statement timeout inside the desk's block would have
+rolled the desk's own proposals back. The arm is ``research_only`` and its
+paper bets are subtracted from the desk's pedigree read
+(``lab_repo_fast._PEDIGREE``), so nothing on a money path changes."""
 
 from __future__ import annotations
 
@@ -31,6 +48,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
+from hunter_core.logging import get_logger
 from hunter_meme_worker.event_gate_caches import refresh_event_gate_caches
 from hunter_meme_worker.gate_refusal_trail import (
     RefusalTrailRow,
@@ -48,13 +66,24 @@ from hunter_meme_worker.proposals import (
     entry_features_of,
     evaluate_gate,
 )
+from hunter_meme_worker.refused_probe import RefusedRow
+from hunter_meme_worker.refused_probe_step import (
+    probe_spec_of,
+    refused_row_of,
+    run_refused_probe,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from datetime import datetime
 
+    from hunter_indicators.meme.pedigree import PedigreeFeatures
+    from hunter_indicators.meme.pedigree_e2b import E2bFeatures
     from hunter_meme_worker.lab import LabContext
     from hunter_meme_worker.lab_models import RuleSetSpec
     from hunter_meme_worker.proposals import ProposalDraft
+
+logger = get_logger(__name__)
 
 WORKER_ROLE = "hunter_worker"
 
@@ -76,6 +105,44 @@ def _trail_row(spec: RuleSetSpec, row: GateRow, refusals: Counter[str]) -> Refus
     return replace(trail, value=value, limit=limit)
 
 
+async def _probe_step(
+    ctx: LabContext,
+    specs: list[RuleSetSpec],
+    *,
+    rows: list[GateRow],
+    refused: list[RefusedRow],
+    admitted: dict[str, datetime],
+    now: datetime,
+    pedigree: Mapping[str, PedigreeFeatures] | None,
+    e2b: Mapping[tuple[str, datetime], E2bFeatures] | None,
+) -> None:
+    """EXP-M23's arm, in its own transaction and with its own failure.
+
+    ``pedigree`` and ``e2b`` are the values the desk's session already read
+    for this very tick — plain dataclasses, not rows of a closed transaction —
+    so the probe's decomposition carries the same blocks the desk read without
+    a second query on the fast lane."""
+    spec = probe_spec_of(specs)
+    if spec is None or not refused:
+        return
+    try:
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            await run_refused_probe(
+                session,
+                ctx.state.probe,
+                spec,
+                rows=rows,
+                refused=refused,
+                admitted=admitted,
+                now=now,
+                ttl_s=ctx.config.lab_proposal_ttl_s,
+                pedigree=pedigree,
+                e2b=e2b,
+            )
+    except Exception as exc:
+        logger.warning("meme_refused_probe_failed", error=type(exc).__name__, detail=str(exc))
+
+
 async def fast_gate_step(
     ctx: LabContext,
     specs: list[RuleSetSpec],
@@ -91,6 +158,11 @@ async def fast_gate_step(
     rows_total = proposals_total = 0
     trail_candidates: list[RefusalTrailRow] = []
     open_mints_by_spec: dict[str, frozenset[str]] = {}
+    # T4.85 (EXP-M23): what the desk's gate refused this tick, and who any arm
+    # admitted — the two halves of the probe's population, both already known
+    # here and nowhere else.
+    refused_rows: list[RefusedRow] = []
+    admitted: dict[str, datetime] = {}
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         rows = await load_fast_gate_rows(
             session, since=since, until=now, features_version=ctx.config.features_15s_version
@@ -121,6 +193,14 @@ async def fast_gate_step(
                 candidate = _trail_row(spec, row, outcome.refusals)
                 if candidate is not None:
                     trail_candidates.append(candidate)
+                if spec.kind == "operator":
+                    refused = refused_row_of(spec, row, outcome.refusals)
+                    if refused is not None:
+                        refused_rows.append(refused)
+            for draft in drafts:  # the earliest instant any arm took this mint
+                at = draft.features_end_time
+                if admitted.get(draft.mint, at) >= at:
+                    admitted[draft.mint] = at
             refusals.setdefault(spec.name, Counter()).update(spec_refusals)
             rows_total += len(rows)
             ttl = ctx.config.lab_proposal_ttl_s if spec.ttl_s is None else spec.ttl_s
@@ -133,6 +213,24 @@ async def fast_gate_step(
             )
             proposals_total += inserted
         await write_refusal_trail(session, ctx.state.trail, trail_candidates)
+    # T4.85 (EXP-M23), after Astra's review of 23/09/2026: the probe runs in
+    # its **own** transaction, opened after the desk's has committed, and its
+    # failure is contained here. ``role_session`` is one transaction
+    # (``hunter_core.db.session``), so a statement timeout on the probe's read
+    # inside the block above would have rolled back ``operator/5`` and
+    # ``operator/6``'s proposals of this tick — an experiment undoing the
+    # desk's work. It never runs before the real inserts are durable, and a
+    # raise here costs the tick nothing.
+    await _probe_step(
+        ctx,
+        specs,
+        rows=rows,
+        refused=refused_rows,
+        admitted=admitted,
+        now=now,
+        pedigree=pedigree,
+        e2b=e2b,
+    )
     if ctx.caches is not None:
         refresh_event_gate_caches(
             ctx.caches,
