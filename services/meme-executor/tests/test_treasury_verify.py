@@ -3,7 +3,12 @@ unsigned transaction Jupiter built for this wallet's public key (18/09/2026,
 ``fixtures/jupiter_swap_usdc_to_sol_real.json``; nothing was signed or sent)
 and against hostile variants of it, each refused by name.
 
-Pure: no network, no database, no signer."""
+Pure: no network, no database, no signer. The capture reaches its
+``CreateIdempotent`` mint through an address lookup table (account index 18),
+so since T4.83 every call hands the verifier the **resolved** key list the
+caller would have read from the chain (``_keys``); the table's own contents
+were never captured, so the snapshot is synthetic with WSOL at slot 11 —
+``test_treasury_verify_alt.py`` is where the resolution itself is pinned."""
 
 from __future__ import annotations
 
@@ -26,6 +31,7 @@ from hunter_exchanges.pumpfun.solana_codec import (
     associated_token_address,
     u64_le,
 )
+from hunter_meme_executor.spot_alt import LookupTable, resolved_account_keys
 from hunter_meme_executor.treasury_rules import JUP_PROGRAM_ID, USDC_MINT, TreasurySwapRefused
 from hunter_meme_executor.treasury_verify import (
     MAX_PRIORITY_FEE_LAMPORTS,
@@ -34,6 +40,8 @@ from hunter_meme_executor.treasury_verify import (
     SwapIntent,
     verify_swap_transaction,
 )
+
+from .spot_tx_fixtures import filler, table_addresses
 
 pytestmark = pytest.mark.unit
 
@@ -46,12 +54,23 @@ INTENT = SwapIntent(
     wallet=WALLET, usdc_atoms=1_000_000, min_quoted_out_lamports=9_487_602, max_slippage_bps=50
 )
 ROUTE_IX = 3  # position of the JUP6 instruction in the real capture
+MINT_SLOT = 11  # the table slot the ``CreateIdempotent`` mint (index 18) resolves to
 _TAIL = struct.Struct("<QQHB")
 
 
 def _real_message() -> VersionedMessage:
     payload = json.loads((FIXTURES / "jupiter_swap_usdc_to_sol_real.json").read_text("utf-8"))
     return decode_versioned_transaction(base64.b64decode(payload["swapTransaction"])).message
+
+
+def _keys(message: VersionedMessage) -> tuple[str, ...]:
+    """The resolved account keys of ``message`` — what ``treasury_send`` reads
+    from the chain before verifying (T4.83)."""
+    if not message.address_table_lookups:
+        return message.static_account_keys
+    address = message.address_table_lookups[0].account_key
+    table = LookupTable(address, table_addresses(256, {MINT_SLOT: WSOL}))
+    return resolved_account_keys(message, {address: table})
 
 
 def _with(message: VersionedMessage, index: int, **fields: object) -> VersionedMessage:
@@ -70,7 +89,7 @@ def _retail(data: bytes, *, in_amount: int, out: int, slippage: int, fee: int = 
 
 def _refused(message: VersionedMessage, intent: SwapIntent = INTENT) -> str:
     with pytest.raises(TreasurySwapRefused) as excinfo:
-        verify_swap_transaction(message, intent=intent)
+        verify_swap_transaction(message, intent=intent, account_keys=_keys(message))
     return excinfo.value.reason
 
 
@@ -79,7 +98,7 @@ def test_the_real_jupiter_transaction_verifies_and_is_decoded_by_name() -> None:
     message = _real_message()
     keys = message.static_account_keys
     assert keys[0] == WALLET and keys[1] == WSOL_ATA and keys[3] == USDC_ATA
-    verified = verify_swap_transaction(message, intent=INTENT)
+    verified = verify_swap_transaction(message, intent=INTENT, account_keys=_keys(message))
     assert verified.route_kind == "route"
     assert verified.in_amount == 1_000_000
     assert verified.quoted_out_amount == 9_487_602
@@ -256,7 +275,17 @@ def test_a_compute_budget_instruction_that_is_not_limit_or_price_is_refused() ->
 # ------------------------------------------------- shared_accounts_route
 def test_a_shared_accounts_route_is_decoded_by_its_own_layout() -> None:
     event_authority = "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
-    keys = (WALLET, JUP_PROGRAM_ID, TOKEN_PROGRAM_ID, USDC_ATA, WSOL_ATA, event_authority)
+    # T4.83: every account index must resolve, so the slots the route names
+    # beyond the six checked ones are real (inert) static keys, not gaps.
+    keys = (
+        WALLET,
+        JUP_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        USDC_ATA,
+        WSOL_ATA,
+        event_authority,
+        *(filler(index) for index in range(6, 11)),
+    )
     step = bytes((0, 100, 0, 1))  # Swap variant 0, percent 100, input 0, output 1
     data = (
         SHARED_ACCOUNTS_ROUTE_DISCRIMINATOR
@@ -276,7 +305,7 @@ def test_a_shared_accounts_route_is_decoded_by_its_own_layout() -> None:
         instructions=(route,),
         address_table_lookups=(),
     )
-    verified = verify_swap_transaction(message, intent=INTENT)
+    verified = verify_swap_transaction(message, intent=INTENT, account_keys=_keys(message))
     assert verified.route_kind == "shared_accounts_route"
     assert verified.quoted_out_amount == 9_500_000
     hostile = replace(route, account_indexes=(2, 6, 0, 3, 7, 8, 4, 9, 10, 5, 1, 5, 1))

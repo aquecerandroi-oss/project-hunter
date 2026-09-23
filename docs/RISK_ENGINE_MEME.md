@@ -1842,7 +1842,7 @@ não é um laço automático do executor.
   `too_many_lookup_tables:<n>` (8), `too_many_loaded_addresses:<n>` (128), `too_many_account_keys:<n>`
   (256). `program_via_lookup_table` **continua**: no v0 o `program_id_index` de uma instrução de topo
   tem de ser chave estática (o `sanitize` do runtime exige). A tesouraria (`treasury_verify.py`)
-  **não** foi tocada e mantém a limitação — ver a ressalva no fim desta seção.
+  passou pela mesma disciplina na T4.83 — ver o fim desta seção.
 - **Fechado na T4.73c (era a pendência que bloqueava o primeiro `--apply`; achado da Astra na
   T4.73b — `hunter_meme_executor.treasury_db`):** os três leitores da tabela
   reaproveitada não filtram por mint: `_SOL_INFLOW` soma `coalesce(sol_out_filled, sol_out_quoted)`
@@ -1877,17 +1877,49 @@ não é um laço automático do executor.
   da T4.54 (`.claude/state/review-T4.54.md`) para o par escolhido — cotação real, transação real
   não assinada com a chave pública da carteira, `simulateTransaction` com `accounts` conferindo o
   invariante — e só então uma primeira troca pequena (0,02 SOL) com `--i-know` se necessário.
-- **Ressalva aberta depois da T4.81 — a tesouraria (`treasury_verify.py`) não foi tocada.** Ela é
-  o caminho USDC → SOL já revisado e em produção, e a T4.81 não mexeu nele de propósito (o risco
-  de tocar no verificador que assina hoje é maior que o ganho, e a mesa `spot/1` é o que estava
-  parado). Consequência **conhecida**, a fechar numa tarefa própria reaproveitando `spot_alt`:
-  em `treasury_verify._create_ata` a derivação `ata == associated_token_address(...)` é pulada
-  quando o mint está atrás de ALT (`if mint is not None and ...`) — é exatamente o caso da captura
-  real, cujo mint é o índice 18. Cenário de falha: uma `/swap` adulterada faz a carteira pagar o
-  rent (~0,002 SOL) de uma ATA de outro mint que ela possui; o programa Associated Token deriva o
-  endereço on-chain, então **não** é desvio de fundos, mas é uma verificação que não verifica. O
-  resto da tesouraria (rota, origem/destino, System, Token) usa só chaves estáticas e continua
-  recusando o que não enxerga.
+- **Ressalva da T4.81 fechada na T4.83 — a tesouraria resolve as ALT igual à `spot/1`.** Os dois
+  defeitos que a revisão da T4.81 deixou anotados aqui: **(1)** `treasury_verify._route` recusava
+  `route_account_via_lookup_table` toda conta da rota que não fosse chave estática — fechado *e*
+  inerte, porque toda rota da Jupiter usa tabela (é a mesma recusa que parou a `spot/1` no primeiro
+  sinal real); **(2)** `treasury_verify._create_ata` **pulava** a derivação
+  `ata == associated_token_address(...)` quando o mint estava atrás de ALT
+  (`if mint is not None and ...`) — exatamente a captura real, cujo mint é o índice 18. Cenário:
+  qualquer mint que a tabela tivesse naquele índice era assinado sem checagem nenhuma. **Não** era
+  desvio de fundos (o programa Associated Token deriva o endereço on-chain), e a ressalva original
+  exagerou ao falar em rent (Astra, T4.83): com o par `mint`/`ATA` divergente a instrução **falha
+  na cadeia** — o que se perde é a taxa, não o rent. O defeito real era mais simples: uma
+  verificação que não podia falhar (medido: com o código anterior a captura real verificava com
+  `mint = None`).
+  **Feito na T4.83, reaproveitando `spot_alt` (nenhuma cópia, nenhum `spot_*.py` alterado):**
+  `treasury_send.attempt_swap` resolve as tabelas antes de verificar
+  (`account_keys_for(ctx.chain.rpc, decoded.message)` — um `getMultipleAccounts` em **`finalized`**,
+  em `asyncio.to_thread`, fora do laço do kill switch) e passa a lista resolvida para
+  `verify_swap_transaction(..., account_keys=...)`, que continua **puro**; a ordem é a do runtime
+  (estáticas + todos os `writable` + todos os `readonly`), a mesma de `spot_alt`. Toda conta —
+  carregada ou estática — passa pelos mesmos testes: derivação da ATA **obrigatória** (mint ou ATA
+  irresolvíveis recusam `ata_accounts_unresolved`, nunca são puladas), autoridade/origem/destino da
+  rota, `CloseAccount`/`SyncNative` na ATA WSOL própria. `route_account_via_lookup_table`
+  **deixou de existir** (uma posição inexistente vira `route_account_count`); as demais recusas da
+  tesouraria mantêm o nome, e as recusas de ALT da T4.81 passam a valer aqui também
+  (`lookup_tables_unresolved`, `account_keys_not_the_messages_own`, `account_index_out_of_range:<i>`,
+  `lookup_table_*`, `too_many_*`, `program_via_lookup_table`). Testes:
+  `test_treasury_verify_alt.py` (14, puros — inclui a regressão do defeito (2) e a mutação de
+  ordem: trocar `writable`/`readonly` em `spot_alt` quebra 26 testes da tesouraria e 37 da suíte),
+  `test_treasury_send_alt.py` (8, só fakes — tabela lida antes da simulação e da assinatura;
+  ausente, desativada, não inicializada, curta demais, dono errado ou RPC fora recusam com nada
+  assinado) e `test_treasury_verify.py` (25, atualizado: a captura real recebe a lista resolvida).
+  O caminho `pumpfun` (compra/venda na curva) **não** tem esse ponto cego: monta a própria mensagem
+  *legacy* e o desserializador recusa v0 por construção — `solana_codec.deserialize_message`
+  levanta `versioned (v0) message refused: address lookup tables hide accounts`.
+  **Limite que continua aberto, de propósito e com teste que o fixa**
+  (`test_a_consistent_ata_of_a_third_mint_is_still_accepted_by_design`): o que `_create_ata` checa é
+  a **derivação**, não uma lista de mints permitidos — uma `Create ATA` da ATA corretamente
+  derivada de um terceiro mint, em nome da própria carteira, continua passando, e aí sim a carteira
+  paga ~0,002 SOL de rent de uma conta que ela possui (recuperável fechando a conta). Restringir o
+  mint a {USDC, WSOL} seria uma regra nova (a tesouraria só troca esse par) e foi deixada para uma
+  decisão do Everton: o risco simétrico é voltar a deixar a tesouraria inerte se a Jupiter emitir
+  uma `Create ATA` de topo de outro mint numa rota futura. Enquanto isso o teto é
+  `MAX_ATA_CREATES = 3` mais o invariante de saldos pós-simulação (0,01 SOL de folga total).
 
 ## 17. Tamanho por convicção (T4.61b, corrigido na T4.61c)
 

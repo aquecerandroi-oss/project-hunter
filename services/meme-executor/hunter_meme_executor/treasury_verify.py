@@ -13,6 +13,17 @@ that WSOL ATA back to the wallet. **No System instruction**: the wrap side
 when SOL is the *input*, which the treasury never does — so System is refused
 outright, as ``docs/RISK_ENGINE_MEME.md`` §16 documents.
 
+**Address lookup tables (T4.83).** Jupiter reaches accounts — the route's, and
+the mint of that ``CreateIdempotent`` — through ALTs; the capture above has one
+table and its ATA mint is account index 18. Until T4.83 this module refused
+what it could not see (``route_account_via_lookup_table``) and, worse,
+*skipped* the ATA derivation when the mint was loaded. Now the caller
+(``treasury_send``) resolves the tables first — IO, ``spot_alt.account_keys_for``,
+one ``getMultipleAccounts`` at ``finalized`` — and hands the resolved
+``account_keys`` in; this module stays pure and checks a loaded address exactly
+like a static one. Nothing is ever skipped: the ATA derivation is mandatory and
+refuses by name when an account cannot be resolved.
+
 Discipline, mirroring ``hunter_exchanges.pumpfun.verify``:
 
 - ComputeBudget: only ``SetComputeUnitLimit``/``SetComputeUnitPrice``, once
@@ -44,6 +55,7 @@ from __future__ import annotations
 
 import hashlib
 import struct
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from hunter_exchanges.jupiter.models import WRAPPED_SOL_MINT
@@ -57,6 +69,8 @@ from hunter_exchanges.pumpfun.solana_codec import (
     associated_token_address,
     pubkey_bytes,
 )
+from hunter_meme_executor.spot_alt import account_at as _key
+from hunter_meme_executor.spot_alt import validated_account_keys
 from hunter_meme_executor.treasury_rules import JUP_PROGRAM_ID, USDC_MINT, TreasurySwapRefused
 
 __all__ = [
@@ -123,14 +137,6 @@ class _Seen:
     closes_wsol_ata: bool = False
 
 
-def _key(message: VersionedMessage, ix: VersionedCompiledInstruction, position: int) -> str | None:
-    """The static key at account slot ``position``; ``None`` when the slot is
-    missing or only reachable through a lookup table."""
-    if position >= len(ix.account_indexes):
-        return None
-    return message.program_id(ix.account_indexes[position])
-
-
 def _compute_budget(ix: VersionedCompiledInstruction, seen: _Seen) -> None:
     if ix.account_indexes:
         raise TreasurySwapRefused("compute_budget_with_accounts")
@@ -148,25 +154,27 @@ def _compute_budget(ix: VersionedCompiledInstruction, seen: _Seen) -> None:
 
 
 def _create_ata(
-    message: VersionedMessage, ix: VersionedCompiledInstruction, wallet: str, seen: _Seen
+    keys: Sequence[str], ix: VersionedCompiledInstruction, wallet: str, seen: _Seen
 ) -> None:
     if ix.data not in (b"", b"\x00", b"\x01"):
         raise TreasurySwapRefused("ata_instruction_not_create")
     if len(ix.account_indexes) != 6:
         raise TreasurySwapRefused("ata_instruction_account_count")
-    if _key(message, ix, 0) != wallet:
+    if _key(keys, ix, 0) != wallet:
         raise TreasurySwapRefused("ata_payer_not_wallet")
-    if _key(message, ix, 2) != wallet:
+    if _key(keys, ix, 2) != wallet:
         raise TreasurySwapRefused("ata_owner_not_wallet")
-    if _key(message, ix, 4) != SYSTEM_PROGRAM_ID:
+    if _key(keys, ix, 4) != SYSTEM_PROGRAM_ID:
         raise TreasurySwapRefused("ata_system_program_mismatch")
-    token_program = _key(message, ix, 5)
+    token_program = _key(keys, ix, 5)
     if token_program not in (TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID):
         raise TreasurySwapRefused("ata_token_program_mismatch")
-    mint = _key(message, ix, 3)
-    if mint is not None and _key(message, ix, 1) != associated_token_address(
-        wallet, mint, token_program=token_program
-    ):
+    mint, ata = _key(keys, ix, 3), _key(keys, ix, 1)
+    # T4.83: never skipped. The account count above already guarantees both
+    # positions exist; this refuses by name instead of trusting a ``None``.
+    if mint is None or ata is None:
+        raise TreasurySwapRefused("ata_accounts_unresolved")
+    if ata != associated_token_address(wallet, mint, token_program=token_program):
         raise TreasurySwapRefused("ata_address_mismatch")
     seen.ata_creates += 1
     if seen.ata_creates > MAX_ATA_CREATES:
@@ -174,7 +182,7 @@ def _create_ata(
 
 
 def _token(
-    message: VersionedMessage,
+    keys: Sequence[str],
     ix: VersionedCompiledInstruction,
     program: str,
     wallet: str,
@@ -187,25 +195,25 @@ def _token(
     if discriminator == 9:  # CloseAccount [account, destination, owner]
         if len(ix.data) != 1 or len(ix.account_indexes) < 3:
             raise TreasurySwapRefused("close_account_malformed")
-        if _key(message, ix, 0) != wsol_ata:
+        if _key(keys, ix, 0) != wsol_ata:
             raise TreasurySwapRefused("close_account_not_wsol_ata")
-        if _key(message, ix, 1) != wallet:
+        if _key(keys, ix, 1) != wallet:
             raise TreasurySwapRefused("close_account_destination_not_wallet")
-        if _key(message, ix, 2) != wallet:
+        if _key(keys, ix, 2) != wallet:
             raise TreasurySwapRefused("close_account_owner_not_wallet")
         if seen.closes_wsol_ata:
             raise TreasurySwapRefused("more_than_one_close_account")
         seen.closes_wsol_ata = True
         return
     if discriminator == 17:  # SyncNative [account]
-        if _key(message, ix, 0) != wsol_ata:
+        if _key(keys, ix, 0) != wsol_ata:
             raise TreasurySwapRefused("sync_native_not_wsol_ata")
         return
     if discriminator in (1, 16, 18):  # InitializeAccount / 2 / 3
-        if _key(message, ix, 0) != wsol_ata:
+        if _key(keys, ix, 0) != wsol_ata:
             raise TreasurySwapRefused("initialize_account_not_wsol_ata")
         owner_ok = (
-            _key(message, ix, 2) == wallet
+            _key(keys, ix, 2) == wallet
             if discriminator == 1
             else ix.data[1:33] == pubkey_bytes(wallet)
         )
@@ -216,7 +224,7 @@ def _token(
 
 
 def _route(
-    message: VersionedMessage,
+    keys: Sequence[str],
     ix: VersionedCompiledInstruction,
     intent: SwapIntent,
     seen: _Seen,
@@ -251,25 +259,38 @@ def _route(
     )
     if len(ix.account_indexes) <= fee_account:
         raise TreasurySwapRefused("route_account_count")
+    # T4.83: a position that does not exist is a malformed route, not an
+    # account "behind a table" — every index is resolved against ``keys``.
     for position in (authority, source, destination, third_party, fee_account):
-        if position is not None and _key(message, ix, position) is None:
-            raise TreasurySwapRefused("route_account_via_lookup_table")
-    if _key(message, ix, authority) != intent.wallet:
+        if position is not None and _key(keys, ix, position) is None:
+            raise TreasurySwapRefused("route_account_count")
+    if _key(keys, ix, authority) != intent.wallet:
         raise TreasurySwapRefused("route_authority_not_wallet")
-    if _key(message, ix, source) != usdc_ata:
+    if _key(keys, ix, source) != usdc_ata:
         raise TreasurySwapRefused("route_source_not_usdc_ata")
-    if _key(message, ix, destination) != wsol_ata:
+    if _key(keys, ix, destination) != wsol_ata:
         raise TreasurySwapRefused("route_destination_not_wsol_ata")
-    if third_party is not None and _key(message, ix, third_party) != JUP_PROGRAM_ID:
+    if third_party is not None and _key(keys, ix, third_party) != JUP_PROGRAM_ID:
         raise TreasurySwapRefused("route_third_party_destination")
-    if _key(message, ix, fee_account) != JUP_PROGRAM_ID:
+    if _key(keys, ix, fee_account) != JUP_PROGRAM_ID:
         raise TreasurySwapRefused("route_platform_fee_account_present")
     seen.route = (kind, in_amount, quoted_out, slippage_bps)
 
 
-def verify_swap_transaction(message: VersionedMessage, *, intent: SwapIntent) -> VerifiedSwap:
-    """§9.1's discipline for a versioned Jupiter swap (module docstring)."""
+def verify_swap_transaction(
+    message: VersionedMessage,
+    *,
+    intent: SwapIntent,
+    account_keys: Sequence[str] | None = None,
+) -> VerifiedSwap:
+    """§9.1's discipline for a versioned Jupiter swap (module docstring).
+
+    ``account_keys`` is the caller's resolved key list (``spot_alt`` reads the
+    lookup tables at ``finalized``); a message without lookup tables needs
+    none, and a message with them is refused (``lookup_tables_unresolved``)
+    rather than verified half-blind."""
     wallet = intent.wallet
+    keys = validated_account_keys(message, account_keys)
     if message.num_required_signatures != 1:
         raise TreasurySwapRefused("more_than_one_signer")
     if not message.static_account_keys or message.static_account_keys[0] != wallet:
@@ -278,17 +299,18 @@ def verify_swap_transaction(message: VersionedMessage, *, intent: SwapIntent) ->
         raise TreasurySwapRefused("blockhash_missing")
     seen = _Seen()
     for ix in message.instructions:
-        program = message.program_id(ix.program_id_index)
-        if program is None:
-            raise TreasurySwapRefused("program_via_lookup_table")
+        # ``validated_account_keys`` already refused a program id that is not a
+        # static key (``program_via_lookup_table``), as the runtime's own
+        # ``sanitize`` requires.
+        program = message.static_account_keys[ix.program_id_index]
         if program == COMPUTE_BUDGET_PROGRAM_ID:
             _compute_budget(ix, seen)
         elif program == ASSOCIATED_TOKEN_PROGRAM_ID:
-            _create_ata(message, ix, wallet, seen)
+            _create_ata(keys, ix, wallet, seen)
         elif program in (TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID):
-            _token(message, ix, program, wallet, seen)
+            _token(keys, ix, program, wallet, seen)
         elif program == JUP_PROGRAM_ID:
-            _route(message, ix, intent, seen)
+            _route(keys, ix, intent, seen)
         elif program == SYSTEM_PROGRAM_ID:
             raise TreasurySwapRefused("system_program_not_allowed")
         else:

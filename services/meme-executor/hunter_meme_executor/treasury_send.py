@@ -29,6 +29,7 @@ from hunter_exchanges.pumpfun.solana_codec import (
 )
 from hunter_meme_executor import treasury_db
 from hunter_meme_executor.journal_db import WORKER_ROLE
+from hunter_meme_executor.spot_alt import account_keys_for
 from hunter_meme_executor.treasury_rules import (
     USDC_MINT,
     TreasurySwapRefused,
@@ -111,7 +112,16 @@ async def attempt_swap(
         )
         raw_tx = base64.b64decode(swap_tx.swap_transaction_b64)
         decoded = decode_versioned_transaction(raw_tx)
-        verified = verify_swap_transaction(decoded.message, intent=intent)
+        # T4.83: Jupiter reaches the route's accounts — and the mint of the
+        # ``CreateIdempotent`` (index 18 in the real capture) — through address
+        # lookup tables. Resolve them here (IO, one ``getMultipleAccounts`` at
+        # ``finalized``, off the loop) and hand the resolved list to the pure
+        # verifier, which then checks a loaded address exactly like a static
+        # one. A table that cannot be read refuses the attempt by name.
+        account_keys = await asyncio.to_thread(account_keys_for, ctx.chain.rpc, decoded.message)
+        verified = verify_swap_transaction(
+            decoded.message, intent=intent, account_keys=account_keys
+        )
     except TreasurySwapRefused as exc:
         await _refuse(ctx, swap_id, exc.reason)
         return
