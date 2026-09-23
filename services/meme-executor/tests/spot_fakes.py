@@ -232,11 +232,17 @@ class FakeSigner:
     log: list[str]
     pubkey: str = WALLET
     signed: list[bytes] = field(default_factory=lambda: list[bytes]())
+    error: Exception | None = None
+    """T4.86: a key rotated or corrupt under the process — ``sign`` raises."""
+    signature: bytes = SIG_BYTES
+    """T4.86: what ``sign`` answers; 32 bytes exercises ``serialize_transaction``."""
 
     def sign(self, message: bytes) -> bytes:
         self.log.append("sign")
+        if self.error is not None:
+            raise self.error
         self.signed.append(message)
-        return SIG_BYTES
+        return self.signature
 
 
 @dataclass

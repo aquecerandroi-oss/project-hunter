@@ -119,6 +119,20 @@ class ExecutorState:
     the floor and nothing was attempted."""
     treasury_wallet_usdc: Decimal | None = None
     """T4.54: the USDC ATA balance as last read, for the heartbeat only."""
+    treasury_last_reconcile_result: str | None = None
+    """T4.86: the named outcome of the last swap ``treasury_reconcile`` settled
+    (``failed:blockhash_expired_never_landed``, ``failed:on_chain_error``,
+    ``confirmed``). A field of its own because ``treasury._tick`` always ends
+    by writing ``treasury_last_attempt_reason`` — T4.84 removed the reconcile's
+    write from there rather than let it be overwritten, and the name then lived
+    only in the log."""
+    treasury_pending_unconfirmed: int = 0
+    """T4.86: ``submitted`` swaps as the last reconcile tick's read found them.
+    One whose meta is permanently unreadable (or whose lamport delta is ≤ 0)
+    has no automatic way out: it waits for a human while still counting against
+    the daily USDC cap, and this is how the desk sees it."""
+    treasury_oldest_pending_s: int | None = None
+    """T4.86: the age of the oldest of those; ``None`` when there is none."""
     resends_total: int = 0
     """T4.55: re-sends of already-signed bytes across every attempt of this
     process (``submit.py``'s confirmation loop) — same signature each time."""

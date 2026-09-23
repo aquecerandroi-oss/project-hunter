@@ -199,3 +199,90 @@ async def test_an_expired_sell_clears_the_marker_so_the_loop_may_try_again(
     await spot_reconcile.spot_reconcile_once(rig.ctx)
     assert rig.store.failed == [(ORDER_ID, "blockhash_expired_never_landed")]
     assert rig.store.pending_cleared[0]["outcome"] == "failed:blockhash_expired_never_landed"
+
+
+# --------------------------------------------- T4.86: what the heartbeat sees
+@pytest.mark.parametrize(
+    ("statuses", "height", "expected"),
+    [
+        ([None], 101, "failed:blockhash_expired_never_landed"),
+        (
+            [{"confirmationStatus": "confirmed", "err": {"x": 1}}],
+            0,
+            "failed:onchain_error:{'x': 1}",
+        ),
+    ],
+    ids=["expired", "on-chain-error"],
+)
+async def test_the_named_reason_of_a_reconciled_failure_reaches_the_stats(
+    monkeypatch: pytest.MonkeyPatch,
+    statuses: list[object],
+    height: int,
+    expected: str,
+) -> None:
+    """T4.86 (2) — an expired row and a row the chain rejected are different
+    accidents. Before this the name lived only in the log: the heartbeat's
+    ``last_refusal`` is the entries loop's, and the treasury's own field is
+    rewritten by its tick. ``last_reconcile_result`` is written by the
+    reconcile alone, so the desk sees it without reading logs."""
+    rig = exits_rig(monkeypatch)
+    rig.store.unconfirmed = [order_row(last_valid_block_height=100)]
+    rig.ctx.chain.rpc.statuses = statuses
+    rig.ctx.chain.rpc.block_height = height
+    await spot_reconcile.spot_reconcile_once(rig.ctx)
+    assert rig.stats.last_reconcile_result == expected
+
+
+async def test_a_confirmed_row_also_publishes_its_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Written on every settled row, not only on failures: otherwise the field
+    would sit on an old accident forever."""
+    rig = exits_rig(monkeypatch)
+    rig.store.unconfirmed = [order_row()]
+    buy_landed(rig)
+    await spot_reconcile.spot_reconcile_once(rig.ctx)
+    assert rig.stats.last_reconcile_result == "confirmed:buy"
+
+
+async def test_a_row_the_chain_will_not_explain_is_counted_with_its_age(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.84's open concern: a ``submitted_unconfirmed`` row whose meta is
+    permanently unreadable has **no automatic way out** — it waits for a human
+    and logs every tick. The heartbeat now says how many there are and how old
+    the oldest is, so the desk sees it before the lane is turned on."""
+    rig = exits_rig(monkeypatch)
+    rig.store.unconfirmed = [order_row()]  # ``submitted_at`` is 90 s before ``NOW``
+    rig.ctx.chain.rpc.statuses = [confirmed_status()]
+    rig.ctx.chain.rpc.transaction = None  # never served: the row stays put
+    await spot_reconcile.spot_reconcile_once(rig.ctx)
+    assert rig.store.confirmed == [] and rig.store.failed == []
+    assert rig.stats.pending_unconfirmed == 1
+    assert rig.stats.oldest_pending_s == 90
+
+
+async def test_with_nothing_in_flight_the_meter_is_zero_not_stale(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rig = exits_rig(monkeypatch)
+    rig.stats.pending_unconfirmed, rig.stats.oldest_pending_s = 3, 900
+    await spot_reconcile.spot_reconcile_once(rig.ctx)
+    assert rig.stats.pending_unconfirmed == 0 and rig.stats.oldest_pending_s is None
+
+
+async def test_an_abandoned_row_also_names_itself_on_the_heartbeat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.86 (Astra, review of this diff): a row the process died inside is
+    settled by ``fail_abandoned`` after 300 s — it never belonged to the
+    ``submitted_unconfirmed`` set, so without this write the heartbeat would
+    stay ``last_reconcile_result = None`` / ``pending_unconfirmed = 0`` while
+    the reconcile was in fact closing orders."""
+    rig = exits_rig(monkeypatch)
+    rig.store.abandoned = [
+        order_row(status="simulated", signature=None, submitted_at=NOW - timedelta(seconds=600))
+    ]
+    await spot_reconcile.spot_reconcile_once(rig.ctx)
+    assert rig.store.abandoned_failed == [ORDER_ID]
+    assert rig.stats.last_reconcile_result == "failed:abandoned_before_signing"

@@ -172,6 +172,22 @@ def test_refusals_publish_the_top_eight_by_count_then_name() -> None:
     assert fields["last_refusal"] == "r9"
 
 
+def test_the_reconciles_own_outcome_and_the_pending_meter_are_published() -> None:
+    """T4.86 — the reconcile's named result and the rows it could not settle,
+    read off the stats object (``spot1_fields`` makes no query: ``_ctx``'s
+    session factory raises if one is opened)."""
+    ctx = _ctx(ON)
+    ctx.spot.last_reconcile_result = "failed:blockhash_expired_never_landed"
+    ctx.spot.pending_unconfirmed, ctx.spot.oldest_pending_s = 2, 4_215
+    fields = spot1_fields(ctx, ON, NOW)
+    assert fields["last_reconcile_result"] == "failed:blockhash_expired_never_landed"
+    assert fields["pending_unconfirmed"] == 2 and fields["oldest_pending_s"] == 4_215
+    json.dumps(fields)
+    empty = spot1_fields(_ctx(ON), ON, NOW)
+    assert empty["last_reconcile_result"] is None
+    assert empty["pending_unconfirmed"] == 0 and empty["oldest_pending_s"] is None
+
+
 # ------------------------------------------------- the heartbeat, end to end
 class _Session:
     async def __aenter__(self) -> object:

@@ -14,7 +14,7 @@ import pytest
 from hunter_core.db.session import role_session
 from hunter_meme_executor import spot_exit_repo as repo
 from hunter_meme_executor.journal_db import WORKER_ROLE
-from hunter_meme_executor.spot_repo import closed_stats
+from hunter_meme_executor.spot_repo import closed_stats, mark_refused
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -36,6 +36,8 @@ async def test_every_statement_runs_on_the_real_schema(
         assert await repo.pending_exits_on_terminal_orders(session) == []
         assert await repo.abandoned_orders(session, before=NOW) == []
         assert await repo.fail_abandoned(session, NO_ROW, reason="x", now=NOW) is False
+        # T4.86: the widened ``_REFUSED`` predicate parses on the real schema.
+        assert await mark_refused(session, NO_ROW, reason="x", now=NOW) is False
         assert await repo.open_position_by_id(session, NO_ROW) is None
         assert await repo.enabled_market_count(session) == 35, "the 0057 seed"
         assert (

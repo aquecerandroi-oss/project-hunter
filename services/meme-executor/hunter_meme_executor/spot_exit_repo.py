@@ -47,11 +47,17 @@ TRANSIENT_EXIT_REFUSALS: tuple[str, ...] = (
     "quote_failed:",
     "swap_build_failed:",
     "simulation_unreadable:",
+    "signer_failed:",
 )
 """Refusal prefixes of ``spot_leg`` that mean "Jupiter/RPC did not answer", not
 "this sell cannot be built": they back off and are retried, and they do
 **not** spend the ``MAX_EXIT_ATTEMPTS`` budget that blocks a position (Astra,
 T4.74-5 review: a 2 min Jupiter outage must not park a stop for ever).
+``signer_failed:`` joined them in T4.86 (Astra, review of that diff) for the
+same reason: a signer out of service says nothing about *this* trade, and six
+of its refusals would leave the position in ``blocked_exits`` — never sold by
+the loop again, not even on ``emergency`` — after the key came back. It stays
+named, backed off and visible as ``stuck_exits`` at the 30th in a row.
 The literal list is repeated in ``_SELL_ATTEMPTS`` — keep the two in step."""
 
 
@@ -85,7 +91,8 @@ _SELL_ATTEMPTS = text(
     "SELECT count(*) AS n, "
     "  count(*) FILTER (WHERE status IN ('refused', 'failed') "
     "    AND reason NOT LIKE 'quote_failed:%' AND reason NOT LIKE 'swap_build_failed:%' "
-    "    AND reason NOT LIKE 'simulation_unreadable:%') AS hard "
+    "    AND reason NOT LIKE 'simulation_unreadable:%' "
+    "    AND reason NOT LIKE 'signer_failed:%') AS hard "
     "FROM spot_orders WHERE side = 'sell' AND position_id = :position_id"
 )
 _SET_EXIT_PENDING = text(

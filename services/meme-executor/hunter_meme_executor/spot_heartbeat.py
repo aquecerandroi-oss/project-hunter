@@ -9,8 +9,10 @@ rows are money on the chain and are read in every mode), the counters from
 ``ctx.spot``. With ``SPOT1_ENABLED=false`` this publishes ``inert:disabled``
 (no entries) next to ``exits_active`` (T4.74-7: the exits loop runs on any
 live executor with a signer) and touches nothing else. ``stuck_exits`` names
-the positions whose sell keeps being refused transiently (A2). Every
-``Decimal`` is a string.
+the positions whose sell keeps being refused transiently (A2). T4.86 adds the
+reconcile's own named outcome (``last_reconcile_result``) and its pending
+meter (``pending_unconfirmed`` / ``oldest_pending_s``) — from the same stats
+object, no query. Every ``Decimal`` is a string.
 """
 
 from __future__ import annotations
@@ -70,6 +72,9 @@ def spot1_fields(
         "buys_unconfirmed": stats.buys_unconfirmed,
         "reconciled_buys": stats.reconciled_buys,
         "reconciled_expired": stats.reconciled_expired,
+        "last_reconcile_result": stats.last_reconcile_result,
+        "pending_unconfirmed": stats.pending_unconfirmed,
+        "oldest_pending_s": stats.oldest_pending_s,
         "refused_by_reason": _top(stats.refused_by_reason),
         "exits_by_reason": dict(sorted(stats.exits_by_reason.items())),
         "blocked_exits": dict(sorted(stats.blocked_exits.items())),

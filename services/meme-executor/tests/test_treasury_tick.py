@@ -7,6 +7,7 @@ from ``getSignatureStatuses``) and the simulated-balance parser."""
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -17,7 +18,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from hunter_exchanges.jupiter import JupiterQuote
-from hunter_meme_executor import treasury, treasury_reconcile
+from hunter_meme_executor import heartbeat, treasury, treasury_reconcile
 from hunter_meme_executor.chain import TokenAccountRead, WalletRead
 from hunter_meme_executor.context import ExecutorContext, ExecutorState
 from hunter_meme_executor.treasury_db import SubmittedSwap
@@ -477,3 +478,72 @@ def test_simulated_balances_reads_the_json_parsed_pair() -> None:
 )
 def test_simulated_balances_refuses_anything_it_cannot_read(accounts: list[Any]) -> None:
     assert simulated_balances(accounts) is None
+
+
+# ------------------------------------------------ T4.86: what the heartbeat sees
+@pytest.mark.parametrize(
+    ("status", "age_s", "expected"),
+    [
+        (None, 200.0, "failed:blockhash_expired_never_landed"),
+        (
+            {"confirmationStatus": "confirmed", "err": {"InstructionError": [3, "Custom"]}},
+            45.0,
+            "failed:on_chain_error",
+        ),
+        ({"confirmationStatus": "finalized", "err": None}, 45.0, "confirmed"),
+    ],
+    ids=["expired", "on-chain-error", "confirmed"],
+)
+async def test_the_reconciled_outcome_reaches_the_heartbeat_by_name(
+    monkeypatch: pytest.MonkeyPatch, status: dict[str, Any] | None, age_s: float, expected: str
+) -> None:
+    """T4.86 (2) — T4.84 took the reconcile's name **out** of
+    ``treasury_last_attempt_reason`` because ``treasury._tick`` always
+    overwrites it, and left the name in the log only. This is the field the
+    tick does not touch: an expired swap and one the chain rejected are told
+    apart on the heartbeat, without reading logs."""
+    ctx = _ctx()
+    _fake_db(monkeypatch, ctx)
+    row = _submitted(age_s)
+    ctx.chain.rpc.statuses = [status]
+    ctx.chain.rpc.tx = _tx(9_400_000)
+    _wire_reconcile(monkeypatch, ctx, row)
+    await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
+    assert ctx.state.treasury_last_reconcile_result == expected
+    published = json.loads(heartbeat.treasury_field(cast(ExecutorContext, ctx)))
+    assert published["last_reconcile_result"] == expected
+    assert published["last_result"] == "", "the tick's own field is untouched by the reconcile"
+
+
+async def test_a_swap_the_chain_will_not_explain_is_counted_with_its_age(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.84's open concern: a ``submitted`` row whose meta is permanently
+    unreadable (or whose lamport delta is ≤ 0) has **no automatic way out** —
+    it waits for a human, keeps counting against the daily cap and logs every
+    tick. The heartbeat now says how many and how old, before
+    ``MEME_TREASURY_ENABLED`` is turned on."""
+    ctx = _ctx()
+    _fake_db(monkeypatch, ctx)
+    row = _submitted(4_215.0)
+    ctx.chain.rpc.statuses = [{"confirmationStatus": "finalized", "err": None}]
+    ctx.chain.rpc.tx = _tx(-5_000)  # landed poorer: left for a human
+    outcomes = _wire_reconcile(monkeypatch, ctx, row)
+    await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
+    assert outcomes == []
+    assert ctx.state.treasury_pending_unconfirmed == 1
+    oldest = ctx.state.treasury_oldest_pending_s
+    assert oldest is not None and 4_215 <= oldest <= 4_217
+    published = json.loads(heartbeat.treasury_field(cast(ExecutorContext, ctx)))
+    assert published["pending_unconfirmed"] == 1 and published["oldest_pending_s"] == oldest
+
+
+async def test_with_nothing_in_flight_the_treasury_meter_is_zero_not_stale(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = _ctx()
+    _fake_db(monkeypatch, ctx)  # ``submitted_swaps`` answers []
+    ctx.state.treasury_pending_unconfirmed, ctx.state.treasury_oldest_pending_s = 3, 900
+    await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
+    assert ctx.state.treasury_pending_unconfirmed == 0
+    assert ctx.state.treasury_oldest_pending_s is None

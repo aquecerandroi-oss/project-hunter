@@ -147,9 +147,16 @@ _FAILED = text(
 )
 _REFUSED = text(
     "UPDATE spot_orders SET status = 'refused', reason = :reason, settled_at = :now, "
-    "  updated_at = :now WHERE id = :id AND status = 'admitted' AND signing_at IS NULL "
-    "RETURNING id"
+    "  updated_at = :now WHERE id = :id AND status IN ('admitted', 'simulated') "
+    "  AND signing_at IS NULL RETURNING id"
 )
+"""T4.86 — the same set ``_FAIL_ABANDONED`` rescues: an order that never left
+this process. ``spot_leg`` marks ``simulated`` **before** it signs, so the
+signer's own refusal (``signer_failed:<type>``) lands on a ``simulated`` row;
+with ``status = 'admitted'`` alone it updated zero rows and the order stayed
+``simulated`` — reservation held — while the caller was told it was refused.
+``signing_at IS NULL`` is the guard that matters: a row that was signed is
+settled by its signature, never refused."""
 _PENDING = text(
     "SELECT signal_id, market_symbol, mint, intent FROM spot_orders "
     "WHERE side = 'buy' AND status IN ('admitted', 'simulated', 'submitted_unconfirmed') "

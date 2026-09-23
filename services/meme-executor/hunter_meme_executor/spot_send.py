@@ -74,7 +74,12 @@ async def _refuse(
 ) -> LegResult:
     logger.warning("meme_spot_leg_refused", order_id=order_id, reason=reason)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await spot_repo.mark_refused(session, order_id, reason=reason, now=utcnow())
+        recorded = await spot_repo.mark_refused(session, order_id, reason=reason, now=utcnow())
+    if not recorded:
+        # T4.86 (Astra): the refusal lost the row to someone else (a signature
+        # already on it, the reconcile, a manual settle). Say so instead of
+        # reporting a state the row does not carry.
+        logger.error("meme_spot_refusal_not_recorded", order_id=order_id, reason=reason)
     return LegResult("refused", reason, None, 0, 0, quote)
 
 
@@ -221,9 +226,21 @@ async def spot_leg(
         await spot_repo.mark_simulated(session, order_id, now=utcnow())
 
     # --- the only signature of the lane; the row carries it before the broadcast
-    signature_bytes = ctx.signer.sign(decoded.message_bytes)
-    signed_tx = serialize_transaction((signature_bytes,), decoded.message_bytes)
-    signature = b58encode(signature_bytes)
+    # T4.86 (mirrors T4.84 in the treasury): everything local that can raise is
+    # **inside** the try. A key rotated or corrupt in flight, and a signature of
+    # the wrong length (``serialize_transaction`` raises ``ValueError``), are
+    # refusals by name — nothing left the process. Outside the try the exception
+    # climbed to the loop's generic ``except`` and the row sat ``simulated``,
+    # never sent and never refused, holding its reservation (a buy's
+    # ``pending_spot_markets``, a sell's ``exit_order_id`` on the position)
+    # until the reconcile's 300 s rescue renamed it ``abandoned_before_signing``
+    # — five minutes of a held reservation, and the real reason lost.
+    try:
+        signature_bytes = ctx.signer.sign(decoded.message_bytes)
+        signed_tx = serialize_transaction((signature_bytes,), decoded.message_bytes)
+        signature = b58encode(signature_bytes)
+    except Exception as exc:
+        return await _refuse(ctx, order_id, f"signer_failed:{type(exc).__name__}", quote)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         recorded = await spot_repo.mark_submitted(
             session,

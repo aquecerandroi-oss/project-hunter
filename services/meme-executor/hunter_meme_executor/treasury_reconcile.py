@@ -33,6 +33,7 @@ from hunter_meme_executor.spot_send_rules import fill_from_transaction
 from hunter_meme_executor.treasury_rules import classify_submitted
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from datetime import datetime
 
     from hunter_meme_executor.context import ExecutorContext
@@ -52,6 +53,7 @@ ON_CHAIN_ERROR_REASON = "failed:on_chain_error"
 async def reconcile_once(ctx: ExecutorContext) -> None:
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         pending = await treasury_db.submitted_swaps(session)
+    _publish_pending(ctx, pending, utcnow())
     if not pending:
         return
     try:
@@ -87,6 +89,9 @@ async def reconcile_once(ctx: ExecutorContext) -> None:
             reason = EXPIRED_REASON if status is None else ON_CHAIN_ERROR_REASON
             async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
                 await treasury_db.mark_failed(session, row.id)
+            # T4.86: on the heartbeat, not only in the log — and in a field
+            # ``treasury._tick`` does not overwrite on its next pass.
+            ctx.state.treasury_last_reconcile_result = reason
             logger.warning(
                 "meme_treasury_reconciled",
                 swap=str(row.id),
@@ -96,6 +101,18 @@ async def reconcile_once(ctx: ExecutorContext) -> None:
             )
             continue
         await _settle_landed(ctx, row, now)
+
+
+def _publish_pending(ctx: ExecutorContext, rows: Sequence[SubmittedSwap], now: datetime) -> None:
+    """T4.86 — how many ``submitted`` swaps this tick's read found, and the age
+    of the oldest. A row whose meta is permanently unreadable (or whose lamport
+    delta is ≤ 0) is left for a human by design: without this it kept counting
+    against the daily cap and logging every tick, with nothing on the heartbeat
+    to see it by. A row settled during this tick is gone from the next read."""
+    ctx.state.treasury_pending_unconfirmed = len(rows)
+    ctx.state.treasury_oldest_pending_s = (
+        None if not rows else int(max((now - row.requested_at).total_seconds() for row in rows))
+    )
 
 
 async def landed_sol_fill(ctx: ExecutorContext, signature: str) -> Decimal | None:
@@ -153,6 +170,7 @@ async def _settle_landed(ctx: ExecutorContext, row: SubmittedSwap, now: datetime
             session, row.id, sol_out_filled=sol_out_filled, wallet_sol_after=wallet_sol_after
         )
     ctx.state.treasury_last_swap_at = now
+    ctx.state.treasury_last_reconcile_result = "confirmed"
     logger.info(
         "meme_treasury_reconciled",
         swap=str(row.id),

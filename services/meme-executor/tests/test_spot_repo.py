@@ -202,6 +202,20 @@ async def test_each_mark_is_one_update_that_names_its_status(
         assert key in params
 
 
+async def test_a_row_that_only_simulated_can_still_be_refused_by_name() -> None:
+    """T4.86 — ``spot_leg`` marks ``simulated`` and only then signs, so the
+    signer's own refusal (``signer_failed:<Tipo>``) lands on a ``simulated``
+    row: a predicate of ``status = 'admitted'`` alone updated **zero** rows
+    and the order stayed ``simulated``, reservation held, while the caller was
+    told it had been refused. The guard that matters is the one
+    ``_FAIL_ABANDONED`` already uses: never a row that was signed."""
+    fake, session = _session([{"id": "o1"}])
+    assert await spot_repo.mark_refused(session, "o1", reason="signer_failed:RuntimeError", now=NOW)
+    sql, _ = _only(fake)
+    assert "status IN ('admitted', 'simulated')" in sql
+    assert "signing_at IS NULL" in sql, "a signed row is never refused"
+
+
 async def test_positions_insert_read_mark_and_close_with_the_signal_s_r() -> None:
     fake, session = _session([{"id": "p1"}])
     pid = await spot_repo.insert_position(

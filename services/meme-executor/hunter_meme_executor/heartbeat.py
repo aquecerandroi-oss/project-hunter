@@ -50,6 +50,7 @@ __all__ = [
     "heartbeat_fields",
     "heartbeat_once",
     "policy_fields",
+    "treasury_field",
 ]
 
 logger = get_logger(__name__)
@@ -246,7 +247,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     fields.update(auto)
     fields.update(ctx.kill.describe())
     fields.update(_pickup_lag_fields(ctx))
-    fields["treasury"] = _treasury_field(ctx)
+    fields["treasury"] = treasury_field(ctx)
     fields.update(_send_fields(ctx))
     fields["spot1"] = json.dumps(
         spot1_fields(ctx, cfg.spot, now, positions=spots, markets_enabled=markets)
@@ -305,7 +306,7 @@ def _send_fields(ctx: ExecutorContext) -> dict[str, str]:
     }
 
 
-def _treasury_field(ctx: ExecutorContext) -> str:
+def treasury_field(ctx: ExecutorContext) -> str:
     """T4.54 — one JSON blob: whether the top-up is on, when it last landed,
     the wallet's USDC as last read, and the last tick's outcome (empty when
     nothing was attempted this tick)."""
@@ -324,6 +325,12 @@ def _treasury_field(ctx: ExecutorContext) -> str:
             "wallet_usdc": (
                 None if state.treasury_wallet_usdc is None else str(state.treasury_wallet_usdc)
             ),
+            # T4.86: the reconcile's own outcome (the tick never overwrites it)
+            # and what it could not settle — the ``submitted`` row with no
+            # automatic way out is visible here, not only in the log.
+            "last_reconcile_result": state.treasury_last_reconcile_result,
+            "pending_unconfirmed": state.treasury_pending_unconfirmed,
+            "oldest_pending_s": state.treasury_oldest_pending_s,
         }
     )
 

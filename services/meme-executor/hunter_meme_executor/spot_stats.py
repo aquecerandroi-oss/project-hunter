@@ -68,6 +68,19 @@ class SpotStats:
     """Buys the reconcile confirmed late and opened (T4.74-5)."""
     reconciled_expired: int = 0
     """Rows the reconcile settled ``failed:blockhash_expired_never_landed``."""
+    last_reconcile_result: str | None = None
+    """T4.86: the named outcome of the last row ``spot_reconcile`` settled
+    (``failed:<reason>`` / ``confirmed:<side>``). Written by the reconcile
+    alone — ``last_refusal`` belongs to the entries loop and would bury it."""
+    pending_unconfirmed: int = 0
+    """T4.86: ``submitted_unconfirmed`` rows as the last reconcile tick's read
+    found them. A row the chain will not explain (meta permanently unreadable,
+    or a delta that contradicts its side) has no automatic way out: it waits
+    for a human, and this is how the desk sees it instead of one log line per
+    tick. A row settled during that tick is gone from the next read."""
+    oldest_pending_s: int | None = None
+    """T4.86: the age of the oldest of those, in seconds; ``None`` when there
+    is none — never ``0``, which would read as "one, brand new"."""
 
     def forget_position(self, position_id: str) -> None:
         """A closed position leaves every per-position memory."""

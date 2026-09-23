@@ -85,6 +85,13 @@ async def spot_reconcile_once(ctx: ExecutorContext) -> None:
 async def _tick(ctx: ExecutorContext, cfg: SpotConfig, stats: SpotStats, now: datetime) -> None:
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         rows = await unconfirmed_spot_orders(session)
+    # T4.86 — the meter of what is in flight, as this read found it: a row the
+    # chain will not explain has no automatic way out and would otherwise be
+    # visible only as one log line per tick.
+    stats.pending_unconfirmed = len(rows)
+    stats.oldest_pending_s = (
+        None if not rows else int(max((now - row.submitted_at).total_seconds() for row in rows))
+    )
     if rows:
         await _settle_by_signature(ctx, cfg, stats, rows, now)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
@@ -120,6 +127,10 @@ async def _tick(ctx: ExecutorContext, cfg: SpotConfig, stats: SpotStats, now: da
                     session, row.position_id, order_id=row.id, outcome=ABANDONED_REASON, now=now
                 )
         if failed:
+            # T4.86: an abandoned row never belonged to the ``submitted`` set,
+            # so without this the heartbeat would read "nothing in flight, no
+            # result" while the reconcile was closing orders.
+            stats.last_reconcile_result = f"failed:{ABANDONED_REASON}"
             logger.warning("meme_spot_abandoned_failed", order_id=row.id, side=row.side)
 
 
@@ -209,6 +220,7 @@ async def _settle_failed(
     if not failed:
         logger.info("meme_spot_reconcile_row_moved", order_id=row.id, side=row.side)
         return
+    stats.last_reconcile_result = f"failed:{reason}"  # T4.86: on the heartbeat, not only in the log
     logger.warning(
         "meme_spot_reconciled", order_id=row.id, side=row.side, state="failed", reason=reason
     )
@@ -244,6 +256,7 @@ async def _settle_landed(
     if not confirmed:
         return  # settled by another pass meanwhile
     stats.last_signature = row.signature
+    stats.last_reconcile_result = f"confirmed:{row.side}"
     logger.info("meme_spot_reconciled", order_id=row.id, side=row.side, state="confirmed")
     await _apply_fill(ctx, cfg, stats, row, fill, now)
 
