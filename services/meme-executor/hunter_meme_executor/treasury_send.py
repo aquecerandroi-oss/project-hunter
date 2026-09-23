@@ -25,11 +25,14 @@ from hunter_exchanges.jupiter import decode_versioned_transaction
 from hunter_exchanges.pumpfun.solana_codec import (
     TOKEN_PROGRAM_ID,
     associated_token_address,
+    b58encode,
     serialize_transaction,
 )
+from hunter_exchanges.pumpfun.tx_rpc import SendDisabled
 from hunter_meme_executor import treasury_db
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.spot_alt import account_keys_for
+from hunter_meme_executor.treasury_reconcile import landed_sol_fill
 from hunter_meme_executor.treasury_rules import (
     USDC_MINT,
     TreasurySwapRefused,
@@ -203,20 +206,43 @@ async def _simulate_sign_and_send(
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         await treasury_db.mark_simulated(session, swap_id)
 
-    signature_bytes = ctx.signer.sign(message_bytes)
-    signed_tx = serialize_transaction((signature_bytes,), message_bytes)
+    # T4.84 — the signature is derived here, from the bytes about to be sent
+    # (the transaction's first signature *is* its id), never from the RPC's
+    # answer: that answer can be lost. Anything that raises before the
+    # broadcast is a local refusal by name — nothing left the process, and the
+    # row never sits ``simulated`` with an empty last-attempt field.
     try:
-        signature = await asyncio.to_thread(ctx.chain.rpc.send_transaction, signed_tx)
+        signature_bytes = ctx.signer.sign(message_bytes)
+        signed_tx = serialize_transaction((signature_bytes,), message_bytes)
+        signature = b58encode(signature_bytes)
     except Exception as exc:
-        ctx.state.rpc_errors += 1
-        ctx.state.treasury_last_attempt_reason = f"send_failed:{type(exc).__name__}"
-        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-            await treasury_db.mark_failed(session, swap_id)
-        logger.error("meme_treasury_send_failed", error_type=type(exc).__name__)
+        await _refuse(ctx, swap_id, f"signer_failed:{type(exc).__name__}")
         return
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         await treasury_db.mark_submitted(session, swap_id, signature=signature)
     ctx.state.last_signature = signature
+    try:
+        relayed = await asyncio.to_thread(ctx.chain.rpc.send_transaction, signed_tx)
+    except SendDisabled:
+        # Unambiguous: this client cannot relay by construction, so nothing is
+        # on the wire and ``failed`` is a fact (mirrors ``spot_send``).
+        ctx.state.treasury_last_attempt_reason = "send_disabled"
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            await treasury_db.mark_failed(session, swap_id)
+        logger.error("meme_treasury_send_disabled", signature=signature)
+        return
+    except Exception as exc:
+        # Ambiguous: the RPC may have relayed it before the answer was lost.
+        # The row stays ``submitted`` — counted by the daily cap, settled by
+        # ``treasury_reconcile`` by signature. Never ``failed`` on a guess.
+        ctx.state.rpc_errors += 1
+        ctx.state.treasury_last_attempt_reason = f"send_unknown:{type(exc).__name__}"
+        logger.error(
+            "meme_treasury_send_unknown", signature=signature, error_type=type(exc).__name__
+        )
+        return
+    if relayed != signature:
+        logger.warning("meme_treasury_signature_mismatch", local=signature, rpc=relayed)
 
     verdict = await _confirm(ctx, signature)
     if verdict == "failed":
@@ -230,12 +256,15 @@ async def _simulate_sign_and_send(
         ctx.state.treasury_last_attempt_reason = "confirm_pending_reconcile"
         logger.warning("meme_treasury_confirm_pending", signature=signature)
         return
-    try:
-        wallet_after = await asyncio.to_thread(ctx.chain.wallet, wallet)
-        wallet_sol_after = Decimal(wallet_after.lamports) / LAMPORTS
-    except Exception:
-        wallet_sol_after = wallet_sol_before
-    sol_out_filled = max(Decimal(0), wallet_sol_after - wallet_sol_before)
+    # T4.84 (Astra, review of this diff): the fill is the lamport delta of
+    # **this signature** (``getTransaction`` meta), never a live re-read of a
+    # wallet the spot lane also moves — and a read that fails is not a fill of
+    # zero: the row stays ``submitted`` and the reconcile settles it.
+    sol_out_filled = await landed_sol_fill(ctx, signature)
+    if sol_out_filled is None:
+        ctx.state.treasury_last_attempt_reason = "confirm_fill_unreadable"
+        return
+    wallet_sol_after = wallet_sol_before + sol_out_filled
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         await treasury_db.mark_confirmed(
             session, swap_id, sol_out_filled=sol_out_filled, wallet_sol_after=wallet_sol_after

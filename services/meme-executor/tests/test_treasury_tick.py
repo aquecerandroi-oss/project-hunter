@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any, cast
 
 import pytest
+from structlog.testing import capture_logs
 
 from hunter_exchanges.jupiter import JupiterQuote
 from hunter_meme_executor import treasury, treasury_reconcile
@@ -42,10 +43,18 @@ class FakeRpc:
         default_factory=lambda: list[dict[str, Any] | None]()
     )
     calls: list[str] = field(default_factory=lambda: list[str]())
+    tx: dict[str, Any] | None = None
+    tx_error: Exception | None = None
 
     def get_signature_statuses(self, signatures: list[str]) -> list[dict[str, Any] | None]:
         self.calls.append("statuses")
         return self.statuses
+
+    def get_transaction(self, signature: str) -> dict[str, Any] | None:
+        self.calls.append("transaction")
+        if self.tx_error is not None:
+            raise self.tx_error
+        return self.tx
 
 
 @dataclass
@@ -260,6 +269,52 @@ def _submitted(age_s: float, sol_before: str = "0.68") -> SubmittedSwap:
     )
 
 
+def _tx(sol_delta: int, *, payer: str = PUBKEY) -> dict[str, Any]:
+    """T4.84 — a ``getTransaction`` answer whose ``meta`` says what **this
+    signature** did to the fee payer's lamports; never the wallet's live
+    balance, which the spot lane moves between the send and the reconcile."""
+    pre = 680_000_000
+    return {
+        "meta": {
+            "err": None,
+            "fee": 5_000,
+            "preBalances": [pre, 1],
+            "postBalances": [pre + sol_delta, 1],
+            "preTokenBalances": [],
+            "postTokenBalances": [],
+        },
+        "transaction": {"message": {"accountKeys": [payer, "11111111111111111111111111111111"]}},
+        "blockTime": 1_758_000_000,
+    }
+
+
+Outcome = tuple[str, Decimal | None, Decimal | None]
+
+
+def _wire_reconcile(
+    monkeypatch: pytest.MonkeyPatch, ctx: FakeContext, row: SubmittedSwap
+) -> list[Outcome]:
+    outcomes: list[Outcome] = []
+
+    async def submitted_swaps(_session: Any) -> list[SubmittedSwap]:
+        return [row]
+
+    async def mark_confirmed(
+        _session: Any, swap_id: uuid.UUID, *, sol_out_filled: Decimal, wallet_sol_after: Decimal
+    ) -> None:
+        assert swap_id == row.id
+        outcomes.append(("confirmed", sol_out_filled, wallet_sol_after))
+
+    async def mark_failed(_session: Any, swap_id: uuid.UUID) -> None:
+        assert swap_id == row.id
+        outcomes.append(("failed", None, None))
+
+    monkeypatch.setattr(treasury_reconcile.treasury_db, "submitted_swaps", submitted_swaps)
+    monkeypatch.setattr(treasury_reconcile.treasury_db, "mark_confirmed", mark_confirmed)
+    monkeypatch.setattr(treasury_reconcile.treasury_db, "mark_failed", mark_failed)
+    return outcomes
+
+
 @pytest.mark.parametrize(
     "status,age_s,expected",
     [
@@ -281,25 +336,8 @@ async def test_the_reconcile_settles_a_submitted_row_from_the_chain(
     _fake_db(monkeypatch, ctx)
     row = _submitted(age_s)
     ctx.chain.rpc.statuses = [status]
-    ctx.chain.lamports = 689_400_000
-    outcomes: list[tuple[str, Decimal | None, Decimal | None]] = []
-
-    async def submitted_swaps(_session: Any) -> list[SubmittedSwap]:
-        return [row]
-
-    async def mark_confirmed(
-        _session: Any, swap_id: uuid.UUID, *, sol_out_filled: Decimal, wallet_sol_after: Decimal
-    ) -> None:
-        assert swap_id == row.id
-        outcomes.append(("confirmed", sol_out_filled, wallet_sol_after))
-
-    async def mark_failed(_session: Any, swap_id: uuid.UUID) -> None:
-        assert swap_id == row.id
-        outcomes.append(("failed", None, None))
-
-    monkeypatch.setattr(treasury_reconcile.treasury_db, "submitted_swaps", submitted_swaps)
-    monkeypatch.setattr(treasury_reconcile.treasury_db, "mark_confirmed", mark_confirmed)
-    monkeypatch.setattr(treasury_reconcile.treasury_db, "mark_failed", mark_failed)
+    ctx.chain.rpc.tx = _tx(9_400_000)
+    outcomes = _wire_reconcile(monkeypatch, ctx, row)
     await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
     if expected == "pending":
         assert outcomes == []
@@ -308,6 +346,110 @@ async def test_the_reconcile_settles_a_submitted_row_from_the_chain(
     else:
         assert outcomes == [("confirmed", Decimal("0.0094"), Decimal("0.6894"))]
         assert ctx.state.treasury_last_swap_at is not None
+
+
+async def test_the_fill_comes_from_this_signature_not_from_the_live_wallet(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The wallet is shared with the spot lane: a live re-read would book
+    someone else's SOL (or someone else's spend) as this swap's fill, and that
+    number feeds the daily-loss brake (§16.3)."""
+    ctx = _ctx()
+    _fake_db(monkeypatch, ctx)
+    row = _submitted(45.0)
+    ctx.chain.rpc.statuses = [{"confirmationStatus": "finalized", "err": None}]
+    ctx.chain.rpc.tx = _tx(9_400_000)
+    ctx.chain.lamports = 120_000_000  # the spot lane spent meanwhile
+    outcomes = _wire_reconcile(monkeypatch, ctx, row)
+    await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
+    assert outcomes == [("confirmed", Decimal("0.0094"), Decimal("0.6894"))]
+    assert "wallet" not in ctx.chain.calls
+
+
+@pytest.mark.parametrize("failure", ["not_served", "rpc_error"], ids=["not-served", "rpc-error"])
+async def test_a_landed_swap_whose_meta_is_unreadable_stays_submitted(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    """Confirmed by status but not yet served (or the RPC failed): the row is
+    left ``submitted`` for the next tick — never a fill of zero, never
+    ``failed``, and it keeps counting against the daily cap."""
+    ctx = _ctx()
+    _fake_db(monkeypatch, ctx)
+    row = _submitted(45.0)
+    ctx.chain.rpc.statuses = [{"confirmationStatus": "finalized", "err": None}]
+    if failure == "rpc_error":
+        ctx.chain.rpc.tx_error = TimeoutError("rpc down")
+    outcomes = _wire_reconcile(monkeypatch, ctx, row)
+    await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
+    assert outcomes == []
+    assert ctx.state.rpc_errors == (1 if failure == "rpc_error" else 0)
+
+
+@pytest.mark.parametrize("answer", [[], [None, None]], ids=["short", "long"])
+async def test_an_answer_that_does_not_match_the_signatures_condemns_nobody(
+    monkeypatch: pytest.MonkeyPatch, answer: list[dict[str, Any] | None]
+) -> None:
+    """Astra, review of this diff: an RPC that answers fewer entries than
+    signatures asked about says **nothing** about the ones it left out. Padding
+    them with ``None`` made a row older than 180 s ``failed`` on no evidence —
+    and a swap that really landed would then leave the daily cap and the
+    inflow. An explicit ``null`` is still evidence (test above); a missing
+    entry is not."""
+    ctx = _ctx()
+    _fake_db(monkeypatch, ctx)
+    row = _submitted(200.0)
+    ctx.chain.rpc.statuses = answer
+    outcomes = _wire_reconcile(monkeypatch, ctx, row)
+    await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
+    assert outcomes == []
+    assert ctx.state.rpc_errors == 1
+
+
+async def test_a_landed_swap_that_took_sol_away_is_left_for_a_human(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A USDC -> SOL swap cannot land with the wallet poorer: booking it as a
+    fill of zero would understate the treasury inflow the daily-loss brake
+    subtracts. The row stays ``submitted`` (counted at its quoted size)."""
+    ctx = _ctx()
+    _fake_db(monkeypatch, ctx)
+    row = _submitted(45.0)
+    ctx.chain.rpc.statuses = [{"confirmationStatus": "finalized", "err": None}]
+    ctx.chain.rpc.tx = _tx(-5_000)
+    outcomes = _wire_reconcile(monkeypatch, ctx, row)
+    await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
+    assert outcomes == []
+
+
+@pytest.mark.parametrize(
+    ("status", "age_s", "reason"),
+    [
+        (None, 200.0, "failed:blockhash_expired_never_landed"),
+        (
+            {"confirmationStatus": "confirmed", "err": {"InstructionError": [3, "Custom"]}},
+            45.0,
+            "failed:on_chain_error",
+        ),
+    ],
+    ids=["expired", "on-chain-error"],
+)
+async def test_a_reconciled_failure_says_which_failure_it_was(
+    monkeypatch: pytest.MonkeyPatch, status: dict[str, Any] | None, age_s: float, reason: str
+) -> None:
+    """A swap that never landed and a swap the chain rejected are different
+    accidents, and the log of the reconcile names which one it settled (the
+    tick's own last-attempt field is rewritten a few lines later, by design —
+    ``treasury._tick`` always ends with its own reason)."""
+    ctx = _ctx()
+    _fake_db(monkeypatch, ctx)
+    row = _submitted(age_s)
+    ctx.chain.rpc.statuses = [status]
+    outcomes = _wire_reconcile(monkeypatch, ctx, row)
+    with capture_logs() as logs:
+        await treasury_reconcile.reconcile_once(cast(ExecutorContext, ctx))
+    assert outcomes == [("failed", None, None)]
+    settled = [entry for entry in logs if entry["event"] == "meme_treasury_reconciled"]
+    assert [(entry["state"], entry["reason"]) for entry in settled] == [("failed", reason)]
 
 
 # --------------------------------------------------- simulated balances

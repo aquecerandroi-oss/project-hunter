@@ -1658,10 +1658,23 @@ Uma vez por tique do kill switch (10 s, depois do saldo de SOL ter sido relido �
    tesouraria nunca troca em papel), há um assinante, o kill switch não está travado.
 2. `wallet_sol < MEME_TREASURY_SOL_FLOOR` (padrão 0,30) — acima disso nada acontece.
 3. Antes de qualquer tentativa nova, o **reconcile** (T4.54b, `treasury_reconcile`): toda linha
-   `submitted` é consultada por `getSignatureStatuses` (`searchTransactionHistory`) — pousou →
-   `confirmed` com `sol_out_filled`/`wallet_sol_after` relidos da carteira; erro on-chain, ou
-   invisível há mais de 180 s (`SUBMITTED_MAX_AGE_S`, além da validade do blockhash) → `failed`;
-   senão continua `submitted`. Um reinício ou um estouro de confirmação **nunca reenvia**.
+   `submitted` **com assinatura** é consultada por `getSignatureStatuses`
+   (`searchTransactionHistory`) — pousou → `getTransaction` e o preenchimento **desta assinatura**
+   sai do `meta` (delta de lamports do pagador da taxa, `fill_from_transaction`, T4.84;
+   `wallet_sol_after = wallet_sol_before + sol_out_filled`), nunca de uma releitura viva da
+   carteira, que a mesa `spot/1` e a mesa meme movem entre o envio e o reconcile — esse número é a
+   entrada da tesouraria que o freio de perda diária subtrai (§16.3); erro on-chain, ou invisível
+   há mais de 180 s (`SUBMITTED_MAX_AGE_S`, além da validade do blockhash) → `failed`, e o **log**
+   do reconcile (`meme_treasury_reconciled`, campo `reason`) diz **qual** dos dois foi
+   (`failed:on_chain_error` / `failed:blockhash_expired_never_landed`) — o `last_result` do
+   heartbeat não serve para isso, porque o resto do tique sempre o reescreve com o próprio motivo;
+   senão continua `submitted`. Um `meta` ainda não servido, ilegível, ou que contradiga a direção
+   da troca (SOL não subiu) deixa a linha `submitted` para o próximo tique — nunca um
+   preenchimento de zero. Uma resposta do `getSignatureStatuses` com tamanho diferente do número
+   de assinaturas perguntadas **não liquida nada** no tique (antes as faltantes eram preenchidas
+   com `null` e uma linha com mais de 180 s virava `failed` sem prova nenhuma — achado da Astra
+   nesta revisão); um `null` explícito continua sendo prova. Um reinício, um estouro de
+   confirmação ou um envio ambíguo (item 9) **nunca reenviam** nada.
 4. O intervalo mínimo desde a última tentativa (`MEME_TREASURY_MIN_INTERVAL_S`, padrão 600 s) e o
    teto diário de USDC **confirmado ou ainda `submitted`** nas últimas 24 h
    (`MEME_TREASURY_MAX_USDC_PER_DAY`, padrão 50; `usdc_committed_last_24h`) permitem uma nova
@@ -1707,7 +1720,28 @@ Uma vez por tique do kill switch (10 s, depois do saldo de SOL ter sido relido �
 9. Assinatura com o mesmo `MemeSigner` do resto do executor; envio só com `allow_send=True` (`live`
    ligado); confirmação por `getSignatureStatuses` por no máximo `min(MEME_LIVE_CONFIRM_TIMEOUT_S,
    20 s)` — passado isso a linha fica `submitted` (contada no teto diário) e o reconcile do item 3
-   a resolve; um erro on-chain marca `failed` na hora.
+   a resolve; um erro on-chain marca `failed` na hora. **T4.84** (o que a auditoria da T4.83 achou
+   aqui, já corrigido na `spot/1` em T4.73b/T4.74-4):
+   - a assinatura é **derivada localmente** dos bytes assinados (b58 dos 64 bytes ed25519 — a
+     primeira assinatura da transação *é* o id dela) e gravada com `mark_submitted` **antes** do
+     broadcast, nunca lida da resposta da RPC, que pode se perder;
+   - qualquer exceção do `sendTransaction` é **ambígua** (a RPC pode ter repassado antes de a
+     resposta sumir): a linha fica `submitted` com a assinatura — dentro do teto diário de USDC
+     (`usdc_committed_last_24h` conta `submitted|confirmed`) e visível para o reconcile —, com
+     `send_unknown:<Tipo>` no heartbeat. Marcar `failed` ali era o defeito: a troca podia pousar,
+     sair do teto e sair do reconcile, e dois ou três *refills* assim estouravam o
+     `MEME_TREASURY_MAX_USDC_PER_DAY` sem nada acusar;
+   - só uma recusa local **inequívoca** é `failed`: `SendDisabled` (cliente sem `allow_send`, nada
+     saiu do processo), com `send_disabled` no heartbeat;
+   - `signer.sign` e a serialização ficam **dentro** do `try`: uma chave rotacionada ou corrompida
+     (ou uma assinatura de tamanho errado) recusa a linha por nome (`signer_failed:<Tipo>`) em vez
+     de deixá-la `simulated` para sempre — nunca enviada, mas também nunca explicada.
+   - a confirmação imediata mede o preenchimento pelo `meta` **desta assinatura**, igual ao item 3
+     (mesma função, `treasury_reconcile.landed_sol_fill`): antes ela relia o saldo vivo da carteira
+     e, se essa leitura falhasse, gravava `confirmed` com preenchimento **zero** — a entrada da
+     tesouraria sumia do freio de perda diária e a linha saía do reconcile para sempre (achado da
+     Astra nesta revisão). Agora um `meta` ilegível deixa a linha `submitted`
+     (`confirm_fill_unreadable`) e o reconcile a liquida.
 10. Uma linha em `meme_treasury_swaps` por tentativa (`0051_meme_treasury_swaps`), do primeiro
    `quoted` até `confirmed`/`failed`/`refused` — nunca apagada (mesma disciplina de
    `meme_wallet_trades`, §17.7 do `DATABASE.md`).
