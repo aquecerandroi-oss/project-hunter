@@ -203,3 +203,13 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **refutação:** limite superior do IC abaixo de +1 pp; **ou** não bate "não comprar nada"; **ou** menos de 150 decisões resolvidas (limite de dado — o controle de 10 entradas pedido pelo Everton é **verificação do mecanismo**, não julgamento: 10 entradas não estimam 2 pp)
 - **registro:** 23/09/2026 ~22:40 BRT, antes de qualquer decisão do braço
 - **status:** aberta
+
+## H-018 — Recompra do mesmo mint logo depois de um ganho
+
+- **origem:** perda real `Megawatt` 24/09/2026 04:38 BRT: a mesa vendeu no alvo (+0,0160, 4 s de posição) e **recomprou o mesmo mint 5 s depois**, 22 % mais caro; a segunda posição perdeu **−0,0519 (−78,7 %)**. A pausa por mint da T4.78 (300 s) só vale **depois de perda** (R64: 19 recompras após perda, 0 acertos); a recompra após **ganho** nunca foi medida. Everton autorizou pausar a mesa real e pediu "já arruma mais estratégia" (24/09 ~11 h BRT)
+- **variável:** recompra = nova entrada no mesmo mint até 300 s depois da saída anterior **com lucro**; direção `low` (a tese é que a recompra rende menos que as primeiras entradas)
+- **população:** todas as posições reais e apostas de papel das portas da mesa (`operator/*`, `flow_v2/*`, braços da porta `fluxo_e_holders`) com saída anterior por alvo no mesmo mint; uma recompra por par (mint, saída anterior); controle = as primeiras entradas das mesmas portas no mesmo período
+- **previsão:** as recompras depois de ganho rendem **menos −0,05 por SOL** que as primeiras entradas (IC 95 % bootstrap por mint inteiramente abaixo de zero) **e** a taxa de perda ≥ 50 % é pelo menos o dobro
+- **refutação:** limite superior do IC acima de −0,01 por SOL; **ou** menos de 20 recompras após ganho (limite de dado — registrar e não julgar)
+- **registro:** 24/09/2026 ~11:10 BRT, antes de contar qualquer recompra
+- **status:** em curso
