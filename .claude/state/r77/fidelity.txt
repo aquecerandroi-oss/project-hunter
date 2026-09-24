@@ -1,0 +1,18 @@
+n = 65 (de 65 elegíveis; R72 não resolveu 0)
+  PnL real por SOL (gasto total, saída histórica)                média -0.0542  mediana -0.0804
+  R72 no fill real, gasto total com aluguel (saída congelada)    média -0.0225  mediana -0.0810
+  R72 no fill real, gasto sem aluguel de ATA (saída congelada)   média +0.0052  mediana -0.0493
+  controlo R77 (compra modelada em t0 + 1,6 s)                   média +0.0041  mediana -0.0257
+  correlação R72-sem-aluguel × controlo R77: 0.90
+  controlo R77 − R72 sem aluguel: média -0.0011, mediana +0.0022
+  atraso fill real − t0 (s): mediana 0.1, min -0.9, max 7.6
+  posições com saída histórica diferente da congelada (alvo ≠ 1,15 ou recuo ≠ 10 %): 12
+  maiores diferenças (controlo R77 − R72 sem aluguel):
+    LVL          -0.6619  (fill real -0.8 s depois de t0)
+    MMKT         -0.2230  (fill real -0.3 s depois de t0)
+    RCITY        -0.0621  (fill real -0.2 s depois de t0)
+    Aura         -0.0560  (fill real +0.1 s depois de t0)
+    RIGBY        +0.0535  (fill real -0.3 s depois de t0)
+    XCrypto      +0.1681  (fill real -0.2 s depois de t0)
+    RUN          +0.2432  (fill real -0.1 s depois de t0)
+    BASK         +0.3049  (fill real -0.6 s depois de t0)

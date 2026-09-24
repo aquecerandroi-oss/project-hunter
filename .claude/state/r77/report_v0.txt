@@ -1,0 +1,326 @@
+# R77 — saída do relatório (H-016)
+
+## População real: 85 decisões, elegibilidade {'ok': 65, 'buraco>60s_ate_saida': 4, 'menos_de_3_trocas': 16}
+  compra nossa ausente da fita: 19 de 85
+### real — n = 65 decisões (uma por mint)
+  controlo (compra em t0): média por SOL +0.0041 a 1,6 s, +0.0070 a 5 s; vitórias 30; motivos {'target': 28, 'time_stop': 1, 'trailing': 36}
+  fidelidade: PnL real por SOL médio -0.0542 × controlo simulado +0.0041; sinal igual em 55/65; correlação 0.66
+  | X | W | entradas | D vs controlo [IC 95 %] p | Holm | D a 5 s [IC] | vs nada [IC] | moinho |
+  | 3 % | 20 s | 38 | +0.0060 [-0.0443, +0.0564] p=0.8186 | 1.000 | -0.0009 [-0.0578, +0.0538] | +0.0101 [-0.0207, +0.0414] | NÃO CONFIRMA |
+  | 5 % | 20 s | 30 | -0.0100 [-0.0581, +0.0385] p=0.6924 | 1.000 | -0.0179 [-0.0772, +0.0400] | -0.0060 [-0.0307, +0.0193] | REFUTA |
+  | 8 % | 20 s | 25 | -0.0141 [-0.0726, +0.0423] p=0.6424 | 1.000 | -0.0239 [-0.0840, +0.0359] | -0.0100 [-0.0465, +0.0208] | REFUTA |
+  | 12 % | 20 s | 20 | -0.0211 [-0.0797, +0.0351] p=0.4858 | 1.000 | -0.0338 [-0.0943, +0.0257] | -0.0170 [-0.0515, +0.0118] | REFUTA |
+  | 3 % | 60 s | 55 | +0.0198 [-0.0361, +0.0747] p=0.5014 | 1.000 | +0.0111 [-0.0520, +0.0711] | +0.0239 [-0.0187, +0.0666] | NÃO CONFIRMA |
+  | 5 % | 60 s | 50 | +0.0088 [-0.0469, +0.0634] p=0.7629 | 1.000 | +0.0004 [-0.0654, +0.0639] | +0.0129 [-0.0264, +0.0524] | NÃO CONFIRMA |
+  | 8 % | 60 s | 42 | +0.0031 [-0.0605, +0.0650] p=0.9251 | 1.000 | -0.0069 [-0.0744, +0.0612] | +0.0072 [-0.0364, +0.0475] | NÃO CONFIRMA |
+  | 12 % | 60 s | 34 | -0.0170 [-0.0818, +0.0474] p=0.6110 | 1.000 | -0.0251 [-0.0937, +0.0448] | -0.0130 [-0.0539, +0.0252] | REFUTA |
+  X=3 % W=20 s
+  entradas 38/65 (58 %); atraso mediano do gatilho 8.7 s; nível médio das entradas +0.0173; gatilho fora do fim do slot: 12
+  vitórias do controlo 30: perdidas por não entrar 14 (+0.2099 SOL); entrou e não ganhou 3
+  vitórias da política 20 (controlo 30); PnL somado política +0.0543 SOL × controlo +0.0215 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 16/35 = 0.46; política 13/18 = 0.72
+  das perdas históricas que nunca passaram do custo presentes (21): evitadas 7, viradas 5, melhoradas (ainda perda) 5, iguais/piores 4
+  X=5 % W=20 s
+  entradas 30/65 (46 %); atraso mediano do gatilho 8.2 s; nível médio das entradas -0.0129; gatilho fora do fim do slot: 12
+  vitórias do controlo 30: perdidas por não entrar 21 (+0.2875 SOL); entrou e não ganhou 2
+  vitórias da política 13 (controlo 30); PnL somado política -0.0147 SOL × controlo +0.0215 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 16/35 = 0.46; política 12/17 = 0.71
+  das perdas históricas que nunca passaram do custo presentes (21): evitadas 7, viradas 5, melhoradas (ainda perda) 5, iguais/piores 4
+  X=8 % W=20 s
+  entradas 25/65 (38 %); atraso mediano do gatilho 9.2 s; nível médio das entradas -0.0259; gatilho fora do fim do slot: 12
+  vitórias do controlo 30: perdidas por não entrar 23 (+0.3158 SOL); entrou e não ganhou 2
+  vitórias da política 11 (controlo 30); PnL somado política -0.0233 SOL × controlo +0.0215 SOL
+  perdas >= 50 %: controlo 2, política 1 (criadas 1, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 16/35 = 0.46; política 9/14 = 0.64
+  das perdas históricas que nunca passaram do custo presentes (21): evitadas 9, viradas 5, melhoradas (ainda perda) 5, iguais/piores 2
+  X=12 % W=20 s
+  entradas 20/65 (31 %); atraso mediano do gatilho 8.5 s; nível médio das entradas -0.0552; gatilho fora do fim do slot: 12
+  vitórias do controlo 30: perdidas por não entrar 25 (+0.3292 SOL); entrou e não ganhou 2
+  vitórias da política 7 (controlo 30); PnL somado política -0.0555 SOL × controlo +0.0215 SOL
+  perdas >= 50 %: controlo 2, política 1 (criadas 1, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 16/35 = 0.46; política 8/13 = 0.62
+  das perdas históricas que nunca passaram do custo presentes (21): evitadas 10, viradas 4, melhoradas (ainda perda) 5, iguais/piores 2
+  X=3 % W=60 s
+  entradas 55/65 (85 %); atraso mediano do gatilho 14.0 s; nível médio das entradas +0.0282; gatilho fora do fim do slot: 16
+  vitórias do controlo 30: perdidas por não entrar 5 (+0.0581 SOL); entrou e não ganhou 6
+  vitórias da política 29 (controlo 30); PnL somado política +0.1168 SOL × controlo +0.0215 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 16/35 = 0.46; política 16/26 = 0.62
+  das perdas históricas que nunca passaram do custo presentes (21): evitadas 5, viradas 6, melhoradas (ainda perda) 6, iguais/piores 4
+  X=5 % W=60 s
+  entradas 50/65 (77 %); atraso mediano do gatilho 16.8 s; nível médio das entradas +0.0167; gatilho fora do fim do slot: 15
+  vitórias do controlo 30: perdidas por não entrar 8 (+0.1165 SOL); entrou e não ganhou 6
+  vitórias da política 25 (controlo 30); PnL somado política +0.0660 SOL × controlo +0.0215 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 16/35 = 0.46; política 16/25 = 0.64
+  das perdas históricas que nunca passaram do custo presentes (21): evitadas 5, viradas 6, melhoradas (ainda perda) 6, iguais/piores 4
+  X=8 % W=60 s
+  entradas 42/65 (65 %); atraso mediano do gatilho 17.0 s; nível médio das entradas +0.0112; gatilho fora do fim do slot: 15
+  vitórias do controlo 30: perdidas por não entrar 16 (+0.2142 SOL); entrou e não ganhou 5
+  vitórias da política 20 (controlo 30); PnL somado política +0.0575 SOL × controlo +0.0215 SOL
+  perdas >= 50 %: controlo 2, política 1 (criadas 1, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 16/35 = 0.46; política 14/22 = 0.64
+  das perdas históricas que nunca passaram do custo presentes (21): evitadas 5, viradas 7, melhoradas (ainda perda) 7, iguais/piores 2
+  X=12 % W=60 s
+  entradas 34/65 (52 %); atraso mediano do gatilho 17.2 s; nível médio das entradas -0.0248; gatilho fora do fim do slot: 16
+  vitórias do controlo 30: perdidas por não entrar 19 (+0.2483 SOL); entrou e não ganhou 7
+  vitórias da política 13 (controlo 30); PnL somado política -0.0347 SOL × controlo +0.0215 SOL
+  perdas >= 50 %: controlo 2, política 1 (criadas 1, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 16/35 = 0.46; política 14/21 = 0.67
+  das perdas históricas que nunca passaram do custo presentes (21): evitadas 7, viradas 5, melhoradas (ainda perda) 7, iguais/piores 2
+  **Veredito (real): REFUTA**
+    - (a) nenhuma célula com IC inferior > +0,01 (maior = -0.0361)
+    - (b) melhor célula X=3% W=60s (D +0.0198) na borda em X
+    - melhor célula X=3% W=60s: D +0.0198 (IC inf -0.0361), 5 s +0.0111, nível +0.0239
+    melhor célula X=3 % W=60 s; fingerprint do moinho: ver cache
+  sensibilidade `slotfinal` (real, 1,6 s):
+    X=3 % W=20 s: entradas 36; D +0.0012 [-0.0498, +0.0522] p=0.9638
+    X=5 % W=20 s: entradas 30; D -0.0100 [-0.0581, +0.0385] p=0.6924
+    X=8 % W=20 s: entradas 25; D -0.0149 [-0.0736, +0.0415] p=0.6251
+    X=12 % W=20 s: entradas 19; D -0.0188 [-0.0779, +0.0377] p=0.5361
+    X=3 % W=60 s: entradas 53; D +0.0146 [-0.0416, +0.0710] p=0.6188
+    X=5 % W=60 s: entradas 49; D +0.0057 [-0.0505, +0.0608] p=0.8479
+    X=8 % W=60 s: entradas 41; D -0.0001 [-0.0638, +0.0618] p=0.9978
+    X=12 % W=60 s: entradas 33; D -0.0075 [-0.0723, +0.0570] p=0.8220
+  sensibilidade `photos` (real, 1,6 s):
+    X=3 % W=20 s: entradas 39; D +0.0095 [-0.0414, +0.0605] p=0.7252; gatilhos por foto 1
+    X=5 % W=20 s: entradas 31; D -0.0066 [-0.0556, +0.0432] p=0.7997; gatilhos por foto 1
+    X=8 % W=20 s: entradas 26; D -0.0106 [-0.0698, +0.0463] p=0.7317; gatilhos por foto 1
+    X=12 % W=20 s: entradas 20; D -0.0211 [-0.0797, +0.0351] p=0.4858; gatilhos por foto 0
+    X=3 % W=60 s: entradas 56; D +0.0232 [-0.0334, +0.0792] p=0.4324; gatilhos por foto 1
+    X=5 % W=60 s: entradas 51; D +0.0122 [-0.0443, +0.0677] p=0.6766; gatilhos por foto 1
+    X=8 % W=60 s: entradas 43; D +0.0066 [-0.0578, +0.0690] p=0.8414; gatilhos por foto 1
+    X=12 % W=60 s: entradas 35; D -0.0142 [-0.0798, +0.0507] p=0.6699; gatilhos por foto 1
+  sensibilidade horizonte fixo 370 s: n = 34
+    X=3 % W=20 s: D -0.0222 [-0.0773, +0.0325] p=0.4319
+    X=5 % W=20 s: D -0.0556 [-0.1112, +0.0010] p=0.0615
+    X=8 % W=20 s: D -0.0737 [-0.1575, +0.0002] p=0.0682
+    X=12 % W=20 s: D -0.0861 [-0.1676, -0.0152] p=0.0260
+    X=3 % W=60 s: D +0.0058 [-0.0359, +0.0470] p=0.7918
+    X=5 % W=60 s: D -0.0280 [-0.0807, +0.0218] p=0.2898
+    X=8 % W=60 s: D -0.0503 [-0.1393, +0.0294] p=0.2628
+    X=12 % W=60 s: D -0.0749 [-0.1651, +0.0075] p=0.0984
+### real — só pista de eventos (descritivo) — n = 53 decisões (uma por mint)
+  controlo (compra em t0): média por SOL -0.0015 a 1,6 s, +0.0025 a 5 s; vitórias 25; motivos {'target': 23, 'time_stop': 0, 'trailing': 30}
+  fidelidade: PnL real por SOL médio -0.0529 × controlo simulado -0.0015; sinal igual em 45/53; correlação 0.77
+  | X | W | entradas | D vs controlo [IC 95 %] p | Holm | D a 5 s [IC] | vs nada [IC] | moinho |
+  | 3 % | 20 s | 31 | +0.0162 [-0.0431, +0.0761] p=0.6038 | 1.000 | +0.0083 [-0.0462, +0.0638] | +0.0147 [-0.0189, +0.0503] | NÃO CONFIRMA |
+  | 5 % | 20 s | 24 | -0.0003 [-0.0555, +0.0566] p=0.9921 | 1.000 | -0.0076 [-0.0637, +0.0496] | -0.0017 [-0.0273, +0.0244] | NÃO CONFIRMA |
+  | 8 % | 20 s | 21 | +0.0100 [-0.0471, +0.0682] p=0.7347 | 1.000 | -0.0113 [-0.0693, +0.0479] | +0.0086 [-0.0187, +0.0365] | NÃO CONFIRMA |
+  | 12 % | 20 s | 16 | +0.0011 [-0.0566, +0.0601] p=0.9701 | 1.000 | -0.0235 [-0.0812, +0.0351] | -0.0003 [-0.0248, +0.0245] | NÃO CONFIRMA |
+  | 3 % | 60 s | 46 | +0.0369 [-0.0271, +0.1013] p=0.2746 | 1.000 | +0.0269 [-0.0340, +0.0879] | +0.0354 [-0.0124, +0.0834] | NÃO CONFIRMA |
+  | 5 % | 60 s | 42 | +0.0209 [-0.0426, +0.0847] p=0.5268 | 1.000 | +0.0140 [-0.0524, +0.0792] | +0.0194 [-0.0231, +0.0631] | NÃO CONFIRMA |
+  | 8 % | 60 s | 35 | +0.0297 [-0.0352, +0.0945] p=0.3676 | 1.000 | +0.0083 [-0.0592, +0.0774] | +0.0282 [-0.0091, +0.0657] | NÃO CONFIRMA |
+  | 12 % | 60 s | 28 | +0.0112 [-0.0557, +0.0780] p=0.7491 | 1.000 | -0.0077 [-0.0776, +0.0629] | +0.0097 [-0.0262, +0.0455] | NÃO CONFIRMA |
+  X=3 % W=20 s
+  entradas 31/53 (58 %); atraso mediano do gatilho 8.1 s; nível médio das entradas +0.0251; gatilho fora do fim do slot: 8
+  vitórias do controlo 25: perdidas por não entrar 12 (+0.1791 SOL); entrou e não ganhou 2
+  vitórias da política 18 (controlo 25); PnL somado política +0.0545 SOL × controlo -0.0055 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 11/28 = 0.39; política 9/13 = 0.69
+  das perdas históricas que nunca passaram do custo presentes (17): evitadas 5, viradas 5, melhoradas (ainda perda) 4, iguais/piores 3
+  X=5 % W=20 s
+  entradas 24/53 (45 %); atraso mediano do gatilho 6.4 s; nível médio das entradas -0.0038; gatilho fora do fim do slot: 9
+  vitórias do controlo 25: perdidas por não entrar 18 (+0.2458 SOL); entrou e não ganhou 1
+  vitórias da política 12 (controlo 25); PnL somado política -0.0064 SOL × controlo -0.0055 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 11/28 = 0.39; política 8/12 = 0.67
+  das perdas históricas que nunca passaram do custo presentes (17): evitadas 5, viradas 5, melhoradas (ainda perda) 4, iguais/piores 3
+  X=8 % W=20 s
+  entradas 21/53 (40 %); atraso mediano do gatilho 8.3 s; nível médio das entradas +0.0216; gatilho fora do fim do slot: 10
+  vitórias do controlo 25: perdidas por não entrar 19 (+0.2570 SOL); entrou e não ganhou 1
+  vitórias da política 11 (controlo 25); PnL somado política +0.0318 SOL × controlo -0.0055 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 11/28 = 0.39; política 6/10 = 0.60
+  das perdas históricas que nunca passaram do custo presentes (17): evitadas 6, viradas 5, melhoradas (ainda perda) 4, iguais/piores 2
+  X=12 % W=20 s
+  entradas 16/53 (30 %); atraso mediano do gatilho 6.9 s; nível médio das entradas -0.0011; gatilho fora do fim do slot: 11
+  vitórias do controlo 25: perdidas por não entrar 21 (+0.2705 SOL); entrou e não ganhou 1
+  vitórias da política 7 (controlo 25); PnL somado política -0.0013 SOL × controlo -0.0055 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 11/28 = 0.39; política 5/9 = 0.56
+  das perdas históricas que nunca passaram do custo presentes (17): evitadas 7, viradas 4, melhoradas (ainda perda) 4, iguais/piores 2
+  X=3 % W=60 s
+  entradas 46/53 (87 %); atraso mediano do gatilho 11.5 s; nível médio das entradas +0.0408; gatilho fora do fim do slot: 11
+  vitórias do controlo 25: perdidas por não entrar 4 (+0.0504 SOL); entrou e não ganhou 4
+  vitórias da política 27 (controlo 25); PnL somado política +0.1314 SOL × controlo -0.0055 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 11/28 = 0.39; política 11/19 = 0.58
+  das perdas históricas que nunca passaram do custo presentes (17): evitadas 3, viradas 6, melhoradas (ainda perda) 5, iguais/piores 3
+  X=5 % W=60 s
+  entradas 42/53 (79 %); atraso mediano do gatilho 17.3 s; nível médio das entradas +0.0245; gatilho fora do fim do slot: 11
+  vitórias do controlo 25: perdidas por não entrar 7 (+0.1088 SOL); entrou e não ganhou 4
+  vitórias da política 23 (controlo 25); PnL somado política +0.0719 SOL × controlo -0.0055 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 11/28 = 0.39; política 11/19 = 0.58
+  das perdas históricas que nunca passaram do custo presentes (17): evitadas 3, viradas 6, melhoradas (ainda perda) 5, iguais/piores 3
+  X=8 % W=60 s
+  entradas 35/53 (66 %); atraso mediano do gatilho 15.1 s; nível médio das entradas +0.0427; gatilho fora do fim do slot: 12
+  vitórias do controlo 25: perdidas por não entrar 14 (+0.1956 SOL); entrou e não ganhou 3
+  vitórias da política 19 (controlo 25); PnL somado política +0.1046 SOL × controlo -0.0055 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 11/28 = 0.39; política 9/16 = 0.56
+  das perdas históricas que nunca passaram do custo presentes (17): evitadas 3, viradas 7, melhoradas (ainda perda) 5, iguais/piores 2
+  X=12 % W=60 s
+  entradas 28/53 (53 %); atraso mediano do gatilho 15.8 s; nível médio das entradas +0.0184; gatilho fora do fim do slot: 14
+  vitórias do controlo 25: perdidas por não entrar 16 (+0.2127 SOL); entrou e não ganhou 5
+  vitórias da política 13 (controlo 25); PnL somado política +0.0360 SOL × controlo -0.0055 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 11/28 = 0.39; política 9/15 = 0.60
+  das perdas históricas que nunca passaram do custo presentes (17): evitadas 5, viradas 5, melhoradas (ainda perda) 5, iguais/piores 2
+
+## População paper: 596 decisões, elegibilidade {'ok': 486, 'menos_de_3_trocas': 58, 'buraco>60s_ate_saida': 51, 'sim_nao_ok': 1}
+### paper — n = 486 decisões (uma por mint)
+  controlo (compra em t0): média por SOL -0.0221 a 1,6 s, -0.0183 a 5 s; vitórias 181; motivos {'target': 165, 'time_stop': 15, 'trailing': 306}
+  | X | W | entradas | D vs controlo [IC 95 %] p | Holm | D a 5 s [IC] | vs nada [IC] | moinho |
+  | 3 % | 20 s | 359 | +0.0199 [+0.0034, +0.0367] p=0.0203 | 0.142 | +0.0111 [-0.0083, +0.0301] | -0.0022 [-0.0167, +0.0124] | REFUTA |
+  | 5 % | 20 s | 312 | +0.0193 [+0.0007, +0.0383] p=0.0474 | 0.284 | +0.0127 [-0.0089, +0.0339] | -0.0027 [-0.0163, +0.0108] | REFUTA |
+  | 8 % | 20 s | 263 | +0.0147 [-0.0057, +0.0352] p=0.1573 | 0.629 | +0.0106 [-0.0117, +0.0327] | -0.0074 [-0.0200, +0.0052] | REFUTA |
+  | 12 % | 20 s | 185 | +0.0106 [-0.0101, +0.0312] p=0.3164 | 0.949 | +0.0121 [-0.0110, +0.0353] | -0.0115 [-0.0225, -0.0011] | REFUTA |
+  | 3 % | 60 s | 446 | +0.0228 [+0.0069, +0.0389] p=0.0065 | 0.052 | +0.0151 [-0.0024, +0.0325] | +0.0008 [-0.0170, +0.0187] | REFUTA |
+  | 5 % | 60 s | 417 | +0.0153 [-0.0035, +0.0338] p=0.1103 | 0.551 | +0.0082 [-0.0135, +0.0292] | -0.0068 [-0.0238, +0.0106] | REFUTA |
+  | 8 % | 60 s | 385 | +0.0109 [-0.0105, +0.0324] p=0.3166 | 0.949 | +0.0077 [-0.0147, +0.0299] | -0.0112 [-0.0276, +0.0054] | REFUTA |
+  | 12 % | 60 s | 329 | -0.0002 [-0.0227, +0.0221] p=0.9839 | 0.984 | +0.0019 [-0.0250, +0.0276] | -0.0223 [-0.0367, -0.0078] | REFUTA |
+  X=3 % W=20 s
+  entradas 359/486 (74 %); atraso mediano do gatilho 5.4 s; nível médio das entradas -0.0030; gatilho fora do fim do slot: 145
+  vitórias do controlo 181: perdidas por não entrar 60 (+0.6841 SOL); entrou e não ganhou 23
+  vitórias da política 151 (controlo 181); PnL somado política -0.0429 SOL × controlo -0.5010 SOL
+  perdas >= 50 %: controlo 7, política 3 (criadas 0, evitadas 4)
+  perdas que nunca passaram do custo (simuladas): controlo 176/305 = 0.58; política 122/208 = 0.59
+  X=5 % W=20 s
+  entradas 312/486 (64 %); atraso mediano do gatilho 6.3 s; nível médio das entradas -0.0042; gatilho fora do fim do slot: 141
+  vitórias do controlo 181: perdidas por não entrar 89 (+0.9464 SOL); entrou e não ganhou 22
+  vitórias da política 131 (controlo 181); PnL somado política -0.0584 SOL × controlo -0.5010 SOL
+  perdas >= 50 %: controlo 7, política 2 (criadas 1, evitadas 6)
+  perdas que nunca passaram do custo (simuladas): controlo 176/305 = 0.58; política 104/181 = 0.57
+  X=8 % W=20 s
+  entradas 263/486 (54 %); atraso mediano do gatilho 7.7 s; nível médio das entradas -0.0137; gatilho fora do fim do slot: 124
+  vitórias do controlo 181: perdidas por não entrar 113 (+1.1636 SOL); entrou e não ganhou 24
+  vitórias da política 100 (controlo 181); PnL somado política -0.1764 SOL × controlo -0.5010 SOL
+  perdas >= 50 %: controlo 7, política 2 (criadas 2, evitadas 7)
+  perdas que nunca passaram do custo (simuladas): controlo 176/305 = 0.58; política 92/163 = 0.56
+  X=12 % W=20 s
+  entradas 185/486 (38 %); atraso mediano do gatilho 7.7 s; nível médio das entradas -0.0301; gatilho fora do fim do slot: 95
+  vitórias do controlo 181: perdidas por não entrar 146 (+1.4741 SOL); entrou e não ganhou 15
+  vitórias da política 63 (controlo 181); PnL somado política -0.2846 SOL × controlo -0.5010 SOL
+  perdas >= 50 %: controlo 7, política 2 (criadas 2, evitadas 7)
+  perdas que nunca passaram do custo (simuladas): controlo 176/305 = 0.58; política 76/122 = 0.62
+  X=3 % W=60 s
+  entradas 446/486 (92 %); atraso mediano do gatilho 8.1 s; nível médio das entradas +0.0009; gatilho fora do fim do slot: 182
+  vitórias do controlo 181: perdidas por não entrar 15 (+0.1364 SOL); entrou e não ganhou 39
+  vitórias da política 189 (controlo 181); PnL somado política +0.0357 SOL × controlo -0.5010 SOL
+  perdas >= 50 %: controlo 7, política 5 (criadas 1, evitadas 3)
+  perdas que nunca passaram do custo (simuladas): controlo 176/305 = 0.58; política 152/257 = 0.59
+  X=5 % W=60 s
+  entradas 417/486 (86 %); atraso mediano do gatilho 9.6 s; nível médio das entradas -0.0079; gatilho fora do fim do slot: 182
+  vitórias do controlo 181: perdidas por não entrar 34 (+0.3766 SOL); entrou e não ganhou 46
+  vitórias da política 172 (controlo 181); PnL somado política -0.1464 SOL × controlo -0.5010 SOL
+  perdas >= 50 %: controlo 7, política 5 (criadas 2, evitadas 4)
+  perdas que nunca passaram do custo (simuladas): controlo 176/305 = 0.58; política 147/245 = 0.60
+  X=8 % W=60 s
+  entradas 385/486 (79 %); atraso mediano do gatilho 13.9 s; nível médio das entradas -0.0141; gatilho fora do fim do slot: 165
+  vitórias do controlo 181: perdidas por não entrar 58 (+0.6091 SOL); entrou e não ganhou 57
+  vitórias da política 143 (controlo 181); PnL somado política -0.2650 SOL × controlo -0.5010 SOL
+  perdas >= 50 %: controlo 7, política 3 (criadas 3, evitadas 7)
+  perdas que nunca passaram do custo (simuladas): controlo 176/305 = 0.58; política 147/242 = 0.61
+  X=12 % W=60 s
+  entradas 329/486 (68 %); atraso mediano do gatilho 17.3 s; nível médio das entradas -0.0329; gatilho fora do fim do slot: 153
+  vitórias do controlo 181: perdidas por não entrar 86 (+0.8700 SOL); entrou e não ganhou 51
+  vitórias da política 113 (controlo 181); PnL somado política -0.5542 SOL × controlo -0.5010 SOL
+  perdas >= 50 %: controlo 7, política 4 (criadas 4, evitadas 7)
+  perdas que nunca passaram do custo (simuladas): controlo 176/305 = 0.58; política 134/216 = 0.62
+  **Veredito (paper): REFUTA**
+    - (a) nenhuma célula com IC inferior > +0,01 (maior = +0.0069)
+    - (b) melhor célula X=3% W=60s (D +0.0228) na borda em X
+    - melhor célula X=3% W=60s: D +0.0228 (IC inf +0.0069), 5 s +0.0151, nível +0.0008
+    melhor célula X=3 % W=60 s; fingerprint do moinho: ver cache
+  sensibilidade `slotfinal` (paper, 1,6 s):
+    X=3 % W=20 s: entradas 354; D +0.0195 [+0.0019, +0.0372] p=0.0320
+    X=5 % W=20 s: entradas 307; D +0.0178 [-0.0010, +0.0370] p=0.0708
+    X=8 % W=20 s: entradas 256; D +0.0155 [-0.0047, +0.0359] p=0.1328
+    X=12 % W=20 s: entradas 180; D +0.0121 [-0.0086, +0.0327] p=0.2511
+    X=3 % W=60 s: entradas 443; D +0.0227 [+0.0054, +0.0402] p=0.0109
+    X=5 % W=60 s: entradas 414; D +0.0140 [-0.0051, +0.0329] p=0.1539
+    X=8 % W=60 s: entradas 380; D +0.0072 [-0.0149, +0.0292] p=0.5246
+    X=12 % W=60 s: entradas 324; D +0.0024 [-0.0200, +0.0250] p=0.8375
+  sensibilidade `photos` (paper, 1,6 s):
+    X=3 % W=20 s: entradas 367; D +0.0215 [+0.0049, +0.0383] p=0.0111; gatilhos por foto 14
+    X=5 % W=20 s: entradas 320; D +0.0209 [+0.0024, +0.0400] p=0.0313; gatilhos por foto 13
+    X=8 % W=20 s: entradas 267; D +0.0158 [-0.0043, +0.0363] p=0.1293; gatilhos por foto 8
+    X=12 % W=20 s: entradas 189; D +0.0119 [-0.0089, +0.0327] p=0.2611; gatilhos por foto 7
+    X=3 % W=60 s: entradas 453; D +0.0240 [+0.0078, +0.0403] p=0.0040; gatilhos por foto 21
+    X=5 % W=60 s: entradas 424; D +0.0166 [-0.0024, +0.0354] p=0.0833; gatilhos por foto 19
+    X=8 % W=60 s: entradas 393; D +0.0092 [-0.0123, +0.0309] p=0.4020; gatilhos por foto 16
+    X=12 % W=60 s: entradas 339; D -0.0019 [-0.0245, +0.0211] p=0.8752; gatilhos por foto 18
+  sensibilidade horizonte fixo 370 s: n = 200
+    X=3 % W=20 s: D +0.0171 [-0.0069, +0.0417] p=0.1658
+    X=5 % W=20 s: D +0.0064 [-0.0210, +0.0349] p=0.6440
+    X=8 % W=20 s: D -0.0086 [-0.0396, +0.0225] p=0.5794
+    X=12 % W=20 s: D -0.0240 [-0.0538, +0.0066] p=0.1184
+    X=3 % W=60 s: D +0.0294 [+0.0061, +0.0537] p=0.0170
+    X=5 % W=60 s: D +0.0110 [-0.0161, +0.0389] p=0.4266
+    X=8 % W=60 s: D -0.0093 [-0.0411, +0.0233] p=0.5588
+    X=12 % W=60 s: D -0.0238 [-0.0558, +0.0089] p=0.1434
+### paper — só pista de eventos (descritivo) — n = 162 decisões (uma por mint)
+  controlo (compra em t0): média por SOL -0.0185 a 1,6 s, -0.0164 a 5 s; vitórias 65; motivos {'target': 56, 'time_stop': 6, 'trailing': 100}
+  | X | W | entradas | D vs controlo [IC 95 %] p | Holm | D a 5 s [IC] | vs nada [IC] | moinho |
+  | 3 % | 20 s | 115 | +0.0259 [-0.0043, +0.0560] p=0.0982 | 0.687 | +0.0256 [-0.0045, +0.0563] | +0.0074 [-0.0170, +0.0315] | NÃO CONFIRMA |
+  | 5 % | 20 s | 103 | +0.0193 [-0.0132, +0.0507] p=0.2407 | 1.000 | +0.0198 [-0.0140, +0.0539] | +0.0008 [-0.0246, +0.0253] | NÃO CONFIRMA |
+  | 8 % | 20 s | 88 | +0.0091 [-0.0263, +0.0435] p=0.6108 | 1.000 | +0.0070 [-0.0288, +0.0425] | -0.0094 [-0.0338, +0.0141] | REFUTA |
+  | 12 % | 20 s | 65 | +0.0001 [-0.0339, +0.0338] p=0.9949 | 1.000 | +0.0078 [-0.0304, +0.0455] | -0.0184 [-0.0396, +0.0017] | REFUTA |
+  | 3 % | 60 s | 143 | +0.0304 [-0.0015, +0.0608] p=0.0603 | 0.482 | +0.0325 [+0.0006, +0.0647] | +0.0119 [-0.0185, +0.0413] | NÃO CONFIRMA |
+  | 5 % | 60 s | 134 | +0.0276 [-0.0065, +0.0609] p=0.1150 | 0.690 | +0.0310 [-0.0038, +0.0660] | +0.0091 [-0.0219, +0.0388] | NÃO CONFIRMA |
+  | 8 % | 60 s | 124 | +0.0116 [-0.0261, +0.0489] p=0.5495 | 1.000 | +0.0130 [-0.0252, +0.0508] | -0.0069 [-0.0355, +0.0211] | REFUTA |
+  | 12 % | 60 s | 108 | -0.0076 [-0.0461, +0.0299] p=0.6857 | 1.000 | +0.0030 [-0.0386, +0.0456] | -0.0261 [-0.0531, +0.0005] | REFUTA |
+  X=3 % W=20 s
+  entradas 115/162 (71 %); atraso mediano do gatilho 5.5 s; nível médio das entradas +0.0104; gatilho fora do fim do slot: 48
+  vitórias do controlo 65: perdidas por não entrar 22 (+0.2444 SOL); entrou e não ganhou 6
+  vitórias da política 56 (controlo 65); PnL somado política +0.0702 SOL × controlo -0.1214 SOL
+  perdas >= 50 %: controlo 2, política 0 (criadas 0, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 56/97 = 0.58; política 43/59 = 0.73
+  X=5 % W=20 s
+  entradas 103/162 (64 %); atraso mediano do gatilho 6.0 s; nível médio das entradas +0.0012; gatilho fora do fim do slot: 49
+  vitórias do controlo 65: perdidas por não entrar 32 (+0.3414 SOL); entrou e não ganhou 5
+  vitórias da política 49 (controlo 65); PnL somado política +0.0140 SOL × controlo -0.1214 SOL
+  perdas >= 50 %: controlo 2, política 1 (criadas 1, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 56/97 = 0.58; política 34/54 = 0.63
+  X=8 % W=20 s
+  entradas 88/162 (54 %); atraso mediano do gatilho 8.2 s; nível médio das entradas -0.0173; gatilho fora do fim do slot: 43
+  vitórias do controlo 65: perdidas por não entrar 40 (+0.4219 SOL); entrou e não ganhou 10
+  vitórias da política 37 (controlo 65); PnL somado política -0.0724 SOL × controlo -0.1214 SOL
+  perdas >= 50 %: controlo 2, política 1 (criadas 1, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 56/97 = 0.58; política 33/51 = 0.65
+  X=12 % W=20 s
+  entradas 65/162 (40 %); atraso mediano do gatilho 6.1 s; nível médio das entradas -0.0459; gatilho fora do fim do slot: 34
+  vitórias do controlo 65: perdidas por não entrar 52 (+0.5283 SOL); entrou e não ganhou 5
+  vitórias da política 24 (controlo 65); PnL somado política -0.1552 SOL × controlo -0.1214 SOL
+  perdas >= 50 %: controlo 2, política 1 (criadas 1, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 56/97 = 0.58; política 29/41 = 0.71
+  X=3 % W=60 s
+  entradas 143/162 (88 %); atraso mediano do gatilho 8.3 s; nível médio das entradas +0.0135; gatilho fora do fim do slot: 57
+  vitórias do controlo 65: perdidas por não entrar 9 (+0.0839 SOL); entrou e não ganhou 9
+  vitórias da política 70 (controlo 65); PnL somado política +0.1160 SOL × controlo -0.1214 SOL
+  perdas >= 50 %: controlo 2, política 1 (criadas 1, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 56/97 = 0.58; política 50/73 = 0.68
+  X=5 % W=60 s
+  entradas 134/162 (83 %); atraso mediano do gatilho 8.7 s; nível médio das entradas +0.0111; gatilho fora do fim do slot: 58
+  vitórias do controlo 65: perdidas por não entrar 16 (+0.1723 SOL); entrou e não ganhou 9
+  vitórias da política 66 (controlo 65); PnL somado política +0.0959 SOL × controlo -0.1214 SOL
+  perdas >= 50 %: controlo 2, política 2 (criadas 2, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 56/97 = 0.58; política 42/68 = 0.62
+  X=8 % W=60 s
+  entradas 124/162 (77 %); atraso mediano do gatilho 12.9 s; nível médio das entradas -0.0090; gatilho fora do fim do slot: 51
+  vitórias do controlo 65: perdidas por não entrar 26 (+0.2909 SOL); entrou e não ganhou 17
+  vitórias da política 53 (controlo 65); PnL somado política -0.0466 SOL × controlo -0.1214 SOL
+  perdas >= 50 %: controlo 2, política 2 (criadas 2, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 56/97 = 0.58; política 46/71 = 0.65
+  X=12 % W=60 s
+  entradas 108/162 (67 %); atraso mediano do gatilho 14.8 s; nível médio das entradas -0.0391; gatilho fora do fim do slot: 48
+  vitórias do controlo 65: perdidas por não entrar 33 (+0.3624 SOL); entrou e não ganhou 17
+  vitórias da política 39 (controlo 65); PnL somado política -0.2213 SOL × controlo -0.1214 SOL
+  perdas >= 50 %: controlo 2, política 2 (criadas 2, evitadas 2)
+  perdas que nunca passaram do custo (simuladas): controlo 56/97 = 0.58; política 45/69 = 0.65
+
+## Hipótese inteira: REFUTA (reais: REFUTA; papel: REFUTA)
