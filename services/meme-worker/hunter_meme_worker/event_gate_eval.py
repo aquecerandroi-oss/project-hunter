@@ -104,6 +104,7 @@ def _handle_logs(rt: EventGateRuntime, notif: LogsNotification) -> str | None:
         )
         state.apply_trade(trade)
         rt.reserves[mint] = EventReserves(trade.virtual_sol_reserves, trade.virtual_token_reserves)
+        rt.pullback.observe_trade(mint, trade)  # T4.91: O(1) unless this mint is armed
     return mint
 
 
@@ -228,6 +229,7 @@ async def evaluate_mint(rt: EventGateRuntime, mint: str, now: datetime) -> None:
     shadow = rt.config.mode == GATE_SHADOW
     to_insert: list[tuple[RuleSetSpec, list[ProposalDraft]]] = []
     trail_candidates: list[RefusalTrailRow] = []
+    to_arm: list[tuple[RuleSetSpec, list[ProposalDraft]]] = []  # T4.91: wait for the pullback
     for spec in caches.specs:
         already_positions = caches.open_mints.get(spec.id, frozenset())
         already_proposed = caches.recently_proposed_mints(spec.id, now=now)
@@ -244,19 +246,22 @@ async def evaluate_mint(rt: EventGateRuntime, mint: str, now: datetime) -> None:
             _record_shadow(rt, caches, spec, mint, row, outcome, already_proposed, now=now)
             continue  # F6/F7: shadow never touches the trail or the database
         if outcome.drafts:
-            to_insert.append((spec, outcome.drafts))
+            (to_insert if spec.entry_pullback is None else to_arm).append((spec, outcome.drafts))
         candidate = _trail_row(spec, row, outcome.refusals)
-        if candidate is not None:
+        if candidate is not None and (spec.entry_pullback is None or not outcome.drafts):
             trail_candidates.append(candidate)
     if shadow:
         return
+    to_arm = rt.pullback.armable(to_arm, mint, now)  # T4.91: an armed/spent mint records nothing
     # T4.89: the tape at ``now``, before the first ``await`` — only when this
     # evaluation has something to record.
     tape = (
         capture_tape(rt, state, as_of=now, series=SERIES_EVENT)
-        if rt.config.decision_tape and (to_insert or trail_candidates)
+        if rt.config.decision_tape and (to_insert or trail_candidates or to_arm)
         else None
     )
+    shared = bool(to_insert or trail_candidates)  # T4.91: another row of now offers the tape
+    rt.pullback.arm_gate(to_arm, row, state, rt.reserves.get(mint), tape, now, shared)
     if trail_candidates:
         queue_trail(rt, mint, trail_candidates, tape)
     if not to_insert:

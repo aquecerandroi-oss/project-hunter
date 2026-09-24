@@ -33,7 +33,10 @@ connection is never idle with zero subscriptions (F2). (6)
 :func:`_trail_flush_loop` writes the per-mint refusal trail queued by
 ``event_gate_eval.py`` at most once a minute per mint (F6/F7). (7) since
 T4.89, :func:`_tape_flush_loop` writes the decision tapes the evaluations
-offered (``decision_tape_writer.py``) and prunes them once a UTC day.
+offered (``decision_tape_writer.py``) and prunes them once a UTC day. (8)
+since T4.91, :func:`_pullback_loop` expires the mints armed for their
+pullback and writes their outcome rows (``event_gate_pullback.py``); the
+trigger itself fires in :func:`_evaluate_loop`, before the debounce.
 
 :func:`run_event_gate_forever` (F2) is what ``main.py`` actually runs: any
 exception out of :func:`run_event_gate` — including one that killed its own
@@ -45,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from hunter_core.domain.types import utcnow
@@ -54,6 +58,11 @@ from hunter_meme_worker.event_gate_eval import (
     evaluate_mint,
     flush_pending_trail,
     handle_reconnect,
+)
+from hunter_meme_worker.event_gate_pullback import (
+    expire_pullbacks,
+    fire_pullbacks,
+    flush_pullback_trail,
 )
 from hunter_meme_worker.event_gate_runtime import EventGateRuntime
 from hunter_meme_worker.event_gate_stats import heartbeat_fields as event_gate_heartbeat_fields
@@ -67,6 +76,7 @@ logger = get_logger(__name__)
 HEARTBEAT_CYCLE_S = 5
 TRAIL_FLUSH_CYCLE_S = 15
 TAPE_FLUSH_CYCLE_S = 2
+PULLBACK_CYCLE_S = 1
 RESTART_DELAY_S = 5
 
 __all__ = ["EventGateRuntime", "run_event_gate", "run_event_gate_forever"]
@@ -113,9 +123,15 @@ async def _evaluate_loop(rt: EventGateRuntime, queue: asyncio.Queue[Notification
         except Exception as exc:  # a malformed frame is dropped, not a crash
             _log_bad_frame(rt, "meme_event_gate_bad_frame", exc, mint=None)
             continue
+        rt.pullback.mark_processed(notif.received_at)  # T4.91: the FIFO proof of an expiry
         if mint is None:
             continue
         rt.stats.record_event(now)
+        if rt.pullback.is_armed(mint):  # T4.91: the trade is the trigger - never debounced
+            try:  # decided here, inserted by ``rt.pullback_inserts`` - this loop never waits
+                fire_pullbacks(rt, mint, max(utcnow(), now + timedelta(microseconds=1)))
+            except Exception as exc:
+                _log_bad_frame(rt, "meme_event_gate_pullback_failed", exc, mint=mint)
         if rt.debouncer.poll(mint, time.monotonic()):
             try:
                 await evaluate_mint(rt, mint, now)
@@ -155,6 +171,18 @@ async def _tape_flush_loop(rt: EventGateRuntime) -> None:
         await rt.tapes.maybe_prune(rt.lab.session_factory, utcnow())
 
 
+async def _pullback_loop(rt: EventGateRuntime) -> None:
+    """T4.91: expire the armed mints whose window is over, write the outcome
+    rows — a failure is logged, never a reason to stop the gate."""
+    while True:
+        await asyncio.sleep(PULLBACK_CYCLE_S)
+        try:
+            expire_pullbacks(rt, utcnow())
+            await flush_pullback_trail(rt)
+        except Exception as exc:
+            logger.warning("meme_event_gate_pullback_loop_failed", error=str(exc))
+
+
 async def _slot_subscribe_loop(rt: EventGateRuntime) -> None:
     """Metrics §5: ``slotSubscribe`` once, retried until it sticks — sets
     ``rt.slot`` (``event_to_proposal_s``) and keeps at least one subscription
@@ -186,6 +214,8 @@ async def _heartbeat_loop(rt: EventGateRuntime) -> None:
             rt.stats, now=utcnow(), enabled=True, cache_sizes=sizes
         )
         fields.update(rt.tapes.heartbeat_fields())
+        fields.update(rt.pullback.heartbeat_fields())
+        fields.update(rt.pullback_inserts.heartbeat_fields("event_gate_pullback_insert_"))
         try:
             await rt.heartbeat(fields)
         except Exception:  # a heartbeat that cannot be written must not stop the gate
@@ -198,6 +228,14 @@ async def run_event_gate(rt: EventGateRuntime) -> None:
     while rt.lab.caches is None or not rt.lab.caches.specs:  # noqa: ASYNC110 — polling a plain field, not an Event
         await asyncio.sleep(1)
     queue: asyncio.Queue[Notification] = asyncio.Queue(maxsize=rt.config.queue_size)
+    try:
+        await _run_loops(rt, queue)
+    except asyncio.CancelledError:
+        await rt.pullback_inserts.aclose()  # T4.91: no insert outlives the gate's shutdown
+        raise
+
+
+async def _run_loops(rt: EventGateRuntime, queue: asyncio.Queue[Notification]) -> None:
     async with asyncio.TaskGroup() as group:
         group.create_task(_slot_subscribe_loop(rt), name="meme-event-gate-slot")
         group.create_task(_sync_loop(rt), name="meme-event-gate-sync")
@@ -206,6 +244,7 @@ async def run_event_gate(rt: EventGateRuntime) -> None:
         group.create_task(_flush_loop(rt), name="meme-event-gate-flush")
         group.create_task(_trail_flush_loop(rt), name="meme-event-gate-trail-flush")
         group.create_task(_tape_flush_loop(rt), name="meme-event-gate-tape-flush")
+        group.create_task(_pullback_loop(rt), name="meme-event-gate-pullback")
         group.create_task(_heartbeat_loop(rt), name="meme-event-gate-heartbeat")
 
 

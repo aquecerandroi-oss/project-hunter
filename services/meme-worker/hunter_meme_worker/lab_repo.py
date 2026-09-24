@@ -23,6 +23,7 @@ from sqlalchemy import text
 from hunter_meme_worker.lab_models import RuleSetSpec
 from hunter_meme_worker.lab_rows import ApprovedProposal, CommandRow, snapshot_from_row
 from hunter_meme_worker.proposals import GateRow, ProposalDraft
+from hunter_meme_worker.rule_set_loading import specs_from_rows
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -139,20 +140,9 @@ _PROPOSAL_STATUS = text("SELECT status FROM meme_proposals WHERE id = :id")
 
 
 async def load_active_rule_sets(session: AsyncSession) -> list[RuleSetSpec]:
-    rows = (await session.execute(_RULE_SETS)).mappings().all()
-    return [
-        RuleSetSpec.from_params(
-            id=str(r["id"]),
-            name=str(r["name"]),
-            version=str(r["version"]),
-            kind=str(r["kind"]),
-            exp_ref=r["exp_ref"],
-            status=str(r["status"]),
-            code_ref=str(r["code_ref"]),
-            params=r["params"],
-        )
-        for r in rows
-    ]
+    """Every active set that parses; one that does not is skipped, logged and
+    counted — never the whole list (``rule_set_loading``, T4.91 review)."""
+    return specs_from_rows((await session.execute(_RULE_SETS)).mappings().all())
 
 
 async def load_gate_rows(

@@ -102,3 +102,11 @@ meme_token_bonding_curve_replaced_total = Counter(
     ["mayhem_enabled"],
     registry=registry,
 )
+
+meme_rule_set_load_failed_total = Counter(
+    "hunter_meme_rule_set_load_failed_total",
+    "Active rule sets whose params did not parse and were skipped by the Lab's "
+    "loader (T4.91 review) - the other sets, the real desk included, still load.",
+    ["rule_set"],
+    registry=registry,
+)

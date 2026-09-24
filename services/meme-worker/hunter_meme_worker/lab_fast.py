@@ -49,6 +49,7 @@ from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
 from hunter_core.logging import get_logger
+from hunter_meme_worker.entry_pullback import EVENT_LANE_ONLY
 from hunter_meme_worker.event_gate_caches import refresh_event_gate_caches
 from hunter_meme_worker.gate_refusal_trail import (
     RefusalTrailRow,
@@ -188,6 +189,11 @@ async def fast_gate_step(
                     pedigree=pedigree,
                     e2b=e2b,
                 )
+                if outcome.drafts and spec.entry_pullback is not None:
+                    # T4.91: a pullback set waits on the live tape - only the event lane
+                    # arms it; no draft, no trail row, no probe population here.
+                    spec_refusals[EVENT_LANE_ONLY] += len(outcome.drafts)
+                    continue
                 spec_refusals.update(outcome.refusals)
                 drafts.extend(outcome.drafts)
                 candidate = _trail_row(spec, row, outcome.refusals)

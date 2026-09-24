@@ -9,7 +9,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
 
+from hunter_meme_worker.bounded_tasks import BoundedTasks
 from hunter_meme_worker.decision_tape_writer import DecisionTapeWriter
+from hunter_meme_worker.entry_pullback_book import PullbackBook
 from hunter_meme_worker.event_book import EventBook
 from hunter_meme_worker.event_gate_rows import EventReserves
 from hunter_meme_worker.event_gate_stats import EventGateStats
@@ -145,6 +147,14 @@ class EventGateRuntime:
     tapes: DecisionTapeWriter = field(default_factory=DecisionTapeWriter)
     """T4.89: the bounded buffer of decision tapes and its counters — on the
     runtime, so a gate restart keeps what was not flushed yet."""
+    pullback: PullbackBook = field(default_factory=PullbackBook)
+    """T4.91: the mints armed for their pullback — in memory, lost with the
+    process (``entry_pullback.py``); a gate restart keeps them."""
+    pullback_inserts: BoundedTasks = field(
+        default_factory=lambda: BoundedTasks(limit=8, name="meme-event-gate-pullback-insert")
+    )
+    """T4.91 (review): the arm's inserts, off the evaluation loop — at most 8
+    in flight, cancelled when the gate is cancelled (``event_gate``)."""
 
     def __post_init__(self) -> None:
         self.book = EventBook(max_mints=self.config.max_mints)

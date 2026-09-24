@@ -35,6 +35,7 @@ from decimal import Decimal
 from typing import Any
 
 from hunter_indicators.meme.rules import EntryGate
+from hunter_meme_worker.entry_pullback import EntryPullback, entry_pullback_of
 from hunter_meme_worker.lab_gate_params import gate_from_params
 from hunter_meme_worker.lab_params import (
     DEFAULT_DEAD_MARK_PCT,
@@ -179,6 +180,9 @@ class RuleSetSpec:
     """T4.79 (EXP-M22): refuse until the event lane saw a sell ≥ 5 % of the real
     reserve recovered and held (``absorb_v0/1``) / until it saw the sell at all
     (``absorb_v0/2``, the control); off by default in every frozen set."""
+    entry_pullback: EntryPullback | None = None
+    """T4.91 (H-016): wait for the pullback before proposing — event lane only
+    (``entry_pullback.py``); ``None`` (no ``entry_pullback_pct``) proposes at once."""
 
     @property
     def label(self) -> str:
@@ -243,6 +247,7 @@ class RuleSetSpec:
             ttl_s=None if params.get("ttl_s") is None else int(params["ttl_s"]),
             require_absorb_confirmed=bool_or(params.get("require_absorb_confirmed"), False),
             require_absorb_sell_seen=bool_or(params.get("require_absorb_sell_seen"), False),
+            entry_pullback=entry_pullback_of(params, clock=_clock_of(params.get("clock"))),
         )
 
     def suggested(self) -> dict[str, Any]:

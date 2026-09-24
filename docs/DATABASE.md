@@ -8166,3 +8166,61 @@ SELECT x.* FROM meme_decision_tapes t,
   jsonb_to_recordset(t.trades) AS x(block_time timestamptz, received_at timestamptz, side text,
                                     sol numeric, tokens numeric, trader text);
 ```
+
+## 65. A entrada no recuo, como braço de papel — `recuo_v1/1` — M19 (`0063_meme_pullback_entry_arm`)
+
+**Por quê (T4.91, EXP-M24, H-017).** O R77 refutou a H-016 (esperar um recuo de 5 % não paga, KB-0157), mas a célula
+3 % / 60 s melhorou o preço de entrada em +2,28 pp por SOL no papel — achado da mesma população, que só se julga em
+coorte nova. A T4.91 construiu o mecanismo **desligado por padrão** (`hunter_meme_worker.entry_pullback`: um conjunto
+sem `entry_pullback_pct` propõe exatamente como antes); esta revisão semeia o único braço que o liga.
+
+**O que a `0063` faz:** **uma linha** em `meme_rule_sets` (`01994d00-6c1a-7000-8000-00000000001d`, `recuo_v1/1`,
+`kind = research_only`, `exp_ref = 'EXP-M24'`, `status = 'active'`). Nenhuma tabela, coluna, índice, vista, enum,
+política ou partição; nada é aposentado; a mesa não é tocada. DDL em `ddl/meme_pullback_entry_arm.py`; o slug tem 28
+caracteres (§17.6). Encadeada em `0062_meme_decision_tapes`. Contagem de conjuntos ativos: 24 → 25.
+
+**Copiado da linha VIVA de `operator/5`, não de constantes — desvio declarado em relação a `0055`/`0060`.** O EXP-M24
+emparelha cada decisão do braço com a sombra de papel de `operator/5` na mesma decisão; isso só vale se as duas portas
+forem o mesmo documento, e a linha de `operator/5` na VPS foi editada à mão por `meme_rule_set.py --set-param` (porta
+`fluxo_e_holders/2`, saída, tamanho — §54) sem nenhuma constante no repositório que carregue essas edições. Por isso o
+seed é `operator/5.params || overrides`, lido no mesmo `INSERT … SELECT`, com o mesmo predicado da guarda
+(`id = operator/5 AND status = 'active'`). Os overrides são exatamente 13 chaves (`PULLBACK_ARM_KEYS`): a saída e o
+tamanho reescritos (alvo `"1.15"`, `trailing_pct "10"`, `trailing_arm_x null`, `max_hold_s 300`, 0,07 SOL em
+`size_sol`/`max_sol_per_bet`/`max_exposure_per_mint_sol`, `exit_key`), os tetos de papel (`max_open_positions 25`,
+`daily_loss_cap_sol "10.0"`, `wallet_max_sol "100.0"` — o raciocínio da `0060`) e a célula (`entry_pullback_pct "3"`,
+`entry_pullback_window_s 60`).
+
+- **CI × VPS:** num banco novo (CI, testes) o braço herda o seed de `operator/5` da `0039`; na VPS, a linha editada
+  como estiver no dia do deploy. `test_migration_0063` prova, em qualquer banco, `braço − 13 chaves = operator/5 − 13
+  chaves`, byte a byte — a igualdade vale **no instante da migração**, não depois.
+- **A guarda recusa** (nada semeado, revisão fica em `0062`): `operator/5` ausente ou não ativo; `params ->> 'clock'`
+  diferente de `'15s'` (ausente ou `null` incluídos) — a pista de eventos só lê conjuntos `15s` e
+  `entry_pullback_of` recusa recuo em outro relógio.
+- **Downgrade → upgrade re-copia o `operator/5` atual.** Um ciclo depois de `operator/5` ter sido editado planta um
+  braço diferente do original. O downgrade só passa sem nenhuma linha que referencie o braço (abaixo), então isso só
+  acontece antes de o braço ter produzido evidência.
+- **Proveniência:** o documento copiado é o próprio `params` de `recuo_v1/1`; a origem é `operator/5` naquele
+  instante, reconstruível por `meme_rule_set.py --history operator/5` (`meme_rule_set_param_history`). **`--history
+  recuo_v1/1` não mostra mudança nenhuma** — a cópia é um `INSERT`, não um `--set-param`. O EXP-M24 pede registrar
+  `md5(params::text)` das duas linhas e a hora do deploy; uma edição posterior de `operator/5` separa coortes (o braço
+  não a acompanha).
+
+**Papel por construção.** `research_only`: o executor só seleciona `rs.kind = 'operator'`
+(`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED`; o teste da `0063` roda essa consulta contra uma proposta do
+braço). As apostas de papel do braço são subtraídas da leitura de pedigree da mesa (`lab_repo_fast._PEDIGREE`, como as
+do `refused_probe_v0/1`) e **não fixam o mint no rastreador** (`tracker_pins._PINNED_MINTS`): um mint fixado continua
+dobrando linhas de `meme_features_1m` — `creator_sold` inclusive, a fonte de `creator_prior_dump_count` que nenhum id
+subtrai — e estreita o teto do rastreador para todos.
+
+**O que o braço escreve (tabelas existentes).** `meme_proposals` (no gatilho: `features_end_time = t0`, `proposed_at`
+= a decisão, bloco `entry_pullback` em `reasons`); `meme_gate_refusals_by_mint` com `refusal` em
+`entry_pullback_armed` (em `t0`, `limit` = pct), `NULL` (a proposta que entrou), `no_pullback` (`value` = recuo mais
+fundo visto, %), `pullback_killed:<motivo>`, `pullback_censored:<motivo>`, `pullback_dropped_cap`,
+`pullback_not_inserted`, `pullback_insert_failed`, `pullback_insert_saturated`; `meme_decision_tapes` em `t0` (o
+armar) e no instante da decisão (ligada à proposta). A consulta do §64 que junta proposta e fita por
+`features_end_time` acha, para este braço, a fita de **`t0`**; a fita da decisão tem `proposal_ids` e `as_of =
+proposed_at`.
+
+**Downgrade (§17.7):** recusa enquanto uma linha de `meme_proposals`, `meme_paper_bets`,
+`meme_rule_set_param_history` ou `meme_gate_refusals_by_mint` referencia o braço — a última importa mais aqui: as linhas
+`entry_pullback_armed`/`no_pullback` são o único registro das decisões que não entraram.

@@ -20,6 +20,7 @@ from sqlalchemy.exc import DBAPIError
 
 from hunter_core.logging import get_logger
 from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, PedigreeGate
+from hunter_meme_worker.entry_pullback import PULLBACK_ARM_RULE_SET_ID
 from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
 from hunter_meme_worker.lab_repo_drawdown import with_recent_drawdown
 from hunter_meme_worker.lab_rows import snapshot_from_row
@@ -109,10 +110,12 @@ _PEDIGREE = text(
     "                       AND pf.creator_sold = true AND pf.end_time < t.created_at)"
     "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb WHERE pb.mint = o.mint "
     "                          AND pb.rule_set_id <> :probe_rule_set_id "
+    "                          AND pb.rule_set_id <> :pullback_rule_set_id "
     "                          AND pb.creator_sold_seen_at IS NOT NULL "
     "                          AND pb.creator_sold_seen_at < t.created_at)"
     "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb2 WHERE pb2.mint = o.mint "
     "                          AND pb2.rule_set_id <> :probe_rule_set_id "
+    "                          AND pb2.rule_set_id <> :pullback_rule_set_id "
     "                          AND pb2.exit ->> 'reason' = 'creator_dump' "
     "                          AND pb2.exit_at < t.created_at)"
     "           )"
@@ -248,6 +251,9 @@ async def pedigree_for(
         # refusals. Excluded by id, so the desk reads exactly what it read
         # before this arm existed.
         "probe_rule_set_id": PROBE_RULE_SET_ID,
+        # T4.91 (EXP-M24): the same for recuo_v1/1 — its bets outlive the desk's
+        # shadow on the same mint and could witness a creator sale it never saw.
+        "pullback_rule_set_id": PULLBACK_ARM_RULE_SET_ID,
     }
     try:
         async with session.begin_nested():

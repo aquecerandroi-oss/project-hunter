@@ -40,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0062_meme_decision_tapes"
+HEAD_REVISION = "0063_meme_pullback_entry_arm"
 ABSORB_ARM_REVISION = "0058_meme_gate_absorb_arm"
 """``0059`` (T4.82) lands on ``0058`` (T4.79), which lands on ``0057`` (T4.74-1), which lands on ``0056`` (T4.73), which lands on ``0055`` (T4.71), which lands on ``0054`` (T4.66), which lands on ``0053`` (T4.67a), which lands on ``0052``
 (T4.61a), which lands on ``0051`` (T4.54), which lands on ``0050`` (T4.49),
@@ -63,7 +63,9 @@ and ``0057`` seed no rule set; ``0058`` seeds **two** research sets
 (``absorb_v0/1`` + ``absorb_v0/2``, EXP-M22) and changes no schema, so it goes
 21 → 23; ``0059`` (T4.82) adds one table (``market_events``) and seeds no
 rule set; ``0060`` seeds one research set (``refused_probe_v0/1``, EXP-M23,
-on its own clock ``refused``) and changes no schema, so it goes 23 → 24."""
+on its own clock ``refused``) and changes no schema, so it goes 23 → 24;
+``0063`` seeds one research set (``recuo_v1/1``, EXP-M24, the entry at the
+pullback) and changes no schema, so it goes 24 → 25."""
 EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
 E2B_ARM_REVISION = "0044_meme_gate_e2b_arm"
 """Where the ``0044`` tests stage now that ``0046``/``0047`` sit on top (T4.44):
@@ -4524,9 +4526,11 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     # ``0058`` seeds absorb_v0/1 + absorb_v0/2 (EXP-M22), nothing retired (+2 = 23) — T4.79.
     # ``0060`` seeds refused_probe_v0/1 (EXP-M23, the refused coins' own arm,
     # clock ``refused``), nothing retired (+1 = 24) — T4.85.
+    # ``0063`` seeds recuo_v1/1 (EXP-M24, the entry at the pullback), nothing
+    # retired (+1 = 25) — T4.91.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["24"]
+    ) == ["25"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",
