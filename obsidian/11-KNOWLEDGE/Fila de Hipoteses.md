@@ -182,3 +182,13 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **refutação:** limite superior do IC acima de −0,01 por SOL; **ou** pico em vez de patamar; **ou** o teto que bloqueia o tercil alto mata > 30 % das vencedoras; **ou** menos de 150 decisões com fita (limite de dado — esperar, não julgar)
 - **registro:** 23/09/2026 ~21:00 BRT, antes de existir qualquer decisão com a variável gravada
 - **status:** aberta
+
+## H-016 — Entrar no recuo, não no pico (esperar a primeira correção depois do sinal)
+
+- **origem:** anatomia das 96 posições reais (16–23/09/2026, −0,399 SOL): **34 das 67 perdas nunca ficaram acima do custo** — a moeda começou a cair no instante em que compramos (`SHORT`, `Jeanne`, `RAGEGOON` em 23/09: pico −10,8 %, −4,6 %, −6,2 %). Todas as 29 vitórias passaram de +5 %. A porta compra **quando o fluxo está no auge**, que é quando o preço está no topo local. O KB-0149 §17 já mostrou que o segundo de entrada decide a aposta (mesmo mint, 19–190 s de diferença, alvo × recuo). Everton, 24/09/2026 ~22 h BRT: "estamos só perdendo, ache a estratégia do motivo". Variável **nova** (momento da entrada), não uma das 13 esgotadas
+- **variável:** política de entrada — depois de a porta aprovar no instante `t0`, **esperar um recuo de X % a partir da máxima observada desde `t0`** e comprar no primeiro trade que o toque, com validade de W segundos (se não recuar, **não compra**); grade `X ∈ {3, 5, 8, 12} %`, `W ∈ {20, 60} s`; controle = comprar em `t0` (regra atual). A saída é a regra congelada da mesa (1,15× · recuo 10 % armado na entrada · 300 s), medida a partir do preço de entrada novo
+- **população:** as decisões reais e de papel da porta `fluxo_e_holders` com fita retrospectiva até 300 s depois de `t0 + W`; uma por mint (a primeira no tempo); simulação do R72/R74, pouso = gatilho + 1,6 s, custo 2,23 % por ida e volta; as moedas que **não** recuam contam como "não entrou" (retorno 0, e o relatório diz quantas vitórias do controle se perdem assim)
+- **previsão:** existe uma célula (X, W) que rende **mais +0,05 por SOL decidido** que o controle (diferença emparelhada por decisão, 0 para quem não entrou), com IC 95 % (bootstrap por mint, 10 000) inteiramente acima de zero, e **patamar** (um vizinho em X no mesmo sentido); nas reais, a fração de perdas que nunca passaram do custo cai
+- **refutação:** nenhuma célula com limite inferior do IC acima de +0,01 por SOL; **ou** a melhor célula na borda da grade; **ou** o ganho some com 5 s de atraso no pouso; **ou** o ganho vem só de "não entrar" (a célula não bate a política "não comprar nada", retorno 0)
+- **registro:** 24/09/2026 ~22:10 BRT, antes de simular qualquer célula
+- **status:** em curso
