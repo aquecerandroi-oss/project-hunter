@@ -5684,6 +5684,7 @@ meme_tokens                                  (global, não particionada)
   completed_at, migrated_at, migrated_pool   -- dois eventos, não um
   first_seen_source, first_seen_at, last_seen_at, updated_at  (NOT NULL)
   INDEX (created_at), INDEX (first_seen_at)
+  INDEX (creator, created_at), INDEX (symbol, created_at)  -- parciais, NOT NULL; pedigree (0040, 0064 §66)
   CHECKs: rótulos de mayhem; `mayhem_enabled IS FALSE` proíbe `mayhem_state`;
           `migrated_at` exige `migrated_pool`; identidade observada não é string vazia
 
@@ -8224,3 +8225,49 @@ proposed_at`.
 **Downgrade (§17.7):** recusa enquanto uma linha de `meme_proposals`, `meme_paper_bets`,
 `meme_rule_set_param_history` ou `meme_gate_refusals_by_mint` referencia o braço — a última importa mais aqui: as linhas
 `entry_pullback_armed`/`no_pullback` são o único registro das decisões que não entraram.
+
+## 66. O índice que a contagem de clones de ticker nunca teve — M19 (`0064_meme_tokens_symbol_index`)
+
+**Por quê (VPS, 24/09/2026, medido só com `SELECT` dentro de `BEGIN READ ONLY … ROLLBACK`).** O worker registrava
+`meme_pedigree_read_failed` em ~40 % dos ticks com `mints≈320` e `error="Error"`. `EXPLAIN (ANALYZE, BUFFERS)` do
+`lab_repo_fast._PEDIGREE` com os 329 mints de um minuto fechado de `meme_features_1m`: **14,0 s**, dos quais
+`symbol_dup_24h` = **31,4 ms × 329 = 10,3 s** (74 %, 15,5 M buffers). `meme_tokens` (360 283 linhas) não tinha índice
+em `symbol`: o planner percorria `ix_meme_tokens_created_at` nas 24 h inteiras e filtrava o ticker (**32 687 linhas
+descartadas por mint julgado**). O timeout de 8 s do savepoint cortava a leitura. Sem essa subconsulta, a mesma leitura
+leva 3,3 s frio / 2,9 s quente. Com os ~80 mints da pista de 15 s, 4,3 s, dos quais 3,0 s no ticker.
+
+**O que a `0064` faz:** **um índice**, `ix_meme_tokens_symbol_created_at ON meme_tokens (symbol, created_at) WHERE
+symbol IS NOT NULL AND created_at IS NOT NULL`. É parcial e com a mesma forma do `(creator, created_at)` da `0040`. O
+`=` estrito da consulta prova `symbol IS NOT NULL`, e a consulta já diz `created_at IS NOT NULL`. Nenhuma tabela,
+coluna, CHECK, política, grant ou semente. O SQL do pedigree não muda, então as exclusões por `rule_set_id` da T4.85 e
+da T4.91 continuam intactas. `meme_tokens` é global (§1.1): sem RLS e sem `organization_id`. DDL em
+`ddl/meme_tokens_symbol_index.py`. No modelo, os dois índices de pedigree (`0040` e `0064`) saíram de `meme.py` para
+`hunter_core/db/models/meme_pedigree_indexes.py`, espalhados em `__table_args__` como `meme_social_checks.py`
+(orçamento de 350 linhas). Nome, ordem das colunas e predicado da `0040` ficaram idênticos (`alembic check` limpo).
+
+**Upgrade `CONCURRENTLY`, portanto não atômico (§17.5, a receita da `0004`).** `meme_tokens` é o caminho de escrita do radar
+(~40 mil inserts/dia mais os updates do ciclo de vida). Um `CREATE INDEX` comum segura `SHARE` durante toda a
+construção, e isso trava todo insert e update da ingestão enquanto a tabela é varrida. O upgrade abre
+`autocommit_block`. Uma queda no meio pode deixar um índice `indisvalid = false`
+com o nome final, e `IF NOT EXISTS` o manteria. Por isso o upgrade derruba o nome primeiro (`DROP INDEX CONCURRENTLY
+IF EXISTS`) e só então constrói. **Reexecutar a revisão é a recuperação.** `test_migration_0064` prova: índice
+válido, definição exata, o subplano de `symbol_dup_24h` lendo o índice novo, **as mesmas quatro contagens de
+`pedigree_for` para ~206 mints** (ramos `NULL` incluídos) antes, depois, após o downgrade e após o re-upgrade, e a
+reconstrução por cima de uma sobra de verdade: um índice `indisvalid = false` com o mesmo nome, deixado por um `CREATE
+UNIQUE INDEX CONCURRENTLY` que falhou. O preço aceito é o mesmo da `0004`: reexecutar por cima de uma construção que
+terminou sem carimbar a versão reconstrói um índice válido.
+
+**O downgrade é um `DROP INDEX IF EXISTS` comum, dentro da transação da execução.** `env.py` roda um `alembic
+downgrade` inteiro numa transação só. Um downgrade que começa na `0064` e é recusado mais abaixo (a guarda da `0059`)
+precisa desfazer o drop junto. Um `DROP INDEX CONCURRENTLY` em `autocommit_block` já teria commitado: o banco ficava
+em `0064` sem o índice, e `alembic check` acusava drift. `test_migrations.py::test_0059_refuses_…` pegou isso, e
+`test_migration_0064` agora prova o contrário. O preço é `ACCESS EXCLUSIVE` em `meme_tokens` até a execução **inteira**
+do downgrade commitar, contando cada revisão desfeita depois desta. É um passo de operador, nunca de deploy.
+
+**Junto, fora do schema (mesma tarefa).** (1) Quem falhava era o `_gate_step` do **minuto**: os `mints` de cada
+falha batem com `count(DISTINCT mint)` de `meme_features_1m` por minuto. Nenhum conjunto ativo está no relógio `1m`
+(todos em `15s`; o `refused_probe_v0/1` em `refused`), então o pedigree do minuto não era lido por gate nenhum.
+`lab_repo_e2b.lineage_for` agora não lê nada quando nenhum conjunto daquele relógio julga. (2) A falha passa a
+registrar `sqlstate` e `detail` (`hunter_meme_worker.db_errors`). O adaptador asyncpg do SQLAlchemy dobra todo
+`PostgresError` sem mapeamento próprio, `QueryCanceledError` inclusive, no `Error` genérico. `57014` (timeout),
+`55P03` (lock) e `40P01` (deadlock) eram indistinguíveis no log.

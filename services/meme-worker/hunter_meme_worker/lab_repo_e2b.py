@@ -188,9 +188,15 @@ async def lineage_for(
     and, **only when some set of this lane asks for it**, the E2-b tape bounded
     by each row's own instant (T4.31, EXP-M9). ``None`` = nobody asked, and
     ``evaluate_gate`` then applies no E2-b at all.
+
+    **No set on this clock → no read** (24/09/2026): with every active set on
+    ``15s``, the minute lane paid the pedigree of ~320 mints (14 s on the VPS,
+    cut at 8 s — ``meme_pedigree_read_failed``) for a result no gate received.
     """
-    judged = list(rows)
+    judged, lane = list(rows), tuple(specs)
+    if not lane:
+        return {}, None
     pedigree = await pedigree_for(session, sorted({row.mint for row in judged}))
-    if not any(spec.pedigree_e2b for spec in specs):
+    if not any(spec.pedigree_e2b for spec in lane):
         return pedigree, None
     return pedigree, await e2b_for(session, [(row.mint, row.end_time) for row in judged])

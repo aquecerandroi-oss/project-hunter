@@ -40,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0063_meme_pullback_entry_arm"
+HEAD_REVISION = "0064_meme_tokens_symbol_index"
 ABSORB_ARM_REVISION = "0058_meme_gate_absorb_arm"
 """``0059`` (T4.82) lands on ``0058`` (T4.79), which lands on ``0057`` (T4.74-1), which lands on ``0056`` (T4.73), which lands on ``0055`` (T4.71), which lands on ``0054`` (T4.66), which lands on ``0053`` (T4.67a), which lands on ``0052``
 (T4.61a), which lands on ``0051`` (T4.54), which lands on ``0050`` (T4.49),
@@ -65,7 +65,8 @@ and ``0057`` seed no rule set; ``0058`` seeds **two** research sets
 rule set; ``0060`` seeds one research set (``refused_probe_v0/1``, EXP-M23,
 on its own clock ``refused``) and changes no schema, so it goes 23 → 24;
 ``0063`` seeds one research set (``recuo_v1/1``, EXP-M24, the entry at the
-pullback) and changes no schema, so it goes 24 → 25."""
+pullback) and changes no schema, so it goes 24 → 25; ``0064`` adds one index
+(``ix_meme_tokens_symbol_created_at``, built ``CONCURRENTLY``) and seeds no rule set."""
 EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
 E2B_ARM_REVISION = "0044_meme_gate_e2b_arm"
 """Where the ``0044`` tests stage now that ``0046``/``0047`` sit on top (T4.44):

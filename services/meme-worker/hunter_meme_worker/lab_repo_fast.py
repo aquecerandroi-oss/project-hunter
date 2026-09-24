@@ -20,6 +20,7 @@ from sqlalchemy.exc import DBAPIError
 
 from hunter_core.logging import get_logger
 from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, PedigreeGate
+from hunter_meme_worker.db_errors import db_error_fields
 from hunter_meme_worker.entry_pullback import PULLBACK_ARM_RULE_SET_ID
 from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
 from hunter_meme_worker.lab_repo_drawdown import with_recent_drawdown
@@ -135,8 +136,8 @@ _PEDIGREE = text(
     "       ) END AS creator_prior_dead_count "
     "FROM meme_tokens t WHERE t.mint = ANY(:mints)"
 )
-"""Four correlated counts over ``meme_tokens`` (indexed on ``created_at``; the
-tracked set is ~130 mints, the table ~40 k/day). ``NULL`` when the identity
+"""Four correlated counts over ``meme_tokens``, index ranges on ``(symbol, created_at)`` (``0064``;
+329 mints took 14 s without it) and ``(creator, created_at)`` (``0040``). ``NULL`` when the identity
 is unknown — the gate refuses that by name, never reads it as zero.
 
 T4.24 (EXP-M6, braço 2): ``creator_prior_dump_count`` counts **any** window
@@ -262,9 +263,7 @@ async def pedigree_for(
     except DBAPIError as exc:
         # T4.24b: the savepoint rolled back; the tick goes on with the pedigree unread
         # (every gate refuses ``pedigree_unknown`` by name) instead of dying.
-        _logger.warning(
-            "meme_pedigree_read_failed", mints=len(mints), error=type(exc.orig).__name__
-        )
+        _logger.warning("meme_pedigree_read_failed", mints=len(mints), **db_error_fields(exc))
         return {}
     return {
         str(r["mint"]): PedigreeFeatures(

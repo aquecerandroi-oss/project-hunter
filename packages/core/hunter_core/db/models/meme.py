@@ -39,12 +39,13 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import BigInteger, CheckConstraint, Index, Integer, Text, func, text
+from sqlalchemy import BigInteger, CheckConstraint, Index, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hunter_core.db.base import Base, UUIDPrimaryKeyMixin
 from hunter_core.db.models._common import JSONB_EMPTY
+from hunter_core.db.models.meme_pedigree_indexes import PEDIGREE_INDEXES
 from hunter_core.db.models.meme_social_checks import SOCIAL_CHECKS_0041
 
 MAYHEM_STATES = ("active", "paused", "completed", "unknown")
@@ -70,15 +71,8 @@ class MemeToken(Base):
         # ~40k-rows/day write path is a cost paid for a plan nobody has seen
         # (§26.4's rule).
         Index("ix_meme_tokens_first_seen_at", "first_seen_at"),
-        # T4.24b (0040): the pedigree counts ("this creator's prior coins") — a
-        # measured plan this time: without it each count scanned ~105 k rows and
-        # the Lab loop died on the statement timeout (15/09/2026, 373 restarts).
-        Index(
-            "ix_meme_tokens_creator_created_at",
-            "creator",
-            "created_at",
-            postgresql_where=text("creator IS NOT NULL AND created_at IS NOT NULL"),
-        ),
+        # T4.24b (0040) and 0064: the pedigree counts, each on a measured plan.
+        *PEDIGREE_INDEXES,
         # Retention's own scan. It cannot use ``created_at``: that column is
         # nullable (identity may be unobserved) and retention must still be able
         # to age a row out. ``first_seen_at`` is NOT NULL by construction — we
