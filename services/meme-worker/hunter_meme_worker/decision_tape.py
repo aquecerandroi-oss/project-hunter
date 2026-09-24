@@ -10,16 +10,21 @@ the desk knew" from ``meme_trades`` measured the wrong tape; H-010 died of it.
 the first ``await``**, only when the lane has something to record:
 
 - ``trades`` — the newest :data:`SLICE_MAX` fills of the 60 s deque that had
-  reached us by ``as_of``, arrival order, each with its two clocks. 50 covers
-  the judged minute of a typical mint (``AIRAA`` had 31 buys in it) and bounds
-  a hot one; ``slice.in_window`` says how many there were, so a cut is never
-  silent, and every aggregate below is over the whole window, not the slice;
+  reached us by ``as_of``, arrival order, each with its two clocks and its slot
+  (T4.89b, ``None`` when the source didn't have one — never invented). 50
+  covers the judged minute of a typical mint (``AIRAA`` had 31 buys in it) and
+  bounds a hot one; ``slice.in_window`` says how many there were, so a cut is
+  never silent, and every aggregate below is over the whole window, not the
+  slice;
 - ``derived`` — 10/30/60 s windows (buys, sells, SOL each way, net, unique
   buyers without the creator — the 60 s one is
   :func:`~hunter_meme_worker.features_tape.tape_for`'s own minute), the largest
   net SOL buyer and the largest net token buyer since the subscription with
   their share of the curve's real SOL and of the supply (H-010), the creator's
-  net position, the curve photo the shares divide by, and the coverage.
+  net position, the curve photo the shares divide by, the coverage, and (T4.89b,
+  H-015) :func:`~hunter_meme_worker.decision_tape_creation.creation_bundle_json`'s
+  ``creation_bundle`` — the SOL bought in the creation slot by wallets other
+  than the creator, past the 60 s window's own reach.
 
 **"Since birth" is proved, not assumed.** The ledger reconciles when Σ net SOL
 of every wallet it saw is within :data:`RECONCILE_TOLERANCE` of the curve's
@@ -44,6 +49,7 @@ from datetime import datetime, timedelta
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import TYPE_CHECKING, Any, Final
 
+from hunter_meme_worker.decision_tape_creation import creation_bundle_json
 from hunter_meme_worker.event_wallets import (
     COVERAGE_GAP,
     NOT_COVERED_FROM_BIRTH,
@@ -69,7 +75,11 @@ __all__ = [
 
 FEATURE: Final = "decision_tape"
 """``reasons[].feature`` of the evidence block this lane appends."""
-TAPE_VERSION: Final = 1
+TAPE_VERSION: Final = 3
+"""T4.89b (H-015) added ``trades[].slot`` and ``derived.creation_bundle``
+(version 2), then ``creation_bundle.early_slots``/``slot_source``/
+``create_signature`` (version 3, after Astra's review) — a reader of an
+earlier version still finds every field it knew."""
 SLICE_MAX: Final = 50
 WINDOWS_S: Final = (10, 30, 60)
 RECONCILE_TOLERANCE: Final = Decimal("0.01")
@@ -119,6 +129,7 @@ class DecisionTape:
             {
                 "block_time": t.block_time.isoformat(),
                 "received_at": t.received_at.isoformat(),
+                "slot": t.slot,
                 "side": t.side,
                 "sol": _sol(t.sol_lamports),
                 "tokens": (
@@ -284,6 +295,7 @@ def capture_decision_tape(state: MintEventState, *, as_of: datetime, series: str
     point = _curve_point(state, as_of)
     real_sol = None if point is None else point.real_sol
     trades = tuple(known[-SLICE_MAX:])
+    holders = _holders(state, as_of, real_sol)
     derived: dict[str, Any] = {
         "version": TAPE_VERSION,
         "series": series,
@@ -302,7 +314,8 @@ def capture_decision_tape(state: MintEventState, *, as_of: datetime, series: str
             "total_supply": None if state.total_supply is None else _plain(state.total_supply),
         },
         "windows": _windows(known, as_of, creator=state.creator, covered_since=state.covered_since),
-        **_holders(state, as_of, real_sol),
+        **holders,
+        "creation_bundle": creation_bundle_json(state, ledger_reason=holders["ledger"]["reason"]),
         "slice": {"trades": len(trades), "in_window": len(known), "max": SLICE_MAX},
     }
     return DecisionTape(state.mint, series, as_of, trades, len(known), derived)

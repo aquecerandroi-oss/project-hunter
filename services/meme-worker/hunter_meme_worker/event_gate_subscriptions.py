@@ -63,7 +63,10 @@ async def subscribe_at_create(
     raised). Sets ``state.expects_create_slot`` so the first trade
     notification's slot becomes ``crowd.create_slot`` (T4.66's 3-slot rule),
     and ``creation_block_buyers`` starts at ``{event.creator}`` — the
-    create frame's own buyer, per T4.67a's own reading of the program."""
+    create frame's own buyer, per T4.67a's own reading of the program.
+    Records ``event.signature`` on the ledger unconditionally (T4.89b,
+    H-015) — research's own handle to resolve the create transaction's real
+    slot later, independent of whether it also carried an initial buy."""
     now = now or utcnow()
     if event.mint in rt.subs or len(rt.subs) >= rt.config.max_mints:
         return
@@ -87,6 +90,7 @@ async def subscribe_at_create(
     state.crowd.creator = event.creator
     state.expects_create_slot = True
     state.creation_block_buyers = frozenset({event.creator}) if event.creator else frozenset()
+    state.wallets.record_create_signature(event.signature)
     if event.creator_initial_sol is not None and event.creator_initial_tokens is not None:
         # T4.89: the create's own buy never reaches the logs subscription opened
         # after it — the ledger takes it from the frame (deduped by signature).

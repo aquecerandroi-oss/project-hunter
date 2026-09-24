@@ -102,6 +102,39 @@ async def test_a_proposal_carries_the_evidence_and_leaves_its_tape(
     assert {t["side"] for t in tape["trades"]} == {"buy", "sell"}
 
 
+async def test_the_slot_and_the_creation_bundle_round_trip_through_postgres(
+    db_session_factory: async_sessionmaker[AsyncSession],
+    db_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.89b (H-015): the JSONB columns carry the new fields exactly as
+    written — a ``null`` slot stays ``null`` (``_prime_state`` never sets one),
+    and a mint not subscribed at its own creation (this fixture's own state)
+    names ``creation_slot_unknown`` rather than a guess."""
+    rt, mint, as_of = await _ready(db_session_factory, db_engine, monkeypatch)
+    await evaluate_mint(rt, mint, as_of)
+    await flush_pending_trail(rt, as_of + timedelta(seconds=61))
+    assert await rt.tapes.flush(db_session_factory) == 1
+    [tape] = await _rows(
+        db_session_factory,
+        "SELECT trades, derived FROM meme_decision_tapes WHERE mint = :m",
+        m=mint,
+    )
+    assert all(t["slot"] is None for t in tape["trades"])
+    bundle = tape["derived"]["creation_bundle"]
+    assert bundle == {
+        "creation_slot": None,
+        "slot_source": None,
+        "sol": None,
+        "wallets": None,
+        "creator_buy_sol": None,
+        "create_signature": None,
+        "early_slots": [],
+        "reason": "creation_slot_unknown",
+    }
+    assert tape["derived"]["version"] == 3
+
+
 async def test_a_near_miss_leaves_one_tape_when_its_trail_row_is_written(
     db_session_factory: async_sessionmaker[AsyncSession],
     db_engine: AsyncEngine,

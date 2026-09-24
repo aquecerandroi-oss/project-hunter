@@ -8052,16 +8052,41 @@ meme_decision_tapes              sem partição, retenção 7 d / 90 d (poda por
 aplicação — o precedente de `meme_gate_refusals_by_mint` (§54.2). Ninguém ordena nem pagina por `id`: a identidade de
 leitura é `(mint, as_of)` (UNIQUE) e a poda anda pelo índice de `as_of`.
 
-**Uma troca** (`trades[]`): `block_time`, `received_at` (quando **nós** a recebemos), `side`, `sol`, `tokens` (tokens
-inteiros; `null` quando a fonte não disse), `trader` — texto decimal, nunca `float`. **O derivado** (`derived`, versão 1):
-`as_of`; `coverage` (`subscribed_at`, `first_seen_at`, `covered_since`, `gaps`); `curve` (o `real_sol` e o
-`total_supply` que dividem as frações, com o `observed_at`/`received_at` da foto lida); `windows` `10s`/`30s`/`60s`
-(`buys`, `sells`, `buy_sol`, `sell_sol`, `net_sol`, `unique_buyers` sem o criador — a de 60 s é o próprio minuto de
-`tape_for` que o portão julgou; `{"reason": "window_not_covered"}` quando a assinatura não cobre a janela);
-`largest_net_buyer` e `largest_holder` (o maior comprador líquido em SOL e o maior saldo líquido **negociado** em tokens
-desde a assinatura, com `share_of_real_sol` e `share_of_supply`, `is_creator`, compras/vendas — H-010); `creator` (a
-posição líquida do criador); `ledger` (`since`, `known_at`, `wallets`, `net_sol_total`, `reconcile_real_sol`,
-`reconcile_gap_sol`, `creator_initial_buy_seeded`, `gapped`, `overflow`, `tokens_missing`, `reason`); `slice` (`trades`, `in_window`, `max`).
+**Uma troca** (`trades[]`): `block_time`, `received_at` (quando **nós** a recebemos), `slot` (T4.89b, `null` quando a
+fonte não disse — nunca inventado), `side`, `sol`, `tokens` (tokens inteiros; `null` quando a fonte não disse), `trader`
+— texto decimal, nunca `float`. **O derivado** (`derived`, **versão 3**, T4.89b — um leitor de versão anterior encontra
+todo campo que já conhecia): `as_of`; `coverage` (`subscribed_at`, `first_seen_at`, `covered_since`, `gaps`); `curve` (o
+`real_sol` e o `total_supply` que dividem as frações, com o `observed_at`/`received_at` da foto lida); `windows`
+`10s`/`30s`/`60s` (`buys`, `sells`, `buy_sol`, `sell_sol`, `net_sol`, `unique_buyers` sem o criador — a de 60 s é o
+próprio minuto de `tape_for` que o portão julgou; `{"reason": "window_not_covered"}` quando a assinatura não cobre a
+janela); `largest_net_buyer` e `largest_holder` (o maior comprador líquido em SOL e o maior saldo líquido **negociado**
+em tokens desde a assinatura, com `share_of_real_sol` e `share_of_supply`, `is_creator`, compras/vendas — H-010);
+`creator` (a posição líquida do criador); `ledger` (`since`, `known_at`, `wallets`, `net_sol_total`,
+`reconcile_real_sol`, `reconcile_gap_sol`, `creator_initial_buy_seeded`, `gapped`, `overflow`, `tokens_missing`,
+`reason`); `creation_bundle` (T4.89b, H-015, `hunter_meme_worker.decision_tape_creation`) — `creation_slot`
+(`crowd.create_slot`, T4.70, só conhecido quando a assinatura abriu no próprio `create`), `sol` e `wallets` (SOL e
+contagem das carteiras distintas do criador que compraram nesse slot — somados desde a assinatura por
+`WalletLedger.push`, não recontados a partir da fatia de 60 s, que já pode ter expulsado essas trocas), `creator_buy_sol`
+(a compra do próprio criador nesse slot, do quadro do `create`, independente da cobertura), `reason` (fala só da
+completude do `ledger`: `null` só quando o slot é conhecido **e** a prova "desde o nascimento" do `ledger` bate — a
+mesma checagem, reaproveitada, nunca recalculada, exceto `tokens_missing`, que nunca invalida este bloco só-SOL; senão
+`creation_slot_unknown` quando o slot em si é desconhecido, ou a razão do próprio `ledger` —
+`coverage_gap`/`wallets_overflow`/`not_covered_from_birth` — quando o slot é conhecido mas a cobertura não prova);
+`slot_source` (diz como `creation_slot` foi obtido — hoje só `"first_trade_seen"`; `null` quando `creation_slot`
+também é `null`); `create_signature` (a assinatura da transação `create`, gravada por
+`WalletLedger.record_create_signature` incondicionalmente, mesmo sem compra inicial do criador; `null` quando a
+assinatura não abriu no próprio `create`); `early_slots` (até 5 slots distintos desde a assinatura, em ordem de
+chegada, cada um `{slot, sol_others, wallets_others, creator_sol}` — SOL/contagem de outras carteiras e a compra do
+próprio criador nesse slot específico, também acumulados por `WalletLedger.push`, O(1) por troca, independente de
+`creation_slot`); `slice` (`trades`, `in_window`, `max`).
+
+**`creation_slot` é inferido, nunca provado — e o bloco diz isso alto** (revisão da Astra, T4.89b, HIGH). É o slot da
+*primeira troca que a assinatura recebeu* (`crowd.create_slot`, T4.70), não necessariamente o slot da própria transação
+`create` (o quadro do `create` não carrega slot nenhum) — `reason` nunca significou "este slot está certo", só a
+completude do `ledger`; daí `slot_source` existir como um campo à parte. Decisão do coordenador (T4.89b, respondendo ao
+HIGH): em vez de uma chamada RPC no caminho quente, `create_signature`/`early_slots` dão à pesquisa o que falta para
+resolver o slot real *depois do fato* — a `create_signature` via RPC (um fato da chain anterior à decisão: reler isso
+depois não é *look-ahead*) — e ler a entrada de `early_slots` que bate com ele, em vez de confiar na inferência.
 
 **"Desde o nascimento" é provado, não presumido.** O livro por carteira (`event_wallets.py`) começa na assinatura; a
 compra do criador **dentro** da transação de criação chega do quadro do `create` (`creator_initial_sol/_tokens`, T4.45),

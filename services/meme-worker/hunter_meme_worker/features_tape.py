@@ -76,6 +76,9 @@ class TapeTrade:
     token_subunits: int | None = None
     """T4.89: the fill's raw token amount, when the source says (the event
     lane's ``TradeEvent`` does; the fold never reads it)."""
+    slot: int | None = None
+    """T4.89b (H-015): the fill's slot, when the source says — ``None`` is
+    never invented; the fold never reads it either."""
 
 
 @dataclass(frozen=True, slots=True)

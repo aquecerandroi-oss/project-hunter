@@ -159,9 +159,10 @@ class MintEventState:
             side=trade.side,
             sol_lamports=int(trade.lamports),
             token_subunits=None if trade.token_amount is None else int(trade.token_amount),
+            slot=trade.slot,
         )
         self._push_trade(tape)
-        self.wallets.push(trade)
+        self.wallets.push(trade, create_slot=self.crowd.create_slot, creator=self.creator)
         self.crowd.push(
             CrowdTrade(
                 block_time=block_time,

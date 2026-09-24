@@ -24,8 +24,10 @@ from hunter_meme_worker.decision_tape import (
     FEATURE,
     SLICE_MAX,
     STATE_AHEAD,
+    DecisionTape,
     capture_decision_tape,
 )
+from hunter_meme_worker.decision_tape_creation import CREATION_SLOT_UNKNOWN
 from hunter_meme_worker.event_gate_subscriptions import subscribe_at_create
 from hunter_meme_worker.event_state import CurvePoint, MintEventState
 from hunter_meme_worker.event_wallets import (
@@ -34,6 +36,7 @@ from hunter_meme_worker.event_wallets import (
     TOKENS_UNKNOWN,
     WALLETS_OVERFLOW,
 )
+from hunter_meme_worker.features_tape import TapeTrade
 
 from .test_event_gate_notify import MINT_A, NOW, FakeWs, _create, _runtime
 
@@ -191,8 +194,9 @@ def test_the_slice_keeps_the_newest_known_trades_and_counts_the_window() -> None
     assert len(tape.trades) == SLICE_MAX
     rows = tape.trades_json()
     assert rows[-1]["trader"] == f"W{SLICE_MAX + 19}" and rows[0]["trader"] == "W20"
-    assert set(rows[0]) == {"block_time", "received_at", "side", "sol", "tokens", "trader"}
+    assert set(rows[0]) == {"block_time", "received_at", "slot", "side", "sol", "tokens", "trader"}
     assert rows[0]["sol"] == "0.01" and rows[0]["tokens"] == "1000"
+    assert rows[0]["slot"] == 1000 + int((start - BIRTH).total_seconds()) + 6  # W20, 300ms*20
     assert tape.derived["slice"] == {
         "trades": SLICE_MAX,
         "in_window": SLICE_MAX + 20,
@@ -252,7 +256,7 @@ def test_the_reasons_block_is_json_and_named() -> None:
     state = _state()
     as_of = _feed(state)
     block = capture_decision_tape(state, as_of=as_of, series=SERIES).reasons_block()
-    assert block["feature"] == FEATURE and block["version"] == 1
+    assert block["feature"] == FEATURE and block["version"] == 3
     assert block["kind"] == "evidence" and block["used_by_gate"] is False
     assert block["as_of"] == as_of.isoformat() and block["series"] == SERIES
     json.dumps(block)  # every value is already a JSON scalar (Decimal as str, UTC ISO)
@@ -364,6 +368,215 @@ def test_the_decision_tape_kill_switch_defaults_on(
         monkeypatch.setenv("MEME_DECISION_TAPE", raw)
     assert decision_tape_enabled() is expected
     assert load_event_gate_config().decision_tape is expected
+
+
+def test_creation_bundle_counts_sol_and_wallets_excluding_the_creator() -> None:
+    """H-015: 3 wallets buy in the creation slot; a 4th buys later, in a
+    different slot, and never counts toward the bundle."""
+    state = _state()
+    state.expects_create_slot = True
+    state.wallets.seed_initial_buy(
+        CREATOR, sol=Decimal("8"), tokens=Decimal("200000000"), signature="sig-create"
+    )
+    t0 = BIRTH + timedelta(seconds=1)
+    state.apply_trade(_trade("X", "buy", at=t0, sol="1", real_sol="9"))
+    state.apply_trade(_trade("Y", "buy", at=t0, sol="1", real_sol="10"))
+    state.apply_trade(_trade("Z", "buy", at=t0, sol="1", real_sol="11"))
+    later = t0 + timedelta(seconds=20)  # a different slot: outside the bundle
+    state.apply_trade(_trade("LATER", "buy", at=later, sol="5", real_sol="16"))
+    as_of = later + timedelta(seconds=60)
+    bundle = capture_decision_tape(state, as_of=as_of, series=SERIES).derived["creation_bundle"]
+    assert bundle["creation_slot"] == state.crowd.create_slot
+    assert bundle["sol"] == "3" and bundle["wallets"] == 3
+    assert bundle["creator_buy_sol"] == "8"
+    assert bundle["reason"] is None
+    assert bundle["slot_source"] == "first_trade_seen"
+    assert bundle["create_signature"] is None  # seeded directly, not via subscribe_at_create
+    assert bundle["early_slots"] == [
+        {
+            "slot": state.crowd.create_slot,
+            "sol_others": "3",
+            "wallets_others": 3,
+            "creator_sol": "0",
+        },
+        {
+            "slot": state.crowd.create_slot + 20,
+            "sol_others": "5",
+            "wallets_others": 1,
+            "creator_sol": "0",
+        },
+    ]
+
+
+def test_creation_bundle_excludes_a_creator_fill_seen_again_in_the_same_slot() -> None:
+    """A creator buy that reaches the WS in the creation slot (not the seeded
+    one, by signature) must never inflate the "other wallets" bucket."""
+    state = _state()
+    state.expects_create_slot = True
+    state.wallets.seed_initial_buy(
+        CREATOR, sol=Decimal("8"), tokens=Decimal("200000000"), signature="sig-create"
+    )
+    t0 = BIRTH + timedelta(seconds=1)
+    state.apply_trade(_trade("X", "buy", at=t0, sol="1", real_sol="9"))
+    state.apply_trade(_trade(CREATOR, "buy", at=t0, sol="2", real_sol="11"))
+    as_of = t0 + timedelta(seconds=70)
+    bundle = capture_decision_tape(state, as_of=as_of, series=SERIES).derived["creation_bundle"]
+    assert bundle["sol"] == "1" and bundle["wallets"] == 1
+    assert bundle["creator_buy_sol"] == "8"  # unchanged by the second, later fill
+    # the second creator fill lands in early_slots' own creator_sol, never in sol_others
+    assert bundle["early_slots"] == [
+        {
+            "slot": state.crowd.create_slot,
+            "sol_others": "1",
+            "wallets_others": 1,
+            "creator_sol": "2",
+        }
+    ]
+
+
+def test_creation_bundle_is_reported_when_only_the_token_amount_is_unknown() -> None:
+    """Astra (T4.89b review), MEDIUM: ``tokens_unknown`` says a *token* amount
+    is missing somewhere in the ledger — it says nothing about SOL, so it must
+    never null out this SOL-only bundle."""
+    state = _state()
+    state.expects_create_slot = True
+    t0 = BIRTH + timedelta(seconds=1)
+    state.apply_trade(_trade("X", "buy", at=t0, sol="1", tokens=None, real_sol="1"))
+    as_of = t0 + timedelta(seconds=70)
+    derived = capture_decision_tape(state, as_of=as_of, series=SERIES).derived
+    assert derived["ledger"]["reason"] == TOKENS_UNKNOWN
+    bundle = derived["creation_bundle"]
+    assert bundle["sol"] == "1" and bundle["wallets"] == 1 and bundle["reason"] is None
+
+
+def test_creation_bundle_reason_is_named_when_the_mint_was_not_subscribed_at_create() -> None:
+    state = _state()  # no subscribe_at_create: crowd.create_slot never learned
+    as_of = _feed(state)
+    bundle = capture_decision_tape(state, as_of=as_of, series=SERIES).derived["creation_bundle"]
+    assert bundle["creation_slot"] is None
+    assert bundle["reason"] == CREATION_SLOT_UNKNOWN
+    assert bundle["sol"] is None and bundle["wallets"] is None
+    assert bundle["creator_buy_sol"] is None  # never seeded either
+    assert bundle["slot_source"] is None  # no slot to source
+    assert bundle["create_signature"] is None
+
+
+def test_creation_bundle_reason_mirrors_the_ledgers_coverage_gap() -> None:
+    state = _state()
+    state.expects_create_slot = True
+    as_of = _feed(state)
+    state.mark_gap(as_of - timedelta(seconds=20))
+    derived = capture_decision_tape(state, as_of=as_of, series=SERIES).derived
+    bundle = derived["creation_bundle"]
+    assert bundle["creation_slot"] is not None
+    assert bundle["reason"] == COVERAGE_GAP == derived["ledger"]["reason"]
+    assert bundle["sol"] is None and bundle["wallets"] is None
+
+
+def test_early_slots_are_bounded_to_five_in_arrival_order() -> None:
+    """Coordinator decision (T4.89b, Astra's HIGH): raw evidence for research
+    to align with the create tx's real slot, resolved retrospectively — kept
+    even when the mint was not subscribed at create (``creation_slot`` stays
+    unknown, but the first slots seen are still honest data)."""
+    state = _state()
+    t0 = BIRTH + timedelta(seconds=1)
+    for i, who in enumerate(("A", "B", "C", "D", "E", "F")):  # 6 distinct slots
+        state.apply_trade(_trade(who, "buy", at=t0 + timedelta(seconds=i), sol="1"))
+    as_of = t0 + timedelta(seconds=70)
+    bundle = capture_decision_tape(state, as_of=as_of, series=SERIES).derived["creation_bundle"]
+    assert len(bundle["early_slots"]) == 5  # the 6th distinct slot (F) never gets a seat
+    assert [e["slot"] for e in bundle["early_slots"]] == [
+        1000 + i for i in range(1, 6)
+    ]  # arrival order, not a later reshuffle
+    assert bundle["early_slots"][0] == {
+        "slot": 1001, "sol_others": "1", "wallets_others": 1, "creator_sol": "0",
+    }  # fmt: skip
+
+
+def test_early_slots_keep_updating_an_already_tracked_slot_after_the_cap() -> None:
+    """Astra (T4.89b round 2) nice-to-have: the 5-slot cap bounds *distinct*
+    slots, never a later trade landing in one already kept."""
+    state = _state()
+    t0 = BIRTH + timedelta(seconds=1)
+    for i, who in enumerate(("A", "B", "C", "D", "E", "F")):  # A..E fill the cap; F is new
+        state.apply_trade(_trade(who, "buy", at=t0 + timedelta(seconds=i), sol="1"))
+    # a second buy lands back in A's own (already tracked) slot
+    state.apply_trade(_trade("A2", "buy", at=t0, sol="4"))
+    as_of = t0 + timedelta(seconds=70)
+    bundle = capture_decision_tape(state, as_of=as_of, series=SERIES).derived["creation_bundle"]
+    assert bundle["early_slots"][0] == {
+        "slot": 1001, "sol_others": "5", "wallets_others": 2, "creator_sol": "0",
+    }  # fmt: skip
+
+
+def test_early_slots_wallets_others_is_bounded_and_trips_overflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Astra (T4.89b round 2), MEDIUM: a wallet set fed outside ``_flow`` must
+    obey the same ``MAX_WALLETS`` ceiling — otherwise it grows past the
+    ledger's bounded-memory guarantee, and a truncated count could be
+    reported as exact."""
+    monkeypatch.setattr("hunter_meme_worker.event_wallets.MAX_WALLETS", 2)
+    state = _state()
+    t0 = BIRTH + timedelta(seconds=1)
+    for who in ("A", "B", "WHALE"):  # same slot: a 3rd distinct wallet overflows
+        state.apply_trade(_trade(who, "buy", at=t0, sol="1"))
+    as_of = t0 + timedelta(seconds=70)
+    derived = capture_decision_tape(state, as_of=as_of, series=SERIES).derived
+    assert derived["ledger"]["overflow"] is True
+    bundle = derived["creation_bundle"]
+    assert bundle["early_slots"][0]["wallets_others"] == 2  # never 3: the cap held
+    assert bundle["sol"] is None and bundle["wallets"] is None  # overflow nulls the primary field
+
+
+def test_creation_block_wallets_is_bounded_and_trips_overflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same guard as ``early_slots``, for the ``creation_slot``-gated bucket."""
+    monkeypatch.setattr("hunter_meme_worker.event_wallets.MAX_WALLETS", 2)
+    state = _state()
+    state.expects_create_slot = True
+    t0 = BIRTH + timedelta(seconds=1)
+    for who in ("A", "B", "WHALE"):
+        state.apply_trade(_trade(who, "buy", at=t0, sol="1"))
+    as_of = t0 + timedelta(seconds=70)
+    bundle = capture_decision_tape(state, as_of=as_of, series=SERIES).derived["creation_bundle"]
+    assert len(state.wallets.creation_block_wallets) == 2  # never 3: the cap held
+    assert bundle["sol"] is None and bundle["wallets"] is None
+
+
+async def test_create_signature_is_recorded_even_without_an_initial_buy() -> None:
+    """T4.89b (coordinator decision): research's handle to resolve the real
+    creation slot over RPC must exist whether or not the creator also bought
+    inside the ``create`` transaction."""
+    rt = _runtime(FakeWs())
+    event = _create(MINT_A, NOW)  # no creator_initial_sol/_tokens
+    await subscribe_at_create(rt, event, now=NOW)
+    state = rt.book.get(MINT_A)
+    assert state is not None
+    assert state.wallets.create_signature == event.signature == "sig-create"
+    assert state.wallets.seed_signature is None  # no initial buy to seed
+    as_of = NOW + timedelta(seconds=70)
+    bundle = capture_decision_tape(state, as_of=as_of, series=SERIES).derived["creation_bundle"]
+    assert bundle["create_signature"] == event.signature
+    assert bundle["creator_buy_sol"] is None
+
+
+def test_a_trades_slot_is_recorded_or_null_when_the_source_does_not_have_one() -> None:
+    """Never invented: a fill built without a slot stays ``null`` in the row."""
+    tape = DecisionTape(
+        mint="M",
+        series=SERIES,
+        as_of=BIRTH,
+        trades=(
+            TapeTrade(
+                block_time=BIRTH, received_at=BIRTH, trader="A", side="buy", sol_lamports=10**9
+            ),
+        ),
+        trades_in_window=1,
+        derived={},
+    )
+    assert tape.trades_json()[0]["slot"] is None
 
 
 def test_a_capture_no_committed_row_explains_is_counted_unlinked() -> None:
