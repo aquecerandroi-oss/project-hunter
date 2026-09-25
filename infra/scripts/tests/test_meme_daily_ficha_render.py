@@ -88,7 +88,8 @@ def test_frontmatter_carries_owner_generator_and_sha() -> None:
 def test_a_winning_position_is_labeled_ganho_not_a_loss_class() -> None:
     body = render_day(_ficha([_position()]))
     assert "| ganho |" in body
-    assert "comprou_no_topo" not in body
+    assert "| comprou_no_topo |" not in body  # not a table row: nobody lost that way
+    assert "Nenhuma perda fechada neste dia." in body
 
 
 def test_a_losing_position_shows_its_class_and_feeds_the_totals() -> None:
@@ -171,3 +172,61 @@ def test_render_week_with_no_losses_says_so() -> None:
         by_day, generated_at=datetime(2026, 9, 26, 3, 0, tzinfo=UTC), git_sha="abc1234"
     )
     assert "Nenhuma perda fechada na semana." in body
+
+
+def test_day_frontmatter_carries_dataview_fields_for_a_win() -> None:
+    body = render_day(_ficha([_position()]))
+    assert "dia: 2026-09-24" in body
+    assert "operacoes: 1" in body
+    assert "ganhos: 1" in body
+    assert "pnl_sol: 0.0112" in body
+    assert "perdas_comprou_no_topo_n: 0" in body
+    assert "perdas_comprou_no_topo_sol: 0.0000" in body
+    assert "perdas_golpe_do_criador_n: 0" in body
+    assert "perdas_recompra_n: 0" in body
+    assert "perdas_custo_n: 0" in body
+    assert "perdas_saida_normal_n: 0" in body
+    assert "maior_vazamento: null" in body
+
+
+def test_day_frontmatter_carries_dataview_fields_for_a_loss() -> None:
+    losing = _position(
+        pnl_sol=Decimal("-0.0556"),
+        sol_out=Decimal("0.0156"),
+        high_water_sol=Decimal("0.06"),  # below cost 0.07 -> comprou_no_topo
+        exit_reason="creator_dump",
+    )
+    body = render_day(_ficha([losing]))
+    assert "operacoes: 1" in body
+    assert "ganhos: 0" in body
+    assert "pnl_sol: -0.0556" in body
+    assert "perdas_comprou_no_topo_n: 1" in body
+    assert "perdas_comprou_no_topo_sol: -0.0556" in body
+    assert "maior_vazamento: comprou_no_topo" in body
+
+
+def test_day_frontmatter_never_invents_a_zero_for_an_open_position() -> None:
+    open_position = _position(exit_at=None, sol_out=None, pnl_sol=None, exit_reason=None)
+    body = render_day(_ficha([open_position]))
+    assert "operacoes: 1" in body
+    assert "ganhos: 0" in body
+    assert "pnl_sol: 0.0000" in body  # net over zero closed positions, not a guess
+    assert "maior_vazamento: null" in body  # no closed loss at all to name
+
+
+def test_week_frontmatter_carries_window_and_dataview_totals() -> None:
+    by_day = {
+        "2026-09-20": [_position(pnl_sol=Decimal("-0.03"), high_water_sol=Decimal("0.06"))],
+        "2026-09-21": [_position(pnl_sol=Decimal("0.02"), high_water_sol=Decimal("0.09"))],
+    }
+    body = render_week(
+        by_day, generated_at=datetime(2026, 9, 26, 3, 0, tzinfo=UTC), git_sha="abc1234"
+    )
+    assert "semana_inicio: 2026-09-20" in body
+    assert "semana_fim: 2026-09-21" in body
+    assert "operacoes: 2" in body
+    assert "ganhos: 1" in body
+    assert "pnl_sol: -0.0100" in body
+    assert "perdas_comprou_no_topo_n: 1" in body
+    assert "perdas_comprou_no_topo_sol: -0.0300" in body
+    assert "maior_vazamento: comprou_no_topo" in body

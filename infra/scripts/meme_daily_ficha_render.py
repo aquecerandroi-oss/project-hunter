@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from meme_daily_ficha_classify import LossClassInputs, classify_loss, rose_after_buy
+from meme_daily_ficha_classify import loss_class, rose_after_buy
+from meme_daily_ficha_frontmatter import day_dataview_lines, week_dataview_lines
 from meme_daily_ficha_queries import SAO_PAULO, TICKET_SOL
 from meme_daily_ficha_types import DayFicha, PaperArm, RealPosition, SpotPosition
 
@@ -80,22 +81,6 @@ def _peak_pct(position: RealPosition) -> Decimal | None:
     return position.high_water_sol / position.cost_sol * 100
 
 
-def _loss_class(position: RealPosition) -> str | None:
-    if position.pnl_sol is None:
-        return None  # open position: not a closed loss, nothing to classify yet
-    return classify_loss(
-        LossClassInputs(
-            pnl_sol=position.pnl_sol,
-            cost_sol=position.cost_sol,
-            high_water_sol=position.high_water_sol,
-            exit_reason=position.exit_reason,
-            distinct_sellers_one_slot=position.distinct_sellers_one_slot,
-            since_prior_exit=position.since_prior_exit,
-            round_trip_cost_sol=position.round_trip_cost_sol,
-        )
-    )
-
-
 def _frontmatter(ficha: Ficha) -> list[str]:
     day = ficha.data.day.isoformat()
     return [
@@ -106,6 +91,7 @@ def _frontmatter(ficha: Ficha) -> list[str]:
         f"generated_by: infra/scripts/meme_daily_ficha.py@{ficha.git_sha}",
         f"generated_at: {ficha.generated_at.astimezone(SAO_PAULO).strftime('%Y-%m-%d %H:%M BRT')}",
         f"updated: {day}",
+        *day_dataview_lines(ficha.data),
         "---",
         "",
         f"# Ficha do dia — {ficha.data.day.strftime('%d/%m/%Y')} · mesa real de memes (automática)",
@@ -159,7 +145,7 @@ def _positions_table(positions: Sequence[RealPosition]) -> list[str]:
     for i, p in enumerate(positions, start=1):
         rose = rose_after_buy(high_water_sol=p.high_water_sol, cost_sol=p.cost_sol)
         rose_text = "—" if rose is None else ("sim" if rose else "não")
-        klass = _loss_class(p)
+        klass = loss_class(p)
         klass_text = "ganho" if p.pnl_sol is not None and p.pnl_sol >= 0 else (klass or "—")
         lines.append(
             f"| {i} | {_label(p)} | `{p.operator}` | {_brt(p.entry_at)} | {_brt(p.exit_at)} | "
@@ -204,7 +190,7 @@ def _features_table(positions: Sequence[RealPosition]) -> list[str]:
 def _loss_totals(positions: Sequence[RealPosition]) -> list[str]:
     by_class: dict[str, list[Decimal]] = {}
     for p in positions:
-        klass = _loss_class(p)
+        klass = loss_class(p)
         if klass is None:
             continue
         by_class.setdefault(klass, []).append(p.pnl_sol or Decimal(0))
@@ -288,7 +274,7 @@ def render_week(
     for positions in by_day.values():
         for p in positions:
             positions_n += 1
-            klass = _loss_class(p)
+            klass = loss_class(p)
             if klass is not None:
                 totals.setdefault(klass, []).append(p.pnl_sol or Decimal(0))
     days = sorted(by_day)
@@ -297,6 +283,7 @@ def render_week(
         "tags: [trading, meme, mesa-real, ficha-semanal, automatica]",
         f"generated_by: infra/scripts/meme_daily_ficha.py@{git_sha}",
         f"generated_at: {generated_at.astimezone(SAO_PAULO).strftime('%Y-%m-%d %H:%M BRT')}",
+        *week_dataview_lines(by_day),
         "---",
         "",
         f"# Ficha semanal — {days[0] if days else '—'} a {days[-1] if days else '—'} · classe de perda",

@@ -32,8 +32,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
-__all__ = ["LOSS_CLASSES", "LossClassInputs", "classify_loss"]
+if TYPE_CHECKING:
+    from meme_daily_ficha_types import RealPosition
+
+__all__ = ["LOSS_CLASSES", "LossClassInputs", "classify_loss", "loss_class"]
 
 LOSS_CLASSES: tuple[str, ...] = (
     "comprou_no_topo",
@@ -94,3 +98,23 @@ def rose_after_buy(*, high_water_sol: Decimal | None, cost_sol: Decimal) -> bool
     if high_water_sol is None:
         return None
     return high_water_sol > cost_sol
+
+
+def loss_class(position: RealPosition) -> str | None:
+    """The automatic loss class of one ``RealPosition`` — ``None`` for a win
+    or an open position. Shared by ``meme_daily_ficha_render`` (the human
+    table) and ``meme_daily_ficha_frontmatter`` (the Dataview totals), so
+    both always agree on the same class."""
+    if position.pnl_sol is None:
+        return None  # open position: not a closed loss, nothing to classify yet
+    return classify_loss(
+        LossClassInputs(
+            pnl_sol=position.pnl_sol,
+            cost_sol=position.cost_sol,
+            high_water_sol=position.high_water_sol,
+            exit_reason=position.exit_reason,
+            distinct_sellers_one_slot=position.distinct_sellers_one_slot,
+            since_prior_exit=position.since_prior_exit,
+            round_trip_cost_sol=position.round_trip_cost_sol,
+        )
+    )
