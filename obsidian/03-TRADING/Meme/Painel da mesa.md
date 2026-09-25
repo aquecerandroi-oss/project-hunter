@@ -120,4 +120,6 @@ LIMIT 14
 
 ## Relacionados
 
-[[03-TRADING/Meme/README|Meme — o que uma "estratégia" é aqui]] · pasta `03-TRADING/Meme/Fichas/`
+[[03-TRADING/Meme/README|Meme — o que uma "estratégia" é aqui]] · pasta `03-TRADING/Meme/Fichas/` ·
+[[Perdas/Index|Perdas]] (as cinco classes, cada uma com sua própria consulta Dataview e a definição
+exata do classificador)

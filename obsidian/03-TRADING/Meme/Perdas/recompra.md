@@ -42,6 +42,28 @@ exatamente o desenho do T4.92 (primeira regra que casa vence); o efeito colatera
 página não pode usar a tabela de classes das fichas como medida do custo da recompra** — usa a
 medição direta da H-018.
 
+## O que a ficha automática mostra (Dataview)
+
+O mesmo campo (`perdas_recompra_n`/`perdas_recompra_sol`, de
+`infra/scripts/meme_daily_ficha_frontmatter.py`, commit `53a1295e`) herda a **mesma ressalva de
+ordem** — ele conta `loss_class(position) == "recompra"`, e `comprou_no_topo`/`golpe_do_criador` são
+checadas antes. É por isso que esta consulta tende a mostrar números baixos ou zero mesmo em dias
+com recompras perdedoras reais (ver o diário de 25/09 abaixo, que achou 4 na unha):
+
+```dataview
+TABLE
+  perdas_recompra_n AS "n",
+  perdas_recompra_sol AS "SOL"
+FROM "03-TRADING/Meme/Fichas"
+WHERE dia
+SORT dia ASC
+```
+
+`WHERE dia` restringe a fichas **diárias** — as semanais (`Semana-*.md`) carregam
+`semana_inicio`/`semana_fim` em vez de `dia`. [[Ficha-2026-09-24|24/09]] e [[Ficha-2026-09-25|25/09]]
+só aparecerão aqui depois de regeradas pelo próximo deploy — o frontmatter delas ainda não tem os
+campos `perdas_*`.
+
 ## O que a H-018 mediu diretamente
 
 Origem: a perda real `Megawatt` (24/09/2026 04:38 BRT) — a mesa vendeu no alvo (+0,0160, 4 s de

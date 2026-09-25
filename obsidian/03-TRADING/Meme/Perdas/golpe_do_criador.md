@@ -65,9 +65,25 @@ Só existem duas fichas diárias automáticas até agora ([[Ficha-2026-09-24]],
 | **soma dos 2 dias** | **2** | **−0,0142** |
 
 Amostra pequena demais para qualquer leitura de tendência — só a soma exata dos dois dias existentes,
-sem extrapolação. **Não é consulta Dataview**: a ficha grava a classe só no corpo (tabela `## A
-classe de perda automática`), não no frontmatter. Um campo `perda_golpe_do_criador_sol` (e `_n`) no
-frontmatter de `Ficha-AAAA-MM-DD.md` destravaria isso — não alterado aqui.
+sem extrapolação.
+
+**Consulta viva (Dataview), desde `infra/scripts/meme_daily_ficha_frontmatter.py`
+(commit `53a1295e`):**
+
+```dataview
+TABLE
+  perdas_golpe_do_criador_n AS "n",
+  perdas_golpe_do_criador_sol AS "SOL"
+FROM "03-TRADING/Meme/Fichas"
+WHERE dia
+SORT dia ASC
+```
+
+`WHERE dia` restringe a fichas **diárias** — as semanais (`Semana-*.md`) carregam
+`semana_inicio`/`semana_fim` em vez de `dia` e ficam fora de propósito. [[Ficha-2026-09-24|24/09]] e
+[[Ficha-2026-09-25|25/09]] só aparecerão aqui depois de regeradas pelo próximo deploy — o
+frontmatter delas ainda não tem `perdas_golpe_do_criador_n`/`_sol`; a tabela estática acima continua
+sendo a fonte até lá.
 
 ## Hipóteses que atacaram esta classe
 

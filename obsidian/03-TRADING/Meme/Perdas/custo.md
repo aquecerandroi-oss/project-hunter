@@ -55,8 +55,7 @@ O diário de [[09-OPERATIONS/Diario/2026-09-22|22/09]] registrou o vazamento e a
 `closes_ata: false`). Esta página **não encontrou**, nas fichas de 24/09 e 25/09, nenhuma linha
 classificada como `custo` — o que é compatível com o reembolso já estar funcionando (as perdas que
 sobram são maiores que o custo, então caem em outras classes) **ou** com a amostra ser pequena
-demais para o caso "perda pequena, só de taxa" aparecer. As duas fichas existentes não trazem uma
-coluna de aluguel reembolsado; **não dá para decidir isto por Dataview hoje**.
+demais para o caso "perda pequena, só de taxa" aparecer.
 
 ## Custo medido, pelas fichas existentes
 
@@ -65,10 +64,27 @@ coluna de aluguel reembolsado; **não dá para decidir isto por Dataview hoje**.
 | [[Ficha-2026-09-24\|24/09]] | 0 | — |
 | [[Ficha-2026-09-25\|25/09]] | 0 | — |
 
-Zero em ambos os dias. **O que faltaria para o Dataview confirmar isto sozinho:** um campo no
-frontmatter da ficha com o aluguel de ATA reembolsado por dia (ex.: `ata_reembolsado_sol`) e a
-contagem de vendas com `closes_ata=true` — nenhum dos dois existe hoje no gerador
-(`infra/scripts/meme_daily_ficha.py`); não alterado aqui.
+Zero em ambos os dias.
+
+**Consulta viva (Dataview), desde `infra/scripts/meme_daily_ficha_frontmatter.py`
+(commit `53a1295e`):**
+
+```dataview
+TABLE
+  perdas_custo_n AS "n",
+  perdas_custo_sol AS "SOL"
+FROM "03-TRADING/Meme/Fichas"
+WHERE dia
+SORT dia ASC
+```
+
+`WHERE dia` restringe a fichas **diárias** — as semanais (`Semana-*.md`) carregam
+`semana_inicio`/`semana_fim` em vez de `dia`. [[Ficha-2026-09-24|24/09]] e [[Ficha-2026-09-25|25/09]]
+só aparecerão aqui depois de regeradas pelo próximo deploy — o frontmatter delas ainda não tem
+`perdas_custo_n`/`_sol`; a tabela estática acima continua sendo a fonte até lá. **O que ainda falta**
+para julgar o reembolso de aluguel especificamente (não é o mesmo que a classe `custo`): um campo
+com o aluguel de ATA reembolsado por dia (ex.: `ata_reembolsado_sol`) e a contagem de vendas com
+`closes_ata=true` — nenhum dos dois existe no gerador hoje; não alterado aqui.
 
 ## Hipóteses que atacaram esta classe
 

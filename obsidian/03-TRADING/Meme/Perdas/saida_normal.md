@@ -47,8 +47,23 @@ Nos dois dias existentes, `saida_normal` é a segunda maior fonte de perda depoi
 soma dos mesmos 2 dias) — coerente com o achado de longa data de que a saída da mesa (alvo 1,15× /
 trailing 10 % / 300 s) **já é a melhor de 52 variantes testadas** ([[KB-0149-o-que-a-mesa-real-ensinou]]
 item 6, R64) e que mexer nela (recuo mais largo, segurar mais tempo) piora — não a entrada.
-**Não é consulta Dataview**: mesma limitação das quatro páginas irmãs — a ficha grava a classe só no
-corpo, não no frontmatter.
+
+**Consulta viva (Dataview), desde `infra/scripts/meme_daily_ficha_frontmatter.py`
+(commit `53a1295e`):**
+
+```dataview
+TABLE
+  perdas_saida_normal_n AS "n",
+  perdas_saida_normal_sol AS "SOL"
+FROM "03-TRADING/Meme/Fichas"
+WHERE dia
+SORT dia ASC
+```
+
+`WHERE dia` restringe a fichas **diárias** — as semanais (`Semana-*.md`) carregam
+`semana_inicio`/`semana_fim` em vez de `dia`. [[Ficha-2026-09-24|24/09]] e [[Ficha-2026-09-25|25/09]]
+só aparecerão aqui depois de regeradas pelo próximo deploy — o frontmatter delas ainda não tem
+`perdas_saida_normal_n`/`_sol`; a tabela estática acima continua sendo a fonte até lá.
 
 ## Por que esta classe não tem, e talvez não deva ter, uma hipótese própria
 

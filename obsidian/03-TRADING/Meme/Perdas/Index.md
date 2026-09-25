@@ -25,6 +25,34 @@ nas fichas existentes e as hipóteses que já a atacaram.
 semana inteira segundo a origem da [[Fila de Hipoteses|H-019]]. Nenhuma variável medida até
 25/09/2026 prevê essa classe antes da compra.
 
+## As cinco classes, por dia (Dataview)
+
+Desde `infra/scripts/meme_daily_ficha_frontmatter.py` (commit `53a1295e`), cada ficha diária carrega
+`perdas_<classe>_n`/`perdas_<classe>_sol` para as cinco classes, mais `dia`, `operacoes`, `ganhos`,
+`pnl_sol` e `maior_vazamento` — ver [[Painel da mesa]] para os gráficos do Tracker sobre os mesmos
+campos.
+
+```dataview
+TABLE
+  maior_vazamento AS "maior vazamento",
+  perdas_comprou_no_topo_sol AS "comprou_no_topo",
+  perdas_golpe_do_criador_sol AS "golpe_do_criador",
+  perdas_recompra_sol AS "recompra",
+  perdas_custo_sol AS "custo",
+  perdas_saida_normal_sol AS "saida_normal"
+FROM "03-TRADING/Meme/Fichas"
+WHERE dia
+SORT dia ASC
+```
+
+`WHERE dia` pega só fichas **diárias** (`Ficha-AAAA-MM-DD.md`); as semanais (`Semana-*.md`, mesma
+pasta) carregam `semana_inicio`/`semana_fim` em vez de `dia` e ficam fora desta tabela de propósito
+— cada classe tem a sua própria consulta e a ressalva de ordem de precedência (`recompra` em
+particular) na página irmã. [[Ficha-2026-09-24|24/09]] e [[Ficha-2026-09-25|25/09]] — hoje as duas
+únicas fichas diárias — só aparecerão aqui depois de regeradas pelo próximo deploy do
+`meme_daily_ficha.py`: o frontmatter delas ainda não tem esses campos. Até lá, a coluna "soma
+24–25/09" da tabela acima (copiada à mão de cada página) continua sendo a fonte.
+
 ## Relacionado
 
 [[Mapa de Estrategias]] · [[Dicionario de Variaveis]] · [[Fila de Hipoteses]] ·
