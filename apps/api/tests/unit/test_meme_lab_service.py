@@ -197,6 +197,29 @@ async def test_without_a_quote_or_bets_every_field_is_null_with_a_reason() -> No
     assert out.sources.lab_status == "heartbeat_missing" and not out.sources.lab_alive
 
 
+async def test_a_pullback_arms_pct_and_window_ride_the_board_and_a_plain_set_has_none() -> None:
+    """T4.91/EXP-M24: ``recuo_v1``'s only difference from the set it copies is
+    *when* it enters -- the board must say so, and a set without the switch
+    must not invent one."""
+    pullback_id = "01994d00-6c1a-7000-8000-00000000001d"
+    pullback = _rule_set(
+        id=pullback_id,
+        name="recuo_v1",
+        exp_ref="EXP-M24",
+        params={**PARAMS, "entry_pullback_pct": "3", "entry_pullback_window_s": 60},
+    )
+    plain = _rule_set()
+    repo = FakeRepository(
+        [pullback, plain], {pullback_id: WALLET, RESEARCH: WALLET}, [SCORE]
+    ).as_repo()
+    out = await build_meme_lab(repo, {}, as_of=AS_OF, heartbeat_key="hb:meme:radar")
+    by_name = {board.name: board for board in out.rule_sets}
+    assert by_name["recuo_v1"].entry_pullback is not None
+    assert by_name["recuo_v1"].entry_pullback.pct == Decimal("3")
+    assert by_name["recuo_v1"].entry_pullback.window_s == 60
+    assert by_name["meme_paper_v0"].entry_pullback is None
+
+
 async def test_the_last_bet_quote_is_the_fallback_and_a_retired_set_does_not_count_as_capital() -> (
     None
 ):

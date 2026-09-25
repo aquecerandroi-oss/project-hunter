@@ -67,7 +67,8 @@ export function remainingHoldLabel(deadlineIso: string | null | undefined, nowMs
   return `espera restante ${formatDuration(remaining)}`;
 }
 
-function splitDecimal(value: string): { negative: boolean; digits: string; scale: number } {
+/** Exported for `components/meme-lab/meme-arms-format.ts`'s own decimal-safe sum -- one BigInt parser, not two. */
+export function splitDecimal(value: string): { negative: boolean; digits: string; scale: number } {
   const match = /^([+-])?(\d+)(?:\.(\d+))?$/.exec(value.trim());
   if (!match) throw new TypeError(`Invalid decimal value: ${JSON.stringify(value)}`);
   const [, sign, intPart, fracPart = ""] = match;

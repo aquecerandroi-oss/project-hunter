@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PaperLabel } from "@/components/meme-desk/paper-label";
+import { MemeArmsBoard } from "@/components/meme-lab/meme-arms-board";
 import { MemeDeskTabs } from "@/components/meme-tests/meme-desk-tabs";
 import { isDayString } from "@/components/meme-tests/meme-tests-format";
 import { MemeTestsSection } from "@/components/meme-tests/meme-tests-section";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
+import { loadMemeArms } from "@/lib/api/meme-lab";
 import { loadMemeTests } from "@/lib/api/meme-tests";
 import { resolveOrgContext } from "@/lib/api/org-context";
 
@@ -31,7 +33,10 @@ export default async function MemeTestsPage({ params, searchParams }: MemeTestsP
 
   const day = isDayString(query.day) ? query.day : undefined;
   const ruleSet = query.set && query.set.length > 0 ? query.set : null;
-  const tests = await loadMemeTests(membership.organization.id, { day, ruleSet: ruleSet ?? undefined, limit: TESTS_PAGE_LIMIT, cursor: query.cursor });
+  const [tests, arms] = await Promise.all([
+    loadMemeTests(membership.organization.id, { day, ruleSet: ruleSet ?? undefined, limit: TESTS_PAGE_LIMIT, cursor: query.cursor }),
+    loadMemeArms(membership.organization.id),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,6 +49,7 @@ export default async function MemeTestsPage({ params, searchParams }: MemeTestsP
         <PaperLabel />
       </div>
       <MemeDeskTabs orgSlug={orgSlug} active="testes" />
+      {arms.ok ? <MemeArmsBoard data={arms.data} /> : <SectionUnavailable title="Braços de pesquisa" reason={`falha ao carregar (${arms.reason})`} />}
       {tests.ok ? (
         <MemeTestsSection orgSlug={orgSlug} host="testes" data={tests.data} ruleSet={ruleSet} />
       ) : (

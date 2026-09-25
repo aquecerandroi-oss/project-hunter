@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AutoRefresh } from "@/components/auto-refresh";
@@ -224,7 +225,17 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
   return (
     <div className="flex flex-col gap-6">
       <AutoRefresh intervalMs={DEFAULT_AUTO_REFRESH_INTERVAL_MS} />
-      <h1 className="text-xl font-semibold text-fg">Lab</h1>
+      <div>
+        <h1 className="text-xl font-semibold text-fg">Lab</h1>
+        <p className="text-xs text-fg-muted">
+          Este Lab é o de estratégia (mercados spot/perp). Os braços de pesquisa do laço meme (pump.fun) — como o{" "}
+          <code className="font-mono">recuo_v1</code> — têm o próprio placar,{" "}
+          <Link href={`/${orgSlug}/meme/testes`} className="underline">
+            Lab meme — braços de pesquisa
+          </Link>
+          .
+        </p>
+      </div>
 
       <LabHeader asOf={result.ok ? result.summary.as_of : null} versions={result.ok ? result.summary.versions : []} ruler={ruler} />
 

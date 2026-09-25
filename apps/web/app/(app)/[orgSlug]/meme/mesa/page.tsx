@@ -13,6 +13,7 @@ import { buildLiveOutcomeIndex } from "@/components/meme-live/live-index";
 import { LivePositionsSection } from "@/components/meme-live/live-positions-section";
 import { Spot1Panel } from "@/components/meme-live/spot1-panel";
 import { WalletSummaryPanel } from "@/components/meme-live/wallet-summary-panel";
+import { MemeArmsBoard } from "@/components/meme-lab/meme-arms-board";
 import { MemeDeskTabs } from "@/components/meme-tests/meme-desk-tabs";
 import { isDayString } from "@/components/meme-tests/meme-tests-format";
 import { MemeTestsSection } from "@/components/meme-tests/meme-tests-section";
@@ -22,6 +23,7 @@ import { isApiError } from "@/lib/api-error";
 import { loadMemeSources } from "@/lib/api/meme";
 import { getMemeDesk, getMemeLoopState } from "@/lib/api/meme-desk";
 import type { MemeDesk } from "@/lib/api/meme-desk-types";
+import { loadMemeArms } from "@/lib/api/meme-lab";
 import { getMemeLive } from "@/lib/api/meme-live";
 import { type MemeLive, realActionsAvailable } from "@/lib/api/meme-live-types";
 import { loadMemeTests } from "@/lib/api/meme-tests";
@@ -78,19 +80,8 @@ export default async function MemeDeskPage({ params, searchParams }: MemeDeskPag
   if (!membership) notFound();
 
   const orgId = membership.organization.id;
-  const testsTab = query.tab === "testes";
-  if (testsTab) {
-    const day = isDayString(query.day) ? query.day : undefined;
-    const ruleSet = query.set && query.set.length > 0 ? query.set : null;
-    const tests = await loadMemeTests(orgId, { day, ruleSet: ruleSet ?? undefined, limit: DESK_PAGE_LIMIT, cursor: query.cursor });
-    return (
-      <div className="flex flex-col gap-6">
-        <AutoRefresh intervalMs={TESTS_REFRESH_MS} />
-        <DeskHeader />
-        <MemeDeskTabs orgSlug={orgSlug} active="testes" />
-        {tests.ok ? <MemeTestsSection orgSlug={orgSlug} host="mesa" data={tests.data} ruleSet={ruleSet} /> : <SectionUnavailable title="Testes" reason={`falha ao carregar (${tests.reason})`} />}
-      </div>
-    );
+  if (query.tab === "testes") {
+    return <TestsTabView orgId={orgId} orgSlug={orgSlug} query={query} />;
   }
 
   const canOperate = roleAtLeast(membership.role, "TRADER");
@@ -143,6 +134,31 @@ function LiveExecutorSections({ orgSlug, orgId, live, canOperate }: { orgSlug: s
       <LiveExecutorPanel live={live.data} loadReason={null} nowMs={nowMs} />
       <LivePositionsSection orgSlug={orgSlug} orgId={orgId} positions={live.data.positions} canOperate={canOperate} nowMs={nowMs} />
     </>
+  );
+}
+
+interface TestsTabViewProps {
+  orgId: string;
+  orgSlug: string;
+  query: Awaited<MemeDeskPageProps["searchParams"]>;
+}
+
+/** `?tab=testes` (T4.13 §2): the day's test record plus the arms board, extracted out of `MemeDeskPage` so its own branch does not push that Server Component's cyclomatic complexity over the lint budget (`lab-page.tsx`'s `DailyGoalSection` convention). */
+async function TestsTabView({ orgId, orgSlug, query }: TestsTabViewProps) {
+  const day = isDayString(query.day) ? query.day : undefined;
+  const ruleSet = query.set && query.set.length > 0 ? query.set : null;
+  const [tests, arms] = await Promise.all([
+    loadMemeTests(orgId, { day, ruleSet: ruleSet ?? undefined, limit: DESK_PAGE_LIMIT, cursor: query.cursor }),
+    loadMemeArms(orgId),
+  ]);
+  return (
+    <div className="flex flex-col gap-6">
+      <AutoRefresh intervalMs={TESTS_REFRESH_MS} />
+      <DeskHeader />
+      <MemeDeskTabs orgSlug={orgSlug} active="testes" />
+      {arms.ok ? <MemeArmsBoard data={arms.data} /> : <SectionUnavailable title="Braços de pesquisa" reason={`falha ao carregar (${arms.reason})`} />}
+      {tests.ok ? <MemeTestsSection orgSlug={orgSlug} host="mesa" data={tests.data} ruleSet={ruleSet} /> : <SectionUnavailable title="Testes" reason={`falha ao carregar (${tests.reason})`} />}
+    </div>
   );
 }
 

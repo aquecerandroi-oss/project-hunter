@@ -28,6 +28,7 @@ __all__ = [
     "GoalOut",
     "MemeLabOut",
     "NullableDecimalOut",
+    "PullbackOut",
     "RuleSetBoardOut",
     "RuleSetCeilingsOut",
     "SolUsdOut",
@@ -108,6 +109,18 @@ class DayScoreOut(BaseModel):
     (sem fotografia)"), left out of ``wins``/``pnl_sol``/``r_sum`` and counted here."""
 
 
+class PullbackOut(BaseModel):
+    """T4.91/EXP-M24: the one entry-timing knob a pullback arm turns on — the
+    gate, exit and size are copied from the rule set it was seeded from
+    (``code_ref``/``ceilings`` say so); only *when* it buys differs. Present
+    exactly when the rule set's ``params`` carry ``entry_pullback_pct`` (the
+    switch, ``hunter_meme_worker.entry_pullback``); ``None`` on a set that
+    still enters at ``t0``."""
+
+    pct: DecimalStr
+    window_s: int
+
+
 class RuleSetBoardOut(BaseModel):
     id: uuid.UUID
     name: str
@@ -117,6 +130,7 @@ class RuleSetBoardOut(BaseModel):
     status: Literal["active", "retired"]
     code_ref: str
     ceilings: RuleSetCeilingsOut
+    entry_pullback: PullbackOut | None
     wallet: WalletOut
     today: DayScoreOut | None
     today_reason: str | None = None

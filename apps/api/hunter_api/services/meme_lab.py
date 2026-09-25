@@ -17,6 +17,7 @@ from hunter_api.schemas.meme_lab import (
     DayScoreOut,
     MemeLabOut,
     NullableDecimalOut,
+    PullbackOut,
     RuleSetBoardOut,
     RuleSetCeilingsOut,
     WalletOut,
@@ -101,6 +102,16 @@ def _ceilings(params: Mapping[str, object]) -> RuleSetCeilingsOut:
     )
 
 
+def _pullback(params: Mapping[str, object]) -> PullbackOut | None:
+    """``entry_pullback_pct`` is the switch (``hunter_meme_worker.entry_pullback``,
+    T4.91): absent, this rule set enters at ``t0`` like every set before it."""
+    pct = params.get("entry_pullback_pct")
+    window_s = params.get("entry_pullback_window_s")
+    if pct is None or window_s is None:
+        return None
+    return PullbackOut(pct=Decimal(str(pct)), window_s=int(str(window_s)))
+
+
 def wallet_out(rule_set: RuleSetRow, wallet: WalletRow) -> WalletOut:
     wallet_max = Decimal(str(rule_set.params["wallet_max_sol"]))
     with localcontext(CONTEXT):
@@ -157,6 +168,7 @@ async def build_meme_lab(
                 status=rule_set.status,  # type: ignore[arg-type]
                 code_ref=rule_set.code_ref,
                 ceilings=_ceilings(rule_set.params),
+                entry_pullback=_pullback(rule_set.params),
                 wallet=wallet_view,
                 today=today_row,
                 today_reason=None if today_row is not None else "no_bets_today",
