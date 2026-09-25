@@ -26,12 +26,16 @@ from hunter_core.strategies.canonical import params_hash
 from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
 from hunter_strategy_worker.gate_policy import parse_policy
 
-from .builders import activate_version, insert_hourly_regime, registry_for, seed_market
+from .builders import activate_version, insert_hourly_regime, note_for, registry_for, seed_market
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _module(name: str, filename: str) -> Any:
+    # T4.93: activate_strategy_version.py now imports the sibling
+    # infra/scripts/obsidian_note_gate.py.
+    if str(REPO_ROOT / "infra" / "scripts") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "infra" / "scripts"))
     path = REPO_ROOT / "infra" / "scripts" / filename
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
@@ -343,7 +347,7 @@ class TestDeriveVariant:
 @pytest.mark.integration
 class TestActivatingTheVariant:
     async def test_activation_keeps_the_override_and_the_lineage(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         """The whole point of the ``_DERIVED`` branch in the ops script: the
         plain research path would rewrite ``default_parameters`` from today's
@@ -371,6 +375,8 @@ class TestActivatingTheVariant:
                 "T3.26: coorte de pesquisa aberta",
                 dry_run=False,
                 registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v2"),
+                repo_root=tmp_path,
             )
         assert message.startswith(f"activated {key} v2 (purpose research_only)")
         async with role_session(db_session_factory, db_role="hunter_worker") as session:

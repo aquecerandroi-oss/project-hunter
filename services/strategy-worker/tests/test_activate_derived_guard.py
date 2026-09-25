@@ -44,7 +44,7 @@ from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 from hunter_strategy_worker.activate_derived import activate_derived
 from hunter_strategy_worker.activation_db import load_row
 
-from .builders import activate_version, registry_for, seed_market
+from .builders import activate_version, note_for, registry_for, seed_market
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -52,6 +52,10 @@ OVERRIDE = {"volume_mult": "5.5"}
 
 
 def _module(name: str, filename: str) -> Any:
+    # T4.93: activate_strategy_version.py now imports the sibling
+    # infra/scripts/obsidian_note_gate.py.
+    if str(REPO_ROOT / "infra" / "scripts") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "infra" / "scripts"))
     path = REPO_ROOT / "infra" / "scripts" / filename
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
@@ -207,7 +211,7 @@ class TestTheStructuralGuard:
                 )
 
     async def test_the_derived_route_still_accepts_the_very_same_row(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         """A recusa não é um beco sem saída: a rota derivada — que é a correta —
         ativa a mesma linha preservando o conteúdo dela."""
@@ -237,6 +241,8 @@ class TestTheStructuralGuard:
                 row,
                 code_ref=row.code_ref,
                 dry_run=False,
+                note=note_for(tmp_path, f"{key} v2"),
+                repo_root=tmp_path,
             )
         assert message.startswith(f"activated {key} v2 (purpose {PURPOSE_RESEARCH_ONLY})")
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -245,7 +251,7 @@ class TestTheStructuralGuard:
         assert variant.default_parameters["volume_mult"] == "5.5"
 
     async def test_a_seed_draft_with_no_parameters_still_activates(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         """A trava só morde um conjunto próprio: a primeira ativação de pesquisa,
         que é o caso normal, continua escrevendo os parâmetros do código."""
@@ -257,7 +263,14 @@ class TestTheStructuralGuard:
             await _seed_style_draft(session, key)
         async with db_session_factory() as session, session.begin():
             message = await activate.activate(
-                session, key, "v1", "primeira ativação", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v1",
+                "primeira ativação",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v1"),
+                repo_root=tmp_path,
             )
         assert message.startswith(f"activated {key} v1 (purpose {PURPOSE_RESEARCH_ONLY})")
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -267,7 +280,7 @@ class TestTheStructuralGuard:
         )
 
     async def test_a_draft_carrying_exactly_the_codes_own_set_is_not_refused(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         """Reescrever o que já está lá não apaga experimento nenhum: o que a
         trava compara é o ``params_hash``, não a presença."""
@@ -278,7 +291,14 @@ class TestTheStructuralGuard:
             await activate_version(session, key=key, active=False, code_ref=None)
         async with db_session_factory() as session, session.begin():
             message = await activate.activate(
-                session, key, "v1", "mesma coisa", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v1",
+                "mesma coisa",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v1"),
+                repo_root=tmp_path,
             )
         assert message.startswith(f"activated {key} v1")
 
@@ -286,7 +306,7 @@ class TestTheStructuralGuard:
 @pytest.mark.integration
 class TestTheActivationEvent:
     async def test_it_names_the_parent_the_params_hash_and_the_kept_changelog(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         derive, activate = _derive(), _activate()
         key = "event_variant"
@@ -305,7 +325,14 @@ class TestTheActivationEvent:
             )
         async with db_session_factory() as session, session.begin():
             await activate.activate(
-                session, key, "v2", "coorte aberta", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v2",
+                "coorte aberta",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v2"),
+                repo_root=tmp_path,
             )
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
             variant = await _row(session, key, "v2")
@@ -317,7 +344,7 @@ class TestTheActivationEvent:
         assert "coorte aberta" in message
 
     async def test_a_paper_line_activation_names_its_source_too(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         activate = _activate()
         key = "event_paper_line"
@@ -326,11 +353,25 @@ class TestTheActivationEvent:
             await activate_version(session, key=key)
         async with db_session_factory() as session, session.begin():
             await activate.paper_line(
-                session, key, "v1", "D10", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v1",
+                "D10",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v1"),
+                repo_root=tmp_path,
             )
         async with db_session_factory() as session, session.begin():
             await activate.activate(
-                session, key, "v2", "D10 cumprida", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v2",
+                "D10 cumprida",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v2"),
+                repo_root=tmp_path,
             )
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
             paper = await _row(session, key, "v2")

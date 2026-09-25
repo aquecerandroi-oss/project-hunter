@@ -16,19 +16,23 @@ from typing import Any
 import pytest
 from sqlalchemy import text
 
+import hunter_strategy_worker.activate as activate_module
 from hunter_core.db.session import role_session
 from hunter_core.strategies.registry import DEFAULT_REGISTRY
 from hunter_strategy_worker.activation import validate_parameters
-from hunter_strategy_worker.code_ref import PACKAGE, version_code_ref
+from hunter_strategy_worker.code_ref import PACKAGE, strategy_module, version_code_ref
 from hunter_strategy_worker.context_budget import required_context_minutes
 
-from .builders import activate_version, registry_for, seed_market
+from .builders import activate_version, note_for, registry_for, seed_market
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _script() -> Any:
     """Import the ops script by path (``infra/scripts`` is not a package)."""
+    # T4.93: the script now imports the sibling infra/scripts/obsidian_note_gate.py
+    if str(REPO_ROOT / "infra" / "scripts") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "infra" / "scripts"))
     path = REPO_ROOT / "infra" / "scripts" / "activate_strategy_version.py"
     spec = importlib.util.spec_from_file_location("activate_strategy_version", path)
     assert spec is not None and spec.loader is not None
@@ -118,9 +122,9 @@ class TestUnbudgetedContextRefusal:
                 changelog=None,
             )
 
-        monkeypatch.setattr(script, "migration_applied", fake_true)
-        monkeypatch.setattr(script, "purpose_column_present", fake_true)
-        monkeypatch.setattr(script, "load_row", fake_row)
+        monkeypatch.setattr(activate_module, "migration_applied", fake_true)
+        monkeypatch.setattr(activate_module, "purpose_column_present", fake_true)
+        monkeypatch.setattr(activate_module, "load_row", fake_row)
         monkeypatch.setenv("SHADOW_CONTEXT_MAX_MINUTES", "100")
 
         registry = registry_for(key)
@@ -145,7 +149,7 @@ class TestUnbudgetedContextRefusal:
         key = "budget_ceiling_idempotent"
         registry = registry_for(key)
         strategy = registry.get(f"{key}_v1", "v1")
-        frozen_code_ref = script.version_code_ref(script.strategy_module(strategy))
+        frozen_code_ref = version_code_ref(strategy_module(strategy))
 
         async def fake_true(_conn: Any) -> bool:
             return True
@@ -163,9 +167,9 @@ class TestUnbudgetedContextRefusal:
                 changelog=None,
             )
 
-        monkeypatch.setattr(script, "migration_applied", fake_true)
-        monkeypatch.setattr(script, "purpose_column_present", fake_true)
-        monkeypatch.setattr(script, "load_row", fake_row)
+        monkeypatch.setattr(activate_module, "migration_applied", fake_true)
+        monkeypatch.setattr(activate_module, "purpose_column_present", fake_true)
+        monkeypatch.setattr(activate_module, "load_row", fake_row)
         monkeypatch.setenv("SHADOW_CONTEXT_MAX_MINUTES", "1")
 
         message = await script.activate(None, key, "v1", "test", dry_run=True, registry=registry)
@@ -174,13 +178,18 @@ class TestUnbudgetedContextRefusal:
 
 @pytest.mark.integration
 class TestActivationScript:
-    async def test_it_refuses_when_the_migration_is_missing(self, db_session_factory: Any) -> None:
+    async def test_it_refuses_when_the_migration_is_missing(
+        self, db_session_factory: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         script = _script()
 
         async def no_migration(_conn: Any) -> bool:
             return False
 
-        script.migration_applied = no_migration
+        # T4.93: activate() now lives in hunter_strategy_worker.activate, a
+        # persistent module (unlike the freshly-loaded ``script``) — patch it
+        # through the fixture so the fake is undone after this test.
+        monkeypatch.setattr(activate_module, "migration_applied", no_migration)
         async with db_session_factory() as session, session.begin():
             with pytest.raises(script.Refused, match="0002_shadow_lab is not applied"):
                 await script.activate(session, "volume_anomaly", "v1", "test", dry_run=True)
@@ -248,7 +257,7 @@ class TestActivationScript:
         assert activated is None
 
     async def test_activation_writes_the_definitive_code_ref_and_an_audit_event(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         script = _script()
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -262,6 +271,8 @@ class TestActivationScript:
                 "S2 proof",
                 dry_run=False,
                 registry=registry_for("real_volume"),
+                note=note_for(tmp_path, "real_volume v1"),
+                repo_root=tmp_path,
             )
         assert message.startswith("activated")
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -288,7 +299,7 @@ class TestActivationScript:
         assert events >= 1
 
     async def test_reactivating_the_same_frozen_version_is_a_no_op(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         script = _script()
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -302,8 +313,11 @@ class TestActivationScript:
                 "first",
                 dry_run=False,
                 registry=registry_for("idempotent_volume"),
+                note=note_for(tmp_path, "idempotent_volume v1"),
+                repo_root=tmp_path,
             )
         async with db_session_factory() as session, session.begin():
+            # Idempotent no-op: the gate is never reached, so no note is needed.
             message = await script.activate(
                 session,
                 "idempotent_volume",
@@ -359,6 +373,10 @@ class TestEveryRunIsAuditedEvenOnAnUnexpectedFailure:
         async def _boom(*_args: Any, **_kwargs: Any) -> str:
             raise RuntimeError("boom: forced for T3.15c")
 
+        # T4.93: the note gate now lives inside activate()/paper_line()
+        # themselves (right before their one write); mocking activate() away
+        # entirely, as this test does, never reaches it — no fixture note
+        # needed here.
         monkeypatch.setattr(script, "activate", _boom)
         args = argparse.Namespace(
             strategy="whatever",

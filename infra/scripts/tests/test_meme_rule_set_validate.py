@@ -115,6 +115,15 @@ def _set(name: str, version: str, **params: Any) -> dict[str, Any]:
 REASON = "T4.64: regressao dos dois incidentes de 18/09/2026 (KB-0140)"
 
 
+def _obsidian_note(tmp_path: Path, *mentions: str) -> str:
+    """T4.93: a fixture note under ``obsidian/`` mentioning every target."""
+    note_dir = tmp_path / "obsidian" / "11-KNOWLEDGE"
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / "fixture.md"
+    note_path.write_text("# fixture de teste\n\n" + "\n".join(mentions), encoding="utf-8")
+    return "obsidian/11-KNOWLEDGE/fixture.md"
+
+
 async def test_incident_1_bare_float_over_a_string_key_is_refused_with_the_fix() -> None:
     """14:19 BRT: ``max_sol_per_bet=0.28`` — a bare JSON number over a key the
     live document already carries as a string. Refused before the merge even
@@ -164,9 +173,10 @@ async def test_incident_2_bare_float_with_no_string_precedent_is_refused() -> No
     assert conn.writes() == []
 
 
-async def test_valid_string_decimal_passes() -> None:
+async def test_valid_string_decimal_passes(tmp_path: Path) -> None:
     script = _load("meme_rule_set")
     conn = FakeConn([_set("flow_v2", "6")])
+    note = _obsidian_note(tmp_path, "flow_v2/6")
     code, report = await script.run(
         conn,
         deprecate=None,
@@ -174,15 +184,18 @@ async def test_valid_string_decimal_passes() -> None:
         reason=REASON,
         set_param='trailing_pct="40"',
         rule_sets=["flow_v2/6"],
+        note=note,
+        repo_root=tmp_path,
     )
     assert code == 0 and "applied: 1 row(s) updated" in report
 
 
-async def test_trailing_arm_x_null_passes() -> None:
+async def test_trailing_arm_x_null_passes(tmp_path: Path) -> None:
     """A set disarming its trailing rule back to "from the entry" — ``null``
     over a previously-set value — loads fine (``arm_multiple_or_none(None)``)."""
     script = _load("meme_rule_set")
     conn = FakeConn([_set("flow_v2", "6", trailing_arm_x="2.0")])
+    note = _obsidian_note(tmp_path, "flow_v2/6")
     code, report = await script.run(
         conn,
         deprecate=None,
@@ -190,16 +203,21 @@ async def test_trailing_arm_x_null_passes() -> None:
         reason=REASON,
         set_param="trailing_arm_x=null",
         rule_sets=["flow_v2/6"],
+        note=note,
+        repo_root=tmp_path,
     )
     assert code == 0 and "applied: 1 row(s) updated" in report
 
 
-async def test_t480_max_buys_1m_accepts_an_int_and_refuses_a_decimal_or_a_negative() -> None:
+async def test_t480_max_buys_1m_accepts_an_int_and_refuses_a_decimal_or_a_negative(
+    tmp_path: Path,
+) -> None:
     """T4.80: the buy-count ceiling is a **count** — ``25`` is written,
     ``25.5`` is refused by type (never truncated to 25 by ``int()``) and
     ``-1`` by the gate's own validation. Nothing written in either refusal."""
     script = _load("meme_rule_set")
     good = FakeConn([_set("operator", "5", kind="operator")])
+    note = _obsidian_note(tmp_path, "operator/5")
     code, report = await script.run(
         good,
         deprecate=None,
@@ -207,6 +225,8 @@ async def test_t480_max_buys_1m_accepts_an_int_and_refuses_a_decimal_or_a_negati
         reason="T4.80: R65 (KB-0147) — teto de compras no minuto, em sombra",
         set_param="max_buys_1m=25",
         rule_sets=["operator/5"],
+        note=note,
+        repo_root=tmp_path,
     )
     assert code == 0 and "applied: 1 row(s) updated" in report
 

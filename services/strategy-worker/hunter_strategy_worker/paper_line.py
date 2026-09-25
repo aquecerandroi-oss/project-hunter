@@ -15,6 +15,7 @@ connection: ``0010_strategy_purpose`` revoked it from every application role.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import text
@@ -29,8 +30,10 @@ from hunter_strategy_worker.activation_db import (
     load_row,
     migration_applied,
     next_free_version,
+    note_provenance_data,
     purpose_column_present,
     record_event,
+    require_note,
 )
 from hunter_strategy_worker.catalogue import resolve_strategy
 from hunter_strategy_worker.code_ref import strategy_module, version_code_ref
@@ -46,8 +49,13 @@ async def paper_line(
     *,
     dry_run: bool,
     registry: StrategyRegistry = DEFAULT_REGISTRY,
+    note: str | None = None,
+    repo_root: Path | None = None,
 ) -> str:
-    """Derive the paper coorte from a frozen research version. Returns a summary."""
+    """Derive the paper coorte from a frozen research version. Returns a summary.
+
+    ``note`` (T4.93, "Obsidian primeiro") is required only once every check
+    below has passed and the row is about to be inserted."""
     if not await migration_applied(conn):
         raise Refused("0002_shadow_lab is not applied: apply the migration before deriving")
     if not await purpose_column_present(conn):
@@ -113,6 +121,7 @@ async def paper_line(
             f"would derive {key} {successor} (purpose {PURPOSE_PAPER}, draft, not activated) "
             f"from {version} at code_ref {code_ref} ({len(params)} parameters copied)"
         )
+    proof = require_note(key, version, note, repo_root=repo_root)
     await conn.execute(
         text(
             "INSERT INTO strategy_versions (id, strategy_id, version, status, "
@@ -138,6 +147,7 @@ async def paper_line(
         "strategy_version_paper_line_derived",
         f"{key} {successor} derived from {version} with purpose={PURPOSE_PAPER} "
         f"code_ref={code_ref}, draft, not activated: {changelog}",
+        data=note_provenance_data(proof),
     )
     return (
         f"derived {key} {successor} (purpose {PURPOSE_PAPER}, draft, not activated) "

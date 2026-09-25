@@ -11,6 +11,7 @@ canned rows. Run: ``uv run pytest infra/scripts/tests/test_meme_ops_scripts.py -
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -250,11 +251,26 @@ async def test_deprecate_dry_run_plans_and_refusals_are_named() -> None:
         assert conn.writes() == [], label
 
 
-async def test_deprecate_apply_retires_the_active_row_and_leaves_an_audit_row() -> None:
+def _obsidian_note(tmp_path: Path, *mentions: str) -> str:
+    """T4.93: a fixture note under ``obsidian/`` mentioning every target,
+    for the ``--apply`` calls the gate now requires one before."""
+    note_dir = tmp_path / "obsidian" / "11-KNOWLEDGE"
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / "fixture.md"
+    note_path.write_text("# fixture de teste\n\n" + "\n".join(mentions), encoding="utf-8")
+    return "obsidian/11-KNOWLEDGE/fixture.md"
+
+
+async def test_deprecate_apply_retires_the_active_row_and_leaves_an_audit_row(
+    tmp_path: Path,
+) -> None:
     script = _load("meme_rule_set")
     conn = FakeConn(ROWS)
     reason = "EXP-M3: descartar; sucessora hype_probe_v0/2 (EXP-M5)"
-    code, report = await script.run(conn, deprecate="hype_probe_v0/1", apply=True, reason=reason)
+    note = _obsidian_note(tmp_path, "hype_probe_v0/1")
+    code, report = await script.run(
+        conn, deprecate="hype_probe_v0/1", apply=True, reason=reason, note=note, repo_root=tmp_path
+    )
     assert code == 0 and "applied: retired" in report
     update, params = next((s, p) for s, p in conn.statements if s.lstrip().startswith("UPDATE"))
     assert "status = 'retired', retired_at = now()" in update and "AND status = 'active'" in update
@@ -262,3 +278,60 @@ async def test_deprecate_apply_retires_the_active_row_and_leaves_an_audit_row() 
     _, audit = next((s, p) for s, p in conn.statements if "system_events" in s)
     assert audit["component"] == "meme_rule_set" and audit["event"] == "deprecated"
     assert "hype_probe_v0/1" in audit["message"] and reason in audit["message"]
+    assert json.loads(audit["data"])["note"] == note
+
+
+# --------------------------------------------------- T4.93: Obsidian primeiro
+
+
+async def test_deprecate_apply_without_a_note_is_refused_before_writing(tmp_path: Path) -> None:
+    script = _load("meme_rule_set")
+    conn = FakeConn(ROWS)
+    with pytest.raises(script.Refused, match="note_required"):
+        await script.run(
+            conn, deprecate="hype_probe_v0/1", apply=True, reason="x" * 20, repo_root=tmp_path
+        )
+    assert conn.writes() == []
+
+
+async def test_deprecate_apply_with_a_missing_note_file_is_refused(tmp_path: Path) -> None:
+    script = _load("meme_rule_set")
+    conn = FakeConn(ROWS)
+    with pytest.raises(script.Refused, match="note_missing"):
+        await script.run(
+            conn,
+            deprecate="hype_probe_v0/1",
+            apply=True,
+            reason="x" * 20,
+            note="obsidian/11-KNOWLEDGE/ghost.md",
+            repo_root=tmp_path,
+        )
+    assert conn.writes() == []
+
+
+async def test_deprecate_apply_with_a_note_not_mentioning_the_target_is_refused(
+    tmp_path: Path,
+) -> None:
+    script = _load("meme_rule_set")
+    conn = FakeConn(ROWS)
+    note = _obsidian_note(tmp_path, "outro conjunto qualquer")
+    with pytest.raises(script.Refused, match="note_does_not_mention_target"):
+        await script.run(
+            conn,
+            deprecate="hype_probe_v0/1",
+            apply=True,
+            reason="x" * 20,
+            note=note,
+            repo_root=tmp_path,
+        )
+    assert conn.writes() == []
+
+
+async def test_deprecate_dry_run_needs_no_note_and_prints_the_hint(tmp_path: Path) -> None:
+    script = _load("meme_rule_set")
+    conn = FakeConn(ROWS)
+    code, report = await script.run(
+        conn, deprecate="hype_probe_v0/1", apply=False, reason="x" * 20, repo_root=tmp_path
+    )
+    assert code == 0 and "dry-run" in report and "--note" in report and "hype_probe_v0/1" in report
+    assert conn.writes() == []

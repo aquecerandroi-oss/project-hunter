@@ -20,12 +20,15 @@ from sqlalchemy import text
 from hunter_core.db.session import role_session
 from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
 
-from .builders import activate_version, registry_for, seed_market
+from .builders import activate_version, note_for, registry_for, seed_market
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _script() -> Any:
+    # T4.93: the script now imports the sibling infra/scripts/obsidian_note_gate.py
+    if str(REPO_ROOT / "infra" / "scripts") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "infra" / "scripts"))
     path = REPO_ROOT / "infra" / "scripts" / "activate_strategy_version.py"
     spec = importlib.util.spec_from_file_location("activate_strategy_version_paper", path)
     assert spec is not None and spec.loader is not None
@@ -71,7 +74,7 @@ class TestPaperLine:
         assert [r.version for r in rows] == ["v1"]
 
     async def test_the_paper_line_copies_the_frozen_content_and_activates_nothing(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         script = _script()
         key = "paper_line_real"
@@ -80,7 +83,14 @@ class TestPaperLine:
             await activate_version(session, key=key)
         async with db_session_factory() as session, session.begin():
             message = await script.paper_line(
-                session, key, "v1", "D10: momentum paper", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v1",
+                "D10: momentum paper",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v1"),
+                repo_root=tmp_path,
             )
         assert message.startswith(f"derived {key} v2 (purpose paper, draft, not activated)")
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -115,7 +125,9 @@ class TestPaperLine:
         assert paper.changelog.startswith("paper line of v1 (D10, T3.15)")
         assert events == ["strategy_version_paper_line_derived"]
 
-    async def test_one_paper_line_per_strategy(self, db_session_factory: Any) -> None:
+    async def test_one_paper_line_per_strategy(
+        self, db_session_factory: Any, tmp_path: Path
+    ) -> None:
         script = _script()
         key = "paper_line_twice"
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -123,9 +135,18 @@ class TestPaperLine:
             await activate_version(session, key=key)
         async with db_session_factory() as session, session.begin():
             await script.paper_line(
-                session, key, "v1", "first", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v1",
+                "first",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v1"),
+                repo_root=tmp_path,
             )
         async with db_session_factory() as session, session.begin():
+            # Refused for "already has a paper line" before the note gate is
+            # ever reached — no note needed for a call that never writes.
             with pytest.raises(script.Refused, match="already has a paper line"):
                 await script.paper_line(
                     session, key, "v1", "second", dry_run=False, registry=registry_for(key)
@@ -162,7 +183,7 @@ class TestPaperLine:
                 )
 
     async def test_the_paper_line_can_later_be_activated_and_live_never(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         """Activating the derived line is a separate run — and resolves the code
         through the frozen ``code_ref``, since ``v2`` has no registry entry."""
@@ -173,7 +194,14 @@ class TestPaperLine:
             await activate_version(session, key=key)
         async with db_session_factory() as session, session.begin():
             await script.paper_line(
-                session, key, "v1", "derive", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v1",
+                "derive",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v1"),
+                repo_root=tmp_path,
             )
         async with db_session_factory() as session, session.begin():
             message = await script.activate(
@@ -193,7 +221,7 @@ class TestPaperLine:
                 )
 
     async def test_activating_the_derived_line_preserves_its_own_copied_content(
-        self, db_session_factory: Any
+        self, db_session_factory: Any, tmp_path: Path
     ) -> None:
         """review-T3.15-risk.md "Antes de ligar a ponte" item 1: ``activate()``
         on a paper line must keep the row's own copied schema/params/
@@ -205,7 +233,14 @@ class TestPaperLine:
             await activate_version(session, key=key)
         async with db_session_factory() as session, session.begin():
             await script.paper_line(
-                session, key, "v1", "derive", dry_run=False, registry=registry_for(key)
+                session,
+                key,
+                "v1",
+                "derive",
+                dry_run=False,
+                registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v1"),
+                repo_root=tmp_path,
             )
         async with db_session_factory() as session, session.begin():
             message = await script.activate(
@@ -215,6 +250,8 @@ class TestPaperLine:
                 "D10: seven conditions met",
                 dry_run=False,
                 registry=registry_for(key),
+                note=note_for(tmp_path, f"{key} v2"),
+                repo_root=tmp_path,
             )
         assert message.startswith(f"activated {key} v2 (purpose paper)")
         async with role_session(db_session_factory, db_role="hunter_worker") as session:

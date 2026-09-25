@@ -314,18 +314,20 @@ class TestImportsItCannotResolve:
 class TestSharedResolution:
     def test_the_ops_script_and_the_worker_use_one_function_and_one_path(self) -> None:
         """MUST-FIX 1(a), nice-to-have 3: a second path constant is a second
-        answer waiting to disagree with the first."""
-        import importlib.util
-        import sys
+        answer waiting to disagree with the first.
+
+        T4.93 pulled the plain activation path (the one that resolves
+        ``code_ref``) out of the ops script into
+        :mod:`hunter_strategy_worker.activate` — that module is the one to
+        check now; the top-level script itself no longer names
+        ``version_code_ref`` at all, only its per-mode delegates do.
+        """
+        from hunter_strategy_worker.activate import version_code_ref as script_version_code_ref
+
+        assert script_version_code_ref is version_code_ref
 
         repo_root = Path(__file__).resolve().parents[3]
         path = repo_root / "infra" / "scripts" / "activate_strategy_version.py"
-        spec = importlib.util.spec_from_file_location("activate_strategy_version", path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        sys.modules["activate_strategy_version"] = module
-        spec.loader.exec_module(module)
-        assert module.version_code_ref is version_code_ref
         source = path.read_text(encoding="utf-8")
         assert "STRATEGIES_DIR = " not in source, "the only path resolution lives in code_ref.py"
         assert re.search(r"^STRATEGIES_DIR", source, re.MULTILINE) is None

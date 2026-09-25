@@ -26,6 +26,7 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+import obsidian_note_gate
 from meme_ops_db import record_event
 from meme_rule_set_types import COMPONENT, Refused, load
 from meme_rule_set_validate import validate_set_param
@@ -35,6 +36,7 @@ from hunter_core.domain.types import utcnow
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
     from meme_rule_set import RuleSetRow
     from meme_rule_set_types import Connection
@@ -131,6 +133,13 @@ async def insert_history_row(
     )
 
 
+def _note_refused(exc: obsidian_note_gate.NoteRefused) -> Refused:
+    """``NoteRefused`` (reason, detail) carries the same shape as this
+    module's own :class:`Refused` — only the class identity differs, since
+    ``meme_rule_set.py``'s CLI catches its own type."""
+    return Refused(exc.reason, str(exc).split(": ", 1)[1])
+
+
 async def set_param(
     conn: Connection,
     rows: Sequence[RuleSetRow],
@@ -140,6 +149,8 @@ async def set_param(
     labels: Sequence[str],
     apply: bool,
     reason: str,
+    note: str | None = None,
+    repo_root: Path | None = None,
 ) -> tuple[int, str]:
     key, value = parse_param(spec)
     raw = spec.partition("=")[2]
@@ -163,7 +174,16 @@ async def set_param(
     if not to_change:
         return 0, plan + "\nnothing to do: every target already carries the value"
     if not apply:
-        return 0, plan + "\ndry-run: nothing written (add --apply)"
+        hint = obsidian_note_gate.describe_required_note([[r.label] for r in to_change])
+        return 0, plan + f"\ndry-run: nothing written (add --apply); {hint}"
+    try:
+        proof = obsidian_note_gate.gate(
+            note,
+            [[r.label] for r in to_change],
+            repo_root=repo_root or obsidian_note_gate.default_repo_root(),
+        )
+    except obsidian_note_gate.NoteRefused as note_refused:
+        raise _note_refused(note_refused) from note_refused
     updated = (
         (
             await conn.execute(
@@ -190,6 +210,7 @@ async def set_param(
                 {"rule_set": r.label, "rule_set_id": r.id, "old_value": r.params.get(key)}
                 for r in to_change
             ],
+            **obsidian_note_gate.provenance_data(proof),
         },
     )
     changed_at = utcnow()

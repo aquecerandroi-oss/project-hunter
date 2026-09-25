@@ -144,9 +144,21 @@ async def test_set_param_dry_run_plans_every_active_set_and_writes_nothing() -> 
     assert "operator/4" not in report, "a retired set is not a live one"
 
 
-async def test_set_param_apply_updates_only_the_sets_that_differ_and_leaves_an_audit_row() -> None:
+def _obsidian_note(tmp_path: Path, *mentions: str) -> str:
+    """T4.93: a fixture note under ``obsidian/`` mentioning every target."""
+    note_dir = tmp_path / "obsidian" / "11-KNOWLEDGE"
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / "fixture.md"
+    note_path.write_text("# fixture de teste\n\n" + "\n".join(mentions), encoding="utf-8")
+    return "obsidian/11-KNOWLEDGE/fixture.md"
+
+
+async def test_set_param_apply_updates_only_the_sets_that_differ_and_leaves_an_audit_row(
+    tmp_path: Path,
+) -> None:
     script = _load("meme_rule_set")
     conn = FakeConn(ROWS)
+    note = _obsidian_note(tmp_path, "flow_v2/1", "operator/5")
     code, report = await script.run(
         conn,
         deprecate=None,
@@ -154,6 +166,8 @@ async def test_set_param_apply_updates_only_the_sets_that_differ_and_leaves_an_a
         reason=REASON,
         set_param="exclude_mayhem=true",
         all_active=True,
+        note=note,
+        repo_root=tmp_path,
     )
     assert code == 0 and "applied: 2 row(s) updated" in report
     update, params = conn.update()
@@ -169,6 +183,61 @@ async def test_set_param_apply_updates_only_the_sets_that_differ_and_leaves_an_a
     audit = conn.audit()
     assert audit["component"] == "meme_rule_set" and audit["event"] == "param_set"
     assert "flow_v2/1 (<unset>)" in audit["message"] and REASON in audit["message"]
+
+
+# --------------------------------------------------- T4.93: Obsidian primeiro
+
+
+async def test_set_param_apply_without_a_note_is_refused_before_writing(tmp_path: Path) -> None:
+    script = _load("meme_rule_set")
+    conn = FakeConn(ROWS)
+    with pytest.raises(script.Refused, match="note_required"):
+        await script.run(
+            conn,
+            deprecate=None,
+            apply=True,
+            reason=REASON,
+            set_param="exclude_mayhem=true",
+            all_active=True,
+            repo_root=tmp_path,
+        )
+    assert conn.writes() == []
+
+
+async def test_set_param_apply_with_a_note_not_mentioning_any_target_is_refused(
+    tmp_path: Path,
+) -> None:
+    script = _load("meme_rule_set")
+    conn = FakeConn(ROWS)
+    note = _obsidian_note(tmp_path, "nada a ver com nenhum conjunto")
+    with pytest.raises(script.Refused, match="note_does_not_mention_target"):
+        await script.run(
+            conn,
+            deprecate=None,
+            apply=True,
+            reason=REASON,
+            set_param="exclude_mayhem=true",
+            all_active=True,
+            note=note,
+            repo_root=tmp_path,
+        )
+    assert conn.writes() == []
+
+
+async def test_set_param_dry_run_needs_no_note_and_prints_the_hint(tmp_path: Path) -> None:
+    script = _load("meme_rule_set")
+    conn = FakeConn(ROWS)
+    code, report = await script.run(
+        conn,
+        deprecate=None,
+        apply=False,
+        reason=REASON,
+        set_param="exclude_mayhem=true",
+        all_active=True,
+        repo_root=tmp_path,
+    )
+    assert code == 0 and "dry-run" in report and "--note" in report
+    assert conn.writes() == []
 
 
 async def test_set_param_refusals_are_named_and_nothing_to_change_is_a_plain_exit() -> None:

@@ -54,19 +54,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, Protocol
 
-from meme_ops_db import migration_url, record_event
+from meme_ops_db import migration_url
 from spot_desk_markets_close import TxReader, close_manual, default_rpc_url, open_rpc
-from spot_desk_markets_plan import (
-    COMPONENT,
-    MarketRow,
-    Refused,
-    format_table,
-    require_reason,
-    validate_mint,
-)
+from spot_desk_markets_plan import MarketRow, Refused, format_table, require_reason, validate_mint
+from spot_desk_markets_write import audit as _audit
+from spot_desk_markets_write import set_enabled as _set_enabled
+from spot_desk_markets_write import set_mint as _set_mint
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -83,18 +80,6 @@ _MARKETS = text(
     "SELECT binance_symbol, mint, kind, tier, round_trip_cost_pct_at_seed, enabled "
     "FROM spot_desk_markets ORDER BY binance_symbol"
 )
-_MARKET_BY_SYMBOL = text(
-    "SELECT binance_symbol, mint, kind, tier, round_trip_cost_pct_at_seed, enabled "
-    "FROM spot_desk_markets WHERE binance_symbol = :symbol"
-)
-_SET_ENABLED = text(
-    "UPDATE spot_desk_markets SET enabled = :enabled, updated_at = now(), updated_by = :actor "
-    "WHERE binance_symbol = :symbol RETURNING binance_symbol"
-)
-_SET_MINT = text(
-    "UPDATE spot_desk_markets SET mint = :mint, updated_at = now(), updated_by = :actor "
-    "WHERE binance_symbol = :symbol RETURNING binance_symbol"
-)
 _POSITION_STATUS = text("SELECT id, status FROM spot_positions WHERE id = CAST(:id AS uuid)")
 _SELL_NOW = text(
     "UPDATE spot_positions SET sell_requested_at = now(), sell_requested_by = :actor "
@@ -105,70 +90,6 @@ _SELL_NOW = text(
 async def list_markets(conn: Connection) -> list[MarketRow]:
     rows = (await conn.execute(_MARKETS)).mappings()
     return [MarketRow.from_mapping(dict(r)) for r in rows]
-
-
-async def _market(conn: Connection, symbol: str) -> MarketRow:
-    rows = (await conn.execute(_MARKET_BY_SYMBOL, {"symbol": symbol})).mappings()
-    for row in rows:
-        return MarketRow.from_mapping(dict(row))
-    raise Refused("market_missing", symbol)
-
-
-async def _audit(conn: Connection, event: str, message: str, data: Mapping[str, Any]) -> None:
-    await record_event(
-        conn, component=COMPONENT, level="info", event=event, message=message, data=data
-    )
-
-
-async def _set_enabled(
-    conn: Connection, symbol: str, enabled: bool, *, apply: bool, actor: str, reason: str
-) -> tuple[int, str]:
-    row = await _market(conn, symbol)
-    verb, label = ("enable", "enabled") if enabled else ("disable", "disabled")
-    if row.enabled == enabled:
-        return 0, f"{symbol} is already {label}; nothing to do"
-    plan = f"{verb} {symbol} (was {'enabled' if row.enabled else 'disabled'})\nreason: {reason}"
-    if not apply:
-        return 0, plan + "\ndry-run: nothing written (add --apply)"
-    written = (
-        (await conn.execute(_SET_ENABLED, {"symbol": symbol, "enabled": enabled, "actor": actor}))
-        .scalars()
-        .all()
-    )
-    if not written:
-        raise Refused("market_missing", f"{symbol} moved under us")
-    await _audit(
-        conn,
-        f"{verb}d",
-        f"{symbol} {verb}d by {actor}; reason: {reason}",
-        {"symbol": symbol, "enabled": enabled, "actor": actor},
-    )
-    return 0, plan + "\napplied: updated; system_events written"
-
-
-async def _set_mint(
-    conn: Connection, symbol: str, mint: str, *, apply: bool, actor: str, reason: str
-) -> tuple[int, str]:
-    row = await _market(conn, symbol)
-    if row.mint == mint:
-        return 0, f"{symbol} already maps to {mint}; nothing to do"
-    plan = f"set-mint {symbol}: {row.mint} -> {mint}\nreason: {reason}"
-    if not apply:
-        return 0, plan + "\ndry-run: nothing written (add --apply)"
-    written = (
-        (await conn.execute(_SET_MINT, {"symbol": symbol, "mint": mint, "actor": actor}))
-        .scalars()
-        .all()
-    )
-    if not written:
-        raise Refused("market_missing", f"{symbol} moved under us")
-    await _audit(
-        conn,
-        "mint_changed",
-        f"{symbol} mint changed {row.mint} -> {mint} by {actor}; reason: {reason}",
-        {"symbol": symbol, "old_mint": row.mint, "new_mint": mint, "actor": actor},
-    )
-    return 0, plan + "\napplied: updated; system_events written"
 
 
 async def _sell_now(
@@ -214,8 +135,14 @@ async def run(
     apply: bool = False,
     reason: str | None = None,
     actor: str = "Everton",
+    note: str | None = None,
+    repo_root: Path | None = None,
 ) -> tuple[int, str]:
-    """``(exit code, report)``. Writes only with ``--apply`` and a reason."""
+    """``(exit code, report)``. Writes only with ``--apply`` and a reason.
+
+    ``--enable``/``--disable``/``--set-mint --apply`` also need ``--note``
+    (T4.93, "Obsidian primeiro"): :func:`spot_desk_markets_plan.require_note`.
+    """
     acts = (enable, disable, set_mint, sell_now, close_manual)
     if all(a is None for a in acts):
         return 0, format_table(await list_markets(conn))
@@ -235,16 +162,37 @@ async def run(
         )
     if enable is not None:
         return await _set_enabled(
-            conn, enable, True, apply=apply, actor=actor, reason=checked_reason
+            conn,
+            enable,
+            True,
+            apply=apply,
+            actor=actor,
+            reason=checked_reason,
+            note=note,
+            repo_root=repo_root,
         )
     if disable is not None:
         return await _set_enabled(
-            conn, disable, False, apply=apply, actor=actor, reason=checked_reason
+            conn,
+            disable,
+            False,
+            apply=apply,
+            actor=actor,
+            reason=checked_reason,
+            note=note,
+            repo_root=repo_root,
         )
     if set_mint is not None:
         symbol, mint = set_mint
         return await _set_mint(
-            conn, symbol, validate_mint(mint), apply=apply, actor=actor, reason=checked_reason
+            conn,
+            symbol,
+            validate_mint(mint),
+            apply=apply,
+            actor=actor,
+            reason=checked_reason,
+            note=note,
+            repo_root=repo_root,
         )
     assert sell_now is not None
     return await _sell_now(conn, sell_now, apply=apply, actor=actor, reason=checked_reason)
@@ -269,6 +217,13 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--reason", default=None)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--actor", default="Everton")
+    parser.add_argument(
+        "--note",
+        default=None,
+        metavar="PATH",
+        help="--enable/--disable/--set-mint --apply only: a .md under obsidian/ mentioning "
+        "the market symbol (T4.93, Obsidian primeiro)",
+    )
     args = parser.parse_args(argv)
     acts = [args.enable, args.disable, args.set_mint, args.sell_now, args.close_manual]
     if not args.list and not any(acts):
@@ -308,6 +263,7 @@ async def _main(argv: Sequence[str]) -> int:
                     apply=args.apply,
                     reason=args.reason,
                     actor=args.actor,
+                    note=args.note,
                 )
         except Refused as refused:
             print(f"refused: {refused}", file=sys.stderr)

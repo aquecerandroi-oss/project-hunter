@@ -125,6 +125,15 @@ class DeskConn:
 REASON = "revisão do R63 §5.5, liquidez subiu bastante"
 
 
+def _obsidian_note(tmp_path: Path, *mentions: str) -> str:
+    """T4.93: a fixture note under ``obsidian/`` mentioning every target."""
+    note_dir = tmp_path / "obsidian" / "11-KNOWLEDGE"
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / "fixture.md"
+    note_path.write_text("# fixture de teste\n\n" + "\n".join(mentions), encoding="utf-8")
+    return "obsidian/11-KNOWLEDGE/fixture.md"
+
+
 async def test_list_prints_the_table_and_writes_nothing() -> None:
     script = _load("spot_desk_markets")
     conn = DeskConn(markets=[_market(), _market(binance_symbol="SUIUSDT", tier="C", enabled=False)])
@@ -141,11 +150,18 @@ async def test_enable_dry_run_writes_nothing() -> None:
     assert conn.markets["WIFUSDT"]["enabled"] is False
 
 
-async def test_enable_apply_writes_and_leaves_an_audit_row() -> None:
+async def test_enable_apply_writes_and_leaves_an_audit_row(tmp_path: Path) -> None:
     script = _load("spot_desk_markets")
     conn = DeskConn(markets=[_market(enabled=False)])
+    note = _obsidian_note(tmp_path, "WIFUSDT")
     code, report = await script.run(
-        conn, enable="WIFUSDT", apply=True, reason=REASON, actor="Everton"
+        conn,
+        enable="WIFUSDT",
+        apply=True,
+        reason=REASON,
+        actor="Everton",
+        note=note,
+        repo_root=tmp_path,
     )
     assert code == 0 and "applied" in report
     assert conn.markets["WIFUSDT"]["enabled"] is True
@@ -187,12 +203,19 @@ async def test_set_mint_validates_base58_length_before_touching_the_database() -
     assert conn.statements == []
 
 
-async def test_set_mint_apply_writes_the_new_mint_and_an_audit_row() -> None:
+async def test_set_mint_apply_writes_the_new_mint_and_an_audit_row(tmp_path: Path) -> None:
     script = _load("spot_desk_markets")
     new_mint = "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
     conn = DeskConn(markets=[_market()])
+    note = _obsidian_note(tmp_path, "WIFUSDT")
     code, report = await script.run(
-        conn, set_mint=("WIFUSDT", new_mint), apply=True, reason=REASON, actor="Everton"
+        conn,
+        set_mint=("WIFUSDT", new_mint),
+        apply=True,
+        reason=REASON,
+        actor="Everton",
+        note=note,
+        repo_root=tmp_path,
     )
     assert code == 0 and "applied" in report
     assert conn.markets["WIFUSDT"]["mint"] == new_mint
@@ -245,6 +268,53 @@ def test_parse_args_requires_one_act() -> None:
     script = _load("spot_desk_markets")
     with pytest.raises(SystemExit):
         script.parse_args([])
+
+
+# --------------------------------------------------- T4.93: Obsidian primeiro
+
+
+async def test_enable_apply_without_a_note_is_refused_before_writing(tmp_path: Path) -> None:
+    script = _load("spot_desk_markets")
+    conn = DeskConn(markets=[_market(enabled=False)])
+    with pytest.raises(script.Refused, match="note_required"):
+        await script.run(conn, enable="WIFUSDT", apply=True, reason=REASON, repo_root=tmp_path)
+    assert conn.writes() == []
+
+
+async def test_enable_apply_with_a_missing_note_file_is_refused(tmp_path: Path) -> None:
+    script = _load("spot_desk_markets")
+    conn = DeskConn(markets=[_market(enabled=False)])
+    with pytest.raises(script.Refused, match="note_missing"):
+        await script.run(
+            conn,
+            enable="WIFUSDT",
+            apply=True,
+            reason=REASON,
+            note="obsidian/11-KNOWLEDGE/ghost.md",
+            repo_root=tmp_path,
+        )
+    assert conn.writes() == []
+
+
+async def test_enable_apply_with_a_note_not_mentioning_the_symbol_is_refused(
+    tmp_path: Path,
+) -> None:
+    script = _load("spot_desk_markets")
+    conn = DeskConn(markets=[_market(enabled=False)])
+    note = _obsidian_note(tmp_path, "outro mercado qualquer")
+    with pytest.raises(script.Refused, match="note_does_not_mention_target"):
+        await script.run(
+            conn, enable="WIFUSDT", apply=True, reason=REASON, note=note, repo_root=tmp_path
+        )
+    assert conn.writes() == []
+
+
+async def test_enable_dry_run_needs_no_note_and_prints_the_hint(tmp_path: Path) -> None:
+    script = _load("spot_desk_markets")
+    conn = DeskConn(markets=[_market(enabled=False)])
+    code, report = await script.run(conn, enable="WIFUSDT", reason=REASON, repo_root=tmp_path)
+    assert code == 0 and "dry-run" in report and "--note" in report and "WIFUSDT" in report
+    assert conn.writes() == []
 
 
 # ------------------------------------------------------------------- spot_ficha

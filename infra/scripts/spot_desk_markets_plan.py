@@ -6,9 +6,13 @@ connection.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
+
+import obsidian_note_gate
 
 __all__ = [
     "COMPONENT",
@@ -18,6 +22,7 @@ __all__ = [
     "MarketRow",
     "Refused",
     "format_table",
+    "require_note",
     "require_reason",
     "validate_mint",
 ]
@@ -75,6 +80,23 @@ def require_reason(reason: str | None) -> str:
     if reason is None or len(reason.strip()) < MIN_REASON_LENGTH:
         raise Refused("reason_required", f"--reason needs >= {MIN_REASON_LENGTH} chars")
     return reason.strip()
+
+
+def require_note(
+    note: str | None, target_groups: Sequence[Sequence[str]], *, repo_root: Path | None = None
+) -> obsidian_note_gate.NoteProof:
+    """``--enable``/``--disable``/``--set-mint --apply`` (T4.93, "Obsidian
+    primeiro"): a Markdown note under ``obsidian/`` naming the market symbol,
+    right before the one write each performs. Converts
+    :class:`obsidian_note_gate.NoteRefused` into this module's own
+    :class:`Refused` — same ``(reason, detail)`` shape, only the class the
+    CLI catches differs."""
+    try:
+        return obsidian_note_gate.gate(
+            note, target_groups, repo_root=repo_root or obsidian_note_gate.default_repo_root()
+        )
+    except obsidian_note_gate.NoteRefused as note_refused:
+        raise Refused(note_refused.reason, str(note_refused).split(": ", 1)[1]) from note_refused
 
 
 def validate_mint(mint: str) -> str:

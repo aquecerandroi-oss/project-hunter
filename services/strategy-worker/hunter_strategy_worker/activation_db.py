@@ -11,7 +11,9 @@ their frozen strings.
 
 from __future__ import annotations
 
+import json
 import re
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -35,8 +37,10 @@ __all__ = [
     "open_paper_exposure",
     "policy_column_present",
     "purpose_column_present",
+    "note_provenance_data",
     "record_event",
     "record_failure",
+    "require_note",
 ]
 
 REQUIRED_TABLES = ("shadow_episodes", "shadow_outbox")
@@ -48,6 +52,48 @@ PURPOSE_LIVE = "live"
 
 class Refused(RuntimeError):
     """A prerequisite failed; nothing was activated."""
+
+
+def _obsidian_note_gate() -> Any:
+    """Lazy import (T4.93): ``infra/scripts/obsidian_note_gate.py`` is a flat
+    script module, not part of any installed package, and is only ever
+    needed the instant an audited write is about to happen. Importing it at
+    module load time would make every mode that imports this module —
+    including ``replication.py``/``variant.py``, reachable from a plain
+    ``import hunter_strategy_worker...`` with no ops script involved — depend
+    on ``infra/scripts`` already being on ``sys.path``, which is only true
+    when the process was launched as ``python infra/scripts/*.py`` (the
+    interpreter's own trick) or a test explicitly arranged it."""
+    import sys
+    from pathlib import Path
+
+    scripts_dir = Path(__file__).resolve().parents[3] / "infra" / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import obsidian_note_gate  # pyright: ignore[reportMissingImports]
+
+    return obsidian_note_gate
+
+
+def require_note(key: str, version: str, note: str | None, *, repo_root: Any = None) -> Any:
+    """T4.93 ("Obsidian primeiro"): call right before the one write
+    ``activate``/``paper_line``/``activate_derived`` perform — never before an
+    earlier refusal or a no-op. ``"key version"``/``"key/version"`` are two
+    spellings of **one** target, not independent ones: a bare version alone
+    (``"v1"``) matched unrelated notes in review (Astra, T4.93)."""
+    gate_module = _obsidian_note_gate()
+    try:
+        return gate_module.gate(
+            note,
+            [[f"{key} {version}", f"{key}/{version}"]],
+            repo_root=repo_root or gate_module.default_repo_root(),
+        )
+    except gate_module.NoteRefused as note_refused:
+        raise Refused(str(note_refused)) from note_refused
+
+
+def note_provenance_data(proof: Any) -> dict[str, str | None]:
+    return _obsidian_note_gate().provenance_data(proof)
 
 
 def migration_url() -> str:
@@ -115,15 +161,28 @@ async def policy_column_present(conn: AsyncConnection) -> bool:
     return await _version_column_present(conn, "eligibility_policy")
 
 
-async def record_event(conn: AsyncConnection, level: str, event: str, message: str) -> None:
-    """Every run leaves a ``system_events`` row, activation or refusal alike."""
+async def record_event(
+    conn: AsyncConnection,
+    level: str,
+    event: str,
+    message: str,
+    *,
+    data: Mapping[str, Any] | None = None,
+) -> None:
+    """Every run leaves a ``system_events`` row, activation or refusal alike.
+
+    ``data`` (T4.93) is the structured half the free-text ``message`` never
+    carried — the note-gate's full ``sha256``/``git_blob_sha`` land here, not
+    truncated into the message, the same ``data`` column
+    :func:`meme_ops_db.record_event` already writes.
+    """
     await conn.execute(
         text(
-            "INSERT INTO system_events (id, created_at, level, component, event, message) "
+            "INSERT INTO system_events (id, created_at, level, component, event, message, data) "
             "VALUES (gen_random_uuid(), now(), CAST(:level AS event_severity), "
-            "'activate_strategy_version', :event, :message)"
+            "'activate_strategy_version', :event, :message, CAST(:data AS jsonb))"
         ),
-        {"level": level, "event": event, "message": message[:1000]},
+        {"level": level, "event": event, "message": message[:1000], "data": json.dumps(data or {})},
     )
 
 

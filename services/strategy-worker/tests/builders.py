@@ -14,6 +14,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import text
@@ -702,3 +703,15 @@ async def isolate_catalogue(session: AsyncSession, *, keep: str = "volume_anomal
         {"keep": keep},
     )
     await session.execute(text(f"SET LOCAL ROLE {current_role}"))
+
+
+def note_for(tmp_path: Path, *mentions: str) -> str:
+    """T4.93: a fixture Obsidian note under ``tmp_path/obsidian/`` mentioning
+    every given target — for the ``--note`` the audited ``activate``/
+    ``paper_line``/``activate_derived`` now require right before their one
+    write. Callers pass ``repo_root=tmp_path`` alongside this path."""
+    note_dir = tmp_path / "obsidian" / "11-KNOWLEDGE"
+    note_dir.mkdir(parents=True, exist_ok=True)
+    note_path = note_dir / "fixture.md"
+    note_path.write_text("# fixture de teste\n\n" + "\n".join(mentions), encoding="utf-8")
+    return "obsidian/11-KNOWLEDGE/fixture.md"

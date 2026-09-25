@@ -119,6 +119,13 @@ services:
     env_file:
       - path: ../../.env
         required: false
+    # T4.93: the audited change tools (meme_rule_set.py, spot_desk_markets.py,
+    # activate_strategy_version.py) refuse to --apply without a --note under
+    # obsidian/ — the image itself never COPYs that folder (it changes on
+    # every commit, and none of api/migrate/every worker needs it at
+    # runtime), so `ops` alone bind-mounts the checkout's own copy, read-only.
+    volumes:
+      - ../../obsidian:/app/obsidian:ro
     depends_on:
       postgres:
         condition: service_healthy

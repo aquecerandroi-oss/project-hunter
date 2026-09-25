@@ -14,6 +14,7 @@ through (review T3.15-risk, "Antes de ligar a ponte" item 1).
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import text
@@ -24,7 +25,9 @@ from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import (
     PURPOSE_RESEARCH_ONLY,
     Refused,
+    note_provenance_data,
     record_event,
+    require_note,
 )
 
 __all__ = [
@@ -144,10 +147,15 @@ async def activate_derived(
     *,
     code_ref: str,
     dry_run: bool,
+    note: str | None = None,
+    repo_root: Path | None = None,
 ) -> str:
     """``row`` already carries its own content; ``code_ref`` is what this
     build recomputes for it (the caller resolves the strategy — the same
-    resolution :func:`activate` uses for the plain research path)."""
+    resolution :func:`activate` uses for the plain research path).
+
+    ``note`` (T4.93) is required only once every check below has passed and a
+    real write is about to happen."""
     if row.code_ref != code_ref:
         raise Refused(
             f"{key} {version} is frozen at code_ref {row.code_ref} but this build is "
@@ -167,6 +175,7 @@ async def activate_derived(
             f"would activate {key} {version} (purpose {row.purpose}) with code_ref {code_ref} "
             f"({len(params)} parameters)"
         )
+    proof = require_note(key, version, note, repo_root=repo_root)
     kept = keep_lineage(row.changelog, changelog)
     updated = await conn.execute(
         text(
@@ -194,6 +203,7 @@ async def activate_derived(
         f"code_ref={code_ref} params_format={row.params_format} "
         f"derived_from={parent or 'unknown'} params_hash={params_hash(params)} "
         f"changelog={kept!r}",
+        data=note_provenance_data(proof),
     )
     return (
         f"activated {key} {version} (purpose {row.purpose}) at {activated[0].isoformat()} "

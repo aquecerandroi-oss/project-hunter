@@ -7,9 +7,9 @@ dry-run by default (T4.16; ``--set-param`` since T4.27; ``--history``/
     uv run python infra/scripts/meme_rule_set.py --deprecate meme_paper_v0/1 \
         --reason "EXP-M1: descartar (9/9 negativas + artefato rug_no_snapshot)"          # dry-run
     uv run python infra/scripts/meme_rule_set.py --deprecate hype_probe_v0/1 --apply \
-        --reason "EXP-M3: descartar (8/8 sondas em giro, vendas ≈ compras); sucessora hype_probe_v0/2 (EXP-M5)"
+        --reason "EXP-M3: descartar (8/8 sondas em giro)" --note obsidian/05-EXPERIMENTS/EXP-M5.md
     uv run python infra/scripts/meme_rule_set.py --set-param exclude_mayhem=true --all-active \
-        --apply --reason "T4.27: os picos de mcap sao SOL virtual do agente Mayhem, nao demanda"
+        --apply --reason "T4.27: picos de mcap sao SOL virtual" --note "obsidian/11-KNOWLEDGE/Fila de Hipoteses.md"
     uv run python infra/scripts/meme_rule_set.py --history operator/5
     uv run python infra/scripts/meme_rule_set.py --backfill --apply
     uv run python infra/scripts/meme_rule_set.py --validate operator/5
@@ -71,8 +71,10 @@ import asyncio
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
+import obsidian_note_gate
 from meme_ops_db import migration_url, record_event
 from meme_rule_set_params import backfill_history, history_for, parse_param
 from meme_rule_set_params import set_param as _apply_set_param
@@ -162,8 +164,20 @@ def _require_reason(reason: str | None, flag: str) -> str:
     return reason.strip()
 
 
+def _note_refused(exc: obsidian_note_gate.NoteRefused) -> Refused:
+    """``NoteRefused`` and this module's ``Refused`` share one ``(reason, detail)`` shape."""
+    return Refused(exc.reason, str(exc).split(": ", 1)[1])
+
+
 async def _deprecate(
-    conn: Connection, rows: Sequence[RuleSetRow], deprecate: str, *, apply: bool, reason: str
+    conn: Connection,
+    rows: Sequence[RuleSetRow],
+    deprecate: str,
+    *,
+    apply: bool,
+    reason: str,
+    note: str | None = None,
+    repo_root: Path | None = None,
 ) -> tuple[int, str]:
     row = load(rows, deprecate)
     if row.status != "active":
@@ -178,7 +192,14 @@ async def _deprecate(
         f"rule_set_inactive at the fill\nreason: {reason}"
     )
     if not apply:
-        return 0, plan + "\ndry-run: nothing written (add --apply)"
+        hint = obsidian_note_gate.describe_required_note([[deprecate]])
+        return 0, plan + f"\ndry-run: nothing written (add --apply); {hint}"
+    try:
+        proof = obsidian_note_gate.gate(
+            note, [[deprecate]], repo_root=repo_root or obsidian_note_gate.default_repo_root()
+        )
+    except obsidian_note_gate.NoteRefused as note_refused:
+        raise _note_refused(note_refused) from note_refused
     retired = (await conn.execute(_RETIRE, {"id": row.id})).scalars().all()
     if not retired:
         raise Refused("already_retired", f"{deprecate} moved under us")
@@ -188,6 +209,7 @@ async def _deprecate(
         level="info",
         event="deprecated",
         message=f"{deprecate} retired; reason: {reason}",
+        data=obsidian_note_gate.provenance_data(proof),
     )
     return 0, plan + "\napplied: retired; system_events written"
 
@@ -204,8 +226,15 @@ async def run(
     history: str | None = None,
     backfill: bool = False,
     validate: str | None = None,
+    note: str | None = None,
+    repo_root: Path | None = None,
 ) -> tuple[int, str]:
-    """``(exit code, report)``. Writes only with ``--apply`` and a reason."""
+    """``(exit code, report)``. Writes only with ``--apply`` and a reason.
+
+    ``--deprecate``/``--set-param`` also need ``--note`` at ``--apply`` time —
+    a Markdown file under ``obsidian/`` mentioning the target set(s) (T4.93,
+    "Obsidian primeiro"): :mod:`obsidian_note_gate`.
+    """
     rows = await list_rule_sets(conn)
     if validate is not None:
         row = load(rows, validate)
@@ -219,7 +248,13 @@ async def run(
         return 0, _describe(rows)
     if deprecate is not None:
         return await _deprecate(
-            conn, rows, deprecate, apply=apply, reason=_require_reason(reason, "--deprecate")
+            conn,
+            rows,
+            deprecate,
+            apply=apply,
+            reason=_require_reason(reason, "--deprecate"),
+            note=note,
+            repo_root=repo_root,
         )
     assert set_param is not None
     return await _apply_set_param(
@@ -230,6 +265,8 @@ async def run(
         labels=rule_sets,
         apply=apply,
         reason=_require_reason(reason, "--set-param"),
+        note=note,
+        repo_root=repo_root,
     )
 
 
@@ -247,6 +284,13 @@ def _parse(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--validate", metavar="NAME/VERSION", default=None)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--reason", default=None)
+    parser.add_argument(
+        "--note",
+        default=None,
+        metavar="PATH",
+        help="--deprecate/--set-param --apply only: a .md under obsidian/ mentioning the "
+        "target set(s) (T4.93, Obsidian primeiro)",
+    )
     args = parser.parse_args(argv)
     acts = [
         args.deprecate is not None,
@@ -284,6 +328,7 @@ async def _main(argv: Sequence[str]) -> int:
                     history=args.history,
                     backfill=args.backfill,
                     validate=args.validate,
+                    note=args.note,
                 )
             except Refused as refused:
                 print(f"refused: {refused}", file=sys.stderr)

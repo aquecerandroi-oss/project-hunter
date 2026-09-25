@@ -32,6 +32,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _script() -> Any:
+    # T4.93: the script now imports the sibling infra/scripts/obsidian_note_gate.py
+    if str(REPO_ROOT / "infra" / "scripts") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "infra" / "scripts"))
     path = REPO_ROOT / "infra" / "scripts" / "activate_strategy_version.py"
     spec = importlib.util.spec_from_file_location("activate_strategy_version", path)
     assert spec is not None and spec.loader is not None
