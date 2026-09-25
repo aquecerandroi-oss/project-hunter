@@ -44,7 +44,12 @@ from hunter_exchanges.pumpfun.global_state import decode_global_account
 from hunter_exchanges.pumpfun.solana_codec import TOKEN_PROGRAM_ID
 from hunter_exchanges.pumpfun.tx_rpc import AccountSnapshot
 from hunter_exchanges.pumpswap.decode import decode_global_config, decode_pool_account
-from hunter_meme_executor.auto_approve import auto_approve_once
+from hunter_meme_executor.auto_approve import (
+    OperatorProposal,
+    auto_approve_once,
+    supersede_busy,
+)
+from hunter_meme_executor.auto_busy import overtaken_proposals
 from hunter_meme_executor.build import decode_fills
 from hunter_meme_executor.chain import (
     ChainReader,
@@ -75,6 +80,7 @@ PUMPSWAP_FIXTURES = (
     Path(__file__).resolve().parents[3] / "packages/exchange-adapters/tests/fixtures/pumpswap"
 )
 OPERATOR_RULE_SET = "01994d00-6c1a-7000-8000-000000000002"
+OTHER_MINT = "2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump"
 TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 POLICY = {
     "MEME_WALLET_MAX_SOL": "0.5",
@@ -408,6 +414,8 @@ async def _plant_operator_proposal(
     size_sol: str = "0.01",
     ttl_s: int = 180,
     risk_snapshot: bool = True,
+    mint: str = MINT,
+    tape_lag_s: float = 15,
 ) -> str:
     """What the radar's gate writes for the desk (T4.19): a ``proposed`` row under
     the **active** ``operator`` set, ``mode = 'paper'``, nobody has decided —
@@ -415,7 +423,9 @@ async def _plant_operator_proposal(
     plants the proposal without it, which is T4.28g's skip)."""
     proposal_id = str(uuid4())
     if risk_snapshot:
-        await _plant_risk_snapshot(engine, observed_at=proposed_at - timedelta(seconds=20))
+        await _plant_risk_snapshot(
+            engine, observed_at=proposed_at - timedelta(seconds=20), mint=mint
+        )
     async with engine.begin() as connection:
         rule_set = await connection.scalar(
             text(
@@ -431,7 +441,7 @@ async def _plant_operator_proposal(
                 "VALUES (:mint, 'pumpportal_ws', :t, :t, :t, :creator, 793100000, 'observed_virgin', 1000000000) "
                 "ON CONFLICT (mint) DO NOTHING"
             ),
-            {"mint": MINT, "t": proposed_at - timedelta(seconds=120), "creator": CREATOR},
+            {"mint": mint, "t": proposed_at - timedelta(seconds=120), "creator": CREATOR},
         )
         await connection.execute(
             text(
@@ -442,11 +452,11 @@ async def _plant_operator_proposal(
             ),
             {
                 "id": proposal_id,
-                "mint": MINT,
+                "mint": mint,
                 "rs": rule_set,
                 "proposed": proposed_at,
                 "expires": proposed_at + timedelta(seconds=ttl_s),
-                "fet": proposed_at - timedelta(seconds=15),
+                "fet": proposed_at - timedelta(seconds=tape_lag_s),
                 "suggested": json.dumps(
                     {
                         "size_sol": size_sol,
@@ -551,9 +561,9 @@ async def harness(
         await connection.execute(
             text(
                 "DELETE FROM meme_proposals WHERE mode = 'live' "
-                "OR (status = 'proposed' AND mint = :mint)"
+                "OR (status = 'proposed' AND mint = ANY(:mints))"
             ),
-            {"mint": MINT},
+            {"mints": [MINT, OTHER_MINT]},
         )
         # T4.28h: and the rug reads. ``_plant_operator_proposal`` plants one per
         # test (T4.28g's precondition), so a read left by the previous test is a
@@ -563,7 +573,8 @@ async def harness(
         # ``bundled_share`` for the same mint — the robot then opened the proposal
         # the test expects it to leave alone.
         await connection.execute(
-            text("DELETE FROM meme_risk_snapshots WHERE mint = :mint"), {"mint": MINT}
+            text("DELETE FROM meme_risk_snapshots WHERE mint = ANY(:mints)"),
+            {"mints": [MINT, OTHER_MINT]},
         )
         await connection.execute(
             text(
@@ -1515,6 +1526,319 @@ async def test_stage_1_leaves_an_old_proposal_and_a_click_proposal_alone(
     assert harness.rpc.sent == [] and harness.ctx.state.auto_approved == 0
 
 
+async def test_stage_1_never_opens_a_proposal_its_mint_was_busy_for_after_the_exit(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.94 — the 007/BAGI sequence of 25/09/2026 (R78, KB-0158 "O que se aprendeu" 1).
+
+    op5 buys the mint; op6's proposal for the same mint arrives while op5 holds
+    it; op5 exits; the next pass used to open op6's proposal on a tape older than
+    the move that made op5 exit (007 1.7 s after the target, BAGI 1.8 s after).
+    Now the first pass that sees the mint busy rejects op6's proposal by name —
+    durable, so no later pass (nor a restarted executor) can open it — and a
+    fresh proposal for the coin is still opened normally. (The scope is wide: the
+    recorded buy takes ~1.0035 SOL from the payer, which would spend a 0,25 one.)"""
+    wide = _small_test(max_total_sol="10")
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=wide)
+    op5 = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, op5))["status"] == "approved"
+    assert len(armed.rpc.sent) == 1, "op5 bought"
+
+    born = datetime.now(UTC)
+    op6 = await _plant_operator_proposal(db_engine, proposed_at=born)
+    assert await auto_approve_once(armed.ctx, now=born + timedelta(seconds=1)) == []
+    row = await _proposal(db_engine, op6)
+    assert row["status"] == "rejected" and row["mode"] == "paper"
+    assert row["decided_by"] == AUTO_STAGE1_DECIDED_BY
+    assert row["decision"]["auto_refusal"] == "mint_busy_superseded"
+    assert "mint_busy_superseded" in row["decision"]["note"]
+    assert armed.ctx.state.auto_skipped == {"mint_busy_superseded": 1}
+    hb = await heartbeat_fields(armed.ctx)
+    assert json.loads(hb["auto_skipped"]) == {"mint_busy_superseded": 1}
+
+    # op5 exits (the target, in the real case; the owner's sell here — same close).
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_positions SET sell_requested_at = now(), "
+                "sell_requested_by = 'everton' WHERE proposal_id = :p"
+            ),
+            {"p": op5},
+        )
+    armed.chain.tokens_on_chain = 10**9
+    armed.rpc.transaction = json.loads(json.dumps(_fixture("rpc_tx_probe_raw.json")["result"]))
+    await exits_once(armed.ctx)
+    closed = await _rows(
+        db_engine, "SELECT status FROM meme_live_positions WHERE proposal_id = :p", p=op5
+    )
+    assert closed == [{"status": "closed"}]
+
+    # The pass right after the exit — 2.7 s after op6 was born, well inside the
+    # freshness bound, so only the supersede keeps it shut. And a restarted
+    # executor reads the same row.
+    restarted = _context(db_session_factory, _signer(), harness.redis, auto=wide)
+    for ctx in (armed.ctx, restarted.ctx):
+        assert await auto_approve_once(ctx, now=born + timedelta(seconds=2.7)) == []
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, op6))["status"] == "rejected"
+    assert (
+        await _rows(db_engine, "SELECT id FROM meme_live_orders WHERE proposal_id = :p", p=op6)
+        == []
+    ), "no order of any kind for the superseded proposal"
+    assert len(armed.rpc.sent) == 2, "op5's buy and op5's sell — nothing else"
+    assert armed.ctx.state.auto_approved == 1
+
+    # The gate proposes the coin again on a fresh tape: the robot opens that one.
+    # (Only the opening is asserted: the fake RPC now answers with op5's sell.)
+    fresh = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    assert await auto_approve_once(armed.ctx, now=datetime.now(UTC)) == [fresh]
+    reopened = await _proposal(db_engine, fresh)
+    assert reopened["status"] == "approved" and reopened["mode"] == "live"
+    assert reopened["decided_by"] == AUTO_STAGE1_DECIDED_BY
+
+
+async def _buy_then_exit(armed: Harness, engine: AsyncEngine, proposal_id: str) -> None:
+    """The owner's sell on an open position (the target, on the real desk)."""
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE meme_live_positions SET sell_requested_at = now(), "
+                "sell_requested_by = 'everton' WHERE proposal_id = :p"
+            ),
+            {"p": proposal_id},
+        )
+    armed.chain.tokens_on_chain = 10**9
+    armed.rpc.transaction = json.loads(json.dumps(_fixture("rpc_tx_probe_raw.json")["result"]))
+    await exits_once(armed.ctx)
+    rows = await _rows(
+        engine, "SELECT status FROM meme_live_positions WHERE proposal_id = :p", p=proposal_id
+    )
+    assert rows == [{"status": "closed"}]
+
+
+async def test_scenario_a_twin_proposals_the_pass_opens_one_and_supersedes_the_other(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """Guardian finding 1, scenario A: op5/op6 born on the same tape instant. The
+    pass opens op5 and rejects op6 in the same pass — it no longer waits as
+    ``tick_cap`` for a tick 2 that may come after op5's target exit."""
+    armed = _context(
+        db_session_factory, _signer(), harness.redis, auto=_small_test(max_total_sol="10")
+    )
+    born = datetime.now(UTC)
+    op5 = await _plant_operator_proposal(db_engine, proposed_at=born)
+    # Same instant; its own ``features_end_time`` only because the harness has one
+    # operator set (in production op5 and op6 are two sets on the same tape).
+    op6 = await _plant_operator_proposal(db_engine, proposed_at=born, tape_lag_s=14)
+    await entries_once(armed.ctx)
+    first, second = sorted([op5, op6])  # the planner's order: proposed_at, then id
+    assert (await _proposal(db_engine, first))["status"] == "approved"
+    twin = await _proposal(db_engine, second)
+    assert twin["status"] == "rejected" and twin["mode"] == "paper"
+    assert twin["decision"]["auto_refusal"] == "mint_busy_superseded"
+    assert armed.ctx.state.auto_skipped == {"mint_busy_superseded": 1}
+    assert len(armed.rpc.sent) == 1
+
+
+async def test_scenario_b_a_proposal_no_pass_saw_busy_is_superseded_by_the_rows(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """Guardian finding 1, scenario B (the 007 pattern): op6 is born while op5 is
+    open, the entry loop is busy elsewhere, the exit loop closes op5 — the first
+    pass that sees op6 finds the mint free. The rows still say the mint was busy
+    after op6 was born (``exit_at >= proposed_at``), so op6 is rejected."""
+    armed = _context(
+        db_session_factory, _signer(), harness.redis, auto=_small_test(max_total_sol="10")
+    )
+    op5 = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    born = datetime.now(UTC)
+    op6 = await _plant_operator_proposal(db_engine, proposed_at=born)
+    await _buy_then_exit(armed, db_engine, op5)  # no stage-1 pass in between
+    assert await auto_approve_once(armed.ctx, now=datetime.now(UTC)) == []
+    row = await _proposal(db_engine, op6)
+    assert row["status"] == "rejected"
+    assert row["decision"]["auto_refusal"] == "mint_busy_superseded"
+    assert armed.ctx.state.auto_skipped == {"mint_busy_superseded": 1}
+
+
+async def test_each_clause_of_the_temporal_rule_supersedes_on_its_own(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """``auto_busy.overtaken_proposals`` against the real schema, one clause at a
+    time. ``exit_at`` alone: the sell was decided (order received) before P was
+    born and landed on chain after it. The order alone: the sale's
+    ``block_time`` precedes P but the executor recorded the sell after P. The
+    executor's close alone (Astra, review of finding 1): sell recorded → sale on
+    chain → P born → executor confirms and closes — every stamp but the close
+    (``updated_at``) is before P. Neither: everything on the mint ended before P."""
+    armed = _context(
+        db_session_factory, _signer(), harness.redis, auto=_small_test(max_total_sol="10")
+    )
+    op5 = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    await _buy_then_exit(armed, db_engine, op5)
+    born = datetime.now(UTC) + timedelta(seconds=5)
+    p = OperatorProposal(
+        id=await _plant_operator_proposal(db_engine, proposed_at=born),
+        mint=MINT,
+        suggested={},
+        proposed_at=born,
+        expires_at=born + timedelta(seconds=180),
+        rule_set_params={},
+    )
+
+    async def overtaken(
+        *, exit_at: datetime, orders_at: datetime, closed_at: datetime | None = None
+    ) -> bool:
+        async with db_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "UPDATE meme_live_positions SET exit_at = :t, updated_at = :closed "
+                    "WHERE proposal_id = :p"
+                ),
+                {"t": exit_at, "closed": closed_at or exit_at, "p": op5},
+            )
+            await connection.execute(
+                text("UPDATE meme_live_orders SET received_at = :t WHERE proposal_id = :p"),
+                {"t": orders_at, "p": op5},
+            )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            return p.id in await overtaken_proposals(session, [p])
+
+    before, after = born - timedelta(seconds=1), born + timedelta(seconds=1)
+    # ``exit_at`` alone: only when the chain's clock runs ahead of the executor's
+    # (the close's ``updated_at`` is otherwise always at or after the block).
+    assert await overtaken(exit_at=after, orders_at=before, closed_at=before), "exit_at alone"
+    assert await overtaken(exit_at=before, orders_at=after), "the sell order alone"
+    assert await overtaken(exit_at=before, orders_at=before, closed_at=after), "the close alone"
+    assert not await overtaken(exit_at=before, orders_at=before), "all before P"
+    assert await overtaken(exit_at=born, orders_at=before), "at the birth instant counts"
+
+
+async def test_a_proposal_born_after_the_previous_exit_is_still_opened(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The temporal rule looks only at activity at or after the proposal's birth:
+    a position that bought and exited before it does not supersede it."""
+    armed = _context(
+        db_session_factory, _signer(), harness.redis, auto=_small_test(max_total_sol="10")
+    )
+    op5 = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    await _buy_then_exit(armed, db_engine, op5)
+    later = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    assert await auto_approve_once(armed.ctx, now=datetime.now(UTC)) == [later]
+    assert (await _proposal(db_engine, later))["status"] == "approved"
+
+
+async def test_stage_1_supersedes_a_busy_mint_even_on_a_pass_the_kill_switch_blocks(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.94: the rejection runs before the kill-switch/program/scope returns — a
+    switch released a few seconds later must not find op6's proposal still
+    ``proposed`` on a freed mint. The other coin's row stays the human's, as
+    before; and a click that decided first wins (``decided_concurrently``)."""
+    armed = _context(
+        db_session_factory, _signer(), harness.redis, auto=_small_test(max_total_sol="10")
+    )
+    op5 = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, op5))["status"] == "approved"
+    harness.redis.values["meme:kill"] = "TRADING_DISABLED"
+    await armed.ctx.kill.refresh()
+    assert armed.ctx.kill.blocks_entries
+
+    born = datetime.now(UTC)
+    op6 = await _plant_operator_proposal(db_engine, proposed_at=born)
+    other = await _plant_operator_proposal(db_engine, proposed_at=born, mint=OTHER_MINT)
+    assert await auto_approve_once(armed.ctx, now=born + timedelta(seconds=1)) == []
+    superseded = await _proposal(db_engine, op6)
+    assert superseded["status"] == "rejected"
+    assert superseded["decision"]["auto_refusal"] == "mint_busy_superseded"
+    assert (await _proposal(db_engine, other))["status"] == "proposed"
+    assert armed.ctx.state.auto_skipped == {"mint_busy_superseded": 1, "kill_switch": 1}
+
+    clicked = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    race = OperatorProposal(
+        id=clicked,
+        mint=MINT,
+        suggested={"size_sol": "0.01"},
+        proposed_at=born,
+        expires_at=born + timedelta(seconds=180),
+        rule_set_params={},
+    )
+    assert await supersede_busy(armed.ctx, (race,), now=datetime.now(UTC)) == {
+        "decided_concurrently": 1
+    }
+    kept = await _proposal(db_engine, clicked)
+    assert kept["status"] == "approved" and kept["decided_by"] == "user_x", "the click stands"
+
+
+async def test_stage_1_counts_its_own_reads_against_the_freshness_bound(
+    harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.94 (Astra's must-fix on the design): the tick's ``now`` is taken before
+    the pass reads anything. A proposal 9.5 s old at that instant whose on-demand
+    risk read then takes 1 s would be opened at 10.5 s, stamped 9.5 s — so the
+    final plan and ``decided_at`` use ``now`` plus the pass's own elapsed time."""
+    import hunter_meme_executor.auto_approve as auto_module
+
+    clock = [1_000.0]
+    io_s = [1.0]
+    monkeypatch.setattr(auto_module, "monotonic", lambda: clock[0])
+    real_ensure = auto_module.ensure_snapshots
+
+    async def slow_read(ctx: Any, mints: list[str], measured: Any, *, now: datetime) -> Any:
+        clock[0] += io_s[0]
+        return await real_ensure(ctx, mints, measured, now=now)
+
+    monkeypatch.setattr(auto_module, "ensure_snapshots", slow_read)
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    start = datetime.now(UTC)
+    late = await _plant_operator_proposal(db_engine, proposed_at=start - timedelta(seconds=9.5))
+
+    assert await auto_approve_once(armed.ctx, now=start) == []
+    assert armed.ctx.state.auto_skipped == {"too_old": 1}
+    assert (await _proposal(db_engine, late))["status"] == "proposed", "left to the human"
+
+    io_s[0] = 0.2
+    assert await auto_approve_once(armed.ctx, now=start) == [late]
+    opened = await _proposal(db_engine, late)
+    assert opened["status"] == "approved"
+    assert opened["decided_at"] == start + timedelta(seconds=0.2), "the instant it was decided"
+
+
+async def test_stage_1_counts_the_kill_switch_refresh_against_the_freshness_bound(
+    harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.94 (Astra's must-fix on the diff): ``entries_once`` stamps the tick,
+    then waits on the kill-switch refresh (Redis and Postgres) before stage 1
+    runs. A proposal 9.5 s old at the stamp whose refresh took 1 s is 10.5 s old
+    when the robot decides — it must be ``too_old``, not opened as 9.6 s."""
+    import hunter_meme_executor.auto_approve as auto_module
+    import hunter_meme_executor.entries as entries_module
+
+    start = datetime.now(UTC)
+    stamps = iter([start, start + timedelta(seconds=1.0)])  # the stamp, then after the refresh
+    monkeypatch.setattr(entries_module, "utcnow", lambda: next(stamps, start))
+    # The pass's own reads are pinned to zero here: only the refresh may age it.
+    monkeypatch.setattr(auto_module, "monotonic", lambda: 0.0)
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test())
+    late = await _plant_operator_proposal(db_engine, proposed_at=start - timedelta(seconds=9.5))
+    await entries_once(armed.ctx)
+    assert armed.ctx.state.auto_skipped == {"too_old": 1}
+    assert (await _proposal(db_engine, late))["status"] == "proposed"
+    assert armed.rpc.sent == []
+
+
 async def test_stage_1_closes_the_tap_on_the_scope_sol_ceiling(
     harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
@@ -1527,7 +1851,10 @@ async def test_stage_1_closes_the_tap_on_the_scope_sol_ceiling(
     await entries_once(armed.ctx)
     assert (await _proposal(db_engine, first))["status"] == "approved"
     assert len(armed.rpc.sent) == 1
-    second = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    # Another coin: the same mint would be superseded while ``first`` holds it (T4.94).
+    second = await _plant_operator_proposal(
+        db_engine, proposed_at=datetime.now(UTC), mint=OTHER_MINT
+    )
     await entries_once(armed.ctx)
     assert (await _proposal(db_engine, second))["status"] == "proposed"
     assert armed.ctx.state.auto_skipped == {"scope_exhausted:max_total_sol": 1}

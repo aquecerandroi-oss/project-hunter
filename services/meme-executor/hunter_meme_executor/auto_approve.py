@@ -14,9 +14,15 @@ filling the same proposal in shadow.
 Brakes that exist only in this mode, all named in the heartbeat:
 
 - at most **one** buy per tick, never two for the same mint in a tick;
-- a proposal older than :data:`AUTO_APPROVE_MAX_AGE_S` (60 s) is left to the
+- a proposal older than ``MEME_LIVE_AUTO_APPROVE_MAX_AGE_S`` (default
+  :data:`AUTO_APPROVE_MAX_AGE_S`, 10 s since T4.94; 60 s before) is left to the
   human (the ``operator`` set expires in 180 s for a hand; the robot decides on
-  its first pass or not at all);
+  its first passes or not at all);
+- ``mint_busy_superseded`` (T4.94, R78): a proposal whose mint has an open live
+  position or a buy in flight is **rejected** by the robot on that pass — before
+  any other early return — and never opened later on a tape the market already
+  moved past; the gate proposes the coin again if it still qualifies
+  (``auto_plan.py``);
 - ``MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR`` (default 5), counted from the rows —
   only proposals the admission did **not** reject (T4.28e): a refusal costs no
   slot, so in stage 1 the cap equals the scope's ``max_trades`` and never binds
@@ -39,30 +45,33 @@ Brakes that exist only in this mode, all named in the heartbeat:
 from __future__ import annotations
 
 import json
-from collections import Counter
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from time import monotonic
+from typing import TYPE_CHECKING
 
 from sqlalchemy import text
 
 from hunter_core.db.session import role_session
-from hunter_core.execution.meme.approval import (
-    AUTO_STAGE1_DECIDED_BY,
-    ProposalDecision,
-    decide_proposal,
-    max_sol_per_bet_of,
-    proposal_state_refusal,
-    size_cap_refusal,
-)
+from hunter_core.execution.meme.approval import AUTO_STAGE1_DECIDED_BY, decide_proposal
 from hunter_core.logging import get_logger
+from hunter_meme_executor.auto_busy import overtaken_proposals
 from hunter_meme_executor.auto_counters import auto_approved_last_hour, auto_refused_last_hour
+from hunter_meme_executor.auto_plan import (
+    AUTO_APPROVE_MAX_AGE_S,
+    AUTO_NOTE,
+    MINT_BUSY_SUPERSEDED,
+    AutoPlan,
+    OperatorProposal,
+    auto_decision,
+    plan_auto_approvals,
+    superseded_decision,
+)
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
 from hunter_meme_executor.repo import open_positions, pending_attempts
 from hunter_meme_executor.risk_read import ensure_snapshots
 from hunter_meme_executor.risk_snapshot import mints_with_snapshot
-from hunter_meme_executor.scope import read_scope_use, requested_sol_of
+from hunter_meme_executor.scope import read_scope_use
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,6 +82,7 @@ if TYPE_CHECKING:
 __all__ = [
     "AUTO_APPROVE_MAX_AGE_S",
     "AUTO_NOTE",
+    "MINT_BUSY_SUPERSEDED",
     "AutoPlan",
     "OperatorProposal",
     "auto_approve_once",
@@ -83,17 +93,15 @@ __all__ = [
     "plan_auto_approvals",
     "reject_auto_proposal",
     "reject_if_auto",
+    "supersede_busy",
+    "superseded_decision",
 ]
 
 logger = get_logger(__name__)
 
-AUTO_APPROVE_MAX_AGE_S = 60.0
-"""Older than this the robot does not decide: the proposal stays ``proposed`` for
-the human until the set's own ``ttl_s`` expires it."""
-AUTO_NOTE = "auto_stage1: aberta pelo executor sem clique"
-
 _OPERATOR_PROPOSED = text(
-    "SELECT p.id, p.mint, p.suggested, p.proposed_at, p.expires_at, rs.params "
+    "SELECT p.id, p.mint, p.suggested, p.proposed_at, p.expires_at, rs.params, "
+    "  p.reasons->0->>'series' AS series "
     "FROM meme_proposals p JOIN meme_rule_sets rs ON rs.id = p.rule_set_id "
     "WHERE rs.kind = 'operator' AND rs.status = 'active' "
     "  AND p.status = 'proposed' AND p.mode = 'paper' "
@@ -109,105 +117,6 @@ _REJECT = text(
 """Only a row this executor opened and that nobody else moved since: the paper
 loop that already filled it in shadow (``filled``/``unfilled``) wins — the
 ``refused`` order is the evidence then."""
-
-
-@dataclass(frozen=True, slots=True)
-class OperatorProposal:
-    id: str
-    mint: str
-    suggested: dict[str, Any]
-    proposed_at: datetime
-    expires_at: datetime
-    rule_set_params: dict[str, Any]
-
-
-@dataclass(frozen=True, slots=True)
-class AutoPlan:
-    picks: tuple[OperatorProposal, ...] = ()
-    skipped: dict[str, int] = field(default_factory=lambda: dict[str, int]())
-
-
-def plan_auto_approvals(
-    candidates: list[OperatorProposal],
-    *,
-    now: datetime,
-    approved_last_hour: int,
-    max_per_hour: int,
-    max_per_tick: int = 1,
-    max_age_s: float = AUTO_APPROVE_MAX_AGE_S,
-    busy_mints: frozenset[str] = frozenset(),
-    cooling_mints: frozenset[str] = frozenset(),
-    snapshot_mints: frozenset[str] | None = None,
-) -> AutoPlan:
-    """Pure: which ``proposed`` rows become live this tick, and why the rest do not.
-
-    Skip names: ``expired`` · ``too_old`` · ``mint_busy`` (an open live position or
-    a buy in flight on that mint — the admission would refuse ``duplicate_position``)
-    · ``recently_refused`` (T4.28f: the admission refused this mint for a reason
-    that needs more than a tick to change — ``refusal_cooldown``) ·
-    ``risk_snapshot_pending`` (T4.28g: the rug read check 11 needs has not landed
-    for this mint yet — ``risk_snapshot``) · ``suggested_incomplete`` ·
-    ``exceeds_max_sol_per_bet`` (the click's rule) · ``hourly_cap`` · ``tick_cap`` ·
-    ``mint_repeated``. Candidates are visited in the order given (oldest first).
-
-    ``snapshot_mints`` is the subset of candidate mints with a fresh, measured
-    ``bundled_share``; ``None`` means the caller did not measure and the skip does
-    not run — the pre-T4.28g behaviour (open, and let the admission refuse by name).
-    ``auto_approve_once`` always measures. The skip needs no age condition of its
-    own: ``too_old`` is evaluated first, so anything reaching it is younger than
-    :data:`AUTO_APPROVE_MAX_AGE_S` and an older row is the human's either way."""
-    picks: list[OperatorProposal] = []
-    skipped: Counter[str] = Counter()
-    mints: set[str] = set()
-    budget = max(0, max_per_hour - approved_last_hour)
-    for candidate in candidates:
-        if proposal_state_refusal("proposed", candidate.expires_at, now, approving=True):
-            skipped["expired"] += 1
-            continue
-        if (now - candidate.proposed_at).total_seconds() > max_age_s:
-            skipped["too_old"] += 1
-            continue
-        if candidate.mint in busy_mints:
-            skipped["mint_busy"] += 1
-            continue
-        if candidate.mint in cooling_mints:
-            skipped["recently_refused"] += 1
-            continue
-        if snapshot_mints is not None and candidate.mint not in snapshot_mints:
-            skipped["risk_snapshot_pending"] += 1
-            continue
-        size = requested_sol_of(candidate.suggested)
-        if size <= 0:
-            skipped["suggested_incomplete"] += 1
-            continue
-        if size_cap_refusal(max_sol_per_bet_of(candidate.rule_set_params), size):
-            skipped["exceeds_max_sol_per_bet"] += 1
-            continue
-        if len(picks) >= budget:
-            skipped["hourly_cap"] += 1
-            continue
-        if len(picks) >= max_per_tick:
-            skipped["tick_cap"] += 1
-            continue
-        if candidate.mint in mints:
-            skipped["mint_repeated"] += 1
-            continue
-        mints.add(candidate.mint)
-        picks.append(candidate)
-    return AutoPlan(picks=tuple(picks), skipped=dict(skipped))
-
-
-def auto_decision(proposal: OperatorProposal, *, now: datetime) -> ProposalDecision:
-    """What the click writes, by the robot: ``decision = suggested`` (the set's own
-    numbers, incl. ``manual_plan``) plus the note, ``mode = 'live'``."""
-    return ProposalDecision(
-        proposal_id=proposal.id,
-        status="approved",
-        decision={**proposal.suggested, "note": AUTO_NOTE},
-        decided_by=AUTO_STAGE1_DECIDED_BY,
-        decided_at=now,
-        mode="live",
-    )
 
 
 async def operator_proposals(
@@ -226,6 +135,7 @@ async def operator_proposals(
             proposed_at=r["proposed_at"],
             expires_at=r["expires_at"],
             rule_set_params=dict(r["params"] or {}),
+            series=r["series"],
         )
         for r in rows
     ]
@@ -260,13 +170,51 @@ async def reject_if_auto(
         ctx.state.auto_rejected += 1
 
 
+async def supersede_busy(
+    ctx: ExecutorContext, proposals: tuple[OperatorProposal, ...], *, now: datetime
+) -> dict[str, int]:
+    """T4.94: reject each proposal whose mint was busy, by name, with the one
+    guarded statement every decision uses (``WHERE status = 'proposed'``) — so it
+    is durable across passes and restarts, and the row no longer holds the
+    gate's "already open" slot for the mint. Returns the skip counts:
+    ``mint_busy_superseded`` per row moved, ``decided_concurrently`` when a click
+    or the loop's ``expired`` stamp got there first."""
+    counts: dict[str, int] = {}
+    moved: list[OperatorProposal] = []
+    if not proposals:
+        return counts
+    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+        for proposal in proposals:
+            if await decide_proposal(session, superseded_decision(proposal, now=now)):
+                moved.append(proposal)
+            else:
+                counts["decided_concurrently"] = counts.get("decided_concurrently", 0) + 1
+    # Counted and logged only once the transaction has committed.
+    if moved:
+        counts[MINT_BUSY_SUPERSEDED] = len(moved)
+    for proposal in moved:
+        logger.warning(
+            "meme_live_auto_superseded",
+            proposal_id=proposal.id,
+            mint=proposal.mint,
+            age_s=round((now - proposal.proposed_at).total_seconds(), 1),
+        )
+    return counts
+
+
 async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]:
     """One pass: open at most one ``operator`` proposal as live. Returns the ids
-    opened; ``entries_once`` picks them up as live candidates in the same tick."""
+    opened; ``entries_once`` picks them up as live candidates in the same tick.
+
+    ``now`` is the tick's instant, taken before any read; the final plan and the
+    decision use ``now`` plus this pass's own elapsed time (T4.94), so a read
+    that runs long counts against ``auto_approve_max_age_s`` and ``decided_at``
+    is when the robot actually decided."""
     cfg, state = ctx.config, ctx.state
     small = ctx.mode.gates.small_test if ctx.mode.gates is not None else None
     if not cfg.auto_approve or not cfg.live or ctx.signer is None or small is None:
         return []
+    started = monotonic()
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         candidates = await operator_proposals(session, now=now)
         if not candidates:
@@ -275,6 +223,7 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
         approved_1h = await auto_approved_last_hour(session, now=now)
         busy = {p.mint for p in await open_positions(session)}
         busy |= {a.mint for a in await pending_attempts(session)}
+        overtaken = await overtaken_proposals(session, candidates)  # guardian finding 1
         cooling = await refusal_cooling_mints(
             session, now=now, cooldown_s=cfg.auto_approve_refusal_cooldown_s
         )
@@ -283,6 +232,30 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
 
     def skip(reason: str, count: int = 1) -> None:
         state.auto_skipped[reason] = state.auto_skipped.get(reason, 0) + count
+
+    def plan_for(pool: list[OperatorProposal], snapshot_mints: frozenset[str] | None) -> AutoPlan:
+        return plan_auto_approvals(
+            pool,
+            now=now,
+            approved_last_hour=approved_1h,
+            max_per_hour=cfg.auto_approve_max_per_hour,
+            max_age_s=cfg.auto_approve_max_age_s,
+            busy_mints=frozenset(busy),
+            superseded_ids=overtaken,
+            cooling_mints=cooling,
+            snapshot_mints=snapshot_mints,
+        )
+
+    # T4.94: a proposal seen with its mint busy is rejected on this very pass,
+    # before the returns below — a pass the kill switch blocks still sees it, and
+    # no later pass may open it once the other position has exited.
+    first = plan_for(candidates, None)
+    for reason, count in (await supersede_busy(ctx, first.superseded, now=now)).items():
+        skip(reason, count)
+    gone = {p.id for p in first.superseded}
+    candidates = [c for c in candidates if c.id not in gone]
+    if not candidates:
+        return []
 
     # A pass that would only open proposals the admission is certain to refuse
     # opens none: the row stays ``proposed`` for the human instead of being
@@ -297,25 +270,14 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
         skip(f"scope_exhausted:{scope.exhausted}", len(candidates))
         return []
 
-    def plan_for(snapshot_mints: frozenset[str] | None) -> AutoPlan:
-        return plan_auto_approvals(
-            candidates,
-            now=now,
-            approved_last_hour=approved_1h,
-            max_per_hour=cfg.auto_approve_max_per_hour,
-            busy_mints=frozenset(busy),
-            cooling_mints=cooling,
-            snapshot_mints=snapshot_mints,
-        )
-
     # T4.45: ask the planner who it *would* open with the read in hand, read for
     # exactly those mints, then plan for real. The wait of T4.28g stays as the
     # fallback - a mint whose read failed is still left ``proposed`` rather than
-    # opened and refused ``bundled_share_unmeasurable``.
-    measured = await ensure_snapshots(
-        ctx, [p.mint for p in plan_for(None).picks], measured, now=now
-    )
-    plan = plan_for(measured)
+    # opened and refused ``bundled_share_unmeasurable``. (``first.picks`` never
+    # held a superseded row, so it is the same list over what is left.)
+    measured = await ensure_snapshots(ctx, [p.mint for p in first.picks], measured, now=now)
+    now += timedelta(seconds=monotonic() - started)
+    plan = plan_for(candidates, measured)
     for reason, count in plan.skipped.items():
         skip(reason, count)
     opened: list[str] = []
@@ -336,4 +298,11 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
             age_s=round((now - pick.proposed_at).total_seconds(), 1),
             approved_last_hour=approved_1h + len(opened),
         )
+    # Guardian finding 1: a twin of what was just opened never waits for a later
+    # tick, in which the pick may already have bought and exited.
+    twins = tuple(
+        s for s in plan.siblings if s.mint in {p.mint for p in plan.picks if p.id in opened}
+    )
+    for reason, count in (await supersede_busy(ctx, twins, now=now)).items():
+        skip(reason, count)
     return opened

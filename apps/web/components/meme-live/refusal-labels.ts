@@ -142,6 +142,7 @@ const AUTO_SKIP_LABEL: Record<string, string> = {
   expired: "proposta expirou antes de decidir",
   too_old: "proposta velha demais para o robô decidir (só o clique, agora)",
   mint_busy: "mint já tem posição aberta ou compra em voo",
+  mint_busy_superseded: "mint tinha posição aberta ou compra em voo — proposta descartada (dado velho); o portão propõe de novo",
   recently_refused: "mint em carência — recusa recente que o relógio não desfaz",
   suggested_incomplete: "sugestão do conjunto de regras incompleta (sem tamanho)",
   exceeds_max_sol_per_bet: "tamanho acima do teto por aposta do conjunto de regras",
@@ -168,6 +169,8 @@ export function autoSkipLabel(code: string): string {
   const known = AUTO_SKIP_LABEL[code];
   if (known !== undefined) return known;
   if (code.startsWith("scope_exhausted:")) return `escopo ${scopeExhaustedLabel(code.slice("scope_exhausted:".length))}`;
+  // T4.94: the per-lane breakdown of `too_old` (`auto_plan.py`), `too_old:<series>`.
+  if (code.startsWith("too_old:")) return `proposta velha demais — pista ${code.slice("too_old:".length)}`;
   return `pulo: ${code}`;
 }
 

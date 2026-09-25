@@ -38,8 +38,10 @@ from hunter_core.execution.meme.gates import (
 from hunter_core.execution.meme.signer import MemeSigner, boot_meme_execution
 from hunter_exchanges.jupiter.client import DEFAULT_JUPITER_BASE_URL
 from hunter_exchanges.pumpfun.tx_rpc import MAINNET_PUBLIC_RPC_URL
+from hunter_meme_executor.auto_plan import AUTO_APPROVE_MAX_AGE_S
 from hunter_meme_executor.config_env import (
     Cluster,
+    auto_approve_max_age_s,
     bps,
     cluster,
     float_env,
@@ -99,6 +101,9 @@ class ExecutorConfig:
     on **and** a written small test in the gates (``auto_approve_needs_small_test``
     otherwise); inert without the live flag."""
     auto_approve_max_per_hour: int = 5
+    auto_approve_max_age_s: float = AUTO_APPROVE_MAX_AGE_S
+    """T4.94 — ``MEME_LIVE_AUTO_APPROVE_MAX_AGE_S``: the robot opens no proposal
+    older than this (``auto_plan.AUTO_APPROVE_MAX_AGE_S`` says why 10 s)."""
     auto_approve_refusal_cooldown_s: float = 120.0
     """T4.28f — ``MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S``: how long a mint the
     admission refused for a reason that needs more than a tick to change
@@ -273,6 +278,7 @@ def boot(
         small_test_max_total_sol=None if small is None else small.max_total_sol,
         auto_approve=auto_approve,
         auto_approve_max_per_hour=max(0, int_env(env, "MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR", 5)),
+        auto_approve_max_age_s=auto_approve_max_age_s(env, AUTO_APPROVE_MAX_AGE_S),
         auto_approve_refusal_cooldown_s=max(
             0.0, float_env(env, "MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S", 120.0)
         ),

@@ -13,7 +13,16 @@ from typing import Literal
 from hunter_core.execution.meme.gates import MemeLiveTradingRefused
 from hunter_meme_executor.creator_flow import DEFAULT_SELL_TOLERANCE_PCT
 
-__all__ = ["Cluster", "bps", "cluster", "float_env", "int_env", "positive_decimal", "tolerance"]
+__all__ = [
+    "Cluster",
+    "auto_approve_max_age_s",
+    "bps",
+    "cluster",
+    "float_env",
+    "int_env",
+    "positive_decimal",
+    "tolerance",
+]
 
 Cluster = Literal["mainnet", "devnet"]
 
@@ -24,6 +33,17 @@ def float_env(env: Mapping[str, str], name: str, default: float) -> float:
         return float(raw) if raw else default
     except ValueError:
         return default
+
+
+def auto_approve_max_age_s(env: Mapping[str, str], default: float) -> float:
+    """``MEME_LIVE_AUTO_APPROVE_MAX_AGE_S`` (T4.94) in ``(0, 60]``, else the default.
+
+    Falls back instead of refusing the boot, like every helper here, and the
+    fallback is the safe value: ``nan`` compares false and would switch the bound
+    off, anything above the old 60 s would reopen the window R78 measured, and
+    ``0``/negative would silently refuse every proposal."""
+    value = float_env(env, "MEME_LIVE_AUTO_APPROVE_MAX_AGE_S", default)
+    return value if 0 < value <= 60 else default  # nan and ±inf fail this too
 
 
 def int_env(env: Mapping[str, str], name: str, default: int) -> int:

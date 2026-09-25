@@ -114,12 +114,13 @@ class TestPlanner:
             assert decided.decision[key] == value
         assert decided.decision["note"] == "auto_stage1: aberta pelo executor sem clique"
 
-    def test_a_proposal_older_than_sixty_seconds_is_left_to_the_human(self) -> None:
-        assert AUTO_APPROVE_MAX_AGE_S == 60
-        plan = _plan([_proposal(age_s=60.5)])
+    def test_a_proposal_older_than_ten_seconds_is_left_to_the_human(self) -> None:
+        """T4.94: 10 s by default (60 s before; R78's queue opened 11.5–53.8 s-old rows)."""
+        assert AUTO_APPROVE_MAX_AGE_S == 10
+        plan = _plan([_proposal(age_s=10.5)])
         assert plan.picks == ()
         assert plan.skipped == {"too_old": 1}
-        assert _plan([_proposal(age_s=59.9)]).picks != ()
+        assert _plan([_proposal(age_s=9.9)]).picks != ()
 
     def test_the_hourly_cap_stops_the_robot_not_the_human(self) -> None:
         plan = _plan([_proposal()], approved_last_hour=5, max_per_hour=5)
@@ -141,14 +142,17 @@ class TestPlanner:
         twin = _proposal(id="01994d00-6c1a-7000-8000-000000000102")
         plan = _plan([first, twin], max_per_tick=2)
         assert [p.id for p in plan.picks] == [first.id]
-        assert plan.skipped == {"mint_repeated": 1}
+        # T4.94 guardian finding 1: the twin is superseded once ``first`` opens.
+        assert [p.id for p in plan.siblings] == [twin.id] and plan.skipped == {}
 
-    def test_a_mint_with_a_live_position_or_a_buy_in_flight_is_left_alone(self) -> None:
-        """Opening it would only be refused ``duplicate_position`` — and an
-        auto-rejected proposal is gone for the human's click too."""
+    def test_a_mint_with_a_live_position_or_a_buy_in_flight_is_never_opened(self) -> None:
+        """Opening it now would only be refused ``duplicate_position``; opening it
+        after the other position exits would buy on a stale tape (T4.94, R78) —
+        so it is superseded (rejected by name), not kept waiting."""
         busy = frozenset({"5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump"})
         plan = _plan([_proposal()], busy_mints=busy)
-        assert plan.picks == () and plan.skipped == {"mint_busy": 1}
+        assert plan.picks == () and plan.skipped == {"mint_busy_superseded": 1}
+        assert [p.id for p in plan.superseded] == ["01994d00-6c1a-7000-8000-000000000101"]
         other = _proposal(mint="2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump")
         assert _plan([other], busy_mints=busy).picks == (other,)
 
@@ -300,14 +304,14 @@ class TestRiskSnapshotPending:
         """``too_old`` wins the ordering, so the two names never collide: past
         ``AUTO_APPROVE_MAX_AGE_S`` the row is left to the click, snapshot or not.
         That is also why the skip needs no age condition of its own — anything
-        reaching it is younger than 60 s."""
+        reaching it is younger than ``AUTO_APPROVE_MAX_AGE_S``."""
         plan = _plan([_proposal(age_s=90)], snapshot_mints=frozenset())
         assert plan.picks == () and plan.skipped == {"too_old": 1}
 
     def test_a_busy_or_cooling_mint_still_wins_the_ordering(self) -> None:
         """Waiting on a read a mint does not need would hide the real reason."""
         busy = _plan([_proposal()], snapshot_mints=frozenset(), busy_mints=frozenset({self.MINT}))
-        assert busy.skipped == {"mint_busy": 1}
+        assert busy.skipped == {"mint_busy_superseded": 1}
         cooling = _plan(
             [_proposal()], snapshot_mints=frozenset(), cooling_mints=frozenset({self.MINT})
         )

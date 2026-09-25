@@ -325,8 +325,10 @@ async def entries_once(ctx: ExecutorContext) -> None:
     ctx.state.last_entries_tick_at = now
     await ctx.kill.refresh()
     # T4.28 stage 1: what the robot opens now is a live candidate of this same
-    # tick — it goes through the admission below like any click would.
-    await auto_approve_once(ctx, now=now)
+    # tick — it goes through the admission below like any click would. Its clock
+    # is read after the refresh above, so that wait counts against the proposal's
+    # age too (T4.94: ``auto_approve_max_age_s``).
+    await auto_approve_once(ctx, now=utcnow())
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         candidates = await live_candidates(session, now=now)
     for candidate in candidates:

@@ -68,9 +68,13 @@ describe("autoScopeLine: the written small-test scope's usage, from gates + the 
 
 describe("autoSkipLabel: the stage-1 pre-filter vocabulary, exhaustive with a named fallback", () => {
   it("every named skip reason from auto_approve.py has a sentence", () => {
-    for (const code of ["expired", "too_old", "mint_busy", "recently_refused", "suggested_incomplete", "exceeds_max_sol_per_bet", "hourly_cap", "tick_cap", "mint_repeated", "decided_concurrently", "kill_switch", "program_upgraded"]) {
+    for (const code of ["expired", "too_old", "mint_busy", "mint_busy_superseded", "recently_refused", "suggested_incomplete", "exceeds_max_sol_per_bet", "hourly_cap", "tick_cap", "mint_repeated", "decided_concurrently", "kill_switch", "program_upgraded"]) {
       expect(autoSkipLabel(code)).not.toBe(code);
     }
+  });
+
+  it("the per-lane too_old:<series> breakdown names the lane", () => {
+    expect(autoSkipLabel("too_old:meme_features_15s_v1")).toBe("proposta velha demais — pista meme_features_15s_v1");
   });
 
   it("the dynamic scope_exhausted:<reason> prefix keeps the reason", () => {

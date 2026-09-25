@@ -302,8 +302,10 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
   `small_test_scope_exhausted`; antes disso o pedido é **clampado** ao que sobra
   (`admission.small_test.requested_clamped`) — o teto é teto, a última compra nunca o ultrapassa.
 - **Freios que só existem neste modo** (todos nomeados no heartbeat, `auto_skipped`): no máximo 1
-  compra por tique e por mint; proposta com `age > 60 s` fica para o humano (a `operator` expira em
-  180 s para a mão; o robô decide na primeira passada ou não decide); `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR`
+  compra por tique e por mint; proposta com idade (`agora − proposed_at`) acima de
+  `MEME_LIVE_AUTO_APPROVE_MAX_AGE_S` (padrão **10 s** desde a T4.94; antes, 60 s fixos) fica para o
+  humano como `too_old` (a `operator` expira em 180 s para a mão; o robô decide nas primeiras passadas
+  ou não decide); `MEME_LIVE_AUTO_APPROVE_MAX_PER_HOUR`
   (padrão 5, contado das linhas — sobrevive a restart — e **só das propostas que a admissão não
   rejeitou**, T4.28e: uma recusa não gasta vaga, então no estágio 1 o cap é igual ao `max_trades` do
   escopo e nunca trava antes dele; em 16/09 quatro recusas de um mint em 80 s tinham comido 4 das 5
@@ -311,6 +313,48 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
   escopo esgotado ⇒ o passe não abre proposta nenhuma; e **toda recusa da admissão** de uma proposta
   aberta pelo robô grava a ordem `refused` **e** marca a proposta `rejected` com o motivo em
   `decision.auto_refusal` (mesma transação) — a mesa mostra por quê.
+- **Mint ocupado invalida a proposta** (`mint_busy_superseded`, T4.94 — R78,
+  `.claude/state/notes-R78.md` §3.4; `obsidian/11-KNOWLEDGE/KB-0158-recompra-sem-amostra-e-bundle-sem-filtro.md`,
+  "O que se aprendeu" 1). Antes, a proposta de um mint com posição real aberta ou compra em voo era
+  só pulada (`mint_busy`) e ficava `proposed` até 60 s; a primeira passada depois da saída do outro
+  operador a abria **sem reler a fita** — 007 (11,5 s), BAGI (52,7 s) e ANT (53,8 s), abertas 1,7–1,8 s
+  depois de um alvo do op5, perderam as três. Agora a passada que vê o mint ocupado **rejeita** a
+  proposta pelo nome, com a mesma instrução guardada de toda decisão (`WHERE status = 'proposed'`):
+  `status = 'rejected'`, `mode = 'paper'` (nunca virou real), `decided_by = 'executor:auto_stage1'`,
+  `decision.auto_refusal = 'mint_busy_superseded'` e a nota. É durável (nenhuma passada posterior nem
+  um executor reiniciado a abre) e roda **antes** dos retornos de kill switch, programa e escopo.
+  **"Ocupado" é temporal, não observado** (revisão do guardião, achado 1): a proposta `P` do mint `M`
+  também é rejeitada quando as linhas mostram atividade em `M` desde que `P` nasceu — posição aberta,
+  ou fechada com `exit_at` (o `block_time` da venda) **ou** o instante do fechamento pelo executor
+  (`updated_at`, que só o fechamento carimba numa posição fechada) `>= P.proposed_at`, ou ordem de
+  outra proposta (compra **ou venda**, qualquer status) com `received_at >= P.proposed_at`
+  (`auto_busy.py`). A venda e o fechamento entram porque `exit_at` pode ficar antes de `P` enquanto o
+  executor ainda segurava a posição (venda registrada → venda na cadeia → `P` nasce → o executor
+  confirma e fecha — revisão da Astra). Isso fecha as duas
+  corridas que a observação deixava passar: gêmeas nascidas no mesmo instante de fita (a passada abre
+  uma; a outra esperava como `tick_cap` um tique em que a primeira já podia ter comprado e saído) e a
+  proposta nascida com a posição aberta que o laço de saída fechou antes de qualquer passada olhar. A
+  gêmea de uma proposta aberta nesta passada é rejeitada na mesma passada, logo depois da abertura
+  (o antigo `mint_repeated` deixou de existir). Atividade que terminou antes de `P` nascer não a toca. A
+  linha sai de `proposed`, então deixa de segurar o "já aberto" do portão para aquele mint: se a moeda
+  ainda passar, o portão propõe de novo com fita nova — sujeito à reserva em memória do próprio portão
+  (`recently_proposed`, até o `ttl` da proposta) e às apostas de papel abertas do conjunto. Custo
+  declarado: o clique humano também perde essa proposta (com o mint ocupado a admissão recusaria
+  `duplicate_position`; depois de livre, o dado é velho). Clique que decidiu antes vence
+  (`decided_concurrently`).
+- **Limite de frescor** (`too_old`, `MEME_LIVE_AUTO_APPROVE_MAX_AGE_S`, padrão 10 s; valor não finito,
+  `≤ 0` ou `> 60` cai no padrão). Medido de `proposed_at`, não de `features_end_time`: na pista de 15 s
+  o `features_end_time` é o fim do balde e fica até ~15 s atrás do tique do Lab por desenho (18 entradas
+  reais: decidido − `features_end_time` = 1,8–28,7 s; limitar isso seria mudar estratégia). Na pista de
+  eventos (`features_end_time` = `proposed_at`), das 130 entradas reais até 25/09, as 125 que não
+  esperaram na fila `mint_busy` foram decididas em até **2,67 s**; as 5 da fila tinham 11,5–53,8 s
+  (`.claude/state/r78/cache/pop.csv`). O heartbeat conta também `too_old:<series>` por pista
+  (`reasons[0].series`), para medir quanto cada pista perde com o limite. A idade usada no plano final e o `decided_at` gravado são o
+  instante do tique **mais o tempo que a própria passada gastou** (leituras e a leitura de risco sob
+  demanda), para que uma leitura lenta conte contra o limite. Custo declarado: uma proposta que espera
+  mais de 10 s por outro freio (`risk_snapshot_pending` depois de uma leitura que falhou,
+  `tick_cap`/`hourly_cap` atrás de outra compra) deixa de ser aberta pelo robô — sinal que esperou
+  demais não é executado.
 - **Carência depois de uma recusa determinística** (`recently_refused`, T4.28f,
   `MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S`, padrão 120 s, `0` desliga): a mesa repropõe o mesmo
   mint a cada ~20 s (medido em 16/09/2026 11:46–11:48 BRT: o robô abriu a mesma moeda 5 vezes e a

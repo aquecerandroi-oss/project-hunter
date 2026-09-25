@@ -139,7 +139,7 @@ class LiveExecutorOut(BaseModel):
     the same vocabulary as ``LiveOrderOut.reason``/``first_refusal``."""
     auto_skipped: dict[str, int] = {}
     """Passes where the robot did not even open a proposal, by reason (in-memory
-    since the process's last restart) — ``expired``, ``too_old``, ``mint_busy``,
+    since the process's last restart) — ``expired``, ``too_old``, ``mint_busy_superseded``,
     ``recently_refused`` (T4.28f), ``exceeds_max_sol_per_bet``, ``hourly_cap``,
     ``tick_cap``, ``mint_repeated``, ``kill_switch``, ``program_upgraded``,
     ``scope_exhausted:<max_trades|max_total_sol>``, ``decided_concurrently``."""
