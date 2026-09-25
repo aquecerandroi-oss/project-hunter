@@ -1,0 +1,11 @@
+Revise o DESENHO do estudo R79 ANTES de eu calcular desfechos. Leia .claude/state/notes-R79.md (secoes 0 a 2), os blocos H-017 e H-019 em obsidian/11-KNOWLEDGE/Fila de Hipoteses.md, obsidian/05-EXPERIMENTS/EXP-M24-entrada-no-recuo.md (secao Protocolo), docs/RESEARCH.md (regra 6 e rotulos) e .claude/state/notes-R76.md secao 0.4b item 4 (errata da clausula (a)). Codigo: .claude/state/r79/h019.py, .claude/state/r79/q_pop.sql, .claude/state/r79/q_h017.sql.
+
+Perguntas precisas:
+1. H-019: a populacao inclui o braco recuo_v1 (86 dos 195 mints), cuja entrada e depois de t0 (espera recuo de 3 %) mas a variavel e lida em t0. Incluir na primaria (letra do bloco: todos os bracos da porta fluxo_e_holders) e ter "sem recuo_v1" como sensibilidade, ou o inverso?
+2. A regra de rotulo da secao 2.1 (ordem: dado -> (c) vencedoras > 30 % -> refutacao por intervalo (IC inf de D > -0,01) -> CONFIRMA -> pico = REFUTA (b) -> (a) literal sozinha = NAO CONFIRMA) esta fiel ao bloco?
+3. Patamar definido como os vizinhos q = 0,30 e q = 0,40 com D <= -0,05: aceitavel?
+4. comprou_no_topo no papel por high_water_x <= 1: equivale ao real high_water_sol <= initial_risk_sol? (ver infra/scripts/meme_daily_ficha_classify.py e services/meme-worker/hunter_meme_worker/paper_engine.py mark_bet)
+5. H-017: a sombra de papel do operator/5 so existe quando a mesa real aceita (39 de 171 armacoes; 122 recusadas pelo auto_stage1). Leio a populacao do bloco como "emparelhadas" -> n emparelhado < 150 -> LIMITE DE DADO, com (b) contra "nada" nas ~166 decisoes resolvidas do braco so descritivo. Concorda, ou (b) deveria ser julgado nas 166?
+6. Algum vazamento/antecipacao ou erro de juncao que eu nao vi?
+
+Responda com: must-fix (cada um com cenario de falha concreto), nice-to-have, e o que concorda. Seja breve.

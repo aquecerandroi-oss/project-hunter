@@ -1,0 +1,9 @@
+Revise o VEREDITO do estudo R79. Leia .claude/state/notes-R79.md inteiro, as saidas .claude/state/r79/h019.txt, h019_mill.txt, h017.txt, pb_check.txt, e o codigo .claude/state/r79/h019.py, h019_run.py, h017.py, h017_run.py, test_r79.py. Pre-registos: blocos H-017 e H-019 em obsidian/11-KNOWLEDGE/Fila de Hipoteses.md; protocolo em obsidian/05-EXPERIMENTS/EXP-M24-entrada-no-recuo.md.
+
+Perguntas:
+1. H-019: rotulo REFUTA pela clausula (c) (vencedoras no tercil baixo 34,7 % > 30 %), com D = +0,037 [-0,109, +0,183] no sentido CONTRARIO a tese, comprou_no_topo 0,88x e o piso bloqueando mais ganho que perda nas reais. Concorda com o rotulo? Algum bug no codigo (tercis, bootstrap, permutacao, contrafactual) que mude o numero?
+2. H-017: LIMITE DE DADO com 39 pares (< 150) porque a sombra de papel do operator/5 so nasce quando a mesa real aceita. Concorda? A decomposicao (22 pares com fill identico na mesma foto, 12 em foto posterior, 5 nao-entradas; sem Megawatt D +0,0136) esta correta e a conclusao de fidelidade (o papel nao mede o preco da entrada quando o gatilho vem antes da foto seguinte) se sustenta?
+3. O que propor para a coorte da H-017 conseguir ser julgada (ex.: braco research_only de entrada imediata com os mesmos params do operator/5, ou fill do papel no preco do gatilho)? Sem implementar.
+4. Qualquer antecipacao/juncao errada.
+
+Responda com must-fix (com cenario de falha concreto), nice-to-have, e o que concorda. Seja breve.

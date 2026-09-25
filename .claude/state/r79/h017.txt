@@ -1,0 +1,70 @@
+## Armações (1.ª por mint): 171 | classes {'entered': 141, 'killed': 16, 'censored': 5, 'no_pullback': 9}
+   emparelháveis: 39 | sem controle resolvido: 127 | status da proposta op5: {'rejected': 122, 'filled': 39, 'expired': 9, 'sem proposta': 1}
+
+## PRIMÁRIA (a) braço − op5 emparelhado: D +0.0324 [-0.0062, +0.0819] (bootstrap por mint 10000)
+   (b) braço contra 'não comprar nada' nos pares: -0.0220 [-0.0845, +0.0447]
+   → LIMITE DE DADO (39 < 150 decisões resolvidas emparelhadas)
+   composição: {'entered': 34, 'no_pullback': 3, 'killed': 2}
+   todos os pares: n 39 | braço -0.0220 [-0.0845, +0.0447] | op5 -0.0545 [-0.1296, +0.0219] | D +0.0324 [-0.0062, +0.0819] | braço melhor em 10, pior 7 | Σ SOL braço−op5 = +0.0886
+   dia UTC 2026-09-24: n 10 | braço -0.0108 [-0.1057, +0.1063] | op5 -0.0862 [-0.2844, +0.0813] | D +0.0755 [+0.0000, +0.2249] | braço melhor em 2, pior 0 | Σ SOL braço−op5 = +0.0528
+   dia UTC 2026-09-25: n 29 | braço -0.0259 [-0.1022, +0.0552] | op5 -0.0435 [-0.1219, +0.0376] | D +0.0176 [-0.0169, +0.0548] | braço melhor em 8, pior 7 | Σ SOL braço−op5 = +0.0357
+   dia BRT 2026-09-24: n 10 | braço -0.0108 [-0.1057, +0.1063] | op5 -0.0862 [-0.2844, +0.0813] | D +0.0755 [+0.0000, +0.2249] | braço melhor em 2, pior 0 | Σ SOL braço−op5 = +0.0528
+   dia BRT 2026-09-25: n 29 | braço -0.0259 [-0.1022, +0.0552] | op5 -0.0435 [-0.1219, +0.0376] | D +0.0176 [-0.0169, +0.0548] | braço melhor em 8, pior 7 | Σ SOL braço−op5 = +0.0357
+
+   pares, um a um:
+     2026-09-24 06:04:09 FunkCat      entered     braço +0.0960 (target) op5 +0.0960 (target)
+     2026-09-24 06:10:24 SSB          entered     braço -0.0710 (creator_dump) op5 -0.0710 (creator_dump)
+     2026-09-24 06:22:28 $NUVEX       entered     braço +0.4105 (target) op5 +0.4026 (target)
+     2026-09-24 07:38:03 Megawatt     entered     braço -0.0610 (creator_dump) op5 -0.8079 (creator_dump)
+     2026-09-24 08:24:19 XDesk        entered     braço +0.1493 (trailing) op5 +0.1493 (trailing)
+     2026-09-24 08:25:05 SIW          entered     braço -0.1846 (trailing) op5 -0.1846 (trailing)
+     2026-09-24 08:44:17 RBXBIT       entered     braço -0.1428 (creator_dump) op5 -0.1428 (creator_dump)
+     2026-09-24 08:54:12 $CONDOM      entered     braço -0.1417 (trailing) op5 -0.1417 (trailing)
+     2026-09-24 10:34:41 Geography    entered     braço -0.1214 (trailing) op5 -0.1214 (trailing)
+     2026-09-24 11:04:19 EVERGLEN     entered     braço -0.0409 (creator_dump) op5 -0.0409 (creator_dump)
+     2026-09-25 03:45:39 CALLS        entered     braço -0.5429 (creator_dump) op5 -0.5429 (creator_dump)
+     2026-09-25 04:52:36 Imago        entered     braço -0.0389 (creator_dump) op5 -0.0389 (creator_dump)
+     2026-09-25 05:25:18 FACRO        no_pullback braço +0.0000 (-) op5 -0.0159 (line_broken)
+     2026-09-25 06:18:25 007          entered     braço -0.0958 (trailing) op5 -0.0958 (trailing)
+     2026-09-25 06:20:42 KOMI         entered     braço -0.1241 (line_broken) op5 -0.1511 (trailing)
+     2026-09-25 08:33:32 LEGOPAID     entered     braço +0.0991 (creator_dump) op5 +0.0991 (creator_dump)
+     2026-09-25 09:08:10 Relaunch     entered     braço +0.6574 (target) op5 +0.5248 (target)
+     2026-09-25 09:17:33 COMO         killed      braço +0.0000 (-) op5 -0.3241 (trailing)
+     2026-09-25 09:31:32 OA           entered     braço -0.1762 (trailing) op5 -0.1128 (trailing)
+     2026-09-25 09:54:13 TREMOR       entered     braço -0.2229 (trailing) op5 -0.2201 (trailing)
+     2026-09-25 10:02:48 PREDICTED    entered     braço -0.1473 (trailing) op5 -0.1437 (trailing)
+     2026-09-25 10:35:18 Calcios      entered     braço +0.3108 (target) op5 +0.3578 (target)
+     2026-09-25 11:01:54 otto         killed      braço +0.0000 (-) op5 -0.2559 (trailing)
+     2026-09-25 11:25:20 launchcat    entered     braço -0.0700 (creator_dump) op5 -0.0700 (creator_dump)
+     2026-09-25 11:50:06 frenlock     no_pullback braço +0.0000 (-) op5 -0.1502 (trailing)
+     2026-09-25 13:45:31 PRIVACY      entered     braço -0.0332 (target) op5 +0.2357 (target)
+     2026-09-25 14:03:44 Bullgrippa   entered     braço +0.0756 (line_broken) op5 +0.0756 (line_broken)
+     2026-09-25 14:11:08 BAGI         entered     braço -0.1979 (creator_dump) op5 -0.1979 (creator_dump)
+     2026-09-25 14:43:26 Agricoon     entered     braço -0.1696 (trailing) op5 -0.1447 (trailing)
+     2026-09-25 15:34:39 AMCL         entered     braço -0.0655 (creator_dump) op5 -0.0767 (trailing)
+     2026-09-25 16:40:00 SPIDER       entered     braço +0.3312 (target) op5 +0.3312 (target)
+     2026-09-25 18:14:48 BB           entered     braço -0.2860 (trailing) op5 -0.2860 (trailing)
+     2026-09-25 18:18:16 Ornyt        entered     braço +0.2951 (target) op5 +0.3236 (target)
+     2026-09-25 18:39:11 MEMEos       entered     braço -0.0422 (trailing) op5 -0.0422 (trailing)
+     2026-09-25 19:20:05 UAV          entered     braço -0.0386 (creator_dump) op5 -0.0386 (creator_dump)
+     2026-09-25 19:24:33 $LAG         no_pullback braço +0.0000 (-) op5 -0.0328 (line_broken)
+     2026-09-25 21:00:02 JALA         entered     braço +0.0711 (target) op5 +0.0711 (target)
+     2026-09-25 22:46:22 Pill Trade   entered     braço -0.2117 (trailing) op5 -0.2117 (trailing)
+     2026-09-25 23:06:19 FTT          entered     braço -0.1296 (line_broken) op5 -0.1296 (line_broken)
+
+## DESCRITIVO (b) em todas as decisões resolvidas do braço: n 166 | média +0.0056 [-0.0385, +0.0511] | Σ SOL +0.0656 | classes {'entered': 141, 'killed': 16, 'no_pullback': 9}
+   op5 aceitou (filled): n 39 | média -0.0220 [-0.0845, +0.0447]
+   op5 recusou/expirou: n 127 | média +0.0141 [-0.0393, +0.0713]
+   dia UTC 2026-09-24: n 75 | média +0.0182 [-0.0581, +0.1009]
+   dia UTC 2026-09-25: n 91 | média -0.0047 [-0.0533, +0.0468]
+
+## Fidelidade op5 real − op5 papel (mesma proposta): n 38 | +0.0020 [-0.0871, +0.0862]
+
+## Decomposição de D (soma das diferenças ÷ 39 pares):
+   entrou na mesma foto do op5: n 22 | contribuição +0.0000 | média no grupo +0.0000
+   entrou em foto posterior: n 12 | contribuição +0.0125 | média no grupo +0.0406
+   não entrou (0 − op5): n 5 | contribuição +0.0200 | média no grupo +0.1558
+   sem o maior par (Megawatt, +0.7469): D +0.0136 [-0.0128, +0.0423] (n 38)
+   motivos de morte/censura no braço (todas as armações): {'pullback_killed:participation_above_cap': 5, 'pullback_killed:creator_sold_during_wait': 4, 'pullback_censored:no_base_row': 1, 'pullback_censored:feed_lost': 4, 'pullback_killed:holders_below_min': 6, 'pullback_killed:progress_trend_unknown': 1}
+
+## Ritmo: pares por dia UTC {'2026-09-24': 10, '2026-09-25': 29}; horas da coorte 41.3

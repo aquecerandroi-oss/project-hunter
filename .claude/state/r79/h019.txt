@@ -1,0 +1,164 @@
+
+## Guardas: troca da fatia recebida depois do as_of 0; derived.as_of ≠ as_of 0; fita depois da aprovação 0; gravação − as_of p50 0.98 s, máx 2.02 s
+
+## PRIMÁRIA — variável buy_sol: n = 195 | lanes {'real': 50, 'paper': 145}
+   cortes q1/3 = 0.5484, q2/3 = 1.6204; baixo 65, alto 65; zeros 11
+   média r: baixo -0.0099 (vitória 0.385, perda≥50% 0.062) | meio -0.0295 | alto -0.0468 (vitória 0.323, perda≥50% 0.062) | todos -0.0287
+   D (baixo − alto) = +0.0370 IC95 [-0.1093, +0.1832] (bootstrap por mint 10000, inválidas 0.000) | p perm (estrato dia) 0.6197
+   (c) vencedoras no tercil baixo: 25/72 = 34.7%
+   comprou_no_topo: baixo 23/65 = 0.354 | alto 26/65 = 0.400 | razão 0.88
+   curva (baixo ≤ Q(q) × alto > Q(1−q)):
+     q 0.200: ≤ 0.177 (n 39) × > 2.426 (n 39): D +0.0526 [-0.1291, +0.2414]
+     q 0.250: ≤ 0.297 (n 49) × > 2.061 (n 49): D +0.0727 [-0.0781, +0.2256]
+     q 0.300: ≤ 0.429 (n 59) × > 1.802 (n 59): D +0.0183 [-0.1361, +0.1677]
+     q 0.333: ≤ 0.548 (n 65) × > 1.620 (n 65): D +0.0370 [-0.1119, +0.1841]
+     q 0.400: ≤ 0.762 (n 78) × > 1.327 (n 78): D +0.0009 [-0.1323, +0.1325]
+     q 0.450: ≤ 0.907 (n 88) × > 1.128 (n 88): D +0.0067 [-0.1167, +0.1292]
+     q 0.500: ≤ 1.028 (n 98) × > 1.028 (n 97): D +0.0184 [-0.0973, +0.1299]
+   patamar (q 0,30 e 0,40 com D ≤ −0,05): False
+
+## PRIMÁRIA — variável buys: n = 195 | lanes {'real': 50, 'paper': 145}
+   cortes q1/3 = 0.6391, q2/3 = 1.4655; baixo 65, alto 65; zeros 11
+   média r: baixo -0.0429 (vitória 0.338, perda≥50% 0.077) | meio +0.0041 | alto -0.0474 (vitória 0.277, perda≥50% 0.046) | todos -0.0287
+   D (baixo − alto) = +0.0044 IC95 [-0.1418, +0.1443] (bootstrap por mint 10000, inválidas 0.000) | p perm (estrato dia) 0.9523
+   (c) vencedoras no tercil baixo: 22/72 = 30.6%
+   comprou_no_topo: baixo 29/65 = 0.446 | alto 28/65 = 0.431 | razão 1.04
+   curva (baixo ≤ Q(q) × alto > Q(1−q)):
+     q 0.200: ≤ 0.411 (n 39) × > 2.144 (n 39): D +0.0253 [-0.1985, +0.2489]
+     q 0.250: ≤ 0.500 (n 51) × > 1.714 (n 48): D -0.0007 [-0.1860, +0.1796]
+     q 0.300: ≤ 0.556 (n 59) × > 1.538 (n 59): D +0.0025 [-0.1591, +0.1593]
+     q 0.333: ≤ 0.639 (n 65) × > 1.466 (n 65): D +0.0044 [-0.1453, +0.1464]
+     q 0.400: ≤ 0.810 (n 78) × > 1.171 (n 78): D -0.0140 [-0.1391, +0.1106]
+     q 0.450: ≤ 0.936 (n 88) × > 1.091 (n 87): D +0.0209 [-0.0995, +0.1429]
+     q 0.500: ≤ 1.000 (n 98) × > 1.000 (n 97): D +0.0045 [-0.1104, +0.1189]
+   patamar (q 0,30 e 0,40 com D ≤ −0,05): False
+
+## Holm (família SOL, contagem): p (0.6197380261973803, 0.9523047695230477) → Holm (1.0, 1.0)
+   → buy_sol: REFUTA por (c): o piso mata 34.7% das vencedoras (> 30 %) (piso bloqueia mais perdas que ganhos nas reais: False)
+   → buys: REFUTA por (c): o piso mata 30.6% das vencedoras (> 30 %) (piso bloqueia mais perdas que ganhos nas reais: True)
+
+## Contrafactual real (buy_sol, piso acc > 0.5484): 60 posições reais com fita completa, Σ -0.1347 SOL
+   bloqueadas 20: perdas evitadas -0.0839 SOL, ganhos mortos +0.0911 SOL → Δ SOL = -0.0072; vencedoras mortas 6/21
+     2026-09-24 05:49:32 SMITH        operator/5 acc 0.505 pnl +0.0154 target  ← VENCEDORA
+     2026-09-24 08:25:05 SIW          operator/5 acc 0.246 pnl -0.0005 trailing
+     2026-09-24 08:54:12 $CONDOM      operator/5 acc 0.000 pnl -0.0037 trailing
+     2026-09-24 10:34:41 Geography    operator/5 acc 0.000 pnl -0.0023 trailing
+     2026-09-25 03:45:35 CALLS        operator/6 acc 0.316 pnl +0.0122 target  ← VENCEDORA
+     2026-09-25 04:45:36 gcr          operator/6 acc 0.199 pnl -0.0026 trailing
+     2026-09-25 04:56:42 ShibBrain    operator/6 acc 0.044 pnl -0.0072 trailing
+     2026-09-25 06:20:42 KOMI         operator/5 acc 0.235 pnl -0.0093 trailing
+     2026-09-25 07:14:43 SLUDGE       operator/5 acc 0.389 pnl -0.0075 trailing
+     2026-09-25 09:08:10 Relaunch     operator/5 acc 0.339 pnl +0.0290 target  ← VENCEDORA
+     2026-09-25 09:17:33 COMO         operator/5 acc 0.078 pnl -0.0074 creator_dump
+     2026-09-25 10:02:48 PREDICTED    operator/5 acc 0.180 pnl +0.0144 target  ← VENCEDORA
+     2026-09-25 10:36:18 BRICK        operator/6 acc 0.037 pnl -0.0122 trailing
+     2026-09-25 10:38:20 Calcios      operator/5 acc 0.111 pnl -0.0095 trailing
+     2026-09-25 11:50:06 frenlock     operator/5 acc 0.000 pnl -0.0062 trailing
+     2026-09-25 18:39:11 MEMEos       operator/5 acc 0.035 pnl +0.0123 target  ← VENCEDORA
+     2026-09-25 19:24:33 $LAG         operator/5 acc 0.129 pnl +0.0078 target  ← VENCEDORA
+     2026-09-25 19:48:36 CHINA        operator/6 acc 0.160 pnl -0.0004 trailing
+     2026-09-25 21:00:02 JALA         operator/5 acc 0.426 pnl -0.0110 trailing
+     2026-09-25 23:06:19 FTT          operator/5 acc 0.249 pnl -0.0042 trailing
+
+## Contrafactual real (buys, piso acc > 0.6391): 60 posições reais com fita completa, Σ -0.1347 SOL
+   bloqueadas 20: perdas evitadas -0.1231 SOL, ganhos mortos +0.0778 SOL → Δ SOL = +0.0453; vencedoras mortas 6/21
+     2026-09-24 08:25:05 SIW          operator/5 acc 0.522 pnl -0.0005 trailing
+     2026-09-24 08:54:12 $CONDOM      operator/5 acc 0.000 pnl -0.0037 trailing
+     2026-09-24 10:34:41 Geography    operator/5 acc 0.000 pnl -0.0023 trailing
+     2026-09-25 03:45:35 CALLS        operator/6 acc 0.273 pnl +0.0122 target  ← VENCEDORA
+     2026-09-25 04:00:57 SELVAGE      operator/6 acc 0.600 pnl +0.0186 target  ← VENCEDORA
+     2026-09-25 04:45:36 gcr          operator/6 acc 0.222 pnl -0.0026 trailing
+     2026-09-25 04:56:42 ShibBrain    operator/6 acc 0.400 pnl -0.0072 trailing
+     2026-09-25 05:18:10 PUMPAGENT    operator/6 acc 0.500 pnl -0.0070 creator_dump
+     2026-09-25 05:25:18 FACRO        operator/5 acc 0.533 pnl +0.0125 target  ← VENCEDORA
+     2026-09-25 09:17:33 COMO         operator/5 acc 0.623 pnl -0.0074 creator_dump
+     2026-09-25 10:02:48 PREDICTED    operator/5 acc 0.103 pnl +0.0144 target  ← VENCEDORA
+     2026-09-25 10:36:18 BRICK        operator/6 acc 0.514 pnl -0.0122 trailing
+     2026-09-25 10:38:20 Calcios      operator/5 acc 0.320 pnl -0.0095 trailing
+     2026-09-25 11:50:06 frenlock     operator/5 acc 0.000 pnl -0.0062 trailing
+     2026-09-25 15:34:39 AMCL         operator/5 acc 0.522 pnl -0.0027 trailing
+     2026-09-25 18:39:11 MEMEos       operator/5 acc 0.462 pnl +0.0123 target  ← VENCEDORA
+     2026-09-25 19:20:05 UAV          operator/5 acc 0.514 pnl -0.0466 trailing
+     2026-09-25 19:24:33 $LAG         operator/5 acc 0.490 pnl +0.0078 target  ← VENCEDORA
+     2026-09-25 21:00:02 JALA         operator/5 acc 0.444 pnl -0.0110 trailing
+     2026-09-25 23:06:19 FTT          operator/5 acc 0.218 pnl -0.0042 trailing
+
+## s1 — sem recuo_v1 (só entrada imediata) — variável buy_sol: n = 114 | lanes {'real': 52, 'paper': 62}
+   cortes q1/3 = 0.4293, q2/3 = 1.8236; baixo 38, alto 38; zeros 8
+   média r: baixo -0.0592 (vitória 0.263, perda≥50% 0.053) | meio -0.0385 | alto -0.1011 (vitória 0.263, perda≥50% 0.053) | todos -0.0663
+   D (baixo − alto) = +0.0419 IC95 [-0.1388, +0.2274] (bootstrap por mint 10000, inválidas 0.000) | p perm (estrato dia) 0.6758
+   (c) vencedoras no tercil baixo: 10/33 = 30.3%
+   comprou_no_topo: baixo 13/38 = 0.342 | alto 16/38 = 0.421 | razão 0.81
+   curva (baixo ≤ Q(q) × alto > Q(1−q)):
+     q 0.200: ≤ 0.149 (n 23) × > 2.651 (n 23): D +0.0031 [-0.2718, +0.2860]
+     q 0.250: ≤ 0.247 (n 29) × > 2.209 (n 29): D +0.0225 [-0.2047, +0.2601]
+     q 0.300: ≤ 0.349 (n 34) × > 1.961 (n 34): D +0.0459 [-0.1589, +0.2499]
+     q 0.333: ≤ 0.429 (n 38) × > 1.824 (n 38): D +0.0419 [-0.1424, +0.2308]
+     q 0.400: ≤ 0.673 (n 46) × > 1.408 (n 46): D -0.0159 [-0.2020, +0.1697]
+     q 0.450: ≤ 0.911 (n 51) × > 1.261 (n 51): D -0.0100 [-0.1871, +0.1585]
+     q 0.500: ≤ 1.008 (n 57) × > 1.008 (n 57): D +0.0237 [-0.1361, +0.1724]
+   patamar (q 0,30 e 0,40 com D ≤ −0,05): False
+
+## s2 — só reais — variável buy_sol: n = 50 | lanes {'real': 50}
+   cortes q1/3 = 0.4851, q2/3 = 1.4495; baixo 17, alto 17; zeros 3
+   média r: baixo +0.0061 (vitória 0.294, perda≥50% 0.000) | meio -0.0198 | alto -0.0717 (vitória 0.412, perda≥50% 0.059) | todos -0.0286
+   D (baixo − alto) = +0.0778 IC95 [-0.0541, +0.2266] (bootstrap por mint 10000, inválidas 0.000) | p perm (estrato dia) 0.3173
+   (c) vencedoras no tercil baixo: 5/19 = 26.3%
+   comprou_no_topo: baixo 4/17 = 0.235 | alto 7/17 = 0.412 | razão 0.57
+   curva (baixo ≤ Q(q) × alto > Q(1−q)):
+     q 0.200: ≤ 0.195 (n 10) × > 1.972 (n 10): D +0.0770 [-0.1044, +0.2867]
+     q 0.250: ≤ 0.247 (n 13) × > 1.839 (n 13): D +0.0555 [-0.0911, +0.2218]
+     q 0.300: ≤ 0.332 (n 15) × > 1.521 (n 15): D +0.0603 [-0.0758, +0.2120]
+     q 0.333: ≤ 0.485 (n 17) × > 1.449 (n 17): D +0.0778 [-0.0553, +0.2254]
+     q 0.400: ≤ 0.717 (n 20) × > 1.241 (n 20): D +0.1138 [-0.0206, +0.2604]
+     q 0.450: ≤ 0.863 (n 23) × > 1.003 (n 23): D +0.0940 [-0.0357, +0.2306]
+     q 0.500: ≤ 0.963 (n 25) × > 0.963 (n 25): D +0.1018 [-0.0183, +0.2315]
+   patamar (q 0,30 e 0,40 com D ≤ −0,05): False
+
+## s3 — gaps = 0 — variável buy_sol: n = 194 | lanes {'real': 49, 'paper': 145}
+   cortes q1/3 = 0.5614, q2/3 = 1.6235; baixo 65, alto 65; zeros 11
+   média r: baixo -0.0045 (vitória 0.400, perda≥50% 0.062) | meio -0.0334 | alto -0.0468 (vitória 0.323, perda≥50% 0.062) | todos -0.0282
+   D (baixo − alto) = +0.0424 IC95 [-0.1047, +0.1895] (bootstrap por mint 10000, inválidas 0.000) | p perm (estrato dia) 0.5805
+   (c) vencedoras no tercil baixo: 26/72 = 36.1%
+   comprou_no_topo: baixo 23/65 = 0.354 | alto 26/65 = 0.400 | razão 0.88
+   curva (baixo ≤ Q(q) × alto > Q(1−q)):
+     q 0.200: ≤ 0.174 (n 39) × > 2.437 (n 39): D +0.0526 [-0.1291, +0.2414]
+     q 0.250: ≤ 0.306 (n 49) × > 2.065 (n 49): D +0.0639 [-0.0876, +0.2180]
+     q 0.300: ≤ 0.431 (n 58) × > 1.811 (n 58): D +0.0557 [-0.0785, +0.1944]
+     q 0.333: ≤ 0.561 (n 65) × > 1.623 (n 65): D +0.0424 [-0.1059, +0.1876]
+     q 0.400: ≤ 0.766 (n 78) × > 1.339 (n 78): D -0.0010 [-0.1357, +0.1304]
+     q 0.450: ≤ 0.908 (n 87) × > 1.142 (n 87): D +0.0108 [-0.1118, +0.1341]
+     q 0.500: ≤ 1.030 (n 97) × > 1.030 (n 97): D +0.0195 [-0.0931, +0.1306]
+   patamar (q 0,30 e 0,40 com D ≤ −0,05): False
+
+## s4 — dia 2026-09-24 — variável buy_sol: n = 100 | lanes {'real': 14, 'paper': 86}
+   cortes q1/3 = 0.6838, q2/3 = 1.8596; baixo 34, alto 33; zeros 6
+   média r: baixo +0.0005 (vitória 0.441, perda≥50% 0.088) | meio +0.0553 | alto -0.0987 (vitória 0.242, perda≥50% 0.091) | todos -0.0142
+   D (baixo − alto) = +0.0992 IC95 [-0.1140, +0.3227] (bootstrap por mint 10000, inválidas 0.000) | p perm (estrato dia) 0.3843
+   (c) vencedoras no tercil baixo: 15/38 = 39.5%
+   comprou_no_topo: baixo 13/34 = 0.382 | alto 13/33 = 0.394 | razão 0.97
+   curva (baixo ≤ Q(q) × alto > Q(1−q)):
+     q 0.200: ≤ 0.291 (n 20) × > 2.844 (n 20): D +0.2246 [-0.0123, +0.5076]
+     q 0.250: ≤ 0.430 (n 25) × > 2.552 (n 25): D +0.0839 [-0.1770, +0.3566]
+     q 0.300: ≤ 0.580 (n 30) × > 2.084 (n 30): D +0.1169 [-0.1280, +0.3558]
+     q 0.333: ≤ 0.684 (n 34) × > 1.860 (n 33): D +0.0992 [-0.1206, +0.3195]
+     q 0.400: ≤ 0.877 (n 40) × > 1.406 (n 40): D -0.0162 [-0.2285, +0.1888]
+     q 0.450: ≤ 1.039 (n 45) × > 1.293 (n 45): D -0.0281 [-0.2461, +0.1831]
+     q 0.500: ≤ 1.124 (n 50) × > 1.124 (n 50): D -0.0627 [-0.2622, +0.1293]
+   patamar (q 0,30 e 0,40 com D ≤ −0,05): False
+
+## s4 — dia 2026-09-25 — variável buy_sol: n = 95 | lanes {'paper': 59, 'real': 36}
+   cortes q1/3 = 0.3594, q2/3 = 1.4495; baixo 32, alto 32; zeros 5
+   média r: baixo -0.0732 (vitória 0.312, perda≥50% 0.031) | meio -0.0050 | alto -0.0527 (vitória 0.375, perda≥50% 0.031) | todos -0.0440
+   D (baixo − alto) = -0.0205 IC95 [-0.1529, +0.1067] (bootstrap por mint 10000, inválidas 0.000) | p perm (estrato dia) 0.7581
+   (c) vencedoras no tercil baixo: 10/34 = 29.4%
+   comprou_no_topo: baixo 12/32 = 0.375 | alto 13/32 = 0.406 | razão 0.92
+   curva (baixo ≤ Q(q) × alto > Q(1−q)):
+     q 0.200: ≤ 0.127 (n 19) × > 2.010 (n 19): D -0.0276 [-0.1853, +0.1251]
+     q 0.250: ≤ 0.217 (n 24) × > 1.818 (n 24): D -0.0296 [-0.1756, +0.1115]
+     q 0.300: ≤ 0.296 (n 29) × > 1.577 (n 29): D -0.0499 [-0.1859, +0.0868]
+     q 0.333: ≤ 0.359 (n 32) × > 1.449 (n 32): D -0.0205 [-0.1508, +0.1068]
+     q 0.400: ≤ 0.610 (n 38) × > 1.149 (n 38): D +0.0640 [-0.0671, +0.1965]
+     q 0.450: ≤ 0.782 (n 43) × > 0.990 (n 43): D +0.0584 [-0.0569, +0.1811]
+     q 0.500: ≤ 0.908 (n 48) × > 0.908 (n 47): D +0.0350 [-0.0761, +0.1448]
+   patamar (q 0,30 e 0,40 com D ≤ −0,05): False
