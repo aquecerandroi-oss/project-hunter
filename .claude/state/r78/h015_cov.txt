@@ -1,0 +1,10 @@
+('absent_zero', 'inf!=real', 'chain_buys>0') 19
+('absent_zero', 'inf!=real', 'chain_zero') 17
+('absent_zero', 'inf=real', 'chain_buys>0') 2
+('absent_zero', 'inf=real', 'chain_zero') 97
+('match', 'inf=real', 'chain_buys>0') 228
+others_in_slot max 31
+primária 342 {'no_create_signature': 31, 'match': 228, 'absent_zero': 135, 'reason:coverage_gap': 1, 'zero_ambiguous': 21}
+strict 309 {'no_create_signature': 31, 'match': 197, 'absent_zero': 115, 'reason:not_covered_from_birth': 51, 'reason:coverage_gap': 1, 'zero_ambiguous': 3}
+mesa 154 {'absent_zero': 68, 'match': 95, 'no_create_signature': 15, 'reason:coverage_gap': 1, 'zero_ambiguous': 9}
+chain 342 {'no_create_signature': 31, 'match': 228, 'absent_zero': 135, 'reason:coverage_gap': 1, 'zero_ambiguous': 21}

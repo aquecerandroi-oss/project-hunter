@@ -1,0 +1,17 @@
+caso1 G52s8B match [('AmwJTo', -2311937041829, 366767623), ('DDvvi2', 2311937041829, -369502121)]
+caso1 D3EZng match [('ADJ419', -30877697811737, 888888888), ('Do3xhT', 30877697811737, -901766365)]
+caso1 GT8mSn match [('FL6ogg', -7018806136653, 197530863), ('FosV7Y', 7018806136653, -403565280)]
+caso1 HtLCwk match [('4yFAz7', -26402627219810, 1503956168), ('CBV6Fc', 26402627219810, -1533125234)]
+caso1 YSSZgw match [('4oDwCr', 25529640206035, -994993128), ('23Cc5S', -25529640206035, 970915119)]
+caso1 22JpGJ match [('HqDXtD', 2550191292414, -407076641), ('AmwJTo', -2550191292414, 403872462)]
+caso1 581E92 match [('7mXsnL', 2700199865360, -429435247), ('AmwJTo', -2700199865360, 425951586)]
+caso1 A6Kipr match [('7qGzv1', 2493790396533, -390775171), ('AmwJTo', -2493790396533, 387774760)]
+caso1 DTpNRQ match [('E3Q8nT', 2339848445200, -368295574), ('AmwJTo', -2339848445200, 365576159)]
+caso1 E19VZ4 match [('4yYANS', 2344774298039, -369932910), ('AmwJTo', -2344774298039, 367193028)]
+{'dono_alheio_com_delta_zero': 243, 'mints': 363, 'caso1_curva_mexe_sem_comprador_liquido': 10}
+E2hNR7 [('CMaUHQ', False, 0, 0)]
+3Gy5Dq [('2KP9mi', False, 0, -5053), ('EbDVsS', False, 0, 0)]
+{'tx_slotS_zero': 20, 'tx_slotS_zero_com_curva': 2}
+E2hNR7 pagador 1f1mim delta -10030 taxa 5030
+3Gy5Dq pagador 2KP9mi delta -10175000 taxa 15000
+3Gy5Dq pagador 2KP9mi delta -5053 taxa 5053

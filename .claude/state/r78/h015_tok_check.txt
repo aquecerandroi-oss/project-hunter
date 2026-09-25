@@ -1,0 +1,5 @@
+curve_tok>0 363
+('absent_zero', 'v1:buys', 'v2:buys') 19
+('absent_zero', 'v1:buys', 'v2:zero') 2
+('absent_zero', 'v1:zero', 'v2:zero') 114
+('match', 'v1:buys', 'v2:buys') 228

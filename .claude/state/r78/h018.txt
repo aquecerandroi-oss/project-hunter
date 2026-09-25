@@ -1,0 +1,158 @@
+
+## real: 148 posições, 132 mints
+
+### PRIMÁRIA saída anterior alvo∧lucro
+  escopo any: recompras n=10 (mints 10) média r -0.1867 perda≥50% 0.100 | controle n=132 média -0.0525 perda≥50% 0.053 | D -0.1341 IC95 [-0.3050, +0.0034] p_perm 0.1037 | razão perda≥50% 1.89 → LIMITE DE DADO (n = 10 < 20: registrar e não julgar)
+    s1 controle desde a 1.ª recompra: recompras n=10 (mints 10) média r -0.1867 perda≥50% 0.100 | controle n=113 média -0.0356 perda≥50% 0.044 | D -0.1510 IC95 [-0.3178, -0.0115] p_perm 0.0501 | razão perda≥50% 2.26 → LIMITE DE DADO (n = 10 < 20: registrar e não julgar)
+    s2 controle sem os mints recomprados: recompras n=10 (mints 10) média r -0.1867 perda≥50% 0.100 | controle n=122 média -0.0729 perda≥50% 0.057 | D -0.1137 IC95 [-0.2863, +0.0187] p_perm 0.1527 | razão perda≥50% 1.74 → LIMITE DE DADO (n = 10 < 20: registrar e não julgar)
+    Cupsey       operator/5→operator/5 (mesma) saída 09-19 08:46:24 target +0.0132 → entrada +137s trailing -0.0075 (r -0.108)
+    KODA         operator/5→operator/5 (mesma) saída 09-19 13:57:16 target +0.0103 → entrada +174s target +0.0083 (r +0.116)
+    ANT          operator/5→operator/6 (cruzada) saída 09-20 04:40:18 target +0.0185 → entrada +55s trailing -0.0150 (r -0.229)
+    Paidichi     operator/5→operator/5 (mesma) saída 09-20 16:10:22 target +0.0125 → entrada +155s trailing -0.0094 (r -0.135)
+    TANK         operator/6→operator/5 (cruzada) saída 09-21 07:44:37 target +0.0125 → entrada +11s trailing -0.0011 (r -0.016)
+    Megawatt     operator/6→operator/5 (cruzada) saída 09-24 07:37:58 target +0.0160 → entrada +5s trailing -0.0519 (r -0.787)
+    CALLS        operator/6→operator/5 (cruzada) saída 09-25 03:45:38 target +0.0122 → entrada +2s trailing -0.0103 (r -0.144)
+    007          operator/5→operator/6 (cruzada) saída 09-25 06:18:35 target +0.0213 → entrada +1s trailing -0.0097 (r -0.270)
+    Calcios      operator/5→operator/5 (mesma) saída 09-25 10:35:38 target +0.0171 → entrada +161s trailing -0.0095 (r -0.132)
+    BAGI         operator/5→operator/6 (cruzada) saída 09-25 14:11:59 target +0.0165 → entrada +2s trailing -0.0116 (r -0.162)
+    Σ pnl recompras -0.1178 SOL
+  escopo same: recompras n=4 (mints 4) média r -0.0647 perda≥50% 0.000 | controle n=142 média -0.0559 perda≥50% 0.056 | D -0.0087 IC95 [-0.0996, +0.1654] p_perm 0.9429 | razão perda≥50% 0.00 → LIMITE DE DADO (n = 4 < 20: registrar e não julgar)
+  escopo cross: recompras n=6 (mints 6) média r -0.2680 perda≥50% 0.167 | controle n=132 média -0.0525 perda≥50% 0.053 | D -0.2155 IC95 [-0.4655, -0.0308] p_perm 0.0407 | razão perda≥50% 3.14 → LIMITE DE DADO (n = 6 < 20: registrar e não julgar)
+
+### SENSIBILIDADE saída anterior lucro (qualquer razão)
+  escopo any: recompras n=10 (mints 10) média r -0.1867 perda≥50% 0.100 | controle n=132 média -0.0525 perda≥50% 0.053 | D -0.1341 IC95 [-0.3050, +0.0034] p_perm 0.1037 | razão perda≥50% 1.89 → LIMITE DE DADO (n = 10 < 20: registrar e não julgar)
+    s1 controle desde a 1.ª recompra: recompras n=10 (mints 10) média r -0.1867 perda≥50% 0.100 | controle n=113 média -0.0356 perda≥50% 0.044 | D -0.1510 IC95 [-0.3178, -0.0115] p_perm 0.0501 | razão perda≥50% 2.26 → LIMITE DE DADO (n = 10 < 20: registrar e não julgar)
+    s2 controle sem os mints recomprados: recompras n=10 (mints 10) média r -0.1867 perda≥50% 0.100 | controle n=122 média -0.0729 perda≥50% 0.057 | D -0.1137 IC95 [-0.2863, +0.0187] p_perm 0.1527 | razão perda≥50% 1.74 → LIMITE DE DADO (n = 10 < 20: registrar e não julgar)
+    Cupsey       operator/5→operator/5 (mesma) saída 09-19 08:46:24 target +0.0132 → entrada +137s trailing -0.0075 (r -0.108)
+    KODA         operator/5→operator/5 (mesma) saída 09-19 13:57:16 target +0.0103 → entrada +174s target +0.0083 (r +0.116)
+    ANT          operator/5→operator/6 (cruzada) saída 09-20 04:40:18 target +0.0185 → entrada +55s trailing -0.0150 (r -0.229)
+    Paidichi     operator/5→operator/5 (mesma) saída 09-20 16:10:22 target +0.0125 → entrada +155s trailing -0.0094 (r -0.135)
+    TANK         operator/6→operator/5 (cruzada) saída 09-21 07:44:37 target +0.0125 → entrada +11s trailing -0.0011 (r -0.016)
+    Megawatt     operator/6→operator/5 (cruzada) saída 09-24 07:37:58 target +0.0160 → entrada +5s trailing -0.0519 (r -0.787)
+    CALLS        operator/6→operator/5 (cruzada) saída 09-25 03:45:38 target +0.0122 → entrada +2s trailing -0.0103 (r -0.144)
+    007          operator/5→operator/6 (cruzada) saída 09-25 06:18:35 target +0.0213 → entrada +1s trailing -0.0097 (r -0.270)
+    Calcios      operator/5→operator/5 (mesma) saída 09-25 10:35:38 target +0.0171 → entrada +161s trailing -0.0095 (r -0.132)
+    BAGI         operator/5→operator/6 (cruzada) saída 09-25 14:11:59 target +0.0165 → entrada +2s trailing -0.0116 (r -0.162)
+    Σ pnl recompras -0.1178 SOL
+  escopo same: recompras n=4 (mints 4) média r -0.0647 perda≥50% 0.000 | controle n=142 média -0.0559 perda≥50% 0.056 | D -0.0087 IC95 [-0.0996, +0.1654] p_perm 0.9429 | razão perda≥50% 0.00 → LIMITE DE DADO (n = 4 < 20: registrar e não julgar)
+  escopo cross: recompras n=6 (mints 6) média r -0.2680 perda≥50% 0.167 | controle n=132 média -0.0525 perda≥50% 0.053 | D -0.2155 IC95 [-0.4655, -0.0308] p_perm 0.0407 | razão perda≥50% 3.14 → LIMITE DE DADO (n = 6 < 20: registrar e não julgar)
+
+## paper: 1497 posições, 788 mints
+
+### PRIMÁRIA saída anterior alvo∧lucro
+  escopo any: recompras n=5 (mints 5) média r -0.0980 perda≥50% 0.200 | controle n=788 média -0.0377 perda≥50% 0.098 | D -0.0603 IC95 [-0.4575, +0.2145] p_perm 0.7390 | razão perda≥50% 2.05 → LIMITE DE DADO (n = 5 < 20: registrar e não julgar)
+    s1 controle desde a 1.ª recompra: recompras n=5 (mints 5) média r -0.0980 perda≥50% 0.200 | controle n=397 média -0.0323 perda≥50% 0.078 | D -0.0657 IC95 [-0.4560, +0.2045] p_perm 0.7122 | razão perda≥50% 2.56 → LIMITE DE DADO (n = 5 < 20: registrar e não julgar)
+    s2 controle sem os mints recomprados: recompras n=5 (mints 5) média r -0.0980 perda≥50% 0.200 | controle n=783 média -0.0379 perda≥50% 0.097 | D -0.0600 IC95 [-0.4564, +0.2134] p_perm 0.7372 | razão perda≥50% 2.06 → LIMITE DE DADO (n = 5 < 20: registrar e não julgar)
+    KODA         operator/5→operator/5 (mesma) saída 09-19 13:57:25 target +0.0091 → entrada +171s target +0.0150 (r +0.214)
+    PROCK        operator/5→operator/5 (mesma) saída 09-20 03:43:08 target +0.0119 → entrada +102s max_loss -0.0527 (r -0.752)
+    Paidichi     operator/5→operator/5 (mesma) saída 09-20 16:11:04 target +0.0095 → entrada +127s line_broken +0.0008 (r +0.011)
+    SMITH        recuo_v1/1→operator/5 (cruzada) saída 09-24 05:47:13 target +0.0092 → entrada +141s line_broken -0.0074 (r -0.106)
+    Calcios      recuo_v1/1→operator/5 (cruzada) saída 09-25 10:36:07 target +0.0218 → entrada +147s line_broken +0.0100 (r +0.142)
+    Σ pnl recompras -0.0343 SOL
+  escopo same: recompras n=6 (mints 6) média r -0.1112 perda≥50% 0.167 | controle n=1397 média -0.0337 perda≥50% 0.106 | D -0.0775 IC95 [-0.4389, +0.2231] p_perm 0.6455 | razão perda≥50% 1.57 → LIMITE DE DADO (n = 6 < 20: registrar e não julgar)
+  escopo cross: recompras n=2 (mints 2) média r +0.0184 perda≥50% 0.000 | controle n=788 média -0.0377 perda≥50% 0.098 | D +0.0561 IC95 [-0.0900, +0.2013] p_perm 0.8058 | razão perda≥50% 0.00 → LIMITE DE DADO (n = 2 < 20: registrar e não julgar)
+
+### SENSIBILIDADE saída anterior lucro (qualquer razão)
+  escopo any: recompras n=36 (mints 33) média r -0.0289 perda≥50% 0.056 | controle n=788 média -0.0377 perda≥50% 0.098 | D +0.0087 IC95 [-0.1128, +0.1238] p_perm 0.9101 | razão perda≥50% 0.57 → NÃO CONFIRMA ((a) literal dispara: IC sup > −0,01; o intervalo não exclui o efeito)
+    s1 controle desde a 1.ª recompra: recompras n=36 (mints 33) média r -0.0289 perda≥50% 0.056 | controle n=760 média -0.0362 perda≥50% 0.097 | D +0.0072 IC95 [-0.1151, +0.1241] p_perm 0.9240 | razão perda≥50% 0.57 → NÃO CONFIRMA ((a) literal dispara: IC sup > −0,01; o intervalo não exclui o efeito)
+    s2 controle sem os mints recomprados: recompras n=36 (mints 33) média r -0.0289 perda≥50% 0.056 | controle n=755 média -0.0552 perda≥50% 0.101 | D +0.0262 IC95 [-0.0946, +0.1382] p_perm 0.7341 | razão perda≥50% 0.55 → NÃO CONFIRMA ((a) literal dispara: IC sup > −0,01; o intervalo não exclui o efeito)
+    WINKY        flow_v2/2→flow_v2/2 (mesma) saída 09-13 17:05:28 line_broken +0.0330 → entrada +62s line_broken -0.0063 (r -0.125)
+    KIRKYAHU     flow_v2/2→flow_v2/2 (mesma) saída 09-15 03:04:33 line_broken +0.0040 → entrada +50s line_broken -0.0114 (r -0.228)
+    IndieReach   flow_v2/5→flow_v2/2 (cruzada) saída 09-16 05:55:46 line_broken +0.0446 → entrada +24s max_loss -0.0433 (r -0.866)
+    Bitmaker     flow_v2/5→flow_v2/2 (cruzada) saída 09-16 09:19:23 line_broken +0.0048 → entrada +46s line_broken +0.0122 (r +0.245)
+    STAND        flow_v2/5→flow_v2/2 (cruzada) saída 09-17 05:42:09 line_broken +0.0009 → entrada +80s line_broken -0.0019 (r -0.037)
+    CORTANA      flow_v2/3→flow_v2/2 (cruzada) saída 09-17 07:36:46 line_broken +0.0001 → entrada +31s creator_dump +0.0330 (r +0.659)
+    CASHOUT      flow_v2/5→flow_v2/1 (cruzada) saída 09-17 08:07:53 line_broken +0.0148 → entrada +16s line_broken -0.0022 (r -0.045)
+    Gato         flow_v2/5→flow_v2/2 (cruzada) saída 09-17 10:30:46 line_broken +0.0140 → entrada +32s line_broken -0.0138 (r -0.276)
+    better       flow_v2/5→flow_v2/2 (cruzada) saída 09-17 15:43:28 line_broken +0.0014 → entrada +41s line_broken +0.0024 (r +0.048)
+    PS           operator/5→flow_v2/6 (cruzada) saída 09-17 21:01:13 creator_dump +0.0105 → entrada +49s line_broken +0.0309 (r +0.618)
+    Vc18z        flow_v2/5→flow_v2/2 (cruzada) saída 09-17 23:00:55 creator_dump +0.0032 → entrada +41s line_broken +0.0149 (r +0.298)
+    Vc18z        flow_v2/5→flow_v2/2 (cruzada) saída 09-17 23:02:09 line_broken +0.0149 → entrada +33s line_broken +0.0082 (r +0.165)
+    Pusheen      flow_v2/5→flow_v2/2 (cruzada) saída 09-18 07:50:26 line_broken +0.0398 → entrada +31s line_broken -0.0045 (r -0.089)
+    coloseum     flow_v2/1→flow_v2/2 (cruzada) saída 09-18 18:08:25 line_broken +0.0030 → entrada +31s line_broken +0.0011 (r +0.022)
+    coloseum     flow_v2/5→flow_v2/1 (cruzada) saída 09-18 18:09:12 line_broken +0.0011 → entrada +38s creator_dump +0.0349 (r +0.698)
+    WIN          flow_v2/2→flow_v2/2 (mesma) saída 09-18 22:01:57 creator_dump +0.0185 → entrada +51s creator_dump -0.0025 (r -0.049)
+    RHOS         flow_v2/5→flow_v2/2 (cruzada) saída 09-18 23:23:03 line_broken +0.0504 → entrada +33s line_broken +0.0097 (r +0.194)
+    RHOS         operator/5→flow_v2/2 (cruzada) saída 09-18 23:24:29 line_broken +0.0040 → entrada +31s line_broken -0.0031 (r -0.063)
+    EQUITITTY    flow_v2/5→flow_v2/1 (cruzada) saída 09-19 07:02:32 line_broken +0.0425 → entrada +43s line_broken -0.0135 (r -0.269)
+    Cupsey       flow_v2/5→flow_v2/2 (cruzada) saída 09-19 08:47:48 trailing +0.0097 → entrada +48s line_broken -0.0240 (r -0.481)
+    CYBER        flow_v2/5→flow_v2/2 (cruzada) saída 09-19 10:59:37 line_broken +0.0089 → entrada +67s line_broken -0.0146 (r -0.291)
+    KODA         operator/5→operator/5 (mesma) saída 09-19 13:57:25 target +0.0091 → entrada +171s target +0.0150 (r +0.214)
+    VIRGIN       flow_v2/5→flow_v2/2 (cruzada) saída 09-19 14:26:24 line_broken +0.0705 → entrada +33s line_broken +0.0033 (r +0.066)
+    KICKTIP      flow_v2/3→flow_v2/3 (mesma) saída 09-19 19:32:55 line_broken +0.0142 → entrada +68s line_broken -0.0168 (r -0.336)
+    PROCK        operator/5→operator/5 (mesma) saída 09-20 03:43:08 target +0.0119 → entrada +102s max_loss -0.0527 (r -0.752)
+    Paidichi     operator/5→operator/5 (mesma) saída 09-20 16:11:04 target +0.0095 → entrada +127s line_broken +0.0008 (r +0.011)
+    DVD          flow_v2/1→flow_v2/1 (mesma) saída 09-20 19:48:54 creator_dump +0.0913 → entrada +33s max_loss -0.0195 (r -0.391)
+    TANK         flow_v2/1→flow_v2/1 (mesma) saída 09-21 07:43:24 line_broken +0.0174 → entrada +59s creator_dump +0.0076 (r +0.152)
+    LETSG        flow_v2/1→flow_v2/1 (mesma) saída 09-21 09:45:39 line_broken +0.0033 → entrada +47s line_broken +0.0049 (r +0.099)
+    FAMILY       flow_v2/1→flow_v2/1 (mesma) saída 09-21 12:31:19 line_broken +0.0426 → entrada +64s line_broken -0.0009 (r -0.018)
+    PFDOG        flow_v2/1→flow_v2/1 (mesma) saída 09-21 13:05:29 line_broken +0.0077 → entrada +37s line_broken +0.0076 (r +0.151)
+    SMITH        recuo_v1/1→operator/5 (cruzada) saída 09-24 05:47:13 target +0.0092 → entrada +141s line_broken -0.0074 (r -0.106)
+    lana         flow_v2/1→operator/5 (cruzada) saída 09-24 11:02:07 line_broken +0.0017 → entrada +31s line_broken +0.0007 (r +0.010)
+    APPSHARE     flow_v2/1→flow_v2/1 (mesma) saída 09-24 20:50:22 line_broken +0.0292 → entrada +44s line_broken -0.0095 (r -0.189)
+    007          flow_v2/1→flow_v2/1 (mesma) saída 09-25 06:21:00 line_broken +0.0002 → entrada +48s line_broken -0.0112 (r -0.224)
+    Calcios      recuo_v1/1→operator/5 (cruzada) saída 09-25 10:36:07 target +0.0218 → entrada +147s line_broken +0.0100 (r +0.142)
+    Σ pnl recompras -0.0617 SOL
+  escopo same: recompras n=62 (mints 29) média r -0.0527 perda≥50% 0.065 | controle n=1397 média -0.0337 perda≥50% 0.106 | D -0.0190 IC95 [-0.1727, +0.1171] p_perm 0.7397 | razão perda≥50% 0.61 → NÃO CONFIRMA ((a) literal dispara: IC sup > −0,01; o intervalo não exclui o efeito)
+  escopo cross: recompras n=23 (mints 20) média r +0.0367 perda≥50% 0.043 | controle n=788 média -0.0377 perda≥50% 0.098 | D +0.0744 IC95 [-0.0888, +0.2198] p_perm 0.4342 | razão perda≥50% 0.44 → NÃO CONFIRMA ((a) literal dispara: IC sup > −0,01; o intervalo não exclui o efeito)
+
+## Contrafactual real — pausa de 300 s por mint depois de QUALQUER saída, os dois operadores
+PnL realizado -0.4707 SOL em 148 posições
+
+### replay qualquer saída (proposta): 16 bloqueadas, Δ +0.0571 SOL
+    Cupsey       operator/5 09-19 08:48:41 pnl -0.0075 ← saída operator/5 target +0.0132 há 137s
+    NARKY        operator/5 09-19 11:24:53 pnl +0.0142 ← saída operator/5 trailing -0.0033 há 149s
+    KODA         operator/5 09-19 14:00:10 pnl +0.0083 ← saída operator/5 target +0.0103 há 174s
+    Musepaid     operator/5 09-19 17:28:40 pnl -0.0018 ← saída operator/6 trailing -0.0107 há 25s
+    ANT          operator/6 09-20 04:41:13 pnl -0.0150 ← saída operator/5 target +0.0185 há 55s
+    BLEP         operator/6 09-20 04:59:00 pnl +0.0039 ← saída operator/5 trailing -0.0084 há 3s
+    Aura         operator/6 09-20 14:11:48 pnl +0.0114 ← saída operator/5 trailing -0.0005 há 2s
+    Paidichi     operator/5 09-20 16:12:57 pnl -0.0094 ← saída operator/5 target +0.0125 há 155s
+    DVD          operator/5 09-20 19:47:46 pnl +0.0204 ← saída operator/6 trailing -0.0044 há 49s
+    TANK         operator/6 09-21 07:44:18 pnl +0.0125 ← saída operator/6 trailing -0.0032 há 159s
+    TANK         operator/5 09-21 07:44:48 pnl -0.0011 ← saída operator/6 trailing -0.0032 há 189s
+    Megawatt     operator/5 09-24 07:38:03 pnl -0.0519 ← saída operator/6 target +0.0160 há 5s
+    CALLS        operator/5 09-25 03:45:40 pnl -0.0103 ← saída operator/6 target +0.0122 há 2s
+    007          operator/6 09-25 06:18:36 pnl -0.0097 ← saída operator/5 target +0.0213 há 1s
+    Calcios      operator/5 09-25 10:38:19 pnl -0.0095 ← saída operator/5 target +0.0171 há 161s
+    BAGI         operator/6 09-25 14:12:01 pnl -0.0116 ← saída operator/5 target +0.0165 há 2s
+
+### replay só perda (check 28, retroativo): 7 bloqueadas, Δ -0.0596 SOL
+    NARKY        operator/5 09-19 11:24:53 pnl +0.0142 ← saída operator/5 trailing -0.0033 há 149s
+    Musepaid     operator/5 09-19 17:28:40 pnl -0.0018 ← saída operator/6 trailing -0.0107 há 25s
+    BLEP         operator/6 09-20 04:59:00 pnl +0.0039 ← saída operator/5 trailing -0.0084 há 3s
+    Aura         operator/6 09-20 14:11:48 pnl +0.0114 ← saída operator/5 trailing -0.0005 há 2s
+    DVD          operator/5 09-20 19:47:46 pnl +0.0204 ← saída operator/6 trailing -0.0044 há 49s
+    TANK         operator/6 09-21 07:44:18 pnl +0.0125 ← saída operator/6 trailing -0.0032 há 159s
+    TANK         operator/5 09-21 07:44:48 pnl -0.0011 ← saída operator/6 trailing -0.0032 há 189s
+
+Incremento sobre o check 28 (replay proposta − replay atual): Δ +0.1167 SOL; só na proposta 9, só na atual 0
+
+## Concorrência real: entradas op5×op6 no mesmo mint com a outra posição ainda aberta: 0
+    Σ primeira +0.0000 · Σ segunda +0.0000 · total +0.0000 SOL
+
+## Concorrência papel (sombras): entradas op5×op6 no mesmo mint com a outra posição ainda aberta: 13
+    Mooning      operator/5 09-20 03:51:19 -0.0038 | operator/6 +0s -0.0038 mesma decisão
+    ANT          operator/5 09-20 04:40:17 -0.0043 | operator/6 +61s -0.0030 
+    BLEP         operator/5 09-20 04:58:32 +0.0018 | operator/6 +31s +0.0015 mesma decisão
+    Aura         operator/5 09-20 14:11:34 +0.0072 | operator/6 +17s +0.0070 
+    JEANLON      operator/5 09-20 16:57:31 -0.0100 | operator/6 +0s -0.0100 mesma decisão
+    PNUT2        operator/5 09-20 21:32:04 -0.0099 | operator/6 +0s -0.0099 mesma decisão
+    CLMB         operator/5 09-20 23:23:25 -0.0187 | operator/6 +0s -0.0187 mesma decisão
+    TANK         operator/6 09-21 07:44:23 +0.0141 | operator/5 +32s +0.0014 
+    HOLLOWPAD    operator/6 09-21 09:17:04 -0.0032 | operator/5 +17s -0.0011 
+    Megawatt     operator/6 09-24 07:38:06 -0.0566 | operator/5 +0s -0.0566 
+    CALLS        operator/6 09-25 03:45:36 -0.0049 | operator/5 +17s -0.0380 
+    007          operator/5 09-25 06:18:37 -0.0067 | operator/6 +0s -0.0067 mesma decisão
+    BAGI         operator/5 09-25 14:11:22 -0.0139 | operator/6 +50s -0.0044 mesma decisão
+    Σ primeira -0.1089 · Σ segunda -0.1423 · total -0.2512 SOL
+
+## Fila mint_busy (real): proposta anterior à saída do mesmo mint, admitida depois dela
+    ANT          operator/5 saída target +0.0185 → operator/6 proposta 53.8s velha, admitida +48.9s depois da saída, pnl -0.0150
+    BLEP         operator/5 saída trailing -0.0084 → operator/6 proposta 33.3s velha, admitida +2.1s depois da saída, pnl +0.0039
+    Aura         operator/5 saída trailing -0.0005 → operator/6 proposta 18.1s velha, admitida +2.8s depois da saída, pnl +0.0114
+    007          operator/5 saída target +0.0213 → operator/6 proposta 11.5s velha, admitida +1.7s depois da saída, pnl -0.0097
+    BAGI         operator/5 saída target +0.0165 → operator/6 proposta 52.7s velha, admitida +1.8s depois da saída, pnl -0.0116
+    total 5
+
+## Ritmo real: 10 recompras (primária) em 8.6 dias = 1.16/dia; últimos 2 dias 5

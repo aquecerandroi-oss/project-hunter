@@ -1,0 +1,41 @@
+
+## PRIMÁRIA — pista inteira, variável da fita, zeros provados por saldo de token na chain: n = 344 | exclusões {'no_create_signature': 31, 'match': 228, 'absent_zero': 135, 'reason:coverage_gap': 1, 'zero_ambiguous': 19}
+   cortes q1/3 = 0.0000, q2/3 = 4.7205 SOL; baixo 116, alto 115; zeros 116; mints sem venda em meme_trades nos 300 s: 71
+   alto: média r -0.0481 (n 115), perda≥50% 0.087, despejo 0.104 | baixo: média +0.0035 (n 116), perda≥50% 0.017, despejo 0.043
+   D (alto − baixo) = -0.0515 IC95 [-0.1428, +0.0369] | despejo alto−baixo +0.061 [+0.000, +0.131], razão 2.42 | (c) vencedoras no alto 38/104 = 36.5%
+   → REFUTA por (c): teto mata 37% das vencedoras
+   composição baixo: lanes {'paper': 106, 'real': 10}; portas {'absorb_v0/2': 59, 'operator/5': 8, 'flow_v2/1': 25, 'absorb_v0/1': 9, 'operator/6': 2, 'recuo_v1/1': 13}
+   composição alto: lanes {'paper': 107, 'real': 8}; portas {'absorb_v0/2': 51, 'absorb_v0/1': 31, 'recuo_v1/1': 19, 'operator/5': 5, 'flow_v2/1': 5, 'operator/6': 3, 'flow_v2/9': 1}
+   grade (partições distintas 5): q0.500 (> 1.702, n 172): D -0.0699 · q0.600 (> 3.416, n 138): D -0.0622 · q0.667 (> 4.720, n 115): D -0.0515 · q0.750 (> 7.599, n 86): D -0.0682 · q0.850 (> 10.753, n 52): D -0.0450
+
+   concordância fita × chain nos 228 'match': Spearman 0.998; chain > fita + 0,5 SOL em 24; mediana chain − fita +0.0000 SOL
+
+## SENSIBILIDADE — só reason null: n = 311 | exclusões {'no_create_signature': 31, 'match': 197, 'absent_zero': 115, 'reason:not_covered_from_birth': 51, 'reason:coverage_gap': 1, 'zero_ambiguous': 1}
+   cortes q1/3 = 0.0000, q2/3 = 3.6005 SOL; baixo 114, alto 104; zeros 114; mints sem venda em meme_trades nos 300 s: 65
+   alto: média r -0.0764 (n 104), perda≥50% 0.115, despejo 0.125 | baixo: média +0.0032 (n 114), perda≥50% 0.018, despejo 0.044
+   D (alto − baixo) = -0.0796 IC95 [-0.1783, +0.0173] | despejo alto−baixo +0.081 [+0.008, +0.157], razão 2.85 | (c) vencedoras no alto 35/97 = 36.1%
+   → REFUTA por (c): teto mata 36% das vencedoras
+   composição baixo: lanes {'paper': 104, 'real': 10}; portas {'absorb_v0/2': 58, 'operator/5': 8, 'flow_v2/1': 25, 'absorb_v0/1': 9, 'operator/6': 2, 'recuo_v1/1': 12}
+   composição alto: lanes {'paper': 96, 'real': 8}; portas {'absorb_v0/2': 32, 'absorb_v0/1': 34, 'recuo_v1/1': 21, 'operator/5': 5, 'flow_v2/1': 8, 'operator/6': 3, 'flow_v2/9': 1}
+   grade (partições distintas 5): q0.500 (> 0.755, n 155): D -0.0698 · q0.600 (> 2.667, n 124): D -0.0824 · q0.667 (> 3.601, n 104): D -0.0796 · q0.750 (> 5.714, n 78): D -0.1086 · q0.850 (> 9.842, n 47): D -0.1140
+
+## SENSIBILIDADE — porta da mesa (fluxo_e_holders): n = 154 | exclusões {'absent_zero': 68, 'match': 95, 'no_create_signature': 15, 'reason:coverage_gap': 1, 'zero_ambiguous': 9}
+   cortes q1/3 = 0.0000, q2/3 = 1.6800 SOL; baixo 59, alto 51; zeros 59; mints sem venda em meme_trades nos 300 s: 24
+   alto: média r -0.0777 (n 51), perda≥50% 0.118, despejo 0.235 | baixo: média +0.0079 (n 59), perda≥50% 0.017, despejo 0.034
+   D (alto − baixo) = -0.0856 IC95 [-0.2448, +0.0728] | despejo alto−baixo +0.201 [+0.084, +0.333], razão 6.94 | (c) vencedoras no alto 18/58 = 31.0%
+   → REFUTA por (c): teto mata 31% das vencedoras
+   composição baixo: lanes {'real': 16, 'paper': 43}; portas {'operator/5': 12, 'flow_v2/1': 28, 'operator/6': 4, 'recuo_v1/1': 14, 'flow_v2/9': 1}
+   composição alto: lanes {'paper': 41, 'real': 10}; portas {'flow_v2/1': 13, 'recuo_v1/1': 27, 'operator/5': 7, 'operator/6': 3, 'flow_v2/9': 1}
+   grade (partições distintas 5): q0.500 (> 0.201, n 77): D -0.0195 · q0.600 (> 0.796, n 62): D -0.0445 · q0.667 (> 1.680, n 51): D -0.0856 · q0.750 (> 3.676, n 39): D -0.0513 · q0.850 (> 6.914, n 22): D -0.1368
+
+## SENSIBILIDADE — variável lida da chain (oráculo retrospectivo): n = 363 | exclusões {'no_create_signature': 31, 'match': 228, 'absent_zero': 135, 'reason:coverage_gap': 1}
+   cortes q1/3 = 0.0094, q2/3 = 4.8042 SOL; baixo 121, alto 121; zeros 116; mints sem venda em meme_trades nos 300 s: 74
+   alto: média r -0.0522 (n 121), perda≥50% 0.091, despejo 0.107 | baixo: média -0.0041 (n 121), perda≥50% 0.033, despejo 0.041
+   D (alto − baixo) = -0.0481 IC95 [-0.1407, +0.0418] | despejo alto−baixo +0.066 [+0.000, +0.132], razão 2.60 | (c) vencedoras no alto 41/110 = 37.3%
+   → REFUTA por (c): teto mata 37% das vencedoras
+   composição baixo: lanes {'paper': 111, 'real': 10}; portas {'absorb_v0/2': 62, 'operator/5': 8, 'flow_v2/1': 26, 'absorb_v0/1': 9, 'operator/6': 2, 'recuo_v1/1': 14}
+   composição alto: lanes {'paper': 112, 'real': 9}; portas {'absorb_v0/2': 53, 'absorb_v0/1': 31, 'recuo_v1/1': 21, 'operator/5': 5, 'flow_v2/1': 6, 'operator/6': 4, 'flow_v2/9': 1}
+   grade (partições distintas 5): q0.500 (> 1.800, n 181): D -0.0643 · q0.600 (> 3.458, n 145): D -0.0588 · q0.667 (> 4.804, n 121): D -0.0481 · q0.750 (> 7.552, n 91): D -0.0626 · q0.850 (> 11.127, n 55): D -0.0461
+baixo 116 vitória 0.319 média +0.0035 mediana -0.0360 perda>=50 0.017 vitória>=+50% 0.052
+meio 113 vitória 0.257 média -0.0548 mediana -0.0816 perda>=50 0.071 vitória>=+50% 0.062
+alto 115 vitória 0.330 média -0.0481 mediana -0.0362 perda>=50 0.087 vitória>=+50% 0.017
