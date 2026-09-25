@@ -5,6 +5,16 @@ owner: sexta-feira
 updated: 2026-09-19
 origem: Everton, 19/09/2026 02:0x BRT — "tem muita gente chamando moeda; com muitos seguidores explode rápido e cai rápido — estamos analisando as que estão começando a bombar?"
 previsao: inconclusivo → descartar
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M20 — Sinal de call: o KOL lido no patch de 1 s (não no minuto fechado) paga entre 2 e 30 min de idade?

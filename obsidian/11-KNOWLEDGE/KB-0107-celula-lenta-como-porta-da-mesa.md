@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0107 — A célula lenta como porta da mesa: cadência e R simulado (12–16/09)

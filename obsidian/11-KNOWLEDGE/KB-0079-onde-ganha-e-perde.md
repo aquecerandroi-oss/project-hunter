@@ -13,6 +13,16 @@ status: arquivada
 owner: sexta-feira
 updated: 2026-09-12
 confiança: "?"
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Onde ganhamos e onde perdemos: 2 248 fatias, 86 julgáveis, 1 achado

@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-23
 confiança: "medido uma vez"
+tipo: pesquisa
+hipotese: H-011
+variavel: alvo (multiplos de 1,08/1,12/1,15(atual)/1,20/1,30/primeiro repique)
+populacao: 89+ posicoes reais + apostas de papel com fita completa
+efeito: melhor alvo 1,08x (borda): D = +3,05 pp (reais), +0,19 pp (papel)
+ic: reais [-0,53, +7,27]; papel [-0,55, +0,96]
+veredito: refuta
+proximo_passo: regra atual (1,15x) mantida; nenhum braco de papel proposto
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0154 — Subir o alvo não paga (e encurtar o tempo também não)

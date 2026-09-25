@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0111 — `top10_share > 1` no retrato de risco: o denominador e qual fonte a admissao usa

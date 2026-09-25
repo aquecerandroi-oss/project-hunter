@@ -13,6 +13,16 @@ status: arquivada
 owner: sexta-feira
 updated: 2026-09-10
 confiança: "?"
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # O atraso de decisão: de onde vinham os segundos, e as três correções

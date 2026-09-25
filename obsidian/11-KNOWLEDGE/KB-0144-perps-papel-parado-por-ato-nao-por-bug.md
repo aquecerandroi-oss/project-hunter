@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-19
 confiança: "backtest do autor"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0144 — A mesa em papel de perps/spot está parada por ato, não por bug (T4.72, 19/09/2026)

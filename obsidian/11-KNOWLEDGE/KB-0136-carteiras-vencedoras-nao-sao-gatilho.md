@@ -4,6 +4,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-18
 fonte: .claude/state/notes-R57.md
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0136 — Carteiras vencedoras existem, mas seguir não é gatilho (R57, 18/09/2026)

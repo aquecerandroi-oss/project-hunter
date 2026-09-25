@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-23
 confiança: "?"
+tipo: pesquisa
+hipotese: H-014
+variavel: rede_financiadora_pct (maior fracao de compradoras com o mesmo financiador)
+populacao: posicoes reais + apostas de papel fluxo_e_holders com fita retrospectiva desde o nascimento
+efeito: D (baixo-alto) = +0,054 por SOL
+ic: [-0,005, +0,116]
+veredito: nao_confirma
+proximo_passo: pista exploratoria (SOL no slot de criacao) virou H-015, em populacao nova
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0156 — O despejo em bloco não é uma rede de financiamento

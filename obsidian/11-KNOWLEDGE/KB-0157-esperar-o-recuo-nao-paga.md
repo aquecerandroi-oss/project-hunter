@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-23
 confiança: "?"
+tipo: pesquisa
+hipotese: H-016
+variavel: politica de entrada com recuo (esperar queda de X% a partir da maxima, comprar no toque)
+populacao: decisoes reais/papel da porta fluxo_e_holders com fita retrospectiva
+efeito: melhor celula X=3%/W=60s: reais +1,99pp, papel +2,28pp
+ic: reais [-3,60, +7,48]; papel [+0,69, +3,89]
+veredito: refuta
+proximo_passo: ganho de preco na entrada (sem esperar recuo grande) virou H-017, julgada em coorte nova
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0157 — Esperar o recuo não paga

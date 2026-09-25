@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 195
 days: 24
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0013 — momentum com alvo de 3 ATR (`target_atr` 1,5 → 3,0)

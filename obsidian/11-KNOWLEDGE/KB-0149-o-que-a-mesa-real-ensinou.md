@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-23
 confiança: "replicado"
+tipo: consolidado
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: recompra
+mercado: meme
 ---
 
 # KB-0149 — O que a mesa real ensinou (16–23/09/2026)

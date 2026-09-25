@@ -10,6 +10,16 @@ result: nao-iniciado
 evaluable: 0
 days: 0
 last_eval: ""
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M9 — E2-b: a moeda que nasce cheia e a carteira que paga a subida sozinha

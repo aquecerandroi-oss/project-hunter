@@ -11,6 +11,16 @@ confiança: backtest do autor (o caso) e relato de implementação (a correção
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0128 — A cadeia deve vencer a fita no fluxo do criador (COVER, T4.56)

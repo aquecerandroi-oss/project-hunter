@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: astra
 updated: 2026-09-16
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0101 — Snipers e graduacao, a medida com n grande (5 dias, 64 mil moedas)

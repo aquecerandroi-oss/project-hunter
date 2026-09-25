@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-15
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0096 — pump.fun: `is_holder_reward` na REST (primeiros positivos) e o segundo deploy do programa em 15/09/2026

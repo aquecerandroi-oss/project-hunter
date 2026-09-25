@@ -13,6 +13,16 @@ status: curada
 owner: sexta-feira
 updated: 2026-09-08
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Por que perdemos: o custo em R é praticamente toda a perda

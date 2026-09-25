@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: astra-quant
 updated: 2026-09-16
 status: vivo (com errata 1, 16/09 — janelas deslocadas em 3 h)
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0103 — Clones "fundo" com preco forjado: a assinatura medida e o custo de uma regra E2-b

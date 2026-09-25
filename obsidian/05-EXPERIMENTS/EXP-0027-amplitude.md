@@ -10,6 +10,16 @@ result: reprovada
 evaluable: 856
 days: 84
 last_eval: "2026-09-11"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0027 — a amplitude do universo como estado: `breadth_v2` em 90 dias de replay

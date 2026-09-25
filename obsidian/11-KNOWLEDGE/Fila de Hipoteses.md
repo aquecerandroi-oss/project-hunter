@@ -9,7 +9,10 @@ owner: sexta-feira
 
 Fila do **moinho de hipóteses** (`infra/research/`, T4.87). Qualquer pessoa acrescenta um
 bloco; o moinho lê esta página com `infra.research.queue.load_queue()` e a hipótese entra
-na vez. Como escrever e como ler o veredito: `docs/RESEARCH.md`.
+na vez. Como escrever e como ler o veredito: `docs/RESEARCH.md`. Ver também
+[[Dicionario de Variaveis]] (toda variável medível, testada ou não — a semente da próxima
+hipótese), [[Mapa de Estrategias]] (o estado de todas, Vivas/Pistas/Cemitério) e
+[[Ideias do Everton]] (o que ainda não virou bloco aqui).
 
 **Regras da casa** (de [[KB-0149-o-que-a-mesa-real-ensinou]] §5):
 
@@ -203,7 +206,8 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** diferença emparelhada ≥ **+2 pp por SOL decidido** contra comprar em `t0`, com IC 95 % (bootstrap por mint) acima de zero, **e** melhor que "não comprar nada" (retorno 0)
 - **refutação:** limite superior do IC abaixo de +1 pp; **ou** não bate "não comprar nada"; **ou** menos de 150 decisões resolvidas (limite de dado — o controle de 10 entradas pedido pelo Everton é **verificação do mecanismo**, não julgamento: 10 entradas não estimam 2 pp)
 - **registro:** 23/09/2026 ~22:40 BRT, antes de qualquer decisão do braço
-- **status:** aberta
+- **status:** em curso
+- **veredito (R79, 25/09/2026):** **LIMITE DE DADO — registrado, não julgado** (relatório em `.claude/state/notes-R79.md` §1, §2.2 e §4, saída em `.claude/state/r79/h017.txt`, KB em [[KB-0159-a-desaceleracao-nao-avisa-o-topo]]). 171 armações `recuo_v1/1` (24/09 05:46Z → 25/09 23:06Z; 141 entraram, 16 `pullback_killed`, 9 `no_pullback`, 5 censuradas); **só 39 com a sombra de papel do `operator/5`**, porque ela só nasce quando a mesa real aceita (122 recusadas pelo `auto_stage1`, 9 expiradas). **39 < 150 emparelhadas.** Leitura sem julgamento: D (braço − op5) **+0,032 [−0,006, +0,082]**; contra "nada" nos pares −0,022 [−0,085, +0,045]; sem o Megawatt D +0,014 [−0,013, +0,042]; 24/09 (n 10) +0,076, 25/09 (n 29) +0,018 — o "25/09 negativo" (24 pares, recuo −0,053 × op5 −0,034 SOL) só contava as entradas; com as 5 não-entradas (todas perdas do op5) o dia fica positivo. **Fidelidade:** em 22 dos 34 pares que entraram o papel comprou na **mesma foto** que a sombra do op5 (fill idêntico, D = 0 por construção); a melhora de preço que a hipótese quer medir só aparece em 12 pares. Papel × real no mesmo op5 (n 38): +0,002 [−0,087, +0,086]. **ETA:** ~29 pares/dia → ~29–30/09, e só com a mesa real ligada e aceitando; a trilha (`no_pullback`, `pullback_killed`) é podada em 7 d — cache em `.claude/state/r79/cache/h017.csv`. Nenhuma mudança no braço.
 
 ## H-018 — Recompra do mesmo mint logo depois de um ganho
 
@@ -225,4 +229,5 @@ Status: `aberta` · `em curso` · `concluída` · `arquivada`.
 - **previsão:** o tercil baixo de `aceleracao_compra` rende **menos −0,05 por SOL** que o tercil alto (IC 95 % bootstrap por mint inteiramente abaixo de zero), com **patamar** em limiares vizinhos, e concentra a classe `comprou_no_topo` (pico ≤ custo) em pelo menos 1,5× a taxa do tercil alto; no contrafactual das reais, um piso bloqueia mais perdas que ganhos em SOL
 - **refutação:** limite superior do IC acima de −0,01 por SOL; **ou** pico em vez de patamar; **ou** o piso que bloqueia o tercil baixo mata > 30 % das vencedoras; **ou** menos de 150 decisões resolvidas com a fita completa (limite de dado — registrar e esperar)
 - **registro:** 25/09/2026 ~20:15 BRT, antes de ler qualquer janela de 10 s contra resultado
-- **status:** em curso
+- **status:** concluída
+- **veredito (R79, 25/09/2026):** **concluída — REFUTA pela cláusula (c)**, e o sinal saiu **ao contrário** da tese (relatório em `.claude/state/notes-R79.md` §1–§3, saídas em `.claude/state/r79/h019.txt` e `h019_mill.txt`, KB em [[KB-0159-a-desaceleracao-nao-avisa-o-topo]]). População: 1.ª decisão por mint da porta `fluxo_e_holders/*` na pista de eventos com fita da decisão completa (janelas 10/60 s, `derived.reason` nulo), 24–25/09, **195 resolvidas ≥ 150** (50 reais, 145 papel; 86 do `recuo_v1`); guardas: 0 trocas depois do `as_of`, 0 fitas depois da aprovação. Tercis de posto (cortes 0,548 · 1,620). **D (baixo − alto) = +0,037 [−0,109, +0,183]**, p 0,62 (permutação por dia); contagem +0,004 [−0,142, +0,144]; Holm 1,0/1,0. **Cláusula a cláusula:** (a) literal dispara (IC sup +0,183 > −0,01) — pela errata do R76 sozinha só não confirma; (b) sem efeito no sentido previsto em nenhum corte vizinho (D de +0,001 a +0,073 de q 0,20 a 0,50); **(c) dispara: o piso mata 25 de 72 vencedoras = 34,7 % > 30 %** (contagem 30,6 %). Previsões secundárias falham: `comprou_no_topo` (perda e pico ≤ custo; real `high_water_sol ≤ initial_risk_sol`, papel `high_water_x ≤ 1`) 35,4 % no baixo × 40,0 % no alto (0,88×, não ≥ 1,5×); contrafactual real (60 posições, piso `acc > 0,548`) bloqueia 20, **Δ −0,007 SOL**, mata 6 de 21 vencedoras (SMITH, CALLS, Relaunch, PREDICTED, MEMEos, $LAG). Sensibilidades no mesmo sentido (sem `recuo_v1` +0,042; só reais +0,078; 24/09 +0,099; 25/09 −0,021, todas com IC largo). Moinho (piso, `acc > c1`): NÃO CONFIRMA, D −0,028 [−0,149, +0,086], pico. **Nenhum braço de papel, nenhum parâmetro de mesa.** Astra indisponível (401) no desenho e no veredito.

@@ -11,6 +11,16 @@ status: curada
 owner: sexta-feira
 updated: 2026-09-08
 confiança: "?"
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Custos em perpétuos e quanto sobra de 1 R

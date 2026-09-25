@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 275
 days: 1
 last_eval: 2026-09-06
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0004 — replay de oito políticas de saída sobre as entradas congeladas (R1)

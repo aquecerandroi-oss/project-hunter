@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 194
 days: 1
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0002 — volume_anomaly em modo sombra (perfil "por barras" v0)

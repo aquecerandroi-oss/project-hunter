@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0130 — Tesouraria USDC→SOL: BLOCK na revisão até prova ao vivo de 1 e 3,2 USDC

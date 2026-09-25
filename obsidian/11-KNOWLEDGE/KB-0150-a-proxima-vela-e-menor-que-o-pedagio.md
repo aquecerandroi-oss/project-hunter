@@ -2,10 +2,19 @@
 id: KB-0150
 titulo: A próxima vela é menor que o pedágio
 origem: R68 (23/09/2026) — `.claude/state/notes-R68.md`
-tipo: business-rule
 confianca: alta (parte A, aritmética sobre 2,38 M minutos) / média (parte B, potência limitada em h≥60)
 tags: [custo, previsibilidade, horizonte, spot, walk-forward, anti-look-ahead]
 relacionados: [KB-0126, KB-0133, KB-0145, KB-0147, R63, R67]
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # KB-0150 — A próxima vela é menor que o pedágio

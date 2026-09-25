@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-12
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # O modelo pré-registrado que morreu no holdout (pump.fun, mai–jun/2026)

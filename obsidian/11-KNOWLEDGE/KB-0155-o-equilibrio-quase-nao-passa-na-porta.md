@@ -10,6 +10,16 @@ astra: concorda (uma ronda; 2 achados corrigidos)
 status: vivo
 owner: sexta-feira
 updated: 2026-09-23
+tipo: pesquisa
+hipotese: H-013
+variavel: equilibrio (vendas/compras >= 0,6 E fluxo < 2 SOL E progresso < 25%)
+populacao: posicoes reais/papel do braco fluxo_e_holders com bloco flow em reasons
+efeito: —
+ic: —
+veredito: limite_de_dado
+proximo_passo: reabrir com coorte prospectiva do operator/5 (teto 1,0) julgando com 20 equilibrios
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0155 — O equilíbrio quase não passa na porta

@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-19
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0146 — Trailing apertado e rent de ATA: o que 24 operações reais ensinaram (R64, 19/09/2026)

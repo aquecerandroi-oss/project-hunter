@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 20
 days: 9
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0010 — rompimento da faixa de abertura de sessão (`session_orb_v1`)

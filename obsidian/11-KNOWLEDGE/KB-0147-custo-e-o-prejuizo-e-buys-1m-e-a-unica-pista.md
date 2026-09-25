@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-23
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0147 — Custo é o prejuízo; `buys_1m` é a única pista de entrada (R65, 16–21/09/2026)

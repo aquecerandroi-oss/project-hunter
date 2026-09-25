@@ -4,6 +4,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-18
 fonte: .claude/state/notes-R58.md
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0138 — Explosão de compradores não tem vantagem; a fita do banco engana por sobrevivência (R58, 18/09/2026)

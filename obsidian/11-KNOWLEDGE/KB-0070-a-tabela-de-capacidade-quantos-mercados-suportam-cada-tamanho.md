@@ -11,6 +11,16 @@ status: curada
 owner: sexta-feira
 updated: 2026-09-06
 confiança: replicado
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # A tabela de capacidade — quantos mercados suportam 500, 2.000 e 10.000 USDT

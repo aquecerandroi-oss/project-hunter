@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 30
 days: 1
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0005 — momentum v1 em carteira paper (D10)

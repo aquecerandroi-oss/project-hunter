@@ -11,6 +11,16 @@ status: curada
 owner: sexta-feira
 updated: 2026-09-06
 confiança: estudo revisado
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Momentum acadêmico: o que existe e o que não se transfere para 15 minutos

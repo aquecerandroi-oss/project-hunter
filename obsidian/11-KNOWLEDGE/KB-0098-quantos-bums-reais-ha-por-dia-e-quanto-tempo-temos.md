@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: sexta-feira
 updated: 2026-09-16
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0098 — Quantos "bums" reais há por dia no pump.fun, e quanto tempo temos para agir

@@ -10,6 +10,16 @@ result: nao-iniciado
 evaluable: 0
 days: 0
 last_eval: ""
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M14 — teto de 1.0 em sells/buys (razao de vendas/compras), aplicado na escolha da barra

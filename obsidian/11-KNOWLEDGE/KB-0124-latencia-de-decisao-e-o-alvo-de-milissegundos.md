@@ -11,6 +11,16 @@ confiança: backtest do autor (medição) e relato de implementação (correçõ
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0124 — Latência ponta a ponta 6,6 s; o gargalo é o poll do executor (4,8 s)

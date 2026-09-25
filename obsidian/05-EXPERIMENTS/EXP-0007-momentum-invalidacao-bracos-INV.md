@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 1681
 days: 29
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0007 — os braços de saída (INV/TGT/EXIT) sobre entradas congeladas

@@ -4,6 +4,16 @@ status: descartado
 owner: sexta-feira
 updated: 2026-09-19
 origem: Everton, 19/09/2026 00:3x BRT — "assim que a moeda é criada dá um pico; se compramos assim que começa a subir conseguimos comprar no lançamento e vender na alta rápida?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M18 — Sniper de lançamento (compra no bloco da criação, venda no pico de segundos)

@@ -9,6 +9,16 @@ owner: astra-quant
 status: vivo
 confianca: alta (n = 53.441 linhas de 15 s; n = 76 propostas)
 updated: 2026-09-16
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0117 — O progresso da série de 15 s está atrasado (e por quanto)

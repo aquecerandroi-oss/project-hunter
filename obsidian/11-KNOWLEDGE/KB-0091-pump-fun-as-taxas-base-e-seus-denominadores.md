@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-12
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # pump.fun: as taxas-base e seus denominadores

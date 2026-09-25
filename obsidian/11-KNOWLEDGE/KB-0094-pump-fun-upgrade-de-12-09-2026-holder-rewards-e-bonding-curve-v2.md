@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-12
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0094 — pump.fun: o upgrade de 12/09/2026 (holder rewards, fim do cashback, `bonding_curve_v2`)

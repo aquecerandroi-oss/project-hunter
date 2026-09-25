@@ -10,6 +10,16 @@ result: nao-iniciado
 evaluable: 0
 days: 0
 last_eval: ""
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M4 — o braço moonshot: mega ROI, segurando através da migração

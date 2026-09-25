@@ -13,6 +13,16 @@ status: arquivada
 owner: sexta-feira
 updated: 2026-09-10
 confiança: "?"
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Uma hora de −34 R: 9 apostas × 4,3 versões, deriva + impulso de amplitude

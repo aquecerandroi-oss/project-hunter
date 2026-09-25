@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0126 — Slippage de compra fixo em 1 % mata compras acima de 50 %; subiu para 3 % (T4.59)

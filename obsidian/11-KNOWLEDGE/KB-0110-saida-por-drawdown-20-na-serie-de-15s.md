@@ -15,6 +15,16 @@ lido_em: 2026-09-16
 owner: astra-quant
 status: vivo
 updated: 2026-09-16
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0110 — Saída por drawdown de 20 % na série de 15 s: R simulado das 4 variantes

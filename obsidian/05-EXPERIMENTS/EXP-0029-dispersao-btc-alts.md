@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 0
 days: 0
 last_eval: "2026-09-12"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0029 — a discordância BTC × alts como estado: `dispersion_24h_v1` em 90 dias de replay

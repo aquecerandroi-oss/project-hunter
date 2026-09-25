@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 47
 days: 14
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0016 — rompimento e repique de linha de tendência (`trendline_breakout_v1`)

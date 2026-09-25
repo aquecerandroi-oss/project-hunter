@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-15
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0097 — pump.fun: "Rewards → holders" visto numa moeda, `is_holder_reward` observado em moedas antigas (conversão compatível) e HR fora do mesmo slot

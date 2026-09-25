@@ -11,6 +11,16 @@ status: curada
 owner: sexta-feira
 updated: 2026-09-06
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Alavancagem em perpétuos — a liquidação da exchange contra o nosso stop

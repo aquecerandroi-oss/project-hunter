@@ -11,6 +11,16 @@ status: curada
 owner: sexta-feira
 updated: 2026-09-06
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Capacidade e impacto — o teto de notional que o livro impõe, e o que ele não é

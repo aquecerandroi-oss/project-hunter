@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-19
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0143 — O que antecede o dump: a venda grande é o gatilho, não o aviso (R62, 19/09/2026)

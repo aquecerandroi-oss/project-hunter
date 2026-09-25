@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0132 — T4.45 teria recusado a TAXCOIN (criador vendeu 53 s antes)

@@ -11,6 +11,16 @@ status: registro
 owner: sexta-feira
 updated: 2026-09-08
 confiança: "?"
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # KB-0077 — linhas de tendência: como o Lab passou a traçá-las (pivôs, linhas, canais, rompimento, reteste)

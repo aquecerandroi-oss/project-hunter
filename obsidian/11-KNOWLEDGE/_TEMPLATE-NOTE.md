@@ -11,6 +11,16 @@ status: template
 owner: sexta-feira
 updated: 2026-09-08
 confiança: "?"
+tipo: pesquisa | leitura | consolidado
+hipotese: H-0xx | —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: confirma | nao_confirma | refuta | limite_de_dado | em_curso | —
+proximo_passo: —
+classe_de_perda: comprou_no_topo | golpe_do_criador | recompra | custo | saida_normal | —
+mercado: meme | cripto
 ---
 
 # Título da ideia
@@ -22,6 +32,25 @@ confiança: "?"
 > mista (documentação + medição própria + preprint, por exemplo) fica **`?`**, e o campo `evidencia`
 > descreve a mistura por extenso. `?` não é preguiça: é a diferença entre "ainda não classifiquei" e
 > "classifiquei errado". Ver `docs/OBSIDIAN.md` §1.
+
+## Como preencher os dez campos novos (2026-09-25, restruturação da base)
+
+Existem para o [[Mapa de Estrategias]] e o [[Dicionario de Variaveis]] lerem por Dataview em vez de
+alguém reabrir cada nota. **Nunca inventar um valor**: o que não se sabe fica `—` (travessão), nunca
+um chute nem um campo vazio (vazio não distingue "não sabemos" de "esqueci de preencher").
+
+| Campo | O que é | Regra |
+|---|---|---|
+| `tipo` | `pesquisa` = medição nossa (dado próprio, real ou papel); `leitura` = literatura externa curada, sem teste nosso; `consolidado` = junta o veredito de várias notas/hipóteses (ex.: [[KB-0149-o-que-a-mesa-real-ensinou]]) | escolha um só; se a nota mistura leitura e medição própria, é `pesquisa` |
+| `hipotese` | o `H-0xx` da [[Fila de Hipoteses]] que esta nota fecha ou alimenta | `—` se a nota não nasceu de uma hipótese pré-registrada |
+| `variavel` | o nome da variável testada, como está no bloco da fila (`variável:`) | copiado, nunca reformulado |
+| `populacao` | população do estudo (quem entrou, quantos, janela) | frase curta; números vêm da nota, nunca de memória |
+| `efeito` | o `D` (diferença) medido, com o sinal | copiado do relatório/nota; `—` se o estudo não chegou a medir efeito (limite de dado, população vazia) |
+| `ic` | o intervalo de confiança que acompanha o `efeito` | mesmo par de colchetes da nota; `—` junto com `efeito: —` |
+| `veredito` | um dos cinco rótulos do `docs/RESEARCH.md` (`confirma`/`nao_confirma`/`refuta`/`limite_de_dado`) mais `em_curso` para o que ainda não rodou | nunca "promissor" nem um sexto rótulo; uma nota `consolidado` que mistura vereditos fica `—` aqui (o veredito de cada hipótese vive na nota dela) |
+| `proximo_passo` | a frase de "reabrir quando..." ou o motivo de não fechar | copiada da nota; `—` se não houver próximo passo declarado |
+| `classe_de_perda` | qual das cinco classes do classificador automático (T4.92, `comprou_no_topo`/`golpe_do_criador`/`recompra`/`custo`/`saida_normal`) esta nota ataca | só se aplica a notas do mercado `meme`; `—` em toda nota de `cripto` ou que não mira uma classe |
+| `mercado` | `meme` ou `cripto` — de qual mesa/Lab é o dado | um só valor; uma nota que compara os dois usa o que domina a medição |
 
 ## O que afirma
 Em uma ou duas frases, nas minhas palavras.

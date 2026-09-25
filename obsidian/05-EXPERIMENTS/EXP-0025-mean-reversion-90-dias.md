@@ -10,6 +10,16 @@ result: reprovada
 evaluable: 798
 days: 89
 last_eval: "2026-09-10"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0025 — 90 dias, 16 mercados: agosto era a história inteira

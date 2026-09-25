@@ -13,6 +13,16 @@ status: arquivada
 owner: sexta-feira
 updated: 2026-09-09
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Candlestick no nosso dado: nada sobrevive, e o único que sobrevive tem o sinal errado

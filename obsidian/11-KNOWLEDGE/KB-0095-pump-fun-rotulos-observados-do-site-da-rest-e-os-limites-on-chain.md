@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-12
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0095 — pump.fun: rótulos observados do site, da REST e os limites da correspondência on-chain

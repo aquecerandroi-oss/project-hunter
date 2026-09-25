@@ -13,6 +13,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-11
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # O teto de participação nos motores de backtest — quem corta, quem só piora o preço, quem ignora

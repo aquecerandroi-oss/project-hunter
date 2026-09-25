@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: backend-specialist
 updated: 2026-09-19
 status: vivo
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0140 — `--set-param` valida antes de gravar

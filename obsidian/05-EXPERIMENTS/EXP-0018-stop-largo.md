@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 412
 days: 24
 last_eval: "2026-09-08"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0018 — stop largo: dividir o pedágio pela largura do stop (seis braços, um contraste pareado cada)

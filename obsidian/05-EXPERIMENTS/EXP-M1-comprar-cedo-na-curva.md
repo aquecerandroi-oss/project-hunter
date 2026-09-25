@@ -10,6 +10,16 @@ result: reprovada
 evaluable: 4
 days: 1
 last_eval: "2026-09-12"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M1 — comprar cedo na curva e vender em ROI alto

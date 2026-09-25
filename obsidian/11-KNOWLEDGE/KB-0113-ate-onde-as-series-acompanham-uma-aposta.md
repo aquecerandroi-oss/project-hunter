@@ -15,6 +15,16 @@ lido_em: 2026-09-16
 owner: astra-quant
 status: vivo
 updated: 2026-09-16
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0113 — Até onde as séries acompanham uma aposta

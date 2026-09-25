@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 0
 days: 1
 last_eval: 2026-09-07
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0003 — baselines por ativo e hora (M2), e o que elas destravam

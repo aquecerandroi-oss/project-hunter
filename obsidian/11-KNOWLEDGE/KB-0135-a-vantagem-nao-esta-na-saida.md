@@ -4,6 +4,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-18
 fonte: .claude/state/notes-R59.md
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0135 — A vantagem não está na saída (R59, 18/09/2026)

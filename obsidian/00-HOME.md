@@ -151,6 +151,13 @@ calculam nada, só mostram e ordenam o que as páginas já declaram) e dois **ca
 As convenções da base — frontmatter obrigatório por pasta, os quatro callouts, o linter — estão em
 `docs/OBSIDIAN.md`. O linter roda com `uv run python infra/scripts/obsidian_lint.py`.
 
+**Dependência nova (2026-09-25): plugin Dataview.** Instalado e ativo (Everton). O
+[[Mapa de Estrategias]] lê o frontmatter (`tipo`, `hipotese`, `veredito`, `efeito`, `mercado` — ver
+[[_TEMPLATE-NOTE|_TEMPLATE-NOTE]]) por consultas `dataview` para montar as seções Vivas/Pistas/
+Cemitério automaticamente; cada consulta tem uma tabela estática logo abaixo, para quem lê sem o
+plugin. Sem Dataview instalado, os blocos de consulta aparecem como texto puro — o resto da base
+continua legível normalmente.
+
 ## Como navegar
 
 - [[Mente da Sexta-feira]] — como a assistente pensa (Claude + Astra) e onde cada tipo de memória fica; [[Dialogos/Index|diálogos]] e [[Revisoes-Astra/Index|revisões da Astra]]. Revisão mais recente: [[2026-09-08-shadow-lab-pronto]] — "o Lab está pronto?" (não; sete pré-requisitos de autonomia, quatro furos na replicação). Diálogo mais recente: [[Dialogos/M3]] — carteira virtual e Risk Engine, a partir da diretiva do Everton de 2026-09-06 (ADR 0005; plano `docs/plans/M3.md`; contrato `docs/RISK_ENGINE.md` v2). O M3 **não** declara modo autônomo: as entradas são manuais e a ponte sinal → proposta é do M4.
@@ -178,7 +185,7 @@ As convenções da base — frontmatter obrigatório por pasta, os quatro callou
 - **08-CHANGELOG/** — uma entrada por commit, agrupado por dia.
 - **09-OPERATIONS/** — deploy, variáveis de ambiente, monitoramento e o **Diário** (`09-OPERATIONS/Diario/AAAA-MM-DD.md`, uma nota por dia de trabalho: o que foi feito, o que foi decidido, o que ficou em voo) — [[Diario/2026-09-09|2026-09-09]] · [[Diario/2026-09-08|2026-09-08]] · [[Diario/2026-09-07|2026-09-07]] · [[Diario/2026-09-06|2026-09-06]] · [[Diario/2026-09-05|2026-09-05]].
 - **10-PERFORMANCE/** — visão de performance (hoje sem trades, descreve o que vai alimentar as métricas).
-- **11-KNOWLEDGE/** — conhecimento **externo** curado pela Sexta-feira com revisão da Astra: estratégias, análise técnica, microestrutura, perpétuos, risco, estatística de backtest. Cada nota traz fonte, qualidade da evidência e uma hipótese testável no Lab; as candidatas ficam em [[Strategy Backlog]] e só viram experimento pelo caminho normal (nada é ativado sozinho). Índice: [[11-KNOWLEDGE/Index|Conhecimento]].
+- **11-KNOWLEDGE/** — conhecimento **externo** curado pela Sexta-feira com revisão da Astra: estratégias, análise técnica, microestrutura, perpétuos, risco, estatística de backtest — e, desde 23/09/2026, o conhecimento **próprio** medido no Lab e na mesa real (moinho de hipóteses, `docs/RESEARCH.md`). Cada nota traz fonte, qualidade da evidência e uma hipótese testável no Lab; as candidatas ficam em [[Strategy Backlog]] e só viram experimento pelo caminho normal (nada é ativado sozinho). Índice: [[11-KNOWLEDGE/Index|Conhecimento]]. **Restruturada em 2026-09-25** para a próxima estratégia ser fácil de criar: [[Dicionario de Variaveis]] (toda variável que o sistema mede, testada ou não), [[Mapa de Estrategias]] (Vivas/Pistas/Cemitério, por Dataview), [[Ideias do Everton]] (inbox de ideias ditas em conversa) e [[Perdas/Index|Perdas]] em `03-TRADING/Meme/Perdas/` (as cinco classes de perda automáticas da mesa de memes, T4.92).
 
 ## Fontes
 

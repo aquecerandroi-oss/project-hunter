@@ -11,6 +11,16 @@ status: arquivada
 owner: sexta-feira
 updated: 2026-09-10
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Auditoria de liquidez: o sinal de uma covariância (Aldridge, arXiv 2606.29018v2)

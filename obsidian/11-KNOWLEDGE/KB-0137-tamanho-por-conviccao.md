@@ -12,6 +12,16 @@ owner: sexta-feira
 updated: 2026-09-18
 revisado: 2026-09-18 (T4.61c)
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0137 — Tamanho por convicção: a compra real como fração do teto, e a queda que recusa

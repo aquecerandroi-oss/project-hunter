@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-19
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0145 — Binance como sinal, Solana como execução (R63, 19/09/2026)

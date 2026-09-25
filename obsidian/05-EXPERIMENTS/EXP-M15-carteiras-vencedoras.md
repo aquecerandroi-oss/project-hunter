@@ -10,6 +10,16 @@ result: nao-iniciado
 evaluable: 0
 days: 0
 last_eval: ""
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M15 — seguir carteiras vencedoras ("smart entry"), como braço `research_only`

@@ -5,6 +5,16 @@ owner: sexta-feira
 updated: 2026-09-19
 origem: R64, 19/09/2026 — Musepaid recomprada 25 s depois de uma saída por trailing; diário de 19/09 ("candidata a pausa por mint")
 previsao: confirma no papel (R das recompras < 0) → candidata a portão de entrada na mesa; se as recompras rápidas (< 60 s) forem a exceção positiva, o desenho da pausa muda
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: recompra
+mercado: meme
 ---
 
 # EXP-M21 — Pausa por mint depois de uma saída por trailing: a recompra paga?

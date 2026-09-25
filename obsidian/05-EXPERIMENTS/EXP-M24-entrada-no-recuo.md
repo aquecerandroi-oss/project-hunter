@@ -5,6 +5,16 @@ owner: sexta-feira
 updated: 2026-09-23
 origem: R77 / KB-0157 (23/09/2026) — a H-016 refutou (esperar um recuo de 5 % não paga), mas a célula X = 3 % / W = 60 s deu +2,28 pp por SOL no papel (IC [+0,69, +3,89], Holm 0,052), com o ganho vindo do PREÇO de entrada. Achado da mesma população → só se julga em coorte nova (H-017). Everton, 23/09 ~22 h: "faz ligada, quero ir vendo o teste".
 previsao: diferença emparelhada ≥ +2 pp por SOL decidido contra comprar em t0, IC 95 % (bootstrap por mint) acima de zero, e melhor que "não comprar nada"
+tipo: pesquisa
+hipotese: H-017
+variavel: recuo_v1 (entrada com recuo de 3% em ate 60s, braco de papel real)
+populacao: decisoes pos-deploy da T4.91, emparelhadas com a sombra de operator/5
+efeito: —
+ic: —
+veredito: limite_de_dado
+proximo_passo: R79 (25/09): 39 decisoes emparelhadas contra o minimo de 150; nao julgada
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M24 — Recuo pequeno como melhora de preço (H-017, coorte nova)
@@ -79,3 +89,56 @@ Só em conjunto `clock = "15s"` (outro relógio recusa). Desligar: `--set-param 
 ## Relacionado
 
 [[Fila de Hipoteses]] · [[KB-0157-esperar-o-recuo-nao-paga]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[EXP-M23-desfecho-das-recusadas]] · [[EXP-M22-absorcao-de-venda]] · [[Registro de Tentativas]]
+
+## Avaliações (acrescentadas, nunca reescritas)
+
+### Avaliação 2026-09-25 (R79, ~23:50Z) — `LIMITE DE DADO`, não julgado
+
+**Coorte:** 171 armações `entry_pullback_armed` (1.ª por mint), de 24/09 05:46Z a 25/09 23:06Z (41,3 h). Lidas
+na VPS só com SELECT (`.claude/state/r79/q_h017.sql`, cache `r79/cache/h017.csv`). Relatório em
+`.claude/state/notes-R79.md` §4, saída em `r79/h017.txt`, KB em [[KB-0159-a-desaceleracao-nao-avisa-o-topo]].
+
+**Desfechos do braço:**
+- entrou: 141;
+- `pullback_killed`: 16 (holders_below_min 6, participation_above_cap 5, creator_sold_during_wait 4,
+  progress_trend_unknown 1);
+- `no_pullback`: 9;
+- `pullback_censored`: 5 (feed_lost 4, no_base_row 1).
+
+Resolvidas: 166.
+
+**Controle (protocolo acima):** a sombra de papel de `operator/5` na mesma `(mint, t0)` existe em **39**
+decisões. O `operator/5` teve 39 propostas `filled`, 122 `rejected` pelo `auto_stage1` (`creator_flow_unknown`
+38, `below_min_sol` 29, `participation_above_cap` 16, `creator_net_seller` 14, `bundled_share_above_cap` 11,
+entre outras), 9 `expired` e 1 armação ficou sem proposta. **A sombra só nasce quando a mesa real aceita.** Este
+protocolo assumia uma sombra em toda decisão, e isso não acontece.
+
+**Contra a régua:** 39 < 150 decisões resolvidas emparelhadas → **limite de dado: esperar, não julgar.**
+
+Leitura, que não é julgamento:
+- D (braço − op5) **+0,032 [−0,006, +0,082]**, braço −0,022, op5 −0,055;
+- contra "nada" nos pares: −0,022 [−0,085, +0,045];
+- sem o Megawatt, D +0,014 [−0,013, +0,042];
+- 24/09 (n 10): +0,076; 25/09 (n 29): +0,018. Os 24 pares "só com entradas" de 25/09 (recuo −0,053 × op5 −0,034
+  SOL) deixavam de fora as 5 não-entradas, que eram todas perdas do op5.
+
+**Verificação do mecanismo:**
+- item 1: 141 blocos `entry_pullback`, **0** com `trigger_price > armed_max_price × 0,97`;
+- item 2: 4 mortes por `creator_sold_during_wait` registradas; não foi refeito na fita;
+- item 4, **divergência de fill**: a sombra do op5 preencheu 0,8–16 s depois de `t0` (mediana 9,6 s, a foto
+  seguinte). O gatilho veio em mediana 5,5 s. Em **22 dos 34 pares que entraram, os dois braços preencheram na
+  mesma foto**, com retorno idêntico: o papel não mede a diferença de preço quando o gatilho vem antes da foto
+  seguinte. O D decompõe-se assim: mesma foto 0,000; foto posterior (12) +0,013; não-entradas (5) +0,020;
+- em 59 de 141 gatilhos, o preço do gatilho estava acima do preço de `t0`.
+
+**Papel × real** (mesma proposta do op5, n 38): real − papel +0,002 [−0,087, +0,086].
+
+**Próximo passo:**
+- a regra congelada volta a ser lida com 150 pares, cerca de 29–30/09 a ~29 pares/dia, **só com a mesa real
+  ligada e a aceitar**;
+- guardar a trilha antes da poda de 7 d; a de 24/09 some por volta de 01/10;
+- um controle que não dependa da mesa real (braço `research_only` de entrada imediata com os mesmos `params`) e
+  o preço medido no gatilho seriam **EXP nova ou emenda declarada**, com decisão do coordenador e do Everton.
+  Nada foi mudado aqui.
+
+Astra indisponível (401).

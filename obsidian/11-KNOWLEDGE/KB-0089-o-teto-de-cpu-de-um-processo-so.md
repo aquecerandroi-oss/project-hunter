@@ -13,6 +13,16 @@ status: arquivada
 owner: sexta-feira
 updated: 2026-09-11
 confiança: "?"
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # O teto de CPU de um processo só: por que a concorrência parou de ajudar, e as três correções seguintes

@@ -5,6 +5,16 @@ owner: sexta-feira
 updated: 2026-09-23
 origem: R69 (23/09/2026) — nenhuma das 13 variáveis de decisão separa, nem em absoluto (R65/R66/R67) nem em percentil dentro da coorte (R69). O que falta não é mais um limiar: é o outro lado da tabela 2×2.
 previsao: se o portão seleciona, o desfecho médio das RECUSADAS é pior que o das ADMITIDAS por uma margem que paga o custo; se o portão apenas aposta menos vezes, os dois desfechos são indistinguíveis os dois desfechos são indistinguíveis — e só então, por teste de não-inferioridade com margem e limite de cauda, um critério pode ser candidato a remoção
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M23 — Qual é o desfecho das moedas que RECUSAMOS?

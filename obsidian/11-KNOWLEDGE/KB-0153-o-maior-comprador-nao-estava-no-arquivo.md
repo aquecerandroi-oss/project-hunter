@@ -10,6 +10,16 @@ astra: concorda (duas rondas; 3 + 6 achados corrigidos)
 status: vivo
 owner: sexta-feira
 updated: 2026-09-23
+tipo: pesquisa
+hipotese: H-010
+variavel: maior_comprador_pct (SOL do maior comprador desde o nascimento)
+populacao: 89 posicoes reais + apostas de papel desde o nascimento (cobertura no instante da decisao: 1/91)
+efeito: D = +0,0139 SOL/SOL (exploratorio, fita retrospectiva)
+ic: [-0,0731, +0,0993]
+veredito: limite_de_dado
+proximo_passo: reabrir so com a fita WS da decisao persistida por troca (T4.89 resolveu isso depois)
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0153 — O maior comprador não estava no arquivo

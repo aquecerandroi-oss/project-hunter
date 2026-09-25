@@ -11,6 +11,16 @@ status: arquivada
 owner: sexta-feira
 updated: 2026-09-10
 confiança: "backtest do autor"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # IC positivo não paga o pedágio: BTC perp a 5 min, 460 células de custo negativas (Zeng et al., arXiv 2608.25348)

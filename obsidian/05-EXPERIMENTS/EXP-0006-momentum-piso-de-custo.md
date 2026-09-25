@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 30
 days: 9
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0006 — piso de custo no momentum (`atr_pct_min = 0,0089`)

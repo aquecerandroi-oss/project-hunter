@@ -10,6 +10,16 @@ owner: astra/quant
 status: vivo
 confianca: alta para a conclusão principal (a cadeia confirma em 135/135 e em 10/10 ao vivo); média para a cobertura da fita (janela de 3 h truncada em 1 h 35)
 updated: 2026-09-16
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0115 — a "volta ao piso" de metade das moedas é real ou artefato da série?

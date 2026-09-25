@@ -4,6 +4,16 @@ status: pre-registrado
 owner: sexta-feira
 updated: 2026-09-19
 origem: Everton, 19/09/2026 00:4x BRT — "se está subindo, vendas rápidas e mudanças rápidas de subida: compra assim que tiver alta, dá para perceber" / "então está precisando melhorar, não?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M19 — Subida com gente atrás (retenção dos snipers + carteiras novas − vendas rápidas)

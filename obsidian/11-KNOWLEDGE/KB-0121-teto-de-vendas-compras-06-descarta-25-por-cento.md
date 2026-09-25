@@ -11,6 +11,16 @@ confiança: backtest do autor
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0121 — Teto de sells/buys em 0,6 descarta 24,6 % das graduadas; 0,81 reteria 90 %

@@ -5,6 +5,16 @@ owner: sexta-feira
 updated: 2026-09-20
 origem: Astra, 20/09/2026 (parecer `astra-review-estrategia-2026-09-20.md`, item 4) sobre R62 (KB-0143) e R64 (KB-0146) — "testar uma sequência de absorção, com parâmetros congelados, em vez de mais um limiar do filtro atual"
 previsao: o braço confirmado tem R médio > controle e cauda menor; se o repique for distribuição antes do segundo dump, o braço confirmado perde igual ou pior que o controle e a família é descartada
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M22 — Absorção de venda: a demanda que recompõe uma venda grande distingue resistência de distribuição?

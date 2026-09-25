@@ -11,6 +11,16 @@ confiança: anedótico
 owner: astra-quant
 updated: 2026-09-16
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0100 — Evento move moeda? A primeira medida (16/09, 8 eventos)

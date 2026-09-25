@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-19
 confiança: "backtest do autor"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0142 — KOL e "call" confirmam, não antecipam: o crachá KOL chega com o pico e o casamento de notícia marca clones (R61, 19/09/2026)

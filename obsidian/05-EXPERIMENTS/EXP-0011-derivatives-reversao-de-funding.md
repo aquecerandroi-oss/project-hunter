@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 0
 days: 0
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0011 — comprar depois de funding liquidado negativo (`derivatives_v1`)

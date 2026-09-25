@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 0
 days: 0
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0012 — momentum com teto de pedágio (`atr_pct_min` 0,003 → 0,020)

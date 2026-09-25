@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 37
 days: 11
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0009 — recuo comprado dentro de tendência de 1 h (`mean_reversion_v1`)

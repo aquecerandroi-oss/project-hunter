@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 8
 days: 7
 last_eval: 2026-09-08
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0008 — rompimento após compressão de volatilidade (`breakout_v1`)

@@ -10,6 +10,16 @@ result: reprovada
 evaluable: 8
 days: 1
 last_eval: "2026-09-12"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # EXP-M3 — a sonda de hype: semi-comprado antes de a linha existir, escalado quando ela confirma

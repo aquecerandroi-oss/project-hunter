@@ -4,6 +4,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-18
 fonte: .claude/state/notes-T4.63.md
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0139 — Saída por evento: a posição real é julgada a cada trade da curva, não a cada tique (T4.63, 18/09/2026)

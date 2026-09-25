@@ -11,6 +11,16 @@ confiança: backtest do autor (diagnóstico) e relato de implementação (corre�
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0127 — `blockhash_expired` é prioridade fixa + zero reenvio, não o blockhash

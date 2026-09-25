@@ -11,6 +11,16 @@ status: curada
 owner: sexta-feira
 updated: 2026-09-09
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # KB-0082 — reversão de 15 minutos: o sinal está no sinal, e o fluxo taker é quem o carrega

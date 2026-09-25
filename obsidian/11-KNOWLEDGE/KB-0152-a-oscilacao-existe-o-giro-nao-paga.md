@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-23
 confiança: "medido uma vez"
+tipo: pesquisa
+hipotese: H-009
+variavel: giros_liquidos_5m (politica de giro: vender no repique, recomprar na queda)
+populacao: 89 posicoes reais + apostas de papel com fita completa entre entrada e saida
+efeito: D entre -4,24% e +4,44% (reais), -1,41% a +2,27% (papel), 12 celulas
+ic: todos os 12 IC de cluster por mint atravessam zero
+veredito: nao_confirma
+proximo_passo: vender o primeiro repique e nao voltar virou hipotese nova sobre o alvo (H-011)
+classe_de_perda: recompra
+mercado: meme
 ---
 
 # KB-0152 — A oscilação existe; o giro não paga

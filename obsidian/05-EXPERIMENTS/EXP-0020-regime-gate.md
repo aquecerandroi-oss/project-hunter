@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 0
 days: 0
 last_eval: "—"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0020 — o regime da hora como porteiro: `mean_reversion` só em lateral, `momentum` só em alta

@@ -9,6 +9,16 @@ owner: astra/quant
 status: vivo
 confianca: alta para a cobertura por board e para a origem dos números da porta (contagens diretas); média para as razões cadeia/fita (a cadeia é ela própria um piso, §2)
 updated: 2026-09-16
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0116 — a fita vê quanto da negociação real? cobertura por fonte, hora e idade

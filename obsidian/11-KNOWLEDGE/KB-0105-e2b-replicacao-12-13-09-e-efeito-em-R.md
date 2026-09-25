@@ -11,6 +11,16 @@ confiança: replicado
 owner: astra-quant
 updated: 2026-09-16
 status: vivo
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0105 — A E2-b replicada em 12 e 13/09, e o que ela teria feito com o R

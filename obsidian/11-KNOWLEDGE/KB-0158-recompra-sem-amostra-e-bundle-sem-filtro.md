@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-25
 confiança: "?"
+tipo: pesquisa
+hipotese: H-015
+variavel: sol_no_slot_de_criacao (SOL comprado por outras carteiras no slot da criacao)
+populacao: decisoes novas da pista meme_event_gate_v1 com fita gravada (pos T4.89b), reais e papel
+efeito: D (alto-baixo) = -0,052 por SOL
+ic: [-0,143, +0,037]
+veredito: refuta
+proximo_passo: teto no tercil alto mataria 36,5% das vencedoras (> 30% da clausula de refutacao)
+classe_de_perda: recompra
+mercado: meme
 ---
 
 # KB-0158 — A recompra ainda não tem amostra; o bundle da criação não é filtro

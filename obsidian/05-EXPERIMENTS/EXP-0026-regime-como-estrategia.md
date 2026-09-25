@@ -10,6 +10,16 @@ result: reprovada
 evaluable: 1767
 days: 47
 last_eval: "2026-09-10"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0026 — a vantagem é um regime, não uma estratégia?

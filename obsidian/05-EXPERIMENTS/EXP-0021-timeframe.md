@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 306
 days: 29
 last_eval: "2026-09-09"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0021 — o eixo de timeframe: o ATR% cresce 2,2× de 15 m para 1 h, o pedágio cai, e o ganho aparece na população

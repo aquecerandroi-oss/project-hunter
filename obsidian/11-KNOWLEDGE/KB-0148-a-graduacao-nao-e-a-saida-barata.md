@@ -11,6 +11,16 @@ status: vivo
 owner: sexta-feira
 updated: 2026-09-22
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0148 — A graduação não é a saída barata (R66, 15–22/09/2026)

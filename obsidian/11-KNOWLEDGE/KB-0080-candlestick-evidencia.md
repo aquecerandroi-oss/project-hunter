@@ -11,6 +11,16 @@ status: arquivada
 owner: sexta-feira
 updated: 2026-09-09
 confiança: "?"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # KB-0080 — padrões de candlestick: o que a evidência publicada diz (e o que ela não diz sobre perps a 15 m / 1 h)

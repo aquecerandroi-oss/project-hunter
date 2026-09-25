@@ -10,6 +10,16 @@ status: vivo
 confiança: backtest do autor
 lido_em: 2026-09-16
 updated: 2026-09-16
+tipo: leitura
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: meme
 ---
 
 # KB-0108 — Anatomia da morte depois da porta: o que acontece nos 5 minutos antes

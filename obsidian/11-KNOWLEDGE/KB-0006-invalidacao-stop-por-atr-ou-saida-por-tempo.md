@@ -11,6 +11,16 @@ status: curada
 owner: sexta-feira
 updated: 2026-09-08
 confiança: replicado
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # Valor incremental da invalidação (candidata #1 do backlog)

@@ -10,6 +10,16 @@ result: reprovada
 evaluable: 373
 days: 72
 last_eval: "2026-09-11"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0028 — a reversão à média decidida em 5 minutos

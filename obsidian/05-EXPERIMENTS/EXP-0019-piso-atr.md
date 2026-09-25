@@ -10,6 +10,16 @@ result: inconclusivo
 evaluable: 70
 days: 11
 last_eval: "2026-09-08"
+tipo: pesquisa
+hipotese: —
+variavel: —
+populacao: —
+efeito: —
+ic: —
+veredito: —
+proximo_passo: —
+classe_de_perda: —
+mercado: cripto
 ---
 
 # EXP-0019 — o piso de ATR%: comprar população de volta com o porteiro e pagar o pedágio com a largura do stop
