@@ -1,0 +1,19 @@
+   board    |   age    | mints | mints_on_curve 
+------------+----------+-------+----------------
+ graduating | a <15    |   729 |            709
+ graduating | b 15-30  |   129 |            129
+ graduating | c 30-60  |    66 |             65
+ graduating | d 60-120 |    47 |             47
+ graduating | e >120   |    68 |             68
+ movers     | a <15    |  3498 |           3042
+ movers     | b 15-30  |   374 |            221
+ movers     | c 30-60  |   178 |             68
+ movers     | d 60-120 |   106 |             38
+ movers     | e >120   |   265 |             81
+(10 rows)
+
+ mature_on_curve_any_board 
+---------------------------
+                       292
+(1 row)
+
