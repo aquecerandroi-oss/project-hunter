@@ -79,6 +79,7 @@ __all__ = [
     "KILLED_PREFIX",
     "NO_PULLBACK",
     "PULLBACK_ARM_RULE_SET_ID",
+    "PULLBACK_CONTROL_RULE_SET_ID",
     "STALL_S",
     "WAIVED_AT_TRIGGER",
     "ArmedEntry",
@@ -109,6 +110,10 @@ CENSORING: Final = frozenset(
 PULLBACK_ARM_RULE_SET_ID: Final = "01994d00-6c1a-7000-8000-00000000001d"
 """``recuo_v1/1`` (``0063``): its paper bets are subtracted from the desk's
 pedigree read (``lab_repo_fast._PEDIGREE``), T4.85's precedent for the probe."""
+PULLBACK_CONTROL_RULE_SET_ID: Final = "01994d00-6c1a-7000-8000-00000000001e"
+"""``recuo_ctrl_v1/1`` (``0065``, T4.95, EXP-M25): ``recuo_v1/1`` minus the two
+pullback keys — the immediate-entry pair of every arming. Subtracted from the
+pedigree and from the tracker pins exactly like the arm."""
 DROPPED_CAP: Final = "pullback_dropped_cap"
 EVENT_LANE_ONLY: Final = "entry_pullback_event_lane_only"
 """The 15-second lane's own count for a pullback set's gate pass: it has no

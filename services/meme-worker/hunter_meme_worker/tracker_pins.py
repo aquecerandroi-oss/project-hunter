@@ -27,6 +27,12 @@ could change what ``operator/5`` reads. The price, declared: under cap
 pressure an arm bet may lose its photos in that tail and close through
 ``lab_point_read`` or ``indeterminate`` — the arm's measurement pays, never
 the desk.
+
+**T4.95 (EXP-M25): ``recuo_ctrl_v1/1`` pins nothing either.** The arm's
+immediate-entry control enters on every arming — 122 of R79's 171 on mints
+the desk refused, where no desk row pins anything — so its pin would keep
+folding exactly the ``creator_sold`` rows above for mints only an experiment
+holds. Unpinned, the pair is also measured under the same tracker.
 """
 
 from __future__ import annotations
@@ -36,7 +42,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import text
 
-from hunter_meme_worker.entry_pullback import PULLBACK_ARM_RULE_SET_ID
+from hunter_meme_worker.entry_pullback import PULLBACK_ARM_RULE_SET_ID, PULLBACK_CONTROL_RULE_SET_ID
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +52,7 @@ __all__ = ["pinned_mints"]
 _PINNED_MINTS = text(
     "SELECT mint FROM meme_paper_bets WHERE status = 'open' "
     "  AND rule_set_id <> CAST(:pullback_rule_set_id AS uuid) "
+    "  AND rule_set_id <> CAST(:pullback_control_rule_set_id AS uuid) "
     "UNION SELECT mint FROM meme_live_positions WHERE status = 'open' "
     "UNION SELECT mint FROM meme_proposals WHERE status = 'proposed' AND expires_at > :now"
 )
@@ -54,6 +61,11 @@ _PINNED_MINTS = text(
 async def pinned_mints(session: AsyncSession, *, now: datetime) -> frozenset[str]:
     """Every mint the tracker's cap and window may not evict right now."""
     rows = await session.execute(
-        _PINNED_MINTS, {"now": now, "pullback_rule_set_id": PULLBACK_ARM_RULE_SET_ID}
+        _PINNED_MINTS,
+        {
+            "now": now,
+            "pullback_rule_set_id": PULLBACK_ARM_RULE_SET_ID,
+            "pullback_control_rule_set_id": PULLBACK_CONTROL_RULE_SET_ID,
+        },
     )
     return frozenset(str(m) for m in rows.scalars().all())

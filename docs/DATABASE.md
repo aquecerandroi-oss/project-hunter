@@ -8271,3 +8271,71 @@ falha batem com `count(DISTINCT mint)` de `meme_features_1m` por minuto. Nenhum 
 registrar `sqlstate` e `detail` (`hunter_meme_worker.db_errors`). O adaptador asyncpg do SQLAlchemy dobra todo
 `PostgresError` sem mapeamento próprio, `QueryCanceledError` inclusive, no `Error` genérico. `57014` (timeout),
 `55P03` (lock) e `40P01` (deadlock) eram indistinguíveis no log.
+
+## 67. O controle de entrada imediata do recuo — `recuo_ctrl_v1/1` — M19 (`0065_meme_pullback_control_arm`)
+
+**Por quê (T4.95, EXP-M25, H-017).** O R79 (`.claude/state/notes-R79.md` §4) mediu que a "sombra de papel do
+`operator/5`", o controle da H-017 no protocolo do EXP-M24, **só nasce quando a mesa real aceita a proposta**. Das 171
+armações de `recuo_v1/1`, 39 tinham a sombra; 122 foram recusadas pelo `auto_stage1` (os checks da mesa, pelos quais
+um braço `research_only` nunca passa), 9 expiraram e 1 ficou sem proposta. Com 39 < 150 pares, a H-017 ficou em
+limite de dado por construção, e o ritmo de pares passou a depender do humor da mesa real (mesa pausada = 0 pares).
+
+**O que a `0065` faz:** **uma linha** em `meme_rule_sets` (`01994d00-6c1a-7000-8000-00000000001e`, `recuo_ctrl_v1/1`,
+`kind = research_only`, `exp_ref = 'EXP-M25'`, `status = 'active'`, `code_ref =
+'hunter_indicators.meme.rules:evaluate_entry+evaluate_exit'`). Nenhuma tabela, coluna, índice, vista, enum, política,
+grant ou partição; nada é aposentado; a mesa e `recuo_v1/1` não são tocados. DDL em `ddl/meme_pullback_control_arm.py`;
+o slug tem 30 caracteres (§17.6). Encadeada em `0064_meme_tokens_symbol_index`. Contagem de conjuntos ativos: 25 → 26.
+O id é o seguinte livre depois de `…001d` (`…0099`/`…00aa` são só de testes). `meme_rule_sets` é global (§34.1): sem
+`organization_id`, sem RLS, e nenhuma tabela de tenant é tocada.
+
+**Copiado da linha VIVA de `recuo_v1/1`, menos duas chaves — o mesmo desvio declarado da `0063` (§65), um passo
+adiante.** `recuo_v1/1` é, ele mesmo, a cópia da linha viva de `operator/5` no dia do deploy da `0063`, sem nenhuma
+constante no repositório que a carregue. O seed é `recuo_v1/1.params - ARRAY['entry_pullback_pct',
+'entry_pullback_window_s']`, lido no mesmo `INSERT … SELECT` com o mesmo predicado da guarda (`id = recuo_v1/1 AND
+status = 'active'`). Nada mais muda: porta, saída (1,15× / trailing 10 % / 300 s), tamanho (0,07 SOL) e tetos de papel
+(25 posições, `"10.0"`, `"100.0"`) são os do braço. Sem `entry_pullback_pct`, o conjunto propõe como todo conjunto
+sempre propôs (`hunter_meme_worker.entry_pullback`): entrada imediata em `t0`.
+
+- **O par.** Os dois são conjuntos `15s` julgados na **mesma** avaliação da mesma linha pela pista de eventos
+  (`event_gate_eval.evaluate_mint`): o braço arma (`entry_pullback_armed`, `as_of = t0`) e o controle propõe com
+  `features_end_time = t0`, lado a lado — o mesmo mecanismo que já produzia a proposta de `operator/5` em 170 das 171
+  armações do R79. O controle também é julgado pela pista de 15 s (ao contrário do braço, que ela nunca propõe); se
+  essa pista o fizer entrar no mint antes da pista de eventos, a proposta em `t0` é recusada por `already_open` e o
+  par falta — fora dos dois lados, contado (EXP-M25). Os dois casos são provados pela pista de eventos real
+  (`services/meme-worker/tests/test_pullback_control.py::test_every_arming_gets_its_control_at_the_same_t0_unless_the_control_holds_the_mint`:
+  uma `evaluate_mint` arma o braço e grava a proposta do controle `approved`/`rules` com `features_end_time = t0`; com o
+  mint já aberto no controle, arma e não propõe).
+- **CI × VPS:** num banco novo o controle herda o braço semeado de `operator/5` da `0039` pela `0063`; na VPS, o braço
+  como estiver no dia do deploy. `test_migration_0065` prova, em qualquer banco, `controle = braço − 2 chaves`, byte a
+  byte — no instante da migração. Uma edição posterior de qualquer das duas linhas separa coortes; o EXP-M25 pede
+  registrar `md5(params::text)` das duas e a hora do deploy.
+- **A guarda recusa** (nada semeado, revisão fica em `0064`): `recuo_v1/1` ausente ou não ativo; `params ->> 'clock'`
+  diferente de `'15s'` (ausente ou `null` incluídos) — a pista de eventos só lê conjuntos `15s` e só lá o braço arma.
+- **Downgrade → upgrade re-copia o `recuo_v1/1` atual**, como na `0063`; só passa antes de o controle ter evidência.
+
+**Papel por construção, e a mesa não lê o controle.** `research_only`: o executor só seleciona `rs.kind = 'operator'`
+(`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED`; `test_migration_0065` roda essa consulta contra uma proposta do
+controle e ela não volta). As apostas do controle são **subtraídas** da leitura de pedigree da mesa
+(`lab_repo_fast._PEDIGREE`, parâmetro `:pullback_control_rule_set_id`, nas duas subconsultas de
+`creator_prior_dump_count`) e **não fixam o mint no rastreador** (`tracker_pins._PINNED_MINTS`) — exatamente como as do
+braço (T4.91) e as do `refused_probe_v0/1` (T4.85). O motivo é mais forte aqui que no braço: o controle entra nas
+decisões que a mesa real **recusou**, e uma aposta dele faz o vigia do criador carimbar `creator_sold_seen_at` em mints
+que a mesa nunca teve, o que mudaria as recusas `creator_repeat_dumper` de `operator/5`. Provado por comportamento
+(`services/meme-worker/tests/test_pullback_control.py`: a mesma venda testemunhada conta 0 com só o controle e 1 com
+uma aposta de `operator/5`; o mint aberto só pelo controle não é fixado). O SQL do pedigree ganha dois filtros por id,
+e o subplano de `symbol_dup_24h` continua lendo o índice da §66 (`test_migration_0064`, que agora passa o parâmetro novo). O que **continua compartilhado**, como no braço: a prioridade de sondagem do poller
+(`repo_tape._OPEN_BETS`) e o vigia do criador (`creator_watch`) seguem vendo as apostas abertas do controle — como
+já acontece com todo braço de papel (os `flow_v2/*` apostam nos mesmos mints, nos mesmos instantes). O efeito disso
+sobre as leituras da mesa (fita e fluxo do criador do mesmo mint) **não foi medido**; é o mesmo resíduo aceito na T4.91.
+
+**Fidelidade do papel (R79, declarada no EXP-M25).** Os dois lados preenchem "na primeira foto depois de
+`decided_at`". O controle decide em `t0` e preenche na foto seguinte (mediana ~9,6 s no R79, como a sombra do
+`operator/5`); o braço, quando o gatilho vem antes dessa foto, preenche **na mesma foto** e o par dá diferença zero por
+construção (22 de 34 pares no R79). O controle não corrige isso — só faz o par existir sem depender da
+mesa real (salvo as faltas contadas acima, em "O par").
+
+**Downgrade (§17.7):** recusa enquanto uma linha de `meme_proposals`, `meme_paper_bets`,
+`meme_rule_set_param_history` ou `meme_gate_refusals_by_mint` referencia o controle (as quatro da `0063`), com a
+mensagem escapada (`safe_why`) e a instrução de `COPY` antes de reverter. Trava e pooler: no upgrade, um bloco `DO` e
+um `INSERT … SELECT`; no downgrade, quatro `DO` e um `DELETE` — nada depende de estado de sessão; nenhuma janela de
+manutenção.

@@ -135,6 +135,7 @@ async def _symbol_subplan_indexes(url: str) -> set[str]:
                     "prior_window_s": PRIOR_WINDOW_S,
                     "probe_rule_set_id": "01994d00-6c1a-7000-8000-00000000001c",
                     "pullback_rule_set_id": "01994d00-6c1a-7000-8000-00000000001d",
+                    "pullback_control_rule_set_id": "01994d00-6c1a-7000-8000-00000000001e",
                 },
             )
     finally:
@@ -238,7 +239,10 @@ def test_a_longer_downgrade_that_fails_further_down_keeps_the_index(db_url: str)
             command.downgrade(config, "0058_meme_gate_absorb_arm")
         valid, _definition = _run(_index(db_url))
         assert valid, "the drop rolled back with the refused downgrade"
+        # ``check`` compares against head, and ``0065`` (T4.95) sits on top now.
+        command.upgrade(config, "head")
         command.check(config)
+        command.downgrade(config, REVISION)
     finally:
         cleanup = text("DELETE FROM market_events WHERE url = 'https://example.test/0064'")
         _run(_execute(db_url, cleanup, {}))
