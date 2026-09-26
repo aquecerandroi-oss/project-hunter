@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -45,6 +46,7 @@ from .test_live_persistence import (
     _fixture,
     _rows,
     _signer,
+    _small_test,
 )
 
 if TYPE_CHECKING:
@@ -336,3 +338,71 @@ async def test_a_stale_launch_proposal_is_refused_by_name_and_claimed(
     assert row[0]["mode"] == "live", "claimed, so neither loop re-reads it"
     await launch_entries_once(live.ctx)
     assert len(await _orders(db_engine, proposal_id, "buy")) == 1
+
+
+def _scoped_launch(
+    db_session_factory: async_sessionmaker[AsyncSession], *, max_total_sol: str, max_trades: int
+) -> Harness:
+    """The launch lane ``on`` under a written small-test scope (the robot flag
+    stays off: only the launch loop runs here)."""
+    live = _context(
+        db_session_factory,
+        _signer(),
+        FakeRedis(),
+        policy=LAUNCH_POLICY,
+        auto=_small_test(max_total_sol, max_trades=max_trades),
+    )
+    live.ctx.config = replace(live.ctx.config, launch=LaunchConfig(mode="on"), auto_approve=False)
+    return live
+
+
+async def test_an_exhausted_scope_refuses_the_launch_lane_by_name(
+    launch_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """T4.96 finding 1: before, ``handle_launch_candidate`` never read the scope —
+    with ``max_trades`` spent a launch buy was still admitted and sent. Now the
+    second launch is refused ``small_test_scope_exhausted`` before any chain
+    read, claimed so neither loop re-reads it, and nothing is sent."""
+    live = _scoped_launch(db_session_factory, max_total_sol="5", max_trades=1)
+    first = await _plant_launch_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await launch_entries_once(live.ctx)
+    buys = await _orders(db_engine, first, "buy")
+    assert buys[0]["status"] == "confirmed" and len(live.rpc.sent) == 1
+    assert buys[0]["admission"]["small_test"]["trades_done"] == 0
+    reserve = Decimal(buys[0]["admission"]["small_test"]["debit_reserve_sol"])
+    assert Decimal(buys[0]["intent"]["scope_reserve_sol"]) == (
+        Decimal(buys[0]["intent"]["max_sol_cost_sol"]) + reserve
+    )
+    second = await _plant_launch_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await launch_entries_once(live.ctx)
+    refused = await _orders(db_engine, second, "buy")
+    assert len(refused) == 1 and refused[0]["status"] == "refused"
+    assert refused[0]["reason"] == "small_test_scope_exhausted"
+    assert refused[0]["admission"]["exhausted"] == "max_trades"
+    assert len(live.rpc.sent) == 1
+    row = await _rows(db_engine, "SELECT mode FROM meme_proposals WHERE id = :p", p=second)
+    assert row[0]["mode"] == "live", "claimed, so neither loop re-reads it"
+
+
+async def test_a_launch_remainder_below_the_launch_floor_is_named_on_both_sides(
+    launch_harness: Harness,
+    db_engine: AsyncEngine,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The recorded fill took ~1,0035 SOL; a 1,01 scope leaves ~0,0065 — under
+    the launch floor (0,01) and the full profile's (0,02): the launch is refused
+    ``small_test_below_min`` and the heartbeat names both profiles."""
+    live = _scoped_launch(db_session_factory, max_total_sol="1.01", max_trades=5)
+    first = await _plant_launch_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await launch_entries_once(live.ctx)
+    assert (await _orders(db_engine, first, "buy"))[0]["status"] == "confirmed"
+    second = await _plant_launch_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await launch_entries_once(live.ctx)
+    refused = await _orders(db_engine, second, "buy")
+    assert refused[0]["status"] == "refused" and refused[0]["reason"] == "small_test_below_min"
+    assert refused[0]["admission"]["exhausted"] is None and len(live.rpc.sent) == 1
+    fields = await heartbeat_fields(live.ctx)
+    assert fields["small_test_below_min"] == "full,launch"
+    assert fields["small_test_exhausted"] == ""

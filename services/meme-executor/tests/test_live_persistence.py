@@ -66,7 +66,14 @@ from hunter_meme_executor.heartbeat import heartbeat_fields
 from hunter_meme_executor.journal_db import PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
-from hunter_meme_executor.repo import RISK_SNAPSHOT_MAX_AGE_S, TokenContext, open_positions
+from hunter_meme_executor.repo import (
+    RISK_SNAPSHOT_MAX_AGE_S,
+    TokenContext,
+    insert_order,
+    open_positions,
+    order_key,
+)
+from hunter_meme_executor.scope import ScopeClaimRefused, claim_scope
 from hunter_meme_executor.wallet_refresh import wallet_refresh_once
 from hunter_risk_meme import limits_from_env
 
@@ -1878,19 +1885,21 @@ async def test_stage_1_closes_the_tap_on_the_scope_sol_ceiling(
 async def test_stage_1_clamps_the_last_buy_to_what_the_scope_has_left(
     harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    """With ~1.0035 SOL already taken and a 1,01 SOL scope, a 0,01 request is
-    admitted for the remainder (~0,0065) — the scope is a ceiling, not a target.
-    The first position is closed by hand in between: the SOL counter is the
-    ledger of **buys sent**, not of positions still open (those the daily cap and
-    ``duplicate_position`` already refuse — the engine's job, not the scope's)."""
-    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test("1.01"))
+    """With ~1.0035 SOL already taken and a 1,0135 SOL scope (~0,00998 left), a
+    0,01 request is admitted for what the **whole** debit leaves (T4.96): the
+    reserve (network + priority + ATA rent) and the instruction's tolerance come
+    off first, so ``max_sol_cost + reserve`` — the most this buy can take from the
+    wallet — fits the remainder. The first position is closed by hand in between:
+    the SOL counter is the ledger of **buys sent**, not of positions still open
+    (those the daily cap and ``duplicate_position`` already refuse)."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test("1.0135"))
     first = await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
     await entries_once(armed.ctx)
     used = (
         await _rows(db_engine, "SELECT fill FROM meme_live_orders WHERE proposal_id = :p", p=first)
     )[0]["fill"]["buy_total_lamports"]
-    remaining = Decimal("1.01") - Decimal(used) / Decimal(10**9)
-    assert Decimal("0") < remaining < Decimal("0.01"), remaining
+    remaining = Decimal("1.0135") - Decimal(used) / Decimal(10**9)
+    assert Decimal("0.005") < remaining < Decimal("0.01"), remaining
     async with db_engine.begin() as connection:
         await connection.execute(
             text(
@@ -1910,10 +1919,233 @@ async def test_stage_1_clamps_the_last_buy_to_what_the_scope_has_left(
         )
     )[0]
     assert order["status"] == "confirmed"
-    assert order["admission"]["small_test"]["requested_clamped"] is True
-    assert Decimal(order["admission"]["small_test"]["requested_cap_sol"]) == remaining
-    assert Decimal(order["intent"]["sol_final"]) <= remaining
+    small = order["admission"]["small_test"]
+    assert small["requested_clamped"] is True and Decimal(small["remaining_sol"]) == remaining
+    reserve = Decimal(small["debit_reserve_sol"])
+    assert reserve >= Decimal("0.00203928") + Decimal("0.000005"), "rent + network at least"
+    assert Decimal(small["requested_cap_sol"]) == Decimal(small["usable_sol"])
+    assert Decimal(small["usable_sol"]) < remaining - reserve
+    worst = Decimal(order["intent"]["scope_reserve_sol"])
+    assert worst == Decimal(order["intent"]["max_sol_cost_sol"]) + reserve
+    assert worst <= remaining, "the most this buy can take fits what the owner wrote"
+    assert Decimal(order["intent"]["sol_final"]) <= Decimal(small["requested_cap_sol"])
     assert order["admission"]["sizing"]["binding_constraint"] == "requested"
+
+
+async def test_a_remainder_below_the_floor_is_named_and_the_robot_opens_nothing(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.96 finding 3 (26/09: 0,012424071 left under the 0,02 floor hid the
+    cause for 15 h behind ``creator_*`` first refusals). With ~0,0045 left under
+    a 0,005 floor the robot does not open the next proposal
+    (``small_test_below_min``, not approve-then-refuse), a click is refused by
+    that name before any chain read, and the heartbeat says so — while
+    ``small_test_exhausted`` stays empty (the counter did not close)."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test("1.008"))
+    await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    assert len(armed.rpc.sent) == 1
+    second = await _plant_operator_proposal(
+        db_engine, proposed_at=datetime.now(UTC), mint=OTHER_MINT
+    )
+    await entries_once(armed.ctx)
+    assert (await _proposal(db_engine, second))["status"] == "proposed"
+    assert armed.ctx.state.auto_skipped == {"small_test_below_min": 1}
+    clicked = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    orders = await _rows(
+        db_engine,
+        "SELECT status, reason, admission FROM meme_live_orders WHERE proposal_id = :p",
+        p=clicked,
+    )
+    assert orders[0]["status"] == "refused" and orders[0]["reason"] == "small_test_below_min"
+    assert orders[0]["admission"]["exhausted"] is None
+    assert Decimal(orders[0]["admission"]["remaining_sol"]) < Decimal("0.005")
+    assert orders[0]["admission"]["debit_reserve_sol"] == "0", "refused before the fee/curve reads"
+    assert len(armed.rpc.sent) == 1
+    hb = await heartbeat_fields(armed.ctx)
+    assert hb["small_test_exhausted"] == "" and hb["small_test_below_min"] == "full"
+
+
+async def test_a_remainder_the_reserve_leaves_unusable_is_refused_by_name_after_the_fee_read(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """~0,0065 left passes the 0,005 floor on the curve alone; the ATA rent and
+    the fees make it ~0,0043 usable — refused ``small_test_below_min`` (not the
+    engine's ``below_min_sol`` under some other first refusal), nothing built."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test("1.01"))
+    await _plant_operator_proposal(db_engine, proposed_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    assert len(armed.rpc.sent) == 1
+    clicked = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(armed.ctx)
+    orders = await _rows(
+        db_engine,
+        "SELECT status, reason, intent, admission FROM meme_live_orders WHERE proposal_id = :p",
+        p=clicked,
+    )
+    assert orders[0]["status"] == "refused" and orders[0]["reason"] == "small_test_below_min"
+    admission = orders[0]["admission"]
+    assert Decimal(admission["remaining_sol"]) > Decimal("0.005") > Decimal(admission["usable_sol"])
+    assert Decimal(admission["debit_reserve_sol"]) > Decimal("0.002")
+    assert orders[0]["intent"] == {} and len(armed.rpc.sent) == 1
+
+
+async def test_the_scope_claim_serialises_two_lanes_on_one_lock(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.96 (Astra, design review must-fix 1): the two lanes are separate tasks
+    and each read the scope before building. The claim — lock, re-read, reserve —
+    runs in the transaction that writes the ``admitted`` row: a second claim waits
+    for the first to commit, then sees its reservation (an ``admitted`` row
+    counts) and refuses a debit that no longer fits."""
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test("0.05"))
+    first = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    holding, release = asyncio.Event(), asyncio.Event()
+
+    async def lane_a() -> None:
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await claim_scope(session, armed.ctx, debit_sol=Decimal("0.03"))
+            await insert_order(
+                session,
+                proposal_id=first,
+                side="buy",
+                client_order_id=order_key(first, side="buy"),
+                attempt=1,
+                status="admitted",
+                reason=None,
+                intent={"scope_reserve_sol": "0.03"},
+                admission={},
+                now=datetime.now(UTC),
+            )
+            holding.set()
+            await release.wait()
+
+    async def lane_b() -> None:
+        await holding.wait()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await claim_scope(session, armed.ctx, debit_sol=Decimal("0.03"))
+
+    a, b = asyncio.create_task(lane_a()), asyncio.create_task(lane_b())
+    await holding.wait()
+    await asyncio.sleep(0.5)
+    assert not b.done(), "the second claim waits on the scope's lock"
+    release.set()
+    await a
+    with pytest.raises(ScopeClaimRefused) as refused:
+        await b
+    assert refused.value.reason == "small_test_scope_exhausted"
+    assert refused.value.detail["trades_done"] == 1
+    assert Decimal(refused.value.detail["remaining_sol"]) == Decimal("0.02")
+    # Alone, the same debit fits: the lock is what made the difference.
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await claim_scope(session, armed.ctx, debit_sol=Decimal("0.02"))
+
+
+async def test_the_scope_counter_charges_each_row_its_worst_debit_by_status(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T4.96: confirmed → the fill's real debit; in flight (``admitted``,
+    ``simulated``, ``submitted_unconfirmed``) → ``scope_reserve_sol``; a row
+    written before T4.96 (only ``max_sol_cost_sol``) → that + network + rent +
+    the priority cap; ``refused``/``failed`` → nothing."""
+    from hunter_meme_executor.scope import legacy_extra_sol, read_scope_use
+
+    armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test("5"))
+    rows: list[tuple[str, dict[str, str], dict[str, int] | None]] = [
+        ("confirmed", {"max_sol_cost_sol": "0.9"}, {"buy_total_lamports": 12_345_678}),
+        ("submitted_unconfirmed", {"scope_reserve_sol": "0.0123"}, None),
+        ("admitted", {"scope_reserve_sol": "0.004"}, None),
+        ("simulated", {"max_sol_cost_sol": "0.01"}, None),  # legacy, in flight
+        ("refused", {}, None),
+        ("failed", {"scope_reserve_sol": "0.5"}, {"network_fee_lamports": 5_000}),
+    ]
+    now = datetime.now(UTC)
+    for status, intent, fill in rows:
+        proposal_id = await _plant_proposal(db_engine, decided_at=now)
+        async with db_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO meme_live_orders (id, proposal_id, side, client_order_id, intent, "
+                    "  status, reason, tx_signature, fill) "
+                    "VALUES (:id, :p, 'buy', :key, CAST(:intent AS jsonb), :status, :reason, "
+                    "  :sig, CAST(:fill AS jsonb))"
+                ),
+                {
+                    "id": str(uuid4()),
+                    "p": proposal_id,
+                    "key": order_key(proposal_id, side="buy"),
+                    "intent": json.dumps(intent),
+                    "status": status,
+                    "reason": "test" if status in ("refused", "failed") else None,
+                    "sig": None
+                    if status in ("admitted", "simulated", "refused")
+                    else f"sig-{status}",
+                    "fill": None if fill is None else json.dumps(fill),
+                },
+            )
+    small = _small_test("5")
+    extra = legacy_extra_sol(armed.ctx.config)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        use = await read_scope_use(
+            session, small, requested_sol=Decimal("0.01"), legacy_extra=extra
+        )
+    assert use.trades_done == 4
+    expected = (
+        Decimal("0.012345678") + Decimal("0.0123") + Decimal("0.004") + Decimal("0.01") + extra
+    )
+    assert use.used_sol == expected
+
+
+async def test_a_refusal_that_loses_the_order_key_never_rejects_the_winners_proposal(
+    harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """Astra, T4.96 diff review: two passes hold the same robot-opened proposal;
+    A reserved the last slot (``admitted``), B then finds the scope spent. B's
+    refused row loses the key (``ON CONFLICT DO NOTHING``) — and B must not mark
+    the proposal ``rejected`` nor count a refusal while A's order goes ahead."""
+    from hunter_meme_executor.entries import handle_candidate
+    from hunter_meme_executor.repo import Candidate
+
+    armed = _context(
+        db_session_factory, _signer(), harness.redis, auto=_small_test("5", max_trades=1)
+    )
+    now = datetime.now(UTC)
+    proposal_id = await _plant_proposal(db_engine, decided_at=now)
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text("UPDATE meme_proposals SET decided_by = :by WHERE id = :p"),
+            {"by": AUTO_STAGE1_DECIDED_BY, "p": proposal_id},
+        )
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await insert_order(
+            session,
+            proposal_id=proposal_id,
+            side="buy",
+            client_order_id=order_key(proposal_id, side="buy"),
+            attempt=1,
+            status="admitted",
+            reason=None,
+            intent={"scope_reserve_sol": "0.012"},
+            admission={"approved": True},
+            now=now,
+        )
+    candidate = Candidate(
+        id=proposal_id,
+        mint=MINT,
+        decision={"size_sol": "0.01"},
+        decided_at=now,
+        decided_by=AUTO_STAGE1_DECIDED_BY,
+        status="approved",
+        proposed_at=now - timedelta(seconds=1),
+    )
+    await handle_candidate(armed.ctx, candidate, now=now)
+    orders = await _rows(
+        db_engine, "SELECT status FROM meme_live_orders WHERE proposal_id = :p", p=proposal_id
+    )
+    assert [o["status"] for o in orders] == ["admitted"], "the winner's row is the only row"
+    assert (await _proposal(db_engine, proposal_id))["status"] == "approved"
+    assert armed.ctx.state.auto_rejected == 0 and armed.ctx.state.refusals == {}
 
 
 async def test_stage_1_with_sending_disabled_opens_admits_simulates_and_sends_nothing(

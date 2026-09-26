@@ -83,6 +83,10 @@ describe("autoSkipLabel: the stage-1 pre-filter vocabulary, exhaustive with a na
     expect(autoSkipLabel("scope_exhausted:something_new")).toContain("something_new");
   });
 
+  it("T4.96: a remainder below the full profile's floor has its own sentence", () => {
+    expect(autoSkipLabel("small_test_below_min")).toContain("abaixo do mínimo");
+  });
+
   it("never returns the bare code -- an unrecognized one is still prefixed", () => {
     expect(autoSkipLabel("never_seen_before")).toBe("pulo: never_seen_before");
   });

@@ -13,44 +13,40 @@ declared: the quote is read ``processed`` (the admission is told so), the
 context comes from what exists at t+1 s (``launch_admission.py``), the
 blockhash comes from the cache, the priority fee is lifted to the launch floor,
 the buy tolerance is the launch's, and the proposal is **claimed** as ``live``
-in the same transaction that writes the order (``launch_repo.py``).
+in the same transaction that writes the order (``launch_repo.py``). T4.96: the
+written small-test scope binds this lane exactly as it binds ``entries.py`` —
+same counters, same clamp (whole debit, ``scope.py``), same named refusals,
+checked against the launch's own floor, and claimed under the scope's lock.
 """
 
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
-from hunter_core.execution.meme.journal import SubmitState
-from hunter_core.execution.meme.submit import (
-    ApprovedSubmission,
-    MemeLiveTradingDisabled,
-    MemeSubmitter,
-)
 from hunter_core.logging import get_logger
 from hunter_meme_executor.admission import AdmissionInputs, admit_launch, curve_from, wallet_from
-from hunter_meme_executor.build import FillRecord, build_buy, decode_fills, fee_bps
+from hunter_meme_executor.build import build_buy, fee_bps
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.launch_admission import (
     launch_context,
-    launch_position_params,
     launch_proposal,
+    launch_requested_sol,
 )
 from hunter_meme_executor.launch_repo import (
     LaunchCandidate,
-    buy_submitted_at,
     claim_launch_proposal,
     launch_candidates,
 )
-from hunter_meme_executor.launch_send import launch_priority_fee, launch_submit_policy
+from hunter_meme_executor.launch_send import launch_priority_fee
+from hunter_meme_executor.launch_submit import submit_launch_buy
 from hunter_meme_executor.repo import (
     insert_order,
-    insert_position,
     order_key,
     participation_used_sol,
     pending_attempts,
@@ -58,9 +54,17 @@ from hunter_meme_executor.repo import (
     refuse_admitted_order,
     token_context,
 )
-from hunter_meme_executor.send_path import curve_fee_accounts, priority_fee_for, record_send_result
+from hunter_meme_executor.scope import (
+    ScopeClaimRefused,
+    buy_reserve_sol,
+    claim_scope,
+    lane_scope,
+    scope_refusal,
+)
+from hunter_meme_executor.send_path import curve_fee_accounts, priority_fee_for
 from hunter_meme_executor.spot_brake import brake_positions, spot_pending_intents
 from hunter_meme_executor.treasury_inflow import ensure_anchor
+from hunter_risk_meme.profile import launch_floor
 
 __all__ = ["handle_launch_candidate", "launch_entries_once", "launch_inert_reason"]
 
@@ -124,6 +128,11 @@ async def handle_launch_candidate(
     if ctx.kill.blocks_entries:
         await _refuse(ctx, candidate, "kill_switch_blocked", ctx.kill.describe())
         return
+    floor = launch_floor(cfg.limits, launch.profile(cfg.limits))
+    scope = await lane_scope(ctx, requested_sol=launch_requested_sol(candidate, cfg.limits, launch))
+    if (late := scope_refusal(scope, floor)) is not None:  # T4.96: before any chain read
+        await _refuse(ctx, candidate, *late)
+        return
     pubkey = ctx.signer.pubkey
     try:
         # The quote (``processed``), the balance and the fee, in parallel: one
@@ -172,6 +181,12 @@ async def handle_launch_candidate(
         max_sol=cfg.send.priority_fee_max_sol,
         compute_unit_limit=cfg.compute_unit_limit,
     )
+    # T4.96: the whole debit (network + priority + rent + tolerance) fits what is left.
+    reserve = buy_reserve_sol(cfg, fee, creates_ata=True)
+    scope = None if scope is None else scope.for_buy(reserve, launch.buy_slippage_bps())
+    if (late := scope_refusal(scope, floor)) is not None:
+        await _refuse(ctx, candidate, *late)
+        return
     context, extras = launch_context(
         candidate, token, curve, global_account, participation_used_sol=used, now=now
     )
@@ -183,6 +198,7 @@ async def handle_launch_candidate(
             limits=cfg.limits,
             launch=launch,
             priority_fee_sol=fee.fee_sol(cfg.compute_unit_limit),
+            requested_cap_sol=None if scope is None else scope.requested_cap_sol,
         ),
         wallet=wallet_from(
             wallet_id=pubkey,
@@ -208,6 +224,8 @@ async def handle_launch_candidate(
         await ctx.kill.latch("daily_loss_cap_reached")
     admission = decision.to_jsonable()
     admission["launch"] = {**extras, "config": launch.as_json(cfg.limits)}
+    if scope is not None:
+        admission["small_test"] = scope.as_json()
     if not decision.approved or decision.sizing is None:
         await _refuse(ctx, candidate, decision.first_refusal or "refused", admission)
         return
@@ -236,25 +254,32 @@ async def handle_launch_candidate(
     intent["priority_fee"] = fee.as_json(cfg.compute_unit_limit)
     intent["sol_final"] = str(decision.sizing.sol_final)
     intent["max_sol_cost_sol"] = str(Decimal(built.intent.sol_limit) / LAMPORTS)
+    intent["scope_reserve_sol"] = str(Decimal(built.intent.sol_limit) / LAMPORTS + reserve)
     intent["blockhash_age_s"] = round(cached.age_s(utcnow()), 3)
     intent["skip_simulation"] = launch.skip_simulation
     key = order_key(candidate.id, side="buy")
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        if not await claim_launch_proposal(session, candidate.id, now=now):
-            ctx.launch.claim_lost_total += 1
-            return
-        order_id = await insert_order(
-            session,
-            proposal_id=candidate.id,
-            side="buy",
-            client_order_id=key,
-            attempt=1,
-            status="admitted",
-            reason=None,
-            intent=intent,
-            admission=admission,
-            now=now,
-        )
+    try:
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            # T4.96: the scope's lock, a re-read and the reservation in one transaction.
+            await claim_scope(session, ctx, debit_sol=Decimal(intent["scope_reserve_sol"]))
+            if not await claim_launch_proposal(session, candidate.id, now=now):
+                ctx.launch.claim_lost_total += 1
+                return
+            order_id = await insert_order(
+                session,
+                proposal_id=candidate.id,
+                side="buy",
+                client_order_id=key,
+                attempt=1,
+                status="admitted",
+                reason=None,
+                intent=intent,
+                admission=admission,
+                now=now,
+            )
+    except ScopeClaimRefused as late:
+        await _refuse(ctx, candidate, late.reason, {**admission, "small_test_claim": late.detail})
+        return
     if order_id is None:
         return  # another pass already owns this key (idempotent on the proposal)
     await ctx.kill.refresh()
@@ -265,62 +290,9 @@ async def handle_launch_candidate(
         ctx.launch.record_refusal(reason)
         ctx.state.record_refusal(reason)
         return
-    submitter = MemeSubmitter(
-        rpc=ctx.chain.rpc,
-        signer=ctx.signer,
-        journal=ctx.journal,
-        verify=built.verify,
-        decode_fill=decode_fills,
-        policy=launch_submit_policy(cfg, launch, ctx.chain.rpc),
-        now=utcnow,
+    await submit_launch_buy(
+        ctx, candidate, built, key=key, order_id=order_id, curve=curve, age_s=age_s
     )
-    approval = ApprovedSubmission(
-        key,
-        utcnow() + timedelta(seconds=cfg.limits.reservation_ttl_s),
-        built.message,
-        built.last_valid_block_height,
-    )
-    try:
-        result = await asyncio.to_thread(submitter.submit, approval)
-    except MemeLiveTradingDisabled:
-        ctx.state.last_refusal = "meme_live_disabled"
-        return
-    await record_send_result(ctx, key, result)
-    if result.signature:
-        ctx.state.last_signature = result.signature
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        submitted = await buy_submitted_at(session, key)
-    if submitted is not None:
-        ms = (submitted - candidate.candidate.proposed_at).total_seconds() * 1000
-        ctx.launch.record_submit_latency_ms(ms)
-    logger.info(
-        "meme_launch_entry_settled",
-        proposal_id=candidate.id,
-        state=result.state,
-        reason=result.reason,
-        proposal_age_s=round(age_s, 3),
-    )
-    if result.state is not SubmitState.CONFIRMED or not isinstance(result.fill, FillRecord):
-        if result.state is SubmitState.FAILED:
-            ctx.launch.record_refusal(f"send_failed:{result.reason.split(':')[0]}")
-        return
-    fill = result.fill
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await insert_position(
-            session,
-            proposal_id=candidate.id,
-            entry_order_id=order_id,
-            mint=candidate.mint,
-            entry_at=fill.block_time or utcnow(),
-            entry=fill.as_json(),
-            tokens=fill.event.token_amount,
-            sol_spent_lamports=fill.buy_total_lamports,
-            params=launch_position_params(candidate, curve),
-            now=utcnow(),
-        )
-    ctx.state.entries_confirmed += 1
-    ctx.launch.buys_total += 1
-    ctx.event_exits_wake.set()  # subscribe to this curve now: the exits are seconds away
 
 
 async def launch_entries_once(ctx: ExecutorContext) -> None:

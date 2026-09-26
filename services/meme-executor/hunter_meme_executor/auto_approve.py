@@ -27,8 +27,10 @@ Brakes that exist only in this mode, all named in the heartbeat:
   only proposals the admission did **not** reject (T4.28e): a refusal costs no
   slot, so in stage 1 the cap equals the scope's ``max_trades`` and never binds
   before it;
-- a blocking kill switch, a diverged program or an exhausted scope skip the
-  pass instead of opening a proposal the admission would refuse;
+- a blocking kill switch, a diverged program, an exhausted scope or (T4.96)
+  a remainder the full profile's floor certainly cannot use
+  (``small_test_below_min``) skip the pass instead of opening a proposal the
+  admission would refuse;
 - ``MEME_LIVE_AUTO_APPROVE_REFUSAL_COOLDOWN_S`` (default 120 s, ``0`` disables,
   T4.28f): a mint the admission refused for a reason that cannot change in the
   next couple of minutes is not re-opened while the cooldown runs — skip
@@ -71,7 +73,12 @@ from hunter_meme_executor.refusal_cooldown import refusal_cooling_mints
 from hunter_meme_executor.repo import open_positions, pending_attempts
 from hunter_meme_executor.risk_read import ensure_snapshots
 from hunter_meme_executor.risk_snapshot import mints_with_snapshot
-from hunter_meme_executor.scope import read_scope_use
+from hunter_meme_executor.scope import (
+    SMALL_TEST_BELOW_MIN,
+    below_min_profiles,
+    legacy_extra_sol,
+    read_scope_use,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -219,7 +226,12 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
         candidates = await operator_proposals(session, now=now)
         if not candidates:
             return []
-        scope = await read_scope_use(session, small, requested_sol=small.max_sol_per_trade)
+        scope = await read_scope_use(
+            session,
+            small,
+            requested_sol=small.max_sol_per_trade,
+            legacy_extra=legacy_extra_sol(cfg),
+        )
         approved_1h = await auto_approved_last_hour(session, now=now)
         busy = {p.mint for p in await open_positions(session)}
         busy |= {a.mint for a in await pending_attempts(session)}
@@ -268,6 +280,9 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
         return []
     if scope.exhausted is not None:
         skip(f"scope_exhausted:{scope.exhausted}", len(candidates))
+        return []
+    if "full" in below_min_profiles(scope, cfg):  # T4.96: never approve-then-refuse
+        skip(SMALL_TEST_BELOW_MIN, len(candidates))
         return []
 
     # T4.45: ask the planner who it *would* open with the read in hand, read for

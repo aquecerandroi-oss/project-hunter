@@ -100,7 +100,9 @@ const CHECK_REFUSAL_LABEL: Record<string, string> = {
   small_test_invalid: "autorização do teste pequeno inválida",
   small_test_without_decision_note: "autorização do teste pequeno sem decisão registrada no Obsidian",
   small_test_expired: "autorização do teste pequeno expirada",
-  small_test_scope_exhausted: "escopo do teste pequeno esgotado (nº de compras)",
+  small_test_scope_exhausted: "escopo do teste pequeno esgotado (nº de compras ou SOL do escopo)",
+  // T4.96: above zero, but below the minimum ticket of the profile that tried to buy.
+  small_test_below_min: "restante do escopo do teste pequeno abaixo do mínimo por compra deste perfil",
 };
 
 /** `curve_not_found`/`curve_complete` (mark reason) and the `rpc_unreachable:<Type>`/`fill_decode_failed:<Type>`/`simulation_failed:<motivo>` prefixes the executor writes with a dynamic suffix. */
@@ -152,6 +154,7 @@ const AUTO_SKIP_LABEL: Record<string, string> = {
   decided_concurrently: "outra decisão chegou antes (clique ou outro tique)",
   kill_switch: "corta-circuito bloqueando entradas",
   program_upgraded: "o programa da pump.fun mudou — pausado até revalidar",
+  small_test_below_min: "restante do escopo abaixo do mínimo por compra — o robô não abre",
 };
 
 const SCOPE_EXHAUSTED_LABEL: Record<string, string> = {

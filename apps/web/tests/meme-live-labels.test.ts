@@ -134,6 +134,8 @@ describe("executorRefusalLabel: the RISK_ENGINE_MEME.md §4 vocabulary, exhausti
     expect(executorRefusalLabel("pumpswap_sell_not_implemented")).toContain("PumpSwap");
     expect(executorRefusalLabel("reservation_expired")).toContain("5 s");
     expect(executorRefusalLabel("small_test_scope_exhausted")).toContain("esgotado");
+    // T4.96: a remainder above zero that the profile's minimum ticket cannot use.
+    expect(executorRefusalLabel("small_test_below_min")).toContain("abaixo do mínimo");
   });
 
   it("never returns the bare code -- an unrecognized one is still prefixed", () => {

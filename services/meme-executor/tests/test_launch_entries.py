@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 
 import hunter_meme_executor.launch_entries as le
+import hunter_meme_executor.launch_submit as lsub
 from hunter_core.domain.enums import KillSwitchState
 from hunter_core.execution.meme.journal import SubmitState
 from hunter_core.execution.meme.submit import SubmitResult
@@ -278,10 +279,11 @@ def _wire(monkeypatch: pytest.MonkeyPatch, db: Db, submitter: FakeSubmitter) -> 
         return _Session()
 
     monkeypatch.setattr(le, "role_session", session)
+    monkeypatch.setattr(lsub, "role_session", session)
     monkeypatch.setattr(le, "launch_candidates", launch_candidates)
     monkeypatch.setattr(le, "claim_launch_proposal", claim)
     monkeypatch.setattr(le, "insert_order", insert_order)
-    monkeypatch.setattr(le, "insert_position", insert_position)
+    monkeypatch.setattr(lsub, "insert_position", insert_position)
     monkeypatch.setattr(le, "refuse_admitted_order", refuse_admitted_order)
     monkeypatch.setattr(le, "brake_positions", nothing)  # T4.74: one brake
     monkeypatch.setattr(le, "pending_attempts", nothing)
@@ -291,13 +293,13 @@ def _wire(monkeypatch: pytest.MonkeyPatch, db: Db, submitter: FakeSubmitter) -> 
     monkeypatch.setattr(le, "token_context", token_context)
     monkeypatch.setattr(le, "ensure_anchor", ensure_anchor)
     monkeypatch.setattr(le, "priority_fee_for", priority_fee_for)
-    monkeypatch.setattr(le, "record_send_result", record_send_result)
-    monkeypatch.setattr(le, "buy_submitted_at", buy_submitted_at)
+    monkeypatch.setattr(lsub, "record_send_result", record_send_result)
+    monkeypatch.setattr(lsub, "buy_submitted_at", buy_submitted_at)
 
     def make_submitter(**_k: Any) -> FakeSubmitter:
         return submitter
 
-    monkeypatch.setattr(le, "MemeSubmitter", make_submitter)
+    monkeypatch.setattr(lsub, "MemeSubmitter", make_submitter)
 
 
 def _fresh_candidate(age_s: float = 0.6) -> Any:
@@ -490,3 +492,144 @@ async def test_an_unreadable_treasury_inflow_refuses_day_anchor_unavailable(
 
 def test_limits_used_by_these_tests_have_the_live_floor_above_the_ticket() -> None:
     assert LIMITS.min_trade_sol == Decimal("0.02") and MINT
+
+
+# ---- T4.96: the small-test scope binds the launch lane too -------------------------------
+
+
+def _scoped(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    used: str,
+    trades: int = 3,
+    max_trades: int = 1000,
+    claim: tuple[str, dict[str, Any]] | None = None,
+) -> tuple[FakeMode, list[Decimal]]:
+    """A written scope of 10 SOL with ``used`` already taken; the lock-and-reread
+    at the insert (``claim_scope``) answers ``claim``. Returns the mode and the
+    debits the lane claimed."""
+    from datetime import date
+    from types import SimpleNamespace
+
+    from hunter_core.execution.meme.gates import SmallTestAuthorization
+    from hunter_meme_executor.scope import ScopeClaimRefused, scope_use
+
+    small = SmallTestAuthorization(
+        authorized_by="everton",
+        max_sol_per_trade=Decimal("0.05"),
+        max_total_sol=Decimal("10"),
+        max_trades=max_trades,
+        expires_at=date(2026, 12, 31),
+        decision_note="obsidian/06-DECISIONS/2026-09-12-teste-pequeno-meme-real.md",
+    )
+    claimed: list[Decimal] = []
+
+    async def lane_scope(_ctx: Any, *, requested_sol: Decimal) -> Any:
+        return scope_use(
+            small, trades_done=trades, used_sol=Decimal(used), requested_sol=requested_sol
+        )
+
+    async def claim_scope(_session: Any, _ctx: Any, *, debit_sol: Decimal) -> None:
+        claimed.append(debit_sol)
+        if claim is not None:
+            raise ScopeClaimRefused(*claim)
+
+    monkeypatch.setattr(le, "lane_scope", lane_scope)
+    monkeypatch.setattr(le, "claim_scope", claim_scope)
+    return FakeMode(gates=SimpleNamespace(small_test=small)), claimed
+
+
+@pytest.mark.parametrize(
+    ("used", "trades", "counter"), [("10", 3, "max_total_sol"), ("1", 1000, "max_trades")]
+)
+async def test_an_exhausted_scope_refuses_the_launch_by_name_before_any_chain_read(
+    monkeypatch: pytest.MonkeyPatch, used: str, trades: int, counter: str
+) -> None:
+    db, submitter = Db(candidates=[_fresh_candidate()]), FakeSubmitter()
+    _wire(monkeypatch, db, submitter)
+    mode, claimed = _scoped(monkeypatch, used=used, trades=trades)
+    ctx = FakeContext(config=_config(), mode=mode)
+    await le.launch_entries_once(ctx)  # type: ignore[arg-type]
+    assert ctx.chain.reads == [] and submitter.calls == [] and claimed == []
+    assert len(db.orders) == 1 and db.orders[0]["status"] == "refused"
+    assert db.orders[0]["reason"] == "small_test_scope_exhausted"
+    assert db.orders[0]["admission"]["exhausted"] == counter
+    assert db.claims == [db.orders[0]["proposal_id"]]
+    assert ctx.launch.refusals == {"small_test_scope_exhausted": 1}
+
+
+async def test_a_remainder_below_the_launch_floor_is_refused_small_test_below_min(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db, submitter = Db(candidates=[_fresh_candidate()]), FakeSubmitter()
+    _wire(monkeypatch, db, submitter)
+    mode, _ = _scoped(monkeypatch, used="9.991")  # 0,009 < the 0,01 launch floor
+    ctx = FakeContext(config=_config(), mode=mode)
+    await le.launch_entries_once(ctx)  # type: ignore[arg-type]
+    assert ctx.chain.reads == [] and submitter.calls == []
+    assert db.orders[0]["reason"] == "small_test_below_min"
+    assert db.orders[0]["admission"]["exhausted"] is None
+
+
+async def test_the_launch_reserve_can_make_the_remainder_unusable_after_the_fee_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """0,012 left passes on the curve alone; with network + the launch priority
+    floor (400 000 CU x 1 000 000 micro = 0,0004) + the ATA rent and the 10 %
+    tolerance, the usable budget is ~0,0087 < 0,01: refused, nothing built."""
+    db, submitter = Db(candidates=[_fresh_candidate()]), FakeSubmitter()
+    _wire(monkeypatch, db, submitter)
+    mode, claimed = _scoped(monkeypatch, used="9.988")
+    ctx = FakeContext(config=_config(), mode=mode)
+    await le.launch_entries_once(ctx)  # type: ignore[arg-type]
+    assert ("curve", "processed") in ctx.chain.reads and submitter.calls == [] and claimed == []
+    order = db.orders[0]
+    assert order["status"] == "refused" and order["reason"] == "small_test_below_min"
+    assert Decimal(order["admission"]["debit_reserve_sol"]) == Decimal("0.00244428")
+    assert order["admission"]["buy_slippage_bps"] == 1000
+
+
+async def test_the_launch_buy_is_clamped_so_its_worst_debit_fits_what_is_left(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    db, submitter = Db(), FakeSubmitter()
+    candidate = _fresh_candidate()
+    candidate = replace(
+        candidate, candidate=replace(candidate.candidate, decision={"size_sol": "0.05"})
+    )
+    db.candidates = [candidate]
+    _wire(monkeypatch, db, submitter)
+    mode, claimed = _scoped(monkeypatch, used="9.97")  # 0,03 left
+    cfg = _config()
+    cfg = replace(cfg, launch=replace(cfg.launch, ticket_sol=Decimal("0.05")))
+    ctx = FakeContext(config=cfg, mode=mode)
+    await le.launch_entries_once(ctx)  # type: ignore[arg-type]
+    order = db.orders[0]
+    assert order["status"] == "admitted", order["reason"]
+    small = order["admission"]["small_test"]
+    assert small["requested_clamped"] is True
+    assert Decimal(small["requested_cap_sol"]) == Decimal("0.025050654")
+    assert order["admission"]["sizing"]["binding_constraint"] == "requested"
+    worst = Decimal(order["intent"]["scope_reserve_sol"])
+    assert worst == Decimal(order["intent"]["max_sol_cost_sol"]) + Decimal("0.00244428")
+    assert worst <= Decimal("0.03") and claimed == [worst]
+    assert len(submitter.calls) == 1
+
+
+async def test_a_scope_spent_by_the_other_lane_meanwhile_refuses_at_the_insert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db, submitter = Db(candidates=[_fresh_candidate()]), FakeSubmitter()
+    _wire(monkeypatch, db, submitter)
+    spent = ("small_test_scope_exhausted", {"remaining_sol": "0.001", "claimed_debit_sol": "0.1"})
+    mode, claimed = _scoped(monkeypatch, used="5", claim=spent)
+    ctx = FakeContext(config=_config(), mode=mode)
+    await le.launch_entries_once(ctx)  # type: ignore[arg-type]
+    assert len(claimed) == 1 and submitter.calls == [] and db.positions == []
+    assert len(db.orders) == 1 and db.orders[0]["status"] == "refused"
+    assert db.orders[0]["reason"] == "small_test_scope_exhausted"
+    assert db.orders[0]["admission"]["small_test_claim"]["remaining_sol"] == "0.001"
+    assert db.orders[0]["admission"]["approved"] is True, "the engine's decision is kept"
+    assert db.claims == [db.orders[0]["proposal_id"]]

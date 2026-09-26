@@ -38,6 +38,7 @@ __all__ = [
     "launch_context",
     "launch_position_params",
     "launch_proposal",
+    "launch_requested_sol",
 ]
 
 LAMPORTS = Decimal(1_000_000_000)
@@ -154,6 +155,14 @@ def launch_context(
     return context, extras
 
 
+def launch_requested_sol(
+    candidate: LaunchCandidate, limits: MemeLimits, launch: LaunchConfig
+) -> Decimal:
+    """The set's ``size_sol``, or the ticket when the set says nothing."""
+    requested = _decimal(candidate.candidate.decision.get("size_sol")) or launch.ticket(limits)
+    return requested if requested > 0 else launch.ticket(limits)
+
+
 def launch_proposal(
     candidate: LaunchCandidate,
     *,
@@ -161,13 +170,15 @@ def launch_proposal(
     limits: MemeLimits,
     launch: LaunchConfig,
     priority_fee_sol: Decimal,
+    requested_cap_sol: Decimal | None = None,
 ) -> MemeEntryProposal:
-    """The request: the set's ``size_sol`` (or the ticket when the set says
-    nothing), always ``live``; the engine caps it by ``launch_ticket`` and
-    ``trade_cap`` — never above either."""
-    requested = _decimal(candidate.candidate.decision.get("size_sol")) or launch.ticket(limits)
-    if requested <= 0:
-        requested = launch.ticket(limits)
+    """The request (:func:`launch_requested_sol`), always ``live``; the engine
+    caps it by ``launch_ticket`` and ``trade_cap`` — never above either.
+    ``requested_cap_sol`` (T4.96) is what the written scope still allows, applied
+    **after** the ticket fallback so a zero cap can never bring the ticket back."""
+    requested = launch_requested_sol(candidate, limits, launch)
+    if requested_cap_sol is not None:
+        requested = min(requested, requested_cap_sol)
     return MemeEntryProposal(
         proposal_id=candidate.id,
         wallet_id=wallet_id,

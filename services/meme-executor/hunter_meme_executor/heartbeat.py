@@ -8,7 +8,8 @@ so far. Written every ``heartbeat_s`` onto the hash the runtime keeps alive.
 T4.28 adds the stage-1 mode (``auto_approve``, ``auto_approved_1h``,
 ``auto_refused_1h`` by reason, ``auto_skipped`` by reason) and the written
 scope's counters (``small_test_used_sol``, ``small_test_trades_done``,
-``small_test_remaining_sol``, ``small_test_exhausted``) — what the desk shows as
+``small_test_remaining_sol``, ``small_test_exhausted``; T4.96: ``small_test_below_min``,
+the profiles whose floor the remainder cannot pay) — what the desk shows as
 "modo sozinho — estágio 1: n/5 compras, x/0,25 SOL".
 """
 
@@ -30,7 +31,7 @@ from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.launch_exits import launch_positions
 from hunter_meme_executor.launch_stats import launch_heartbeat_fields
 from hunter_meme_executor.repo import orders_by_state
-from hunter_meme_executor.scope import read_scope_use
+from hunter_meme_executor.scope import below_min_profiles, legacy_extra_sol, read_scope_use
 from hunter_meme_executor.send_tuning import SendTuning
 from hunter_meme_executor.spot_brake import brake_positions
 from hunter_meme_executor.spot_exit_repo import enabled_market_count
@@ -124,11 +125,14 @@ async def _auto_fields(
     }
     if small is None:
         return fields
-    scope = await read_scope_use(session, small, requested_sol=small.max_sol_per_trade)
+    scope = await read_scope_use(
+        session, small, requested_sol=small.max_sol_per_trade, legacy_extra=legacy_extra_sol(cfg)
+    )
     fields["small_test_used_sol"] = str(scope.used_sol)
     fields["small_test_trades_done"] = str(scope.trades_done)
     fields["small_test_remaining_sol"] = str(scope.remaining_sol)
     fields["small_test_exhausted"] = scope.exhausted or ""
+    fields["small_test_below_min"] = ",".join(below_min_profiles(scope, cfg))
     return fields
 
 

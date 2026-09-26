@@ -296,11 +296,37 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
 - **Quando ela é lida:** só com `ENABLE_MEME_LIVE_TRADING` ligada **e** `small_test_authorization`
   válido nos portões. Ligada sem escopo escrito ⇒ o boot recusa `auto_approve_needs_small_test` antes
   de tocar a chave; ligada com a flag live desligada ⇒ ignorada (um executor inerte não abre nada).
-- **O escopo fecha pelas duas contas:** `max_trades` (compras enviadas) e, desde a T4.28, `max_total_sol`
-  (a soma do SOL **real** que cada compra confirmada tirou da carteira — `fill.buy_total_lamports`, o
-  delta do pagador; a reserva `max_sol_cost` enquanto uma está em voo). Qualquer uma atingida ⇒
-  `small_test_scope_exhausted`; antes disso o pedido é **clampado** ao que sobra
-  (`admission.small_test.requested_clamped`) — o teto é teto, a última compra nunca o ultrapassa.
+- **O escopo fecha pelas duas contas:** `max_trades` (compras reservadas ou enviadas) e, desde a
+  T4.28, `max_total_sol` (a soma do SOL **real** que cada compra confirmada tirou da carteira —
+  `fill.buy_total_lamports`, o delta do pagador; enquanto uma está em voo, o **débito máximo**
+  `intent.scope_reserve_sol`). Qualquer uma atingida ⇒ `small_test_scope_exhausted`; antes disso o
+  pedido é **clampado** ao que sobra (`admission.small_test.requested_clamped`) — o teto é teto.
+- **O clamp cobre o débito inteiro (T4.96,** `obsidian/09-OPERATIONS/Diario/2026-09-26.md`**).** Até a
+  T4.96 o clamp limitava só o `sol_final` (curva + taxas da curva), mas o contador cobra o débito da
+  carteira (+ rede, prioridade, rent da ATA, tolerância): em 161 compras confirmadas, débito −
+  `sol_final` teve mediana +0,00156 e máximo +0,00327 SOL — a última compra podia passar do teto.
+  Agora, em lamports: `reserva = rede + ceil(CU × preço / 10⁶) + rent da ATA (se cria)`,
+  `orçamento = floor((floor(restante) − ceil(reserva)) × 10⁴ / (10⁴ + bps da tolerância))`, logo
+  `max_sol_cost + reserva ≤ restante` (`scope.py`; o programa recusa gastar acima do `max_sol_cost`,
+  que inclui as taxas da curva). **Fora da margem, declarado:** o rent único do
+  `user_volume_accumulator` (1 346 200 lamports, uma vez por carteira, R43 — já pago), cortes de
+  roteadores de terceiros (caminho que não construímos) e a taxa de uma compra que **falha** na
+  cadeia (linha `failed`, fora do contador desde a T4.28). Linhas em voo gravadas antes da T4.96 (só
+  `max_sol_cost_sol`) são cobradas `max_sol_cost + rede + rent + MEME_PRIORITY_FEE_MAX_SOL`.
+- **O escopo é reclamado sob uma trava (T4.96).** As duas pistas (entradas e lançamento) são tarefas
+  separadas e cada uma lê o escopo antes de montar a compra; a transação que grava a ordem `admitted`
+  toma `pg_advisory_xact_lock` (namespace "MEME", chave 1), relê os contadores — contando `admitted` e
+  `simulated` também — e recusa `small_test_scope_exhausted` se o débito máximo da compra montada não
+  couber mais (`admission.small_test_claim`). Uma `admitted` presa por queda antes da assinatura segura
+  sua reserva, como o freio da carteira (`pending_attempts`) já segura.
+- **Restante abaixo do mínimo do perfil (T4.96,** `small_test_below_min`**).** Restante > 0 mas menor
+  que o piso do perfil (0,02 no perfil cheio; o piso do lançamento é outro, §18) já não é "esgotado":
+  a entrada é recusada por esse nome (antes da leitura da cadeia com o restante bruto; depois da
+  leitura da taxa com a reserva), o robô **não abre** a proposta (skip `small_test_below_min`, com
+  cota inferior de custo — só pula o que a admissão certamente recusaria) e o heartbeat publica
+  `small_test_below_min` = os perfis (`full`, `launch` com a pista ligada) cujo piso o restante não
+  paga. Em 26/09 esse estado (0,012424071 sob 0,02) ficou 15 h escondido atrás do primeiro check que
+  falhava (`creator_*`), com `small_test_exhausted` vazio.
 - **Freios que só existem neste modo** (todos nomeados no heartbeat, `auto_skipped`): no máximo 1
   compra por tique e por mint; proposta com idade (`agora − proposed_at`) acima de
   `MEME_LIVE_AUTO_APPROVE_MAX_AGE_S` (padrão **10 s** desde a T4.94; antes, 60 s fixos) fica para o
@@ -593,7 +619,8 @@ sol_final   = quantize(sol_bruto × ks_multiplier)
   Um escopo escrito (`small_test.max_sol_per_trade`) menor que o piso puxa o piso para o número do
   escopo, em vez de recusar o boot. Consequência declarada, com a flag desligada: um teto qualquer
   (participação, restante do escopo, disponível) que caia entre 0,001 e 0,02 SOL passa a recusar
-  (`below_min_sol`/`participation_above_cap`) em vez de mandar pó.
+  (`below_min_sol`/`participation_above_cap`) em vez de mandar pó — o restante do escopo, desde a
+  T4.96, recusa antes, pelo nome `small_test_below_min` (§3.5).
 - **Volume orgânico exclui o agente Mayhem** (carteira `BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s`,
   T4.0d §7) e exclui o que reconhecemos como wash/bundle. Sem poder excluir, o volume é
   `unavailable` — não é volume.
@@ -2234,6 +2261,12 @@ existir** — ausente não é recusa, porque a proposta carrega o carimbo.
   `MEME_LAUNCH_MAX_AGE_S` é recusada `launch_proposal_stale` **antes** de qualquer leitura da cadeia.
 - **A releitura do kill switch entre a admissão e a assinatura** (§7, §9.5) e o `client_order_id =
   meme:{proposal_id}` (§9.4) são os mesmos: idempotente na proposta, um envio por proposta.
+- **O escopo do teste pequeno vale aqui também (T4.96).** Até a T4.96 a pista não consultava o
+  escopo: com `MEME_LAUNCH_LANE=on` e o escopo esgotado uma compra de lançamento ainda seria admitida e
+  enviada. Agora: mesmos contadores, mesmo clamp do débito inteiro (reserva com `creates_ata = true` e a
+  tolerância do lançamento), mesmos nomes (`small_test_scope_exhausted`, `small_test_below_min`,
+  este contra o piso do lançamento `min(MEME_MIN_TRADE_SOL, bilhete)`), a mesma trava na gravação da
+  ordem; `admission.small_test` grava o escopo e o `intent.scope_reserve_sol` o débito máximo.
 
 ### 18.4 Saídas em segundos
 

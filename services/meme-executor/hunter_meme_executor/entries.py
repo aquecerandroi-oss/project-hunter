@@ -22,12 +22,6 @@ from decimal import Decimal
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
-from hunter_core.execution.meme.journal import SubmitState
-from hunter_core.execution.meme.submit import (
-    ApprovedSubmission,
-    MemeLiveTradingDisabled,
-    MemeSubmitter,
-)
 from hunter_core.logging import get_logger
 from hunter_meme_executor.admission import (
     AdmissionInputs,
@@ -38,26 +32,31 @@ from hunter_meme_executor.admission import (
 )
 from hunter_meme_executor.admission_context import build_admission_context
 from hunter_meme_executor.auto_approve import auto_approve_once, reject_if_auto
-from hunter_meme_executor.build import BuiltTrade, FillRecord, decode_fills, fee_bps
+from hunter_meme_executor.build import fee_bps
 from hunter_meme_executor.chain import read_entry
 from hunter_meme_executor.context import ExecutorContext
 from hunter_meme_executor.conviction_read import conviction_for
+from hunter_meme_executor.entry_submit import submit_entry_buy
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.repo import (
     Candidate,
     insert_order,
-    insert_position,
     live_candidates,
     order_key,
     refuse_admitted_order,
 )
-from hunter_meme_executor.scope import ScopeUse, read_scope_use, requested_sol_of
+from hunter_meme_executor.scope import (
+    ScopeClaimRefused,
+    buy_reserve_sol,
+    claim_scope,
+    lane_scope,
+    requested_sol_of,
+    scope_refusal,
+)
 from hunter_meme_executor.send_path import (
     build_entry_buy,
     curve_fee_accounts,
     priority_fee_for,
-    record_send_result,
-    submit_policy,
 )
 from hunter_meme_executor.treasury_inflow import ensure_anchor
 
@@ -72,7 +71,7 @@ async def _refuse(
 ) -> None:
     now = utcnow()
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await insert_order(
+        written = await insert_order(
             session,
             proposal_id=candidate.id,
             side="buy",
@@ -84,6 +83,8 @@ async def _refuse(
             admission=admission,
             now=now,
         )
+        if written is None:  # T4.96: another pass owns this proposal's order; its word stands
+            return
         await reject_if_auto(ctx, session, candidate, reason, now=now)
     ctx.state.record_refusal(reason)
     logger.warning(
@@ -104,17 +105,10 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     if ctx.state.program_divergence is not None:  # T4.8b: never sign against an unknown program
         await _refuse(ctx, candidate, "program_upgraded", {"detail": ctx.state.program_divergence})
         return
-    scope: ScopeUse | None = None
-    small = mode.gates.small_test if mode.gates is not None else None
-    if small is not None:
-        # The written scope is two counters against the ledger (trades sent, SOL
-        # taken) and a clamp: the last buy never overshoots ``max_total_sol``.
-        requested = requested_sol_of(candidate.decision)
-        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-            scope = await read_scope_use(session, small, requested_sol=requested)
-        if scope.exhausted is not None:
-            await _refuse(ctx, candidate, "small_test_scope_exhausted", scope.as_json())
-            return
+    scope = await lane_scope(ctx, requested_sol=requested_sol_of(candidate.decision))
+    if (late := scope_refusal(scope, cfg.limits.min_trade_sol)) is not None:
+        await _refuse(ctx, candidate, *late)
+        return
     pubkey = ctx.signer.pubkey
     try:
         # T4.55: the priority fee is read alongside the curve (bounded, cached,
@@ -153,6 +147,11 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
         )
         return
     fees = fee_bps(global_account)
+    reserve = buy_reserve_sol(cfg, fee, creates_ata=reads.creates_ata)  # T4.96: whole debit
+    scope = None if scope is None else scope.for_buy(reserve, cfg.send.buy_slippage_bps())
+    if (late := scope_refusal(scope, cfg.limits.min_trade_sol)) is not None:
+        await _refuse(ctx, candidate, *late)
+        return
     proposal = proposal_from(
         candidate,
         wallet_id=pubkey,
@@ -218,20 +217,26 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     intent["sol_final"] = str(decision.sizing.sol_final)
     intent["conviction"] = conviction.as_json()
     intent["max_sol_cost_sol"] = str(Decimal(built.intent.sol_limit) / LAMPORTS)
+    intent["scope_reserve_sol"] = str(Decimal(built.intent.sol_limit) / LAMPORTS + reserve)
     key = order_key(candidate.id, side="buy")
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        order_id = await insert_order(
-            session,
-            proposal_id=candidate.id,
-            side="buy",
-            client_order_id=key,
-            attempt=1,
-            status="admitted",
-            reason=None,
-            intent=intent,
-            admission=admission,
-            now=now,
-        )
+    try:
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            await claim_scope(session, ctx, debit_sol=Decimal(intent["scope_reserve_sol"]))
+            order_id = await insert_order(
+                session,
+                proposal_id=candidate.id,
+                side="buy",
+                client_order_id=key,
+                attempt=1,
+                status="admitted",
+                reason=None,
+                intent=intent,
+                admission=admission,
+                now=now,
+            )
+    except ScopeClaimRefused as late:
+        await _refuse(ctx, candidate, late.reason, {**admission, "small_test_claim": late.detail})
+        return
     if order_id is None:
         return  # another pass already owns this key (idempotent on the proposal)
     # An approval is not a safe-conduct (§7, §9.5): the effective kill switch is
@@ -253,71 +258,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             kill_switch=ctx.kill.effective.value,
         )
         return
-    await _submit_and_record(ctx, candidate, built, key, order_id, now)
-
-
-async def _submit_and_record(
-    ctx: ExecutorContext,
-    candidate: Candidate,
-    built: BuiltTrade,
-    key: str,
-    order_id: str,
-    now: datetime,
-) -> None:
-    cfg = ctx.config
-    submitter = MemeSubmitter(
-        rpc=ctx.chain.rpc,
-        signer=ctx.signer,
-        journal=ctx.journal,
-        verify=built.verify,
-        decode_fill=decode_fills,
-        policy=submit_policy(cfg, ctx.chain.rpc),
-        now=utcnow,
-    )
-    approval = ApprovedSubmission(
-        key,
-        now + timedelta(seconds=cfg.limits.reservation_ttl_s),
-        built.message,
-        built.last_valid_block_height,
-    )
-    try:
-        result = await asyncio.to_thread(submitter.submit, approval)
-    except MemeLiveTradingDisabled:
-        ctx.state.last_refusal = "meme_live_disabled"
-        return
-    await record_send_result(ctx, key, result)
-    if result.signature:
-        ctx.state.last_signature = result.signature
-    logger.info(
-        "meme_live_entry_settled",
-        proposal_id=candidate.id,
-        state=result.state,
-        reason=result.reason,
-    )
-    if result.state is not SubmitState.CONFIRMED or not isinstance(result.fill, FillRecord):
-        return
-    fill = result.fill
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await insert_position(
-            session,
-            proposal_id=candidate.id,
-            entry_order_id=order_id,
-            mint=candidate.mint,
-            entry_at=fill.block_time or utcnow(),
-            entry=fill.as_json(),
-            tokens=fill.event.token_amount,
-            sol_spent_lamports=fill.buy_total_lamports,
-            params={
-                "size_sol": str(candidate.decision.get("size_sol")),
-                "target_x": str(candidate.decision.get("target_x")),
-                "trailing_pct": str(candidate.decision.get("trailing_pct")),
-                "max_hold_s": candidate.decision.get("max_hold_s"),
-                "decided_by": candidate.decided_by,
-            },
-            now=utcnow(),
-        )
-    ctx.state.entries_confirmed += 1
-    ctx.event_exits_wake.set()  # T4.63: subscribe to this curve now, not on the next sync
+    await submit_entry_buy(ctx, candidate, built, key, order_id, now)
 
 
 async def entries_once(ctx: ExecutorContext) -> None:
