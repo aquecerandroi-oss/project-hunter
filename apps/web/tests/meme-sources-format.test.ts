@@ -148,6 +148,13 @@ describe("sourceChip: green connected/fresh, amber lagging or budget ≥ 90 %, r
     expect(chip.title).toContain("HTTP 429");
   });
 
+  it("T4.97/R80: the title carries falhas seguidas beside errors_1h, and is silent when the worker never reported it", () => {
+    const withBreaker = sourceChip(source({ status: "erroring", errors_1h: 3, consecutive_failures: 42, last_error: "404" }), 60);
+    expect(withBreaker.title).toContain("falhas seguidas: 42");
+    const withoutBreaker = sourceChip(source({ status: "ok" }), 60);
+    expect(withoutBreaker.title).not.toContain("falhas seguidas");
+  });
+
   it("red: errors in the last hour even when the source is observing again (the brief's rule), and red beats amber", () => {
     const chip = sourceChip(source({ status: "ok", errors_1h: 2, used_60s: 59, budget_60s: 60 }), 60);
     expect(chip.tone).toBe("red");

@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from hunter_meme_worker.creator_stats import CreatorWatchStats
 from hunter_meme_worker.features import CurveObservation
+from hunter_meme_worker.identity_breaker import IdentityBreaker
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -194,6 +195,12 @@ class RadarContext:
     because it holds only counters: whether the loop *runs* is
     ``config.creator_watch_enabled``, which the heartbeat reads at write time —
     so a context built anywhere still reports honestly instead of silently."""
+    identity_breaker: IdentityBreaker = field(default_factory=IdentityBreaker)
+    """T4.97b/R80: the by-mint identity read's own circuit breaker
+    (``identity_breaker.py``) — never ``sources[PUMPFUN_REST]`` itself, whose
+    ``consecutive_failures`` the identity sweep's listing successes reset
+    every ~20 s. Defaulted like ``creator`` above: a plain counter, not a
+    switch, so any context still degrades safely."""
 
 
 def attach_event_gate(ctx: RadarContext, event_gate: EventGateRuntime | None) -> None:

@@ -83,6 +83,11 @@ class MemeSourceOut(BaseModel):
     errors_1h: int | None
     last_error: str | None
     last_error_at: datetime | None
+    consecutive_failures: int | None = None
+    """Requests since the last success on this source — unbounded, unlike
+    ``errors_1h`` (T4.97/R80): an operator cannot tell "every single one, for
+    over an hour" from a saturated hourly count alone. ``None`` from a worker
+    that predates T4.97."""
     reason: str | None
     """Why there is no observation: ``disabled`` | ``never_observed`` |
     ``heartbeat_missing`` — the worker's word, never inferred here."""

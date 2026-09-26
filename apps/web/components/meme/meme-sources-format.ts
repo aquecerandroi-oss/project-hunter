@@ -118,6 +118,9 @@ function databaseWitness(source: MemeSourceOut): string {
 function chipTitle(name: string, state: string, detail: string, source: MemeSourceOut): string {
   const lines = [`${name} — ${state}`, detail, `último dado observado (UTC): ${source.last_observed_at ?? "sem leitura"}`];
   if (isNum(source.errors_1h)) lines.push(`erros na última hora: ${source.errors_1h}`);
+  // T4.97/R80: unbounded, unlike errors_1h (which saturates at its own hour) -- says
+  // "every single one, for over an hour" when errors_1h alone would just look full.
+  if (isNum(source.consecutive_failures)) lines.push(`falhas seguidas: ${source.consecutive_failures}`);
   if (source.last_error) lines.push(`último erro: ${source.last_error}${source.last_error_at ? ` (${source.last_error_at})` : ""}`);
   lines.push(databaseWitness(source));
   return lines.join("\n");

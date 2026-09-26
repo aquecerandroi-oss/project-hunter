@@ -323,6 +323,33 @@ def test_the_creator_watch_and_its_measured_latency_are_the_workers_numbers() ->
     assert empty.creator_watch_sale_to_exit_n == 0
 
 
+def test_consecutive_failures_is_exposed_and_none_from_a_worker_that_predates_t4_97() -> None:
+    """T4.97/R80: ``consecutive_failures`` (requests since the last success,
+    unbounded unlike ``errors_1h``) is the worker's own number, propagated
+    verbatim — ``None`` from a block that predates T4.97, never a ``0`` that
+    would read as "recovered"."""
+    out = build_meme_sources(
+        _heartbeat(
+            sources=json.dumps(
+                {
+                    "pumpportal_ws": _block(connected=True),
+                    "pumpfun_rest": _block(consecutive_failures=42),
+                    "solana_rpc": _block(),
+                    "trenches_ws": _block(connected=False),
+                    "swap_api": _block(),
+                    "indexer_risk": _block(enabled=False, last_observed_at=None, reason="disabled"),
+                }
+            )
+        ),
+        _latest(),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    by_name = {s.name: s for s in out.sources}
+    assert by_name["pumpfun_rest"].consecutive_failures == 42
+    assert by_name["solana_rpc"].consecutive_failures is None, "a block that predates T4.97"
+
+
 def test_source_status_reads_the_workers_word_and_never_infers_health() -> None:
     assert source_status("swap_api", None) == ("unknown", "heartbeat_missing")
     assert source_status("swap_api", {"enabled": False}) == ("disabled", "disabled")

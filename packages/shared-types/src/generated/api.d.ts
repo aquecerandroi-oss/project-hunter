@@ -3547,6 +3547,11 @@ export interface components {
             budget_60s: number | null;
             /** Connected */
             connected: boolean | null;
+            /**
+             * Consecutive Failures
+             * @default null
+             */
+            consecutive_failures?: number | null;
             /** Enabled */
             enabled: boolean | null;
             /** Errors 1H */

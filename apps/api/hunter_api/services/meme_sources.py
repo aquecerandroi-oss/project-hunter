@@ -120,6 +120,7 @@ def _source_out(
         errors_1h=_int(b.get("errors_1h")),
         last_error=b.get("last_error") if isinstance(b.get("last_error"), str) else None,
         last_error_at=_instant(b.get("last_error_at")),
+        consecutive_failures=_int(b.get("consecutive_failures")),
         reason=reason,
         table=None if latest is None else latest.table,
         last_row_observed_at=None if latest is None else latest.observed_at,

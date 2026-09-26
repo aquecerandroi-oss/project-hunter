@@ -49,7 +49,7 @@ from hunter_core.logging import get_logger
 from hunter_exchanges.base import RateLimited
 from hunter_exchanges.pumpfun.normalize import UnsupportedQuote
 from hunter_exchanges.pumpfun.pdas import bonding_curve_address
-from hunter_meme_worker.config import CURVE_STREAM
+from hunter_meme_worker.budget_gap import record_budget_gap
 from hunter_meme_worker.curve_rows import snapshot_row, token_row_from_curve, tracked_from_curve
 from hunter_meme_worker.features import (
     NOT_POLLED,
@@ -61,13 +61,11 @@ from hunter_meme_worker.features import (
 from hunter_meme_worker.fold import fold_minute
 from hunter_meme_worker.lab_trail import maybe_prune_trail
 from hunter_meme_worker.metrics import (
-    meme_budget_skipped_total,
-    meme_gaps_total,
     meme_polls_total,
     meme_tokens_pruned_total,
     meme_tracked_mints,
 )
-from hunter_meme_worker.repo import GapRow, insert_snapshot, prune_tokens, record_gap, upsert_token
+from hunter_meme_worker.repo import insert_snapshot, prune_tokens, upsert_token
 from hunter_meme_worker.repo_tape import open_bet_mints
 from hunter_meme_worker.sources import PUMPFUN_REST, SOLANA_RPC
 from hunter_meme_worker.tracker import TIER_OPEN_BET
@@ -81,7 +79,6 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 WORKER_ROLE = "hunter_worker"
-BUDGET_REASON = "budget_exhausted"
 
 __all__ = [
     "chain_covered",
@@ -180,15 +177,25 @@ async def poll_once(ctx: RadarContext) -> int:
     if ctx.sources is not None:
         ctx.sources.record_tracker_prune(now, pinned=len(pinned_kept), capped=len(capped))
     open_bets = await refresh_open_bets(ctx)
+    covered = chain_covered(ctx, now)
     plan = ctx.tracker.plan(
         now,
         ctx.config.rest_budget_per_minute,
         boosted={mint: TIER_OPEN_BET for mint in open_bets},
-        chain_covered=chain_covered(ctx, now),
+        chain_covered=covered,
         mayhem_refresh=timedelta(seconds=ctx.config.rest_mayhem_refresh_s),
     )
+    # T4.97b/R80: under a covered chain every selected mint is an identity-only
+    # read (``tracker.needs_rest``) of the by-mint route that 404s since
+    # ~25/09 — the breaker (``identity_breaker.py``) never touches the plan
+    # when the chain is not covering the curve, because then the same route
+    # is the only source of price/reserves and must not be suspended.
+    selected, suspended = (
+        ctx.identity_breaker.filter(plan.selected, now) if covered else (plan.selected, ())
+    )
     read = 0
-    for mint in plan.selected:
+    unattempted: tuple[str, ...] = ()
+    for index, mint in enumerate(selected):
         try:
             state = await ctx.curves.get_curve_state(mint)
         except UnsupportedQuote:
@@ -201,16 +208,41 @@ async def poll_once(ctx: RadarContext) -> int:
         except Exception as exc:  # one mint's failure is not the cycle's
             ctx.state.absences.setdefault(mint, RATE_LIMITED)
             meme_polls_total.labels(source="pumpfun_rest", outcome="error").inc()
-            _spent(ctx, now, "rate_limited" if isinstance(exc, RateLimited) else type(exc).__name__)
+            error = "rate_limited" if isinstance(exc, RateLimited) else str(exc)[:200]
+            _spent(ctx, now, error)
             logger.warning("meme_curve_poll_failed", mint=mint, error=str(exc))
+            # T4.97b review round 2: the breaker's own outcome bookkeeping is
+            # never conditioned on ``covered`` — a by-mint failure is the same
+            # fact about the same route whether the chain covers the curve or
+            # not. Only *suspending* reads (the filter above) and breaking the
+            # cycle early below are gated on ``covered``: with no chain to
+            # fall back on, every mint must still be tried this cycle.
+            ctx.identity_breaker.record_failure()
+            if covered and ctx.identity_breaker.is_open:
+                # Tripped mid-cycle by this very failure: stop spending
+                # the shared bucket on the rest of this cycle's plan.
+                unattempted = selected[index + 1 :]
+                break
             continue
+        ctx.identity_breaker.record_success()
         await persist_reading(ctx, state)
         meme_polls_total.labels(source="pumpfun_rest", outcome="ok").inc()
         read += 1
-    for mint in plan.skipped:
+    breaker_suspended = suspended + unattempted
+    for mint in plan.skipped + breaker_suspended:
         ctx.state.absences.setdefault(mint, NOT_POLLED)
-    if plan.skipped or capped:
-        await _record_budget_gap(ctx, now, plan.skipped_count, len(capped), len(aged_out))
+    if plan.skipped or capped or breaker_suspended:
+        await record_budget_gap(
+            ctx,
+            now,
+            skipped=plan.skipped_count,
+            capped=len(capped),
+            aged_out=len(aged_out),
+            poll_cycle_s=ctx.config.poll_cycle_s,
+            rest_budget_per_minute=ctx.config.rest_budget_per_minute,
+            chain_covered=covered,
+            breaker_suspended=len(breaker_suspended),
+        )
     return read
 
 
@@ -218,34 +250,6 @@ def _spent(ctx: RadarContext, at: datetime, error: str) -> None:
     if ctx.sources is not None:
         ctx.sources[PUMPFUN_REST].record_spent(at)
         ctx.sources[PUMPFUN_REST].record_error(at, error)
-
-
-async def _record_budget_gap(
-    ctx: RadarContext, now: datetime, skipped: int, capped: int, aged_out: int
-) -> None:
-    """One row per cycle, not one per mint: the count is the fact."""
-    meme_budget_skipped_total.inc(skipped + capped)
-    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-        await record_gap(
-            session,
-            GapRow(
-                stream=CURVE_STREAM,
-                gap_start=now - timedelta(seconds=ctx.config.poll_cycle_s),
-                gap_end=now,
-                reason=BUDGET_REASON,
-                detail={
-                    "skipped": skipped,
-                    "evicted_by_cap": capped,
-                    "aged_out": aged_out,
-                    "tracked": len(ctx.tracker),
-                    "budget": ctx.config.rest_budget_per_minute,
-                    "chain_covered": chain_covered(ctx, now),
-                },
-            ),
-        )
-    meme_gaps_total.labels(stream=CURVE_STREAM, reason=BUDGET_REASON).inc()
-    if ctx.sources is not None:
-        ctx.sources.gaps_60s.add(now)
 
 
 async def reconcile_once(ctx: RadarContext) -> int:
