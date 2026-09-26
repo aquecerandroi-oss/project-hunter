@@ -118,3 +118,12 @@ em 7 d: guardar o recorte antes da poda.
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[EXP-M23-desfecho-das-recusadas]]
 
 ## Avaliações (acrescentadas, nunca reescritas)
+
+### Início da coorte — 2026-09-26 15:05:30 UTC (12:05 BRT)
+
+- Deploy `40cfa93b`, migração `0065_meme_pullback_control_arm` aplicada; `recuo_ctrl_v1/1` criado às 15:05:30.94Z, `research_only`, `active`.
+- Assinatura dos parâmetros no instante do deploy (`md5(params::text)`, lida na VPS às 15:09Z):
+  - `recuo_v1/1`: `0ba31bb6f939638f5d73642350cbd6dd`
+  - `recuo_ctrl_v1/1`: `04a27c1907160419c756dd306bf9d6d8`
+- Qualquer avaliação futura confere estas duas assinaturas antes de contar pares; se mudarem, a coorte acaba ali.
+- 15:10Z: primeira aposta do controle registrada (ainda aberta).
