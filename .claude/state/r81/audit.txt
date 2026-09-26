@@ -1,0 +1,9 @@
+# A. fita da decisão × arquivo (pista de eventos, 1.ª proposta por mint com fita): 338
+   trocas no minuto julgado: fita ao vivo mediana 38; arquivo (block_time) mediana 30; arquivo/fita quantis 10/25/50/75/90 [0.   0.   1.   1.05 1.14]
+   arquivo com ≥ 90 % das trocas do minuto: 68.9%; < 50 %: 28.7%
+   arquivo recebido até o as_of (o que a base tinha): mediana 0; zero em 95.0% das decisões
+   slot de criação da fita (inferido ao vivo) × slot da 1.ª troca arquivada: {'igual': 171, 'diferente': 32, 'sem arquivo': 61} (fita com slot: 264 de 338)
+   fotos da curva recebidas antes de T: últimos 5 min mediana 6 (p10 4); último minuto mediana 5; < 5 fotos em 5 min: 11.5%
+
+# B. último slot ambíguo (P0 1.ª por mint resolvida, trocas block_time < T)
+   decisões com troca na janela 775; último slot com > 1 preço distinto: 184 (23.7%); amplitude mediana 0.021

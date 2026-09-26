@@ -4,7 +4,7 @@ tipo: consolidado
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 # Dicionário de Variáveis
@@ -60,7 +60,7 @@ decomposição é congelada por conjunto (EXP-M1's invariant).
 | `curve_progress_pct` | sempre | progresso da bonding curve (fração 0–1) | T4.10 | — | R65 (progresso) | esgotada, não sobrevive |
 | `creator_net_seller` | sempre | se o criador é vendedor líquido no instante | T4.10 | — | não isolada (compõe `equilibrio`, H-013) | H-013 [[Fila de Hipoteses|limite_de_dado]] |
 | `participation_pct` | sempre | fração do tamanho da aposta sobre o volume da curva no minuto | T4.16 | — | não | — |
-| `higher_lows`, `breakout_15m`, `distance_to_support_pct` | `line` (T4.10) | estrutura de linha de tendência sobre a curva | T4.10 | só gravado quando o conjunto usa `require_higher_lows`/`require_breakout_15m`/teto de distância | não | — |
+| `higher_lows`, `breakout_15m`, `distance_to_support_pct` | `line` (T4.10) | estrutura de linha de tendência sobre a curva: reta pelos dois últimos mínimos locais de 15 min de **fotos da curva** (`received_at ≤ end_time`, ≥ 5 fotos), rompimento da máxima da janela anterior (T − 16, T − 1 min] | T4.10 | colunas de `meme_features_1m` em todo minuto; no bloco `line` das razões só quando o conjunto usa `require_higher_lows`/`require_breakout_15m`/teto de distância — **nenhuma proposta da porta `fluxo_e_holders` tem o bloco** (0 de 3 734); a porta compra com 1,6 min de vida (mediana; `max_age_s = 300` em todos os conjuntos) e, na série de 1 min, a linha só existe em 67 de 623 decisões (`flat` 290, `too_few_points` 256); as duas pistas da porta nem entregam esses campos ao portão (`lab_repo_fast.py`, `event_gate_rows.py`; só a via de 1 min, `lab_repo.py`, os lê), então um teto de distância recusaria tudo (`line_unknown`). **Não confundir** com a distância ao mínimo **negociado** de 5 min da H-021 (fill, `meme_trades`), que é outra medida | [[Fila de Hipoteses#H-021 — Estrutura do gráfico na hora da compra (distância do suporte, fundos mais altos, rompimento)\|H-021]] (`distancia_do_suporte`, `fundos_mais_altos`, `rompimento` reconstruídos da fita) | **limite_de_dado** — 1 de 885 decisões com 5 min de fita (limite 150); desfechos não abertos; o arquivo `meme_trades` não reconstrói a estrutura (menos da metade das trocas do minuto julgado em 28,7 %; nenhuma troca desse minuto recebida até o instante das features em 95 %) ([[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]]) |
 | `hype_score`, `dev_share`, `snipers` | `hype` (T4.10) | pontuação de hype; fração do dev; contagem de snipers | T4.10 | uma das 13 esgotadas cada (dev share, snipers) | R65 (snipers, dev_share) | esgotadas: snipers p=0,52, dev_share p=0,67 |
 | `net_sol_flow_1m`, `mcap_delta_60s`, `buys_1m`, `sells_1m`, `unique_buyers_1m`, `holders_rising`, `progress_rising` | `flow` (T4.16, EXP-M5) | fluxo do minuto e holders | T4.16 | `buys_1m`, `sells/buys`, `compradores únicos`, `fluxo do criador`, `holders`, `carteiras novas`, `flip rápido` estão entre as 13 esgotadas | R65 + R67 (`buys_1m`) | esgotadas; `buys_1m ≤ 25` **não confirmou fora da amostra** (D=+0,036, IC [−0,058,+0,136], p=0,43 — R67) |
 | `creator_prior_mints_1h`, `symbol_dup_24h`, `creator_prior_dump_count`, `creator_prior_dead_count` | `pedigree` (T4.16/T4.24, EXP-M6) | pedigree do criador: mints prévios, símbolo duplicado, dumps/mortes anteriores | T4.16/T4.24 | contadas em `meme_tokens` na hora da proposta | não isolada dos testes de H-014/H-015 (rede/slot) | ver H-014, H-015 |
@@ -116,7 +116,7 @@ pré-registrada (dado já existe, ninguém mediu):
 1. `distance_from_24h_high`/`_low` (cripto) — bloqueada só por uma medição de redundância nunca feita.
 2. `open_interest` **em nível** (não a variação) como profundidade — item 14 do [[Strategy Backlog]], nunca rodado.
 3. `{buy,sell}_pressure_{Nm}` e `trade_velocity_{Nm}` (cripto) — disponibilidade operacional nunca medida desde que o bloqueio de `covered_until` caiu.
-4. `higher_lows`/`breakout_15m`/`distance_to_support_pct` (meme, bloco `line`) — nunca isolado de um conjunto que já os usa.
+4. ~~`higher_lows`/`breakout_15m`/`distance_to_support_pct` (meme, bloco `line`) — nunca isolado de um conjunto que já os usa.~~ Virou a H-021 (R81, 26/09): **limite de dado** — a porta compra moedas de 1–4 min, não há gráfico de 5 min; volta só com a estrutura do preço marginal gravada na fita da decisão ([[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]]).
 5. ~~`has_twitter`/`twitter_kind`/`twitter_reuse_count` (meme, `identity`) — coletado desde T4.26, nunca virou hipótese.~~ Virou a H-020 (R80, 26/09): **NÃO CONFIRMA** ([[KB-0160-o-link-reciclado-nao-avisa-o-golpe]]).
 6. `is_mayhem` (meme) — excluído por padrão, nunca medido se a exclusão paga.
 7. `top_buyer_share`/`fill_seconds` (meme, `pedigree_e2b`) — a família E2-b morreu como "seguir carteira", nunca como o **preenchimento** em si.

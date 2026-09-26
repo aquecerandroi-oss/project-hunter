@@ -7,12 +7,12 @@ populacao: —
 efeito: —
 ic: —
 veredito: —
-proximo_passo: nenhuma hipótese ativa ataca esta classe hoje (H-016, H-017, H-019 tentaram e não fecharam a favor)
+proximo_passo: nenhuma hipótese ativa ataca esta classe hoje (H-016, H-017, H-019 tentaram e não fecharam a favor; H-021 parou por limite de dado)
 classe_de_perda: comprou_no_topo
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 # `comprou_no_topo` — o maior vazamento da mesa real
@@ -89,11 +89,13 @@ tem `perdas_comprou_no_topo_n`/`_sol` — a tabela estática acima continua send
 | [[Fila de Hipoteses#H-016 — Entrar no recuo, não no pico (esperar a primeira correção depois do sinal)\|H-016]] | esperar um recuo de X % depois do sinal antes de comprar, para não comprar exatamente no pico | **REFUTA** — as moedas que não recuam são as vencedoras; não entrar custa mais do que comprar no topo ([[KB-0157-esperar-o-recuo-nao-paga]]) |
 | [[Fila de Hipoteses#H-017 — Recuo pequeno como melhora de preço (coorte nova, braço de papel)\|H-017]] | recuo pequeno (3 %/60 s) como melhora de **preço** de entrada, não como filtro | **LIMITE DE DADO** (R79, 25/09): 39 decisões emparelhadas contra o mínimo de 150; braço `recuo_v1/1` seguindo em papel ([[EXP-M24-entrada-no-recuo]]) |
 | [[Fila de Hipoteses#H-019 — Fluxo desacelerando na hora da compra (o topo local visto pela fita de 10 s)\|H-019]] | prever a classe pela forma do minuto (`aceleracao_compra`) antes da compra | **REFUTA** pela cláusula (c) — piso mataria vencedoras demais, sinal ao contrário ([[KB-0159-a-desaceleracao-nao-avisa-o-topo]]) |
+| [[Fila de Hipoteses#H-021 — Estrutura do gráfico na hora da compra (distância do suporte, fundos mais altos, rompimento)\|H-021]] | ler a classe pela estrutura do gráfico dos 5 min antes da compra (distância do mínimo, fundos mais altos, rompimento) | **LIMITE DE DADO** (estrutural, R81, 26/09) — a porta compra moedas de 1–4 min (`max_age_s = 300`): 1 de 885 decisões tem 5 min de fita; desfechos não abertos; **nem a favor nem contra** a tese ([[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]]) |
 
 **O que continua sem resposta:** nenhuma variável medida até 25/09/2026 separa, antes da compra, a
 moeda que vai virar `comprou_no_topo` da que vai subir. As 13 variáveis de decisão do R65 já estavam
 esgotadas ([[KB-0149-o-que-a-mesa-real-ensinou]] §3), e as três tentativas específicas contra esta
-classe (H-016, H-017, H-019) ou refutaram ou ainda não têm amostra.
+classe (H-016, H-017, H-019) ou refutaram ou ainda não têm amostra. A H-021 (26/09) mostrou que quase nunca há os 5 minutos de
+trocas antes da compra nesta porta — a moeda tem 1–4 min de vida — e que o arquivo de trocas não reconstrói a estrutura do preço.
 
 ## Relacionado
 

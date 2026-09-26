@@ -4,7 +4,7 @@ tipo: consolidado
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 # Mapa de Estratégias
@@ -41,7 +41,8 @@ SORT mercado ASC, hipotese ASC
 ## Pistas — inconclusivas, mas com sinal que vale acompanhar
 
 Nada aqui é `CONFIRMA` (vocabulário de `docs/RESEARCH.md`) — é o que ficou de interessante depois de
-uma hipótese fechar sem confirmar, e que só vira hipótese nova em população futura.
+uma hipótese fechar sem confirmar, e que só vira hipótese nova em população futura. Entra aqui também o
+que parou por **limite de dado** sem sinal nenhum (a consulta lê `limite_de_dado`), como a H-021.
 
 ```dataview
 TABLE mercado AS "mercado", hipotese AS "hipótese", efeito AS "efeito descritivo"
@@ -57,6 +58,7 @@ SORT mercado ASC
 | `buys_1m ≤ 25` (fluxo baixo no minuto) | R65 → R67 | tercil favorável na amostra original (34 % de alvos, MFE +28,1 %) | **não confirmou fora da amostra**: 473 moedas independentes, D=+0,036, IC [−0,058,+0,136], p=0,43, curva **pico** — [[KB-0147-custo-e-o-prejuizo-e-buys-1m-e-a-unica-pista]] |
 | Percentil de `sells/buys` dentro da coorte viva (`p_sb`) | R69 → H-004 | sobrevivente isolado em família de 17 (p=0,014) | reproduziu (D=+0,106, p=0,0145) mas a curva é **pico**: só 1 de 7 limiares exclui zero — [[KB-0154-subir-o-alvo-nao-paga]] não se aplica aqui, ver [[Fila de Hipoteses#H-004 — Percentil de sells/buys dentro da coorte viva\|H-004]] |
 | Célula `P3_vol_surge`, h=120 (cripto) | R68 → H-003 | D=+0,25 % líquido, IC de cluster [+0,16 %,+0,34 %] (aperta) | IC de **permutação** é largo (p=0,1478) — carregado por poucas barras extremas — [[Fila de Hipoteses#H-003 — Horizontes de 1 a 4 h no lado à vista\|H-003]] |
+| Estrutura do gráfico na compra (distância do suporte, fundos mais altos, rompimento) | [[Fila de Hipoteses#H-021 — Estrutura do gráfico na hora da compra (distância do suporte, fundos mais altos, rompimento)\|H-021]] | **nada de desempenho** — desfechos não abertos; o achado é estrutural: a porta compra com 1,6 min de vida (`max_age_s = 300`), só 1 de 885 decisões tem 5 min de fita | **limite_de_dado** (estrutural): o bloco pede 150; o arquivo de trocas não reconstrói a estrutura; volta só como H-021b prospectiva com o preço marginal gravado na fita da decisão — [[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]] |
 
 ## Cemitério — refutadas ou não confirmadas
 

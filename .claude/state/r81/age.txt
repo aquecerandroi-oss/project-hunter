@@ -1,0 +1,12 @@
+n com created_at 885 de 885
+idade >= 120 s: 322
+idade >= 180 s: 173
+idade >= 240 s: 74
+idade >= 270 s: 30
+idade >= 300 s: 6
+idade >= 360 s: 0
+idade >= 600 s: 0
+máx idade (s) 315.1 quantis 95/99 [257.7 297.1]
+1.ª troca arquivada − created_at (s) quantis 10/50/90/99: [ -1.4  -0.8  58.  342.5]
+todas as apostas (não só 1.ª): 1811 idade >= 300 s: 30
+por rule set, idade máx (s): {'flow_v2/1': 305.7, 'flow_v2/10': 295.9, 'flow_v2/2': 313.3, 'flow_v2/3': 309.6, 'flow_v2/5': 313.3, 'flow_v2/6': 315.1, 'flow_v2/7': 315.1, 'flow_v2/8': 315.1, 'flow_v2/9': 315.1, 'operator/5': 417.4, 'operator/6': 285.7, 'recuo_ctrl_v1/1': 293.9, 'recuo_v1/1': 302.7}

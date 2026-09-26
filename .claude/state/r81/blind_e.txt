@@ -1,0 +1,9 @@
+P_E: 623 excluídas {'arquivo começa depois do nascimento (+5 s) e depois de T−300': 176, 'sem troca arquivada': 86}
+lanes Counter({'paper': 566, 'real': 57}) séries Counter({'meme_event_gate_v1': 364, 'meme_features_15s_v1': 259})
+dist quantis 0/10/25/33/50/67/75/90/100: [0.    0.151 0.294 0.378 0.542 0.76  0.941 1.481 9.125]
+min5 (SOL/token) quantis 1/10/50/90/99: [2.80000e-08 2.84000e-08 3.15000e-08 5.79400e-08 1.91232e-07]
+Spearman dist × preço na decisão 0.600; dist × idade 0.232; preço × idade 0.185
+fundos_mais_altos Counter({None: 448, True: 108, False: 67}) (None = coin < 180 s ou minuto vazio)
+rompimento Counter({False: 480, True: 143})
+produção distance_to_support_pct presente: 67 ; line_reason: Counter({'flat': 290, 'too_few_points': 256, 'ok': 67, 'no_snapshot': 7}) sem linha 1m: 3
+Spearman produção × bloco: 0.235

@@ -1,0 +1,6 @@
+P_E: 623 excluídas {'arquivo começa depois do nascimento (+5 s) e depois de T−300': 176, 'sem troca arquivada': 86}
+lanes Counter({'paper': 566, 'real': 57}) séries Counter({'meme_event_gate_v1': 364, 'meme_features_15s_v1': 259})
+dist quantis 0/10/25/33/50/67/75/90/100: [0.    0.151 0.294 0.378 0.542 0.76  0.941 1.481 9.125]
+min5 (SOL/token) quantis 1/10/50/90/99: [2.80000e-08 2.84000e-08 3.15000e-08 5.79400e-08 1.91232e-07]
+Spearman (postos médios) dist × preço: 0.6
+por dia UTC, primeiras decisões resolvidas: [('2026-09-12', 5), ('2026-09-13', 31), ('2026-09-14', 27), ('2026-09-15', 27), ('2026-09-16', 47), ('2026-09-17', 98), ('2026-09-18', 97), ('2026-09-19', 105), ('2026-09-20', 71), ('2026-09-21', 44), ('2026-09-23', 24), ('2026-09-24', 104), ('2026-09-25', 106), ('2026-09-26', 99)]

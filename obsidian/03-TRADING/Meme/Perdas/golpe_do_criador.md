@@ -7,12 +7,12 @@ populacao: —
 efeito: —
 ic: —
 veredito: —
-proximo_passo: nenhuma medida aprovada até 25/09; H-014 e H-015 refutaram as duas tentativas feitas
+proximo_passo: nenhuma medida aprovada até 26/09; H-014 e H-020 não confirmaram, H-015 refutou
 classe_de_perda: golpe_do_criador
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 # `golpe_do_criador` — a saída por despejo do criador ou por venda coordenada em bloco
@@ -91,8 +91,9 @@ sendo a fonte até lá.
 |---|---|---|
 | [[Fila de Hipoteses#H-014 — Rede coordenada de compradores (o golpe em um bloco só)\|H-014]] | achar se as vendedoras do despejo compartilham financiador (`rede_financiadora_pct`) | **NÃO CONFIRMA** — nos 4 casos de origem, rede 0–1,4 % ([[KB-0156-o-despejo-em-bloco-nao-e-uma-rede-de-financiamento]]) |
 | [[Fila de Hipoteses#H-015 — Compra no slot de criação (o "bundle" do lançamento)\|H-015]] | usar SOL comprado no slot da criação como filtro de entrada | **REFUTA** pela cláusula (c) — teto mataria 36,5 % das vencedoras ([[KB-0158-recompra-sem-amostra-e-bundle-sem-filtro]]) |
+| [[Fila de Hipoteses#H-020 — Identidade social reciclada (o mesmo X/Twitter em várias moedas)\|H-020]] | barrar moedas que reciclam o link de X/Twitter de outras moedas das 24 h anteriores (o "cartão de visita" do lançador em série) | **NÃO CONFIRMA** (R80, 26/09) — D −0,0525 [−0,123, +0,016]; `golpe_do_criador` 32,9 % × 32,3 % = **1,02×** (a previsão pedia ≥ 2×); some com o que a base sabia em T; a coleta do link parou em 25/09 17:13Z ([[KB-0160-o-link-reciclado-nao-avisa-o-golpe]]) |
 
-**O que continua sem resposta:** nenhuma medida pré-decisão prevê o despejo coordenado. O teto de
+**O que continua sem resposta:** nenhuma medida pré-decisão prevê o despejo coordenado — nem o link social reciclado (H-020). O teto de
 concentração (`max_top10_share`) existe no código e nunca foi configurado nas mesas reais — ver
 [[Fila de Hipoteses#H-010 — Concentração do maior comprador (o dono que pode afundar)|H-010]], que
 morreu por limite de dado antes mesmo de chegar ao contrafactual do teto.

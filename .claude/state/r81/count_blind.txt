@@ -1,0 +1,18 @@
+apostas 1811; mints 909; 1.ª por mint resolvidas 885
+por lane Counter({'paper': 802, 'real': 83}) série Counter({'meme_event_gate_v1': 477, 'meme_features_15s_v1': 408})
+excluídas: {'fita arquivada começa depois de T−300 s (ou sem troca)': 884}
+P (1.ª por mint, resolvida, 5 min de fita): 1  — limite do bloco 150
+por lane Counter({'paper': 1}) série Counter({'meme_features_15s_v1': 1})
+rule sets [('flow_v2/9', 1)]
+por dia [('2026-09-24', 1)]
+idade na decisão (min), P0 quantis 10/25/50/75/90: [1.  1.2 1.6 2.6 3.8]
+idade na decisão (min), P  quantis 10/25/50/75/90: [5.2 5.2 5.2 5.2 5.2]
+dist quantis 0/10/25/33/50/67/75/90/100: [0.2366 0.2366 0.2366 0.2366 0.2366 0.2366 0.2366 0.2366 0.2366]
+zeros (última = mínimo): 0
+n na janela quantis 10/50/90: [177. 177. 177.]
+fundos_mais_altos: Counter({False: 1})
+rompimento: Counter({False: 1})
+sensibilidade received_at < T: com valor 1 de 1
+   mesma distância que o oráculo: 0
+maior received_at das trocas usadas − T (s), quantis 10/50/90: [16. 16. 16.] ; fração com alguma troca recebida depois de T: 1.0
+produção (meme_features_1m, end_time ≤ T e computed_at ≤ T): linha 1, distance_to_support_pct 1; line_reason Counter({'': 1})
