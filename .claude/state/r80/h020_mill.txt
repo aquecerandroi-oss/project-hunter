@@ -1,0 +1,67 @@
+# H-020 — reuso do link de X/Twitter nas 24 h anteriores (o filtro deixa passar reuso = 0) — NÃO CONFIRMA
+
+> Origem: Fila de Hipoteses H-020; R80 (complemento da primária A × B)  ·  impressão digital do pré-registo: `73cfdbba94a4`
+> Limiar congelado: **0.5**  ·  efeito mínimo relevante (MRE): **+0.0500**
+
+## Pré-registo (escrito antes de correr)
+
+- **Previsão:** reuso >= 1 rende menos -0,05 por SOL que reuso = 0; aqui: o que o filtro deixa passar rende +0,05 a mais
+- **Refutação:** IC sup acima de -0,01; ou o filtro mata > 30 % das vencedoras; ou < 30 com reuso >= 1; ou legível < 60 %
+- **Regra de decisão:** CONFIRMA com D>0, IC inferior>0, p<0,05, D>=MRE, patamar e nível positivo
+- **Política de limiar:** reuso >= 1 (qualquer reuso), fixado no pré-registo
+- **Congelado em:** 2026-09-26
+
+## Os números
+
+| # | o quê | valor |
+|---|---|---|
+| 1 | população usada (de 612 linhas lidas) | **612** em 612 clusters |
+| 2 | selecionados / resto no limiar congelado | 439 / 173 |
+| 3 | média do desfecho: selecionados / resto | -0.0033 / -0.0558 |
+| 4 | **D = média(selecionados) − média(resto)** | **+0.0525** |
+| 5 | IC 95 % de D (bootstrap de cluster por `mint`) | [-0.0161, +0.1229]  P(D≤0) = 0.072 |
+| 6 | IC 95 % de D (bootstrap de blocos) | [-0.0244, +0.1308] em 154 blocos |
+| 7 | p de permutação (estratificada por `day`) | 0.1829 |
+| 8 | dinheiro somado na população (Decimal) | `-0.5464676250` |
+
+Censura: 0 linhas sem desfecho, 0 sem a variável, 0 recusadas pela guarda anti-antecipação. Ausente nunca virou zero.
+
+## VEREDITO: NÃO CONFIRMA
+
+- IC 95 % inferior -0.0161 não está acima de zero
+- p de permutação 0.1829 não é < 0,05
+- o braço selecionado perde em nível (-0.0033); perder menos que o resto não é vantagem
+- a curva de limiares é pico, não planalto (4 limiares avaliáveis; maior corrida positiva 4 (0 com IC acima de zero))
+- há dependência temporal declarada e o IC 95 % por blocos [-0.0244, +0.1308] cobre zero
+
+## Curva de limiares — planalto ou pico?
+
+Diagnóstico: **pico** (4 limiares avaliáveis; maior corrida positiva 4 (0 com IC acima de zero)).
+
+| limiar | n sel/resto | D | IC 95 % |
+|---|---|---|---|
+| 0.5 | 439/173 | +0.0525 | [-0.0161, +0.1229] |
+| 1.5 | 531/81 | +0.0186 | [-0.0832, +0.1121] |
+| 2.5 | 561/51 | +0.0464 | [-0.0701, +0.1620] |
+| 4.5 | 587/25 | +0.0424 | [-0.1412, +0.2240] |
+
+## Baldes por tercis (descritivo, não decide nada)
+
+| balde | n | média | mediana |
+|---|---|---|---|
+| -0 | 439 | -0.0033 | -0.0627 |
+| 0-inf | 173 | -0.0558 | -0.0664 |
+
+## A ressalva que mais importa
+
+sem fatia de teste reservada: o resultado é dentro da amostra
+
+## Suposições numéricas declaradas
+
+- r = pnl ÷ SOL gasto; real e papel juntos; custos já dentro do pnl registrado
+- link de X/Twitter tratado como metadado da criação (observação posterior não é antecipação)
+
+Estatística em `float` (contrastes de retorno); dinheiro publicado em `Decimal`. Tempo em UTC.
+
+> Nada aqui autoriza dinheiro real. Um CONFIRMA é candidato a **braço de papel pré-registado**, nunca parâmetro de mesa.
+

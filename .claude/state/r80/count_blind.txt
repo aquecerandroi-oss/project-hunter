@@ -1,0 +1,21 @@
+tokens 442727 com twitter 124374
+tipos de link (universo) [('post', 84501), ('profile', 36736), ('other', 2468), ('community', 669)]
+chaves mais repetidas (universo inteiro, 11/09+): [('profile:jessicalucluvh', 443), ('profile:buttbrainer', 413), ('profile:usepaid', 383), ('profile:pui_fireman', 325), ('profile:xvolkzgaming', 225), ('post:2100830038950023549', 220), ('post:2100751509554164177', 213), ('profile:elonmusk', 208), ('profile:trytipped', 202), ('profile:19stocksfun', 198), ('post:2101669333860573189', 171), ('post:2103092640400990332', 171), ('post:2101729526828916954', 160), ('post:2100560813094268975', 155), ('post:2101374707530420670', 153)]
+linhas 1787 [(('paper', 'closed', 'measured'), 1590), (('real', 'closed', ''), 161), (('paper', 'closed', 'indeterminate'), 36)]
+mints (1.a por mint) 895 resolvidas 871
+dia | n | própria legível | cobertura 24h (mediana, mín) | legível (própria e cob>=0,60) | reuso>=1 | reuso>=1 (só o que a base sabia) | sem_social
+2026-09-12 5 0 0.001 0.001 0 0 0 0
+2026-09-13 31 0 0.000 0.000 0 0 0 0
+2026-09-14 27 0 0.000 0.000 0 0 0 0
+2026-09-15 27 0 0.001 0.001 0 0 0 0
+2026-09-16 47 34 0.143 0.001 4 1 1 2
+2026-09-17 98 98 0.928 0.748 98 30 25 17
+2026-09-18 97 97 0.950 0.944 97 37 36 24
+2026-09-19 105 103 0.906 0.856 103 27 16 20
+2026-09-20 71 66 0.875 0.833 66 12 6 30
+2026-09-21 44 44 0.829 0.826 44 12 7 17
+2026-09-23 24 21 0.784 0.707 21 4 0 4
+2026-09-24 104 96 0.653 0.631 96 24 14 26
+2026-09-25 106 83 0.669 0.478 83 26 11 22
+2026-09-26 85 0 0.290 0.042 0 0 0 0
+TOTAL {'n': 871, 'own': 642, 'legivel': 612, 'reuse1': 173, 'reuse1_k': 116, 'semsoc': 162}
