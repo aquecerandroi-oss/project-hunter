@@ -53,6 +53,57 @@ async def test_rest_all_routes() -> None:
         assert "mayhemState=paused" in paths[1]
 
 
+async def test_rest_list_recent_reads_identity_from_the_listing_and_skips_a_bad_item() -> None:
+    """T4.97/R80: the by-mint route (``/coins/{mint}``) started 404ing for every
+    mint on 2026-09-25; ``list_recent`` hits the unaffected listing route
+    instead and must survive one of its three items being an already-migrated
+    pool this adapter does not speak for (``UnsupportedQuote``, live capture)."""
+    raw = json.loads((FIXTURES / "frontend_api_v3_coins_recent_raw.json").read_text())
+    paths: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        paths.append(str(request.url))
+        return httpx.Response(200, json=raw)
+
+    async with httpx.AsyncClient(
+        base_url="https://test", transport=httpx.MockTransport(respond)
+    ) as http:
+        client = PumpFunRestClient(http_client=http)
+        states = await client.list_recent(limit=3)
+    assert [s.mint for s in states] == [raw[0]["mint"], raw[1]["mint"]]
+    assert states[0].twitter == raw[0]["twitter"]
+    assert states[1].twitter is None
+    assert (
+        "limit=3" in paths[0] and "sort=created_timestamp" in paths[0] and "order=DESC" in paths[0]
+    )
+
+
+async def test_rest_list_recent_returns_empty_rather_than_raise_when_every_item_is_bad() -> None:
+    """Astra's must-fix (T4.97/R80 review): a page where every item fails to
+    parse must not raise (one bad shape must not become an outage of its
+    own), but it also must not read like an ordinary quiet minute — covered
+    here by the return value; the aggregate warning log is the operator side."""
+    raw = json.loads((FIXTURES / "frontend_api_v3_coins_recent_raw.json").read_text())
+    bad = [{**item, "quote_mint": "not-native-sol"} for item in raw]
+    async with httpx.AsyncClient(
+        base_url="https://test",
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=bad)),
+    ) as http:
+        client = PumpFunRestClient(http_client=http)
+        states = await client.list_recent()
+    assert states == []
+
+
+async def test_rest_list_recent_refuses_a_non_list_body() -> None:
+    async with httpx.AsyncClient(
+        base_url="https://test",
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json={"not": "a list"})),
+    ) as http:
+        client = PumpFunRestClient(http_client=http)
+        with pytest.raises(MalformedMessage):
+            await client.list_recent()
+
+
 async def test_rest_global_params_are_read_for_the_coins_creation_instant() -> None:
     """``GET /global-params/{created_timestamp_ms}`` (T4.2d): the curve parameters
     in force when the coin was created — the denominator of progress and the

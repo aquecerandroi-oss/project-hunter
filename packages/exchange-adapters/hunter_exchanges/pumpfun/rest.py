@@ -36,6 +36,7 @@ from urllib.parse import quote
 import httpx
 
 from hunter_core.domain.types import utcnow
+from hunter_core.logging import get_logger
 from hunter_exchanges.base import ExchangeError, ExchangeUnavailable, MalformedMessage, RateLimited
 from hunter_exchanges.pumpfun.models import (
     NormalizedCurveState,
@@ -53,6 +54,8 @@ __all__ = [
     "REQUEST_PERIOD_S",
     "PumpFunRestClient",
 ]
+
+logger = get_logger(__name__)
 
 EXCHANGE = "pumpfun"
 BASE_URL = "https://frontend-api-v3.pump.fun"
@@ -170,6 +173,53 @@ class PumpFunRestClient:
         ):
             raise MalformedMessage("mayhem listing must be an array of objects", exchange=EXCHANGE)
         return [parse_curve_state_rest(item) for item in cast(list[dict[str, Any]], raw)]
+
+    async def list_recent(
+        self, *, limit: int = 50, sort: str = "created_timestamp", order: str = "DESC"
+    ) -> list[NormalizedCurveState]:
+        """``GET /coins`` — the newest mints, curve and identity together.
+
+        Stands in for polling ``/coins/{mint}`` one mint at a time for the
+        collector's identity reads (R80/notes-R80.md §1): live on
+        2026-09-26 the by-mint route answered ``404 Cannot GET`` for **every**
+        mint tried, old and freshly created (a mint from this very listing,
+        and one already tracked for hours) — read here as the route having
+        broken or been withdrawn, not a rate limit (no ``429``/``418`` seen)
+        and not a shape change; a single ``404`` does not by itself prove the
+        route is gone for good (RFC 9110 §15.5.5). This listing route was not
+        affected and returns the identical raw shape
+        :func:`parse_curve_state_rest` already parses, so one call answers up
+        to 50 mints' ``twitter``/``telegram``/``website`` for the budget a
+        single by-mint call used to cost one mint.
+
+        The newest-first listing routinely mixes in curves this adapter does
+        not speak for (an ``UnsupportedQuote`` already-migrated pool, a shape
+        too malformed to trust — confirmed live in the same capture this
+        method's own fixture is taken from), so one bad item is skipped and
+        counted rather than losing the other 49 with it. A page that skips
+        *every* item is logged once, named, so a schema change upstream does
+        not read as a quiet minute with nothing new.
+        """
+        if not 1 <= limit <= 50:
+            raise ValueError("limit must be 1..50")
+        raw = await self._get("/coins", {"limit": limit, "sort": sort, "order": order})
+        if not isinstance(raw, list) or not all(
+            isinstance(item, dict) for item in cast(list[Any], raw)
+        ):
+            raise MalformedMessage("coins listing must be an array of objects", exchange=EXCHANGE)
+        items = cast(list[dict[str, Any]], raw)
+        states: list[NormalizedCurveState] = []
+        skipped = 0
+        for item in items:
+            try:
+                states.append(parse_curve_state_rest(item))
+            except MalformedMessage:
+                skipped += 1
+        if items and not states:
+            logger.warning("pumpfun_rest_listing_all_items_skipped", items=len(items))
+        elif skipped:
+            logger.info("pumpfun_rest_listing_items_skipped", skipped=skipped, of=len(items))
+        return states
 
     async def get_global_params(self, created_at_ms: int) -> GlobalParams:
         """``GET /global-params/{created_timestamp_ms}`` — the curve parameters in

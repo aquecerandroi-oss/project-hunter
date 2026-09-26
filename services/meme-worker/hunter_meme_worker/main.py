@@ -59,6 +59,7 @@ from hunter_meme_worker.event_gate_wiring import (
 from hunter_meme_worker.events import spawn_events_match
 from hunter_meme_worker.fast_lane import fast_once
 from hunter_meme_worker.graduation import GlobalParamsStore
+from hunter_meme_worker.identity_sweep import IDENTITY_SWEEP_CYCLE_S, identity_sweep_once
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
 from hunter_meme_worker.launch_lane import run_launch_lane_forever
 from hunter_meme_worker.launch_lane_wiring import build_launch_lane, register_launch_lane_health
@@ -233,6 +234,10 @@ async def run_meme(runtime: WorkerRuntime) -> None:
             group.create_task(_discovery(ctx), name="meme-discovery")
             group.create_task(
                 forever("poll", config.poll_cycle_s, poll_once, ctx), name="meme-poll"
+            )
+            group.create_task(
+                forever("identity_sweep", IDENTITY_SWEEP_CYCLE_S, identity_sweep_once, ctx),
+                name="meme-identity-sweep",
             )
             if config.chain_curves_enabled:
                 # T4.2f: every tracked curve from the chain, once a minute; the

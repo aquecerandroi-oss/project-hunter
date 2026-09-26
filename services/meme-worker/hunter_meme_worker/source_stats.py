@@ -48,6 +48,14 @@ class SourceStats:
     last_received_at: datetime | None = None
     last_error: str | None = None
     last_error_at: datetime | None = None
+    consecutive_failures: int = 0
+    """Requests since the last success — unbounded, unlike ``errors_1h``.
+    T4.97/R80: 25–26/09 the mirror failed 100 % of ~1 800 calls/h and
+    ``errors_1h`` simply saturated at ~1 800 (its own one-hour cap), which
+    reads the same as "a lot of errors mixed with some successes" — an
+    operator cannot tell "every single one, for over an hour" from that
+    number alone. This counter says exactly that, and keeps saying it past
+    the hour ``errors_1h`` forgets."""
     reason: str | None = None
     """Why the source has nothing to say (``disabled``, ``never_connected``…)."""
     used_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
@@ -59,6 +67,7 @@ class SourceStats:
             self.last_observed_at = observed_at
         if self.last_received_at is None or received_at >= self.last_received_at:
             self.last_received_at = received_at
+        self.consecutive_failures = 0
         self.reason = None
 
     def record_spent(self, at: datetime, count: int = 1) -> None:
@@ -69,6 +78,7 @@ class SourceStats:
         self.errors_1h.add(at)
         self.last_error = error
         self.last_error_at = at
+        self.consecutive_failures += 1
 
     def lag_s(self, now: datetime) -> float | None:
         if self.last_observed_at is None or self.last_received_at is None:
@@ -95,6 +105,7 @@ class SourceStats:
             "errors_1h": self.errors_1h.total(now),
             "last_error": self.last_error,
             "last_error_at": iso_or_none(self.last_error_at),
+            "consecutive_failures": self.consecutive_failures,
             "reason": reason,
         }
 

@@ -84,6 +84,25 @@ def test_the_heartbeat_names_every_source_and_never_a_silent_zero() -> None:
     assert rest["reason"] is None
 
 
+def test_a_source_that_fails_every_cycle_keeps_counting_past_what_errors_1h_can_say() -> None:
+    """T4.97/R80: live on the VPS during the outage, ``errors_1h`` sat at 1680
+    (its own one-hour cap at 30 attempts/min) — indistinguishable from "a lot
+    of errors mixed with some successes". ``consecutive_failures`` is the
+    field that still says "every single one, unbroken"."""
+    sources = SourcesState()
+    stats = sources[PUMPFUN_REST]
+    assert stats.consecutive_failures == 0
+    stats.record_spent(NOW)
+    stats.record_error(NOW, "pumpfun rest resource not found")
+    stats.record_spent(NOW + timedelta(seconds=1))
+    stats.record_error(NOW + timedelta(seconds=1), "pumpfun rest resource not found")
+    assert stats.consecutive_failures == 2
+    fields = stats.as_fields(NOW + timedelta(seconds=1))
+    assert fields["consecutive_failures"] == 2
+    stats.record_ok(observed_at=NOW, received_at=NOW + timedelta(seconds=2))
+    assert stats.consecutive_failures == 0
+
+
 def test_the_heartbeat_declares_the_discovery_blind_share_and_never_a_silent_zero() -> None:
     """T4.2d, item 3: 8/50 of the ``new`` board at 05:51 BRT were
     ``raydium_launchpad`` — invisible to ``subscribeNewToken`` by construction.

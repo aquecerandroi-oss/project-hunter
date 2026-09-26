@@ -57,6 +57,14 @@ class CurveSource(Protocol):
 
     async def get_curve_state(self, mint: str) -> NormalizedCurveState: ...
 
+    async def list_recent(
+        self, *, limit: int = 50, sort: str = "created_timestamp", order: str = "DESC"
+    ) -> list[NormalizedCurveState]:
+        """``GET /coins``: the newest mints, curve and identity together
+        (T4.97/R80: the identity sweep's own source, since ``/coins/{mint}``
+        stopped answering for any mint on 2026-09-25)."""
+        ...
+
 
 class ChainSource(Protocol):
     """The Solana RPC — the truth, and the scarcest budget of the three."""
