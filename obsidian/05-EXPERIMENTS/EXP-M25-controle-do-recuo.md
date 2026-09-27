@@ -2,23 +2,23 @@
 tags: [experimento, meme, entrada, recuo, controle, h-017, m4, r79, t4-95]
 status: pré-registrado — braço de papel `recuo_ctrl_v1/1` semeado pela migração `0065` (T4.95); nada real
 owner: sexta-feira
-updated: 2026-09-25
+updated: 2026-09-27
 origem: R79 (25/09/2026) — a sombra de papel do `operator/5`, controle da H-017 no EXP-M24, só nasce quando a mesa real aceita; 39 de 171 armações tinham par (122 recusadas pelo `auto_stage1`, 9 expiradas, 1 sem proposta). Decisão do coordenador (T4.95): um controle de entrada imediata que não dependa da mesa real.
 previsao: operacional — toda armação de `recuo_v1/1` depois do deploy tem, na mesma decisão, uma proposta de `recuo_ctrl_v1/1`; ≥ 150 pares resolvidos em ~1,5–2 dias. O julgamento é o da H-017, sem mudança de régua
 exp: EXP-M25
 strategy: "meme/pumpfun - controle: entrada imediata em t0, mesmos parâmetros do recuo_v1 sem o recuo (H-017)"
 version: "recuo_ctrl_v1/1 research_only (migração 0065, T4.95)"
-result: nao-iniciado
-evaluable: 0
-days: 0
+result: inconclusivo
+evaluable: 151
+days: 2
 tipo: pesquisa
 hipotese: H-017
 variavel: controle de entrada imediata em t0 (recuo_ctrl_v1 = recuo_v1 sem entry_pullback_pct/entry_pullback_window_s)
 populacao: armacoes de recuo_v1/1 depois do deploy da 0065, uma por mint, emparelhadas com recuo_ctrl_v1/1 na mesma (mint, t0)
-efeito: —
-ic: —
-veredito: —
-proximo_passo: deploy da 0065; registrar md5 das duas linhas e a hora; conferir o par nas 10 primeiras armacoes
+efeito: "D (recuo_v1 - recuo_ctrl_v1) = +0,0077 por SOL; braco contra nada -0,0385"
+ic: "D [-0,0269, +0,0410]; braco [-0,0775, +0,0022]"
+veredito: nao_confirma
+proximo_passo: R82 (27/09): 151 pares, H-017 NAO CONFIRMA no papel; controle pode ser aposentado junto com recuo_v1/1 (decisao do orquestrador)
 classe_de_perda: —
 mercado: meme
 ---
@@ -133,3 +133,54 @@ em 7 d: guardar o recorte antes da poda.
   - `recuo_ctrl_v1/1`: `04a27c1907160419c756dd306bf9d6d8`
 - Qualquer avaliação futura confere estas duas assinaturas antes de contar pares; se mudarem, a coorte acaba ali.
 - 15:10Z: primeira aposta do controle registrada (ainda aberta).
+
+### Avaliação 2026-09-27 (R82, 21:26Z) — H-017 `NÃO CONFIRMA`, no papel
+
+**Coorte e assinaturas.**
+- Assinaturas relidas na VPS às 20:26Z e às 21:26Z: `recuo_v1/1` `0ba31bb6…` e `recuo_ctrl_v1/1` `04a27c19…`, iguais às
+  do deploy.
+- `meme_rule_set_param_history` e `audit_logs` dos dois conjuntos: 0 linhas. **A coorte não foi cortada.**
+- Só SELECT (`.claude/state/r82/q.sh`, transação só-leitura).
+
+**Parada.** Às 20:28Z havia **147** pares resolvidos (os "150" contados antes eram as armações). A regra de parada foi
+congelada antes de abrir qualquer desfecho: 1.ª extração com ≥ 150 pares, `t0 ≤ extração − 15 min`, todos os pares
+dessa extração. Às **21:26:27Z** havia **151**.
+
+**População.** 155 armações (1.ª por mint, 26/09 15:10Z → 27/09 21:11Z), 0 rearmações; 154 na janela, 1 em voo.
+- Braço: entrou 125, `pullback_killed` 17, `no_pullback` 11, `indeterminate` 1, censuradas 0.
+- Controle: resolvido 151; ausente 2 (BossAssHat e TELE: o controle já estava no mint pela pista de 15 s, a falta
+  prevista em "Como o par nasce"); `indeterminate` 1 (PROFIT, o mesmo do braço).
+- **Pares resolvidos: 151 ≥ 150.**
+
+**Verificação do mecanismo (itens 1–3, na coorte inteira):**
+- proposta do controle em `(mint, t0)` em 152 de 154 (as 2 faltas `already_open`);
+- 152 `decided_by = rules`, **0** posições reais;
+- md5 iguais.
+
+**Julgamento (a régua da H-017):**
+- **D = braço − controle = +0,0077 [−0,0269, +0,0410]** por SOL decidido (bootstrap por mint 10 000, moinho);
+- braço contra "nada" **−0,0385 [−0,0775, +0,0022]**; controle contra "nada" −0,0462 [−0,0914, +0,0015];
+- IC sup de D +4,10 pp ≥ +1 pp → **não refuta**; D +0,77 pp < +2 pp e IC com zero → **não confirma**;
+- a leitura literal de "não bate nada" dispara (média do braço negativa). Mas o IC do braço alcança +0,22 pp. Pela
+  operacionalização declarada no R82 antes dos desfechos (princípio da errata do R76), sozinha ela não refuta;
+- → **`NÃO CONFIRMA`**.
+
+**Descritivos:**
+- por dia UTC: 26/09 (n 68) D +0,0000; 27/09 (n 83) D +0,0141;
+- blocos de 6 h: D +0,0077 [−0,0272, +0,0380];
+- sem BULA-KUN (braço morto por venda do criador, controle +102,5 %): D +0,0146 [−0,0172, +0,0460].
+
+**Parte de D de pares na mesma foto (a ressalva deste protocolo):**
+- 74 de 124 entradas (59,7 %) preencheram na mesma foto do controle, com retorno idêntico em 74/74: contribuição 0;
+- foto posterior (50): −0,0014; mortos na rechecagem (16): +0,0106; sem recuo (11): −0,0014;
+- nos 74 de mesma foto, o preço marginal da foto ficou em média 1,98 % abaixo do gatilho (30 de 74 gatilhos eram mais
+  baratos que a foto).
+
+**Papel × real:** sem par real nesta coorte (op5 na mesma decisão: 139 `expired`, 13 `rejected`).
+
+Relatório em `.claude/state/notes-R82.md`, saída em `.claude/state/r82/h017.txt`, pares em `r82/pairs.csv`.
+Cache da trilha (os dois conjuntos, 19 190 linhas) em `r82/cache/trail.csv`; KB em
+[[KB-0162-o-recuo-pequeno-empata-com-comprar-na-hora]]. Astra concorda (desenho e veredito, [[R82-recuo-controle]]).
+
+**Próximo passo:** o experimento cumpriu o papel (dar par à H-017). Recomenda-se ao orquestrador **aposentar
+`recuo_ctrl_v1/1`** junto com `recuo_v1/1`; é decisão dele. Nada foi desativado aqui.

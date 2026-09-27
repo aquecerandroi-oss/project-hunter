@@ -1,0 +1,13 @@
+extraído 2026-09-27 21:26:27.712367+00; armações 1.ª por mint 155; população {'in': 154, 'in_flight': 1}
+t0 de 2026-09-26 15:10:24.292239+00 a 2026-09-27 21:11:05.929624+00
+rearmação (n_armed > 1): 0 | 1.ª armação do mint antes do início: 0
+braço: {'entered': 125, 'killed': 17, 'indeterminate': 1, 'no_pullback': 11}
+controle: {'resolved': 151, 'absent_already_open': 2, 'indeterminate': 1}
+resolvido (braço, controle): {(True, True): 151, (True, False): 2, (False, False): 1}
+pares resolvidos: 151
+série da proposta do controle: {'meme_event_gate_v1': 152, '-': 2}
+decided_by controle: {'rules': 152, '-': 2} | posições reais do controle: 0
+recusas do controle em (mint,t0) quando ausente: {'-': 2}
+1.ª proposta do controle quando ausente em t0: [('BossAssHat', '2026-09-26 15:35:56.921564+00', 'meme_features_15s_v1', 'filled'), ('TELE', '2026-09-26 23:48:50.887509+00', 'meme_features_15s_v1', 'filled')]
+pares por dia UTC: {'2026-09-26': 68, '2026-09-27': 83}
+op5 status na mesma decisão: {'rejected': 13, 'sem proposta': 2, 'expired': 139}

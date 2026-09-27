@@ -80,6 +80,7 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 - [[Meme-refused-probe-apostrophe-guard]] — guarda de apóstrofo nas razões de recusa (23/09)
 - [[R80-link-reciclado]] — H-020, link reciclado + coleta REST do pump.fun (26/09)
 - [[R81-grafico-5min]] — H-021, gráfico de 5 minutos não existe na porta (26/09)
+- [[R82-recuo-controle]] — H-017, o recuo pequeno empata com comprar na hora (KB-0162) (27/09)
 - [[T4.96-escopo-teste-pequeno]] — corte do débito do escopo, diagnóstico da parada de 26/09 (26/09)
 - [[T4.96b-scope-debit]] — corrida SigningLocked/admitted_orphan_expired (26/09)
 - [[T4.97b-identity-breaker]] — disjuntor da identidade por mint (26/09)

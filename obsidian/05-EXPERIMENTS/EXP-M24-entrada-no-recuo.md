@@ -2,23 +2,23 @@
 tags: [experimento, meme, entrada, recuo, h-017, m4, r77, t4-91]
 status: pré-registrado — braço de papel `recuo_v1/1` semeado pela migração `0063` (T4.91); nada real
 owner: sexta-feira
-updated: 2026-09-23
+updated: 2026-09-27
 origem: R77 / KB-0157 (23/09/2026) — a H-016 refutou (esperar um recuo de 5 % não paga), mas a célula X = 3 % / W = 60 s deu +2,28 pp por SOL no papel (IC [+0,69, +3,89], Holm 0,052), com o ganho vindo do PREÇO de entrada. Achado da mesma população → só se julga em coorte nova (H-017). Everton, 23/09 ~22 h: "faz ligada, quero ir vendo o teste".
 previsao: diferença emparelhada ≥ +2 pp por SOL decidido contra comprar em t0, IC 95 % (bootstrap por mint) acima de zero, e melhor que "não comprar nada"
 exp: EXP-M24
 strategy: "meme/pumpfun - entrada com recuo de 3 % em até 60 s após a armação (H-017)"
 version: "recuo_v1/1 research_only (migração 0063, T4.91)"
 result: inconclusivo
-evaluable: 166
+evaluable: 151
 days: 2
 tipo: pesquisa
 hipotese: H-017
 variavel: recuo_v1 (entrada com recuo de 3% em ate 60s, braco de papel real)
 populacao: decisoes pos-deploy da T4.91, emparelhadas com a sombra de operator/5
-efeito: —
-ic: —
-veredito: limite_de_dado
-proximo_passo: R79 (25/09): 39 decisoes emparelhadas contra o minimo de 150; nao julgada
+efeito: "D (braco - controle EXP-M25) = +0,0077 por SOL; braco contra nada -0,0385"
+ic: "D [-0,0269, +0,0410]; braco [-0,0775, +0,0022]"
+veredito: nao_confirma
+proximo_passo: R82 (27/09): 151 pares com o controle do EXP-M25, H-017 NAO CONFIRMA no papel; braco pode ser aposentado (decisao do orquestrador)
 classe_de_perda: —
 mercado: meme
 ---
@@ -148,3 +148,36 @@ Leitura, que não é julgamento:
   Nada foi mudado aqui.
 
 Astra indisponível (401).
+
+### Avaliação 2026-09-27 (R82, 21:26Z) — H-017 `NÃO CONFIRMA`, no papel, com o controle do EXP-M25
+
+**O controle.** O controle deste protocolo (a sombra de papel do `operator/5`) não nasce quando a mesa real não
+aceita. Nesta coorte ela não aceitou nenhuma das decisões: 139 `expired` e 13 `rejected`, **0** pares. O julgamento
+usou o controle de entrada imediata do [[EXP-M25-controle-do-recuo]] (`recuo_ctrl_v1/1`, os mesmos `params` sem o
+recuo), criado para isso pela decisão do coordenador na T4.95. A régua da H-017 não mudou.
+
+**Coorte.** Armações de `recuo_v1/1` de 26/09 15:05:30Z a 27/09 21:11Z (1.ª por mint). Assinatura `0ba31bb6…` sem
+edição. **151 pares resolvidos.**
+
+**Julgamento:**
+- **D = +0,0077 [−0,0269, +0,0410]** por SOL decidido; braço contra "nada" −0,0385 [−0,0775, +0,0022];
+- **`NÃO CONFIRMA`**: não confirma (D < +2 pp, IC com zero); não refuta pelo tamanho (IC sup +4,10 pp ≥ +1 pp);
+- "não bate nada" dispara só na leitura literal (IC do braço alcança +0,22 pp).
+
+**Verificação do mecanismo:**
+- item 1: 124 blocos `entry_pullback`, **0** com `trigger_price > armed_max_price × 0,97`;
+- item 2: 4 mortes `creator_sold_during_wait` registradas (não refeito na fita);
+- item 4, divergência de fill: 74 de 124 entradas na mesma foto do controle (retorno idêntico). Gatilho p50 5,2 s
+  depois de `t0`, foto do controle p50 6,3 s. Nos 74, o preço marginal da foto ficou em média 1,98 % abaixo do gatilho.
+
+**De onde vem D:** mesma foto 0,0000; foto posterior −0,0014; mortos na rechecagem +0,0106; sem recuo −0,0014. As
+entradas não contribuíram positivamente.
+
+**Papel × real:** não mensurável nesta coorte (nenhuma decisão aceita pela mesa real).
+
+Relatório em `.claude/state/notes-R82.md` e KB [[KB-0162-o-recuo-pequeno-empata-com-comprar-na-hora]]. Astra concorda
+([[R82-recuo-controle]]).
+
+**Próximo passo:** H-017 concluída. Recomenda-se ao orquestrador **aposentar `recuo_v1/1`** (e o controle); é decisão
+dele. Nada foi desativado aqui. A trilha de 24–25/09 já está em `r79/cache/h017.csv`; a de 24–27/09, em
+`r82/cache/trail.csv`.
