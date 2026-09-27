@@ -66,6 +66,7 @@ _GATE_ROWS = text(
     "       f.creator_net_seller, f.curve_volume_1m_sol, "
     "       f.snapshot_observed_at, f.snapshot_source, "
     "       f.higher_lows, f.breakout_15m, f.distance_to_support_pct, f.line_reason, "
+    "       f.line_points, f.mcap_slope_15m, f.computed_at, "  # EXP-M26 R1: recorded, never judged
     "       f.hype_score, f.hype_reason, f.dev_share, f.dev_share_reason, f.snipers, "
     "       f.top10_share, f.top10_share_reason, "
     "       f.net_sol_flow_1m, f.buys_1m, f.sells_1m, f.unique_buyers, f.tape_reason, "
@@ -219,6 +220,9 @@ async def load_gate_rows(
                 event_confidence=r["event_confidence"],
                 event_observed_at=r["event_observed_at"],
                 event_match_kind=r["event_match_kind"],
+                line_points=r["line_points"],
+                mcap_slope_15m=r["mcap_slope_15m"],
+                computed_at=r["computed_at"],
             )
         )
     return out

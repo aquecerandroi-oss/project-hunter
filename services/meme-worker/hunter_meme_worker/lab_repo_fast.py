@@ -23,6 +23,7 @@ from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, Pedig
 from hunter_meme_worker.db_errors import db_error_fields
 from hunter_meme_worker.entry_pullback import PULLBACK_ARM_RULE_SET_ID, PULLBACK_CONTROL_RULE_SET_ID
 from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
+from hunter_meme_worker.lab_opportunities import MATURE_CHART_RULE_SET_IDS
 from hunter_meme_worker.lab_repo_drawdown import with_recent_drawdown
 from hunter_meme_worker.lab_rows import snapshot_from_row
 from hunter_meme_worker.proposals import SERIES_15S, GateRow
@@ -113,12 +114,14 @@ _PEDIGREE = text(
     "                          AND pb.rule_set_id <> :probe_rule_set_id "
     "                          AND pb.rule_set_id <> :pullback_rule_set_id "
     "                          AND pb.rule_set_id <> :pullback_control_rule_set_id "
+    "                          AND pb.rule_set_id <> ALL(CAST(:mature_rule_set_ids AS uuid[])) "
     "                          AND pb.creator_sold_seen_at IS NOT NULL "
     "                          AND pb.creator_sold_seen_at < t.created_at)"
     "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb2 WHERE pb2.mint = o.mint "
     "                          AND pb2.rule_set_id <> :probe_rule_set_id "
     "                          AND pb2.rule_set_id <> :pullback_rule_set_id "
     "                          AND pb2.rule_set_id <> :pullback_control_rule_set_id "
+    "                          AND pb2.rule_set_id <> ALL(CAST(:mature_rule_set_ids AS uuid[])) "
     "                          AND pb2.exit ->> 'reason' = 'creator_dump' "
     "                          AND pb2.exit_at < t.created_at)"
     "           )"
@@ -246,18 +249,15 @@ async def pedigree_for(
         "creator_window_s": gate.creator_window_s,
         "symbol_window_s": gate.symbol_window_s,
         "prior_window_s": PRIOR_WINDOW_S,
-        # T4.85 (EXP-M23): the probe's own paper bets are evidence the desk
-        # would never have had — it follows coins the desk REFUSED, so its
-        # bets make the creator watcher stamp ``creator_sold_seen_at`` on
-        # mints nobody was watching. Counting them here would let the
-        # experiment change the real desk's ``creator_repeat_dumper``
-        # refusals. Excluded by id, so the desk reads exactly what it read
-        # before this arm existed.
+        # T4.85 (EXP-M23): the probe's own paper bets are evidence the desk would
+        # never have had — its bets make the creator watcher stamp
+        # ``creator_sold_seen_at`` on mints nobody was watching, which would
+        # change the real desk's ``creator_repeat_dumper`` refusals. Excluded by id.
         "probe_rule_set_id": PROBE_RULE_SET_ID,
-        # T4.91 (EXP-M24): the same for recuo_v1/1 — its bets outlive the desk's
-        # shadow on the same mint and could witness a creator sale it never saw.
+        # T4.91 (EXP-M24): the same for recuo_v1/1 — its bets could witness a creator sale.
         "pullback_rule_set_id": PULLBACK_ARM_RULE_SET_ID,
         "pullback_control_rule_set_id": PULLBACK_CONTROL_RULE_SET_ID,  # T4.95: and its control
+        "mature_rule_set_ids": list(MATURE_CHART_RULE_SET_IDS),  # EXP-M26 (0067): the 3 arms
     }
     try:
         async with session.begin_nested():

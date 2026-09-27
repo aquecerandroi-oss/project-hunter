@@ -46,6 +46,7 @@ from hunter_meme_worker.lab_bets import BetsReport, FillReport, fill_approved, p
 from hunter_meme_worker.lab_fast import fast_gate_step
 from hunter_meme_worker.lab_heartbeat import HEARTBEAT_PREFIX, heartbeat_fields, write_lab_heartbeat
 from hunter_meme_worker.lab_models import RuleSetSpec, SolUsd
+from hunter_meme_worker.lab_opportunities import MatureOpportunityState, is_mature, mature_gate_step
 from hunter_meme_worker.lab_pins import reload_pinned_mints
 from hunter_meme_worker.lab_repo import (
     apply_command,
@@ -131,6 +132,8 @@ class LabState:
     probe: RefusedProbeState = field(default_factory=RefusedProbeState)
     """T4.85 (EXP-M23): which refused mints the probe has already decided
     the lottery for — so a mint gets one draw, not one every 15 s."""
+    mature: MatureOpportunityState = field(default_factory=MatureOpportunityState)
+    """EXP-M26 R1: the first-opportunity record's counters (``lab_opportunities``)."""
 
     def record_fill_delay(self, seconds: int) -> None:
         self.fill_delays.append(seconds)
@@ -254,6 +257,24 @@ async def _gate_step(
             pedigree, e2b = await lineage_for(session, rows, minute_specs)
             for spec in minute_specs:
                 already_open = await open_mints_for(session, spec.id)
+                if is_mature(spec):  # EXP-M26 R1: its proposals and its first opportunities
+                    mature = await mature_gate_step(
+                        session,
+                        ctx.state.mature,
+                        spec,
+                        rows,
+                        now=now,
+                        ttl_s=ctx.config.lab_proposal_ttl_s,
+                        already_open=already_open,
+                        pedigree=pedigree,
+                        e2b=e2b,
+                        features_version=ctx.config.features_version,
+                        minute=minute,
+                    )
+                    refusals[spec.name].update(mature.refusals)
+                    rows_total += mature.evaluated
+                    proposals_total += mature.proposals
+                    continue
                 outcome = evaluate_gate(
                     spec,
                     rows,

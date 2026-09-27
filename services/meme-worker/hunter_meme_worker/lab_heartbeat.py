@@ -79,6 +79,12 @@ def heartbeat_fields(state: LabState, *, enabled: bool = True) -> dict[str, str]
         "refused_probe_considered": str(state.probe.considered_total),
         "refused_probe_proposals": str(state.probe.proposals_total),
         "refused_probe_unquotable": str(state.probe.unquotable_total),
+        # EXP-M26 R1: the first-opportunity record, since boot (failures never stop the tick).
+        "mature_opportunities_written": str(state.mature.written_total),
+        "mature_opportunities_unfaithful": str(state.mature.unfaithful_total),
+        "mature_opportunities_failed": str(state.mature.failed_total),
+        "mature_proposal_insert_failed": str(state.mature.proposal_failed_total),
+        "mature_lane_since": state.mature.lane_since.isoformat() if state.mature.lane_since else "",
     }
     return {HEARTBEAT_PREFIX + key: str(value) for key, value in fields.items()}
 

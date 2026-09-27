@@ -563,6 +563,11 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         tuple[str, ...],
         migration_ddl("meme_decision_tapes").MEME_DECISION_TAPES_APP_READ_ONLY_TABLES,
     )
+    # EXP-M26 R1 (0066): the first opportunity per (rule set, mint) — read-only for the app.
+    mature_opportunities_read_only = cast(
+        tuple[str, ...],
+        migration_ddl("meme_mature_opportunities").MEME_MATURE_OPPORTUNITIES_APP_READ_ONLY_TABLES,
+    )
 
     classified = (
         list(write)
@@ -598,6 +603,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(spot_desk_sell_request)
         + list(treasury_read_only)
         + list(decision_tapes_read_only)
+        + list(mature_opportunities_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

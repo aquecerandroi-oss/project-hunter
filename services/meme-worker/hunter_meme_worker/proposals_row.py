@@ -122,7 +122,10 @@ class GateRow:
     written, which is not when it claims to describe. The anti-look-ahead
     guard of ``refused_probe.is_readable_at`` refuses a row written after
     the tick even when its ``as_of`` is inside the window (R69's own trap);
-    ``None`` on a closed-minute row, which that guard reads as "unreadable"."""
+    ``None`` where the series carries none, which that guard reads as "unreadable". Since
+    EXP-M26 R1 a closed-minute row carries ``meme_features_1m.computed_at``
+    too (recorded in ``meme_mature_opportunities``; the probe never reads
+    closed-minute rows)."""
     tape_as_of: datetime | None = None
     """T4.85 (EXP-M23): ``meme_features_15s.tape_as_of`` (``0032``) — the end
     of the tape window folded into the row. ``tape_as_of > as_of`` is tape
@@ -131,6 +134,12 @@ class GateRow:
     """T4.79 (EXP-M22): :class:`hunter_meme_worker.absorb.AbsorbFeatures`, filled
     by the event lane only; ``None`` elsewhere — ``absorb_unknown`` for a set
     that asks, fail closed."""
+    line_points: int | None = None
+    mcap_slope_15m: Decimal | None = None
+    """EXP-M26 R1: the photo count of the line's window and the 15-minute slope of
+    the closed minute (``meme_features_1m``), read by the same query as the rest
+    of the row and recorded in ``meme_mature_opportunities``; no gate reads them.
+    ``None`` on a 15-second or event row."""
 
 
 __all__ = ["GateRow"]

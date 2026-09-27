@@ -105,6 +105,7 @@ from hunter_core.db.models.meme_lab import (
 from hunter_core.db.models.meme_lab_audit import MemeGateRefusalByMint, MemeRuleSetParamHistory
 from hunter_core.db.models.meme_lab_ticks import MemeLabTick
 from hunter_core.db.models.meme_live import MemeLiveKillSwitch, MemeLiveOrder, MemeLivePosition
+from hunter_core.db.models.meme_mature_opportunities import MemeMatureOpportunity
 from hunter_core.db.models.meme_series import MemeCurveSnapshot, MemeTrade
 from hunter_core.db.models.meme_treasury import MemeTreasurySwap
 from hunter_core.db.models.meme_wallets import MemeWalletPosition, MemeWalletTrade
@@ -232,6 +233,7 @@ __all__ = [
     "MemeLiveKillSwitch",
     "MemeLiveOrder",
     "MemeLivePosition",
+    "MemeMatureOpportunity",
     "MemeMarketActivity1m",
     "MemeOperatorCommand",
     "MemePaperBet",
