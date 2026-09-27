@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
-from hunter_core.execution.meme.journal import SubmitState
+from hunter_core.execution.meme.journal import SigningLocked, SubmitState
 from hunter_core.execution.meme.submit import (
     ApprovedSubmission,
     MemeLiveTradingDisabled,
@@ -61,6 +61,10 @@ async def submit_entry_buy(
         result = await asyncio.to_thread(submitter.submit, approval)
     except MemeLiveTradingDisabled:
         ctx.state.last_refusal = "meme_live_disabled"
+        return
+    except SigningLocked as exc:  # T4.96b: the row left ``admitted`` (orphan expiry) — nothing sent
+        ctx.state.last_refusal = "signing_refused:not_admitted"
+        logger.warning("meme_live_signing_refused", order=key, detail=str(exc))
         return
     await record_send_result(ctx, key, result)
     if result.signature:

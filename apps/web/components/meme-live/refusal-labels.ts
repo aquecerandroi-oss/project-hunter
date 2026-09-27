@@ -103,6 +103,9 @@ const CHECK_REFUSAL_LABEL: Record<string, string> = {
   small_test_scope_exhausted: "escopo do teste pequeno esgotado (nº de compras ou SOL do escopo)",
   // T4.96: above zero, but below the minimum ticket of the profile that tried to buy.
   small_test_below_min: "restante do escopo do teste pequeno abaixo do mínimo por compra deste perfil",
+  // T4.96b: scope not exhausted, but another buy reserved part of it after this one was sized.
+  small_test_remainder_short: "restante do escopo não cobre mais esta compra (outra compra reservou antes)",
+  admitted_orphan_expired: "compra admitida e nunca assinada — expirou e liberou o escopo (nada foi enviado)",
 };
 
 /** `curve_not_found`/`curve_complete` (mark reason) and the `rpc_unreachable:<Type>`/`fill_decode_failed:<Type>`/`simulation_failed:<motivo>` prefixes the executor writes with a dynamic suffix. */

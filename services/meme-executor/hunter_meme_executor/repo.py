@@ -174,7 +174,8 @@ _SEND_STATS = text(
 )
 _FAILED_FILL = text(
     "UPDATE meme_live_orders SET fill = CAST(:fill AS jsonb), updated_at = :now "
-    "WHERE client_order_id = :key AND status = 'failed' AND fill IS NULL"
+    "WHERE client_order_id = :key AND status = 'failed' "
+    "  AND (fill IS NULL OR jsonb_typeof(fill) = 'null') RETURNING id"  # T4.96b: JSON null too
 )
 
 
@@ -334,14 +335,13 @@ async def record_send_stats(
 
 async def record_failed_fill(
     session: AsyncSession, client_order_id: str, fill: dict[str, Any]
-) -> None:
-    """T4.59: the network fee a landed-and-failed transaction paid, as the row's
-    ``fill`` (``send_path.failed_onchain_fill``) — only onto a ``failed`` row that
-    has none, so a confirmed fill is never overwritten by a late reconcile."""
-    await session.execute(
+) -> bool:
+    """T4.59: a landed-and-failed tx's paid fee as ``fill``, onto a ``failed`` row without one."""
+    written = await session.execute(
         _FAILED_FILL,
         {"key": client_order_id, "fill": json.dumps(fill, default=str), "now": utcnow()},
     )
+    return written.scalar() is not None
 
 
 def order_key(proposal_id: str, *, side: str, attempt: int = 1) -> str:

@@ -133,6 +133,9 @@ async def _auto_fields(
     fields["small_test_remaining_sol"] = str(scope.remaining_sol)
     fields["small_test_exhausted"] = scope.exhausted or ""
     fields["small_test_below_min"] = ",".join(below_min_profiles(scope, cfg))
+    fields["small_test_below_min_with_ata"] = ",".join(  # T4.96b: the blind band
+        below_min_profiles(scope, cfg, with_ata=True)
+    )
     return fields
 
 

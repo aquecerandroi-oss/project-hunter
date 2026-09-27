@@ -164,24 +164,25 @@ async def _failed_onchain_fee(ctx: ExecutorContext, result: SubmitResult) -> dic
 
 async def record_failed_onchain_fee(
     ctx: ExecutorContext, key: str, result: SubmitResult | None
-) -> None:
+) -> bool:
     """T4.59: a transaction that landed **with** an error still charged its
     network fee; write it to the order's ``fill`` so the day's fees count it.
     Called after every settlement — the send itself and the two reconciles
     (``main.reconcile_once``, ``exits._reconcile_sell``). Any other result, a
-    replay or an unreadable transaction writes nothing."""
+    replay or an unreadable transaction writes nothing. Returns whether it wrote."""
     if result is None or result.replayed:
-        return
+        return False
     fee_fill = await _failed_onchain_fee(ctx, result)
     if fee_fill is None:
-        return
+        return False
     try:
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-            await record_failed_fill(session, key, fee_fill)
+            return await record_failed_fill(session, key, fee_fill)
     except Exception as exc:  # bookkeeping must never mask the settled result
         logger.warning(
             "meme_live_failed_fee_write_failed", order=key, error_type=type(exc).__name__
         )
+        return False
 
 
 async def record_send_result(ctx: ExecutorContext, key: str, result: SubmitResult) -> None:

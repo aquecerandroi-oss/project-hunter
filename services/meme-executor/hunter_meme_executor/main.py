@@ -68,6 +68,7 @@ from hunter_meme_executor.event_exits import (
 )
 from hunter_meme_executor.exit_settle import repair_confirmed_sells
 from hunter_meme_executor.exits import exits_once
+from hunter_meme_executor.failed_fees import recover_failed_fees
 from hunter_meme_executor.gates_reload import gates_reload_once, prime_gates
 from hunter_meme_executor.heartbeat import heartbeat_once
 from hunter_meme_executor.journal_db import WORKER_ROLE, PostgresOrderJournal
@@ -75,6 +76,7 @@ from hunter_meme_executor.kill_switch import KillSwitchReader
 from hunter_meme_executor.launch_config import LAUNCH_EXIT_TICK_S
 from hunter_meme_executor.launch_entries import launch_entries_once
 from hunter_meme_executor.launch_exits import launch_exits_once
+from hunter_meme_executor.orphan_buys import expire_orphan_buys
 from hunter_meme_executor.priority_fee import PriorityFeeReader
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
@@ -157,6 +159,8 @@ async def reconcile_once(ctx: ExecutorContext) -> None:
         await record_failed_onchain_fee(ctx, key, result)  # T4.59: a landed error paid its fee
     # T4.90b: a sell confirmed above (or before a crash) closes its position now.
     await repair_confirmed_sells(ctx)
+    await expire_orphan_buys(ctx, now=utcnow())  # T4.96b: last, never raises
+    await recover_failed_fees(ctx, now=utcnow())  # T4.96b: a failed buy's fee, never raises
 
 
 async def kill_switch_once(ctx: ExecutorContext) -> None:

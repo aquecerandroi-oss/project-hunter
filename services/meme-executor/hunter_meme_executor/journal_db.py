@@ -48,8 +48,10 @@ _BY_SIGNATURE = text(
 )
 _LOCK = text(
     "UPDATE meme_live_orders SET signing_at = :now, updated_at = :now "
-    "WHERE client_order_id = :key AND signing_at IS NULL RETURNING client_order_id"
+    "WHERE client_order_id = :key AND signing_at IS NULL AND status = 'admitted' "
+    "RETURNING client_order_id"
 )
+"""T4.96b: only an ``admitted`` row can be locked — a refused orphan never signs."""
 _UNLOCK = text(
     "UPDATE meme_live_orders SET signing_at = NULL, updated_at = :now WHERE client_order_id = :key"
 )
@@ -57,8 +59,13 @@ _SIGNATURE = text(
     "UPDATE meme_live_orders SET signatures = signatures || CAST(:sig AS jsonb), "
     "  tx_signature = :signature, last_valid_block_height = :height, "
     "  status = 'simulated', simulated_at = coalesce(simulated_at, :now), updated_at = :now "
-    "WHERE client_order_id = :key AND NOT (signatures @> CAST(:sig AS jsonb))"
+    "WHERE client_order_id = :key AND NOT (signatures @> CAST(:sig AS jsonb)) "
+    "  AND status = 'admitted' "
+    "RETURNING client_order_id"
 )
+"""T4.96b: the signature is recorded (before the send) only on an ``admitted``
+row; on any other row :meth:`PostgresOrderJournal.record_signature` raises, so
+the submitter stops before sending (``orphan_buys``)."""
 _STATE = text(
     "UPDATE meme_live_orders SET status = :state, reason = :reason, "
     "  fill = CAST(:fill AS jsonb), "
@@ -171,7 +178,7 @@ class PostgresOrderJournal:
         self, proposal_id: str, signature: str, *, last_valid_block_height: int | None
     ) -> None:
         async def work(session: AsyncSession) -> None:
-            await session.execute(
+            recorded = await session.execute(
                 _SIGNATURE,
                 {
                     "key": proposal_id,
@@ -181,6 +188,11 @@ class PostgresOrderJournal:
                     "now": utcnow(),
                 },
             )
+            if recorded.scalar() is not None:
+                return
+            row = (await session.execute(_GET, {"key": proposal_id})).mappings().first()
+            if row is None or signature not in (row["signatures"] or []):
+                raise SigningLocked(f"{proposal_id}: not admitted any more, nothing sent")
 
         self._run(work)
 

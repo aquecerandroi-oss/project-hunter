@@ -1965,6 +1965,7 @@ async def test_a_remainder_below_the_floor_is_named_and_the_robot_opens_nothing(
     assert len(armed.rpc.sent) == 1
     hb = await heartbeat_fields(armed.ctx)
     assert hb["small_test_exhausted"] == "" and hb["small_test_below_min"] == "full"
+    assert hb["small_test_below_min_with_ata"] == "full"
 
 
 async def test_a_remainder_the_reserve_leaves_unusable_is_refused_by_name_after_the_fee_read(
@@ -2034,7 +2035,9 @@ async def test_the_scope_claim_serialises_two_lanes_on_one_lock(
     await a
     with pytest.raises(ScopeClaimRefused) as refused:
         await b
-    assert refused.value.reason == "small_test_scope_exhausted"
+    assert refused.value.reason == "small_test_remainder_short", (
+        "not exhausted: a trade slot is left"
+    )
     assert refused.value.detail["trades_done"] == 1
     assert Decimal(refused.value.detail["remaining_sol"]) == Decimal("0.02")
     # Alone, the same debit fits: the lock is what made the difference.
@@ -2048,7 +2051,8 @@ async def test_the_scope_counter_charges_each_row_its_worst_debit_by_status(
     """T4.96: confirmed → the fill's real debit; in flight (``admitted``,
     ``simulated``, ``submitted_unconfirmed``) → ``scope_reserve_sol``; a row
     written before T4.96 (only ``max_sol_cost_sol``) → that + network + rent +
-    the priority cap; ``refused``/``failed`` → nothing."""
+    the priority cap; a landed `failed` buy → its paid network fee, no slot (T4.96b);
+    ``refused`` → nothing."""
     from hunter_meme_executor.scope import legacy_extra_sol, read_scope_use
 
     armed = _context(db_session_factory, _signer(), harness.redis, auto=_small_test("5"))
@@ -2092,7 +2096,12 @@ async def test_the_scope_counter_charges_each_row_its_worst_debit_by_status(
         )
     assert use.trades_done == 4
     expected = (
-        Decimal("0.012345678") + Decimal("0.0123") + Decimal("0.004") + Decimal("0.01") + extra
+        Decimal("0.012345678")
+        + Decimal("0.0123")
+        + Decimal("0.004")
+        + Decimal("0.01")
+        + extra
+        + Decimal("0.000005")
     )
     assert use.used_sol == expected
 

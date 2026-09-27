@@ -136,6 +136,9 @@ describe("executorRefusalLabel: the RISK_ENGINE_MEME.md §4 vocabulary, exhausti
     expect(executorRefusalLabel("small_test_scope_exhausted")).toContain("esgotado");
     // T4.96: a remainder above zero that the profile's minimum ticket cannot use.
     expect(executorRefusalLabel("small_test_below_min")).toContain("abaixo do mínimo");
+    // T4.96b: the claim found the remainder taken by another buy (scope not exhausted).
+    expect(executorRefusalLabel("small_test_remainder_short")).toContain("não cobre");
+    expect(executorRefusalLabel("admitted_orphan_expired")).toContain("nunca assinada");
   });
 
   it("never returns the bare code -- an unrecognized one is still prefixed", () => {

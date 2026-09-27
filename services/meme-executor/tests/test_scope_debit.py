@@ -213,3 +213,25 @@ def test_below_min_profiles_is_per_profile_and_launch_only_when_on() -> None:
 def test_below_min_profiles_is_empty_when_exhausted_or_healthy() -> None:
     assert below_min_profiles(_use("10"), _config(launch="on")) == []
     assert below_min_profiles(_use("5"), _config(launch="on")) == []
+
+
+# ---- T4.96b: the heartbeat's blind band -------------------------------------------------------
+
+
+def test_the_blind_band_is_published_with_the_ata_and_the_minimum_priority() -> None:
+    """0,0215 left, floor 0,02, 1 % tolerance: the lower bound (network only)
+    still fits a ticket (21 282 178 lamports usable) — the robot keeps opening —
+    but with the ATA rent and the minimum priority (100 000 micro x 400 000 CU)
+    it does not (19 223 485): the heartbeat names that band instead of ``""``."""
+    use = _use("9.9785")
+    assert _config().send.buy_slippage_bps() == 100
+    assert below_min_profiles(use, _config()) == []
+    assert below_min_profiles(use, _config(), with_ata=True) == ["full"]
+
+
+def test_the_launch_blind_band_uses_the_launch_priority_floor() -> None:
+    # 0,0132 left: launch floor 0,01; lower bound (network + rent, 10 %) fits,
+    # + the 1 000 000 micro launch floor (0,0004) does not.
+    use = _use("9.9868")
+    assert below_min_profiles(use, _config(launch="on")) == ["full"]
+    assert below_min_profiles(use, _config(launch="on"), with_ata=True) == ["full", "launch"]

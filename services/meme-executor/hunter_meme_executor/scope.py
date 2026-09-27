@@ -8,7 +8,8 @@ its own ledger, never in memory: ``max_trades`` against the buys reserved or
 sent (T4.14; since T4.96 ``admitted``/``simulated`` too — a buy in flight holds
 its slot) and — since T4.28 — ``max_total_sol`` against the SOL those buys take
 from the wallet (the chain's delta on a confirmed fill; the worst-case debit
-``scope_reserve_sol`` while one is in flight). Either reached ⇒
+``scope_reserve_sol`` while one is in flight; since T4.96b also the network
+fee a landed ``failed`` buy paid — SOL out, but no trade slot). Either reached ⇒
 ``small_test_scope_exhausted``; short of it, the requested size is **clamped**
 so the last buy of the scope never overshoots the number the owner wrote.
 
@@ -38,6 +39,7 @@ from sqlalchemy import text
 
 from hunter_core.db.session import role_session
 from hunter_meme_executor.journal_db import WORKER_ROLE
+from hunter_meme_executor.priority_fee import PriorityFeeChoice, cap_micro_lamports
 from hunter_risk_meme.profile import launch_floor
 
 if TYPE_CHECKING:
@@ -46,11 +48,11 @@ if TYPE_CHECKING:
     from hunter_core.execution.meme.gates import SmallTestAuthorization
     from hunter_meme_executor.config import ExecutorConfig
     from hunter_meme_executor.context import ExecutorContext
-    from hunter_meme_executor.priority_fee import PriorityFeeChoice
 
 # fmt: off
 __all__ = [
-    "SMALL_TEST_BELOW_MIN", "SMALL_TEST_SCOPE_EXHAUSTED", "ScopeClaimRefused", "ScopeUse",
+    "SMALL_TEST_BELOW_MIN", "SMALL_TEST_REMAINDER_SHORT", "SMALL_TEST_SCOPE_EXHAUSTED",
+    "ScopeClaimRefused", "ScopeUse",
     "below_min_profiles", "buy_reserve_sol", "claim_scope", "lane_scope", "legacy_extra_sol",
     "read_scope_use", "requested_sol_of", "scope_refusal", "scope_use",
 ]
@@ -59,6 +61,9 @@ __all__ = [
 SMALL_TEST_SCOPE_EXHAUSTED: Final = "small_test_scope_exhausted"
 SMALL_TEST_BELOW_MIN: Final = "small_test_below_min"
 """T4.96: the remainder is above zero but below this profile's minimum ticket."""
+SMALL_TEST_REMAINDER_SHORT: Final = "small_test_remainder_short"
+"""T4.96b: at the claim, the scope is not exhausted but no longer covers *this*
+buy's worst-case debit (another buy reserved part of it meanwhile)."""
 SCOPE_LOCK: Final = (0x4D454D45, 1)
 """``pg_advisory_xact_lock`` (namespace "MEME", key 1): the small-test scope."""
 
@@ -105,18 +110,23 @@ def legacy_extra_sol(cfg: ExecutorConfig) -> Decimal:
 
 
 _USED = text(
-    "SELECT count(*) AS trades, "
-    "  coalesce(sum(coalesce((fill->>'buy_total_lamports')::numeric / 1000000000, "
-    "                        (intent->>'scope_reserve_sol')::numeric, "
-    "                        (intent->>'max_sol_cost_sol')::numeric + :legacy_extra, 0)), 0) "
+    "SELECT count(*) FILTER (WHERE status <> 'failed') AS trades, "
+    "  coalesce(sum(CASE WHEN status = 'failed' "
+    "    THEN coalesce((fill->>'network_fee_lamports')::numeric / 1000000000, "
+    "      CASE WHEN reason LIKE 'onchain_error:%' THEN CAST(:legacy_extra AS numeric) "
+    "      ELSE 0 END) "
+    "    ELSE coalesce((fill->>'buy_total_lamports')::numeric / 1000000000, "
+    "                  (intent->>'scope_reserve_sol')::numeric, "
+    "                  (intent->>'max_sol_cost_sol')::numeric + :legacy_extra, 0) END), 0) "
     "  AS used_sol "
     "FROM meme_live_orders WHERE side = 'buy' "
-    "  AND status IN ('admitted', 'simulated', 'submitted_unconfirmed', 'confirmed')"
+    "  AND status IN ('admitted', 'simulated', 'submitted_unconfirmed', 'confirmed', 'failed')"
 )
-"""One read for both counters: every buy reserved or sent (a stuck ``admitted``
-row keeps its reservation, as the wallet brake's ``pending_attempts`` does) and
+"""One read for both counters: every buy reserved or sent (an ``admitted`` row
+keeps its reservation until it signs or ``orphan_buys`` refuses it, T4.96b) and
 what it cost — the fill's real wallet delta once confirmed, the worst-case
-debit while in flight."""
+debit while in flight, the paid network fee of a buy that landed and failed (the
+conservative ``legacy_extra`` while that fee is still unread — ``failed_fees``)."""
 _LOCK = text("SELECT pg_advisory_xact_lock(:namespace, :key)")
 
 
@@ -194,19 +204,37 @@ def scope_refusal(scope: ScopeUse | None, floor: Decimal) -> tuple[str, dict[str
     return None
 
 
-def below_min_profiles(scope: ScopeUse, cfg: ExecutorConfig) -> list[str]:
+def _min_priority(cfg: ExecutorConfig, floor_micro_lamports: int) -> PriorityFeeChoice:
+    """The cheapest priority a buy of this profile can pay: its floor, under the cap."""
+    cap = cap_micro_lamports(cfg.send.priority_fee_max_sol, cfg.compute_unit_limit)
+    return PriorityFeeChoice.static(min(floor_micro_lamports, cap))
+
+
+def below_min_profiles(
+    scope: ScopeUse, cfg: ExecutorConfig, *, with_ata: bool = False
+) -> list[str]:
     """The profiles whose floor the remainder **certainly** cannot pay — with a
     lower bound of the reserve (the network fee; + the rent on the launch lane,
     which always creates the ATA), so a name here means the admission refuses.
-    Empty when exhausted (that state has its own name) or when a buy fits."""
+    ``with_ata`` (T4.96b, the heartbeat's second field): the reserve of a buy
+    that creates its ATA at the profile's minimum priority — the band where the
+    lower bound still says "fits" but a typical buy is refused. Empty when
+    exhausted (that state has its own name) or when a buy fits."""
     if scope.exhausted is not None:
         return []
     limits, out = cfg.limits, list[str]()
-    full = scope.for_buy(limits.network_fee_sol, cfg.send.buy_slippage_bps())
+    reserve = limits.network_fee_sol
+    if with_ata:
+        fee = _min_priority(cfg, cfg.send.priority_fee_floor_micro_lamports)
+        reserve = buy_reserve_sol(cfg, fee, creates_ata=True)
+    full = scope.for_buy(reserve, cfg.send.buy_slippage_bps())
     if full.usable_sol < limits.min_trade_sol:
         out.append("full")
     if cfg.launch.enabled:
         reserve = limits.network_fee_sol + limits.ata_rent_sol
+        if with_ata:
+            fee = _min_priority(cfg, cfg.launch.priority_floor_micro_lamports)
+            reserve = buy_reserve_sol(cfg, fee, creates_ata=True)
         launch = scope.for_buy(reserve, cfg.launch.buy_slippage_bps())
         if launch.usable_sol < launch_floor(limits, cfg.launch.profile(limits)):
             out.append("launch")
@@ -284,4 +312,5 @@ async def claim_scope(session: AsyncSession, ctx: ExecutorContext, *, debit_sol:
     )
     if use.exhausted is not None or debit_sol > use.remaining_sol:
         detail = {**use.as_json(), "claimed_debit_sol": str(debit_sol)}
-        raise ScopeClaimRefused(SMALL_TEST_SCOPE_EXHAUSTED, detail)
+        reason = SMALL_TEST_SCOPE_EXHAUSTED if use.exhausted else SMALL_TEST_REMAINDER_SHORT
+        raise ScopeClaimRefused(reason, detail)

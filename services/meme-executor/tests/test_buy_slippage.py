@@ -260,8 +260,16 @@ class _Rpc:
 class _Session:
     executed: list[tuple[str, dict[str, Any]]] = field(default_factory=lambda: list[Any]())
 
-    async def execute(self, statement: Any, params: dict[str, Any]) -> None:
+    async def execute(self, statement: Any, params: dict[str, Any]) -> _Result:
         self.executed.append((str(statement), params))
+        return _Result()
+
+
+class _Result:
+    """What ``RETURNING id`` answers: one row matched (T4.96b)."""
+
+    def scalar(self) -> str:
+        return "row"
 
 
 class _Sessions:
@@ -305,7 +313,8 @@ def test_a_buy_that_failed_on_chain_records_the_fee_it_paid(
     assert "intent = intent ||" in stats[0]
     assert json.loads(stats[1]["patch"]) == {"resends": 2, "resend_errors": 0}
     assert "SET fill = " in fill_write[0]
-    assert "status = 'failed' AND fill IS NULL" in fill_write[0]
+    # T4.96b: ``submit._fail`` leaves JSON null — the old ``fill IS NULL`` never matched.
+    assert "(fill IS NULL OR jsonb_typeof(fill) = 'null')" in fill_write[0]
     assert fill_write[1]["key"] == "meme:pid"
     written = json.loads(fill_write[1]["fill"])
     assert written["network_fee_lamports"] == 105_000

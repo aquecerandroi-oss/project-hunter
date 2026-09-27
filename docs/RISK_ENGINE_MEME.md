@@ -310,15 +310,44 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
   `max_sol_cost + reserva ≤ restante` (`scope.py`; o programa recusa gastar acima do `max_sol_cost`,
   que inclui as taxas da curva). **Fora da margem, declarado:** o rent único do
   `user_volume_accumulator` (1 346 200 lamports, uma vez por carteira, R43 — já pago), cortes de
-  roteadores de terceiros (caminho que não construímos) e a taxa de uma compra que **falha** na
-  cadeia (linha `failed`, fora do contador desde a T4.28). Linhas em voo gravadas antes da T4.96 (só
+  roteadores de terceiros (caminho que não construímos). Desde a T4.96b a taxa de rede de uma compra
+  que **pousa e falha** (`failed` com `fill.network_fee_lamports`) entra no `used_sol` — SOL que saiu —
+  sem gastar vaga de `max_trades`. **Enquanto a taxa não é conhecida** (entre o `record_state(FAILED)` e
+  a gravação, ou quando o `getTransaction` voltou vazio) a linha `failed` com motivo `onchain_error:` é
+  cobrada a reserva conservadora (rede + rent + `MEME_PRIORITY_FEE_MAX_SOL`), nunca zero — várias falhas
+  não lidas não deixam o escopo passar do teto (revisão da Astra; antes a janela admitia uma taxa por
+  falha pendente). A gravação aceita `fill` SQL NULL **ou** JSON `null` (o `submit._fail`
+  grava JSON `null`; até 27/09 o predicado exigia SQL NULL e **nenhuma** taxa de falha foi gravada — na
+  VPS, 13 compras e 9 vendas desde 17/09). **Recuperação durável:** a cada tique o laço de
+  reconciliação (depois das liquidações; nunca levanta) relê até 10 compras `failed` com motivo
+  `onchain_error:`, assinatura e sem taxa, com recuo de 600 s por linha (`failed_fees.py`) — cobre a
+  leitura que voltou vazia, o timeout e a queda entre `FAILED` e a gravação; as 13 históricas passam a
+  contar a reserva no deploy e a taxa real quando o `getTransaction` responder. Linhas em voo gravadas
+  antes da T4.96 (só
   `max_sol_cost_sol`) são cobradas `max_sol_cost + rede + rent + MEME_PRIORITY_FEE_MAX_SOL`.
 - **O escopo é reclamado sob uma trava (T4.96).** As duas pistas (entradas e lançamento) são tarefas
   separadas e cada uma lê o escopo antes de montar a compra; a transação que grava a ordem `admitted`
   toma `pg_advisory_xact_lock` (namespace "MEME", chave 1), relê os contadores — contando `admitted` e
-  `simulated` também — e recusa `small_test_scope_exhausted` se o débito máximo da compra montada não
-  couber mais (`admission.small_test_claim`). Uma `admitted` presa por queda antes da assinatura segura
-  sua reserva, como o freio da carteira (`pending_attempts`) já segura.
+  `simulated` também — e recusa se o débito máximo da compra montada não couber mais
+  (`admission.small_test_claim`): `small_test_scope_exhausted` quando um contador fechou,
+  `small_test_remainder_short` (T4.96b) quando o escopo não esgotou mas outra compra reservou parte do
+  restante depois que esta foi dimensionada.
+- **Compra `admitted` órfã (T4.96b,** `admitted_orphan_expired`**).** Uma ordem de compra `admitted`
+  **sem assinatura** nunca saiu do processo: o submissor assina, **grava a assinatura** (`simulated`) e
+  só depois envia. Uma queda entre o commit da ordem e o `begin_signing`, ou uma falha do journal que
+  deixou a trava de assinatura para trás, deixava essa linha segurando vaga e SOL do escopo para sempre.
+  O laço de reconciliação (depois das liquidações, inclusive das vendas; nunca levanta exceção) marca
+  `refused`/`admitted_orphan_expired` as compras `admitted` sem `tx_signature` e com `signatures = []`
+  cujo `admitted_at` passou de TTL da reserva + 300 s (sem trava) ou cujo `signing_at` passou de TTL +
+  `MEME_LIVE_CONFIRM_TIMEOUT_S` + 300 s (trava deixada). Não há assinatura para consultar na cadeia —
+  a prova de "não pousou" é estrutural: desde a T4.96b o journal **não trava nem grava assinatura**
+  numa linha que não esteja `admitted`, então um submissor atrasado falha fechado antes do envio.
+  Linhas com assinatura continuam da reconciliação por assinatura (`unconfirmed_orders`). **Caminho
+  manual** (quando o dono não quer esperar o prazo, com o executor parado ou a linha comprovadamente
+  sem assinatura): `UPDATE meme_live_orders SET status = 'refused', reason =
+  'admitted_orphan_expired', settled_at = now(), updated_at = now() WHERE client_order_id = '<chave>'
+  AND side = 'buy' AND status = 'admitted' AND tx_signature IS NULL AND signatures = '[]'::jsonb;` —
+  nunca numa linha com `tx_signature` (essa se liquida pela cadeia).
 - **Restante abaixo do mínimo do perfil (T4.96,** `small_test_below_min`**).** Restante > 0 mas menor
   que o piso do perfil (0,02 no perfil cheio; o piso do lançamento é outro, §18) já não é "esgotado":
   a entrada é recusada por esse nome (antes da leitura da cadeia com o restante bruto; depois da
@@ -326,7 +355,11 @@ dinheiro: **o worker não decide dinheiro real; o executor decide**, com os mesm
   cota inferior de custo — só pula o que a admissão certamente recusaria) e o heartbeat publica
   `small_test_below_min` = os perfis (`full`, `launch` com a pista ligada) cujo piso o restante não
   paga. Em 26/09 esse estado (0,012424071 sob 0,02) ficou 15 h escondido atrás do primeiro check que
-  falhava (`creator_*`), com `small_test_exhausted` vazio.
+  falhava (`creator_*`), com `small_test_exhausted` vazio. A cota inferior deixa uma faixa cega (o
+  restante cobre a rede mas não a ATA): o heartbeat publica também `small_test_below_min_with_ata`
+  (T4.96b), com a reserva de uma compra que cria a ATA pagando a prioridade mínima do perfil (o piso
+  de prioridade, sob o teto) — ex.: 0,0215 restante, piso 0,02, 1 % ⇒ `below_min = ""`,
+  `with_ata = "full"`. O pulo do robô continua na cota inferior (só pula o que é certo recusar).
 - **Freios que só existem neste modo** (todos nomeados no heartbeat, `auto_skipped`): no máximo 1
   compra por tique e por mint; proposta com idade (`agora − proposed_at`) acima de
   `MEME_LIVE_AUTO_APPROVE_MAX_AGE_S` (padrão **10 s** desde a T4.94; antes, 60 s fixos) fica para o
