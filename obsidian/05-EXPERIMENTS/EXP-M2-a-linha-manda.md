@@ -158,6 +158,41 @@ séries (`0042`). **Leitura para o veredito:** toda aposta desta página em moed
 o número de apostas medidas pode cair; nenhum limiar foi mexido. Braço que quiser Mayhem de propósito diz `exclude_mayhem: false`
 (nenhum hoje). Detalhe em [[11-KNOWLEDGE/KB-0098-quantos-bums-reais-ha-por-dia-e-quanto-tempo-temos|KB-0098]] §5.
 
+### Avaliação de 2026-09-26 — por que morreu com 0 propostas
+
+**Reconstrução do funil (`q6.sql`/`q8.sql`/`q11.sql`, conjunto ativo de 12/09 15:03Z a 20/09 01:24Z, porta
+`a_linha_manda` v1, idade 300–600 s), sequencial sobre `meme_features_1m`:**
+
+| passo | minutos (linhas) |
+|---|---:|
+| todas as linhas do período | 1 513 826 |
+| idade 300–600 s | 347 344 |
+| + progresso 2–50 % | 68 946 |
+| + linha traçada | 18 305 |
+| + `higher_lows` | 11 059 |
+| + `breakout_15m` | 1 136 |
+| + distância 0–0,25 | **287** (209 mints) |
+| + `creator_net_seller = false` | **8** |
+| + volume 1 min ≥ 5 SOL (participação ≤ 1 % com 0,05 SOL) | **1** |
+
+**O que o funil sustenta:** a linha **nunca foi julgada por desfecho**.
+
+- Dos 287 minutos que passaram a linha, **275 tinham o criador desconhecido**: 241 `no_trade_feed` (a fita
+  era a agregada `activity_1m`, que não sabe quem é o criador) e 34 `not_polled`. O critério recusou por
+  **instrumento**, não por mercado.
+- Dos 12 com criador conhecido, 4 eram vendedores líquidos; dos 8 não vendedores, a participação eliminou 7.
+- O **único sobrevivente** do funil (`3EsVoo…pump`, 13/09 01:39Z, 336 s, progresso 44,7 %, volume 83,6 SOL,
+  criador `false`, não Mayhem) **não virou proposta**, e a recusa não é recuperável:
+  `meme_gate_refusals_by_mint` só começa em 19/09 15:06Z.
+
+**O que a reconstrução não sustenta (Astra, rodada 1 do EXP-M26):** a ordem causal. Os filtros são
+correlacionados e a decomposição depende da ordem escolhida — "janela curta" é uma explicação plausível da
+escassez, não uma causa isolada.
+
+Este achado é a origem do [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]] (H-022): testar a mesma estrutura de
+linha numa população que **já sobreviveu** até 15–120 min, com a leitura da linha ligada a um registro
+durável (R1) que vai até à proposta e ao fill, em vez de reconstruída depois pela trilha amostrada.
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde |

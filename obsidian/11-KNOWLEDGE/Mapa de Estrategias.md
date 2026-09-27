@@ -37,6 +37,7 @@ SORT mercado ASC, hipotese ASC
 | `spot/1` (Jupiter/Binance, `mean_reversion v14`) | cripto | primeira mesa de cripto normal em dinheiro real (23/09) | viva — primeira posição real 25/09 11:30 BRT, `TAOUSDT`, alvo/stop declarados ([[09-OPERATIONS/Diario/2026-09-25|Diário 25/09]]) |
 | mesa real de memes (`operator/5`, `operator/6`) | meme | operadores em produção | vivos — 148 operações acumuladas até 25/09, acumulado **−0,4707 SOL**, primeiro dia verde em 25/09 (+0,0356 até 12:00 BRT) |
 | `mean_reversion v1/v2/v3/v6/v7/v8/v10` + `momentum v3` (paper) + `momentum v8` | cripto (Lab/Shadow) | roster do Shadow Lab depois da poda T3.56 (2026-09-09) | vivos na última leitura registrada (2026-09-09); **esta página não confirmou estado mais recente** — conferir [[Estratégias.base]] antes de citar como atual |
+| [[Fila de Hipoteses#H-022 — Estrutura do gráfico em moedas maduras (15–120 min, ainda na curva)\|H-022]] — gráfico em moedas maduras | meme | três braços de papel `grafico_ctrl_v1/1`/`grafico_v1/1`/`grafico_v1/2` ([[EXP-M26-grafico-em-moedas-maduras]]) | **em construção** — desenho congelado 26/09 (decisão conjunta com a Astra); I1/L1/R1 em construção na árvore de trabalho, nada semeado, nenhuma proposta |
 
 ## Pistas — inconclusivas, mas com sinal que vale acompanhar
 
