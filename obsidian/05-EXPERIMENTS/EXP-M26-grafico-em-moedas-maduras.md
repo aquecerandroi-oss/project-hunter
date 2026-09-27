@@ -120,14 +120,14 @@ No repositório, hoje:
 
 | # | o quê | dono | revisão | estado |
 |---|---|---|---|---|
-| I1 | retenção madura limitada (`MEME_TRACK_MATURE_TOP_K`, orçamento à parte, `mcap_observed_at`) | backend-specialist | quant-engineer, code-reviewer | **em construção** — `tracker_mature.py`, `mature_config.py` e o acréscimo em `tracker_types.py` já existem na árvore de trabalho, sem commit |
-| I2 | acompanhar a posição do EXP-M26 até ao fecho (fixar `approved` sem aposta; série de 15 s por pertença) | backend-specialist | quant-engineer | **pendente** |
-| L1 | causalidade da saída `line_broken` (`line_support_causal`, `line_support_max_age_s`, `support_stale`) | backend-specialist | quant-engineer, risk-engine-guardian | **em construção** — `lines_exit.py`, `lab_repo_lines.py`, `lab_params.py` modificados e `test_lab_params_line_support.py` novo na árvore de trabalho, sem commit |
-| R1 | registro durável `meme_mature_opportunities` (1.ª avaliação, insumos do tique, recusas, `proposal_id`) | backend-specialist | database-architect, quant-engineer | **em construção** — migração `0066_meme_mature_opportunities.py` e a DDL correspondente já na árvore de trabalho, sem commit; `lab_models.py` e `lab_bets.py` também tocados |
-| C1 | `MEME_TRACK_MATURE_TOP_K=60` no compose de produção | devops-engineer | — | **pendente** |
+| I1 | retenção madura limitada (`MEME_TRACK_MATURE_TOP_K`, orçamento à parte, `mcap_observed_at`) | backend-specialist | quant-engineer, code-reviewer | **feito** (`f5e75ef9`, 27/09) |
+| I2 | acompanhar a posição do EXP-M26 até ao fecho (fixar `approved` sem aposta; série de 15 s por pertença) | backend-specialist | quant-engineer | **feito** (`f5e75ef9`, 27/09) |
+| L1 | causalidade da saída `line_broken` (`line_support_causal`, `line_support_max_age_s`, `support_stale`) | backend-specialist | quant-engineer, risk-engine-guardian | **feito** (`191647ec`, 27/09 — padrão global, não só EXP-M26) |
+| R1 | registro durável `meme_mature_opportunities` (1.ª avaliação, insumos do tique, recusas, `proposal_id`) | backend-specialist | database-architect, quant-engineer | **feito** (`ee5ffaa6`, 27/09 — migração `0066`) |
+| C1 | `MEME_TRACK_MATURE_TOP_K=60` no compose de produção | devops-engineer | — | **feito** (`f5e75ef9`, 27/09) |
 | F | funil de viabilidade de 24 h (sem desfecho), depois de I1/I2/L1/R1/C1 | quant-engineer | Astra | **pendente** |
 | J | spec do moinho, congelado com impressão digital antes do seed | quant-engineer | Astra | **pendente** |
-| S | migração de semente dos três conjuntos `research_only` (`grafico_ctrl_v1/1`, `grafico_v1/1`, `grafico_v1/2`) | backend-specialist | database-architect | **pendente** |
+| S | migração de semente dos três conjuntos `research_only` (`grafico_ctrl_v1/1`, `grafico_v1/1`, `grafico_v1/2`) | backend-specialist | database-architect | **pronto, retido** (migração `0067` escrita e testada; só entra depois de F e J, pela decisão conjunta) |
 | P | piloto técnico de 48 h (só contagens e motivos, fora da inferência) | quant-engineer | — | **pendente** |
 
 Ordem congelada: I1 + I2 + L1 + R1 (com testes de integração) → C1 → 24 h → F → J congelado → S → P (48 h) →
