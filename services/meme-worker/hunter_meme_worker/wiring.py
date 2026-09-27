@@ -48,6 +48,7 @@ from hunter_meme_worker.tracker import (
     TIER_REST,
     TIER_YOUNG,
 )
+from hunter_meme_worker.tracker_mature import mature_heartbeat_fields
 from hunter_meme_worker.trades import TradesPuller, pull_once
 
 if TYPE_CHECKING:
@@ -290,6 +291,9 @@ async def heartbeat_once(ctx: RadarContext, write: HeartbeatWriter) -> None:
         ctx.creator.heartbeat_fields(now, enabled=ctx.config.creator_watch_enabled)
     )
     fields["fast_lane_commitment"] = fast_lane_commitment()  # T4.42
+    # I1 (EXP-M26): the *last* prune's own report — Astra's review found that
+    # recomputing it here, after the cap already ran, zeroes ranked_out/stale_mcap.
+    fields.update(mature_heartbeat_fields(ctx.tracker.last_mature_report))
     try:
         await write(fields)
     except Exception:  # a heartbeat that cannot be written must not stop the radar

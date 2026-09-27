@@ -18,9 +18,10 @@ from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
+from hunter_meme_worker.mature_config import mature_top_k
 from hunter_meme_worker.metrics import meme_tracked_mints
-from hunter_meme_worker.repo import load_tracked, load_tracked_by_mint
-from hunter_meme_worker.tracker_pins import pinned_mints
+from hunter_meme_worker.repo import load_mature_candidates, load_tracked, load_tracked_by_mint
+from hunter_meme_worker.tracker_pins import pinned_mints, pinned_mints_exp_m26
 
 if TYPE_CHECKING:
     from hunter_meme_worker.context import RadarContext
@@ -31,16 +32,28 @@ WORKER_ROLE = "hunter_worker"
 
 
 async def warm_tracked_set(ctx: RadarContext) -> int:
-    """Rebuild the tracked set from the database before any loop starts."""
+    """Rebuild the tracked set from the database before any loop starts.
+
+    I1/I2 (EXP-M26, design §1.6): the EXP-M26-only pins are rescued the same
+    way T4.16b already rescues the ordinary ones, and the mature-eligible
+    mints are re-read straight from their own last photo (``repo.load_mature_candidates``)
+    — reloading does **not** replay the photos lost while the worker was down.
+    """
     now = utcnow()
     cutoff = now - timedelta(minutes=ctx.config.track_window_minutes)
+    top_k = mature_top_k()
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         tracked = await load_tracked(session, cutoff=cutoff, cap=ctx.config.tracked_max)
         pinned = await pinned_mints(session, now=now)
-        missing = sorted(pinned - {t.mint for t in tracked})
-        rescued = await load_tracked_by_mint(session, mints=missing)
-    for mint in (*tracked, *rescued):
+        exp_m26 = await pinned_mints_exp_m26(session, now=now)
+        known = {t.mint for t in tracked}
+        rescued = await load_tracked_by_mint(session, mints=sorted((pinned | exp_m26) - known))
+        mature = await load_mature_candidates(
+            session, now=now, top_k=top_k, excluded=pinned | exp_m26
+        )
+    for mint in (*tracked, *rescued, *mature):
         ctx.tracker.observe(mint)
     ctx.tracker.pin(pinned)
+    ctx.tracker.pin_exp_m26(exp_m26)
     meme_tracked_mints.set(len(ctx.tracker))
     return len(tracked) + len(rescued)

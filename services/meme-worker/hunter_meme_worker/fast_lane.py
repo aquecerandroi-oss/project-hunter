@@ -118,13 +118,26 @@ def young_mints(
     bet or not — the cutoff was the market's own instrument blinking, not the
     coin dying. ``pinned_max_age_s = None`` (the default) keeps every mint,
     pinned or not, on the same ``max_age_s`` — the pre-T4.33 behaviour every
-    other caller still gets."""
+    other caller still gets.
+
+    **I2 (EXP-M26, design §1.6): membership, not age, for its own pins.** A
+    mint in :attr:`MintTracker.pinned_exp_m26` is admitted whatever its age —
+    a mature mint's entry happens well past ``pinned_max_age_s`` itself, so
+    raising that ceiling for every rule set (design's own rejected option)
+    would also stretch the flow/pullback arms' cadence. Ends the moment the
+    mint leaves ``pinned_exp_m26`` (the bet closes, the proposal decides or
+    times out) — no new query, the same ``frozenset`` membership check T4.33
+    already made for ``pinned``."""
     limit = timedelta(seconds=max_age_s)
     pinned_limit = limit if pinned_max_age_s is None else timedelta(seconds=pinned_max_age_s)
     pinned = tracker.pinned
+    exp_m26 = tracker.pinned_exp_m26
     out: list[TrackedMint] = []
     for t in tracker.snapshot():
         if t.created_at is None or t.quote_unsupported or t.finished:
+            continue
+        if t.mint in exp_m26:
+            out.append(t)
             continue
         age = now - t.created_at
         if age < timedelta(0):

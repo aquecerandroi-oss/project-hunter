@@ -33,6 +33,13 @@ class TrackedMint:
     photographing the curve every minute, this is what says whether the mirror
     has ever told us the site's agent state of this mint, and when."""
     mcap_sol: Decimal | None = None
+    mcap_observed_at: datetime | None = None
+    """When the current ``mcap_sol`` was read (I1, EXP-M26): the tracker never
+    stamps a market cap without the instant it came from, because the mature
+    retention policy (``tracker_mature.py``) refuses a stale reading rather
+    than rank a mint on a number nobody has re-confirmed in the last
+    ``MATURE_MCAP_FRESHNESS_S``. ``None`` until the first poll that carried a
+    value — never a fabricated ``first_seen_at``."""
     complete: bool = False
     migrated: bool = False
     final_read_pending: bool = False

@@ -60,6 +60,7 @@ from hunter_meme_worker.features import (
 )
 from hunter_meme_worker.fold import fold_minute
 from hunter_meme_worker.lab_trail import maybe_prune_trail
+from hunter_meme_worker.mature_config import mature_top_k
 from hunter_meme_worker.metrics import (
     meme_polls_total,
     meme_tokens_pruned_total,
@@ -172,7 +173,7 @@ def chain_covered(ctx: RadarContext, now: datetime) -> bool:
 async def poll_once(ctx: RadarContext) -> int:
     """One pass of the REST budget. Returns how many curves were read."""
     now = utcnow()
-    aged_out, capped, pinned_kept = ctx.tracker.prune(now)
+    aged_out, capped, pinned_kept = ctx.tracker.prune(now, mature_top_k=mature_top_k())
     meme_tracked_mints.set(len(ctx.tracker))
     if ctx.sources is not None:
         ctx.sources.record_tracker_prune(now, pinned=len(pinned_kept), capped=len(capped))

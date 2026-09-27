@@ -392,6 +392,12 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
       MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-90}
       MEME_TRACKED_MINTS_MAX: ${MEME_TRACKED_MINTS_MAX:-120}
+      # I1 (EXP-M26, docs/design/exp-m26-grafico-moedas-maduras.md §1.6): retém
+      # as K maiores por mcap_sol entre 5-120 min de idade, num orçamento à
+      # parte que nunca tira vaga das jovens (MEME_TRACKED_MINTS_MAX acima).
+      # Padrão 0 = desligado no código; o experimento usa 60. Custo no teto:
+      # +18,5% em meme_features_1m, +7,9% em meme_curve_snapshots (docs/DEPLOYMENT.md).
+      MEME_TRACK_MATURE_TOP_K: ${MEME_TRACK_MATURE_TOP_K:-60}
       # T4.52b-3: o portão de evento, off por padrão (docs/RISK_ENGINE_MEME.md §9).
       # SOLANA_RPC_WS_URL vazio deriva de SOLANA_RPC_URL (https->wss/http->ws) ou o RPC público.
       MEME_EVENT_GATE: ${MEME_EVENT_GATE:-off}

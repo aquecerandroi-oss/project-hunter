@@ -33,11 +33,21 @@ immediate-entry control enters on every arming — 122 of R79's 171 on mints
 the desk refused, where no desk row pins anything — so its pin would keep
 folding exactly the ``creator_sold`` rows above for mints only an experiment
 holds. Unpinned, the pair is also measured under the same tracker.
+
+**I2 (EXP-M26, design §1.6): a second, separate pin.** :func:`pinned_mints`
+now also excludes every EXP-M26 rule set's own bets/proposals — they move to
+:func:`pinned_mints_exp_m26` instead, which :meth:`MintTracker.prune` never
+lets narrow the young cap. Fixed there: an open bet or re-entry, and an
+``approved`` proposal with no bet yet, until it decides (a bet, a refusal, an
+expiry) or :data:`APPROVED_PIN_TERMINAL_S` after ``decided_at``, whichever
+comes first — the design's own failure scenario is a research proposal born
+``approved`` (``research_only`` sets never sit in ``proposed``) whose mint
+leaves the top-K before the fill's photo ever lands.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import text
@@ -47,25 +57,61 @@ from hunter_meme_worker.entry_pullback import PULLBACK_ARM_RULE_SET_ID, PULLBACK
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["pinned_mints"]
+__all__ = ["APPROVED_PIN_TERMINAL_S", "EXP_M26", "pinned_mints", "pinned_mints_exp_m26"]
 
-_PINNED_MINTS = text(
-    "SELECT mint FROM meme_paper_bets WHERE status = 'open' "
-    "  AND rule_set_id <> CAST(:pullback_rule_set_id AS uuid) "
-    "  AND rule_set_id <> CAST(:pullback_control_rule_set_id AS uuid) "
+EXP_M26 = "EXP-M26"
+APPROVED_PIN_TERMINAL_S = 180
+"""How long an ``approved``-without-bet EXP-M26 proposal stays pinned past
+``decided_at`` (design §1.6) — the desk's own ``lab_proposal_ttl_s`` is a
+different clock (``proposed_at``), and this one is not it."""
+
+_ORDINARY_PINNED_MINTS = text(
+    "SELECT b.mint FROM meme_paper_bets b JOIN meme_rule_sets rs ON rs.id = b.rule_set_id "
+    "WHERE b.status = 'open' "
+    "  AND b.rule_set_id <> CAST(:pullback_rule_set_id AS uuid) "
+    "  AND b.rule_set_id <> CAST(:pullback_control_rule_set_id AS uuid) "
+    "  AND COALESCE(rs.exp_ref, '') <> :exp_m26 "
     "UNION SELECT mint FROM meme_live_positions WHERE status = 'open' "
-    "UNION SELECT mint FROM meme_proposals WHERE status = 'proposed' AND expires_at > :now"
+    "UNION SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets rs ON rs.id = p.rule_set_id "
+    "WHERE p.status = 'proposed' AND p.expires_at > :now AND COALESCE(rs.exp_ref, '') <> :exp_m26"
+)
+
+_EXP_M26_PINNED_MINTS = text(
+    "SELECT b.mint FROM meme_paper_bets b JOIN meme_rule_sets rs ON rs.id = b.rule_set_id "
+    "WHERE b.status = 'open' AND rs.exp_ref = :exp_m26 "
+    "UNION SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets rs ON rs.id = p.rule_set_id "
+    "WHERE p.status = 'approved' AND p.bet_id IS NULL AND rs.exp_ref = :exp_m26 "
+    "  AND p.decided_at > :approved_cutoff "
+    "UNION SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets rs ON rs.id = p.rule_set_id "
+    "WHERE p.status = 'proposed' AND p.expires_at > :now AND rs.exp_ref = :exp_m26"
 )
 
 
 async def pinned_mints(session: AsyncSession, *, now: datetime) -> frozenset[str]:
-    """Every mint the tracker's cap and window may not evict right now."""
+    """Every *ordinary* mint the tracker's cap and window may not evict right
+    now — an EXP-M26 rule set's own bets/proposals are :func:`pinned_mints_exp_m26`
+    instead."""
     rows = await session.execute(
-        _PINNED_MINTS,
+        _ORDINARY_PINNED_MINTS,
         {
             "now": now,
             "pullback_rule_set_id": PULLBACK_ARM_RULE_SET_ID,
             "pullback_control_rule_set_id": PULLBACK_CONTROL_RULE_SET_ID,
+            "exp_m26": EXP_M26,
+        },
+    )
+    return frozenset(str(m) for m in rows.scalars().all())
+
+
+async def pinned_mints_exp_m26(session: AsyncSession, *, now: datetime) -> frozenset[str]:
+    """Every mint fixed *only* for belonging to an EXP-M26 rule set — never
+    narrows the tracker's young cap (:meth:`MintTracker.pin_exp_m26`)."""
+    rows = await session.execute(
+        _EXP_M26_PINNED_MINTS,
+        {
+            "now": now,
+            "exp_m26": EXP_M26,
+            "approved_cutoff": now - timedelta(seconds=APPROVED_PIN_TERMINAL_S),
         },
     )
     return frozenset(str(m) for m in rows.scalars().all())

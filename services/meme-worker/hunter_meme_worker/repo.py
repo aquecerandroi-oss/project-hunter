@@ -28,9 +28,9 @@ The row shapes live in ``repo_rows.py`` and are re-exported here.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import text
@@ -41,6 +41,11 @@ from hunter_meme_worker.features import FeatureRow
 from hunter_meme_worker.repo_rows import GapRow, SnapshotRow, TokenRow
 from hunter_meme_worker.repo_token_sql import UPSERT_TOKEN
 from hunter_meme_worker.tracker import TrackedMint
+from hunter_meme_worker.tracker_mature import (
+    MATURE_MAX_AGE_S,
+    MATURE_MCAP_FRESHNESS_S,
+    MATURE_MIN_AGE_S,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +57,7 @@ __all__ = [
     "TokenRow",
     "insert_features",
     "insert_snapshot",
+    "load_mature_candidates",
     "load_tracked",
     "load_tracked_by_mint",
     "prune_tokens",
@@ -185,6 +191,33 @@ cutoff/cap may leave out at boot — a real position or a paper bet older than
 ``track_window_minutes``, or simply not among the youngest ``tracked_max``, is
 loaded anyway, because a pinned mint is never optional inventory."""
 
+_LOAD_MATURE_CANDIDATES = text(
+    "SELECT t.mint, t.first_seen_at, t.created_at, t.creator, t.bonding_curve, "
+    "       t.mayhem_state, t.initial_real_token_reserves, t.completed_at, t.migrated_at, "
+    "       s.mcap_sol, s.observed_at AS mcap_observed_at "
+    "FROM meme_tokens t "
+    "JOIN LATERAL ("
+    "  SELECT cs.mcap_sol, cs.observed_at FROM meme_curve_snapshots cs "
+    "  WHERE cs.mint = t.mint AND cs.received_at <= :now "
+    "  ORDER BY cs.observed_at DESC LIMIT 1"
+    ") s ON true "
+    "WHERE t.completed_at IS NULL AND t.migrated_at IS NULL "
+    "  AND COALESCE(t.mayhem_state, '') NOT IN ('active', 'paused') "
+    "  AND t.created_at BETWEEN :min_created_at AND :max_created_at "
+    "  AND s.mcap_sol IS NOT NULL "
+    "  AND s.observed_at BETWEEN :freshness_cutoff AND :now "
+    "  AND t.mint <> ALL(:excluded) "
+    "ORDER BY s.mcap_sol DESC, t.mint LIMIT :top_k"
+)
+"""I1 (EXP-M26, design §1.6): a restart applies the same eligibility
+``tracker_mature.is_mature_eligible`` checks live over the last photo of each
+mint — ``:now − 120 s ≤ observed_at ≤ :now`` and ``received_at ≤ :now``,
+never a photo lost during the stop. ``:excluded`` (Astra's review) is every
+already-pinned mint: unlike live ``prune`` (which ranks only its own
+``unpinned``), a bare ``LIMIT :top_k`` would let a pinned mint — never in
+need of this budget at all — spend one of the K slots a genuinely unpinned
+mature mint needed."""
+
 _PRUNE_TOKENS = text(
     "WITH doomed AS ("
     "  SELECT mint FROM meme_tokens t "
@@ -258,6 +291,44 @@ async def load_tracked_by_mint(session: AsyncSession, *, mints: Sequence[str]) -
         return []
     result = await session.execute(_LOAD_TRACKED_BY_MINT, {"mints": list(mints)})
     return [_tracked_from_row(row) for row in result.mappings()]
+
+
+async def load_mature_candidates(
+    session: AsyncSession, *, now: datetime, top_k: int, excluded: Iterable[str] = ()
+) -> list[TrackedMint]:
+    """I1 (EXP-M26): the mature-eligible mints a restart may re-retain, ranked
+    already — ``tracker_mature.select_mature`` re-checks eligibility over
+    these, but the freshness window means a stopped worker usually finds none
+    (design §1.6's own declared consequence). ``excluded`` is every mint
+    already pinned (ordinary or EXP-M26-only): it never needs this budget,
+    and a bare ``LIMIT`` would let it spend one of the ``top_k`` slots anyway."""
+    if top_k <= 0:
+        return []
+    result = await session.execute(
+        _LOAD_MATURE_CANDIDATES,
+        {
+            "now": now,
+            "min_created_at": now - timedelta(seconds=MATURE_MAX_AGE_S),
+            "max_created_at": now - timedelta(seconds=MATURE_MIN_AGE_S),
+            "freshness_cutoff": now - timedelta(seconds=MATURE_MCAP_FRESHNESS_S),
+            "top_k": top_k,
+            "excluded": list(excluded),
+        },
+    )
+    return [
+        TrackedMint(
+            mint=str(row["mint"]),
+            first_seen_at=row["first_seen_at"],
+            created_at=row["created_at"],
+            creator=row["creator"],
+            bonding_curve=row["bonding_curve"],
+            mayhem_state=row["mayhem_state"],
+            initial_real_token_reserves=row["initial_real_token_reserves"],
+            mcap_sol=row["mcap_sol"],
+            mcap_observed_at=row["mcap_observed_at"],
+        )
+        for row in result.mappings()
+    ]
 
 
 async def prune_tokens(session: AsyncSession, *, cutoff: datetime, batch: int) -> int:

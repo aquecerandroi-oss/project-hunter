@@ -88,6 +88,31 @@ def test_a_pinned_mint_follows_the_fast_lane_past_300s_up_to_its_own_ceiling() -
     assert "pinned_past_ceiling" not in [t.mint for t in with_pin], "even a pin has a ceiling"
 
 
+def test_an_exp_m26_pin_follows_the_fast_lane_by_membership_not_age() -> None:
+    """I2 (EXP-M26, design §1.6): a mature mint's entry happens well past
+    ``pinned_max_age_s`` itself (design's own rejected fix), so its bet is
+    admitted whatever the age, and only for as long as it stays pinned."""
+    tracker = MintTracker(window_minutes=1440, cap=200)
+    for t in (
+        _tracked("exp_m26_mature", age_s=6000),
+        _tracked("ordinary_old", age_s=6000),
+        _tracked("unpinned_old", age_s=301),
+    ):
+        tracker.observe(t)
+    tracker.pin_exp_m26(["exp_m26_mature"])
+    tracker.pin(["ordinary_old"])
+
+    with_exp_m26 = young_mints(tracker, NOW, max_age_s=300, pinned_max_age_s=1800)
+    assert [t.mint for t in with_exp_m26] == ["exp_m26_mature"], (
+        "the EXP-M26 pin ignores both max_age_s and the pinned ceiling"
+    )
+
+    tracker.unpin_exp_m26(["exp_m26_mature"])
+    assert young_mints(tracker, NOW, max_age_s=300, pinned_max_age_s=1800) == [], (
+        "once unpinned, the mature mint falls back to the ordinary age rule"
+    )
+
+
 async def test_the_fast_lane_reads_the_young_subset_through_the_same_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

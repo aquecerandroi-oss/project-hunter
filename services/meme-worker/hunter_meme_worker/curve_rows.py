@@ -114,6 +114,7 @@ def tracked_from_curve(
         initial_real_token_reserves=denominator_for(state, params).value,
         complete=state.complete,
         mcap_sol=state.market_cap_sol,
+        mcap_observed_at=state.observed_at,
     )
 
 

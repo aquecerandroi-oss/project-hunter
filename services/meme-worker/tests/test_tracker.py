@@ -182,6 +182,40 @@ def test_reconciliation_ranks_by_market_cap_and_ignores_a_mint_never_priced() ->
     assert tracker.top_by_mcap(0) == ()
 
 
+def test_observe_stamps_mcap_observed_at_together_with_a_fresher_mcap_sol() -> None:
+    """I1 (EXP-M26): the two fields move together on ``.observe()`` itself, not
+    only when a caller happens to follow up with ``mark_polled`` — a fresher
+    ``mcap_sol`` must never leave a stale ``mcap_observed_at`` behind it."""
+    tracker = MintTracker(window_minutes=1440, cap=10)
+    stale_at = NOW - timedelta(minutes=5)
+    fresh_at = NOW
+    tracker.observe(
+        TrackedMint(
+            mint="m", first_seen_at=stale_at, mcap_sol=Decimal("5"), mcap_observed_at=stale_at
+        )
+    )
+    tracker.observe(
+        TrackedMint(
+            mint="m", first_seen_at=stale_at, mcap_sol=Decimal("9"), mcap_observed_at=fresh_at
+        )
+    )
+    kept = tracker.get("m")
+    assert kept is not None
+    assert (kept.mcap_sol, kept.mcap_observed_at) == (Decimal("9"), fresh_at)
+
+
+def test_observe_with_no_new_mcap_keeps_the_old_pair_intact() -> None:
+    tracker = MintTracker(window_minutes=1440, cap=10)
+    at = NOW - timedelta(minutes=1)
+    tracker.observe(
+        TrackedMint(mint="m", first_seen_at=at, mcap_sol=Decimal("5"), mcap_observed_at=at)
+    )
+    tracker.observe(TrackedMint(mint="m", first_seen_at=at, mcap_sol=None, mcap_observed_at=None))
+    kept = tracker.get("m")
+    assert kept is not None
+    assert (kept.mcap_sol, kept.mcap_observed_at) == (Decimal("5"), at)
+
+
 def test_marking_a_poll_records_the_market_cap_without_losing_the_old_one() -> None:
     tracker = MintTracker(window_minutes=1440, cap=10)
     tracker.observe(_tracked("m", minutes_old=1, mcap_sol=Decimal("5")))
@@ -255,6 +289,77 @@ def test_unpin_returns_a_mint_to_the_ordinary_window_and_cap() -> None:
     assert tracker.prune(NOW)[0] == (), "pinned: the window does not evict it"
     tracker.unpin(["m"])
     assert tracker.prune(NOW)[0] == ("m",), "unpinned: the ordinary rule applies again"
+
+
+# I1/I2 (EXP-M26, design §1.6): a second budget, never spending the young cap.
+
+
+def test_an_exp_m26_pin_never_narrows_the_young_cap() -> None:
+    """Unlike an ordinary pin (``test_a_pinned_mint_survives_the_cap_and_...``),
+    an EXP-M26-only pin costs the young population none of its 25 slots."""
+    tracker = MintTracker(window_minutes=1440, cap=25)
+    for age in range(1, 26):
+        tracker.observe(_tracked(f"free{age}", minutes_old=age))
+    tracker.observe(_tracked("m26_bet", minutes_old=100))
+    tracker.pin_exp_m26(["m26_bet"])
+    aged_out, capped, pinned_kept = tracker.prune(NOW)
+    assert aged_out == ()
+    assert pinned_kept == ("m26_bet",)
+    assert capped == (), "25 free mints fit the un-narrowed cap of 25"
+    assert len(tracker) == 26, "25 free plus the EXP-M26 pin — the cap never shrank"
+
+
+def test_a_mint_pinned_both_ways_counts_as_ordinary_once() -> None:
+    tracker = MintTracker(window_minutes=1440, cap=25)
+    for age in range(1, 26):
+        tracker.observe(_tracked(f"free{age}", minutes_old=age))
+    tracker.observe(_tracked("both", minutes_old=100))
+    tracker.pin(["both"])
+    tracker.pin_exp_m26(["both"])
+    _, capped, pinned_kept = tracker.prune(NOW)
+    assert pinned_kept == ("both",)
+    assert capped == ("free25",), "cap 25 - 1 ordinary = 24 slots for the free mints"
+
+
+def test_mature_top_k_retains_the_largest_mcap_mints_past_the_cap() -> None:
+    """A mature mint would normally be evicted by the cap almost at once (it
+    is old, and the cap drops the oldest excess) — ``mature_top_k`` protects
+    the ``k`` largest-by-``mcap_sol`` eligible ones in a budget of their own."""
+    tracker = MintTracker(window_minutes=1440, cap=5)
+    for age in range(1, 6):
+        tracker.observe(_tracked(f"free{age}", minutes_old=age))
+    tracker.observe(_tracked("mature_big", minutes_old=60, mcap_sol=Decimal(50)))
+    tracker.observe(_tracked("mature_small", minutes_old=61, mcap_sol=Decimal(5)))
+    for mint in ("mature_big", "mature_small"):
+        current = tracker.get(mint)
+        assert current is not None
+        tracker.mark_polled(mint, NOW, mcap_sol=current.mcap_sol)
+    aged_out, capped, pinned_kept = tracker.prune(NOW, mature_top_k=1)
+    assert aged_out == ()
+    assert pinned_kept == ()
+    assert "mature_big" not in capped, "the largest mature mint is retained"
+    assert "mature_small" in capped, "beyond k=1, an eligible mint still competes for the cap"
+    assert len(tracker) - 1 == 5, "the 5 free mints kept every one of their slots"
+    report = tracker.last_mature_report
+    assert report.kept == ("mature_big",)
+    assert set(report.eligible) == {"mature_big", "mature_small"}
+    assert report.ranked_out == ("mature_small",), (
+        "the last prune's own report says ranked_out even though the mint is "
+        "now gone from the tracker — a heartbeat that recomputed this fresh "
+        "afterwards would see 0 (Astra's review)"
+    )
+
+
+def test_mature_top_k_zero_is_off_and_changes_nothing() -> None:
+    tracker = MintTracker(window_minutes=1440, cap=5)
+    for age in range(1, 6):
+        tracker.observe(_tracked(f"free{age}", minutes_old=age))
+    tracker.observe(_tracked("mature", minutes_old=60, mcap_sol=Decimal(50)))
+    current = tracker.get("mature")
+    assert current is not None
+    tracker.mark_polled("mature", NOW, mcap_sol=current.mcap_sol)
+    _, capped, _ = tracker.prune(NOW, mature_top_k=0)
+    assert "mature" in capped, "off by default: no separate budget, the oldest still goes"
 
 
 def test_set_pinned_replaces_the_whole_set_in_one_call() -> None:
