@@ -1,0 +1,14 @@
+# PROJECT HUNTER - /etc/cron.d/hunter-partitions. NAO e instalado pelo bootstrap:
+# o Everton instala a mao (infra/vps/README.md, "Particoes diarias"; a poda e
+# decisao do Everton). Hora da maquina (Europe/Berlin), a mesma do hunter-backup
+# (03:17): 01:07/01:27 = 23:07Z/23:27Z no CEST, 00:07Z/00:27Z no CET - 1h50
+# antes do pg_dump, que comeca 03:17 e hoje dura 80+ min (50 min na noite em
+# que entra o horario de verao; os dois jobs levam segundos). Os dois nunca
+# atravessam a meia-noite UTC entre si (a retencao vira a meia-noite UTC).
+# Mesmo flock nos dois: criar e podar nunca rodam juntos. O podador tambem
+# recusa sozinho se houver um pg_dump conectado (prune_partitions.py).
+# Saida 75 = pulou por lock/dump, tenta amanha; 1 = investigar.
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+7 1 * * * hunter cd /opt/project-hunter && flock -n /tmp/hunter-partitions.lock bash infra/vps/compose.sh ops python infra/scripts/create_partitions.py >> /opt/backups/partitions.log 2>&1
+27 1 * * * hunter cd /opt/project-hunter && flock -n /tmp/hunter-partitions.lock bash infra/vps/compose.sh ops python infra/scripts/prune_partitions.py >> /opt/backups/partitions-prune.log 2>&1

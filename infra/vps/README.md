@@ -163,8 +163,8 @@ agendamento abaixo é a **prevenção**.
 Os dois meses para trás (`--months-behind`, padrão 2) são o que faz backfill de
 histórico ter onde cair: sem eles um pedido de 7 dias feito no começo do mês era
 recusado com `market_backfill_refused reason=no_partition` (T2.5f). Um mês para
-trás que a retenção já não cubra **não** é criado — seria criado às 04:07 e
-derrubado por `prune_partitions.py` logo depois. O cron abaixo não muda: o
+trás que a retenção já não cubra **não** é criado — seria criado às 01:07 e
+derrubado por `prune_partitions.py` às 01:27. O cron abaixo não muda: o
 padrão já é 2.
 
 Rodar a mão pelo serviço `ops` (T3.15d/T3.15e, docs/DEPLOYMENT.md §3.4): é o
@@ -186,30 +186,58 @@ precisava (para não rodar `alembic upgrade head` toda vez, inclusive às 04:07
 sem ninguém olhando) deixou de ser necessário porque `ops` simplesmente não
 tem essa dependência para subir.
 
-A contrapartida de retenção, `prune_partitions.py`, ainda não tem cron
-próprio (ver "Open Bugs"); quando rodada à mão, mesmo caminho:
+A contrapartida de retenção, `prune_partitions.py`, faz `DETACH` + `DROP` de
+cada mês cuja borda superior já passou da retenção (`DATABASE.md` §1.3); à mão,
+mesmo caminho:
 
 ```bash
-bash infra/vps/compose.sh ops python infra/scripts/prune_partitions.py --dry-run
+bash infra/vps/compose.sh ops python infra/scripts/prune_partitions.py --dry-run   # imprime, não toca
+bash infra/vps/compose.sh ops python infra/scripts/prune_partitions.py             # aplica
 ```
 
-Agendamento (instalar uma vez, à mão — `bootstrap_vps.sh` só instala o cron do
-backup, não este; segue o mesmo padrão de `/etc/cron.d/hunter-backup`):
+Ela não trava a ingestão (`docs/design/retencao-e-disco-2026-09-27.md` §6,
+passo 2c): **uma transação por partição** com `SET LOCAL lock_timeout = '3s'` e
+`statement_timeout = '60s'`; a partição cujo lock não sai em 3 s é pulada **pelo
+nome** e a próxima execução tenta de novo; qualquer outro erro numa partição é
+registrado e a execução segue; e ela **não toca em nada enquanto houver um
+`pg_dump` conectado ao banco** (`pg_stat_activity.application_name =
+'pg_dump'`, conferido antes de cada partição — vale para o backup noturno e
+para qualquer `pg_dump` à mão **sem** `PGAPPNAME`; quem mudar o backup não pode
+definir `PGAPPNAME`). Limites honestos: o `lock_timeout` vale por espera de lock
+(pai, depois filha), então um `INSERT` atrás do `DETACH` pode esperar até ~6 s
+no pior caso, não a noite toda; e a checagem não é exclusão mútua — um dump que
+conecta entre ela e o `DETACH` espera os milissegundos daquela partição ou a faz
+pular. Toda execução aplicada deixa uma linha em
+`system_events` (`component = 'prune_partitions'`, `event =
+'partitions_pruned'`) com o que caiu, o que pulou e o que falhou. Saída 0 =
+tudo feito, **75** = pulou por lock/dump (tenta amanhã), 1 = uma partição falhou
+por outro motivo (investigar).
+
+Agendamento: o arquivo pronto é `infra/vps/cron/hunter-partitions` (criar às
+01:07 e podar às 01:27, hora da máquina, Europe/Berlin — 23:07Z/23:27Z no
+horário de verão, 00:07Z/00:27Z no inverno; o backup das 03:17 usa o mesmo
+relógio, então a distância de 1h50 até o dump não muda com o horário de verão;
+o dump hoje dura 80+ min, e a receita anterior, às 04:07, caía dentro dele).
+`bootstrap_vps.sh` só instala o cron do backup, não este.
+
+**Decisão do Everton** — o arquivo liga a poda, que apaga meses de dado pela
+retenção do §1.3 (a primeira queda é `candles_1m_2026_06` em 29/09; depois
+`meme_features_15s_2026_09` em 08/10, `feature_snapshots_2026_09` em 15/10 e as
+de 30 d em 31/10). Antes de instalar, rodar o `--dry-run` acima e ler a lista.
+Para instalar (uma vez, como o dono da máquina, de `/opt/project-hunter`):
 
 ```bash
-printf '%s\n' \
-  'SHELL=/bin/bash' \
-  'PATH=/usr/local/bin:/usr/bin:/bin' \
-  '7 4 * * * hunter cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/create_partitions.py >> /opt/backups/partitions.log 2>&1' \
-  | sudo tee /etc/cron.d/hunter-partitions >/dev/null
-sudo chmod 644 /etc/cron.d/hunter-partitions
+sudo install -o root -g root -m 644 infra/vps/cron/hunter-partitions /etc/cron.d/hunter-partitions
 ```
 
-Todo dia às 04:07 (hora da máquina, depois do backup das 03:17 — mesmo
-horário de menor uso, sem disputar o mesmo minuto), saída anexada em
-`/opt/backups/partitions.log` (mesmo diretório do backup, já criado e fechado
-em 700 pelo `backup_postgres.sh`; não é um segundo local de estado, é o mesmo
-diretório operacional).
+Só a criação, sem a poda: instalar o mesmo arquivo sem a linha do
+`prune_partitions.py` (`grep -v prune_partitions infra/vps/cron/hunter-partitions
+| sudo tee /etc/cron.d/hunter-partitions >/dev/null`, depois `sudo chmod 644`).
+Saídas anexadas em `/opt/backups/partitions.log` e
+`/opt/backups/partitions-prune.log` (mesmo diretório do backup, já criado e
+fechado em 700 pelo `backup_postgres.sh`; não é um segundo local de estado, é o
+mesmo diretório operacional). O `flock` é o mesmo nas duas linhas: criar e podar
+nunca rodam juntos.
 
 O script é idempotente e o próprio processo distingue "pulou uma partição por
 `lock_timeout` de 3 s" (não fatal — sai com código **75**, `EX_TEMPFAIL` de
@@ -248,16 +276,20 @@ bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py       
 bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --max-batches 400  # primeira passada em fatias
 ```
 
-Agendamento (instalar uma vez, à mão, no mesmo padrão dos outros crons; 04:37 —
-depois do backup das 03:17 e do `create_partitions` das 04:07):
+Agendamento: o arquivo pronto é `infra/vps/cron/hunter-outbox` — 00:47, hora da
+máquina (22:47Z no verão, 23:47Z no inverno), 2h30 antes do backup das 03:17
+(1h30 na noite da entrada do horário de verão, que pula uma hora; a receita
+anterior, 04:37, caía dentro do dump de 80+ min), com `--max-batches 1000`
+(5 M linhas/noite, mais que os ~2,1 M/dia que entram). O teto é de **volume**,
+não de tempo: medir a duração das primeiras noites em `outbox-prune.log`. Se
+um dia encostar no dump, não trava nada — `DELETE` (`ROW EXCLUSIVE`) e o
+`ACCESS SHARE` do dump não se bloqueiam; só disputam disco e o snapshot longo do
+dump adia o reuso do espaço. **Decisão do Everton** — apaga as linhas
+despachadas há mais de 7 dias (o prazo já é o do contrato, §1.3). Fazer antes a
+primeira passada em fatias (abaixo) e instalar (uma vez, de `/opt/project-hunter`):
 
 ```bash
-printf '%s\n' \
-  'SHELL=/bin/bash' \
-  'PATH=/usr/local/bin:/usr/bin:/bin' \
-  '37 4 * * * hunter cd /opt/project-hunter && flock -n /tmp/hunter-outbox-prune.lock bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py >> /opt/backups/outbox-prune.log 2>&1' \
-  | sudo tee /etc/cron.d/hunter-outbox >/dev/null
-sudo chmod 644 /etc/cron.d/hunter-outbox
+sudo install -o root -g root -m 644 infra/vps/cron/hunter-outbox /etc/cron.d/hunter-outbox
 ```
 
 **Três números diferentes, não confundir** (segunda opinião da Astra, `review-T4.63`):

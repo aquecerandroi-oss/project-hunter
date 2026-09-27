@@ -52,9 +52,13 @@ def _joined_lines(text: str) -> str:
     return re.sub(r"\\\s*\n\s*", " ", text)
 
 
+CRON_DIR = REPO_ROOT / "infra" / "vps" / "cron"
+
 DOCS_TO_CHECK = [
     REPO_ROOT / "infra" / "vps" / "README.md",
     REPO_ROOT / "docs" / "DEPLOYMENT.md",
+    # the cron.d files themselves (retencao-e-disco-2026-09-27.md §6), not only the recipe
+    *sorted(p for p in CRON_DIR.iterdir() if p.is_file()),
 ]
 
 
@@ -84,16 +88,20 @@ def test_create_and_prune_partitions_never_run_on_the_api_service(doc_path: Path
 
 
 def test_no_dedicated_cron_template_file_exists_uncovered() -> None:
-    """Guards against a future ``infra/vps/*.cron``/crontab template file that
-    this test would not otherwise scan — today the only schedule is the
-    inline ``printf`` block in ``infra/vps/README.md``, already covered above.
-    If a dedicated template file appears, it must be added to ``DOCS_TO_CHECK``.
+    """Guards against a cron template file this test would not otherwise scan.
+
+    The cron.d files live in ``infra/vps/cron/`` and are all in
+    ``DOCS_TO_CHECK``; a template anywhere else under ``infra/vps`` (a
+    ``*.cron`` next to the README, a second cron folder) must be added too.
     """
     vps_dir = REPO_ROOT / "infra" / "vps"
     candidates = [
         p
-        for p in vps_dir.iterdir()
-        if p.is_file() and ("cron" in p.name.lower()) and p.suffix != ".md"
+        for p in vps_dir.rglob("*")
+        if p.is_file()
+        and ("cron" in p.name.lower() or "cron" in p.parent.name.lower())
+        and p.suffix != ".md"
+        and p not in DOCS_TO_CHECK
     ]
     assert candidates == [], (
         f"found cron template file(s) not covered by this lint: {candidates} — "

@@ -48,6 +48,8 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 
 ## Desde 19/09/2026 (síntese por tarefa/pesquisa; brutos em `.claude/state/astra-review-*.md`)
 
+- 2026-09-27 — [[Prune-partitions-locks]] (podador sem travar a ingestão)
+
 - [[T4.74-spot-desk]] — fundações, perfil, sinal, dinheiro e saídas da mesa `spot/1` (19/09)
 - [[T4.77-close-atas-token2022]] — fechar ATAs cheias, extensão ao Token-2022 (19/09)
 - [[T4.78-estrategia-2026-09-20]] — parecer noturno de estratégia + cooldown por mint (20/09)

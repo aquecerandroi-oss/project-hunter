@@ -1,0 +1,11 @@
+# PROJECT HUNTER - /etc/cron.d/hunter-outbox. NAO e instalado pelo bootstrap:
+# o Everton instala a mao (infra/vps/README.md, "Poda da outbox"; decisao do
+# Everton). Retencao 7 d (DATABASE.md 1.3, teto da janela de replay). Hora da
+# maquina (Europe/Berlin): 00:47 = 22:47Z no CEST, 23:47Z no CET, 2h30 antes do
+# pg_dump das 03:17 (1h30 na noite em que entra o horario de verao).
+# --max-batches 1000 = teto de VOLUME (5 M linhas, mais que os ~2,1 M/dia que
+# entram), nao de tempo. Encostar no dump nao trava nada (DELETE e o ACCESS
+# SHARE do dump nao se bloqueiam); so disputa disco.
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+47 0 * * * hunter cd /opt/project-hunter && flock -n /tmp/hunter-outbox-prune.lock bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --max-batches 1000 >> /opt/backups/outbox-prune.log 2>&1
