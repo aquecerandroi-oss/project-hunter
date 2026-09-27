@@ -30,7 +30,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 import asyncpg
 import pytest
@@ -65,6 +65,43 @@ def _load_module() -> ModuleType:
     return module
 
 
+def _wrapped_lock_timeout() -> BaseException:
+    """The exact shape SQLAlchemy's asyncpg dialect raises for a real lock_timeout hit.
+
+    ``AsyncAdapt_asyncpg_dbapi._handle_exception``
+    (``sqlalchemy/dialects/postgresql/asyncpg.py``) never re-raises the driver's own
+    ``asyncpg.exceptions.LockNotAvailableError``: it walks the error's MRO through its own
+    ``_asyncpg_error_translate`` table and raises one of its own dbapi exception classes
+    instead (``AsyncAdapt_asyncpg_dbapi.Error`` here), copying across only ``.sqlstate``.
+    ``isinstance(exc.orig, asyncpg.exceptions.LockNotAvailableError)`` is therefore always
+    False for a real run — the bug this module's fix removes. This reproduces the real
+    dialect translation (rather than assume it) so the test that uses it exercises the same
+    exception shape a real lock timeout produces, not the raw driver exception the old
+    version of this test used, which the isinstance check matched by accident.
+    """
+    from sqlalchemy.dialects.postgresql.asyncpg import AsyncAdapt_asyncpg_dbapi
+
+    driver_error = asyncpg.exceptions.LockNotAvailableError("lock timeout")
+    dbapi = AsyncAdapt_asyncpg_dbapi(asyncpg)
+    # A private, dynamically-typed table on SQLAlchemy's own dialect class, and an
+    # attribute its dbapi exception classes never declare — exactly what makes the real
+    # exception this reproduces untyped on ``exc.orig`` too.
+    translate = cast(
+        "dict[type[BaseException], type[BaseException]]",
+        dbapi._asyncpg_error_translate,  # pyright: ignore[reportPrivateUsage]
+    )
+    for superclass in type(driver_error).__mro__:
+        translated_cls = translate.get(superclass)
+        if translated_cls is None:
+            continue
+        translated = translated_cls(f"{type(driver_error)}: {driver_error}")
+        sqlstate = getattr(driver_error, "sqlstate", None)
+        translated.pgcode = sqlstate  # type: ignore[attr-defined]
+        translated.sqlstate = sqlstate  # type: ignore[attr-defined]
+        return translated
+    raise AssertionError("asyncpg's own dialect mapping no longer covers LockNotAvailableError")
+
+
 class FakeResult:
     """Just enough of a cursor result for ``for row in result`` to work."""
 
@@ -90,10 +127,10 @@ class FakeConnection:
 
     ``fail_contains``/``fail_with`` let a test make a specific DDL statement
     raise the exact exception shape ``ensure_partitions`` has to tell apart —
-    real Postgres wraps a ``lock_timeout`` hit as
-    ``asyncpg.exceptions.LockNotAvailableError`` inside a
-    ``sqlalchemy.exc.DBAPIError`` (SQLSTATE 55P03); a different ``orig`` type
-    is the control case that must still propagate.
+    a real lock_timeout hit surfaces as a ``sqlalchemy.exc.DBAPIError`` whose
+    ``orig`` is SQLAlchemy's own asyncpg-dialect wrapper carrying ``.sqlstate
+    == "55P03"`` (see :func:`_wrapped_lock_timeout`); a different ``orig``
+    type/sqlstate is the control case that must still propagate.
     """
 
     def __init__(
@@ -229,9 +266,7 @@ def test_lock_timeout_on_one_group_is_skipped_not_raised_and_others_still_create
     failing_parent, failing_statements = groups[0]
     _failing_name, failing_sql = failing_statements[0]
 
-    lock_error = DBAPIError(
-        failing_sql, {}, asyncpg.exceptions.LockNotAvailableError("lock timeout")
-    )
+    lock_error = DBAPIError(failing_sql, {}, _wrapped_lock_timeout())
     connection = FakeConnection(fail_contains=failing_sql, fail_with=lock_error)
     _patch_engine(monkeypatch, module, connection)
     skipped: list[str] = []

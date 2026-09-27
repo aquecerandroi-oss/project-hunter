@@ -13,6 +13,16 @@ them after a deploy:
    exists to remove: before the backward horizon the insert raised ``no
    partition of relation "candles_1m" found for row`` and took the whole
    transaction — candles, outbox rows and the gap's own status — down with it.
+4. a real ``lock_timeout`` on one parent (another session holding a
+   conflicting lock) is skipped, not raised: the job exits 75 and every other
+   parent still gets its partitions. Before the fix, ``exc.orig`` through
+   SQLAlchemy's asyncpg dialect was never an instance of
+   ``asyncpg.exceptions.LockNotAvailableError`` (that check only ever matched
+   in the unit tests, which passed the raw driver exception directly as
+   ``orig`` instead of the dialect's own wrapper) — so a real lock timeout
+   propagated, ``main()`` exited 1, and every parent after the locked one
+   never got its partitions (found by the prune_partitions task on 27/09,
+   ``.claude/state/astra-review-prune-locks.md``).
 
 Run:
     uv run pytest infra/scripts/tests/test_create_partitions_integration.py -q
@@ -23,7 +33,10 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import os
+import re
 import sys
+import threading
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -39,6 +52,8 @@ from hunter_core.db.models import monthly_partition_parents, partition_name
 from hunter_core.domain.types import uuid7
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from sqlalchemy.ext.asyncio import AsyncConnection
 
 pytestmark = pytest.mark.integration
@@ -265,3 +280,143 @@ def test_the_backward_months_are_hardened_like_every_other_partition(
 
     assert directly_granted == []
     assert unforced_tenant_children == []
+
+
+@contextmanager
+def _held_connection(url: str, *, lock: str, mode: str = "ACCESS SHARE") -> Generator[None]:
+    """Another session, on its own thread, holding ``mode`` on ``lock`` for the ``with`` block.
+
+    Mirrors ``test_prune_partitions_integration.py``'s helper of the same name: a real
+    ``lock_timeout`` can only be reproduced against a real Postgres, by making another
+    session hold the conflicting lock while the job under test tries to acquire its own.
+    """
+    ready, release = threading.Event(), threading.Event()
+    failure: list[BaseException] = []
+
+    async def _hold() -> None:
+        engine = create_async_engine(url, connect_args={"statement_cache_size": 0})
+        try:
+            async with engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))  # opens the transaction
+                await connection.execute(text(f"LOCK TABLE {lock} IN {mode} MODE"))
+                ready.set()
+                await asyncio.to_thread(release.wait)
+                await connection.rollback()
+        finally:
+            await engine.dispose()
+
+    def _run() -> None:
+        try:
+            asyncio.run(_hold())
+        except BaseException as exc:  # surfaced to the test below
+            failure.append(exc)
+            ready.set()
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    assert ready.wait(30), "the holding session never came up"
+    if failure:
+        raise failure[0]
+    try:
+        yield
+    finally:
+        release.set()
+        thread.join(30)
+
+
+def test_a_locked_parent_is_skipped_and_the_others_still_create(migrated_db_url: str) -> None:
+    """Property 4, direct call: the bug this task fixes.
+
+    Uses months far enough ahead that every statement here is genuinely new DDL — not
+    the idempotent no-op the earlier tests in this module already created for the months
+    around the real ``now``, which a lock on the parent alone would not force through
+    ``CREATE TABLE IF NOT EXISTS``.
+    """
+    _use(migrated_db_url)
+    create_partitions = _load_script("create_partitions")
+    future = datetime.now(UTC) + timedelta(days=400)
+    groups = create_partitions.planned_groups(0, future, 0)
+    by_parent = dict(groups)
+    locked_parent = "system_events"
+    assert locked_parent in by_parent
+    monthly_suffix = re.compile(r"_\d{4}_\d{2}$")
+    # only the RANGE monthly children, not the LIST-level intermediates (``candles_1m``
+    # etc.): those are unconditional and an earlier test in this module already created
+    # them, so a fresh run with a future ``now`` would report them as pre-existing, not
+    # newly created, even though nothing here is broken.
+    other_names = {
+        name
+        for parent, statements in groups
+        if parent != locked_parent
+        for name, _sql in statements
+        if monthly_suffix.search(name)
+    }
+    assert other_names, "need at least one other group's partitions to prove they still land"
+
+    skipped: list[str] = []
+    with _held_connection(migrated_db_url, lock=locked_parent):
+        created = asyncio.run(create_partitions.ensure_partitions(groups, on_skip=skipped.append))
+
+    assert skipped == [locked_parent]
+    locked_names = {name for name, _sql in by_parent[locked_parent]}
+    assert not (locked_names & set(created)), "the skipped group must not report anything created"
+    assert other_names <= set(created), "every other group must still have been created"
+
+    # the lock is gone: a retry finishes the parent the first run skipped and
+    # changes nothing else (idempotent)
+    retried: list[str] = asyncio.run(create_partitions.ensure_partitions(groups))
+    assert set(retried) == locked_names
+
+
+def test_the_cli_exits_75_when_a_parent_is_locked_and_other_parents_still_create(
+    migrated_db_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Property 4, through ``main()``: the exit code the README promises an operator.
+
+    75 (``EX_TEMPFAIL``, retry), never 1 (propagated) — the whole point of the fix.
+    ``--months-ahead 15`` reaches months no earlier test in this module created for
+    ``opportunity_history``. A different locked parent than the direct-call test above
+    (``system_events`` there) on purpose: this module's fixture is session-scoped, so a
+    shared parent plus overlapping horizons could make one test's already-created month
+    look, to the other, like the skip never happened — a false negative in test order,
+    not a false pass.
+    """
+    _use(migrated_db_url)
+    create_partitions = _load_script("create_partitions")
+    locked_parent = "opportunity_history"
+    now = datetime.now(UTC)
+    groups = create_partitions.planned_groups(15, now)
+    by_parent = dict(groups)
+    assert locked_parent in by_parent
+    monthly_suffix = re.compile(r"_\d{4}_\d{2}$")
+    other_names = {
+        name
+        for parent, statements in groups
+        if parent != locked_parent
+        for name, _sql in statements
+        if monthly_suffix.search(name)
+    }
+    locked_names = {name for name, _sql in by_parent[locked_parent] if monthly_suffix.search(name)}
+    before = asyncio.run(_partition_names(migrated_db_url))
+    new_locked_names = locked_names - before
+    assert new_locked_names, "need at least one genuinely new month for the locked parent"
+
+    monkeypatch.setattr(sys, "argv", ["create_partitions.py", "--months-ahead", "15"])
+    with _held_connection(migrated_db_url, lock=locked_parent):
+        code = create_partitions.main()
+    assert code == 75
+
+    after_locked_run = asyncio.run(_partition_names(migrated_db_url))
+    assert not (new_locked_names & after_locked_run), (
+        "the locked parent must not have gained a partition while its lock was held"
+    )
+    assert other_names <= after_locked_run, (
+        "every other parent must still have been created despite the one skip"
+    )
+
+    # the lock is gone: the same CLI call now finishes what it skipped
+    monkeypatch.setattr(sys, "argv", ["create_partitions.py", "--months-ahead", "15"])
+    code_after = create_partitions.main()
+    assert code_after == 0
+    after_retry = asyncio.run(_partition_names(migrated_db_url))
+    assert new_locked_names <= after_retry

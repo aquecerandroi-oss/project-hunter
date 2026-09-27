@@ -92,7 +92,6 @@ import asyncio
 import sys
 from collections.abc import Callable
 
-import asyncpg
 from partition_plan import (
     DEFAULT_MONTHS_AHEAD,
     DEFAULT_MONTHS_BEHIND,
@@ -113,6 +112,9 @@ logger = get_logger(__name__)
 _LOCK_TIMEOUT_SQL = "SET LOCAL lock_timeout = '3s'"
 _SESSION_UTC_SQL = "SET LOCAL TimeZone = 'UTC'"
 """D4 / D12 (docs/plans/M1.md) — see the module docstring."""
+
+_LOCK_NOT_AVAILABLE = "55P03"
+"""SQLSTATE for a ``lock_timeout`` hit — see the ``except DBAPIError`` below."""
 
 _EXISTING_PARTITIONS = text(
     "SELECT c.relname FROM pg_class c "
@@ -214,7 +216,14 @@ async def ensure_partitions(
                             ):
                                 group_created.append(name)
                 except DBAPIError as exc:
-                    if not isinstance(exc.orig, asyncpg.exceptions.LockNotAvailableError):
+                    # SQLSTATE, not ``isinstance(exc.orig, asyncpg...LockNotAvailableError)``:
+                    # through SQLAlchemy's asyncpg dialect ``orig`` is the dialect's own
+                    # wrapper (``AsyncAdapt_asyncpg_dbapi.Error``), which carries the code as
+                    # ``.sqlstate`` — the isinstance check is never true for a real lock
+                    # timeout, so it used to re-raise here, abandon every remaining group and
+                    # never reach the exit-75 path below (found by the prune_partitions task
+                    # on 27/09, same fix as prune_partitions.py's ``_drop_one``).
+                    if getattr(exc.orig, "sqlstate", None) != _LOCK_NOT_AVAILABLE:
                         raise
                     logger.warning(
                         "create_partitions.group_skipped",
