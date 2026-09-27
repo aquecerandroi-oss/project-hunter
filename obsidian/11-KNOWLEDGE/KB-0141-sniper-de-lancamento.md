@@ -93,5 +93,5 @@ Pendente.
 
 ## Relacionados
 [[EXP-M18-sniper-de-lancamento]] · [[KB-0138-explosao-de-compradores-nao-tem-vantagem]] ·
-[[KB-0123-graduacoes-born-full]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] ·
+[[KB-0123-quase-metade-das-graduacoes-nasce-cheia]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] ·
 [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] · [[Strategy Backlog]] · `.claude/state/notes-R60.md`

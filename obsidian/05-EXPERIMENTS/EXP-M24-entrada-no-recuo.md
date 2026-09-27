@@ -5,6 +5,12 @@ owner: sexta-feira
 updated: 2026-09-23
 origem: R77 / KB-0157 (23/09/2026) — a H-016 refutou (esperar um recuo de 5 % não paga), mas a célula X = 3 % / W = 60 s deu +2,28 pp por SOL no papel (IC [+0,69, +3,89], Holm 0,052), com o ganho vindo do PREÇO de entrada. Achado da mesma população → só se julga em coorte nova (H-017). Everton, 23/09 ~22 h: "faz ligada, quero ir vendo o teste".
 previsao: diferença emparelhada ≥ +2 pp por SOL decidido contra comprar em t0, IC 95 % (bootstrap por mint) acima de zero, e melhor que "não comprar nada"
+exp: EXP-M24
+strategy: "meme/pumpfun - entrada com recuo de 3 % em até 60 s após a armação (H-017)"
+version: "recuo_v1/1 research_only (migração 0063, T4.91)"
+result: inconclusivo
+evaluable: 166
+days: 2
 tipo: pesquisa
 hipotese: H-017
 variavel: recuo_v1 (entrada com recuo de 3% em ate 60s, braco de papel real)

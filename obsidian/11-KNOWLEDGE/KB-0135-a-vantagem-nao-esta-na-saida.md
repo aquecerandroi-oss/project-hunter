@@ -3,6 +3,8 @@ tags: [knowledge, meme, saida, exits, r59, m4]
 status: vivo
 owner: sexta-feira
 updated: 2026-09-18
+confiança: backtest do autor
+lido_em: 2026-09-18
 fonte: .claude/state/notes-R59.md
 tipo: leitura
 hipotese: —
@@ -31,4 +33,4 @@ mercado: meme
 
 **Ressalvas.** Série censurada quando a aposta fecha (só 61 apostas com ≥ 10 min); mcap teórico sem impacto; regras escolhidas olhando o resultado.
 
-Ligações: [[KB-0119-entrada-depois-da-queda]] · [[EXP-M17-regra-de-saida]] · [[KB-0133]] · [[03-TRADING/Meme/Balanco-2026-09-18-estagio-1b]]
+Ligações: [[KB-0119-entrada-depois-da-queda-em-producao]] · [[EXP-M17-regra-de-saida]] · [[KB-0133-papel-vs-real-custo-fixo-e-atraso-de-30s]] · [[03-TRADING/Meme/Balanco-2026-09-18-estagio-1b]] · [[KB-0137-tamanho-por-conviccao|KB-0137]]

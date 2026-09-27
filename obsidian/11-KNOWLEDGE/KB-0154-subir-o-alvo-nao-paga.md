@@ -10,7 +10,7 @@ astra: concorda com ressalvas (duas rondas; 8 correções de desenho antes de co
 status: vivo
 owner: sexta-feira
 updated: 2026-09-23
-confiança: "medido uma vez"
+confiança: "?"
 tipo: pesquisa
 hipotese: H-011
 variavel: alvo (multiplos de 1,08/1,12/1,15(atual)/1,20/1,30/primeiro repique)

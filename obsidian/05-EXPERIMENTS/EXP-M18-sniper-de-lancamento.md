@@ -4,6 +4,12 @@ status: descartado
 owner: sexta-feira
 updated: 2026-09-19
 origem: Everton, 19/09/2026 00:3x BRT — "assim que a moeda é criada dá um pico; se compramos assim que começa a subir conseguimos comprar no lançamento e vender na alta rápida?"
+exp: EXP-M18
+strategy: "meme/pumpfun - compra em até 1 s após o create (feed por evento), venda em +6 s/+15 s ou no primeiro sell de terceiro"
+version: "launch_v0/1 research_only (T4.67a)"
+result: reprovada
+evaluable: 885
+days: 1
 tipo: pesquisa
 hipotese: —
 variavel: —
@@ -36,7 +42,7 @@ Conjunto `launch_v0/1` (`research_only`): sem porta de saúde (não existe dado)
 ## Regra de decisão
 Vira mesa só se: R médio líquido > 0 com ≥ 300 moedas, top-3 < 50 % do lucro, e o custo de prioridade cabe. Se negativo a +1 s, o jogo do lançamento é dos bots colocados no bloco: descartar e registrar.
 
-Ligações: [[KB-0123-graduacoes-born-full]] · [[KB-0138-explosao-de-compradores-nao-tem-vantagem]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]]
+Ligações: [[KB-0123-quase-metade-das-graduacoes-nasce-cheia]] · [[KB-0138-explosao-de-compradores-nao-tem-vantagem]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]]
 
 ## Braço semeado (T4.67a, 19/09/2026)
 

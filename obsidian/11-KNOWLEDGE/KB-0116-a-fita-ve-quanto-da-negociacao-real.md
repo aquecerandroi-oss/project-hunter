@@ -8,6 +8,8 @@ sql: infra/scripts/sql/research/2026-09-16-r34-q0{1,2,3,4,5,6,7}-*.sql
 owner: astra/quant
 status: vivo
 confianca: alta para a cobertura por board e para a origem dos números da porta (contagens diretas); média para as razões cadeia/fita (a cadeia é ela própria um piso, §2)
+confiança: "?"
+lido_em: 2026-09-16
 updated: 2026-09-16
 tipo: leitura
 hipotese: —

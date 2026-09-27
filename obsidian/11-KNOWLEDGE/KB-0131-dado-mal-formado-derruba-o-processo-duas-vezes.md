@@ -46,4 +46,5 @@ janela). Lição registrada no diário: todo decimal em `--set-param` vai entre 
 
 ## Relacionados
 `.claude/state/notes-T4.47.md` · `.claude/state/notes-R45.md` ·
-[[09-OPERATIONS/Diario/2026-09-18]]
+[[09-OPERATIONS/Diario/2026-09-18]] ·
+[[11-KNOWLEDGE/KB-0140-set-param-valida-antes-de-gravar|KB-0140]] (o mesmo `--set-param`, corrigido na T4.64)

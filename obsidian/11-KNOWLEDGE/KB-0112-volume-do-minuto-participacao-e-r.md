@@ -182,4 +182,5 @@ parciais, n = 344, e todas as faixas foram escolhidas depois de ver a distribui�
 [[11-KNOWLEDGE/KB-0106-snipers-e-graduacao-organica]] ·
 [[11-KNOWLEDGE/KB-0109-top10-e-bundle-onde-o-teto-deveria-estar]] ·
 [[11-KNOWLEDGE/KB-0088-o-teto-de-participacao-nos-motores-de-backtest]] ·
+[[11-KNOWLEDGE/KB-0116-a-fita-ve-quanto-da-negociacao-real|KB-0116]] (cobertura da fita que sustenta este volume) ·
 `docs/RISK_ENGINE_MEME.md` §3.1 · `packages/risk-core/hunter_risk_meme/sizing.py`

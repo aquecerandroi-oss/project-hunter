@@ -7,7 +7,7 @@ lido_em: 2026-09-17
 evidencia: medição própria (R55) + relato de construção (T4.52a, plan-T4.52b, T4.52b-1/2/3, review-T4.52a/b)
 hipotese_testavel: sim
 astra: não consultada nesta nota
-confiança: backtest do autor (medição) e relato de implementação (correções)
+confiança: "?"
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo

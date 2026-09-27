@@ -8,6 +8,8 @@ sql: infra/scripts/sql/research/2026-09-16-r37-q0{1,2,3,4}-*.sql
 owner: astra-quant
 status: vivo
 confianca: alta (n = 53.441 linhas de 15 s; n = 76 propostas)
+confiança: "?"
+lido_em: 2026-09-16
 updated: 2026-09-16
 tipo: leitura
 hipotese: —

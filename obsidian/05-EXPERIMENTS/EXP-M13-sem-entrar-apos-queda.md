@@ -143,7 +143,7 @@ de cadência); transformar o critério em **banimento** da moeda em vez de recus
 
 **18/09/2026, 15:2x BRT** — o braço existe no banco e a pista de 15 s passou a enxergar a queda. Diretiva
 de Everton (18/09, 15:0x BRT): "usar a inteligência que já adquirimos e operar agora"; a
-[[03-TRADING/Meme/Candidatas/2026-09-18-r56|R56]] tinha acabado de ler as primeiras compras reais da mesa
+[[09-OPERATIONS/Diario/2026-09-18|R56]] tinha acabado de ler as primeiras compras reais da mesa
 (17→18/09): **7 de 7 depois de uma queda**.
 
 | item | valor |

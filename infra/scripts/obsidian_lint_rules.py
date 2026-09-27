@@ -98,12 +98,18 @@ def parse_frontmatter(text: str) -> FrontMatter:
 
 def is_template(rel_path: str) -> bool:
     """Templates declaram as chaves com valor vazio de propósito — presença basta."""
-    return PurePosixPath(rel_path).name.startswith("_TEMPLATE-")
+    path = PurePosixPath(rel_path)
+    # `_TEMPLATE-*` é a convenção antiga; `_templates/` é a pasta do Templater (25/09/2026),
+    # cujos trechos são inseridos dentro de outras notas e usam `<% tp.* %>` de propósito.
+    return path.name.startswith("_TEMPLATE-") or "_templates" in path.parts
 
 
 def required_keys(rel_path: str) -> set[str]:
     name = PurePosixPath(rel_path).name
     stem = PurePosixPath(rel_path).stem
+    if rel_path.startswith("_templates/"):
+        # Trechos do Templater: não são notas; o frontmatter pertence à nota de destino.
+        return set()
     if rel_path.startswith("03-TRADING/Estrategias/"):
         # README.md é a convenção do catálogo (T3.20), não uma página de estratégia.
         if name == "README.md":
@@ -153,8 +159,8 @@ def check_values(notes: list[Note], parsed: dict[str, FrontMatter]) -> list[Find
     for note in notes:
         for key, (raw, line) in parsed.get(note.rel_path, {}).items():
             value = _unquote(raw)
-            if value == "":
-                continue
+            if value == "" or (is_template(note.rel_path) and value.startswith("<%")):
+                continue  # expressão do Templater: vira valor real ao criar a nota
             bad = (
                 (key in DATE_KEYS and not DATE_RE.match(value))
                 or (key in ENUM_VOCAB and value not in ENUM_VOCAB[key])

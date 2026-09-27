@@ -5,6 +5,12 @@ owner: sexta-feira
 updated: 2026-09-20
 origem: Astra, 20/09/2026 (parecer `astra-review-estrategia-2026-09-20.md`, item 4) sobre R62 (KB-0143) e R64 (KB-0146) — "testar uma sequência de absorção, com parâmetros congelados, em vez de mais um limiar do filtro atual"
 previsao: o braço confirmado tem R médio > controle e cauda menor; se o repique for distribuição antes do segundo dump, o braço confirmado perde igual ou pior que o controle e a família é descartada
+exp: EXP-M22
+strategy: "meme/pumpfun - entrada depois de uma venda grande com recuperação e sustentação do preço (absorção)"
+version: "flow_v2/8–10 (absorb_v0) research_only (T4.79)"
+result: nao-iniciado
+evaluable: 0
+days: 0
 tipo: pesquisa
 hipotese: —
 variavel: —

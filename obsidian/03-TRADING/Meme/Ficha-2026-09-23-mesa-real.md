@@ -3,6 +3,7 @@ tags: [trading, meme, mesa-real, ficha-diaria, operator-5, metricas]
 data: 2026-09-23
 mesa: operator/5 (porta fluxo_e_holders/2, pista por evento)
 regra: alvo 1,15× · recuo 10 % armado na entrada · máx. 5 min · saídas por evento · ficha 0,07 SOL
+status: registro
 owner: sexta-feira
 updated: 2026-09-23
 ---

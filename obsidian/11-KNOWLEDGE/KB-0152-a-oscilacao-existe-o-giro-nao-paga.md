@@ -10,7 +10,7 @@ astra: concorda com ressalvas (duas rondas, 7 must-fix corrigidos)
 status: vivo
 owner: sexta-feira
 updated: 2026-09-23
-confiança: "medido uma vez"
+confiança: "?"
 tipo: pesquisa
 hipotese: H-009
 variavel: giros_liquidos_5m (politica de giro: vender no repique, recomprar na queda)

@@ -5,6 +5,12 @@ owner: sexta-feira
 updated: 2026-09-19
 origem: R64, 19/09/2026 — Musepaid recomprada 25 s depois de uma saída por trailing; diário de 19/09 ("candidata a pausa por mint")
 previsao: confirma no papel (R das recompras < 0) → candidata a portão de entrada na mesa; se as recompras rápidas (< 60 s) forem a exceção positiva, o desenho da pausa muda
+exp: EXP-M21
+strategy: "meme/pumpfun - cooldown de recompra no mesmo mint depois de uma saída com perda"
+version: "check 28 mint_cooldown_after_loss, 300 s (T4.78), medição em sombra"
+result: inconclusivo
+evaluable: 24
+days: 1
 tipo: pesquisa
 hipotese: —
 variavel: —

@@ -5,6 +5,12 @@ owner: sexta-feira
 updated: 2026-09-19
 origem: Everton, 19/09/2026 02:0x BRT — "tem muita gente chamando moeda; com muitos seguidores explode rápido e cai rápido — estamos analisando as que estão começando a bombar?"
 previsao: inconclusivo → descartar
+exp: EXP-M20
+strategy: "meme/pumpfun - entrada no gatilho kol_seen (kol_after > kol_before) com filtros de idade/mcap/holders/pedigree"
+version: "kol_v0/1 research_only (condicionado à T4.68a)"
+result: nao-iniciado
+evaluable: 0
+days: 0
 tipo: pesquisa
 hipotese: —
 variavel: —

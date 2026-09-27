@@ -151,6 +151,10 @@ calculam nada, só mostram e ordenam o que as páginas já declaram) e dois **ca
 As convenções da base — frontmatter obrigatório por pasta, os quatro callouts, o linter — estão em
 `docs/OBSIDIAN.md`. O linter roda com `uv run python infra/scripts/obsidian_lint.py`.
 
+**Dependência nova (2026-09-25): plugin Templater.** Instalado e ativo (Everton). Os três modelos
+(nova hipótese, nova ideia do Everton, nova nota de pesquisa) e como inseri-los estão em
+[[_templates/LEIA-ME|_templates/]].
+
 **Dependência nova (2026-09-25): plugin Dataview.** Instalado e ativo (Everton). O
 [[Mapa de Estrategias]] lê o frontmatter (`tipo`, `hipotese`, `veredito`, `efeito`, `mercado` — ver
 [[_TEMPLATE-NOTE|_TEMPLATE-NOTE]]) por consultas `dataview` para montar as seções Vivas/Pistas/

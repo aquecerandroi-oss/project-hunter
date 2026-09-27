@@ -7,6 +7,7 @@ lido_em: 2026-09-23
 evidencia: medição própria — 91 posições reais + 1 475 apostas de papel (694 mints), fita `meme_trades` de 144 859 trocas; guarda de chegada da T4.80 testada (15 testes); moinho `run_hypothesis`
 hipotese_testavel: sim (com medida nova)
 astra: concorda (duas rondas; 3 + 6 achados corrigidos)
+confiança: "?"
 status: vivo
 owner: sexta-feira
 updated: 2026-09-23

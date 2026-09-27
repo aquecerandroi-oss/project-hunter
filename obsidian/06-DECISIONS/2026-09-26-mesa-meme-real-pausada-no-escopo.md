@@ -1,9 +1,12 @@
 ---
 tags: [decisao, meme, mesa-real, risco]
 date: 2026-09-26
+updated: 2026-09-26
 owner: sexta-feira
 decidido_por: Sexta-feira, por delegação explícita do Everton ("sexta feira pode decidir", 26/09/2026)
 status: vigente
+decided_on: 2026-09-26
+by: sexta-feira
 ---
 
 # Decisão — a mesa real de memes fica parada no fim do escopo do teste pequeno (26/09/2026)

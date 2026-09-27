@@ -123,6 +123,23 @@ páginas `Candidatas/` como as rodadas de 16/09 acima. Os achados dessas ~15 not
 [[11-KNOWLEDGE/KB-0134-websocket-do-rpc-lag-medido-ao-vivo|KB-0134]] em 18/09, para não ficarem só no
 estado de trabalho. As duas páginas de balanço abaixo continuam sendo a referência número a número.
 
+**A faixa nota a nota:** [[11-KNOWLEDGE/KB-0119-entrada-depois-da-queda-em-producao|KB-0119]] ·
+[[11-KNOWLEDGE/KB-0120-piso-de-snipers-e-as-vencedoras-do-papel|KB-0120]] ·
+[[11-KNOWLEDGE/KB-0121-teto-de-vendas-compras-06-descarta-25-por-cento|KB-0121]] ·
+[[11-KNOWLEDGE/KB-0122-clones-de-simbolo-filtram-lixo-e-barram-boas|KB-0122]] ·
+[[11-KNOWLEDGE/KB-0123-quase-metade-das-graduacoes-nasce-cheia|KB-0123]] ·
+[[11-KNOWLEDGE/KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos|KB-0124]] ·
+[[11-KNOWLEDGE/KB-0125-relogio-de-atividade-pico-14-20-brt|KB-0125]] ·
+[[11-KNOWLEDGE/KB-0126-slippage-de-compra-1-por-cento-mata-acima-de-50|KB-0126]] ·
+[[11-KNOWLEDGE/KB-0127-blockhash-expirado-e-prioridade-fixa-sem-reenvio|KB-0127]] ·
+[[11-KNOWLEDGE/KB-0128-cadeia-vence-fita-no-fluxo-do-criador|KB-0128]] ·
+[[11-KNOWLEDGE/KB-0129-cap-diario-cego-a-entrada-da-tesouraria|KB-0129]] ·
+[[11-KNOWLEDGE/KB-0130-tesouraria-usdc-sol-block-ate-prova-ao-vivo|KB-0130]] ·
+[[11-KNOWLEDGE/KB-0131-dado-mal-formado-derruba-o-processo-duas-vezes|KB-0131]] ·
+[[11-KNOWLEDGE/KB-0132-t445-teria-recusado-a-taxcoin|KB-0132]] ·
+[[11-KNOWLEDGE/KB-0133-papel-vs-real-custo-fixo-e-atraso-de-30s|KB-0133]] ·
+[[11-KNOWLEDGE/KB-0134-websocket-do-rpc-lag-medido-ao-vivo|KB-0134]]
+
 - [[03-TRADING/Meme/Balanco-2026-09-16-mesa-real|Balanço 16/09 — mesa real (R39)]] — primeiro dia
   completo da mesa real, 58 ordens, zero fills.
 - [[03-TRADING/Meme/Balanco-2026-09-17-estagio-1|Balanço 17/09 — estágio 1 (R54)]] — as primeiras 5

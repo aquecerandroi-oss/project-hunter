@@ -3,6 +3,8 @@ tags: [knowledge, meme, evento, saida, executor, trailing, t4-63, m4]
 status: vivo
 owner: sexta-feira
 updated: 2026-09-18
+confiança: backtest do autor
+lido_em: 2026-09-18
 fonte: .claude/state/notes-T4.63.md
 tipo: leitura
 hipotese: —

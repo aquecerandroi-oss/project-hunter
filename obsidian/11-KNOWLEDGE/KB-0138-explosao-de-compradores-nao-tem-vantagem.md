@@ -3,6 +3,8 @@ tags: [knowledge, meme, evento, burst, momentum, r58, m4]
 status: vivo
 owner: sexta-feira
 updated: 2026-09-18
+confiança: backtest do autor
+lido_em: 2026-09-18
 fonte: .claude/state/notes-R58.md
 tipo: leitura
 hipotese: —
@@ -31,4 +33,4 @@ mercado: meme
 
 **Ressalvas.** 25 min de um dia; preço marginal ao vivo vs preço médio no banco (favorece o banco); slippage de venda 0 (sensibilidade 3 % piora tudo).
 
-Ligações: [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0135-a-vantagem-nao-esta-na-saida]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] · [[KB-0119-entrada-depois-da-queda]]
+Ligações: [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0135-a-vantagem-nao-esta-na-saida]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] · [[KB-0119-entrada-depois-da-queda-em-producao]]

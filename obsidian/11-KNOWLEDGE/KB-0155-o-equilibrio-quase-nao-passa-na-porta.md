@@ -7,6 +7,7 @@ lido_em: 2026-09-23
 evidencia: medição própria — 93 posições reais + 1 219 apostas de papel da porta fluxo_e_holders (587 mints), features lidas de meme_proposals.reasons (gravadas na decisão); moinho run_hypothesis; 7 testes
 hipotese_testavel: sim (coorte prospectiva)
 astra: concorda (uma ronda; 2 achados corrigidos)
+confiança: "?"
 status: vivo
 owner: sexta-feira
 updated: 2026-09-23

@@ -47,3 +47,11 @@ set, an activation, a paper line, a spot/1 market toggle):
 This rule does not replace `astra-second-opinion.md` or the specialist
 routing table — it adds one more precondition specific to strategy changes,
 enforced twice: by the agent's own workflow and, structurally, by the tools.
+
+## Astra reviews and dialogues are Obsidian-first too
+
+Every Astra review or dialogue used in a task gets its synthesis note in
+`obsidian/06-DECISIONS/Revisoes-Astra/` or `Dialogos/` in the same commit as
+the task, linked from the task's notes (KB/EXP/diary). Raw
+`.claude/state/astra-review-*.md`/`dialogue-*.md` files are not a substitute
+— they are the cited source, not the record.

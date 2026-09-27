@@ -5,6 +5,12 @@ owner: sexta-feira
 updated: 2026-09-25
 origem: R79 (25/09/2026) — a sombra de papel do `operator/5`, controle da H-017 no EXP-M24, só nasce quando a mesa real aceita; 39 de 171 armações tinham par (122 recusadas pelo `auto_stage1`, 9 expiradas, 1 sem proposta). Decisão do coordenador (T4.95): um controle de entrada imediata que não dependa da mesa real.
 previsao: operacional — toda armação de `recuo_v1/1` depois do deploy tem, na mesma decisão, uma proposta de `recuo_ctrl_v1/1`; ≥ 150 pares resolvidos em ~1,5–2 dias. O julgamento é o da H-017, sem mudança de régua
+exp: EXP-M25
+strategy: "meme/pumpfun - controle: entrada imediata em t0, mesmos parâmetros do recuo_v1 sem o recuo (H-017)"
+version: "recuo_ctrl_v1/1 research_only (migração 0065, T4.95)"
+result: nao-iniciado
+evaluable: 0
+days: 0
 tipo: pesquisa
 hipotese: H-017
 variavel: controle de entrada imediata em t0 (recuo_ctrl_v1 = recuo_v1 sem entry_pullback_pct/entry_pullback_window_s)

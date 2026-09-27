@@ -4,6 +4,12 @@ status: pre-registrado
 owner: sexta-feira
 updated: 2026-09-19
 origem: Everton, 19/09/2026 00:4x BRT — "se está subindo, vendas rápidas e mudanças rápidas de subida: compra assim que tiver alta, dá para perceber" / "então está precisando melhorar, não?"
+exp: EXP-M19
+strategy: "meme/pumpfun - porta de evento com retenção dos snipers ≥ 70 % por ≥ 60 s, carteiras novas e vendas rápidas ≤ 20 %"
+version: "flow_v2/10 research_only (T4.66), controle flow_v2/6"
+result: nao-iniciado
+evaluable: 0
+days: 0
 tipo: pesquisa
 hipotese: —
 variavel: —
@@ -30,7 +36,7 @@ Estado em memória por moeda: carteiras dos 3 primeiros blocos e seus saldos (vi
 ## Regra de decisão
 Vira mesa se R médio do braço > controle com ≥ 60 apostas e vetar ≥ 2 dos 3 rugs reais sem vetar a única vencedora (PS).
 
-Ligações: [[KB-0119-entrada-depois-da-queda]] · [[KB-0120-piso-de-snipers]] · [[KB-0128-cadeia-vence-fita]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[EXP-M18-sniper-de-lancamento]]
+Ligações: [[KB-0119-entrada-depois-da-queda-em-producao]] · [[KB-0120-piso-de-snipers-e-as-vencedoras-do-papel]] · [[KB-0128-cadeia-vence-fita-no-fluxo-do-criador]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[EXP-M18-sniper-de-lancamento]]
 
 ## Braço semeado (T4.66)
 

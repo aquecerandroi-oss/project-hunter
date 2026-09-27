@@ -7,7 +7,7 @@ lido_em: 2026-09-18
 evidencia: medição própria (R56 §3.2) + relato de construção e revisão (T4.56, review-T4.55-56)
 hipotese_testavel: não
 astra: não consultada nesta nota
-confiança: backtest do autor (o caso) e relato de implementação (a correção)
+confiança: "?"
 owner: sexta-feira
 updated: 2026-09-18
 status: vivo

@@ -52,7 +52,7 @@ mercado: meme
 
 11. **13 variáveis de decisão testadas** (snipers, dev share, compradores únicos, progresso, fluxo do criador, idade, volume 1 m, sells/buys, holders, top10, retenção, carteiras novas, flip rápido) com bucket + bootstrap por cluster de mint + permutação + Benjamini-Hochberg: **nenhuma sobrevive**. p mais baixo 0,046 contra limiar 0,0077. Snipers p = 0,52; dev share p = 0,67 (R65/[[KB-0147-custo-e-o-prejuizo-e-buys-1m-e-a-unica-pista|KB-0147]]).
 12. **`buys_1m` parecia a exceção e não é**: ≤ 25 compras/min dava 34 % de alvos e MFE +28,1 % contra 20 % e +8,2 % nas 87 — mas em **473 moedas independentes** o efeito é D = +0,036 por SOL, IC 95 % **[−0,058, +0,136]**, p = **0,43**; a mediana inverte o sinal e a curva de limiares é **pico, não patamar** (R67). *Não confirmado ≠ refutado*: faltariam ~1 300 mints sob a saída real para decidir.
-13. **Rajada de compradores é negativa** em 54 células (R58/[[KB-0138-rajada-de-compradores|KB-0138]]).
+13. **Rajada de compradores é negativa** em 54 células (R58/[[KB-0138-explosao-de-compradores-nao-tem-vantagem|KB-0138]]).
 14. **Sniper de lançamento: descartado** — 18/18 células negativas, e não era latência (R60/[[KB-0141-sniper-de-lancamento|KB-0141]]).
 15. **KOL/call confirma, não antecipa**: o bum começa 16 s *depois* do sinal; R −0,07, acerto 15 % (R61/[[KB-0142-kol-e-call-antecipam-ou-confirmam|KB-0142]]).
 16. **Seguir carteira vencedora não é gatilho** (R57/KB-0136).

@@ -10,7 +10,7 @@ astra: revisou desenho e veredito
 status: vivo
 owner: sexta-feira
 updated: 2026-09-23
-confiança: "medido uma vez, com mecanismo"
+confiança: "?"
 tipo: pesquisa
 hipotese: —
 variavel: —
