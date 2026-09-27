@@ -16,7 +16,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BACKUP_DIR="${HUNTER_BACKUP_DIR:-/opt/backups}"
-RETENTION_DAYS="${HUNTER_BACKUP_RETENTION_DAYS:-7}"
+# O cron (/etc/cron.d/hunter-backup) nao carrega o .env: a retencao vem do
+# ambiente, senao da linha HUNTER_BACKUP_RETENTION_DAYS do .env (so essa linha,
+# nunca o arquivo inteiro), senao 3 dias (27/09/2026: 8 dumps de ate 25 G
+# lotaram o disco e o dump da noite falhou).
+if [ -z "${HUNTER_BACKUP_RETENTION_DAYS:-}" ] && [ -f "$ROOT/.env" ]; then
+  HUNTER_BACKUP_RETENTION_DAYS="$(sed -n 's/^HUNTER_BACKUP_RETENTION_DAYS=\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$ROOT/.env" | tail -n 1)"
+fi
+RETENTION_DAYS="${HUNTER_BACKUP_RETENTION_DAYS:-3}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 TARGET="$BACKUP_DIR/hunter-$STAMP.dump"
 
