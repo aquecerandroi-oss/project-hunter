@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 from hunter_indicators.meme.rules import ExitRules
 from hunter_meme_worker.lab_values import money_str, optional_money_str
+from hunter_meme_worker.lines_exit import SUPPORT_MAX_AGE_S
 
 if TYPE_CHECKING:
     from hunter_meme_worker.lab_models import RuleSetSpec
@@ -36,6 +37,7 @@ __all__ = [
     "decimal_of",
     "effective_params",
     "optional_count",
+    "positive_count_or",
 ]
 
 REFUSAL_EXCEEDS_MAX_SOL_PER_BET = "exceeds_max_sol_per_bet"
@@ -83,6 +85,16 @@ def optional_int(value: Any) -> int | None:
     return None if value is None else int(value)
 
 
+def positive_count_or(name: str, value: Any, default: int) -> int:
+    """T4.98: a positive bare JSON integer (:func:`optional_count`), else ``default``."""
+    count = optional_count(name, value)
+    if count is None:
+        return default
+    if count <= 0:
+        raise ValueError(f"{name} must be positive, never {count}")
+    return count
+
+
 def optional_count(name: str, value: Any) -> int | None:
     """T4.80: an optional **count** parameter — a bare JSON integer, or absent.
 
@@ -128,6 +140,10 @@ class EffectiveParams:
     exit_on_dead: bool = False
     dead_stale_s: int = DEFAULT_DEAD_STALE_S
     dead_mark_pct: Decimal = DEFAULT_DEAD_MARK_PCT
+    line_support_causal: bool = True
+    line_support_max_age_s: int = SUPPORT_MAX_AGE_S
+    """T4.98 (EXP-M26 L1): the support ``line_broken`` reads — only a minute
+    folded by the photo, closed at most this long before it (``lines_exit``)."""
 
     def exit_rules(self, key: str = "lab_exit") -> ExitRules:
         return ExitRules(
@@ -168,6 +184,9 @@ class EffectiveParams:
             params["exit_on_dead"] = True
             params["dead_stale_s"] = self.dead_stale_s
             params["dead_mark_pct"] = money_str(self.dead_mark_pct)
+        if self.exit_on_line_break:
+            params["line_support_causal"] = self.line_support_causal
+            params["line_support_max_age_s"] = self.line_support_max_age_s
         return params
 
     @classmethod
@@ -187,6 +206,10 @@ class EffectiveParams:
             exit_on_dead=bool_or(params.get("exit_on_dead"), False),
             dead_stale_s=int_or(params.get("dead_stale_s"), DEFAULT_DEAD_STALE_S),
             dead_mark_pct=decimal_or(params.get("dead_mark_pct"), DEFAULT_DEAD_MARK_PCT),
+            line_support_causal=bool_or(params.get("line_support_causal"), True),
+            line_support_max_age_s=positive_count_or(
+                "line_support_max_age_s", params.get("line_support_max_age_s"), SUPPORT_MAX_AGE_S
+            ),
         )
 
 
@@ -225,6 +248,8 @@ def effective_params(spec: RuleSetSpec, decision: Mapping[str, Any]) -> Effectiv
         exit_on_dead=bool_or(decision.get("exit_on_dead"), spec.exit_on_dead),
         dead_stale_s=int_or(decision.get("dead_stale_s"), spec.dead_stale_s),
         dead_mark_pct=decimal_or(decision.get("dead_mark_pct"), spec.dead_mark_pct),
+        line_support_causal=spec.line_support_causal,
+        line_support_max_age_s=spec.line_support_max_age_s,
     )
 
 

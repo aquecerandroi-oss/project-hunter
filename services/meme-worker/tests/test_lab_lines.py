@@ -33,6 +33,8 @@ from hunter_meme_worker.features_tape import HoldersObservation, TapeMinute
 from hunter_meme_worker.lab import LabContext, LabState, lab_tick
 from hunter_meme_worker.lab_models import RuleSetSpec
 from hunter_meme_worker.lab_repo import load_active_rule_sets
+from hunter_meme_worker.lab_repo_lines import support_lines_for
+from hunter_meme_worker.lines_exit import support_at
 from hunter_meme_worker.repo import insert_features, insert_snapshot
 from hunter_meme_worker.repo_lines import load_line_points
 
@@ -138,9 +140,31 @@ def _minute(
     )
 
 
-async def _fold(factory: async_sessionmaker[AsyncSession], inputs: MinuteInputs) -> None:
+async def _fold(
+    factory: async_sessionmaker[AsyncSession],
+    inputs: MinuteInputs,
+    *,
+    computed_at: datetime | None = None,
+) -> None:
+    """Insert the minute and pin its ``computed_at`` (T4.98): the column's
+    default is the database's wall clock, which these 2026-10 instants do not
+    share — the exit reads ``computed_at <= photo``. Default: the fold's measured
+    delay, 3 s after the close."""
     async with role_session(factory, db_role=WORKER) as session:
         await insert_features(session, [build_row(inputs)])
+    async with factory() as session:  # the owner: hunter_worker only inserts
+        await session.execute(
+            text(
+                "UPDATE meme_features_1m SET computed_at = :at "
+                "WHERE mint = :mint AND end_time = :end_time"
+            ),
+            {
+                "at": computed_at or inputs.end_time + timedelta(seconds=3),
+                "mint": inputs.mint,
+                "end_time": inputs.end_time,
+            },
+        )
+        await session.commit()
 
 
 async def _bets(factory: async_sessionmaker[AsyncSession], mint: str) -> list[dict[str, Any]]:
@@ -228,15 +252,40 @@ async def test_a_photo_received_after_the_close_is_not_a_line_point(
 # ---- probe → scale → line broken --------------------------------------------------------
 
 
-async def test_a_probe_scales_once_when_the_line_is_born_and_sells_when_it_breaks(
+MINUTE_B = CREATED + timedelta(minutes=6)
+"""The minute the line is born: support 30,4 SOL at the close, slope 0,2 SOL/min."""
+TICK_3 = CREATED + timedelta(minutes=11, seconds=30)
+FILL_2 = CREATED + timedelta(minutes=7, seconds=40)
+"""The scale leg's fill — the first photo after tick 2 — 100 s after ``MINUTE_B``."""
+
+
+async def _probe_then_scale(
     lab: LabContext,
     db_session_factory: async_sessionmaker[AsyncSession],
-) -> None:
+    *,
+    minute_b_computed_at: datetime | None = None,
+) -> str:
+    """A probe opened at 2 min, scaled the minute the line is born; the mint.
+    The scale leg (``exit_on_line_break``) fills at ``FILL_2``."""
+    async with db_session_factory() as session:
+        # The T4.98 cases leave their bets open on purpose, and the container is
+        # the session's: retire this file's leftovers, or the set's
+        # ``max_open_positions`` (5) refuses the next probe. Closed flat (0 SOL),
+        # so no cap's loss sum moves.
+        await session.execute(
+            text(
+                "UPDATE meme_paper_bets SET status = 'closed', "
+                "  exit_at = entry_at + interval '1 second', "
+                "  exit = jsonb_build_object('reason', 'sell_now'), pnl_sol = 0, r_multiple = 0 "
+                "WHERE mint LIKE 'PROBE\\_%' AND status = 'open'"
+            )
+        )
+        await session.commit()
     mint = f"PROBE_{uuid4().hex[:8]}"
-    minute_a, minute_b = CREATED + timedelta(minutes=2), CREATED + timedelta(minutes=6)
+    minute_a, minute_b = CREATED + timedelta(minutes=2), MINUTE_B
     photo_a, photo_b = minute_a - timedelta(seconds=20), minute_b - timedelta(seconds=20)
-    tick_1, tick_2, tick_3 = (CREATED + timedelta(minutes=m, seconds=30) for m in (3, 7, 11))
-    fill_1, fill_2 = tick_1 + timedelta(seconds=10), tick_2 + timedelta(seconds=10)
+    tick_1, tick_2 = (CREATED + timedelta(minutes=m, seconds=30) for m in (3, 7))
+    fill_1, fill_2 = tick_1 + timedelta(seconds=10), FILL_2
     await _plant_curve(
         db_session_factory,
         mint,
@@ -268,7 +317,11 @@ async def test_a_probe_scales_once_when_the_line_is_born_and_sells_when_it_break
     assert probe["params"]["exit_on_line_break"] is False
     assert lab.state.refusals["trendline_v0"].get("age_below_min", 0) >= 1, "no line at 2 min"
 
-    await _fold(db_session_factory, _minute(mint, minute_b, observed_at=photo_b, with_line=True))
+    await _fold(
+        db_session_factory,
+        _minute(mint, minute_b, observed_at=photo_b, with_line=True),
+        computed_at=minute_b_computed_at,
+    )
     line = await _one(
         db_session_factory,
         "SELECT support_line_sol, support_line_slope, higher_lows, breakout_15m, "
@@ -300,23 +353,39 @@ async def test_a_probe_scales_once_when_the_line_is_born_and_sells_when_it_break
     assert scale["params"]["exit_on_line_break"] is True
     assert scale["params"]["max_hold_s"] == 900 and scale["params"]["target_x"] == "2"
     assert lab.state.refusals["hype_probe_v0"].get("already_open", 0) >= 1, "no second probe"
+    return mint
 
-    # The future arrives only now — planted before tick 2 it would have been
-    # walked in that same tick, which is the engine doing its job, not a bug.
-    async with role_session(db_session_factory, db_role=WORKER) as session:
-        for minutes, sol in ((1, BELOW_1), (2, BELOW_2), (3, SALE)):
-            # 29,6 < 30,9 (1st close below), 28,5 < 31,1 (2nd — the rule), then the sale.
+
+async def _break_photos(
+    factory: async_sessionmaker[AsyncSession], mint: str, seconds: tuple[int, int, int]
+) -> None:
+    """Two closes below the line and the sale photo, ``seconds`` after ``FILL_2``.
+    The future arrives only now — planted before tick 2 it would have been walked
+    in that same tick, which is the engine doing its job, not a bug."""
+    async with role_session(factory, db_role=WORKER) as session:
+        for second, sol in zip(seconds, (BELOW_1, BELOW_2, SALE), strict=True):
             await insert_snapshot(
-                session, _snapshot(mint, fill_2 + timedelta(minutes=minutes), sol, "946000000")
+                session, _snapshot(mint, FILL_2 + timedelta(seconds=second), sol, "946000000")
             )
-    report = await lab_tick(lab, now=tick_3)
+
+
+async def test_a_probe_scales_once_when_the_line_is_born_and_sells_when_it_breaks(
+    lab: LabContext,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    mint = await _probe_then_scale(lab, db_session_factory)
+    fill_2 = FILL_2
+    # 29,6 < 30,77 (1st close below, line 110 s old), 28,5 < 30,78 (2nd — the
+    # rule, 115 s old: still fresh under the 120 s bound), then the sale.
+    await _break_photos(db_session_factory, mint, (10, 15, 25))
+    await lab_tick(lab, now=TICK_3)
     bets = await _bets(db_session_factory, mint)
     hype_bets = [b for b in bets if b["rule_set_id"] == HYPE_PROBE_ID]
     assert len(hype_bets) == 2, "a probe scales once"
     scale = next(b for b in hype_bets if b["leg"] == "scale")
     assert scale["status"] == "closed" and scale["exit"]["reason"] == "line_broken"
-    assert scale["exit"]["intent_snapshot_at"] == (fill_2 + timedelta(minutes=2)).isoformat()
-    assert scale["exit"]["snapshot"]["observed_at"] == (fill_2 + timedelta(minutes=3)).isoformat()
+    assert scale["exit"]["intent_snapshot_at"] == (fill_2 + timedelta(seconds=15)).isoformat()
+    assert scale["exit"]["snapshot"]["observed_at"] == (fill_2 + timedelta(seconds=25)).isoformat()
     probe = next(b for b in hype_bets if b["leg"] == "probe")
     assert probe["status"] == "open", "the probe does not watch the line"
     async with role_session(db_session_factory, db_role=WORKER) as session:
@@ -329,3 +398,126 @@ async def test_a_probe_scales_once_when_the_line_is_born_and_sells_when_it_break
             {"mint": mint, "rs": HYPE_PROBE_ID},
         )
     assert pending == 1, "exactly one scale proposal was ever written under our own set"
+
+
+# ---- T4.98 (EXP-M26 L1): a stale, unborn or hidden line never sells --------------------
+
+
+@pytest.mark.parametrize(
+    ("scenario", "seconds"),
+    [
+        # the same two closes below, 160 and 220 s after the only line: stale
+        ("stale_line", (60, 120, 180)),
+        # minute B closed at 12:06 but was folded at 12:08:00, after both closes
+        ("folded_after_the_photos", (10, 15, 25)),
+        # minute 12:07 was folded without a line: the 12:06 line is not projected over it
+        ("newer_minute_without_a_line", (10, 15, 25)),
+    ],
+)
+async def test_a_line_the_photo_could_not_trust_never_fires_line_broken(
+    lab: LabContext,
+    db_session_factory: async_sessionmaker[AsyncSession],
+    scenario: str,
+    seconds: tuple[int, int, int],
+) -> None:
+    late = FILL_2 + timedelta(seconds=20) if scenario == "folded_after_the_photos" else None
+    mint = await _probe_then_scale(lab, db_session_factory, minute_b_computed_at=late)
+    if scenario == "newer_minute_without_a_line":
+        minute_c = MINUTE_B + timedelta(minutes=1)
+        photo_c = minute_c - timedelta(seconds=20)
+        await _fold(
+            db_session_factory, _minute(mint, minute_c, observed_at=photo_c, with_line=False)
+        )
+    await _break_photos(db_session_factory, mint, seconds)
+    await lab_tick(lab, now=TICK_3)
+    bets = await _bets(db_session_factory, mint)
+    scale = next(b for b in bets if b["leg"] == "scale" and b["rule_set_id"] == HYPE_PROBE_ID)
+    assert scale["status"] == "open", f"{scenario}: {scale['exit']}"
+    marked = await _one(
+        db_session_factory,
+        "SELECT mark_at, exit_intent FROM meme_paper_bets WHERE id = CAST(:id AS uuid)",
+        id=scale["id"],
+    )
+    assert marked["exit_intent"] is None
+    assert marked["mark_at"] == FILL_2 + timedelta(seconds=seconds[-1]), "every photo was walked"
+
+
+async def test_a_stale_line_does_not_block_the_other_exits(
+    lab: LabContext,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Unknown support is neutral: 3 min after the only line, the price more than
+    doubles and the scale leg sells ``target`` (``target_x 2``) as it always did."""
+    mint = await _probe_then_scale(lab, db_session_factory)
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        for second, sol in ((180, "80"), (195, "80")):
+            await insert_snapshot(
+                session, _snapshot(mint, FILL_2 + timedelta(seconds=second), sol, "946000000")
+            )
+    await lab_tick(lab, now=TICK_3)
+    bets = await _bets(db_session_factory, mint)
+    scale = next(b for b in bets if b["leg"] == "scale" and b["rule_set_id"] == HYPE_PROBE_ID)
+    assert scale["status"] == "closed" and scale["exit"]["reason"] == "target"
+    assert scale["exit"]["intent_snapshot_at"] == (FILL_2 + timedelta(seconds=180)).isoformat()
+
+
+async def test_the_bet_s_own_bound_reaches_the_loop(
+    lab: LabContext,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """``line_support_max_age_s`` rides in ``meme_paper_bets.params``: a bet
+    written with 300 s sells on the 160/220 s-old line a 120 s bet ignores."""
+    mint = await _probe_then_scale(lab, db_session_factory)
+    async with db_session_factory() as session:  # the owner: the experiment's explicit key
+        await session.execute(
+            text(
+                "UPDATE meme_paper_bets SET params = params || "
+                "'{\"line_support_max_age_s\": 300}'::jsonb "
+                "WHERE mint = :mint AND leg = 'scale' AND rule_set_id = CAST(:rs AS uuid)"
+            ),
+            {"mint": mint, "rs": HYPE_PROBE_ID},
+        )
+        await session.commit()
+    await _break_photos(db_session_factory, mint, (60, 120, 180))
+    await lab_tick(lab, now=TICK_3)
+    bets = await _bets(db_session_factory, mint)
+    scale = next(b for b in bets if b["leg"] == "scale" and b["rule_set_id"] == HYPE_PROBE_ID)
+    assert scale["params"]["line_support_max_age_s"] == 300
+    assert scale["status"] == "closed" and scale["exit"]["reason"] == "line_broken"
+    assert scale["exit"]["intent_snapshot_at"] == (FILL_2 + timedelta(seconds=120)).isoformat()
+
+
+async def test_a_backlog_past_30_minutes_still_reads_the_photo_s_own_minute(
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Astra, T4.98 review: with the lineless minutes read too, a ``LIMIT 30``
+    covers only 30 minutes — a Lab back from a 40-minute pause would judge the
+    old photos with no line. The read is by range: ``[photo − bound, now]``."""
+    mint = f"BACKLOG_{uuid4().hex[:8]}"
+    await _plant_curve(
+        db_session_factory,
+        mint,
+        [(MINUTE_B - timedelta(seconds=20), ABOVE, "946000000")],
+        created_at=CREATED,
+    )
+    await _fold(
+        db_session_factory,
+        _minute(mint, MINUTE_B, observed_at=MINUTE_B - timedelta(seconds=20), with_line=True),
+    )
+    for m in range(1, 41):
+        minute = MINUTE_B + timedelta(minutes=m)
+        await _fold(
+            db_session_factory,
+            _minute(mint, minute, observed_at=minute - timedelta(seconds=20), with_line=False),
+        )
+    photo = MINUTE_B + timedelta(seconds=15)
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        lines = await support_lines_for(
+            session,
+            mint=mint,
+            features_version=MemeConfig().features_version,
+            since=photo - timedelta(seconds=120),
+            until=MINUTE_B + timedelta(minutes=41),
+        )
+    assert support_at(lines, photo) == Decimal("30.45")
+    assert support_at(lines, MINUTE_B + timedelta(minutes=1, seconds=10)) is None, "flat after"

@@ -50,6 +50,7 @@ from hunter_meme_worker.lab_params import (
     effective_params,
     int_or,
     optional_decimal,
+    positive_count_or,
     suggested_extras,
 )
 from hunter_meme_worker.lab_values import (
@@ -64,6 +65,7 @@ from hunter_meme_worker.lab_values import (
     money_str,
     optional_money_str,
 )
+from hunter_meme_worker.lines_exit import SUPPORT_MAX_AGE_S
 
 __all__ = [
     "CLOCKS",
@@ -149,6 +151,9 @@ class RuleSetSpec:
     exit_on_dead: bool = False
     dead_stale_s: int = DEFAULT_DEAD_STALE_S
     dead_mark_pct: Decimal = DEFAULT_DEAD_MARK_PCT
+    line_support_causal: bool = True
+    line_support_max_age_s: int = SUPPORT_MAX_AGE_S
+    """T4.98 (EXP-M26 L1): the support ``line_broken`` reads (``lines_exit``)."""
     clock: str = "1m"
     """T4.16: ``1m`` | ``15s`` | ``refused`` (:data:`CLOCKS`) — which series
     this set's gate reads (``refused`` reads none: T4.85's own lane)."""
@@ -237,6 +242,10 @@ class RuleSetSpec:
             exit_on_dead=bool_or(params.get("exit_on_dead"), False),
             dead_stale_s=int_or(params.get("dead_stale_s"), DEFAULT_DEAD_STALE_S),
             dead_mark_pct=decimal_or(params.get("dead_mark_pct"), DEFAULT_DEAD_MARK_PCT),
+            line_support_causal=bool_or(params.get("line_support_causal"), True),
+            line_support_max_age_s=positive_count_or(
+                "line_support_max_age_s", params.get("line_support_max_age_s"), SUPPORT_MAX_AGE_S
+            ),
             clock=_clock_of(params.get("clock")),
             pedigree_exclusions=bool_or(params.get("pedigree_exclusions"), True),
             pedigree_repeat_dumper=bool_or(params.get("pedigree_repeat_dumper"), False),
