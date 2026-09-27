@@ -119,6 +119,6 @@ O que alimenta as consultas Dataview é o frontmatter de cada nota — `tipo`, `
 
 ## Relacionado
 
-[[Dicionario de Variaveis]] · [[Fila de Hipoteses]] · [[Strategy Backlog]] ·
+[[Dicionario de Variaveis]] · [[Fila de Hipoteses]] · [[Proximas Hipoteses]] · [[Strategy Backlog]] ·
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[Perdas/Index|Perdas]] · [[Estratégias.base]] ·
 [[Experimentos.base]] · `docs/RESEARCH.md`

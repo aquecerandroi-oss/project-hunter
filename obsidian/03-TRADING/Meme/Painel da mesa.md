@@ -102,6 +102,26 @@ line:
     lineColor: '#e63946', '#f4a261', '#e9c46a', '#adb5bd', '#457b9d'
 ```
 
+## Hipóteses por veredito
+
+Contagem de notas `KB-00xx` com `hipotese`/`veredito` preenchidos (frontmatter,
+`_TEMPLATE-NOTE.md`) — não é o mesmo universo da tabela estática abaixo, que conta os **22 blocos**
+`H-001`–`H-022` de [[Fila de Hipoteses]] diretamente (a maioria não tem `KB-00xx` própria; ver
+[[Proximas Hipoteses]] §b para o porquê e para o próximo passo de cada `nao_confirma`/`limite_de_dado`).
+
+```dataview
+TABLE WITHOUT ID veredito AS "Veredito", length(rows) AS "Notas"
+FROM "11-KNOWLEDGE" OR "03-TRADING/Meme/Perdas"
+WHERE veredito AND veredito != "—"
+GROUP BY veredito
+```
+
+Contagem estática de hoje (27/09/2026), das 22 hipóteses `H-001`–`H-022` de [[Fila de Hipoteses]] —
+`em_curso` 3 (H-001, H-002, H-022) · `nao_confirma` 7 (H-003, H-004, H-005, H-006, H-009, H-014,
+H-020) · `refuta` 6 (H-007, H-011, H-012, H-015, H-016, H-019) · `limite_de_dado` 5 (H-010, H-013,
+H-017, H-018, H-021) · `confirma` 0. H-008 fica fora dos cinco rótulos (estudo inválido por censura
+> 20 %, continua `aberta`) — ver [[Proximas Hipoteses]] §b.
+
 ## Últimos 14 dias
 
 ```dataview

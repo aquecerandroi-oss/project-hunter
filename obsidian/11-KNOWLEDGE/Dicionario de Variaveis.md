@@ -124,7 +124,11 @@ pré-registrada (dado já existe, ninguém mediu):
 9. `holders_rising`/`progress_rising` (meme, `meme_features_15s`) isolados — só medidos hoje **dentro** de `equilibrio` (H-013, que morreu por 1 caso).
 10. `liquidations` notional (cripto) — 8 421 linhas já coletadas, defeito de semântica nunca corrigido nem a série testada.
 
+Como transformar uma destas em hipótese pré-registrada, com onde os dados vivem e a classe de
+perda candidata (meme): [[Proximas Hipoteses]] §a e §d.
+
 ## Relacionado
 
-[[Mapa de Estrategias]] · [[Strategy Backlog]] · [[Fila de Hipoteses]] · [[KB-0149-o-que-a-mesa-real-ensinou]] ·
+[[Mapa de Estrategias]] · [[Strategy Backlog]] · [[Fila de Hipoteses]] · [[Proximas Hipoteses]] ·
+[[KB-0149-o-que-a-mesa-real-ensinou]] ·
 [[Perdas/Index|Perdas]] · `docs/DATABASE.md` §64 · `docs/PIPELINE.md` · `docs/RESEARCH.md`

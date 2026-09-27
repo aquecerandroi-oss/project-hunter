@@ -11,8 +11,9 @@ Fila do **moinho de hipóteses** (`infra/research/`, T4.87). Qualquer pessoa acr
 bloco; o moinho lê esta página com `infra.research.queue.load_queue()` e a hipótese entra
 na vez. Como escrever e como ler o veredito: `docs/RESEARCH.md`. Ver também
 [[Dicionario de Variaveis]] (toda variável medível, testada ou não — a semente da próxima
-hipótese), [[Mapa de Estrategias]] (o estado de todas, Vivas/Pistas/Cemitério) e
-[[Ideias do Everton]] (o que ainda não virou bloco aqui).
+hipótese), [[Mapa de Estrategias]] (o estado de todas, Vivas/Pistas/Cemitério),
+[[Proximas Hipoteses]] (o que nunca foi testado, as pistas com próximo passo e o cemitério, num só
+lugar, para montar o próximo bloco) e [[Ideias do Everton]] (o que ainda não virou bloco aqui).
 
 **Regras da casa** (de [[KB-0149-o-que-a-mesa-real-ensinou]] §5):
 
