@@ -1,44 +1,75 @@
 # Plantão da Sexta-feira — nota do turno
 
-Atualizado: **2026-09-18, 20:45–21:2x BRT** (23:45–00:2xZ). Turno automático (ninguém olhando).
-Turno anterior: 19:45 BRT do mesmo dia (disco 88 %, T4.63 poda da outbox).
+Atualizado: **2026-09-27, 02:15–02:45 BRT** (05:15–05:45Z). Turno automático (ninguém olhando).
+Turno anterior registrado nesta nota: 18/09, 20:45 BRT. Entre um e outro o trabalho foi todo em
+sessões ao vivo — o registro vivo desses nove dias está em `obsidian/09-OPERATIONS/Diario/`
+(19 a 27/09) e no Changelog; esta nota estava parada.
 
-## O que mudou desde o último turno
+## Saúde agora (medido neste turno)
 
-- **INCIDENTE EM PRODUÇÃO (novo, 23:24Z = 20:24 BRT): `meme-worker` em laço de reinício** — 84 reinícios
-  em 22 min. O lote das 22:47Z que trocou a saída da mesa (`operator/5`) para "alvo 1,3× / trailing 20 %
-  **sempre** / 5 min" escreveu `trailing_arm_x = "1.0"`; o `ExitRules` só aceita `None` ou `> 1`. A primeira
-  aposta de papel do conjunto novo (`01a0b6d5-b8ee-782a-9d02-ee508754f4f0`, 23:24:07Z) leva o valor e mata
-  o tique do Lab, e o `TaskGroup` inteiro do worker cai — **o portão de evento que alimenta a mesa real cai
-  junto** a cada ~15 s (propostas 23/h → 11/h). A mesa real em si está de pé (executor `healthy`, 0 posições,
-  perda do dia 0,1088/0,15, 0 erros de RPC). Detalhe completo em `obsidian/07-BUGS/Open Bugs.md`.
-- **T4.65 (código):** normalizar `trailing_arm_x ≤ 1 → None` ao ler conjunto e aposta
-  (`services/meme-worker/.../lab_params.py`, `lab_models.py`, testes). **Commitada em `c569ae7f`** (408 testes do worker verdes,
-  ruff/pyright limpos, Astra APPROVE_WITH_NITS). Ainda **não** está na imagem da VPS. **T4.65b (aberta):** uma aposta inválida não pode derrubar o processo — isolar como a
-  T4.62 fez no executor.
-- Disco da VPS: **88 %, inalterado**. Nada mais mudou na VPS (`e130906d`).
+| Onde | Estado |
+|---|---|
+| VPS — contêineres | **18, todos `healthy`** (api, meme-worker, meme-executor, web, scanner, execution e 4 strategy com 10 h; 5 market-worker com 2 h) |
+| VPS — disco | **65 %**, 225 de 348 G, **124 G livres** (era 88 % no último turno; 99 % às 03:06Z de hoje) |
+| VPS — Lab | **vivo**: `lab_fast_last_as_of` = `2026-09-27T03:15:54Z`, 2 apostas abertas, `lab_decision_to_fill_s_p50` = 5 s |
+| VPS — backup | **3 dumps** (24, 25, 26/09; 64 G). **O de hoje falhou** às 01:31Z por disco cheio; a retenção de 3 dias (`3771a020`) já está implantada, o próximo roda 01:17Z de 28/09 |
+| Stack local | **parada**: postgres, redis, api e web saíram há 2 semanas; 3 workers em laço de reinício sem banco e o `market-worker` `unhealthy` há 3 dias. Nada de produção depende disso |
+| Árvore local | **muito suja**: 94 arquivos modificados, 479 não rastreados (sessões ao vivo). Commit só por pathspec |
+
+## O achado do turno — o registro de pesquisa está parado há 12 dias
+
+O cron `hunter-meme-close` **sai 1 desde 20/09, oito noites seguidas, patch de 0 linhas em todas**:
+`KeyError: 'wallet_max_sol'` em `meme_diary.py:143`. Causa: `_RULE_SETS` lê as 30 linhas de
+`meme_rule_sets` sem filtrar `status` e **uma** delas — `launch_v0/1`, criada em 19/09, hoje
+`retired` — não declara teto de carteira (só `size_sol = 0.01`). Criada em 19/09, primeira falha em
+20/09.
+
+As avaliações datadas do Lab nascem daí (`Diario-Meme/`, `Hipoteses-do-plantao.md`, páginas
+`05-EXPERIMENTS/`). Além das 8 noites que nem rodaram, o último fechamento **aplicado** foi o de
+**14/09** (`8b5f5ea7`) — os patches de 15 a 19/09 rodaram verdes e nunca foram aplicados, e continuam
+em `/opt/hunter-close/`. Nenhuma avaliação datada automática entrou no vault há **12 dias**. Passou
+batido porque a ficha diária da mesa real (T4.92) e os diários à mão continuaram saindo.
+
+Terceira ocorrência da classe da KB-0131 (dado incompleto derruba o processo inteiro): antes o
+executor (T4.62) e o `meme-worker` (T4.65). Detalhe completo em `obsidian/07-BUGS/Open Bugs.md`.
 
 ## Em voo (não tocar)
-Saídas por evento no `meme-executor` (`event_exits*.py`, `exit_settle.py` + 10 módulos modificados, 2 testes),
-último toque 20:44 BRT — sessão ao vivo do Everton. O docstring diz "T4.63", número já gasto pela poda da
-outbox (`724e5246`); renumerar ao commitar.
+
+- **T4.98** — despachada neste turno ao especialista: `params.get("wallet_max_sol")` → `None`,
+  `RuleSetDay.wallet_max_sol: Decimal | None`, célula `— (sem teto declarado)` pelo `_n()` que já
+  existe, testes de regressão com os `params` reais da `launch_v0/1`. Arquivos:
+  `infra/scripts/meme_diary.py`, `meme_diary_render.py`, `tests/test_meme_diary.py`,
+  `tests/test_meme_close_render.py` (estavam limpos na árvore). **Ainda não commitada** — o relatório
+  não voltou dentro do limite do turno. Próximo turno: rodar o kit de revisão + Astra e commitar.
+- **T4.98b (aberta, não começada):** isolar a falha por linha no `meme_close_day` — uma linha ruim não
+  pode matar o fechamento inteiro. Mesma dívida da T4.65b.
+- Sessão ao vivo do Everton: EXP-M26 (retenção madura, registro de oportunidades), saída `line_broken`,
+  T4.96b, arrumação do Obsidian. Não commitei nada desses caminhos.
+- **`08-CHANGELOG/Changelog.md` não entrou no commit deste turno**: está modificado e não commitado
+  pela sessão ao vivo, e commitar por pathspec levaria o trabalho dela junto. A linha do fechamento
+  quebrado entra no próximo turno, junto com a T4.98.
 
 ## O que preciso do Everton (em ordem)
 
-1. **AGORA — parar o laço de reinício sem deploy (2 comandos, ~1 min).** O classificador negou ao plantão
-   até o dry-run. O primeiro passa pelo caminho auditado (`meme_rule_set_param_history` + `system_events`);
-   o segundo tira o valor da única aposta que o carrega (`UPDATE 1` esperado; valor antigo `"1"`, registrado
-   em Open Bugs). Sem isso o worker continua caindo a cada tique e o fechamento diário das 00:10 BRT lê um
-   Lab parado.
+1. **Deploy da T4.98 quando ela estiver commitada** (`compose.sh update`) e, em seguida, a recuperação
+   dos 7 dias perdidos, um dia por vez:
    ```
-   ssh hunter-vps 'cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/meme_rule_set.py --set-param trailing_arm_x=null --rule-set operator/5 --apply --reason "18/09 23:5xZ: trailing_arm_x=1.0 (22:47Z, trailing 20 % sempre) e recusado por ExitRules (> 1 ou null); null = armado desde a entrada, a intencao; meme-worker em laco de reinicio desde 23:24Z"'
-   ssh hunter-vps "docker exec hunter-postgres-1 psql -U hunter -d hunter -c \"UPDATE meme_paper_bets SET params = params - 'trailing_arm_x' WHERE id = '01a0b6d5-b8ee-782a-9d02-ee508754f4f0' AND params->>'trailing_arm_x' = '1'\""
+   ssh hunter-vps 'for d in 2026-09-20 2026-09-21 2026-09-22 2026-09-23 2026-09-24 2026-09-25 2026-09-26; do bash /opt/project-hunter/infra/vps/meme_close_nightly.sh "$d"; done'
    ```
-   Conferir: `ssh hunter-vps 'docker inspect hunter-meme-worker-1 --format "{{.RestartCount}} {{.State.StartedAt}}"'`
-   (o contador para de subir) e `hb:meme:radar.lab_last_tick_at` andando.
-2. **Disco da VPS — ainda 88 %.** Mesmo comando do turno anterior (devolve ~200 GB, não apaga dado):
-   `ssh hunter-vps 'docker image prune -a -f --filter until=72h && docker builder prune -f --filter until=72h && df -h /'`
-3. **Próximo `compose.sh update`:** leva a T4.65 (quando commitada) e a T4.63; depois instalar o cron
-   `hunter-outbox` (`infra/vps/README.md`) e rodar a primeira fatia.
-4. Decisões de escopo pendentes (turno anterior): `opportunity_history` a 4,2 GB/dia; retenção do backup;
-   Groenlândia como `meme_event` (`.claude/state/plantao-meme/baha-2026-09-18-1950.md`).
+   Depois aplicar os patches de 15 a 19/09 que já estão em `/opt/hunter-close/` (`patch -p0` na raiz).
+2. **Prune do Docker na VPS — negado ao plantão de novo** (~18 G, sem apagar dado nenhum: só cache de
+   build e imagens sem uso):
+   ```
+   ssh hunter-vps 'docker builder prune -f --filter until=72h && docker image prune -f && df -h /'
+   ```
+3. **Retenção do banco — decisão sua, e o prazo é real.** Volumes Docker em **141,6 G**; banco em
+   **129 G**, dos quais `opportunity_history_2026_09` = **63 G** (era 25 G em 18/09: **+4,2 G/dia**) e
+   `outbox_events` = **33 G** (era 17 G: **+1,8 G/dia**). Juntas, 96 dos 129 G. Com 124 G livres e
+   ~6 G/dia, o disco volta a encher em **~20 dias** — menos, porque o dump cresce junto. O cron
+   `hunter-outbox` da T4.63 **nunca foi instalado** (`/etc/cron.d` tem só `hunter-backup` e
+   `hunter-meme-close`): é a poda mais barata e já está escrita. O que apagar dado é seu.
+4. **`docs/design/retencao-e-disco-2026-09-27.md` não existe** — o `database-architect` prometido no
+   diário desta madrugada ficou pela metade quando a sessão encerrou. Redespacho no próximo turno se
+   você não quiser antes.
+5. Pendências antigas que continuam de pé: Groenlândia como `meme_event`, retenção do backup fora da
+   VPS (serviço pago), e a stack local que ninguém subiu há 2 semanas.

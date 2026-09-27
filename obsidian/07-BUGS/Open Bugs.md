@@ -1,6 +1,6 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-18
+updated: 2026-09-27
 status: aberto
 owner: sexta-feira
 severity: misto
@@ -11,6 +11,56 @@ closed: ""
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## O fechamento noturno morre há 8 noites — um conjunto sem `wallet_max_sol` derruba o registro de pesquisa inteiro (plantão 27/09, 02:3x BRT)
+
+**HIGH (instrumento de pesquisa), medido às 05:20Z de 2026-09-27 na VPS.** O cron
+`hunter-meme-close` (`/etc/cron.d/hunter-meme-close`, 03:10Z = 00:10 BRT) sai **1 em oito noites
+seguidas**, de **20/09 a 27/09**, cada uma com **patch de 0 linhas**. Última corrida verde: **19/09**
+(781 linhas). Saída real de `grep 'exit=' /opt/hunter-close/cron.log`:
+
+```
+ 8:meme_close_day exit=1 log=.../run-20260920-0310.log patch=.../patch-20260920-0310.diff (0 linhas)
+ …
+155:meme_close_day exit=1 log=.../run-20260927-0310.log patch=.../patch-20260927-0310.diff (0 linhas)
+```
+
+- **Rastro real (fim do traceback em `/opt/hunter-close/cron.log`):** `meme_close_day.py:239 _run`
+  → `meme_diary.py:242 gather` → `meme_diary.py:143 _rule_set_day` →
+  `wallet_max = Decimal(str(params["wallet_max_sol"]))` → **`KeyError: 'wallet_max_sol'`**.
+- **Causa, confirmada por SQL na VPS:** `_RULE_SETS` (`meme_diary.py:54`) lê **todas** as linhas de
+  `meme_rule_sets`, sem filtrar `status`, e **1 das 30** não tem a chave `wallet_max_sol` em `params`:
+  **`launch_v0/1`, criada em 19/09, hoje `retired`**. Ela declara `size_sol = "0.01"` por aposta e
+  nenhum teto de carteira (`{"clock": "event", "exit_key": "lancamento_6s_ou_primeiro_sell",
+  "size_sol": "0.01", "time_stop_s": 6, …}`). Criada em **19/09**, primeira falha na noite de
+  **20/09** — as datas fecham. As outras 29 linhas têm a chave.
+- **O que isso custou:** as **avaliações datadas** do Lab saem justamente daí — o fechamento escreve
+  `09-OPERATIONS/Diario-Meme/`, `00-INBOX/Hipoteses-do-plantao.md` e as páginas `05-EXPERIMENTS/`.
+  Nada disso chegou ao vault há 8 dias. Pior: o último fechamento **aplicado** foi o de **14/09**
+  (`8b5f5ea7`); os patches de **15 a 19/09** rodaram verdes (378 a 849 linhas) e **nunca foram
+  aplicados** — continuam em `/opt/hunter-close/patch-2026091{5..9}-0310.diff`, recuperáveis. Ou seja:
+  **12 dias sem avaliação datada automática no registro de pesquisa.**
+- **Por que ninguém viu:** a ficha diária da mesa real (T4.92, desde 24/09) e os diários escritos à
+  mão nas sessões ao vivo continuaram aparecendo todos os dias. O silêncio ficou só nas páginas EXP —
+  e é exatamente o que o item 10 do turno do Lab diz que nunca pode passar: *silêncio num registro de
+  experimento é indistinguível de instrumento quebrado*.
+- **Terceira ocorrência da mesma classe:** [[KB-0131-dado-mal-formado-derruba-o-processo-duas-vezes]]
+  — um dado incompleto derruba o processo inteiro. Antes foi o executor (T4.62) e o `meme-worker`
+  (T4.65/T4.65b); agora o fechamento.
+- **Correção de código (T4.98, despachada neste plantão):** `params.get("wallet_max_sol")` → `None`
+  quando ausente; `RuleSetDay.wallet_max_sol: Decimal | None`; a célula passa a render
+  `— (sem teto declarado)` pelo `_n()` que já existe (`meme_diary_render.py:106`), **sem inventar teto
+  nenhum**; testes de regressão com os `params` reais da `launch_v0/1`. Sem filtro de `status` no
+  `_RULE_SETS` (conjunto aposentado precisa continuar aparecendo na linha histórica) e sem
+  `try/except` geral (esconderia o próximo defeito).
+- **Aberto como T4.98b:** uma linha ruim não pode matar o fechamento inteiro — a mesma dívida de
+  isolamento da T4.65b, agora no `meme_close_day`.
+- **Recuperação, depois do deploy (um dia por vez, ordem cronológica):**
+  ```
+  ssh hunter-vps 'for d in 2026-09-20 2026-09-21 2026-09-22 2026-09-23 2026-09-24 2026-09-25 2026-09-26; do bash /opt/project-hunter/infra/vps/meme_close_nightly.sh "$d"; done'
+  ```
+  e depois aplicar os patches de 15 a 19/09 que já estão lá (`patch -p0` na raiz do repositório).
+- Ligações: [[Diario/2026-09-27]], [[03-TRADING/Meme/README]], `docs/plans/T4-MEME-RADAR.md`.
 
 ## `meme-worker` em laço de reinício desde 23:24Z de 18/09 — `trailing_arm_x = 1.0` na `operator/5` derruba o Lab e, com ele, o radar da mesa real (plantão 18/09, 20:5x BRT)
 
