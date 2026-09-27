@@ -30,9 +30,13 @@ class RuleSetDay:
     version: str
     kind: str
     exp_ref: str | None
-    wallet_max_sol: Decimal
-    balance_start_sol: Decimal
-    balance_end_sol: Decimal
+    wallet_max_sol: Decimal | None
+    """``None`` when the rule set's ``params`` declare no wallet ceiling (e.g. a
+    per-bet-sized arm) — read as absent, never as zero."""
+    balance_start_sol: Decimal | None
+    balance_end_sol: Decimal | None
+    """``None`` alongside ``wallet_max_sol`` — there is no wallet balance to
+    report without a declared ceiling to compute it from."""
     realized_day_sol: Decimal
     realized_total_sol: Decimal
     r_day: Decimal | None
@@ -143,9 +147,10 @@ def _wallets(inputs: DiaryInputs) -> list[str]:
     for r in inputs.rule_sets:
         label = f"`{r.name}/{r.version}`" + (f" ({r.exp_ref})" if r.exp_ref else "")
         lines.append(
-            f"| {label} | {r.kind} | {_n(r.wallet_max_sol)} | {_n(r.balance_start_sol)} | "
-            f"{_n(r.balance_end_sol)} | {_n(r.realized_day_sol)} | {_n(r.realized_total_sol)} | "
-            f"{len(r.open_at_end)} |"
+            f"| {label} | {r.kind} | {_n(r.wallet_max_sol, reason='sem teto declarado')} | "
+            f"{_n(r.balance_start_sol, reason='sem teto declarado')} | "
+            f"{_n(r.balance_end_sol, reason='sem teto declarado')} | {_n(r.realized_day_sol)} | "
+            f"{_n(r.realized_total_sol)} | {len(r.open_at_end)} |"
         )
     for r in inputs.rule_sets:
         for position in r.open_at_end:
@@ -230,42 +235,58 @@ def _r_section(inputs: DiaryInputs) -> list[str]:
 
 
 def _goal(inputs: DiaryInputs) -> list[str]:
-    capital_sol = sum((r.balance_end_sol for r in inputs.rule_sets), start=Decimal(0))
     lines = ["## 4. Distância à meta", ""]
     lines.append(
         "> [!alerta] Conta sobre o alvo declarado (US$ 7 M em 30 dias), nunca previsão de retorno."
     )
     lines.append("")
-    if inputs.sol_usd is None:
-        capital_usd_text = "— (sem cotação SOL/USD observada)"
-        required_text = "— (sem cotação SOL/USD observada)"
+    # A capital total spanning a wallet-ceiling population and a per-bet one has
+    # no honest single number — an incomplete gap, never a figure (T4.98).
+    missing = [r for r in inputs.rule_sets if r.balance_end_sol is None]
+    if missing:
+        names = ", ".join(f"`{r.name}/{r.version}`" for r in missing)
+        capital_value = (
+            f"— (capital incompleto: {len(missing)} conjunto(s) sem teto declarado: {names})"
+        )
+        required_text = measured = "— (capital incompleto)"
     else:
-        capital_usd = capital_sol * inputs.sol_usd
-        capital_usd_text = f"US$ {_n(capital_usd, places=2)} (SOL/USD {_n(inputs.sol_usd, places=4)}, {inputs.sol_usd_source} @ {inputs.sol_usd_observed_at})"
-        days_elapsed = (
-            0 if inputs.clock_start is None else max((inputs.day - inputs.clock_start).days, 0)
+        capital_sol = sum(
+            (r.balance_end_sol for r in inputs.rule_sets if r.balance_end_sol is not None),
+            start=Decimal(0),
         )
-        remaining = max(GOAL_HORIZON_DAYS - days_elapsed, 0)
-        rate = required_daily_return(capital_usd, remaining)
-        required_text = (
-            f"{_n(rate * 100, places=2)} %/dia com {remaining} dias restantes"
-            if rate is not None
-            else "— (horizonte esgotado ou capital não positivo)"
+        if inputs.sol_usd is None:
+            capital_usd_text = required_text = "— (sem cotação SOL/USD observada)"
+        else:
+            capital_usd = capital_sol * inputs.sol_usd
+            capital_usd_text = (
+                f"US$ {_n(capital_usd, places=2)} (SOL/USD {_n(inputs.sol_usd, places=4)}, "
+                f"{inputs.sol_usd_source} @ {inputs.sol_usd_observed_at})"
+            )
+            days_elapsed = (
+                0 if inputs.clock_start is None else max((inputs.day - inputs.clock_start).days, 0)
+            )
+            remaining = max(GOAL_HORIZON_DAYS - days_elapsed, 0)
+            rate = required_daily_return(capital_usd, remaining)
+            required_text = (
+                f"{_n(rate * 100, places=2)} %/dia com {remaining} dias restantes"
+                if rate is not None
+                else "— (horizonte esgotado ou capital não positivo)"
+            )
+        realized_day = sum((r.realized_day_sol for r in inputs.rule_sets), start=Decimal(0))
+        opening = capital_sol - realized_day
+        measured = (
+            f"{_n(realized_day / opening * 100, places=2)} %/dia"
+            if opening > 0 and any(r.closed_day for r in inputs.rule_sets)
+            else "— (nenhuma aposta fechada no dia)"
         )
-    realized_day = sum((r.realized_day_sol for r in inputs.rule_sets), start=Decimal(0))
-    opening = capital_sol - realized_day
-    measured = (
-        f"{_n(realized_day / opening * 100, places=2)} %/dia"
-        if opening > 0 and any(r.closed_day for r in inputs.rule_sets)
-        else "— (nenhuma aposta fechada no dia)"
-    )
+        capital_value = f"{_n(capital_sol)} SOL = {capital_usd_text}"
     clock = (
         f"{inputs.clock_start.isoformat()} (primeiro conjunto ativo; seed da migração 0022)"
         if inputs.clock_start
         else "— (nenhum conjunto de regras)"
     )
     lines += [
-        f"- Capital (paper, soma dos conjuntos ativos ao fechar o dia): {_n(capital_sol)} SOL = {capital_usd_text}",
+        f"- Capital (paper, soma dos conjuntos ativos ao fechar o dia): {capital_value}",
         f"- Retorno diário exigido: {required_text}",
         f"- Retorno diário medido: {measured}",
         f"- Início do relógio: {clock}",

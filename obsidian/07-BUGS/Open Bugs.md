@@ -47,12 +47,27 @@ seguidas**, de **20/09 a 27/09**, cada uma com **patch de 0 linhas**. Última co
 - **Terceira ocorrência da mesma classe:** [[KB-0131-dado-mal-formado-derruba-o-processo-duas-vezes]]
   — um dado incompleto derruba o processo inteiro. Antes foi o executor (T4.62) e o `meme-worker`
   (T4.65/T4.65b); agora o fechamento.
-- **Correção de código (T4.98, despachada neste plantão):** `params.get("wallet_max_sol")` → `None`
-  quando ausente; `RuleSetDay.wallet_max_sol: Decimal | None`; a célula passa a render
-  `— (sem teto declarado)` pelo `_n()` que já existe (`meme_diary_render.py:106`), **sem inventar teto
-  nenhum**; testes de regressão com os `params` reais da `launch_v0/1`. Sem filtro de `status` no
-  `_RULE_SETS` (conjunto aposentado precisa continuar aparecendo na linha histórica) e sem
-  `try/except` geral (esconderia o próximo defeito).
+- **Correção de código (T4.98, RESOLVIDA neste plantão, duas rodadas):** `params.get("wallet_max_sol")`
+  → `None` quando ausente; `RuleSetDay.wallet_max_sol` e os dois saldos viram `Decimal | None`; as
+  células rendem `— (sem teto declarado)` pelo `_n()` que já existe, **sem inventar teto nenhum**. Sem
+  filtro de `status` no `_RULE_SETS` (conjunto aposentado precisa continuar aparecendo na linha
+  histórica) e sem `try/except` geral (esconderia o próximo defeito).
+  **A rodada 1 criou um defeito novo, achado pela Astra e pelo `code-reviewer` independentemente:**
+  `_goal` passou a somar o capital só dos conjuntos com teto, mas manteve o PnL de **todos** no
+  numerador — numerador de uma população, denominador de outra. O revisor reproduziu num render real:
+  `flow_v2/1` com teto 2,0 SOL e PnL zero mais `launch_v0/1` sem teto a +0,50 SOL publicava
+  `Capital: 2 SOL` e `Retorno diário medido: 33,33 %/dia`, percentual que base de capital nenhuma
+  sustenta; com todos os conjuntos sem teto, publicava `0 SOL`. Número inventado — proibido pelo
+  `CLAUDE.md` e pela regra escrita no alto do próprio `meme_diary_render.py`.
+  **Rodada 2:** havendo qualquer saldo desconhecido, as três linhas da seção 4 saem como
+  `— (capital incompleto: N conjunto(s) sem teto declarado: nome/versão)`, e `required_daily_return` e
+  a conversão em dólar não são chamados; as células de saldo deixaram de usar o motivo padrão
+  `sem leitura`, que afirmava falha de medição onde não houve falha; e a fronteira tipada do dublê de
+  teste virou um `Protocol` estreito, sem `# type: ignore` nem `Any`.
+  **Prova (a que importa):** `uv run pytest infra/scripts/tests/test_meme_close_day_integration.py`
+  → **`3 passed in 84.00s`**, contra Postgres real com as migrações no `head` e a `launch_v0/1` semeada
+  pela 0053 — exatamente o dado que derrubava a produção. Mais `20 passed` nas três suítes de unidade,
+  ruff limpo, pyright `0 errors` nos quatro arquivos, `check_file_size` `0 over budget`.
 - **Aberto como T4.98b:** uma linha ruim não pode matar o fechamento inteiro — a mesma dívida de
   isolamento da T4.65b, agora no `meme_close_day`.
 - **Recuperação, depois do deploy (um dia por vez, ordem cronológica):**
@@ -60,6 +75,18 @@ seguidas**, de **20/09 a 27/09**, cada uma com **patch de 0 linhas**. Última co
   ssh hunter-vps 'for d in 2026-09-20 2026-09-21 2026-09-22 2026-09-23 2026-09-24 2026-09-25 2026-09-26; do bash /opt/project-hunter/infra/vps/meme_close_nightly.sh "$d"; done'
   ```
   e depois aplicar os patches de 15 a 19/09 que já estão lá (`patch -p0` na raiz do repositório).
+- **O gate existia e ninguém rodou (o achado mais grave):** `launch_v0/1` é semeada pela migração
+  `0053_meme_launch_lane_arm` (`LAUNCH_PARAMS`, sem `wallet_max_sol`), e
+  `infra/scripts/tests/test_meme_close_day_integration.py` roda o fechamento inteiro contra um Postgres
+  real com as migrações no `head` — passando por `_rule_set_day` com exatamente a linha que derruba a
+  produção. **Esse teste estava vermelho desde que a 0053 entrou, oito dias.** A falha não escapou por
+  falta de cobertura; escapou porque ninguém rodou a suíte de integração. Fica como **T4.98c**: a
+  suíte de integração de `infra/scripts` precisa de gatilho automático (CI ou passo do
+  `compose.sh update`), senão o próximo defeito de dado semeado por migração passa igual.
+- **Revisão:** a Astra deu a lacuna do contrato SQL como "não coberta" e o `code-reviewer` como
+  "mitigada por `test_meme_close_day_integration.py`". Quem resolveu a discordância foi rodar o teste —
+  ele existe, cobre, e estava vermelho. Parecer em
+  [[06-DECISIONS/Revisoes-Astra/T4.98-fechamento-noturno|Revisão da Astra — T4.98]].
 - Ligações: [[Diario/2026-09-27]], [[03-TRADING/Meme/README]], `docs/plans/T4-MEME-RADAR.md`.
 
 ## `meme-worker` em laço de reinício desde 23:24Z de 18/09 — `trailing_arm_x = 1.0` na `operator/5` derruba o Lab e, com ele, o radar da mesa real (plantão 18/09, 20:5x BRT)

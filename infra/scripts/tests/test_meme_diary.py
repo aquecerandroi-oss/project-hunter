@@ -1,3 +1,6 @@
+# pyright: reportPrivateUsage=false
+# (the ``_rule_set_day`` regression tests dispatch on the module's private SQL
+# statement objects by identity, on purpose — see ``_RuleSetDaySession`` below)
 """``infra/scripts/meme_diary_render.py`` and the pure helpers of ``meme_diary.py``
 — no database: the note is a function of the rows.
 
@@ -6,6 +9,7 @@ Run: ``uv run pytest infra/scripts/tests/test_meme_diary.py -q``
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -18,6 +22,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+import meme_diary  # noqa: E402
 from meme_diary import day_bounds, max_drawdown  # noqa: E402
 from meme_diary_render import (  # noqa: E402
     BetLine,
@@ -206,3 +211,204 @@ def test_the_real_observed_section_is_labelled_and_reads_the_labs_verdict() -> N
     assert "desconhecido (transaction_not_found)" in section and "— (não decodificado)" in section
     empty = render_diary(_inputs())
     assert "Nenhuma operação real observada neste dia" in empty
+
+
+# --- T4.98: a rule set without a declared wallet ceiling must not crash the close ---
+#
+# ``launch_v0`` version ``1`` (retired 2026-09-19) has no ``wallet_max_sol`` key in
+# its params — it sizes per bet instead of from a wallet ceiling. ``_rule_set_day``
+# indexed ``params["wallet_max_sol"]`` directly and raised ``KeyError`` for every
+# night since, because ``_RULE_SETS`` selects every row regardless of status.
+
+LAUNCH_V0_PARAMS: dict[str, object] = {
+    "clock": "event",
+    "exit_key": "lancamento_6s_ou_primeiro_sell",
+    "size_sol": "0.01",
+    "time_stop_s": 6,
+    "max_creator_initial_sol": "2",
+    "max_drawdown_from_peak_pct": "20",
+    "exit_on_first_third_party_sell": True,
+}
+
+
+class _FakeMappingRows(list[Any]):
+    def all(self) -> list[Any]:
+        return list(self)
+
+    def one(self) -> Any:
+        return self[0]
+
+    def first(self) -> Any:
+        return self[0] if self else None
+
+
+class _FakeResult:
+    def __init__(self, rows: list[Any]) -> None:
+        self._rows = rows
+
+    def mappings(self) -> _FakeMappingRows:
+        return _FakeMappingRows(self._rows)
+
+    def scalars(self) -> list[Any]:
+        return list(self._rows)
+
+
+class _RuleSetDaySession:
+    """Answers the queries ``_rule_set_day`` makes, by statement identity — no DB."""
+
+    async def execute(self, stmt: object, params: object = None) -> _FakeResult:
+        if stmt is meme_diary._WALLET_AT:
+            return _FakeResult([{"realized": Decimal(0), "exposure": Decimal(0)}])
+        if stmt is meme_diary._DAY_STATS:
+            return _FakeResult([{"bets": 0, "closed": 0, "wins": 0, "rugs": 0, "r_day": None}])
+        if stmt is meme_diary._CLOSED_SERIES:
+            return _FakeResult([])
+        if stmt is meme_diary._OPEN_AT:
+            return _FakeResult([])
+        raise AssertionError(f"unexpected statement: {stmt!r}")
+
+    async def scalar(self, stmt: object, params: object = None) -> Any:
+        if stmt is meme_diary._R_TOTAL:
+            return None
+        raise AssertionError(f"unexpected scalar statement: {stmt!r}")
+
+
+def _rule_row(**overrides: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "name": "meme_paper_v0",
+        "version": "1",
+        "kind": "research_only",
+        "exp_ref": "EXP-M1",
+        "params": {"wallet_max_sol": "2.0"},
+    }
+    base.update(overrides)
+    return base
+
+
+def test_rule_set_day_reads_an_absent_wallet_ceiling_as_none_not_a_crash() -> None:
+    day_start, day_end = day_bounds(DAY)
+    row = _rule_row(name="launch_v0", exp_ref=None, params=LAUNCH_V0_PARAMS)
+    result = asyncio.run(
+        meme_diary._rule_set_day(_RuleSetDaySession(), row, day_start=day_start, day_end=day_end)
+    )
+    assert result.wallet_max_sol is None
+    assert result.balance_start_sol is None
+    assert result.balance_end_sol is None
+
+
+def test_rule_set_day_still_reads_a_declared_wallet_ceiling() -> None:
+    day_start, day_end = day_bounds(DAY)
+    result = asyncio.run(
+        meme_diary._rule_set_day(
+            _RuleSetDaySession(), _rule_row(), day_start=day_start, day_end=day_end
+        )
+    )
+    assert result.wallet_max_sol == Decimal("2.0")
+    assert result.balance_start_sol == Decimal("2.0")
+    assert result.balance_end_sol == Decimal("2.0")
+
+
+def test_a_rule_set_without_a_declared_wallet_ceiling_renders_honestly() -> None:
+    """The teto cell reads the honest reason, never a fabricated zero ceiling."""
+    note = render_diary(
+        _inputs(
+            rule_sets=[
+                _rule_set(
+                    name="launch_v0",
+                    exp_ref=None,
+                    wallet_max_sol=None,
+                    balance_start_sol=None,
+                    balance_end_sol=None,
+                )
+            ]
+        )
+    )
+    section = note.split("## 1.")[1].split("## 2.")[0]
+    assert "| `launch_v0/1` | research_only | — (sem teto declarado) |" in section
+    row = [line for line in section.splitlines() if line.startswith("| `launch_v0/1`")][0]
+    assert row.count("— (sem teto declarado)") == 3, row
+    assert "sem leitura" not in row, "no wallet ceiling is a structural absence, not a failed read"
+
+
+# --- T4.98 round 2: capital incompleto never mixes populations (Astra HIGH) ---
+
+
+def test_the_goal_omits_the_number_when_capital_is_incomplete() -> None:
+    """Astra's reproduced scenario: ``launch_v0/1`` has no declared ceiling and
+    closes +0,50 SOL on the day; ``flow_v2/1`` has a 2,0 SOL ceiling and zero PnL.
+    Publishing capital 2 SOL and a 33,33 %/dia measured return mixes a population
+    with a known balance and one without — an invented number (CLAUDE.md)."""
+    note = render_diary(
+        _inputs(
+            rule_sets=[
+                _rule_set(
+                    name="flow_v2",
+                    version="1",
+                    exp_ref=None,
+                    wallet_max_sol=Decimal("2.0"),
+                    balance_start_sol=Decimal("2.0"),
+                    balance_end_sol=Decimal("2.0"),
+                    realized_day_sol=Decimal("0"),
+                    closed_day=1,
+                ),
+                _rule_set(
+                    name="launch_v0",
+                    version="1",
+                    exp_ref=None,
+                    wallet_max_sol=None,
+                    balance_start_sol=None,
+                    balance_end_sol=None,
+                    realized_day_sol=Decimal("0.50"),
+                    closed_day=1,
+                ),
+            ]
+        )
+    )
+    section = note.split("## 4.")[1].split("## 5.")[0]
+    assert "— (capital incompleto: 1 conjunto(s) sem teto declarado: `launch_v0/1`)" in section, (
+        section
+    )
+    assert section.count("— (capital incompleto)") == 2  # exigido e medido
+    assert "33.33" not in section and "33,33" not in section
+    assert "2 SOL" not in section and "2.0 SOL" not in section
+
+
+def test_the_goal_never_publishes_zero_capital_when_every_set_lacks_a_ceiling() -> None:
+    note = render_diary(
+        _inputs(
+            rule_sets=[
+                _rule_set(
+                    name="launch_v0",
+                    version="1",
+                    exp_ref=None,
+                    wallet_max_sol=None,
+                    balance_start_sol=None,
+                    balance_end_sol=None,
+                )
+            ]
+        )
+    )
+    section = note.split("## 4.")[1].split("## 5.")[0]
+    assert "0 SOL" not in section
+    assert "— (capital incompleto: 1 conjunto(s) sem teto declarado: `launch_v0/1`)" in section, (
+        section
+    )
+    assert "Retorno diário exigido: — (capital incompleto)" in section
+    assert "Retorno diário medido: — (capital incompleto)" in section
+
+
+def test_the_goal_section_is_unchanged_when_every_rule_set_has_a_ceiling() -> None:
+    """Pins section 4 byte-for-byte for the all-known-capital case — a regression
+    here would silently change every already-recovered diary page."""
+    note = render_diary(_inputs())
+    section = note.split("## 4.")[1].split("## 5.")[0]
+    assert section == (
+        " Distância à meta\n\n"
+        "> [!alerta] Conta sobre o alvo declarado (US$ 7 M em 30 dias), nunca previsão de retorno.\n\n"
+        "- Capital (paper, soma dos conjuntos ativos ao fechar o dia): 2.03 SOL = "
+        "US$ 205.93 (SOL/USD 101.4445, pumpfun_rest:/sol-price @ 2026-09-12T12:05:00+00:00)\n"
+        "- Retorno diário exigido: 41.59 %/dia com 30 dias restantes\n"
+        "- Retorno diário medido: 1.5 %/dia\n"
+        "- Início do relógio: 2026-09-12 (primeiro conjunto ativo; seed da migração 0022)\n\n"
+    )

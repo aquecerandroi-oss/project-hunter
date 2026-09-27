@@ -35,14 +35,22 @@ executor (T4.62) e o `meme-worker` (T4.65). Detalhe completo em `obsidian/07-BUG
 
 ## Em voo (não tocar)
 
-- **T4.98** — despachada neste turno ao especialista: `params.get("wallet_max_sol")` → `None`,
-  `RuleSetDay.wallet_max_sol: Decimal | None`, célula `— (sem teto declarado)` pelo `_n()` que já
-  existe, testes de regressão com os `params` reais da `launch_v0/1`. Arquivos:
-  `infra/scripts/meme_diary.py`, `meme_diary_render.py`, `tests/test_meme_diary.py`,
-  `tests/test_meme_close_render.py` (estavam limpos na árvore). **Ainda não commitada** — o relatório
-  não voltou dentro do limite do turno. Próximo turno: rodar o kit de revisão + Astra e commitar.
+- **T4.98 — FECHADA e commitada neste turno**, em duas rodadas, com o kit de revisão inteiro.
+  Rodada 1: chave opcional com `.get`, `RuleSetDay.wallet_max_sol/balance_*: Decimal | None`, célula
+  `— (sem teto declarado)`. **A Astra e o `code-reviewer` acharam, cada um por seu caminho, um HIGH que
+  a rodada 1 criou:** `_goal` passou a somar o capital só dos conjuntos com teto mas manteve o PnL de
+  todos no numerador, publicando percentual que base de capital nenhuma sustenta (o revisor reproduziu
+  num render real: capital 2 SOL, **33,33 %/dia**). Rodada 2: as três linhas da seção 4 saem como
+  `— (capital incompleto: …)` nomeando os conjuntos, sem chamar a conversão em dólar; o motivo das
+  células de saldo deixou de ser `sem leitura` (que afirma falha de medição onde não houve falha); e a
+  fronteira tipada do dublê virou um `Protocol` estreito, sem `type: ignore` nem `Any`.
+  **Prova:** `test_meme_close_day_integration.py` → **3 passed in 84.00s** (Postgres real, migrações no
+  `head`, `launch_v0/1` semeada pela 0053) — o mesmo teste que estava vermelho.
 - **T4.98b (aberta, não começada):** isolar a falha por linha no `meme_close_day` — uma linha ruim não
   pode matar o fechamento inteiro. Mesma dívida da T4.65b.
+- **T4.98c (aberta, e é a mais importante das duas):** a suíte de integração de `infra/scripts` não tem
+  gatilho automático. O teste que reproduz este defeito existia e ficou **vermelho oito dias** sem
+  ninguém rodar. Sem gatilho, o próximo defeito de dado semeado por migração passa igual.
 - Sessão ao vivo do Everton: EXP-M26 (retenção madura, registro de oportunidades), saída `line_broken`,
   T4.96b, arrumação do Obsidian. Não commitei nada desses caminhos.
 - **`08-CHANGELOG/Changelog.md` não entrou no commit deste turno**: está modificado e não commitado
@@ -51,7 +59,7 @@ executor (T4.62) e o `meme-worker` (T4.65). Detalhe completo em `obsidian/07-BUG
 
 ## O que preciso do Everton (em ordem)
 
-1. **Deploy da T4.98 quando ela estiver commitada** (`compose.sh update`) e, em seguida, a recuperação
+1. **Deploy da T4.98 — ela está commitada e provada** (`compose.sh update`) e, em seguida, a recuperação
    dos 7 dias perdidos, um dia por vez:
    ```
    ssh hunter-vps 'for d in 2026-09-20 2026-09-21 2026-09-22 2026-09-23 2026-09-24 2026-09-25 2026-09-26; do bash /opt/project-hunter/infra/vps/meme_close_nightly.sh "$d"; done'
@@ -62,14 +70,14 @@ executor (T4.62) e o `meme-worker` (T4.65). Detalhe completo em `obsidian/07-BUG
    ```
    ssh hunter-vps 'docker builder prune -f --filter until=72h && docker image prune -f && df -h /'
    ```
-3. **Retenção do banco — decisão sua, e o prazo é real.** Volumes Docker em **141,6 G**; banco em
-   **129 G**, dos quais `opportunity_history_2026_09` = **63 G** (era 25 G em 18/09: **+4,2 G/dia**) e
-   `outbox_events` = **33 G** (era 17 G: **+1,8 G/dia**). Juntas, 96 dos 129 G. Com 124 G livres e
-   ~6 G/dia, o disco volta a encher em **~20 dias** — menos, porque o dump cresce junto. O cron
-   `hunter-outbox` da T4.63 **nunca foi instalado** (`/etc/cron.d` tem só `hunter-backup` e
-   `hunter-meme-close`): é a poda mais barata e já está escrita. O que apagar dado é seu.
-4. **`docs/design/retencao-e-disco-2026-09-27.md` não existe** — o `database-architect` prometido no
-   diário desta madrugada ficou pela metade quando a sessão encerrou. Redespacho no próximo turno se
-   você não quiser antes.
-5. Pendências antigas que continuam de pé: Groenlândia como `meme_event`, retenção do backup fora da
-   VPS (serviço pago), e a stack local que ninguém subiu há 2 semanas.
+3. **Retenção do banco — a decisão já é sua e está tomada; falta a implementação.** Corrigindo o que
+   escrevi no meio deste turno: `docs/design/retencao-e-disco-2026-09-27.md` **existe** e você
+   autorizou os passos 1–5 ([[2026-09-27-retencao-de-dados-e-backup]]). Medi de novo no fim do turno e
+   confirmo os números da proposta: banco **129 G**, `opportunity_history_2026_09` **63 G**
+   (era 25 G em 18/09), `outbox_events` **33 G** (era 17 G), volumes Docker **141,6 G**. E confirmo o
+   que ainda não andou: **`/etc/cron.d` continua com só `hunter-backup` e `hunter-meme-close`** — as
+   podas do passo 2 (outbox 7 d, partições) não estão instaladas. O próximo turno despacha o código dos
+   passos 1–2 aos especialistas; os comandos que apagam dado continuam seus, pelo roteiro da §7.
+4. Pendências antigas que continuam de pé: Groenlândia como `meme_event`, backup fora da VPS (serviço
+   pago), e a stack local — postgres/redis/api/web pararam há 2 semanas e 3 workers ficam reiniciando
+   sem banco na sua máquina.

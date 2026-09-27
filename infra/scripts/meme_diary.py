@@ -28,15 +28,9 @@ from collections import Counter
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
-from meme_diary_render import (
-    SAO_PAULO,
-    BetLine,
-    DiaryInputs,
-    RuleSetDay,
-    render_diary,
-)
+from meme_diary_render import SAO_PAULO, BetLine, DiaryInputs, RuleSetDay, render_diary
 from meme_diary_wallets import gather_wallets
 from sqlalchemy import text
 
@@ -44,8 +38,11 @@ from hunter_core.db.session import create_engine, create_session_factory, role_s
 from hunter_core.domain.types import utcnow
 from hunter_core.settings import get_settings
 
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
+
+class _SessionLike(Protocol):  # the two AsyncSession methods _rule_set_day calls (T4.98)
+    async def execute(self, stmt: Any, params: Any = None, /) -> Any: ...
+    async def scalar(self, stmt: Any, params: Any = None, /) -> Any: ...
+
 
 DB_ROLE = "hunter_app"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -136,11 +133,17 @@ def max_drawdown(pnls: list[Decimal]) -> Decimal | None:
     return -worst
 
 
+def _wallet_balance(wallet_max: Decimal | None, row: Any) -> Decimal | None:
+    if wallet_max is None:
+        return None
+    return wallet_max + Decimal(row["realized"]) - Decimal(row["exposure"])
+
+
 async def _rule_set_day(
-    session: AsyncSession, row: Any, *, day_start: datetime, day_end: datetime
+    session: _SessionLike, row: Any, *, day_start: datetime, day_end: datetime
 ) -> RuleSetDay:
     rule_set_id, params = str(row["id"]), row["params"]
-    wallet_max = Decimal(str(params["wallet_max_sol"]))
+    wallet_max = None if (raw := params.get("wallet_max_sol")) is None else Decimal(str(raw))
     start = (
         (await session.execute(_WALLET_AT, {"rule_set_id": rule_set_id, "at": day_start}))
         .mappings()
@@ -189,14 +192,16 @@ async def _rule_set_day(
         ).mappings()
     ]
     realized_day = Decimal(end["realized"]) - Decimal(start["realized"])
+    balance_start_sol = _wallet_balance(wallet_max, start)
+    balance_end_sol = _wallet_balance(wallet_max, end)
     return RuleSetDay(
         name=str(row["name"]),
         version=str(row["version"]),
         kind=str(row["kind"]),
         exp_ref=row["exp_ref"],
         wallet_max_sol=wallet_max,
-        balance_start_sol=wallet_max + Decimal(start["realized"]) - Decimal(start["exposure"]),
-        balance_end_sol=wallet_max + Decimal(end["realized"]) - Decimal(end["exposure"]),
+        balance_start_sol=balance_start_sol,
+        balance_end_sol=balance_end_sol,
         realized_day_sol=realized_day,
         realized_total_sol=Decimal(end["realized"]),
         r_day=stats["r_day"],
