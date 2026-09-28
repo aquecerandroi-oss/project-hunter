@@ -1,6 +1,6 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-27
+updated: 2026-09-28
 status: aberto
 owner: sexta-feira
 severity: misto
@@ -11,6 +11,14 @@ closed: ""
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## Token de phishing congelado na carteira travaria todas as entradas quando a checagem de moedas estranhas for ao ar (28/09)
+
+**HIGH (bloqueia o deploy da checagem `wallet_unrecognized_holdings`), medido às 06:17Z de 2026-09-28** pelo guardião de risco (RPC público, só leitura, nenhuma transação). A carteira do robô tem 81 contas de token; uma só com saldo: mint `DgY9Z8xPG1346Ydrq98ASAZcVdyrurT4tCQ7TDapHcJg`, 100 000 tokens, nome "FOMPOSIT.TOP CLAIM YOUR REWARD 1000 USDC" (phishing), recebido em 2026-09-23 20:54Z, conta **congelada** pelo emissor (autoridades de terceiro). Conferido no banco da VPS (`BEGIN READ ONLY`): 0 linhas em `meme_live_positions` e `spot_positions` para esse mint; 0 posições `spot` abertas (o NEAR foi vendido às 04:00Z).
+
+- **Cenário:** com a checagem ligada, o veredito nomeia `DgY9…` e as três pistas (mesa, lançamento, `spot/1`) recusam toda entrada. O remédio que o contrato prometia ("zerar o saldo") é impossível: conta congelada não transfere, não queima e não fecha.
+- **Decisão pendente do Everton:** exceção durável e auditada por mint (recomendação do guardião e da Astra) ou outra política. Revisão: [[Wallet-unrecognized-holdings]]; origem do defeito original: [[KB-0165-staking-do-sol-parado]].
+- **Achado lateral:** 80 contas de token vazias prendem **0,1210 SOL** de aluguel; fechá-las devolve o SOL e exige assinatura (decisão do Everton).
 
 ## O fechamento noturno morre há 8 noites — um conjunto sem `wallet_max_sol` derruba o registro de pesquisa inteiro (plantão 27/09, 02:3x BRT)
 
