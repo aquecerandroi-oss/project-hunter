@@ -60,6 +60,10 @@ SORT mercado ASC
 | Longe da mínima de 24 h (`distance_from_24h_low`, cripto) | secundária da [[Fila de Hipoteses#H-023 — Proximidade da máxima de 24 h nos sinais do Lab de cripto (segunda frente, custo baixo)\|H-023]] (nao_confirma) | tercil longe − perto da mínima **+0,207 R** [+0,121,+0,284], Holm 0,0004, patamar 7/7, nos 9 187 sinais de continuação | sem sinal pré-registrado; o melhor tercil **perde −0,097 R** em nível; anda com ATR% (ρ 0,77) e retorno 4 h (0,70); só volta em coorte nova, com a feature no envelope e teste incremental conjunto — [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]] |
 | Estrutura do gráfico na compra (distância do suporte, fundos mais altos, rompimento) | [[Fila de Hipoteses#H-021 — Estrutura do gráfico na hora da compra (distância do suporte, fundos mais altos, rompimento)\|H-021]] | **nada de desempenho** — desfechos não abertos; o achado é estrutural: a porta compra com 1,6 min de vida (`max_age_s = 300`), só 1 de 885 decisões tem 5 min de fita | **limite_de_dado** (estrutural): o bloco pede 150; o arquivo de trocas não reconstrói a estrutura; volta só como H-021b prospectiva com o preço marginal gravado na fita da decisão — [[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]] |
 
+O que a literatura de análise gráfica diz que merece virar pista depois do EXP-M26 (três candidatas, nenhuma
+registrada, e o que **não** vale testar): [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] e
+[[Proximas Hipoteses]] (seção de 28/09).
+
 ## Cemitério — refutadas ou não confirmadas
 
 Uma linha, o porquê, o número. `nao_confirma` = ignorância (não sabemos), nunca reaberta com o
@@ -121,5 +125,6 @@ O que alimenta as consultas Dataview é o frontmatter de cada nota — `tipo`, `
 ## Relacionado
 
 [[Dicionario de Variaveis]] · [[Fila de Hipoteses]] · [[Proximas Hipoteses]] · [[Strategy Backlog]] ·
-[[KB-0149-o-que-a-mesa-real-ensinou]] · [[Perdas/Index|Perdas]] · [[Estratégias.base]] ·
+[[KB-0149-o-que-a-mesa-real-ensinou]] · [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] ·
+[[Perdas/Index|Perdas]] · [[Estratégias.base]] ·
 [[Experimentos.base]] · `docs/RESEARCH.md`

@@ -4,7 +4,7 @@ tipo: consolidado
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-27
+updated: 2026-09-28
 ---
 
 # Próximas Hipóteses — como montar a próxima
@@ -92,6 +92,25 @@ Fora da tabela: H-001 e H-002 estão `em_curso` (amostra insuficiente ainda, sem
 
 - **H-024 — momentum semanal de série temporal em cripto grande (à vista, só compra)**: literatura e desenho em [[KB-0164-momentum-semanal-em-cripto-grande]]; registrada antes de baixar qualquer vela. Poder declarado baixo: o desfecho esperado sem efeito grande é NÃO CONFIRMA.
 
+### Candidatas de análise gráfica (28/09/2026) — não registradas
+
+Da leitura [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] (literatura aberta, nenhum preço nem desfecho
+nosso consultado; revisão da Astra em [[06-DECISIONS/Revisoes-Astra/KB-analise-grafica|KB-analise-grafica]]). Na
+ordem abaixo; **nenhuma é bloco da [[Fila de Hipoteses]]** — quem registra é o orquestrador, com MRE e refutação
+declarados antes de qualquer desfecho. Nenhuma é variável esgotada por definição; o risco de repetir uma com outro
+nome é empírico e tem de ser afastado no registro (regras 1 e 2 da Fila).
+
+| # | candidata | variável | onde vive o dado | mercado / tempo | classe de perda | por que não é esgotada | portão antes de registrar |
+|---|---|---|---|---|---|---|---|
+| C1 | tendência diária como estado dos sinais de continuação do Lab | `razao_mm20d` = último fechamento diário UTC completo ÷ média dos 20 últimos − 1 (dias com os 1.440 min presentes; dia incompleto = indisponível; secundária: só o sinal) | reconstruída de `candles` 1 min `is_final` (não existe como feature; 20 dias > teto de contexto de 6.000 min do Lab) | perpétuos Binance no Lab, **por estratégia** (`momentum` 15 min, `volume_anomaly` 5 min); `spot/1` descritiva | — (cripto) | horizonte de 20 dias; as testadas são 15 min (H-005), 4 h (H-008, aberta) e 24 h (H-023) | teste incremental **conjunto** com `distance_from_24h_low` (pista do R83), ATR% e `return_4h`; coorte futura; grupo favorável lucrativo em nível |
+| C2 | fundos mais altos **sem** rompimento de 15 min | `higher_lows ∧ ¬breakout_15m` × `higher_lows ∧ breakout_15m` na 1.ª oportunidade de `grafico_ctrl_v1/1`, linha coberta | `meme_features_1m` (`lines.py` v1) + registro R1 `meme_mature_opportunities` do [[EXP-M26-grafico-em-moedas-maduras]] | memes de 15–120 min na curva, via de 1 min | `comprou_no_topo` | o bloco `line` nunca foi isolado; H-021 = limite de dado; H-022 testa só a conjunção | só depois do veredito da H-022, em coorte que não seja a dela; bloqueada se a H-022 fechar por instrumento; herda cobertura, controle de progresso e cláusula de `mcap_slope_15m` |
+| C3 | geometria do nível antes do rompimento (exploratória) | `rejeicoes_nivel` (visitas distintas a ≤ 0,25·ATR do nível, sem fechar acima) e `barras_perto_nivel`, nas 20 barras de 15 min antes do rompimento da `momentum_v1`; 0,25 = convenção | reconstruída de `candles` 1 min; nível e ATR no envelope da `momentum_v1` | perpétuos Binance no Lab, 15 min | — (cripto) | `breakout_strength_20` mede quanto passou do nível, não a história dele | previsão bicaudal e extrapolada (não vem dos artigos); antes, rever a prontidão da `sweep_reclaim_v1` ([[EXP-0017-sweep-reclaim]]), que já existe para o mesmo mecanismo |
+
+**Não recomendados agora** (detalhe na KB-0167): confirmação por volume do rompimento (três resultados nossos
+contra e evidência externa fraca), distância à VWAP (nenhum estudo revisado achado), cruzamento de número redondo
+(BTC sem padrão de retorno depois), canal diário como estratégia própria na `spot/1` (mesmo objeto da H-024) e o
+momento intradiário de primeira/última janela (custo de equilíbrio publicado de 3–10 bps por operação).
+
 ## (c) Cemitério — não repetir
 
 Uma linha, o porquê. Lista completa e o número exato de cada uma: [[Mapa de Estrategias]] §Cemitério.
@@ -139,5 +158,5 @@ Regra da casa (Fila de Hipoteses.md, regra 2): **hipótese que morreu não volta
 ## Relacionado
 
 [[Dicionario de Variaveis]] · [[Mapa de Estrategias]] · [[Fila de Hipoteses]] · [[Ideias do Everton]] ·
-[[Perdas/Index|Perdas]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · `docs/RESEARCH.md` ·
-`.claude/rules/obsidian-first.md`
+[[Perdas/Index|Perdas]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] ·
+`docs/RESEARCH.md` · `.claude/rules/obsidian-first.md`
