@@ -1755,3 +1755,32 @@ carteira do Everton deixou de ser um número parado e passou a ter um processo q
 ## 2026-09-26
 
 - `2c725a8a` docs(ficha): 24 e 25/09 regeradas com os campos do Dataview (25/09 fechou 46 operações, 19 ganhos, −0,0141 SOL; maior vazamento comprou_no_topo) → [[Ficha-2026-09-24|Ficha 24/09]] · [[Ficha-2026-09-25|Ficha 25/09]] · [[comprou_no_topo]] · [[Diario/2026-09-26]]
+
+## 2026-09-27
+
+- `bec04718` docs(obsidian): EXP-M26 com protocolo congelado (braços C/L/H, H-022, estado da construção); avaliação datada no EXP-M2 → [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]]
+- `3771a020` fix(vps): backup lê HUNTER_BACKUP_RETENTION_DAYS da linha do .env (o cron não carrega o .env) e o padrão cai de 7 para 3 dias
+- `82fa7004` docs(ficha): ficha automática de 2026-09-26 → [[Ficha-2026-09-26|Ficha 26/09]]
+- `d82f4d3d` docs(diario): 27/09 — incidente do disco da VPS em 99 % (dump falhou), 55 G liberados sem apagar dado, backups em 3 dias → [[09-OPERATIONS/Diario/2026-09-27|Diário 27/09]]
+- `b4518209` docs(plantao): 27/09 — o fechamento noturno do Lab morre há 8 noites (KeyError wallet_max_sol); saúde da VPS e trajetória do disco medidas
+- `6d3f0c52` docs(obsidian): base impecável — lint 77 → 0; 33 sínteses de revisões da Astra (19–27/09) em Revisoes-Astra; noite de 26/09 no diário → [[09-OPERATIONS/Diario/2026-09-26|Diário 26/09]]
+- `191647ec` fix(meme-worker): saída line_broken só usa o minuto já fechado e calculado antes da foto julgada, com no máximo 120 s
+- `88203621` docs(design): retenção e disco (27/09) — banco 129 G crescendo ~8 G/dia; previsão por opção e comandos exatos
+- `fd1c619e` docs(decisao): retenção de dados e backup autorizados pelo Everton (passos 1–5 da proposta de 27/09) → [[2026-09-27-retencao-de-dados-e-backup]]
+- `07207240` fix(meme): T4.96b — compras admitted órfãs expiram como admitted_orphan_expired; taxa de compra que falha na cadeia passa a ser gravada
+- `f5e75ef9` feat(meme-worker): EXP-M26 I1+I2+C1 — retenção madura (até K moedas de 5–120 min por mcap, orçamento à parte) → [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]]
+- `30765e70` fix(lab): T4.98 — um conjunto sem wallet_max_sol derrubava o fechamento noturno inteiro (8 noites, 20 a 27/09)
+- `21b79a82` fix(ops): podador de partições não trava a ingestão; crons hunter-partitions e hunter-outbox escritos fora da janela do dump
+- `ee5ffaa6` feat(meme): EXP-M26 R1 — tabela só de acréscimo meme_mature_opportunities (0066) → [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]]
+- `435c99d1` docs(obsidian): EXP-M26 — estado da construção (I1, I2, C1, L1, R1 feitos; S pronto e retido até F e J) → [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]]
+- `b3327d26` fix(ops): criador de partições reconhece o lock expirado pelo SQLSTATE 55P03
+- `ae9c13e2` docs(obsidian): página Próximas Hipóteses e quadro de hipóteses por veredito no Painel da mesa → [[Proximas Hipoteses]] · [[Painel da mesa]]
+- `5d3fbca8` feat(pesquisa): EXP-M26 J — especificação do moinho da H-022; ainda NÃO congelada → [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]]
+- `56a49201` docs(pesquisa): R82 — H-017 NÃO CONFIRMA (151 pares com o controle do EXP-M25); recuo vai para o cemitério → [[KB-0162-o-recuo-pequeno-empata-com-comprar-na-hora|KB-0162]] · [[EXP-M25-controle-do-recuo|EXP-M25]] · [[Fila de Hipoteses#H-017 — Recuo pequeno como melhora de preço (coorte nova, braço de papel)|H-017]]
+- `54401569` docs(diario): 27/09 noite — H-017 não confirma e braços do recuo aposentados, deploy 56a49201, EXP-M26 J → [[09-OPERATIONS/Diario/2026-09-27|Diário 27/09]]
+- `d3722968` docs(pesquisa): H-023 pré-registrada — proximidade da máxima de 24 h nos sinais do Lab de cripto → [[Fila de Hipoteses#H-023 — Proximidade da máxima de 24 h nos sinais do Lab de cripto (segunda frente, custo baixo)|H-023]]
+- `82246f52` docs(pesquisa): R83 — H-023 NÃO CONFIRMA: perto da máxima de 24 h não separa os sinais de continuação do Lab de cripto; pista: longe da mínima de 24 h → [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab|KB-0163]] · [[Fila de Hipoteses#H-023 — Proximidade da máxima de 24 h nos sinais do Lab de cripto (segunda frente, custo baixo)|H-023]]
+- `e7ac4a30` docs(obsidian): Próximas Hipóteses recebe as duas pistas do R83 → [[Proximas Hipoteses]]
+- `ac7fc32c` docs(conhecimento): KB-0165 — staking do SOL parado não compensa agora → [[KB-0165-staking-do-sol-parado|KB-0165]]
+- `ce4bcd34` feat(meme): EXP-M26 — histórico de estado das moedas (0067_meme_token_state_history) e a leitura J passa a usar 'o que se sabia em L' → [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]]
+- `78209589` docs(pesquisa): KB-0164 (momentum semanal em cripto) e H-024 pré-registrada → [[KB-0164-momentum-semanal-em-cripto-grande|KB-0164]] · [[Fila de Hipoteses#H-024 — Momentum semanal de série temporal em cripto grande (à vista, só compra)|H-024]]
