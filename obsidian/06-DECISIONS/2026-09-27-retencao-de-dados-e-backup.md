@@ -37,3 +37,6 @@ Código pelos especialistas (revisado antes do commit); os comandos que apagam d
 ## Relacionado
 
 [[2026-09-27]] · [[2026-09-26-mesa-meme-real-pausada-no-escopo]] · [[Open Bugs]]
+
+- **28/09/2026 ~04:40Z — passo 3 executado:** `TRUNCATE opportunity_history_2026_09` (sessão com `lock_timeout = 15000`) → a partição foi de **65 GB para 16 kB**; disco **72 % → 53 %** (248 → 183 G usados, 166 G livres). Rodado pela Sexta-feira na VPS sob a autorização do Everton de 27/09 (a tentativa dele não chegou à VPS). Antes: deploy `d8dda658` com a `0067` e `MEME_RETENTION_DAYS=30` conferido no contêiner; nenhum `pg_dump` ativo (o dump de 28/09 terminou 04:52 hora da máquina, 29 GB).
+
