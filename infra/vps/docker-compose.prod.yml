@@ -390,7 +390,7 @@ services:
       HEALTH_PORT: "8001"
       MEME_ENABLED: ${MEME_ENABLED:-false}
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
-      MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-90}
+      MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-30}
       MEME_TRACKED_MINTS_MAX: ${MEME_TRACKED_MINTS_MAX:-120}
       # I1 (EXP-M26, docs/design/exp-m26-grafico-moedas-maduras.md §1.6): retém
       # as K maiores por mcap_sol entre 5-120 min de idade, num orçamento à

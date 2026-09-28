@@ -286,7 +286,7 @@ def load_config(settings: Settings) -> MemeConfig:
     **The split is deliberate and it is where the line falls in this repo.**
     ``meme_retention_days`` is in ``Settings`` because
     ``infra/scripts/partition_retention.py`` reads the *same* number to drop a
-    month of the three partitioned tables — two copies would be two retention
+    month of the five partitioned tables — two copies would be two retention
     policies that agree until the night one of them is edited (§1.3's own
     argument). The four budgets below are read by nobody else, and the precedent
     for a worker owning its own knob is ``hunter_scanner_worker.config``

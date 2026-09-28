@@ -643,7 +643,7 @@ services:
       HEALTH_PORT: "8001"
       MEME_ENABLED: ${MEME_ENABLED:-false}
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
-      MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-90}
+      MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-30}
       MEME_TRACKED_MINTS_MAX: ${MEME_TRACKED_MINTS_MAX:-120}
       # Its own (small) pool: four loops, one transaction each at a time, and a
       # per-frame upsert on the discovery loop. 2 + 2 is measured headroom over

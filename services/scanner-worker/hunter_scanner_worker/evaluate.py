@@ -41,8 +41,10 @@ from hunter_indicators.features import (
     compute_features,
 )
 from hunter_indicators.opportunity import (
+    EpisodeAction,
     EpisodeState,
     HistoryMark,
+    HistoryPolicy,
     HistoryVerdict,
     ScoreContext,
     ScoreResult,
@@ -55,6 +57,7 @@ from hunter_indicators.opportunity import (
     score_opportunity,
     should_record_history,
 )
+from hunter_indicators.opportunity.history import DEFAULT_HISTORY_POLICY
 from hunter_indicators.stage import (
     EMPTY_STAGE_STATE,
     StageDecision,
@@ -99,6 +102,8 @@ class EvaluationInputs:
     regime_stale: bool = False
     regime_id: UUID | None = None
     last_history: HistoryMark | None = None
+    history_policy: HistoryPolicy = DEFAULT_HISTORY_POLICY
+    """``history_v1`` unless the caller picks one; the scanner passes ``history_v2``."""
     score_due: bool = True
     """A vector is produced on every tick that passes the 1 s throttle; the score
     has its own 2 s throttle, and skipping it must not skip the features."""
@@ -248,7 +253,10 @@ def evaluate_market(inputs: EvaluationInputs) -> Evaluation:
         eligible=score.eligible,
         versions=score.versions,
     )
-    history = should_record_history(inputs.last_history, mark)
+    # A new episode's first row is its own ``first_sample``: comparing it with the
+    # previous episode's last sample could delay it by up to one interval (F5).
+    previous = None if status.action is EpisodeAction.OPEN else inputs.last_history
+    history = should_record_history(previous, mark, inputs.history_policy)
     return Evaluation(
         market_id=inputs.market_id,
         vector=vector,

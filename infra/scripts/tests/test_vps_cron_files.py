@@ -94,9 +94,12 @@ def test_the_partitions_file_creates_then_prunes_under_one_lock() -> None:
     assert "--dry-run" not in jobs[1][2]
 
 
-def test_the_outbox_file_keeps_the_contract_seven_days() -> None:
+def test_the_outbox_file_keeps_the_contract_two_days() -> None:
+    """DATABASE.md §1.3: dispatched rows are kept 2 days since 27/09/2026 — Everton's
+    decision (``obsidian/06-DECISIONS/2026-09-27-retencao-de-dados-e-backup.md``, step 4;
+    it was 7). Written as an explicit flag, never inherited from the script's default:
+    the default stays 7 so a bare manual run deletes less, never more."""
     (job,) = _jobs("hunter-outbox")
     command = job[2]
     assert "prune_outbox_events.py" in command
-    # DATABASE.md §1.3: 7 days is the replay window; shortening it is Everton's call
-    assert "--retention-days" not in command or "--retention-days 7" in command
+    assert re.findall(r"--retention-days (\d+)", command) == ["2"]

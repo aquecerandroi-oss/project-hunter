@@ -11,8 +11,8 @@ EXCLUSIVE`` lock on the parent for nothing.
 
 Nothing here touches the database. ``retention_days`` reads three figures from
 ``Settings`` (the tunable ones - the third, ``meme_retention_days``, governs the
-three meme parents of ``0021`` at once) and hard-codes the rest of DATABASE.md
-§1.3;
+five meme parents of ``0021``/``0023`` at once) and hard-codes the rest of
+DATABASE.md §1.3;
 ``is_expired`` and :func:`month_is_retained` are pure calendar arithmetic on a
 partition's **upper** bound, which is the only bound that proves no retained row
 can fall inside it.
@@ -67,17 +67,24 @@ def retention_days(settings: Settings | None = None) -> dict[str, int | None]:
         "system_events": 30,
         "market_snapshots": 30,
         "liquidations": 30,
-        "opportunity_history": 90,
+        # 90 -> 14 d on 27/09/2026 (docs/design/retencao-e-disco-2026-09-27.md
+        # §3, authorized): the perpetual radar's explanation, 63 G in September,
+        # and no reader looks further back than ~10 h (design §2).
+        "opportunity_history": 14,
         "feature_snapshots": config.retention_feature_snapshots_days,
-        # The three meme parents (0021, DATABASE.md §33). One window for all
-        # three and for graduated and non-graduated mints alike: selecting on
-        # success after the fact deletes the controls (T4-MEME-RADAR.md §8
-        # decision 2). ``meme_tokens`` is absent on purpose - its key is the
-        # mint, so it has no monthly partition to drop and the meme-worker
-        # prunes it row-wise behind ``app.meme_retention``.
+        # The meme parents of 0021 and 0023 (DATABASE.md §33, §35). One window
+        # for all five and for graduated and non-graduated mints alike:
+        # selecting on success after the fact deletes the controls
+        # (T4-MEME-RADAR.md §8 decision 2). Board and risk had no line until
+        # 27/09/2026 and so were kept forever by omission, although §35.4
+        # always said MEME_RETENTION_DAYS. ``meme_tokens`` is absent on purpose -
+        # its key is the mint, so it has no monthly partition to drop and the
+        # meme-worker prunes it row-wise behind ``app.meme_retention``.
         "meme_curve_snapshots": config.meme_retention_days,
         "meme_features_1m": config.meme_retention_days,
         "meme_trades": config.meme_retention_days,
+        "meme_board_observations": config.meme_retention_days,
+        "meme_risk_snapshots": config.meme_retention_days,
         # The 15-second series of the young mints (0030, T4.16): four rows a
         # minute per mint under five minutes of age, kept seven days — the
         # diary of the week, not the quarter. On monthly partitions "7 days"

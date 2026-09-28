@@ -50,9 +50,11 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 
 - 2026-09-27 — [[Prune-partitions-locks]] (podador sem travar a ingestão)
 - 2026-09-27 — [[Create-partitions-lock]] (criador de partições reconhece o lock expirado)
+- 2026-09-27 — [[Retencao-disco-execucao]] (código dos passos 1–5 do disco: backup por contagem, `history_v2`, 14/30/2 d, F1–F5 do quant)
 - 2026-09-28 — [[Staking-sol-parado]] (staking do SOL parado; checagem de ativos estranhos inerte)
 - 2026-09-28 — [[Token-state-history]] (histórico de estado das moedas; must-fix 2 do J fechado)
 - 2026-09-28 — [[KB-momentum-semanal]] (H-024, momentum semanal em cripto grande)
+- 2026-09-28 — [[KB-analise-grafica]] (KB-0167, análise gráfica depois do custo; candidatas C1–C3, nada registrado)
 
 - [[T4.74-spot-desk]] — fundações, perfil, sinal, dinheiro e saídas da mesa `spot/1` (19/09)
 - [[T4.77-close-atas-token2022]] — fechar ATAs cheias, extensão ao Token-2022 (19/09)

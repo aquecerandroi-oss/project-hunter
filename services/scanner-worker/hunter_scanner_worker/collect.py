@@ -131,6 +131,8 @@ def collect_opportunity(
     opportunity_id = market.opportunity_id or uuid7()
     market.opportunity_id = opportunity_id
     batch.reference(market.ref.market_id, evaluation.baseline_ids)
+    mark = evaluation.history_mark
+    keep = evaluation.history is not None and evaluation.history.record and mark is not None
     batch.opportunities.append(
         rows.opportunity_row(
             evaluation,
@@ -138,10 +140,10 @@ def collect_opportunity(
             regime_id=regime_id,
             anomaly_ids=sorted(market.anomaly_ids.values()),
             now=now,
+            history_mark=mark if keep else market.checkpoint.history,
         )
     )
-    mark = evaluation.history_mark
-    if evaluation.history is not None and evaluation.history.record and mark is not None:
+    if keep and mark is not None:
         batch.history.append(rows.history_row(evaluation, opportunity_id=opportunity_id))
         batch.after_commit.append((market.ref.market_id, lambda: remember_history(market, mark)))
     announcement = build_envelope(

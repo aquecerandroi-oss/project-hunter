@@ -1,5 +1,5 @@
 ---
-status: proposta (nada executado)
+status: autorizada em 27/09 (passos 1–5); código entregue; o que apaga dado é o roteiro da §7, rodado pelo Everton
 autor: database-architect
 data: 2026-09-27
 decide: Everton (todo passo que apaga dado ou reduz o que o backup protege)
@@ -321,7 +321,166 @@ meme-executor seguem rodando (não escrevem outbox). No cron, trocar para
   rotina se o `prune_partitions.py` ganhar um gancho `--archive-dir` que recusa o `DROP` quando o arquivo
   falhar — mudança de código revisada pelo database-architect.
 
-## 7. O que muda no contrato quando o Everton decidir
+## 7. Execução autorizada (27/09/2026)
+
+O Everton autorizou os passos 1–5 ([[2026-09-27-retencao-de-dados-e-backup]],
+`obsidian/06-DECISIONS/2026-09-27-retencao-de-dados-e-backup.md`; contexto do incidente em
+`obsidian/09-OPERATIONS/Diario/2026-09-27.md`). A parte de **código** foi entregue pelo
+`database-architect` (lista abaixo, revisão antes do commit); a parte que **apaga dado** é este roteiro,
+rodado pelo Everton, na ordem, de um PowerShell na máquina dele. Todo comando é uma linha `ssh hunter-vps
+"..."`: sem `$`, sem aspas duplas por dentro — o SQL vai entre aspas simples e evita literais de texto
+(`exit_at IS NULL` no lugar de `status = 'open'`; o `CHECK (status = 'closed') = (exit_at IS NOT NULL)` das
+duas tabelas de posição torna as duas formas equivalentes). Números medidos em 27/09 ~05:30Z (só `SELECT`,
+`\dt+`, `df`, `ls`, `docker ps`).
+
+**O que o código já faz sozinho, depois do deploy** (nada a rodar):
+
+| Passo | Mudança | Onde |
+|---|---|---|
+| 1 | dump sem os dados de `opportunity_history` (esquema vai), `-Z zstd:3` quando o `pg_config` do container diz `--with-zstd` (o `postgres:16` da VPS diz; senão cai no gzip padrão e loga), retenção pelos **N dumps válidos mais novos** (`HUNTER_BACKUP_RETENTION_DAYS`, agora uma contagem; 3 na VPS), escrita em `.partial` até o `pg_restore --list` passar; noite que falha não apaga nada | `infra/vps/backup_postgres.sh` (lido do repositório pelo cron: basta o `git pull` do deploy) |
+| 3 | `history_v2`: 1 amostra por episódio a cada `SCANNER_HISTORY_INTERVAL_S` (300 s) ou quando status/estágio muda, cada linha com o envelope inteiro; `opportunity_history` 90 → 14 d | `hunter_indicators.opportunity.history`, `services/scanner-worker`, `infra/scripts/partition_retention.py` |
+| 5 | `MEME_RETENTION_DAYS` 90 → **30** (código e os dois composes); `meme_board_observations` e `meme_risk_snapshots` ganham a mesma retenção; 15 s segue 7 d | `hunter_core.settings`, `infra/*/docker-compose*.yml`, `partition_retention.py` |
+
+As quedas de partição (14 d, 30 d) só acontecem com o cron do `prune_partitions.py` instalado (tarefa
+paralela: `infra/vps/cron/hunter-partitions`, depois da correção de trava) — setembro de
+`opportunity_history` cai em 15/10, setembro das séries meme em 31/10.
+
+**Onde não rodar.** Longe do dump (01:17Z; hoje termina ~02:40Z, o reduzido bem antes), do
+`hunter-partitions` (01:07/01:27 hora da máquina, 23:07/23:27Z no verão) e do `hunter-outbox` (00:47 hora
+da máquina, 22:47Z). Janela sugerida: entre 06:00Z e 21:00Z.
+
+### 7.1 Antes de tudo: deploy e conferência
+
+1. Deploy normal do commit (`docs/DEPLOYMENT.md`), com **as mesmas variáveis de perfil do último
+   `update`** (`MARKET_SPOT`, `MARKET_SHARDS`, `STRATEGY_SHARDS`, `MEME`, `MEME_LIVE`) — sem elas o `update`
+   derruba serviços (`compose.sh:126`). Sem o deploy, o `TRUNCATE` abaixo seria reenchido a ~3,4 G/dia.
+2. O `.env` da VPS **não** deve ter `MEME_RETENTION_DAYS=90` (o `.env` vence o padrão novo; o Everton confere
+   e edita — agente não lê `.env`):
+   ```powershell
+   ssh hunter-vps "grep -c '^MEME_RETENTION_DAYS=' /opt/project-hunter/.env"
+   ```
+   `0` = usa o padrão 30. Se sair `1`, trocar a linha para `MEME_RETENTION_DAYS=30` e refazer o `update`.
+3. Retrato do disco (guardar a saída). Todo `hunter-*.dump` que ficar no diretório conta como um dos N
+   válidos: os três de hoje (24, 25 e 26/09) têm linha `ok:` no `backup.log`, isto é, passaram no
+   `pg_restore --list` do script antigo (conferido em 27/09); um arquivo sem essa linha não deve estar lá:
+   ```powershell
+   ssh hunter-vps "df -h / && ls -la /opt/backups/ && grep ok: /opt/backups/backup.log | tail -n 3"
+   ```
+
+### 7.2 Passo 3 — `TRUNCATE opportunity_history_2026_09` (apaga o histórico de setembro do radar de perpétuos)
+
+1. Confirmar nome e tamanho da partição (27/09: `opportunity_history_2026_09` com **62 GB** + índice de
+   **275 MB**; as outras com 8 kB). A partir de 01/10 as linhas novas vão para `_2026_10`; setembro continua
+   sendo a grande:
+   ```powershell
+   ssh hunter-vps "docker exec hunter-postgres-1 psql -X -U hunter -d hunter -c '\dt+ opportunity_history*' -c '\di+ opportunity_history_2026_09*'"
+   ```
+2. Apagar (dois `-c`: o `SET` vale para a sessão do `psql` e o `TRUNCATE` roda sozinho, em autocommit;
+   `lock_timeout` de 3 s limita a **espera** pela trava — o scanner escreve nessa partição —, não a
+   operação; se sair `canceling statement due to lock timeout`, repetir):
+   ```powershell
+   ssh hunter-vps "docker exec hunter-postgres-1 psql -X -v ON_ERROR_STOP=1 -U hunter -d hunter -c 'SET lock_timeout = 3000' -c 'TRUNCATE opportunity_history_2026_09'"
+   ```
+3. Conferir: `\dt+` mostra a partição em kB e o `df` volta **~62 G** na hora:
+   ```powershell
+   ssh hunter-vps "docker exec hunter-postgres-1 psql -X -U hunter -d hunter -c '\dt+ opportunity_history_2026_09' && df -h /"
+   ```
+   Efeitos visíveis: a trajetória das oportunidades abertas recomeça; `radar_coverage` passa a reportar o
+   `MAX(score)` desde o `TRUNCATE`; nenhum leitor quebra com a tabela vazia (§2).
+
+### 7.3 Passo 4a — outbox: podar as despachadas com mais de 2 dias (com os escritores de pé)
+
+Pendentes nunca são apagadas (`dispatched_at IS NULL`, o `WHERE` do `prune_dispatched`). Mesmo `flock` do
+cron `hunter-outbox`, para as duas execuções nunca se sobreporem: se o comando sair sem imprimir nada, o
+cron está com a trava — esperar e repetir.
+
+1. Contar (27/09: 30 GB de heap, ~36,8 M linhas, a mais velha de 06/09; ~4 M ficam com 2 d):
+   ```powershell
+   ssh hunter-vps "cd /opt/project-hunter && flock -n /tmp/hunter-outbox-prune.lock bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --retention-days 2 --dry-run"
+   ```
+2. Apagar em lotes de 5 mil (≈ 6 500 lotes; dezenas de minutos; reexecutar retoma de onde parou):
+   ```powershell
+   ssh hunter-vps "cd /opt/project-hunter && flock -n /tmp/hunter-outbox-prune.lock bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --retention-days 2"
+   ```
+   Espaço devolvido ao `df`: **0** — apagar linha libera espaço para reuso dentro da tabela; quem devolve é o
+   passo seguinte. O dump da noite encolhe ~3 G.
+
+### 7.4 Passo 4b — `VACUUM FULL outbox_events` com os escritores de perpétuos parados
+
+Pré-condição, **as cinco têm de dar 0**: nenhuma posição real aberta (spot, meme, perp) e nenhuma ordem
+assinada ainda sem liquidação (`tx_signature` sem `settled_at`: uma compra enviada que confirma depois
+abre posição pelo reconciliador). 27/09 ~05:40Z: 0, 0, 0, 0, 0; kill switch `wallet` = `ACTIVE`;
+`SPOT1_ENABLED` e `ENABLE_MEME_LIVE_TRADING` **ligados** no executor — isto é, a mesa `spot/1` pode admitir
+entrada a qualquer tique, e por isso o executor também para na janela (revisão da Astra, 27/09):
+```powershell
+ssh hunter-vps "docker exec hunter-postgres-1 psql -X -U hunter -d hunter -c 'SELECT count(*) AS spot_abertas FROM spot_positions WHERE exit_at IS NULL' -c 'SELECT count(*) AS meme_abertas FROM meme_live_positions WHERE exit_at IS NULL' -c 'SELECT count(*) AS perp_abertas FROM positions WHERE closed_at IS NULL' -c 'SELECT count(*) AS spot_em_voo FROM spot_orders WHERE settled_at IS NULL AND tx_signature IS NOT NULL' -c 'SELECT count(*) AS meme_em_voo FROM meme_live_orders WHERE settled_at IS NULL AND tx_signature IS NOT NULL' -c 'SELECT scope, state FROM meme_live_kill_switch'"
+```
+E o `risk-engine-guardian` de acordo (desenho, passo 4). meme-worker (Lab de papel), api e web **seguem
+rodando**: nenhum escreve `outbox_events` (a API só tem `SELECT`, §19.1 do DATABASE.md). **Desvio do
+desenho, que mantinha o `meme-executor` de pé:** com zero posição e zero ordem em voo ele não tem nada a
+vigiar, e parado ele não abre uma entrada `spot/1` enquanto o `market-worker-spot` está desligado.
+
+1. Guardar quais containers estão de pé (arquivo local, no PowerShell):
+   ```powershell
+   ssh hunter-vps "docker ps --format '{{.Names}}' | sort" > antes.txt
+   ```
+2. Parar **primeiro o executor** (nenhuma entrada nova, meme ou spot) e **repetir a pré-condição acima** —
+   as cinco contagens têm de continuar 0 com ele parado; se alguma mudou, religar o executor
+   (`docker start hunter-meme-executor-1`) e adiar a janela:
+   ```powershell
+   ssh hunter-vps "docker stop -t 30 hunter-meme-executor-1"
+   ```
+3. Parar **os mesmos** onze escritores/despachantes de perpétuos — `docker stop`, nunca `compose.sh up`
+   (que faz `--build --remove-orphans` e depende dos perfis, `compose.sh:220`):
+   ```powershell
+   ssh hunter-vps "docker stop -t 30 hunter-scanner-worker-1 hunter-market-worker-1 hunter-market-worker-1-1 hunter-market-worker-2-1 hunter-market-worker-3-1 hunter-market-worker-spot-1 hunter-strategy-worker-1 hunter-strategy-worker-1-1 hunter-strategy-worker-2-1 hunter-strategy-worker-3-1 hunter-execution-worker-1"
+   ```
+4. Compactar — **dois `-c` separados**: vários comandos num `-c` só viram uma transação e `VACUUM` recusa
+   rodar dentro de uma (Astra). `lock_timeout` limita a espera, não a compactação. Reescreve só as linhas
+   vivas (~4 M, ~4 G); o arquivo antigo existe até o fim, então pede **~10 G livres** (há >180 G depois do
+   `TRUNCATE`). Alguns minutos:
+   ```powershell
+   ssh hunter-vps "docker exec hunter-postgres-1 psql -X -v ON_ERROR_STOP=1 -U hunter -d hunter -c 'SET lock_timeout = 5000' -c 'VACUUM (FULL, VERBOSE, ANALYZE) outbox_events'"
+   ```
+5. Religar os mesmos onze e, **por último**, o executor (os coletores já de pé quando ele voltar a
+   admitir):
+   ```powershell
+   ssh hunter-vps "docker start hunter-scanner-worker-1 hunter-market-worker-1 hunter-market-worker-1-1 hunter-market-worker-2-1 hunter-market-worker-3-1 hunter-market-worker-spot-1 hunter-strategy-worker-1 hunter-strategy-worker-1-1 hunter-strategy-worker-2-1 hunter-strategy-worker-3-1 hunter-execution-worker-1"
+   ssh hunter-vps "docker start hunter-meme-executor-1"
+   ```
+6. Conferir que voltou exatamente o que estava de pé (saída vazia) e o espaço devolvido (**~29 G**: 30 GB
+   de heap + ~3,6 G de índices → ~4 G):
+   ```powershell
+   ssh hunter-vps "docker ps --format '{{.Names}}' | sort" > depois.txt
+   Compare-Object (Get-Content antes.txt) (Get-Content depois.txt)
+   ssh hunter-vps "docker exec hunter-postgres-1 psql -X -U hunter -d hunter -c '\dt+ outbox_events' && df -h /"
+   ```
+   O market-worker recupera os minutos parados pelo backfill de lacunas (`ingestion_gaps`); os
+   pendentes da outbox saem quando os despachantes voltam.
+7. **O prazo que fica valendo: 2 d, todo dia.** O cron `infra/vps/cron/hunter-outbox` passa
+   `--retention-days 2` explícito (o padrão do script continua 7, de propósito — sem a flag apaga menos) e a
+   §1.3 do DATABASE.md diz 2 d vigente. Reinstalar o arquivo depois do deploy:
+   ```powershell
+   ssh hunter-vps "cd /opt/project-hunter && sudo install -o root -g root -m 644 infra/vps/cron/hunter-outbox /etc/cron.d/hunter-outbox && grep -o 'retention-days [0-9]*' /etc/cron.d/hunter-outbox"
+   ```
+   Tem de imprimir `retention-days 2`. Com isso a tabela fica em ~4 M linhas.
+
+### 7.5 O que cada passo devolve (estimativa sobre 27/09: 226 G usados, 123 G livres)
+
+| Passo | Quando | Devolve ao `df` |
+|---|---|---|
+| 1 (backup) | 1ª noite depois do deploy | dump novo ~9 G no lugar de ~27 G; a contagem apaga o de 24/09: **~+10 G**; 2ª noite **~+15 G**; 3ª **~+17 G** → `/opt/backups` de 68 G para ~25 G (3 × ~8 G) |
+| 3 (`TRUNCATE`) | na hora | **~62 G** |
+| 4a (poda 2 d) | na hora | 0 (reuso interno) |
+| 4b (`VACUUM FULL`) | na hora | **~29 G** |
+| 3 (14 d) e 5 (30 d) | 15/10 e 31/10, com o cron de poda | setembro de `opportunity_history` (o que acumular depois do `TRUNCATE`, ~0,7 G/dia com `history_v2`) e ~15–20 G das cinco séries meme de setembro |
+
+## 8. O que muda no contrato quando o Everton decidir
+
+> **Feito em 27/09, com o código da §7:** §1.3 (`opportunity_history` 14 d; séries meme a
+> `MEME_RETENTION_DAYS` = 30 d; linhas novas para `board`, `risk` e `meme_market_activity_1m`; a outbox com
+> a decisão de 2 d registrada e ainda não vigente), §17.3a (`history_v2`, novo), §33.4 e §35.4 (notas de
+> correção, o texto das revisões fica). A coluna "Job" da §1.3 ficou para a tarefa dos crons.
 
 Nada foi alterado em `docs/DATABASE.md` por esta proposta. Se aprovada, a mesma tarefa que muda o código
 atualiza:
@@ -336,7 +495,7 @@ Lacunas que já existem no contrato e ficam registradas aqui: `meme_board_observ
 `meme_risk_snapshots` (§35, `0023`) nunca receberam retenção; a §1.3 atribui a poda de partições e a criação
 "agendada no analytics-worker", que não existe, e nenhum cron substituiu isso na VPS.
 
-## 8. Recomendação (para o Everton decidir)
+## 9. Recomendação (para o Everton decidir)
 
 1. **Hoje, sem apagar dado:** passo 0 (cache/imagens, ~10 G) e a correção do `prune_partitions.py` (§6,
    passo 2c) antes de qualquer cron de poda.
@@ -350,7 +509,7 @@ Lacunas que já existem no contrato e ficam registradas aqui: `meme_board_observ
 6. **Depois da emergência (arquitetural, plano próprio):** partição semanal para as séries meme de alto
    volume, e offsite dos dumps. Só com um dos dois uma janela meme de 45–60 d volta a caber.
 
-## 9. Segunda opinião (Astra)
+## 10. Segunda opinião (Astra)
 
 Parecer completo em `.claude/state/astra-review-retencao-disco-2026-09-27.md` (só leitura, 27/09). Cada
 achado foi conferido no código antes de entrar aqui:
@@ -368,3 +527,18 @@ achado foi conferido no código antes de entrar aqui:
 | parar o scanner não dá `None` na ponte (score velho de `opportunities`) | `bridge_universe.py:294-323` | **aceito**: registrado no passo 3(b) como tarefa do `risk-engine-guardian` |
 
 Sem discordâncias abertas.
+
+### 10.1 Revisão da execução (27/09, código e §7)
+
+Dois pareceres, `.claude/state/astra-review-disk-plan-design.md` (antes de codar) e
+`.claude/state/astra-review-disk-plan-code.md` (sobre o diff). Cada achado conferido com um comando:
+
+| Achado da Astra | Conferido em | Decisão |
+|---|---|---|
+| teto rígido de 1 linha/5 min apaga uma excursão `WATCHING → HOT → WATCHING` entre batimentos | desenho §6 passo 3(a) diz "ou quando status/stage muda" | **aceito**: `history_v2` = 1ª amostra, status, estágio ou 300 s. **Desvio da letra** do registro da decisão ("no máximo 1 linha por mercado a cada 5 min"), a favor do desenho que o Everton autorizou |
+| a marca gravada em `opportunities` era a da avaliação, não a persistida: cada reinício adiava o batimento | `rows.storage_envelope`, `runners._rehydrate` | **aceito**: o episódio carrega a última marca persistida (teste `test_history_rate.py`) |
+| gravar por que cada linha existe | `rows.history_row` | **aceito**: `envelope.history_sample` |
+| janela do `VACUUM FULL`: zero posição não impede o executor de abrir `spot/1` com o coletor spot parado | `printenv` no executor: `SPOT1_ENABLED=true`, `ENABLE_MEME_LIVE_TRADING=true` | **aceito**: pré-condição com ordens em voo, executor parado antes e recontagem (§7.4) |
+| um `hunter-*.dump` truncado do script antigo ocuparia uma vaga | `backup.log`: os três dumps de hoje têm `ok:` | **rejeitado para o estado atual** (não existe tal arquivo; todo nome final novo passa no `--list` antes); a conferência entrou na §7.1 |
+| lock para execuções manuais concorrentes; falha da listagem na substituição de processo | `backup_postgres.sh` | **não adotado**: o cron roda uma vez por dia; uma listagem que falha poda **menos**, nunca mais |
+| o pedigree `creator_prior_dump_count` não depende de 90 → 30 d | `lab_repo_fast.PRIOR_WINDOW_S` = 7 d | **aceito**: a consequência que eu tinha escrito na §33.4 do DATABASE.md estava errada e foi corrigida; entraram as fichas antigas e a vigilância do criador |

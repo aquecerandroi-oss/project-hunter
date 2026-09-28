@@ -2,7 +2,8 @@
 ``markets``, ``anomalies``, ``opportunity_history``, ``opportunity_weights``
 and ``feature_baselines`` (T3.46, ``.claude/state/notes-T3.46.md``).
 
-Cost note (review of T3.46c): ``MAX(opportunity_history.score)``,
+Cost note (review of T3.46c): ``MAX(opportunity_history.score)`` (and, since
+27/09/2026, ``MAX(opportunities.peak_score)``),
 ``MIN(anomalies.detected_at)`` and the ``COUNT`` over ``feature_baselines`` have
 no covering index today and run uncached on every ``/radar`` and
 ``/opportunities`` load; the three tables only grow. Cheap now (2e5 rows);
@@ -19,7 +20,12 @@ from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import func, select
 
-from hunter_core.db.models.analysis import Anomaly, OpportunityHistory, OpportunityWeights
+from hunter_core.db.models.analysis import (
+    Anomaly,
+    Opportunity,
+    OpportunityHistory,
+    OpportunityWeights,
+)
 from hunter_core.db.models.analysis_baselines import FeatureBaseline
 from hunter_core.db.models.markets import Market
 from hunter_core.domain.enums import AnomalyType
@@ -59,12 +65,23 @@ class RadarCoverageRepository:
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def max_score_ever(self) -> Decimal | None:
-        """The ceiling ``opportunity_history``'s full series ever recorded —
-        the same read T3.46's inventory query used (``OpportunityHistory``,
-        not ``Opportunity.peak_score``, so a sample from an episode that has
-        since expired still counts, unlike a per-episode column that stops
-        mattering once the row itself is gone)."""
-        stmt = select(func.max(OpportunityHistory.score))
+        """The highest score still on record: the greater of
+        ``MAX(opportunity_history.score)`` and ``MAX(opportunities.peak_score)``,
+        each aggregated on its own.
+
+        The history alone stopped being enough on 27/09/2026: ``history_v2``
+        samples sparsely (DATABASE.md §17.3a), so a 30 → 45 → 30 excursion with no
+        status/stage change leaves no 45 in it, and the history keeps 14 days (it
+        was truncated that day). ``peak_score`` is kept on every sample of every
+        episode, expired ones included — ``opportunities`` is never pruned. The
+        history still counts on its own for a row whose ``peak_score`` is NULL.
+        ``GREATEST`` ignores a NULL side; both NULL is ``None``, never a zero."""
+        stmt = select(
+            func.greatest(
+                select(func.max(OpportunityHistory.score)).scalar_subquery(),
+                select(func.max(Opportunity.peak_score)).scalar_subquery(),
+            )
+        )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def anomaly_rows_by_type(self, *, since: datetime) -> dict[AnomalyType, int]:

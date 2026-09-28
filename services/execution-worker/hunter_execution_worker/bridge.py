@@ -226,6 +226,8 @@ async def _submit(
             else admitted[0].decision.sizing.binding_constraint
         ),
         score=str(screened.score) if screened.score is not None else None,
+        score_ts=screened.score_ts.isoformat() if screened.score_ts is not None else None,
+        score_age_s=screened.score_age_s,
     )
 
 

@@ -30,13 +30,14 @@ import orjson
 
 from hunter_core.domain.enums import AnomalyStatus, OpportunityStatus
 from hunter_core.events.streams import Streams
-from hunter_indicators.opportunity import envelope_bytes
+from hunter_indicators.opportunity import HistoryMark, envelope_bytes
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from hunter_indicators.anomalies import AnomalyState
     from hunter_indicators.features import FeatureVector
+    from hunter_indicators.opportunity import HistoryVerdict
     from hunter_indicators.regime import RegimeDecision
     from hunter_scanner_worker.evaluate import Evaluation
 
@@ -53,6 +54,9 @@ __all__ = [
     "storage_envelope",
 ]
 
+_EVALUATED = object()
+"""``storage_envelope``'s default: attach the evaluation's own mark."""
+
 
 def jsonable(value: Mapping[str, Any]) -> dict[str, Any]:
     """The canonical JSON form of a dict that still holds ``Decimal``/``datetime``.
@@ -64,17 +68,24 @@ def jsonable(value: Mapping[str, Any]) -> dict[str, Any]:
     return dict(decoded)
 
 
-def storage_envelope(evaluation: Evaluation) -> dict[str, Any]:
+def storage_envelope(
+    evaluation: Evaluation, *, mark: HistoryMark | None | object = _EVALUATED
+) -> dict[str, Any]:
     """The envelope as a column holds it: exactly as produced, plus the mark.
 
     ``history_mark`` is additive and outside every path any reader names, so it
     cannot shadow a key the engine or the API depends on; it is here because the
     sampling rule has to compare against the **last persisted** sample and a
-    restart would otherwise have nothing to compare with.
+    restart would otherwise have nothing to compare with. The episode row passes
+    that mark explicitly (``collect.collect_opportunity``): writing the
+    evaluation's own mark on a sample that was *not* kept made a restart compare
+    against a sample nobody stored (Astra, 27/09 — under ``history_v2`` that is
+    up to one interval of silence per restart).
     """
     envelope = dict(evaluation.envelope)
-    if evaluation.history_mark is not None:
-        envelope["history_mark"] = evaluation.history_mark.as_wire()
+    chosen = evaluation.history_mark if mark is _EVALUATED else mark
+    if isinstance(chosen, HistoryMark):
+        envelope["history_mark"] = chosen.as_wire()
     return jsonable(envelope)
 
 
@@ -144,6 +155,7 @@ def opportunity_row(
     regime_id: UUID | None,
     anomaly_ids: Sequence[UUID],
     now: datetime,
+    history_mark: HistoryMark | None,
 ) -> dict[str, Any]:
     """The full column set of one ``opportunities`` row.
 
@@ -171,7 +183,7 @@ def opportunity_row(
         "stage": state.stage,
         "explanation": jsonable(evaluation.explanation),
         "below_40_since": state.below_floor_since,
-        "feature_snapshot": storage_envelope(evaluation),
+        "feature_snapshot": storage_envelope(evaluation, mark=history_mark),
         "first_seen_at": state.first_seen_at,
         "last_updated_at": now,
         "expired_at": state.expired_at,
@@ -179,7 +191,9 @@ def opportunity_row(
 
 
 def history_row(evaluation: Evaluation, *, opportunity_id: UUID) -> dict[str, Any]:
-    """One preserved sample. Carries the whole envelope, by contract."""
+    """One preserved sample. Carries the whole envelope, by contract, plus the
+    policy and the reasons that kept it (``history_sample``), so a sparse series
+    says why each of its rows exists."""
     score = evaluation.score
     state = evaluation.status.state_out if evaluation.status is not None else None
     if score is None or state is None:  # pragma: no cover - guarded by the caller
@@ -192,8 +206,18 @@ def history_row(evaluation: Evaluation, *, opportunity_id: UUID) -> dict[str, An
         "status": state.status,
         "stage": state.stage,
         "decomposition": jsonable(score.decomposition()),
-        "envelope": storage_envelope(evaluation),
+        "envelope": _with_sample(storage_envelope(evaluation), evaluation.history),
     }
+
+
+def _with_sample(envelope: dict[str, Any], verdict: HistoryVerdict | None) -> dict[str, Any]:
+    if verdict is not None:
+        envelope["history_sample"] = {
+            "policy_version": verdict.policy_version,
+            "reasons": list(verdict.reasons),
+            "interval_s": verdict.interval_s,
+        }
+    return envelope
 
 
 def opportunity_event_payload(

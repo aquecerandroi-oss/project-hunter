@@ -121,5 +121,7 @@ def test_cutoff_refuses_zero_retention_and_naive_clocks(script: ModuleType) -> N
         script.cutoff(7, datetime(2026, 9, 18))  # noqa: DTZ001 — the naive clock is the point
 
 
-def test_default_retention_matches_database_md(script: ModuleType) -> None:
+def test_the_default_retention_is_the_conservative_seven_days(script: ModuleType) -> None:
+    """The contract is 2 d (DATABASE.md §1.3, 27/09/2026) and the cron passes it
+    explicitly; the default stays above it so a run without the flag deletes less."""
     assert script.RETENTION_DAYS == 7

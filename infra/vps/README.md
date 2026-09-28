@@ -263,7 +263,9 @@ não é.
 ## Poda da outbox (`prune_outbox_events.py`)
 
 `outbox_events` é fila, não histórico (`docs/DATABASE.md` §1.3): a linha
-despachada fica **7 dias** só como teto da janela de replay e depois é peso
+despachada fica **2 dias** (desde 27/09/2026; eram 7 — decisão do Everton,
+`obsidian/06-DECISIONS/2026-09-27-retencao-de-dados-e-backup.md`) só como teto da
+janela de replay e depois é peso
 morto numa tabela em que o despachante escreve o tempo todo. Até 18/09/2026
 nenhum job a podava — a VPS acumulou **19,57 milhões** de linhas despachadas
 (17 GB, +2,1 M/dia) e o dump noturno foi de 1,6 GB para 10,6 GB numa semana.
@@ -271,9 +273,9 @@ O script chama `prune_dispatched` em laço (lotes de 5 mil ids em ordem de PK,
 uma transação por lote; pendente nunca é apagada):
 
 ```bash
-bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --dry-run   # conta, não apaga
-bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py             # apaga até o lote vir curto
-bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --max-batches 400  # primeira passada em fatias
+bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --retention-days 2 --dry-run   # conta, não apaga
+bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --retention-days 2             # apaga até o lote vir curto
+bash infra/vps/compose.sh ops python infra/scripts/prune_outbox_events.py --retention-days 2 --max-batches 400  # primeira passada em fatias
 ```
 
 Agendamento: o arquivo pronto é `infra/vps/cron/hunter-outbox` — 00:47, hora da
@@ -284,8 +286,11 @@ anterior, 04:37, caía dentro do dump de 80+ min), com `--max-batches 1000`
 não de tempo: medir a duração das primeiras noites em `outbox-prune.log`. Se
 um dia encostar no dump, não trava nada — `DELETE` (`ROW EXCLUSIVE`) e o
 `ACCESS SHARE` do dump não se bloqueiam; só disputam disco e o snapshot longo do
-dump adia o reuso do espaço. **Decisão do Everton** — apaga as linhas
-despachadas há mais de 7 dias (o prazo já é o do contrato, §1.3). Fazer antes a
+dump adia o reuso do espaço. **Decisão do Everton** (autorizada em 27/09/2026) —
+apaga as linhas despachadas há mais de **2 dias**, com `--retention-days 2` escrito
+na linha do cron: o padrão do script continua 7, então a flag nunca pode faltar
+(`test_vps_cron_files.py` confere). O `reconcile` de partida só republica
+pendentes, que nunca são apagadas, e nenhum chamador usa `reconcile(since=)`. Fazer antes a
 primeira passada em fatias (abaixo) e instalar (uma vez, de `/opt/project-hunter`):
 
 ```bash
@@ -305,9 +310,12 @@ Primeira passada sobre o acúmulo (≈7 M linhas): comece com `--max-batches 200
 (1 M linhas), meça duração, `pg_stat_progress_vacuum`, WAL e o `outbox_lag_s` dos
 heartbeats antes de ampliar; 400 lotes/dia = 2 M linhas, **menos** do que entra
 (2,1 M/dia), então o teto é fatia inicial, não regime permanente. O `flock` na linha
-do cron impede duas podas simultâneas disputando as mesmas linhas. Com 7 d a
-população estabiliza em ~15 M linhas (estimativa, não garantia); encurtar a retenção
-é mudança de política (`DATABASE.md` §1.3), não de operação.
+do cron impede duas podas simultâneas disputando as mesmas linhas. Com 2 d a
+população fica em ~4 M linhas (estimativa, não garantia; com 7 d eram ~15 M); mudar
+a retenção é mudança de política (`DATABASE.md` §1.3), não de operação. A primeira
+passada de 2 d e o `VACUUM FULL` que devolve o espaço ao `df` são o roteiro da §7 de
+`docs/design/retencao-e-disco-2026-09-27.md` — a única exceção, com os escritores
+parados, à regra "nunca `VACUUM FULL`" acima.
 
 ## O que fica exposto
 

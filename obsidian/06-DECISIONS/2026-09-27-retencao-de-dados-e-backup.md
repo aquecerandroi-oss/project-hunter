@@ -32,6 +32,8 @@ Com os cinco: **sem falha em 150 dias**, pico do banco ~169 G, mínimo ~55 G liv
 
 Código pelos especialistas (revisado antes do commit); os comandos que apagam dado são rodados pelo Everton na VPS a partir do roteiro da §7 da proposta.
 
+- **28/09 — o que o código faz agora (database-architect, sem commit ainda):** backup sem os dados de `opportunity_history`, `zstd:3`, os 3 dumps válidos mais novos pelo nome; scanner com `history_v2` (1ª amostra, status/estágio ou 300 s; toda linha com `envelope`) e `opportunity_history` a 14 d; `MEME_RETENTION_DAYS` = 30 para as cinco séries meme (`board`/`risk` incluídas, 15 s segue 7 d); cron da outbox com `--retention-days 2`; Radar com o teto de score corrigido para amostras esparsas. **Diferença da letra do item 3:** status/estágio continuam gravando linha fora do intervalo de 5 min (senão uma excursão HOT entre dois batimentos some). Revisões: [[Retencao-disco-execucao]]. O que apaga dado (`TRUNCATE`, poda de 2 d, `VACUUM FULL`) segue no roteiro da §7, para o Everton.
+
 ## Relacionado
 
 [[2026-09-27]] · [[2026-09-26-mesa-meme-real-pausada-no-escopo]] · [[Open Bugs]]

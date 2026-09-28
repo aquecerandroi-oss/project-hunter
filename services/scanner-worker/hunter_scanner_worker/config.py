@@ -14,6 +14,7 @@ markets cost one transaction, not two hundred.
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 
@@ -107,6 +108,11 @@ class ScannerConfig:
     """How often the durable open-interest history is re-read. The collector
     samples every 5 minutes, so anything faster only re-reads the same rows."""
 
+    history_interval_s: float = 300.0
+    """The ``history_v2`` heartbeat (``SCANNER_HISTORY_INTERVAL_S``): one preserved
+    ``opportunity_history`` sample per episode per interval, plus one per change
+    of status or stage (disk decision of 27/09/2026, DATABASE.md §1.3/§17.3)."""
+
 
 def _env_float(name: str, default: float) -> float:
     raw = os.environ.get(name)
@@ -116,6 +122,22 @@ def _env_float(name: str, default: float) -> float:
         return float(raw)
     except ValueError:
         return default
+
+
+HISTORY_INTERVAL_DEFAULT_S = 300.0
+HISTORY_INTERVAL_MAX_S = 86_400.0
+
+
+def history_interval(raw: float) -> float:
+    """``SCANNER_HISTORY_INTERVAL_S`` made safe to hand to ``timedelta``.
+
+    Not finite (``inf``, ``nan``) is a typo and falls back to the default —
+    ``timedelta(seconds=inf)`` raised ``OverflowError`` on every cycle (quant
+    review F4); a finite number is clamped to ``[1 s, 1 day]``.
+    """
+    if not math.isfinite(raw):
+        return HISTORY_INTERVAL_DEFAULT_S
+    return min(HISTORY_INTERVAL_MAX_S, max(1.0, raw))
 
 
 def _clamped_duty(raw: float) -> float:
@@ -134,6 +156,9 @@ def build_config() -> ScannerConfig:
         exchange=exchange_code(),
         bootstrap_budget_s=max(1.0, _env_float("SCANNER_BOOTSTRAP_BUDGET_S", 120.0)),
         bootstrap_duty=_clamped_duty(_env_float("SCANNER_BOOTSTRAP_DUTY", 0.4)),
+        history_interval_s=history_interval(
+            _env_float("SCANNER_HISTORY_INTERVAL_S", HISTORY_INTERVAL_DEFAULT_S)
+        ),
     )
 
 

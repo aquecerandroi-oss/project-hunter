@@ -122,7 +122,7 @@ class Settings(BaseSettings):
     radar_push_ms: int = 1000
     retention_candles_1m_days: int = 90
     retention_feature_snapshots_days: int = 14
-    meme_retention_days: int = 90  # T4.2, a MESMA para graduado e nao (DATABASE.md §33.4)
+    meme_retention_days: int = 30  # 27/09: 90 -> 30 (disco); a MESMA para graduado e nao (§33.4)
 
     # ---- market-worker (docs/plans/M1.md T1.3) ----
     market_universe_allowlist: list[str] = []

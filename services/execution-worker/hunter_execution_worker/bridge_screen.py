@@ -107,6 +107,10 @@ class Screened:
     spot: SpotPair | None = None
     beta: BetaEstimate | None = None
     score: Decimal | None = None
+    score_ts: datetime | None = None
+    """When the Radar sample behind ``score`` was taken (``bridge_universe.radar_score``)."""
+    score_age_s: int | None = None
+    """Whole seconds between that sample and the cut it was read for (the source bar)."""
     agent_id: uuid.UUID | None = None
     freshly_refused: bool = True
     """``False`` when this exact (signal, reason) was already logged and
@@ -315,7 +319,15 @@ async def screen_signal(
     if agent_id is None:
         return _refuse(signal, "agent_unavailable", reported=reported)
 
-    score = await radar_score(
-        session, market_id=signal.perp_market_id, at=signal.source_bar_close or now
+    cut = signal.source_bar_close or now
+    score, score_ts = await radar_score(session, market_id=signal.perp_market_id, at=cut)
+    age = None if score_ts is None else int((cut - score_ts).total_seconds())
+    return Screened(
+        signal=signal,
+        spot=spot,
+        beta=beta,
+        score=score,
+        score_ts=score_ts,
+        score_age_s=age,
+        agent_id=agent_id,
     )
-    return Screened(signal=signal, spot=spot, beta=beta, score=score, agent_id=agent_id)

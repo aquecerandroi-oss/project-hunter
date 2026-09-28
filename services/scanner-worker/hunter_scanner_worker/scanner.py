@@ -26,6 +26,7 @@ from hunter_core.logging import get_logger
 from hunter_indicators.anomalies import silence_reasons
 from hunter_indicators.baselines import BaselineCut
 from hunter_indicators.features import Quality
+from hunter_indicators.opportunity import HistoryPolicy, sparse_history_policy
 from hunter_indicators.regime import RegimeDecision
 from hunter_indicators.stage import StageInputs
 from hunter_scanner_worker import collect
@@ -76,6 +77,12 @@ class Scanner:
 
     regime_id: UUID | None = None
     producer: str = "scanner-worker"
+    history_policy: HistoryPolicy = field(init=False)
+    """``history_v2`` at the configured interval, built once (quant review F4)."""
+
+    def __post_init__(self) -> None:
+        interval = timedelta(seconds=self.config.history_interval_s)
+        self.history_policy = sparse_history_policy(interval)
 
     # --- inputs ------------------------------------------------------------
 
@@ -168,6 +175,7 @@ class Scanner:
                 ),
                 regime_id=self.regime_id,
                 last_history=market.checkpoint.history,
+                history_policy=self.history_policy,
                 score_due=score_due,
             )
         )

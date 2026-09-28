@@ -182,7 +182,10 @@ describe("RadarTable: honest empty states (distinct from a filtered miss)", () =
       />,
     );
     expect(screen.getByText(/Nenhuma oportunidade pontuada ainda/)).toBeInTheDocument();
-    expect(screen.getByText(/nenhum episódio passou de NORMAL/)).toBeInTheDocument();
+    // 27/09/2026: the history is retained, not eternal, and ANOMALY exists below 40 -- the note says only what the query saw.
+    expect(screen.getByText(/entre os picos dos episódios guardados e as amostras de histórico ainda retidas, o maior score é 38, abaixo do primeiro degrau \(WATCHING, 40\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/desde que o Radar existe/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/passou de NORMAL/)).not.toBeInTheDocument();
   });
 });
 

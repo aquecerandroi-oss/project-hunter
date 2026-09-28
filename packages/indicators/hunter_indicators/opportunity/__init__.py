@@ -24,12 +24,14 @@ from hunter_indicators.opportunity.episode import (
 )
 from hunter_indicators.opportunity.explanation import EXPLANATION_VERSION, explain
 from hunter_indicators.opportunity.history import (
+    HISTORY_POLICY_V2,
     HISTORY_POLICY_VERSION,
     HistoryMark,
     HistoryPolicy,
     HistoryVerdict,
     quality_signature,
     should_record_history,
+    sparse_history_policy,
 )
 from hunter_indicators.opportunity.model import (
     COMPONENT_PROFILE_VERSION,
@@ -78,6 +80,7 @@ __all__ = [
     "COMPONENT_QUANTUM",
     "CONFIDENCE_QUANTUM",
     "EXPLANATION_VERSION",
+    "HISTORY_POLICY_V2",
     "HISTORY_POLICY_VERSION",
     "REASON_ANOMALIES_UNKNOWN",
     "REASON_DEGRADED",
@@ -128,4 +131,5 @@ __all__ = [
     "score_opportunity",
     "score_regime_component",
     "should_record_history",
+    "sparse_history_policy",
 ]

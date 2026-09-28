@@ -30,6 +30,24 @@ What triggers a row, and why each one is here:
 - five minutes since the last persisted sample, so a quiet episode still has a
   heartbeat.
 
+**``history_v2`` (27/09/2026, the disk decision).** ``history_v1`` wrote ~50 rows
+an hour per opportunity (``docs/design/retencao-e-disco-2026-09-27.md`` §1: 63 G
+in September). :func:`sparse_history_policy` keeps only the first sample, a
+change of status or stage (what the Radar filters on — a HOT excursion between two
+heartbeats would otherwise vanish) and the heartbeat, whose interval the scanner
+reads as a cadence (``SCANNER_HISTORY_INTERVAL_S``). The other triggers still
+compute but no longer write a row by themselves: each preserved sample stays whole
+(envelope included), what happens *between* samples is no longer fully observable.
+
+**``history_v2`` (27/09/2026, the disk decision).** ``history_v1`` wrote ~50 rows
+an hour per opportunity (``docs/design/retencao-e-disco-2026-09-27.md`` §1: 63 G
+in September). :func:`sparse_history_policy` keeps only the first sample, a
+change of status or stage (what the Radar filters on — a HOT excursion between two
+heartbeats would otherwise vanish) and the heartbeat, whose interval the scanner
+reads as a cadence (``SCANNER_HISTORY_INTERVAL_S``). The other triggers still
+compute but no longer write a row by themselves: each preserved sample stays whole
+(envelope included), what happens *between* samples is no longer fully observable.
+
 What deliberately does **not** trigger one: a new ``baseline_id`` (the hourly
 refresh would write a row for every market every hour) and a confidence that
 merely wobbles.
@@ -50,6 +68,8 @@ from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.opportunity.model import ComponentScore
 
 HISTORY_POLICY_VERSION = "history_v1"
+HISTORY_POLICY_V2 = "history_v2"
+HISTORY_POLICY_V2 = "history_v2"
 
 REASON_FIRST = "first_sample"
 REASON_SCORE_DELTA = "score_delta"
@@ -89,11 +109,37 @@ class HistoryPolicy:
     min_score_delta: Decimal = Decimal("3")
     interval: timedelta = timedelta(minutes=5)
     version: str = HISTORY_POLICY_VERSION
+    triggers: frozenset[str] | None = None
+    """The reasons allowed to write a row; ``None`` = every one (``history_v1``)."""
+    triggers: frozenset[str] | None = None
+    """The reasons allowed to write a row; ``None`` = every one (``history_v1``)."""
 
 
 DEFAULT_HISTORY_POLICY = HistoryPolicy()
 """The shipped ``history_v1`` policy, as a module singleton (a call in a default
 argument is evaluated once anyway, and ruff's B008 asks for it to be visible)."""
+
+
+def sparse_history_policy(interval: timedelta) -> HistoryPolicy:
+    """``history_v2``: first sample, status or stage change, or ``interval`` elapsed."""
+    if interval <= timedelta(0):
+        raise ValueError(f"history interval must be positive, got {interval}")
+    return HistoryPolicy(
+        interval=interval,
+        version=HISTORY_POLICY_V2,
+        triggers=frozenset({REASON_STATUS, REASON_STAGE, REASON_INTERVAL}),
+    )
+
+
+def sparse_history_policy(interval: timedelta) -> HistoryPolicy:
+    """``history_v2``: first sample, status or stage change, or ``interval`` elapsed."""
+    if interval <= timedelta(0):
+        raise ValueError(f"history interval must be positive, got {interval}")
+    return HistoryPolicy(
+        interval=interval,
+        version=HISTORY_POLICY_V2,
+        triggers=frozenset({REASON_STATUS, REASON_STAGE, REASON_INTERVAL}),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,13 +184,26 @@ class HistoryVerdict:
     record: bool
     reasons: tuple[str, ...] = ()
     policy_version: str = HISTORY_POLICY_VERSION
+    interval_s: int | None = None
+    """The heartbeat of the policy that judged the sample, in whole seconds — a
+    sparse series says under which interval each of its rows was kept (F2)."""
 
     def as_wire(self) -> dict[str, Any]:
         return {
             "record": self.record,
             "reasons": list(self.reasons),
             "policy_version": self.policy_version,
+            "interval_s": self.interval_s,
         }
+
+
+def _verdict(policy: HistoryPolicy, reasons: tuple[str, ...], *, record: bool) -> HistoryVerdict:
+    return HistoryVerdict(
+        record=record,
+        reasons=reasons,
+        policy_version=policy.version,
+        interval_s=int(policy.interval.total_seconds()),
+    )
 
 
 def should_record_history(
@@ -154,9 +213,9 @@ def should_record_history(
 ) -> HistoryVerdict:
     """Pure: ``previous`` is the last **persisted** sample, ``now`` the candidate."""
     if previous is None:
-        return HistoryVerdict(record=True, reasons=(REASON_FIRST,), policy_version=policy.version)
+        return _verdict(policy, (REASON_FIRST,), record=True)
     if now.ts <= previous.ts:
-        return HistoryVerdict(record=False, reasons=(REASON_STALE,), policy_version=policy.version)
+        return _verdict(policy, (REASON_STALE,), record=False)
     found: set[str] = set()
     if previous.score is not None and now.score is not None:
         with localcontext(CONTEXT):  # the subtraction rounds under the ambient context
@@ -181,8 +240,10 @@ def should_record_history(
         found.add(REASON_QUALITY)
     if now.ts - previous.ts >= policy.interval:
         found.add(REASON_INTERVAL)
+    if policy.triggers is not None:
+        found &= policy.triggers
     reasons = tuple(reason for reason in _ORDER if reason in found)
-    return HistoryVerdict(record=bool(reasons), reasons=reasons, policy_version=policy.version)
+    return _verdict(policy, reasons, record=bool(reasons))
 
 
 def quality_signature(components: Sequence[ComponentScore]) -> str:
@@ -201,6 +262,7 @@ def quality_signature(components: Sequence[ComponentScore]) -> str:
 
 __all__ = [
     "DEFAULT_HISTORY_POLICY",
+    "HISTORY_POLICY_V2",
     "HISTORY_POLICY_VERSION",
     "REASON_DIRECTION",
     "REASON_ELIGIBILITY",
@@ -219,4 +281,5 @@ __all__ = [
     "HistoryVerdict",
     "quality_signature",
     "should_record_history",
+    "sparse_history_policy",
 ]

@@ -24,7 +24,7 @@ function NeverLitNote({ coverage }: { coverage: RadarCoverageOut | null | undefi
   if (score === null || Number(coverage.max_score_ever) >= WATCHING_THRESHOLD) return null;
   return (
     <p className="mt-3 text-sm text-fg-muted">
-      Isto não é "nada interessante agora": desde que o Radar existe, nenhum episódio passou de NORMAL (maior score já visto {score}, primeiro degrau {WATCHING_THRESHOLD}).{" "}
+      Isto não é "nada interessante agora": entre os picos dos episódios guardados e as amostras de histórico ainda retidas, o maior score é {score}, abaixo do primeiro degrau (WATCHING, {WATCHING_THRESHOLD}).{" "}
       <a href={`#${RADAR_COVERAGE_STRIP_ID}`} className="font-medium text-fg underline underline-offset-2 hover:text-gold">
         Veja o estado completo do Radar acima
       </a>

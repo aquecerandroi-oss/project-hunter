@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock
@@ -67,7 +68,10 @@ async def test_screen_uses_candle_volume(
     monkeypatch.setattr(bridge_screen, "current_beta", beta)
     monkeypatch.setattr(bridge_screen, "coin_commitment", AsyncMock(return_value=None))
     monkeypatch.setattr(bridge_screen, "_agent_for", AsyncMock(return_value=uuid4()))
-    monkeypatch.setattr(bridge_screen, "radar_score", AsyncMock(return_value=Decimal(80)))
+    score_ts = NOW - timedelta(minutes=4)
+    monkeypatch.setattr(
+        bridge_screen, "radar_score", AsyncMock(return_value=(Decimal(80), score_ts))
+    )
 
     screened = await bridge_screen.screen_signal(
         session,
@@ -82,5 +86,7 @@ async def test_screen_uses_candle_volume(
     if reason is None:
         assert screened.spot_market_id == spot.market_id
         beta.assert_awaited_once()
+        # F3 (quant review of history_v2): the score travels with its instant.
+        assert (screened.score, screened.score_ts) == (Decimal(80), score_ts)
     else:
         beta.assert_not_awaited()

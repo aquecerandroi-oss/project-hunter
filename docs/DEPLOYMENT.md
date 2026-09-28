@@ -645,7 +645,7 @@ quando não há observação, e `row_reason = no_rows` quando a tabela está vaz
 que pareça saúde. Depois desta tarefa `completos` deixa de ser 0: toda curva concluída/migrada recebe
 uma leitura final antes de sair do conjunto rastreado (`docs/plans/T4-MEME-RADAR.md` §T4.2c).
 
-**Retenção e partições:** `MEME_RETENTION_DAYS` (padrão 90) governa as duas
+**Retenção e partições:** `MEME_RETENTION_DAYS` (padrão 30 desde 27/09/2026; era 90) governa as duas
 metades — `infra/scripts/prune_partitions.py` derruba o mês inteiro das cinco
 tabelas particionadas (as três da `0021` e as duas da `0023`) e o próprio worker poda `meme_tokens` linha a linha, em
 lotes, atrás de `SET LOCAL app.meme_retention = 'on'`. A janela é **a mesma para
@@ -1230,7 +1230,7 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | `MEME` | não | `0` | **só no comando** (nunca no `.env`): `MEME=1` adiciona o perfil `meme` ao `compose.sh` (§3.6) — sem ele, `update` derruba o meme-worker por `--remove-orphans` |
 | `MEME_ENABLED` | não | `false` | se o radar pump.fun **coleta**. O perfil decide se o container existe; esta flag decide se ele fala com os dois endpoints de terceiros. Desligado, serve `/health`, `/ready` e `/metrics` e diz `disabled` no readiness |
 | `SOLANA_RPC_URL` | não | público | endpoint RPC Solana do meme-worker. Vazio = `api.mainnet-beta.solana.com` (~10 req/s **e** 40 chamadas por método/10 s), que é por que só o top-K por mcap é reconciliado. Provedor com chave é decisão do Everton (T4.0 §8.3), com teto de consumo aprovado antes |
-| `MEME_RETENTION_DAYS` | não | `90` | janela de retenção do radar, **idêntica para mints graduados e não graduados** (`docs/DATABASE.md` §33.4). Governa o `DROP` mensal das três tabelas particionadas **e** a poda linha a linha de `meme_tokens` |
+| `MEME_RETENTION_DAYS` | não | `30` (era `90` até 27/09/2026) | janela de retenção do radar, **idêntica para mints graduados e não graduados** (`docs/DATABASE.md` §33.4). Governa o `DROP` mensal das cinco tabelas particionadas (curva, fita, minuto, boards e risco; a série de 15 s fica em 7 d) **e** a poda linha a linha de `meme_tokens` |
 | `MEME_TRACKED_MINTS_MAX` | não | `120` | teto do conjunto rastreado. O orçamento REST é 60 req/60 s, então 120 mints é uma volta completa a cada dois minutos; qualquer número maior é uma promessa que o orçamento não cumpre |
 | `MEME_TRACK_MATURE_TOP_K` | não | `0` | I1 (EXP-M26, `docs/design/exp-m26-grafico-moedas-maduras.md` §1.6): retém, num orçamento **à parte** que nunca tira vaga de `MEME_TRACKED_MINTS_MAX`, as K maiores por `mcap_sol` entre os mints de 5–120 min de idade, não terminados, não Mayhem, com leitura de mcap com ≤ 120 s. `0` (padrão do código) desliga a política; a VPS do experimento usa `60`. Custo medido no teto de 60: **+18,5 %** de linhas/dia em `meme_features_1m` (≈ 50 MB/dia) e **+7,9 %** em `meme_curve_snapshots`; nenhum pedido REST novo (a retenção nunca gera `needs_rest`, só o laço de 1 min que já cobre todo rastreado) |
 | `MEME_TRACK_WINDOW_MINUTES` | não | `1440` | quanto tempo um mint fica rastreado depois de criado (24 h — a vida do próprio agente Mayhem). Um agente `active`/`paused` mantém o mint mesmo depois disso |

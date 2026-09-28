@@ -63,17 +63,21 @@ O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) —
 | `market_snapshots` | mensal | 30 d | idem |
 | `feature_snapshots` | mensal | 14 d (snapshots ligados a anomalias/oportunidades/trades vivem na própria linha dessas tabelas) | idem |
 | `liquidations` | mensal | 30 d | idem |
-| `opportunity_history` | mensal | 90 d | idem |
+| `opportunity_history` | mensal | **14 d** (era 90 d até 27/09/2026 — decisão do Everton sobre `docs/design/retencao-e-disco-2026-09-27.md` §3: 63 G em setembro e nenhum leitor passa de ~10 h). Escrita esparsa desde a mesma data: `history_v2` (§17.3a) | idem |
 | `portfolio_equity_snapshots` | LIST por `resolution`, depois RANGE por `ts`, mensal | 1m: 30 d · demais: sem limite | idem |
 | `audit_logs` | mensal | sem limite | — |
 | `system_events` | mensal | 30 d | idem |
-| `meme_curve_snapshots` | mensal | `MEME_RETENTION_DAYS` (90 d) | idem |
+| `meme_curve_snapshots` | mensal | `MEME_RETENTION_DAYS` (**30 d** desde 27/09/2026; era 90 d — §33.4) | idem |
 | `meme_features_1m` | mensal | idem | idem |
 | `meme_trades` | mensal | idem | idem |
+| `meme_board_observations` | mensal | idem (**desde 27/09/2026**: até então nenhuma linha em `partition_retention.py`, isto é, "para sempre" por omissão, embora a §35.4 dissesse `MEME_RETENTION_DAYS`) | idem |
+| `meme_risk_snapshots` | mensal | idem (idem) | idem |
+| `meme_market_activity_1m` | mensal | 30 d (T4.2g, `0032`, §44.1 — linha que faltava nesta tabela; o código já a tinha) | idem |
 | `meme_features_15s` | mensal | **7 d** (T4.16, `0030`: a série de 15 s das moedas jovens — em partições mensais o mês cai quando o seu fim tem mais de 7 dias) | idem — T4.33: uma moeda **fixada** (aposta/posição/proposta) segue na via rápida até 1 800 s (`MEME_FAST_LANE_PINNED_MAX_AGE_S`), não só 300 s; +2 % de linhas/dia medido, ~83 mints/dia |
 | `meme_decision_tapes` | — | **7 d** a fita que só explica uma linha da trilha; **90 d** a que tem `proposal_ids` (T4.89, `0062`, §64) | poda por linha, diária UTC, em lotes de 5 mil, no laço de descarga da própria pista de eventos (`decision_tape_writer.maybe_prune`) |
+| `meme_mature_opportunities` | — | **sem retenção** até a leitura da H-022 (EXP-M26 R1, `0066`, §68): ~300 linhas/dia por conjunto; o worker não tem `DELETE` | nenhum — a poda, se vier, é revisão nova depois da leitura |
 | `meme_token_state_history` | — | **a do token** (EXP-M26 J, `0067`, §70): a linha cai junto com a de `meme_tokens` (`FOREIGN KEY … ON DELETE CASCADE`), isto é, `MEME_RETENTION_DAYS` (30 d) contado pelo `first_seen_at`/`created_at` do token; um token vivo tem sempre o histórico inteiro | a poda por linha de `meme_tokens` (`collect.prune_once` → `repo.prune_tokens`, atrás de `app.meme_retention`); nenhum job próprio, e o worker não tem `DELETE` na tabela (a cascata roda como dono) |
-| `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `infra/scripts/prune_outbox_events.py` diário (cron `hunter-outbox`, `infra/vps/README.md`), DELETE em lotes de 5 mil via `prune_dispatched`. Até 18/09/2026 **nenhum job rodava**: 19,57 M linhas despachadas (17 GB) na VPS, +2,1 M/dia — 3× os 700 mil/dia estimados abaixo; com 7 d a população estabiliza em ~15 M linhas (estimativa); apagar linha libera espaço para reuso dentro da tabela, **não** no `df` |
+| `outbox_events` | — | despachadas há mais de **2 d** desde 27/09/2026 (era 7 d; `dispatched_at IS NOT NULL AND dispatched_at < now() - interval '2 days'`); pendentes **nunca** são apagadas | `infra/scripts/prune_outbox_events.py` diário (cron `hunter-outbox`, `infra/vps/README.md`), DELETE em lotes de 5 mil via `prune_dispatched`. Até 18/09/2026 **nenhum job rodava**: 19,57 M linhas despachadas (17 GB) na VPS, +2,1 M/dia — 3× os 700 mil/dia estimados abaixo; com 7 d a população estabiliza em ~15 M linhas (estimativa); apagar linha libera espaço para reuso dentro da tabela, **não** no `df`. **Vigente desde 27/09/2026: 2 d** — decisão do Everton (`obsidian/06-DECISIONS/2026-09-27-retencao-de-dados-e-backup.md`, passo 4 de `docs/design/retencao-e-disco-2026-09-27.md`, janela de replay 7 → 2 d). O cron passa `--retention-days 2` **explícito**; o padrão do script continua 7, de propósito: uma execução manual sem a flag apaga menos, nunca mais. Com 2 d a população fica em ~4 M linhas (~4 G depois do `VACUUM FULL` do roteiro, §7 do desenho). Conferido no código: nenhum chamador usa `reconcile(since=...)` — o de partida (`market-worker/outbox.py`, `scanner-worker/main.py`, `request_backfill.py`) só drena `dispatched_at IS NULL`, que nunca é podada |
 | `shadow_outbox` | — | idem, enquanto a fila existir (§17.5 a absorve) | idem |
 
 **As duas filas de outbox não são particionadas — são podadas.** Elas são fila,
@@ -108,11 +112,13 @@ Duas regras que o `WHERE` carrega e não são negociáveis:
   é uma publicação que o sistema deve; apagá-la é exatamente a perda silenciosa
   que a outbox existe para tornar impossível (é a mesma razão pela qual o
   downgrade da `0003` recusa, §17.7);
-- **os 7 dias são o teto da janela de replay.** `reconcile(since=...)` só
+- **os 7 dias (2 d desde 27/09/2026, tabela acima) são o teto da janela de replay.** `reconcile(since=...)` só
   alcança linha que ainda esteja na tabela, então essa retenção é o que faz
   "sabemos reencher um stream perdido de até uma semana atrás" ser verdade e
   "de um mês atrás" ser mentira. Aumentar a janela de replay é aumentar este
-  prazo, nunca o contrário.
+  prazo, nunca o contrário. **Desde 27/09/2026 a frase verdadeira é "de até 2
+  dias atrás"** — o Everton aceitou a janela menor (§1.3, linha da outbox), e
+  nenhum chamador de produção usa `reconcile(since=)`.
 
 O job em si é do analytics-worker e chega no **M5**; até lá a função pura existe,
 tem teste e não é chamada por ninguém em produção — registrado aqui para que a
@@ -123,6 +129,8 @@ lacuna seja um item de plano e não uma descoberta.
 O nível LIST é criado para **todos** os rótulos de `candle_timeframe`, não só os que a ingestão escreve hoje: uma linha sem partição é recusada, e uma escrita recusada é indisponibilidade, não aviso.
 
 Partições são criadas com 3 meses de antecedência por `infra/scripts/create_partitions.py`, agendado no analytics-worker. Uma partição faltante gera `system_event` de severidade `critical`. A contrapartida é `infra/scripts/prune_partitions.py`, que faz `DETACH` + `DROP` de cada partição cuja **borda superior** já passou da janela de retenção — nunca de uma que ainda possa conter linha retida — e é idempotente porque lê as partições existentes em `pg_inherits` em vez de gerá-las pelo calendário.
+
+**A poda não pode travar a ingestão** (`docs/design/retencao-e-disco-2026-09-27.md` §6, passo 2c). O `DETACH` não concorrente pede `ACCESS EXCLUSIVE` na pai; na fila atrás do `pg_dump` noturno (`ACCESS SHARE` em todas as tabelas por 80+ min) ele fazia todo `INSERT` seguinte naquela pai esperar atrás dele, e todas as quedas rodavam numa transação só. Desde 27/09/2026: **uma transação por partição** (`DETACH` + `DROP`) aberta com `SET LOCAL lock_timeout = '3s'` e `SET LOCAL statement_timeout = '60s'`; lock não concedido em 3 s (SQLSTATE `55P03`) pula a partição **pelo nome** e a próxima execução tenta de novo; qualquer outro erro numa partição é registrado e a execução segue; **nada é tocado enquanto houver um `pg_dump` conectado ao banco** (`pg_stat_activity.application_name = 'pg_dump'`, o nome que a libpq dá a todo `pg_dump` sem `PGAPPNAME` — provado com o binário real em teste —, conferido antes de cada partição; é checagem, não exclusão mútua). O `lock_timeout` limita **cada** espera de lock (pai, depois filha), não a transação: um escritor atrás do `DETACH` espera no pior caso ~6 s, não a noite; cada execução aplicada grava uma linha em `system_events` (`component = 'prune_partitions'`, `event = 'partitions_pruned'`, `data` com `dropped`/`skipped`/`failed`/`dump_active`). Saída 0 / 75 (pulou por lock ou dump) / 1 (falhou). O agendamento real é o arquivo `infra/vps/cron/hunter-partitions` (criação 01:07 e poda 01:27, hora da máquina, fora da janela do dump das 03:17), instalado à mão por decisão do Everton (`infra/vps/README.md`) — não o analytics-worker das linhas acima, que não existe.
 
 **E com 2 meses de atraso (`--months-behind`, T2.5f).** O job só olhava para a frente, e histórico entra pelo passado: um pedido de backfill de 7 dias feito em 06/09 nomeia minutos de agosto, nenhuma partição os aceitava, e o consumidor do market-worker recusou **3 300 de 8 547 minutos** com `market_backfill_refused reason=no_partition` (`.claude/state/notes-T2.5.md` §31). O padrão é **2** porque a janela mais larga que alguém pede é de 30 dias (replay/β; o bootstrap de baselines pede 7), e **um mês para trás não basta sempre**: 30 dias contados a partir de 1º de março caem em **30 de janeiro** — fevereiro é curto —, então um único mês para trás recusaria os dois dias mais velhos desse pedido, que é exatamente o `no_partition` que esta política existe para eliminar. Dois cobrem no mínimo 59 dias de passado (rodando no dia 1º) e ~92 no melhor caso: 30 dias em qualquer mês do calendário, mais margem para um pedido cuja janela termina alguns dias no passado — uma lacuna detectada tarde, um replay de um trecho mais antigo, um dia em que o job não rodou.
 
@@ -1369,6 +1377,74 @@ não acusaria drift e estaria fazendo cumprir o invariante errado, então a troc
 escrita à mão na revisão e
 `test_schema_analysis.py::test_episode_identity_is_keyed_on_expired_at_and_not_on_a_status_list`
 lê `pg_indexes.indexdef` para provar.
+
+### 17.3a Amostragem esparsa — `history_v2` (27/09/2026, sem migração)
+
+A regra que decide gravar uma amostra (`hunter_indicators.opportunity.history`,
+`history_v1`) gravava por delta de score ≥ 3, status, estágio, direção, regime,
+versões, elegibilidade, assinatura de qualidade ou 5 min: medido na VPS, **~50
+linhas/h por oportunidade** (96 % com score diferente), 63 G em
+`opportunity_history_2026_09`. O Everton autorizou gravar menos
+(`docs/design/retencao-e-disco-2026-09-27.md` §3/§6 passo 3(a);
+`obsidian/06-DECISIONS/2026-09-27-retencao-de-dados-e-backup.md`). O scanner passou a
+amostrar com **`history_v2`**: a primeira amostra, uma **mudança de status ou de
+estágio**, ou `SCANNER_HISTORY_INTERVAL_S` (cadência, padrão **300 s**, mínimo 1 s)
+desde a última amostra persistida. Os demais gatilhos continuam calculados e deixam
+de gravar sozinhos. `history_v1` segue no pacote, congelada, para os testes e para
+quem quiser comparar.
+
+- **O que não muda:** o schema; cada linha gravada continua completa — `decomposition`
+  **e** `envelope` (o envelope anulável foi descartado: ele é o que torna "recalcule
+  este score com o que ele viu" verdadeiro, `analysis.py:282-286`). A frase acima
+  sobre `stage` continua valendo: estágio é um dos três gatilhos de `history_v2`.
+- **O que muda, declarado:** o que acontece **entre** duas amostras deixa de ser
+  integralmente observável — uma inversão de direção, um regime breve, uma queda e
+  volta de qualidade ou de elegibilidade, ou uma troca de versão só aparecem se
+  coincidirem com uma amostra (revisão da Astra, 27/09). Status/estágio ficam como
+  gatilho **contra** a letra "no máximo 1 linha por 5 min" do registro da decisão
+  porque é o que o desenho autorizado diz, e porque sem eles uma excursão
+  `WATCHING → HOT → WATCHING` entre dois batimentos sumiria da trajetória. Em
+  episódio estável a conta é ~12 linhas/h (−76 %); transições acrescentam linhas.
+- **Por que cada linha existe:** `envelope.history_sample = {policy_version,
+  reasons}` (chave aditiva, fora de todo caminho que a API lê), para que uma série
+  esparsa diga por que cada linha dela existe.
+- **Correção junto (reinício):** `opportunities.feature_snapshot.history_mark`
+  passou a guardar a **última marca persistida**, não a da última avaliação — era
+  ela que o reinício relia (`runners._rehydrate`), e com `history_v2` isso empurrava
+  o próximo batimento até um intervalo inteiro a cada restart. Marcas antigas (da
+  avaliação) ficam como estão: no primeiro reinício depois do deploy o batimento
+  pode atrasar no máximo 300 s, uma vez.
+- **Leitores:** `list_history` (≤ 500 linhas; 50 com envelope) passa a cobrir ~40 h
+  em vez de ~10 h; `radar._change_expr` continua sendo "score atual menos a última
+  amostra persistida", que agora acumula até 5 min; `bridge_universe.radar_score`
+  lê a última amostra `<= at` com a mesma regra de corte e perde resolução, nunca
+  ganha antecipação — provado com amostras a 5 min em
+  `services/execution-worker/tests/test_radar_score_sparse_history.py`.
+- **Testes:** `packages/indicators/tests/unit/test_opportunity_history_v2.py`,
+  `services/scanner-worker/tests/test_history_rate.py`.
+- **Revisão do `quant-engineer` (27/09, aprovada com correções), aplicada:**
+  - `envelope.history_sample` carrega também `interval_s` (o batimento da política que
+    julgou a amostra; vem de `HistoryVerdict.interval_s`);
+  - `SCANNER_HISTORY_INTERVAL_S` não finito (`inf`, `nan`) volta ao padrão e o finito é
+    limitado a `[1 s, 86 400 s]` — `timedelta(seconds=inf)` derrubava todo ciclo; a
+    política é montada **uma vez**, no `Scanner`, não a cada `advance`;
+  - um episódio que **abre** (`EpisodeAction.OPEN`) é julgado contra `None`, então a sua
+    primeira linha é `first_sample` e não espera o intervalo contado da última amostra do
+    episódio anterior;
+  - `bridge_universe.radar_score` devolve `(score, instante da amostra)`; `Screened` e o
+    log `bridge_proposal_submitted` levam `score_ts` e `score_age_s` (idade contra o corte
+    da barra). A escolha da amostra não mudou (`services/execution-worker/tests/test_bridge_score_age.py`);
+  - `GET /api/v1/radar/coverage` → `max_score_ever` passou a ser
+    `GREATEST(MAX(opportunity_history.score), MAX(opportunities.peak_score))`, cada
+    agregado por conta própria: com amostras esparsas uma excursão 30 → 45 → 30 sem troca
+    de status/estágio não deixa o 45 no histórico, e depois do `TRUNCATE` o histórico
+    começa vazio; `peak_score` é mantido a cada amostra e `opportunities` não é podada.
+    As notas "nunca acendeu" do web (`radar-empty.tsx`, `opportunities-empty.tsx`) deixaram
+    de dizer "desde que o Radar existe" e "nenhum episódio passou de NORMAL" (há `ANOMALY`
+    abaixo de 40): dizem só que, entre os picos dos episódios guardados e as amostras de
+    histórico ainda retidas, o maior score está abaixo de 40 — uma linha antiga com
+    `peak_score` NULL e histórico podado não é vista, e a nota não promete que seja
+    (`apps/api/tests/integration/test_radar_coverage_max_score.py`).
 
 ### 17.4 `anomalies.evaluation_state`
 
@@ -5767,6 +5843,25 @@ futura sobre o que separa um rug de uma graduação.
 derrubar. Ela é podada **linha a linha**, em lotes, pelo meme-worker — e por isso
 é a única tabela desta revisão em que `hunter_worker` tem `DELETE` (§33.6).
 
+> **Corrigido em 27/09/2026 (sem migração): o padrão é 30 d.** Decisão do Everton sobre
+> `docs/design/retencao-e-disco-2026-09-27.md` §3/§5 (passo 5;
+> `obsidian/06-DECISIONS/2026-09-27-retencao-de-dados-e-backup.md`): com partição mensal a
+> tabela carrega até `retenção + 31` dias (§1.3), e as séries meme a 90 d chegariam a ~143 G
+> no pico, que este disco não comporta. `Settings.meme_retention_days` e o padrão dos dois
+> composes (`MEME_RETENTION_DAYS:-30`) passaram de 90 para **30**. **A regra desta seção não
+> muda** — a mesma janela para graduado e não graduado; o que a Astra vetou foi escolher pelo
+> desfecho, não o prazo. O número vale para os cinco pais particionados (os três acima e os
+> dois da §35) e para a poda por linha de `meme_tokens`. `meme_features_15s` segue em 7 d.
+> Consequências declaradas: a pesquisa que lê "tudo desde 12/09" perde setembro em 31/10 (sem
+> arquivo mensal, que o desenho deixa como opção do Everton); as fichas antigas
+> (`GET /meme/tests`) perdem nome e símbolo quando o token sai de `meme_tokens` (o `LEFT JOIN` já
+> responde `null`); e a poda por linha de `meme_tokens` não poupa mint com aposta ou posição aberta,
+> de que a vigilância do criador depende (`creator_watch._WATCHED` faz `JOIN meme_tokens`) — hoje
+> inócuo, porque nenhuma saída segura mais que 2 h, mas a margem caiu de 90 para 30 d. O pedigree
+> **não** muda: `creator_prior_dump_count` só olha 7 dias para trás (`lab_repo_fast.PRIOR_WINDOW_S`,
+> T4.24b) — a frase "qualquer janela" da §51 é anterior a esse teto (conferido na revisão da Astra
+> deste diff). Parágrafos acima ficam como a `0021` os escreveu (§16.5).
+
 ### 33.5 O que é NULL com motivo, e por que isso é o produto
 
 Quatro colunas de `meme_features_1m` são **NULL com motivo em toda linha que esta
@@ -6197,7 +6292,9 @@ por minuto é "o que se sabia em T", nunca "o que aconteceu até T".
 | `MEME_BOARDS_WORKER_APPEND_TABLES` | `hunter_worker` | `SELECT`/`INSERT` | as duas |
 
 Partições `2026-09..12` criadas e endurecidas como as da `0021`; retenção por `DROP` de mês
-(`MEME_RETENTION_DAYS`). **Sem guarda de upgrade** (colunas anuláveis sem default e `DROP NOT NULL`
+(`MEME_RETENTION_DAYS`; **até 27/09/2026 só no papel** — `partition_retention.py` não tinha as
+duas linhas e nada as podava; desde então elas seguem o mesmo número das três da `0021`,
+§1.3/§33.4). **Sem guarda de upgrade** (colunas anuláveis sem default e `DROP NOT NULL`
 não tornam linha nenhuma irrepresentável). **O downgrade recusa** com linha em qualquer das duas
 tabelas, com linha de feature carregando coluna da `0023`, ou com trade de `commitment NULL`
 (restaurar `NOT NULL` falharia no meio). `ADD COLUMN` anulável e `DROP NOT NULL` são só catálogo no
@@ -8340,6 +8437,191 @@ mesa real (salvo as faltas contadas acima, em "O par").
 mensagem escapada (`safe_why`) e a instrução de `COPY` antes de reverter. Trava e pooler: no upgrade, um bloco `DO` e
 um `INSERT … SELECT`; no downgrade, quatro `DO` e um `DELETE` — nada depende de estado de sessão; nenhuma janela de
 manutenção.
+
+## 68. A primeira oportunidade madura, gravada no tique — `meme_mature_opportunities` — M19 (`0066_meme_mature_opportunities`)
+
+**Por quê (EXP-M26 R1, `docs/design/exp-m26-grafico-moedas-maduras.md` §1.6/§2.2/§7, H-022, KB-0161).** A primária
+da H-022 é lida na **1.ª avaliação** em que a porta pura de `grafico_ctrl_v1/1` deixa passar um mint, com os insumos
+que o laço de 1 min leu naquele tique. Nada no schema guardava isso: a via de 1 min grava propostas e contadores por
+tique (`meme_lab_ticks`), nunca a avaliação individual; a trilha de recusas é amostrada (0 ou 1 recusa) e morre em 7 d
+(§54.2); o Mayhem vem do estado corrente de `meme_tokens`; `completed_at`/`migrated_at` são testados pela presença.
+Uma reconstrução posterior chamaria de "sem proposta por instrumento" uma exclusão `creator_serial`, ou descartaria
+uma oportunidade válida porque o token migrou depois. A 1.ª oportunidade passa a ser **leitura desta tabela**, nunca
+reconstrução.
+
+**O que a `0066` faz:** **uma tabela nova**, dois índices, grants. Nenhuma coluna em tabela existente, nenhuma vista,
+enum, política, partição ou semente (os conjuntos são a `0068`, §69; o escritor funciona com zero conjuntos do
+EXP-M26). Global e sem RLS (§1.1), como `meme_decision_tapes` (§64): a linha descreve uma moeda pública julgada por um
+conjunto de pesquisa — pertence ao Lab, não a uma organização; nenhuma tabela de tenant é tocada. DDL em
+`ddl/meme_mature_opportunities.py`, ORM em `hunter_core/db/models/meme_mature_opportunities.py`; o slug tem 30
+caracteres (§17.6). Encadeada em `0065_meme_pullback_control_arm`.
+
+```
+meme_mature_opportunities        sem partição, sem retenção até a leitura da H-022
+  id uuid PK                          -- UUID v7 gerado pelo worker (§1), sem default
+  rule_set_id uuid FK → meme_rule_sets, mint text        UNIQUE (rule_set_id, mint)
+  evaluated_at timestamptz            -- o tique do Lab: O relógio único da H-022
+  features_end_time, features_version, features_computed_at   -- o minuto julgado e quando foi dobrado
+  code_ref text                       -- o commit (HUNTER_RELEASE, do GIT_SHA da imagem); 'unknown' dito alto
+  age_s, curve_progress_pct (fração), mcap_sol, curve_volume_1m_sol, participation_pct (%),
+  creator_net_seller, higher_lows, breakout_15m, distance_to_support_pct, line_reason, line_points,
+  mcap_slope_15m, mayhem_enabled, mayhem_state, completed_at, migrated_at      -- COMO LIDOS no tique
+  inputs jsonb (objeto)               -- a linha inteira que o laço leu (GateRow), decimais como string
+  gate jsonb (array)                  -- a decomposição da porta (gate_reasons), como numa proposta
+  pedigree jsonb NULL                 -- as quatro contagens lidas; NULL = não lidas (a recusa diz qual)
+  coverage_version, coverage_status ∈ {covered, covered_from_birth, gap, unread}, coverage jsonb
+  proposal_refusals text[]            -- TODAS as recusas da camada de propostas, por nome
+  proposal_id uuid FK → meme_proposals NULL | no_proposal_reason ∈ {refused, insert_failed, not_inserted}
+  fidelity ∈ {faithful, earlier_pass_unrecorded, write_failed, eligible_before_lane}  DEFAULT 'faithful'
+  lane_since timestamptz              -- o 1.º minuto que ESTE processo avaliou para o EXP-M26
+  recorded_at timestamptz DEFAULT now()
+  INDEX (rule_set_id, evaluated_at), INDEX (proposal_id) WHERE proposal_id IS NOT NULL
+  CHECKs: exatamente um de proposal_id / no_proposal_reason; 'refused' ⟺ proposal_refusals não vazio
+          (logo proposta nunca vem com recusa); rótulos; features_end_time <= evaluated_at;
+          lane_since <= features_end_time; age_s/line_points >= 0; tipos jsonb; textos não vazios
+```
+
+**Quem escreve e como (`hunter_meme_worker.lab_opportunities`, chamado por `lab._gate_step` só para conjuntos com
+`exp_ref = 'EXP-M26'`).** Por linha do minuto fechado: `evaluate_gate` sobre a linha sozinha (as mesmas propostas e
+contagens do lote — o corpo do laço não lê linha irmã, o argumento da T4.43), o que dá as recusas **desta** linha por
+nome; a porta **pura** decidida à parte (`evaluate_entry` sobre as features da linha: idade, progresso, participação,
+linha, Mayhem — sem pedigree, identidade, evento nem a foto da cotação); um mint já aberto no conjunto **não** é pulado
+(posição aberta = passagem anterior; se a linha dela se perdeu, esta passagem a registra como não fiel — revisão da Astra). As propostas entram **cada uma no seu savepoint**; a que falha deixa a oportunidade com
+`insert_failed` (o aceite da rodada 5: "uma transação inteira revertida não basta"); a que bate na chave de
+idempotência é **ligada à existente** pela identidade exata `(rule_set_id, mint, features_end_time, origin='rules')`.
+Para os mints que passaram a porta pura e ainda não têm linha, uma leitura das fotos de `(T − 16 min, T]`
+(`repo_lines.load_line_points`, timeout próprio de 5 s restaurado antes de sair do savepoint — `SET LOCAL` sobrevive a
+`RELEASE`) alimenta a guarda de cobertura, e a linha entra `ON CONFLICT (rule_set_id, mint) DO NOTHING`. Os três
+campos novos da linha (`line_points`, `mcap_slope_15m`, `computed_at`) vêm da **mesma** consulta do portão
+(`lab_repo._GATE_ROWS`), nunca de uma segunda leitura. Nada disso derruba o tique (a leitura das linhas já gravadas também tem savepoint; falha = nenhuma escrita e todas as passagens do minuto lembradas como perdidas): falha contada no heartbeat
+`hb:meme:radar` (`lab_mature_opportunities_written`, `_unfaithful`, `_failed`, `lab_mature_proposal_insert_failed`,
+`lab_mature_lane_since`) e logada com `sqlstate`.
+
+**A guarda de cobertura (`lab_opportunities_coverage`, versão `grafico_maduro_cobertura_v1`).** Com os **mesmos
+pontos utilizáveis** da fórmula da linha (`lines.usable_points`: recebidos até T, `mcap_sol > 0`, um por instante) na
+união `(T − 16 min, T]`: coberta se o 1.º ponto está a ≤ 150 s do início, o último a ≤ 150 s de T e nenhum intervalo
+passa de 150 s. Moeda com < 16 min: o início é o `created_at` e a janela é `covered_from_birth` (truncada no
+nascimento, contada à parte — aos 900 s toda a porta de C cai aqui). `unread` = as fotos não puderam ser lidas no
+tique, nunca `gap`. Versão, parâmetros e medidas (`lead_s`, `tail_s`, `max_gap_s`, pontos) vão no `coverage`, para
+reproduzir a classe sem as fotos. `lines.py` v1 não muda.
+
+**`fidelity` — a 1.ª oportunidade nunca é substituída em silêncio** (MUST-FIX da Astra no desenho e na revisão deste diff):
+
+- `faithful` — a linha é a 1.ª passagem que o laço conseguiu provar;
+- `write_failed` — a linha completa foi recusada; uma linha **mínima** (chave, relógio, vínculo com a proposta,
+  recusas; insumos vazios, `coverage_status = 'unread'`) entra num segundo savepoint e é o marcador durável que faz o
+  `UNIQUE` barrar qualquer passagem posterior;
+- `earlier_pass_unrecorded` — calculado **no próprio `INSERT`**: existe proposta do mesmo conjunto no mesmo mint com
+  `features_end_time <=` o minuto julgado que **esta passagem não inseriu** (`fresh_proposal_id`) — um minuto
+  anterior, ou o **mesmo** minuto reavaliado depois de um reinício (revisão da Astra, rodada 2): prova de uma
+  passagem commitada que não deixou linha —, **ou** o processo lembra que a escrita anterior do par falhou por
+  completo. A proposta do mesmo minuto commitada antes é **ligada** (`proposal_id`) mesmo quando o mint está aberto
+  e não há draft novo, e a recusa `already_open` da passagem de recuperação não é gravada;
+- `eligible_before_lane` — o mint já podia passar a porta num minuto **anterior** a `lane_since` (o 1.º minuto que o
+  processo que escreve avaliou): `created_at + min_age_s <= lane_since − 1 min`. Um reinício pode esconder a 1.ª
+  passagem (escrita e marcador perdidos, sem proposta, memória zerada), então a linha nunca é lida como "a 1.ª".
+  **Conservador de propósito** (revisão da Astra deste diff, must-fix 1: "classificação instrumental conservadora"):
+  também marca 1.ªs verdadeiras de mints que já eram elegíveis no reinício — custo limitado, porque a elegibilidade
+  dura no máximo `max_age_s − min_age_s` (6 300 s) depois de cada reinício. Entra na taxa de falha de instrumento; o
+  relatório conta os reinícios (`system_events`) e essas linhas à parte.
+
+Precedência, calculada no `INSERT`: `write_failed`/`earlier_pass_unrecorded` do processo → prova por proposta
+anterior (`earlier_pass_unrecorded`) → `eligible_before_lane` → `faithful`. Tudo que não é `faithful` é **falha de
+instrumento** na leitura da H-022, nunca "a 1.ª".
+
+**O que continua dependendo da leitura.** Toda proposta de um conjunto do EXP-M26 **sem** linha nesta tabela é falha
+de instrumento (escrita e marcador falharam e o mint nunca mais passou a porta) — a segunda consulta abaixo. E uma
+queda da transação inteira do minuto só é recuperada fielmente se o reinício acontecer dentro do backlog
+(`lab_gate_backlog_minutes` = 3): o minuto é reavaliado na ordem, com os insumos relidos (a linha de `meme_features_1m`
+é imutável; o Mayhem e `completed_at`/`migrated_at` são os do novo tique). Fora do backlog, `eligible_before_lane`
+cobre o caso.
+
+**Grants.** `hunter_worker`: `SELECT`, `INSERT` — **sem `UPDATE`** (a 1.ª oportunidade nunca é reescrita) e **sem
+`DELETE`** (sem poda até a leitura). `hunter_app`: `SELECT`. Classificada em `test_schema_privileges.py`
+(`MEME_MATURE_OPPORTUNITIES_APP_READ_ONLY_TABLES`). **Downgrade** recusa enquanto houver linha, com `LOCK ... ACCESS
+EXCLUSIVE` antes da contagem (a ordem da `0062`). Trava e pooler: um `CREATE TABLE` e dois `CREATE INDEX` numa tabela
+nova, grants no catálogo — sem janela de manutenção; o escritor usa só savepoints e `SET LOCAL` (restaurado), nada de
+estado de sessão. Provado em `packages/core/tests/integration/test_migration_0066.py` (inclusive `alembic check`),
+`services/meme-worker/tests/test_lab_opportunities.py` (1.ª passagem com os insumos do tique, passagem posterior não
+substitui, recusa por nome, proposta que falha, marcador `write_failed`, `earlier_pass_unrecorded` em memória e depois
+de reinício, `eligible_before_lane`, recuperação com o mint ainda aberto, reinício que reavalia o mesmo minuto
+(vínculo e `earlier_pass_unrecorded`), leitura do registro que falha sem derrubar
+o minuto, queda antes do commit, zero conjuntos, retenção > 7 d, timeout
+restaurado) e `test_lab_opportunities_coverage.py`.
+
+**Desvios em relação ao §1:** nenhum. A PK é UUID v7 da aplicação (ao contrário das irmãs `meme_decision_tapes` e
+`meme_gate_refusals_by_mint`, que usam `gen_random_uuid()`); global sem RLS pela regra do §1.1.
+
+**Como a pesquisa lê:**
+
+```sql
+-- a 1.ª oportunidade de C desde o seed, com a classe de linha e o desfecho (o J lê isto, não reconstrói)
+SELECT o.mint, o.evaluated_at, o.fidelity, o.coverage_status, o.line_reason, o.higher_lows, o.breakout_15m,
+       o.distance_to_support_pct, o.mcap_slope_15m, o.proposal_refusals, o.no_proposal_reason,
+       b.pnl_sol / b.initial_risk_sol AS pnl_por_sol
+FROM meme_mature_opportunities o
+LEFT JOIN meme_paper_bets b ON b.proposal_id = o.proposal_id
+WHERE o.rule_set_id = '01994d00-6c1a-7000-8000-00000000001f'
+  AND o.evaluated_at >= :t0 AND o.evaluated_at < :corte;
+-- falha de instrumento: proposta de um braço do EXP-M26 sem linha de oportunidade
+SELECT p.rule_set_id, p.mint, min(p.features_end_time) FROM meme_proposals p
+JOIN meme_rule_sets rs ON rs.id = p.rule_set_id AND rs.exp_ref = 'EXP-M26'
+LEFT JOIN meme_mature_opportunities o ON o.rule_set_id = p.rule_set_id AND o.mint = p.mint
+WHERE o.id IS NULL GROUP BY 1, 2;
+```
+
+## 69. Os três braços do gráfico maduro — `grafico_ctrl_v1/1`, `grafico_v1/1`, `grafico_v1/2` — M19 (`0068_meme_mature_chart_arms`)
+
+**Por quê (EXP-M26 S, desenho §2, H-022).** A população nova (moedas de 15–120 min ainda na curva, retidas por I1)
+precisa de três conjuntos de papel no relógio `1m` — só a via de 1 min lê o bloco `line`.
+
+**O que a `0068` faz:** **três linhas** em `meme_rule_sets`, `research_only`, `exp_ref = 'EXP-M26'`, `status =
+'active'`, `code_ref = 'hunter_indicators.meme.rules:evaluate_entry+evaluate_exit'`: `grafico_ctrl_v1/1` (C,
+`…001f`), `grafico_v1/1` (L, `…0020`), `grafico_v1/2` (H, `…0021`) — os ids livres depois de `…001e` (`…0099`,
+`…00aa` e `…00b6` são só de testes). Nenhuma tabela, coluna, índice, vista, enum, política, grant ou partição; nada é
+aposentado; a mesa não é tocada. DDL em `ddl/meme_mature_chart_arms.py`; o slug tem 27 caracteres. Encadeada em
+`0067_meme_token_state_history` (§70; era `0066` até a `0067` entrar na frente, 27/09). Contagem de conjuntos ativos: 26 → 29.
+
+**Parâmetros: constantes do módulo, exatamente as tabelas §2.1/§2.2 do desenho** (decimais como string JSON) — não
+cópia de linha viva, ao contrário da `0063`/`0065`: nenhuma linha na VPS carrega estes conjuntos. Porta comum
+`grafico_maduro` v1: `min_age_s 900`, `max_age_s 7200`, `require_progress true`, progresso `"5"`–`"90"`,
+`max_participation_pct "1"`, `require_creator_not_net_seller false`, `exclude_mayhem true`, `pedigree_exclusions true`,
+`pedigree_repeat_dumper false`, 0,07 SOL em `size_sol`/`max_sol_per_bet`/`max_exposure_per_mint_sol`, tetos de papel
+`wallet_max_sol "100.0"`, `daily_loss_cap_sol "10.0"`, `max_open_positions 25`, `fee_pct "1.75"`, `priority_fee_sol
+"0"`, e os dois de L1 (`line_support_causal true`, `line_support_max_age_s 120`). L e H somam a banda congelada do
+EXP-M2 (`require_higher_lows`, `require_breakout_15m`, distância `"0"`–`"0.25"`). C e L saem pela saída da mesa
+(`alvo_1_15x_trailing_10_tempo_5m` v1: `"1.15"`, trailing `"10"` armado na entrada, 300 s, perda `"50"`, linha rompida
+em 2 fotos, migração); H pelo pacote do EXP-M2 (`alvo_2x_trailing_30_tempo_15m_linha` v1: `"2"`, `"30"`, 900 s,
+`"50"`, linha rompida em 2 fotos, migração). `day_timezone` e `ttl_s` não estão no desenho e ficam de fora (o laço
+usa o seu TTL; nenhum leitor do worker lê `day_timezone`).
+
+**A guarda recusa** (nada semeado, revisão fica em `0066`) quando um `name/version` do EXP-M26 já existe com outros
+parâmetros — o `ON CONFLICT DO NOTHING` guardaria um estranho sob o nome congelado.
+
+**Papel por construção.** `research_only`: o executor só seleciona `rs.kind = 'operator'`
+(`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED`; `test_migration_0068` roda essa consulta contra uma proposta
+de cada braço e nenhuma volta). As apostas dos três são **subtraídas** da leitura de pedigree da mesa
+(`lab_repo_fast._PEDIGREE`, parâmetro `:mature_rule_set_ids` nas duas subconsultas de `creator_prior_dump_count`,
+`hunter_meme_worker.lab_opportunities.MATURE_CHART_RULE_SET_IDS`), como as do `refused_probe_v0/1` e dos braços do
+recuo. **Ao contrário** destes, as apostas do EXP-M26 **fixam** o mint no rastreador (I2 do desenho, outra tarefa):
+sem isso o fill e as marcas de 15 s de uma moeda madura se perdem.
+
+**Ordem de deploy — a `0068` É o seed (desenho §7: I1+I2+L1+R1 → C1 → 24 h → F → J congelado → S → P).** Ela não
+pode ir no mesmo deploy da `0066`/`0067`: `alembic upgrade head` aplicaria todas, e os braços começariam a apostar antes do
+funil F ("sem os três conjuntos") e antes de o J estar congelado — e a "1.ª por mint" conta desde o seed. Também
+depende de L1 no código: sem `RuleSetSpec.line_support_*`, o carregador **ignora** as duas chaves e a saída
+`line_broken` roda com o suporte velho que o desenho proíbe; `test_migration_0068` falha sem L1 (lê
+`spec.line_support_causal`/`line_support_max_age_s`).
+
+**Custo que volta com um conjunto `1m` ativo.** `lab_repo_e2b.lineage_for` só lê o pedigree do minuto quando algum
+conjunto daquele relógio julga (§66); com C/L/H ativos, a leitura de ~320 mints por minuto volta (medida em §66: ~3 s
+frio com o índice da `0064`, dentro do timeout de 8 s). Uma falha dela vira `pedigree_unknown` em todas as linhas do
+minuto — na H-022, "sem proposta por instrumento" (teto de 5 %). Medir `meme_pedigree_read_failed` no piloto P.
+
+**Downgrade (§17.7):** recusa enquanto uma linha de `meme_proposals`, `meme_paper_bets`,
+`meme_rule_set_param_history`, `meme_gate_refusals_by_mint` ou `meme_mature_opportunities` referencia um braço; senão
+apaga as três linhas. Trava e pooler: um `INSERT` e um bloco `DO` no upgrade; cinco `DO` e um `DELETE` no downgrade.
+Provado em `packages/core/tests/integration/test_migration_0068.py` (inclusive `alembic check`).
 
 ## 70. O que se sabia do token em cada instante — `meme_token_state_history` — M19 (`0067_meme_token_state_history`)
 

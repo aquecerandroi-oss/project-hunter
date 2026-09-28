@@ -293,7 +293,7 @@ async def coin_commitment(
 
 async def radar_score(
     session: AsyncSession, *, market_id: uuid.UUID, at: datetime
-) -> Decimal | None:
+) -> tuple[Decimal | None, datetime | None]:
     """The Radar's score for the **perpetual**, as of the source bar (D3, key 1).
 
     Read from the durable trajectory first (``opportunity_history``, which is
@@ -304,6 +304,11 @@ async def radar_score(
 
     ``None`` is a legitimate answer and never a refusal: D3 puts signals without
     a score **after** the ones with it, because the classifier is in warm-up.
+
+    Returns ``(score, instant of the sample)``, ``(None, None)`` when nothing is
+    at or before ``at``. Since ``history_v2`` (27/09/2026) samples every five
+    minutes, the instant is how the caller says how old the ranking score was
+    (quant review, F3); the choice of sample does not change.
     """
     row = (
         await session.execute(
@@ -320,4 +325,6 @@ async def radar_score(
             {"market": market_id, "at": at},
         )
     ).one_or_none()
-    return None if row is None else decimal_or_none(row.score)
+    if row is None:
+        return None, None
+    return decimal_or_none(row.score), ensure_utc(row.ts)

@@ -42,7 +42,7 @@ asyncpg, like ``prune_processed_events.py``; on the VPS it runs through
 Usage:
     uv run python infra/scripts/prune_outbox_events.py --dry-run
     uv run python infra/scripts/prune_outbox_events.py
-    uv run python infra/scripts/prune_outbox_events.py --retention-days 7 --max-batches 400
+    uv run python infra/scripts/prune_outbox_events.py --retention-days 2 --max-batches 400
 """
 
 from __future__ import annotations
@@ -63,9 +63,14 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
 RETENTION_DAYS = 7
-"""Days a dispatched row is kept — DATABASE.md §1.3. It is the ceiling of the
-replay window (``reconcile(since=)`` can only reach rows still in the table),
-not a retry schedule: every consumer is idempotent by ``event_id``."""
+"""Default days a dispatched row is kept when no ``--retention-days`` is given. The
+contract (DATABASE.md §1.3) is **2 d** since 27/09/2026 (Everton's decision,
+``obsidian/06-DECISIONS/2026-09-27-retencao-de-dados-e-backup.md``), applied by the
+explicit flag in ``infra/vps/cron/hunter-outbox``; this default stays 7 on purpose,
+so a bare manual run deletes less than the contract, never more. The window is the
+ceiling of ``reconcile(since=)`` (it only reaches rows still in the table), not a
+retry schedule: every consumer is idempotent by ``event_id``, and the startup
+``reconcile()`` drains ``dispatched_at IS NULL`` rows, which are never pruned."""
 
 MAX_BATCHES_DEFAULT = 0
 """``0`` = no ceiling: loop until a batch comes back short."""
