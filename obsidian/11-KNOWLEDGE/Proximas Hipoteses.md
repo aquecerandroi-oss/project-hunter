@@ -81,6 +81,13 @@ nunca tiveram KB própria — só relatório em `.claude/state/`. A tabela está
 Fora da tabela: H-001 e H-002 estão `em_curso` (amostra insuficiente ainda, sem veredito — ver
 [[Mapa de Estrategias]] §Vivas); H-022 está `aberta`/em construção, ainda sem veredito.
 
+### Pistas novas do R83 (28/09/2026) — só em coorte nova
+
+| pista | número (exploratório) | por que ainda não vale | próximo passo |
+|---|---|---|---|
+| **Longe da mínima de 24 h** nos sinais de continuação do Lab de cripto | +0,207 R [+0,121, +0,284], Holm 0,0004, patamar nos 7 cortes ([[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]]) | secundária de uma hipótese que não confirmou; anda com ATR% (ρ 0,77); o melhor tercil ainda perde −0,097 R | pré-registrar em coorte prospectiva, com ATR% controlado e a comparação contra "não operar" |
+| **`mean_reversion v14`** (a da `spot/1`) | +0,228 R [−0,099, +0,597] no contraste da máxima, 183 sinais | amostra pequena, IC largo, só descritivo | seguir acumulando na `spot/1` (limite pequeno) até ter amostra para pré-registrar |
+
 ## (c) Cemitério — não repetir
 
 Uma linha, o porquê. Lista completa e o número exato de cada uma: [[Mapa de Estrategias]] §Cemitério.
