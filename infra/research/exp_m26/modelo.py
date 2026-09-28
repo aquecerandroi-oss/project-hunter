@@ -34,6 +34,9 @@ class Aposta:
     fee_buy_sol: Decimal | None
     fee_sell_sol: Decimal | None
     curve_proceeds_sol: Decimal | None
+    token_estado_via: str = "history"  # noqa: S105 - a label, not a secret
+    """Como `token_completed_at`/`token_migrated_at` são conhecidos em L
+    (`estado_token.VIAS`); a carga deixa `nao_resolvido` até a leitura resolver."""
 
     def retorno(self) -> float | None:
         """`pnl_sol / size_sol` (H-022, desfecho), ou ausente."""

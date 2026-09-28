@@ -27,7 +27,6 @@ LEITURA_APOS_CORTE = timedelta(hours=2)
 JANELA_EXPORTACAO = timedelta(hours=1)
 """J: o export (retrato da leitura) tem de ser tirado em [L, L + 1 h]; depois disso pode
 trazer informação chegada depois de L (Astra, revisão do J, must-fix 2)."""
-
 # --- população e classes (§2.2) ----------------------------------------------
 FIDEDIGNA = "faithful"
 COBERTAS = frozenset({"covered", "covered_from_birth"})

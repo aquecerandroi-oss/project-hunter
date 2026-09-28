@@ -257,7 +257,7 @@ async def pedigree_for(
         # T4.91 (EXP-M24): the same for recuo_v1/1 — its bets could witness a creator sale.
         "pullback_rule_set_id": PULLBACK_ARM_RULE_SET_ID,
         "pullback_control_rule_set_id": PULLBACK_CONTROL_RULE_SET_ID,  # T4.95: and its control
-        "mature_rule_set_ids": list(MATURE_CHART_RULE_SET_IDS),  # EXP-M26 (0067): the 3 arms
+        "mature_rule_set_ids": list(MATURE_CHART_RULE_SET_IDS),  # EXP-M26 (0068): the 3 arms
     }
     try:
         async with session.begin_nested():

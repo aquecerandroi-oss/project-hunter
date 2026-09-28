@@ -136,7 +136,7 @@ async def _symbol_subplan_indexes(url: str) -> set[str]:
                     "probe_rule_set_id": "01994d00-6c1a-7000-8000-00000000001c",
                     "pullback_rule_set_id": "01994d00-6c1a-7000-8000-00000000001d",
                     "pullback_control_rule_set_id": "01994d00-6c1a-7000-8000-00000000001e",
-                    "mature_rule_set_ids": [  # EXP-M26 (0067)
+                    "mature_rule_set_ids": [  # EXP-M26 (0068)
                         "01994d00-6c1a-7000-8000-00000000001f",
                         "01994d00-6c1a-7000-8000-000000000020",
                         "01994d00-6c1a-7000-8000-000000000021",

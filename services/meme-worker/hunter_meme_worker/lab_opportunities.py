@@ -84,7 +84,7 @@ MATURE_CHART_RULE_SET_IDS: tuple[str, ...] = (
     "01994d00-6c1a-7000-8000-000000000020",  # grafico_v1/1 (L)
     "01994d00-6c1a-7000-8000-000000000021",  # grafico_v1/2 (H)
 )
-"""``0067``'s seed. The desk's pedigree read subtracts their paper bets
+"""``0068``'s seed. The desk's pedigree read subtracts their paper bets
 (``lab_repo_fast._PEDIGREE``), like the probe's and the pullback arms'."""
 
 

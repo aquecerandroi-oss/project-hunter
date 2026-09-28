@@ -8,7 +8,7 @@ H-022). **One new table**, ``meme_mature_opportunities``, everything in
 ``ddl/meme_mature_opportunities.py``: no column on an existing table, no view,
 no enum, no RLS policy (global, §1.1), no partition, no retention until H-022
 is read (``docs/DATABASE.md`` §68). No rule set is seeded here — the writer
-works with zero EXP-M26 sets (the seed is ``0067``).
+works with zero EXP-M26 sets (the seed is ``0068``).
 
 Upgrade guard: none, and that is an assertion — the table is new. The
 downgrade refuses while a row exists (§17.7). **Named

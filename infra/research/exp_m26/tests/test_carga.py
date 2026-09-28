@@ -13,6 +13,7 @@ import pytest
 
 from infra.research.exp_m26.carga import ler_export
 from infra.research.exp_m26.constantes import BRACOS, RULE_SET_C, RULE_SET_L
+from infra.research.exp_m26.estado_token import ProvaDeVisibilidade
 
 _SQL = Path(__file__).resolve().parents[1] / "export_h022.sql"
 
@@ -64,8 +65,6 @@ def op_export(**kw: Any) -> dict[str, Any]:
         "outcome_quality": "measured",
         "sale_observed_at": "2026-10-01T10:06:30+00:00",
         "sale_complete": False,
-        "token_completed_at": None,
-        "token_migrated_at": None,
         "high_water_x": 1.2,
         "fee_buy_sol": "0.001225",
         "fee_sell_sol": "0.0014",
@@ -77,11 +76,28 @@ def op_export(**kw: Any) -> dict[str, Any]:
 META = json.dumps({"tipo": "meta", "exportado_em": "2026-11-01T02:10:00.123+00:00"})
 
 
-def linhas_export(*ops: dict[str, Any], meta: str = META) -> list[str]:
+def estado_export(mint: str = "Mint1pump", **kw: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "tipo": "estado_token",
+        "mint": mint,
+        "token_existe": True,
+        "completed_at_atual": None,
+        "migrated_at_atual": None,
+        "historico": [],
+    }
+    return {**base, **kw}
+
+
+def linhas_export(
+    *ops: dict[str, Any], meta: str = META, estados: list[dict[str, Any]] | None = None
+) -> list[str]:
+    if estados is None:
+        estados = [estado_export(m) for m in sorted({str(o["mint"]) for o in ops})]
     return [
         meta,
         *(_braco(rs) for rs in BRACOS),
         *(json.dumps(o) for o in ops),
+        *(json.dumps(s) for s in estados),
         json.dumps(
             {
                 "tipo": "proposta",
@@ -140,6 +156,67 @@ def test_export_sem_o_seu_instante_e_recusado() -> None:
         ler_export([META, *linhas_export()])
 
 
+def test_estado_do_token_vem_do_historico_e_nunca_da_linha_da_oportunidade() -> None:
+    """O export não traz mais `completed_at`/`migrated_at` correntes na oportunidade: o
+    estado é o histórico por mint (`estado_token`), resolvido em L pela leitura. Uma linha
+    velha que ainda os traga é ignorada; a aposta sai da carga sem estado resolvido."""
+    hist = [
+        {
+            "id": 3,
+            "coluna": "completed_at",
+            "antes": None,
+            "depois": "2026-10-01T10:05:00+00:00",
+            "registrado_em": "2026-10-01T10:05:01+00:00",
+        }
+    ]
+    linhas = linhas_export(
+        op_export(token_completed_at="2026-10-01T09:00:00+00:00"),
+        estados=[estado_export(historico=hist, completed_at_atual="2026-10-01T10:05:00+00:00")],
+    )
+    e = ler_export(linhas)
+    (o,) = e.oportunidades
+    assert o.aposta is not None
+    assert (o.aposta.token_completed_at, o.aposta.token_estado_via) == (None, "nao_resolvido")
+    (m,) = e.estados["Mint1pump"].historico
+    assert (m.id, m.coluna, m.depois) == (
+        3,
+        "completed_at",
+        datetime(2026, 10, 1, 10, 5, tzinfo=UTC),
+    )
+
+
+def test_a_prova_de_visibilidade_vem_da_linha_meta() -> None:
+    """Sem os campos, a prova é a que recusa (`ve_toda_atividade` falso); com eles, lidos
+    como vieram — inteiros, `Decimal`, instante com fuso."""
+    assert ler_export(linhas_export(op_export())).prova == ProvaDeVisibilidade()
+    meta = json.dumps(
+        {
+            "tipo": "meta",
+            "exportado_em": "2026-11-01T02:10:00.123+00:00",
+            "escritoras_abertas_desde": "2026-11-01T02:09:59+00:00",
+            "escritoras_sem_inicio": 2,
+            "preparadas": 1,
+            "relogio_recuou_s": -0.000021,
+            "ve_toda_atividade": True,
+        }
+    )
+    prova = ler_export(linhas_export(op_export(), meta=meta)).prova
+    assert prova == ProvaDeVisibilidade(
+        escritoras_abertas_desde=datetime(2026, 11, 1, 2, 9, 59, tzinfo=UTC),
+        escritoras_sem_inicio=2,
+        preparadas=1,
+        relogio_recuou_s=Decimal("-0.000021"),
+        ve_toda_atividade=True,
+    )
+
+
+def test_oportunidade_sem_estado_ou_estado_duplicado_e_recusado() -> None:
+    with pytest.raises(ValueError, match="estado_token"):
+        ler_export(linhas_export(op_export(), estados=[]))
+    with pytest.raises(ValueError, match="estado_token"):
+        ler_export(linhas_export(op_export(), estados=[estado_export(), estado_export()]))
+
+
 def test_seed_e_o_created_at_de_c_e_os_tres_sao_do_mesmo_seed() -> None:
     linhas = linhas_export()
     linhas[2] = _braco(BRACOS[1], created_at="2026-09-30T12:00:00+00:00")
@@ -160,6 +237,16 @@ def test_o_sql_e_so_leitura_e_cobre_os_tres_bracos() -> None:
         "'oportunidade'",
         "'proposta'",
         "'braco'",
+        "'estado_token'",
+        "meme_token_state_history",
+        "escritoras_abertas_desde",
+        "escritoras_sem_inicio",
+        "pg_prepared_xacts",
+        "relogio_recuou_s",
+        "'USAGE'",
+        "pg_stat_activity",
         "default_transaction_read_only",
     ):
         assert chave in sql
+    assert "'token_completed_at'" not in sql, "o estado corrente não entra na oportunidade"
+    assert "'token_migrated_at'" not in sql, "o estado corrente não entra na oportunidade"

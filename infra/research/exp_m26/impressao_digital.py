@@ -27,6 +27,7 @@ ARQUIVOS: tuple[str, ...] = (
     _J + "classes.py",
     _J + "constantes.py",
     _J + "contabil.py",
+    _J + "estado_token.py",
     _J + "estimador.py",
     _J + "impressao_digital.py",
     _J + "ler.py",

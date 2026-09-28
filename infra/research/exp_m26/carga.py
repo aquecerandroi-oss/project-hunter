@@ -2,7 +2,11 @@
 
 Decimais do JSON entram como `Decimal` (`parse_float=Decimal`), nunca `float`; tempo sem
 fuso é recusado. O seed é o `created_at` de C, e os três braços têm de ser do mesmo seed
-(a mesma migração `0067`): senão o export não é o do experimento.
+(a mesma migração `0068`): senão o export não é o do experimento.
+
+O estado do token (`completed_at`/`migrated_at`) **não** vem da oportunidade: vem da linha
+`estado_token` do mint (o histórico, `0067`), exatamente uma por mint com oportunidade, e é
+resolvido em L pela leitura (`estado_token.em`). A aposta sai daqui `nao_resolvido`.
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 from infra.research.exp_m26.constantes import BRACOS, RULE_SET_C
+from infra.research.exp_m26.estado_token import EstadoToken, de_registro, prova_de_registro
 from infra.research.exp_m26.leitura import Entrada
 from infra.research.exp_m26.modelo import Aposta, Oportunidade
 
@@ -56,12 +61,13 @@ def _aposta(r: Mapping[str, Any], size_sol: Decimal) -> Aposta | None:
         outcome_quality=str(r["outcome_quality"]),
         sale_observed_at=_dt_opt(r.get("sale_observed_at"), "sale_observed_at"),
         sale_complete=r.get("sale_complete"),
-        token_completed_at=_dt_opt(r.get("token_completed_at"), "token_completed_at"),
-        token_migrated_at=_dt_opt(r.get("token_migrated_at"), "token_migrated_at"),
+        token_completed_at=None,
+        token_migrated_at=None,
         high_water_x=_dec(r.get("high_water_x")),
         fee_buy_sol=_dec(r.get("fee_buy_sol")),
         fee_sell_sol=_dec(r.get("fee_sell_sol")),
         curve_proceeds_sol=_dec(r.get("curve_proceeds_sol")),
+        token_estado_via="nao_resolvido",  # noqa: S106 - a label, not a secret
     )
 
 
@@ -105,6 +111,7 @@ def ler_export(linhas: Iterable[str]) -> Entrada:
     tamanhos = {rs: Decimal(str(b["size_sol"])) for rs, b in bracos.items()}
     ops: list[Oportunidade] = []
     props: list[tuple[str, str, datetime]] = []
+    estados: dict[str, EstadoToken] = {}
     for r in registros:
         tipo = r.get("tipo")
         if tipo == "oportunidade":
@@ -113,12 +120,22 @@ def ler_export(linhas: Iterable[str]) -> Entrada:
             props.append(
                 (str(r["rule_set_id"]), str(r["mint"]), _dt(r["proposed_at"], "proposed_at"))
             )
+        elif tipo == "estado_token":
+            s = de_registro(r)
+            if s.mint in estados:
+                raise ValueError(f"estado_token duplicado para {s.mint}")
+            estados[s.mint] = s
         elif tipo not in ("braco", "meta"):
             raise ValueError(f"linha de tipo desconhecido no export: {tipo!r}")
+    faltam = sorted({o.mint for o in ops} - set(estados))
+    if faltam:
+        raise ValueError(f"export sem estado_token para {len(faltam)} mints: {faltam[:5]}")
     return Entrada(
         seed=seed,
         exportado_em=_dt(metas[0]["exportado_em"], "exportado_em"),
         oportunidades=tuple(ops),
         propostas=tuple(props),
         aposentadorias={rs: _dt_opt(b.get("retired_at"), "retired_at") for rs, b in bracos.items()},
+        estados=estados,
+        prova=prova_de_registro(metas[0]),
     )

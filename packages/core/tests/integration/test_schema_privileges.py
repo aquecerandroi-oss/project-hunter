@@ -568,6 +568,11 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         tuple[str, ...],
         migration_ddl("meme_mature_opportunities").MEME_MATURE_OPPORTUNITIES_APP_READ_ONLY_TABLES,
     )
+    # EXP-M26 J (0067): when each completed_at/migrated_at became known — read-only for the app.
+    token_state_history_read_only = cast(
+        tuple[str, ...],
+        migration_ddl("meme_token_state_history").MEME_TOKEN_STATE_HISTORY_APP_READ_ONLY_TABLES,
+    )
 
     classified = (
         list(write)
@@ -604,6 +609,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(treasury_read_only)
         + list(decision_tapes_read_only)
         + list(mature_opportunities_read_only)
+        + list(token_state_history_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

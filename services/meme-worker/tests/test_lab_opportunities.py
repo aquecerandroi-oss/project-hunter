@@ -11,7 +11,7 @@ marker; a pass the lane could not record makes the next one
 re-evaluates the same first minute; nothing prunes it; zero EXP-M26 sets write
 nothing; and the bounded photo read does not leak its timeout.
 
-The set is this file's own (``…00b6``, test-only), not ``0067``'s seed, so these
+The set is this file's own (``…00b6``, test-only), not ``0068``'s seed, so these
 tests hold whether or not the arms are seeded.
 """
 

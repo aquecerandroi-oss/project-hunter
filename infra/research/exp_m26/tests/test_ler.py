@@ -18,7 +18,17 @@ from infra.research.exp_m26.tests.test_carga import linhas_export, op_export
 
 # seed 2026-09-29 12:00Z → T0 10-01 12:00 → sem metas, corte no dia 21 = 10-23 00:00Z,
 # leitura 10-23 02:00Z.
-NO_PRAZO = json.dumps({"tipo": "meta", "exportado_em": "2026-10-23T02:30:00+00:00"})
+NO_PRAZO = json.dumps(
+    {
+        "tipo": "meta",
+        "exportado_em": "2026-10-23T02:30:00+00:00",
+        "escritoras_abertas_desde": None,
+        "escritoras_sem_inicio": 0,
+        "preparadas": 0,
+        "relogio_recuou_s": 0,
+        "ve_toda_atividade": True,
+    }
+)
 
 
 def _export(tmp_path: Path, meta: str = NO_PRAZO) -> Path:

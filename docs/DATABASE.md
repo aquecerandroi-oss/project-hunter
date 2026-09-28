@@ -72,6 +72,7 @@ O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) —
 | `meme_trades` | mensal | idem | idem |
 | `meme_features_15s` | mensal | **7 d** (T4.16, `0030`: a série de 15 s das moedas jovens — em partições mensais o mês cai quando o seu fim tem mais de 7 dias) | idem — T4.33: uma moeda **fixada** (aposta/posição/proposta) segue na via rápida até 1 800 s (`MEME_FAST_LANE_PINNED_MAX_AGE_S`), não só 300 s; +2 % de linhas/dia medido, ~83 mints/dia |
 | `meme_decision_tapes` | — | **7 d** a fita que só explica uma linha da trilha; **90 d** a que tem `proposal_ids` (T4.89, `0062`, §64) | poda por linha, diária UTC, em lotes de 5 mil, no laço de descarga da própria pista de eventos (`decision_tape_writer.maybe_prune`) |
+| `meme_token_state_history` | — | **a do token** (EXP-M26 J, `0067`, §70): a linha cai junto com a de `meme_tokens` (`FOREIGN KEY … ON DELETE CASCADE`), isto é, `MEME_RETENTION_DAYS` (30 d) contado pelo `first_seen_at`/`created_at` do token; um token vivo tem sempre o histórico inteiro | a poda por linha de `meme_tokens` (`collect.prune_once` → `repo.prune_tokens`, atrás de `app.meme_retention`); nenhum job próprio, e o worker não tem `DELETE` na tabela (a cascata roda como dono) |
 | `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `infra/scripts/prune_outbox_events.py` diário (cron `hunter-outbox`, `infra/vps/README.md`), DELETE em lotes de 5 mil via `prune_dispatched`. Até 18/09/2026 **nenhum job rodava**: 19,57 M linhas despachadas (17 GB) na VPS, +2,1 M/dia — 3× os 700 mil/dia estimados abaixo; com 7 d a população estabiliza em ~15 M linhas (estimativa); apagar linha libera espaço para reuso dentro da tabela, **não** no `df` |
 | `shadow_outbox` | — | idem, enquanto a fila existir (§17.5 a absorve) | idem |
 
@@ -8339,3 +8340,179 @@ mesa real (salvo as faltas contadas acima, em "O par").
 mensagem escapada (`safe_why`) e a instrução de `COPY` antes de reverter. Trava e pooler: no upgrade, um bloco `DO` e
 um `INSERT … SELECT`; no downgrade, quatro `DO` e um `DELETE` — nada depende de estado de sessão; nenhuma janela de
 manutenção.
+
+## 70. O que se sabia do token em cada instante — `meme_token_state_history` — M19 (`0067_meme_token_state_history`)
+
+**Por quê (EXP-M26 J, must-fix 2 da revisão do J pela Astra, rodada 2, `.claude/state/astra-review-EXP-M26-J-r2.md`).**
+A leitura da H-022 censura uma venda de papel feita em/depois de `completed_at`/`migrated_at` do token (venda sem praça,
+`protocolo_h022.txt` item 3). O export lia a linha **corrente** de `meme_tokens`, e as duas colunas se movem depois do
+fato: `completed_at` é escrito com `LEAST(existente, novo)` e **recua** quando o `gd` retrospectivo do indexador chega
+(§36.1); `migrated_at` é escrito uma vez, mas com o instante do evento, não o da escrita. Um fato chegado entre L e o
+export (em `[L, L + 1 h]`) mudava a leitura de L — o contraexemplo sintético da Astra: vendas `true` avaliáveis em L,
+uma conclusão anterior a elas registrada em L + 10 min, export em L + 30 min, rótulo CONFIRMA → NÃO CONFIRMA com L
+idêntico. Nenhuma tabela guardava **quando** cada valor passou a ser conhecido.
+
+**O que a `0067` faz:** **uma tabela nova**, um índice, uma função `SECURITY DEFINER`, **dois gatilhos de restrição
+adiados em `meme_tokens`**, grants. Nenhuma coluna em tabela existente, nenhuma vista, enum, política, partição, semente
+ou backfill. Global e sem RLS (§1.1), como `meme_decision_tapes` (§64) e `meme_mature_opportunities` (§68): a linha
+descreve o ciclo de vida de uma moeda pública — pertence à cadeia, não a uma organização; nenhuma tabela de tenant é
+tocada, e a ausência de `organization_id`/política é asserida em `test_migration_0067` (e pelos dois testes `LIKE
+'meme%'` da §33.1). DDL em `ddl/meme_token_state_history.py`, ORM em `hunter_core/db/models/meme_token_state_history.py`;
+o slug tem 29 caracteres (§17.6). Encadeada em `0066_meme_mature_opportunities`; a semente do EXP-M26 (§69) passou de
+`0067` a **`0068`** e se encadeia nesta.
+
+```
+meme_token_state_history         sem partição, retenção = a do token (ON DELETE CASCADE)
+  id bigserial PK                     -- desvio do §1 (abaixo)
+  mint text FK → meme_tokens(mint) ON DELETE CASCADE
+  column_name text                    -- 'completed_at' | 'migrated_at'
+  old_value, new_value timestamptz    -- o valor antes e depois da escrita (NULL = não havia)
+  operation text                      -- 'insert' (o token nasceu com o valor) | 'update'
+  db_role text                        -- o papel que o escritor tinha SET (current_setting('role')), senão o login
+  recorded_at timestamptz DEFAULT clock_timestamp()   -- o relógio do banco NO COMMIT (gatilho adiado)
+  INDEX (mint, recorded_at)
+  CHECKs: coluna e operação conhecidas; old_value IS DISTINCT FROM new_value (toda linha é uma mudança);
+          'insert' ⇒ old_value IS NULL
+```
+
+**Escrita só pelos gatilhos, no commit.** `meme_tokens_state_history_on_insert` (`AFTER INSERT … WHEN
+(NEW.completed_at IS NOT NULL OR NEW.migrated_at IS NOT NULL)`) e `meme_tokens_state_history_on_update` (`AFTER UPDATE
+… WHEN (OLD.completed_at IS DISTINCT FROM NEW.completed_at OR OLD.migrated_at IS DISTINCT FROM NEW.migrated_at)`) são
+`CONSTRAINT TRIGGER … DEFERRABLE INITIALLY DEFERRED`: o `WHEN` é avaliado quando a linha muda; a linha do histórico é
+inserida quando a transação commita, uma por coluna que mudou, com os `OLD`/`NEW` daquele instante. **Por que adiado
+(Astra, revisão deste diff, rodada 3):** o laço dos boards (`wiring.run_board`) faz o upsert de um lote inteiro numa
+transação só; com gatilho imediato, uma conclusão retroativa escrita em L − 1 s num lote que commita em L + 150 s
+ficaria com `recorded_at < L` sem ter sido visível em L — um export em L não a veria, outro em L + 3 min veria, e a mesma
+venda passaria de A para C. Adiado, o carimbo é o relógio do commit. Várias mudanças do mesmo mint na mesma transação
+viram linhas na ordem em que aconteceram (eventos adiados disparam na ordem dos eventos). Um token mudado **e apagado**
+na mesma transação não tem pai no commit: a função não grava nada (o histórico sai com o token, como na cascata) em vez
+de a FK derrubar o commit do escritor (Astra, rodada 4). **Com gatilhos imediatos, três testes falham** (catálogo,
+carimbo no commit e a regressão de duas conexões — rodado numa cópia das migrações com `HUNTER_MIGRATIONS_DIR`). Uma
+sessão que rodasse `SET CONSTRAINTS ALL IMMEDIATE` voltaria a carimbar no comando — nada no repositório faz isso.
+
+**Desvio declarado em relação ao brief (`AFTER UPDATE OF completed_at, migrated_at`):** o `UPSERT_TOKEN` do worker
+nomeia as duas colunas em **toda** observação (`LEAST`/`COALESCE`), então a lista de colunas não filtraria nada; o
+`WHEN` sobre os valores filtra o no-op (nenhum evento é enfileirado) e pega também uma mudança feita por um gatilho
+`BEFORE` sem nomear a coluna. Provado com o próprio `UPSERT_TOKEN` como `hunter_worker`: o mesmo valor de novo, um
+valor mais tarde (o `LEAST` o descarta), uma observação que não sabe nada, um `migrated_at` diferente depois do
+primeiro (o `COALESCE` o descarta) e um `UPDATE` de outras colunas **não** escrevem linha; nascer com os dois valores
+escreve duas linhas `insert`; o recuo do `LEAST` escreve `(antigo → novo)`.
+
+**Só o gatilho escreve — por privilégio, não por convenção** (nice-to-have da Astra, aceito). A função
+`meme_token_state_history_record` é `SECURITY DEFINER` (dono = o papel da migração), com `search_path` fixado em
+`pg_catalog, pg_temp`, todo objeto qualificado por schema e `EXECUTE` revogado de `PUBLIC`: **nenhum dos dois papéis tem
+`INSERT`**, então nenhum caminho da aplicação grava uma linha nem escolhe o seu `recorded_at`. `db_role` vem de
+`current_setting('role')` (o `SET LOCAL ROLE` do `role_session`, que o `SECURITY DEFINER` não troca), senão
+`session_user`. **Desvio em relação à prática do schema:** é a primeira função `SECURITY DEFINER` daqui; o risco
+clássico (sequestro por `search_path`) está fechado pelo `SET search_path` e pelos nomes qualificados, e a função só é
+chamável como gatilho. Asserido no catálogo (`prosecdef`, `proconfig`, `has_function_privilege` falso para os dois
+papéis, `tgdeferrable`/`tginitdeferred`).
+
+**Desvio em relação ao §1: a PK é `BIGSERIAL`**, não UUID v7 da aplicação — a linha nasce **dentro** do banco, num
+gatilho, onde nenhuma aplicação gera UUID v7 (o PG 16 não tem `uuidv7()`), e a ordem de inserção desempata duas
+mudanças do mesmo mint no mesmo commit (os eventos adiados disparam na ordem em que ocorreram). Precedente:
+`outbox_events.id` (§17.5). Como só a função (dono) insere, nenhum papel precisa de `USAGE` na sequência.
+
+**Retenção: a do token.** A FK para `meme_tokens` é `ON DELETE CASCADE`: o histórico sai exatamente quando o token sai
+pela retenção declarada (`repo.prune_tokens`, `MEME_RETENTION_DAYS`, `app.meme_retention`, §33.4/§33.6). Isso é o que
+torna verdadeira a invariante de que a leitura depende — **um token vivo tem o histórico inteiro desde a `0067`**. A
+cascata roda como **dono** da tabela (ações referenciais do Postgres), então o worker poda `meme_tokens` sem ter
+`DELETE` aqui — provado como o papel. Custo declarado (Astra): locks/WAL proporcionais às linhas filhas de cada lote de
+5 000 tokens; volume de uma linha por conclusão/migração observada (uma fração das ~40 mil moedas/dia), ordens de
+grandeza abaixo de `meme_tokens`. Nenhuma linha em `partition_retention.py` (a tabela não é particionada).
+
+**Grants.** `hunter_worker`: `SELECT`. `hunter_app`: `SELECT`. Classe congelada
+`MEME_TOKEN_STATE_HISTORY_APP_READ_ONLY_TABLES`, unida em
+`test_schema_privileges.py::test_the_grant_lists_cover_every_table_exactly_once`.
+
+**Sem backfill, e isso é afirmação.** Um valor gravado antes da `0067` não tem `recorded_at` honesto; inventar um seria
+exatamente o dado falso que esta tabela existe para impedir. A leitura trata o caso por nome (abaixo).
+
+**Downgrade (§17.7):** recusa enquanto houver linha. `LOCK TABLE meme_tokens IN SHARE ROW EXCLUSIVE MODE` e depois
+`LOCK TABLE meme_token_state_history IN ACCESS EXCLUSIVE MODE` **antes** da contagem — a ordem do próprio escritor (token →
+histórico), para nenhuma mudança cair entre a contagem e o `DROP` e nenhum ciclo de lock se formar com um upsert em voo;
+senão derruba os dois gatilhos, a função e a tabela. Em todo banco que já observou uma conclusão depois do deploy a
+reversão recusa, com a instrução de `COPY` antes. **Trava e pooler:** no upgrade um `CREATE TABLE`, um `CREATE INDEX` e
+uma função novos, e dois `CREATE CONSTRAINT TRIGGER` que tomam `SHARE ROW EXCLUSIVE` em `meme_tokens` por um instante
+(espera os upserts em voo; não conflita com o `ACCESS SHARE` do `pg_dump`). Nada de estado de sessão: o gatilho adiado é
+da transação, e `current_setting('role')` lê o `SET LOCAL ROLE` da própria transação.
+
+**Ordem de deploy: antes da semente `0068`** (o histórico tem de existir antes de T0 = seed + 48 h; pode ir no mesmo
+deploy da `0066` ou depois dela, nunca depois da `0068`).
+
+**Como a pesquisa lê** (`infra/research/exp_m26/export_h022.sql`, linha `estado_token`; resolução em
+`infra/research/exp_m26/estado_token.py`). O export entrega, por mint com oportunidade, o token corrente e **todo** o
+histórico; o valor em L é resolvido no código, porque L só é conhecido depois de ler o export (o corte sai das
+inscrições). **"Conhecido em L" é, operacionalmente, "carimbado no commit até L".** Por coluna: a última mudança **na
+ordem do `id`** (a ordem de commit dentro do mint — o lock de linha serializa os escritores; nunca a ordem do relógio,
+que pode recuar e acusaria divergência num histórico íntegro, Astra rodada 4) com `recorded_at <= L` → `new_value`, via
+`history`; nenhuma até L → o `old_value` da primeira posterior (NULL = não havia, `history`; não nulo = anterior ao
+histórico, `current_row_pre_history`, só se `<= L`); nenhuma mudança → a linha corrente, com a mesma regra. Por mint, a
+pior via entre essas, `historico_diverge` (a linha corrente difere da última mudança registrada — as duas saem do mesmo
+comando e portanto do mesmo snapshot: alguém escreveu sem o gatilho) e `token_ausente` (sem linha nem histórico). **Só
+`history` é estado conhecido em L**: com qualquer outra via a aposta preenchida é C (`estado_do_token_desconhecido:<via>`),
+nunca A — inclusive `current_row_pre_history` (Astra: "valor do evento ≤ L não prova escrita ≤ L"), que para mint
+inscrito é impossível por construção (o token nasce depois de T0 − 2 h, com o histórico já instalado). A contagem por
+via sai em `funil.estado_token_via`. A leitura exige `MEME_RETENTION_DAYS` ≥ 23 (hoje 30).
+
+**A prova de visibilidade (Astra, rodadas 4 e 5 — o que fecha o must-fix 2).** Carimbar no commit não basta: entre o
+carimbo e o commit ficar visível há o resto do commit (outros gatilhos adiados, verificações, WAL, a saída do ProcArray).
+Uma mudança carimbada em L − 1 s e visível em L + 1 s seria invisível a um export em L e visível a outro em L + 2 s, e a
+mesma venda leria A num e C no outro — e uma margem antes de L (tentada e descartada) só trocava o lado em que a leitura
+mudava. O export passa a ter **dois comandos**, cada um na sua transação (como o `psql` roda o arquivo): o primeiro, a
+linha `meta`, lê `pg_stat_activity`/`pg_prepared_xacts`/o histórico **antes** de o segundo (os dados) tomar o seu
+snapshot, e grava:
+
+| campo | o quê | recusa quando |
+|---|---|---|
+| `escritoras_abertas_desde` | o `xact_start` mais antigo das transações com `backend_xid` em voo nesta base, **de qualquer backend** (a própria excluída) | `<= L` |
+| `escritoras_sem_inicio` | quantas dessas não mostram `xact_start` (`track_activities` desligado: o xid aparece, o início não, e o `min()` a pularia) | `> 0` |
+| `preparadas` | transações preparadas nesta base (2PC: o `PREPARE` roda os gatilhos adiados e a visibilidade só vem no `COMMIT PREPARED`, fora de qualquer backend cliente) | `> 0` |
+| `relogio_recuou_s` | o maior recuo do carimbo na ordem do `id`, no histórico inteiro | `> 1 s` |
+| `ve_toda_atividade` | superusuário, ou `pg_read_all_stats` com **`USAGE`** (privilégio efetivo; `MEMBER` sem herança esconde `xact_start` dos outros) | falso |
+
+Uma transação cujo carimbo é `<= L` começou antes de L; se ela ainda não estava visível no snapshot dos dados, ainda
+estava no ProcArray (com xid) quando o primeiro comando leu `pg_stat_activity` — e aparece com início `<= L`, ou sem
+início, ou como preparada. O J recusa (`ExportSemProvaDeVisibilidade`) e tira-se outro export na janela: **todo export
+aceito vê o mesmo conjunto de carimbos `<= L`** e lê L igual. Se a janela fechar sem prova, a leitura não roda e o caso
+sobe ao orquestrador (desfecho operacional ainda não decidido — ver abaixo). **Premissa declarada:** o relógio do
+servidor não recua (NTP em *slew*); um recuo depois da leitura de atividade poderia carimbar abaixo de L uma escrita
+iniciada depois dela (Astra, rodada 5) — o detector recusa todo recuo > 1 s visível no histórico, não um recuo sem
+mudança nenhuma em volta. "Carimbado até L" não é "visível em L": a diferença é o processamento do próprio commit (a
+transação já tinha escrito tudo e entrado no commit antes de L; o seu sucesso final pode vir depois). Custo declarado:
+uma transação com xid, iniciada antes de L e ainda aberta, recusa exports até terminar, mesmo escrevendo outra tabela.
+Não há carimbo de commit nativo (`track_commit_timestamp` desligado, e depender dele exigiria política de preservação —
+Astra).
+
+```sql
+-- completed_at / migrated_at de cada mint COMO CONHECIDOS em :l (a via 'history'; o código ainda aplica
+-- a divergência com a linha corrente, o caso anterior ao histórico e a prova de visibilidade — ver acima)
+SELECT DISTINCT ON (mint, column_name) mint, column_name, new_value, recorded_at
+FROM meme_token_state_history
+WHERE recorded_at <= :l
+ORDER BY mint, column_name, id DESC;
+```
+
+**Endurecimentos sugeridos e não feitos, declarados (Astra, rodadas 4 e 5):** dono dedicado `NOLOGIN` com privilégio mínimo
+para a função `SECURITY DEFINER` (hoje é o papel da migração); `db_role` é o papel configurado **no commit** (um `RESET
+ROLE` entre a mudança e o commit o trocaria — o `role_session` não faz isso).
+
+
+**Em aberto, para o orquestrador:** o desfecho de uma janela `[L, L + 1 h]` que fecha sem nenhum export com prova (uma
+transação longa aberta desde antes de L, por exemplo): hoje a leitura simplesmente não roda.
+
+Provado em `packages/core/tests/integration/test_migration_0067.py` (global/sem RLS; grants só de leitura; função
+`SECURITY DEFINER` e gatilhos adiados no catálogo; índice; cascata; gatilho pelo `UPSERT_TOKEN` real — muda só quando
+muda, nunca no no-op; nascimento; linha ausente dentro da transação e carimbada no commit; várias mudanças numa
+transação, em ordem; token mudado e podado na mesma transação sem derrubar o commit; nenhum papel escreve, nem com
+`recorded_at` escolhido; poda pela retenção declarada como `hunter_worker`; recusa e ida e volta do downgrade; `alembic
+check` no head), em `test_migration_0067_visibility.py` (o export contra este schema e `pg_stat_activity` reais: lote
+aberto desde antes de L → o export em L é recusado, o depois do commit é aceito e lê L igual; **commit segurado entre o
+carimbo `<= L` e a visibilidade** por um gatilho adiado de teste que dorme 2 s → o export do meio leria L diferente e é
+o recusado, o de depois lê o valor carimbado; escritora com `track_activities` desligado → recusado; membro de
+`pg_read_all_stats` sem herança → `MEMBER` verdadeiro, `USAGE` falso, recusado) e em
+`infra/research/exp_m26/tests/test_estado_token.py`, `test_carga.py` e `test_leitura.py`
+(`test_conclusao_registrada_depois_de_l_nao_muda_a_leitura_de_l` — o contraexemplo da Astra: a mesma leitura byte a byte
+com a conclusão registrada em L + 10 min; registrada em L − 10 min, as 168 vendas `true` viram C —;
+`test_token_sem_estado_em_l_censura_a_venda_…`: `token_ausente`, `current_row_pre_history` e `historico_diverge` viram
+C; `test_export_sem_prova_de_visibilidade_em_l_e_recusado`).

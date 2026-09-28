@@ -18,6 +18,12 @@ import pytest
 
 from infra.research.exp_m26.calendario import LeituraAntecipada
 from infra.research.exp_m26.constantes import RULE_SET_C, RULE_SET_H, RULE_SET_L
+from infra.research.exp_m26.estado_token import (
+    EstadoToken,
+    ExportSemProvaDeVisibilidade,
+    Mudanca,
+    ProvaDeVisibilidade,
+)
 from infra.research.exp_m26.leitura import Entrada, ExportForaDaJanela, ler_h022
 from infra.research.exp_m26.modelo import Oportunidade
 from infra.research.exp_m26.tests.fabrica import aposta, oportunidade
@@ -72,16 +78,20 @@ def _entrada(
     ops: list[Oportunidade],
     aposentadorias: dict[str, datetime | None] | None = None,
     exportado_em: datetime = EXPORT,
+    estados: dict[str, EstadoToken] | None = None,
 ) -> Entrada:
     propostas = tuple(
         (o.rule_set_id, o.mint, o.evaluated_at) for o in ops if o.proposal_id is not None
     )
+    nunca_concluiu = {o.mint: EstadoToken(o.mint, True, None, None, ()) for o in ops}
     return Entrada(
         seed=SEED,
         exportado_em=exportado_em,
         oportunidades=tuple(ops),
         propostas=propostas,
         aposentadorias=aposentadorias or {},
+        estados={**nunca_concluiu, **(estados or {})},
+        prova=ProvaDeVisibilidade(ve_toda_atividade=True),
     )
 
 
@@ -165,6 +175,81 @@ def test_o_export_e_o_retrato_em_l() -> None:
     r = ler_h022(_entrada(ops), reps=REPS)
     assert r["denominadores"]["true"]["C"] == 1
     assert r["exportado_em"] == EXPORT.isoformat()
+
+
+def _conclusao_retroativa(
+    ops: list[Oportunidade], registrada_em: datetime
+) -> dict[str, EstadoToken]:
+    """Toda venda `true` de C ganha um `completed_at` anterior à venda, registrado em
+    `registrada_em` (o `gd` retrospectivo do indexador, escrito por `LEAST`)."""
+    out: dict[str, EstadoToken] = {}
+    for o in ops:
+        a = o.aposta
+        if o.rule_set_id != RULE_SET_C or o.breakout_15m is not True or a is None:
+            continue
+        if a.sale_observed_at is None:
+            continue
+        antes = a.sale_observed_at - timedelta(minutes=1)
+        mud = Mudanca(1, "completed_at", None, antes, registrada_em)
+        out[o.mint] = EstadoToken(o.mint, True, antes, None, (mud,))
+    return out
+
+
+def test_conclusao_registrada_depois_de_l_nao_muda_a_leitura_de_l() -> None:
+    """Must-fix 2 (Astra, J rodada 2), dentro da janela aceita: em L as vendas `true`
+    são avaliáveis; em L + 10 min chega uma conclusão anterior a elas; o export sai em
+    L + 30 min. A leitura de L é a mesma, byte a byte. Registrada ANTES de L, a mesma
+    conclusão censura as vendas (controle: o mecanismo de censura continua vivo)."""
+    ops = _pop(0.12, 0.0)
+    limpo = ler_h022(_entrada(ops), reps=REPS)
+    tarde = _conclusao_retroativa(ops, LEITURA + timedelta(minutes=10))
+    assert len(tarde) == 168
+    assert ler_h022(_entrada(ops, estados=tarde), reps=REPS) == limpo
+    assert limpo["rotulo_h022"] == CONFIRMA
+    cedo = _conclusao_retroativa(ops, LEITURA - timedelta(minutes=10))
+    r = ler_h022(_entrada(ops, estados=cedo), reps=REPS)
+    assert r["denominadores"]["true"]["C"] == 168
+    assert r["funil"]["motivos"]["C:venda_sem_praca:completed_at"] == 168
+    assert r["funil"]["estado_token_via"] == {"history": 168 + 476}
+
+
+def test_token_sem_estado_em_l_censura_a_venda_e_estado_ausente_no_export_e_recusado() -> None:
+    ops = _pop(0.12, 0.0)
+    alvo = next(o for o in ops if o.rule_set_id == RULE_SET_C and o.breakout_15m is True)
+    a = alvo.aposta
+    assert a is not None and a.sale_observed_at is not None
+    depois_da_venda = a.sale_observed_at + timedelta(minutes=1)  # não censuraria por si
+    antes = Mudanca(1, "completed_at", None, depois_da_venda, LEITURA - timedelta(hours=1))
+    casos = {
+        "token_ausente": EstadoToken(alvo.mint, False, None, None, ()),
+        "current_row_pre_history": EstadoToken(alvo.mint, True, depois_da_venda, None, ()),
+        "historico_diverge": EstadoToken(alvo.mint, True, None, None, (antes,)),
+    }
+    for via, estado in casos.items():
+        r = ler_h022(_entrada(ops, estados={alvo.mint: estado}), reps=REPS)
+        assert r["funil"]["motivos"][f"C:estado_do_token_desconhecido:{via}"] == 1, via
+        assert r["funil"]["estado_token_via"][via] == 1, via
+    e = _entrada(ops)
+    sem = replace(e, estados={k: v for k, v in e.estados.items() if k != alvo.mint})
+    with pytest.raises(ValueError, match="estado_token"):
+        ler_h022(sem, reps=REPS)
+
+
+def test_export_sem_prova_de_visibilidade_em_l_e_recusado() -> None:
+    """Astra (J rodada 4): uma transação que carimbou antes de L e ainda não estava visível
+    quando o export começou faria dois exports da janela lerem L diferente. O export que não
+    prova visibilidade é recusado; o seguinte, depois do commit, é o único aceito."""
+    ops = _pop(0.12, 0.0)
+    ok = ProvaDeVisibilidade(ve_toda_atividade=True)
+    for prova in (
+        replace(ok, escritoras_abertas_desde=LEITURA - timedelta(seconds=1)),
+        replace(ok, escritoras_sem_inicio=1),
+        replace(ok, ve_toda_atividade=False),
+    ):
+        with pytest.raises(ExportSemProvaDeVisibilidade):
+            ler_h022(replace(_entrada(ops), prova=prova), reps=REPS)
+    depois = replace(ok, escritoras_abertas_desde=LEITURA + timedelta(seconds=1))
+    assert ler_h022(replace(_entrada(ops), prova=depois), reps=REPS)["rotulo_h022"] == CONFIRMA
 
 
 def test_export_fora_da_janela_e_recusado() -> None:

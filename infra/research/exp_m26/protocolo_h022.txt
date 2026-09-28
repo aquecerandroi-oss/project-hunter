@@ -34,8 +34,9 @@ na página EXP-M26 ANTES do seed. Qualquer mudança é versão nova e hipótese 
     I = sem proposta (qualquer outro motivo: pedigree/creator/symbol_unknown, cotação,
     insert_failed, not_inserted); F = proposta sem aposta na leitura (inclui
     rule_set_inactive); C = aposta aberta na leitura, outcome_quality ≠ measured, sem foto de
-    venda, foto de venda com complete = true ou observed_at ≥ completed_at/migrated_at do
-    token (qualquer gatilho), ou sem pnl; A = avaliável.
+    venda, foto de venda com complete = true, estado do token em L desconhecido, foto de
+    venda com observed_at ≥ completed_at/migrated_at do token CONHECIDOS EM L (item 7;
+    qualquer gatilho), ou sem pnl; A = avaliável.
  4. Proposta de C sem linha em R1 (órfã) conta uma vez por mint em U. Proposta de L/H sem
     linha em R1 é par ausente, nunca reconstruída.
  5. Piloto: um mint com qualquer linha de R1 ou proposta de qualquer dos três braços antes de
@@ -52,17 +53,47 @@ na página EXP-M26 ANTES do seed. Qualquer mudança é versão nova e hipótese 
  7. Leitura fixa L = corte + 2 h. O export (export_h022.sql) é o retrato da leitura: a sua
     linha 'meta' traz exportado_em = now() da transação, o único relógio do J, e tem de cair
     em [L, L + 1 h] (antes: LeituraAntecipada; depois: ExportForaDaJanela — um export tardio
-    pode trazer o que só chegou depois de L, como completed_at recuado por LEAST ou um
-    fechamento processado tarde com exit_at antigo). As apostas são vistas como estavam em
-    L: entry_at > L = sem fill (F); exit_at > L = aberta na leitura (C). Rodar a leitura de
-    novo sobre o mesmo export dá o mesmo relatório. Antes de qualquer conta as linhas dos
-    três braços passam pela guarda do item 1 e entram em ordem canônica (braço, mint).
-    Semântica de tempo do desfecho: fatos com instante ≤ L (entry_at, exit_at, foto de
-    venda, completed_at/migrated_at do token) julgados com o conhecimento disponível no
-    export. A leitura é UM export: o seu sha256 sai no relatório e é registrado na página
-    EXP-M26 logo depois de exportar; outro export é outra leitura. (Divergência registrada
-    com a Astra, revisão do J rodada 2: ela pede o estado conhecido em L; o schema não
-    guarda o histórico de completed_at, que só recua por LEAST.)
+    pode trazer um fechamento processado tarde com exit_at antigo). As apostas são vistas
+    como estavam em L: entry_at > L = sem fill (F); exit_at > L = aberta na leitura (C).
+    completed_at/migrated_at do token são os CONHECIDOS EM L, nunca os da linha corrente:
+    o export traz, por mint com oportunidade, o histórico só de acréscimo
+    meme_token_state_history (migração 0067, instalada antes do seed; uma linha por mudança
+    efetiva, escrita só por gatilho adiado para o commit, recorded_at = clock_timestamp()
+    no commit — um lote que escreve antes de L e commita depois é registrado depois de L).
+    "Conhecido em L" = carimbado no commit até L: o valor em L de cada coluna é o `depois`
+    da última mudança, na ordem do id (a de commit dentro do mint; nunca a do relógio), com
+    recorded_at ≤ L. Sem mudança até L: o `antes` da 1.ª mudança posterior; sem mudança
+    nenhuma: a linha corrente — e aí um valor não nulo é anterior ao histórico (via
+    current_row_pre_history), só vale se ≤ L e mesmo assim não é afirmado. Por mint vale a
+    pior via: history; current_row_pre_history; historico_diverge (a linha corrente difere
+    da última mudança: escrita sem o gatilho); token_ausente (sem linha e sem histórico). SÓ
+    a via history é estado conhecido em L: com qualquer outra a aposta preenchida é C
+    (estado_do_token_desconhecido:<via>), nunca A; para mint inscrito
+    current_row_pre_history é impossível por construção (o token nasce depois de T0 − 2 h,
+    com o histórico já instalado); a contagem por via sai em funil.estado_token_via. PROVA
+    DE VISIBILIDADE: o 1.º comando do export, antes do snapshot dos dados, grava na linha
+    'meta' o xact_start mais antigo das transações com xid ainda em voo nesta base, de
+    qualquer backend (escritoras_abertas_desde), quantas delas não mostram xact_start
+    (escritoras_sem_inicio), quantas transações preparadas existem (preparadas), o maior
+    recuo do carimbo na ordem do id no histórico inteiro (relogio_recuou_s) e se o papel
+    enxerga de fato a atividade de todos (ve_toda_atividade: superusuário ou
+    pg_read_all_stats com USAGE); o J recusa (ExportSemProvaDeVisibilidade) o export com
+    escritora aberta desde ≤ L ainda em voo — o carimbo dela pode ser ≤ L com o commit
+    ainda invisível —, com escritora sem início, com transação preparada, com recuo do
+    relógio > 1 s ou sem ve_toda_atividade; tira-se outro export na janela (se a janela
+    fechar sem prova, a leitura não roda e o caso sobe ao orquestrador). Assim todo export
+    aceito vê o mesmo conjunto de carimbos ≤ L e lê L igual. Premissa declarada: o relógio
+    do servidor não recua (o detector cobre recuo > 1 s visível no histórico). Um
+    completed_at recuado por LEAST ou um migrated_at gravado depois de L, mesmo apontando
+    para antes das vendas, não muda a leitura de L (must-fix 2 da revisão do J, Astra,
+    rodadas 2 a 5). "Carimbado até L" não é "visível em L": a diferença é o processamento
+    do próprio commit (a transação já tinha escrito tudo e entrado no commit antes de L;
+    o seu sucesso final pode vir depois). O histórico vive o que o token vive (FK ON DELETE CASCADE,
+    MEME_RETENTION_DAYS); a leitura exige MEME_RETENTION_DAYS ≥ 23 (hoje 30). Rodar a
+    leitura de novo sobre o mesmo export dá o mesmo relatório. Antes de qualquer conta as
+    linhas dos três braços passam pela guarda do item 1 e entram em ordem canônica (braço,
+    mint). A leitura é UM export: o seu sha256 sai no relatório e é registrado na página
+    EXP-M26 logo depois de exportar; outro export é outra leitura.
  8. Estrato = bloco do bootstrap temporal = (data UTC, ⌊hora/6⌋) de evaluated_at.
     D = Σ w_s (ȳ_true,s − ȳ_false,s) / Σ w_s, w_s = n_true,s·n_false,s/(n_true,s + n_false,s),
     só estratos com os dois grupos; os mínimos (100 true, 300 false, 10 estratos) contam os

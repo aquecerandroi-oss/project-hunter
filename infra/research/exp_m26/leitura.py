@@ -7,8 +7,11 @@
 2. Corte pelas inscrições elegíveis de C (sem desfecho); leitura L = corte + 2 h. **O export
    é o retrato em L**: o seu instante (`exportado_em`, o único relógio da leitura) tem de
    cair em [L, L + 1 h] — um export posterior pode trazer o que só chegou depois de L
-   (`completed_at` recuado, fechamento processado tarde com `exit_at` antigo). As apostas
-   são vistas como estavam em L.
+   (fechamento processado tarde com `exit_at` antigo). As apostas são vistas como estavam
+   em L, e o `completed_at`/`migrated_at` do token é o **conhecido em L** — a última
+   mudança do histórico só de acréscimo com `recorded_at <= L` (`estado_token`, `0067`),
+   nunca a linha corrente — e o export tem de provar que toda mudança carimbada até L
+   estava visível nele (`provar_visibilidade`), senão é recusado.
 3. Primária em C: classes, motivo único, denominadores, estimador estratificado, dois IC,
    permutação, robustez e estresse. Secundária H − L. Holm sobre os dois p. Rótulos.
 """
@@ -16,12 +19,13 @@
 from __future__ import annotations
 
 import math
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Any
 
-from infra.research.exp_m26 import censura, pacote, robustez
+from infra.research.exp_m26 import censura, estado_token, pacote, robustez
 from infra.research.exp_m26.calendario import Corte, corte, t0_de
 from infra.research.exp_m26.classes import Registro, registrar, verificar_relogio
 from infra.research.exp_m26.constantes import (
@@ -41,6 +45,7 @@ from infra.research.exp_m26.constantes import (
     SEMENTE,
 )
 from infra.research.exp_m26.contabil import pnl_alternativo
+from infra.research.exp_m26.estado_token import EstadoToken, ProvaDeVisibilidade
 from infra.research.exp_m26.estimador import (
     Intervalo,
     estimar,
@@ -68,6 +73,29 @@ class Entrada:
     """`(rule_set_id, mint, 1.ª proposed_at)` de cada braço e mint — acha órfãs e piloto."""
     aposentadorias: Mapping[str, datetime | None]
     """`retired_at` dos três braços; a primeira antes do corte é a parada pela guarda."""
+    estados: Mapping[str, EstadoToken]
+    """O histórico de `completed_at`/`migrated_at` de cada mint com oportunidade."""
+    prova: ProvaDeVisibilidade = ProvaDeVisibilidade()
+    """A linha 'meta' do export: a prova de que tudo carimbado até L estava visível nele."""
+
+
+def _em_l(o: Oportunidade, e: Entrada, leitura: datetime) -> Oportunidade:
+    """A aposta como estava em L, com o estado do token conhecido em L."""
+    a = na_leitura(o.aposta, leitura)
+    if a is None:
+        return replace(o, aposta=None)
+    if o.mint not in e.estados:
+        raise ValueError(f"export sem estado_token para {o.mint}")
+    s = estado_token.em(e.estados[o.mint], leitura)
+    return replace(
+        o,
+        aposta=replace(
+            a,
+            token_completed_at=s.completed_at,
+            token_migrated_at=s.migrated_at,
+            token_estado_via=s.via,
+        ),
+    )
 
 
 def _iv(i: Intervalo) -> dict[str, Any]:
@@ -198,7 +226,7 @@ def _pares(
     por: dict[str, dict[str, Oportunidade]] = {RULE_SET_L: {}, RULE_SET_H: {}}
     for o in e.oportunidades:
         if o.rule_set_id in por and o.mint in ok:
-            por[o.rule_set_id][o.mint] = replace(o, aposta=na_leitura(o.aposta, leitura))
+            por[o.rule_set_id][o.mint] = _em_l(o, e, leitura)
     inicio: dict[str, datetime] = {}
     for rs, m, t in e.propostas:
         if rs in por and m in ok and m not in por[rs]:
@@ -245,11 +273,10 @@ def ler_h022(e: Entrada, *, reps: int = REPS) -> dict[str, Any]:
             f"export em {e.exportado_em.isoformat()}, leitura em {c.leitura.isoformat()}: "
             f"fora da janela de {JANELA_EXPORTACAO}"
         )
+    estado_token.provar_visibilidade(e.prova, leitura=c.leitura)
     janela = (t0, c.instante)
     regs = [
-        registrar(replace(o, aposta=na_leitura(o.aposta, c.leitura)))
-        for o in c_ops
-        if janela[0] <= o.evaluated_at < janela[1]
+        registrar(_em_l(o, e, c.leitura)) for o in c_ops if janela[0] <= o.evaluated_at < janela[1]
     ]
     com_r1 = {(o.rule_set_id, o.mint) for o in e.oportunidades}
     orfas_c = {
@@ -294,6 +321,9 @@ def ler_h022(e: Entrada, *, reps: int = REPS) -> dict[str, Any]:
             "mints_do_piloto": len(piloto),
             "c_inscritas": len(regs),
             "motivos": dict(sorted(motivos.items())),
+            "estado_token_via": dict(
+                sorted(Counter(r.o.aposta.token_estado_via for r in regs if r.o.aposta).items())
+            ),
         },
         "denominadores": den,
         "primaria": {

@@ -18,7 +18,8 @@
 - I: sem proposta por instrumento (pedigree desconhecido, cotação, falha de escrita, …);
 - F: proposta sem fill na leitura (inclui `rule_set_inactive`);
 - C: preenchida sem desfecho precificável (aberta na leitura, `indeterminate`, venda sem
-  praça pelo estado da foto de venda, qualquer que seja o gatilho);
+  praça pelo estado da foto de venda ou pelo `completed_at`/`migrated_at` conhecido em L,
+  qualquer que seja o gatilho, estado do token em L desconhecido);
 - A: avaliável.
 """
 
@@ -40,6 +41,10 @@ from infra.research.exp_m26.modelo import Aposta, Oportunidade
 from infra.research.guards import Instants, LookAheadError, check_observable
 
 MOTIVOS = ("E", "U", "I", "F", "C", "A")
+ESTADO_CONHECIDO = ("history",)
+"""`completed_at`/`migrated_at` conhecidos em L pelo histórico (`estado_token`); qualquer
+outra via (anterior ao histórico, histórico divergente, token ausente) e a
+venda não tem praça provada: C, nunca A."""
 
 
 def verificar_relogio(o: Oportunidade) -> None:
@@ -79,6 +84,8 @@ def censura_da_aposta(a: Aposta) -> str | None:
         return "sem_foto_de_venda"
     if a.sale_complete:
         return "venda_sem_praca:complete"
+    if a.token_estado_via not in ESTADO_CONHECIDO:
+        return f"estado_do_token_desconhecido:{a.token_estado_via}"
     for nome, quando in (
         ("completed_at", a.token_completed_at),
         ("migrated_at", a.token_migrated_at),
