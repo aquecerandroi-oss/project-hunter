@@ -4,7 +4,7 @@ tipo: consolidado
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-25
+updated: 2026-09-27
 ---
 
 # Ideias do Everton — inbox
@@ -32,6 +32,7 @@ responda.
 | T4.92 (pedido implícito: parar de perder por não lembrar) | ficha automática — cada operação real com métricas e motivo, sem depender de alguém lembrar | **aplicada** — `infra/scripts/meme_daily_ficha.py` gera [[Ficha-2026-09-24]]/[[Ficha-2026-09-25]] diariamente, com a classe de perda automática ([[Perdas/Index|Perdas]]) |
 | 23/09/2026 11:19 BRT | "tudo no talo" — usar o Helius sem economizar | **aplicada** — `.env` com as 8 linhas e recriação forçada: teto de moedas 120→300, orçamento pump.fun 60→30, `MEME_RPC_TOP_K` 100, `MEME_EVENT_GATE_MAX_MINTS` 400, concorrência 4 ([[09-OPERATIONS/Diario/2026-09-23|Diário 23/09]]) |
 | (recorrente nas conversas de operação) | meta: ganhar mais do que perder por dia | **em aberto** — nenhum artefato encontrado que codifique isto como alvo formal (limite, alarme ou critério de sucesso); hoje só se lê no placar diário da ficha automática (net SOL do dia) — [[Ficha-2026-09-24]] fechou negativa, [[Ficha-2026-09-25]] foi o primeiro dia positivo |
+| 27/09/2026 | render o SOL parado — staking | **em estudo** — [[KB-0165-staking-do-sol-parado]]: nativo e líquido (JitoSOL/mSOL) rendem hoje 5–7 % a.a., mas sobre 0,33–0,38 SOL isso é ≈ 0,02 SOL/ano (menos ainda sobre o excedente ao piso de tesouraria); um LST não é contado por `equity_sol`/`available_sol` do motor de risco (viraria "perda" na conta); recomendação: não stakar enquanto nenhuma estratégia estiver confirmada — decisão de dinheiro real em protocolo externo é só do Everton |
 
 ## Relacionado
 
