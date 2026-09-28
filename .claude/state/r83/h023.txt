@@ -1,0 +1,209 @@
+# R83 / H-023 — contraste (desenho congelado em notes-R83.md §2 + emenda §2b)
+população: {'fora_duplicada': 1494, 'fora_spot': 133, 'dentro': 15824, 'recusadas_guarda': 79}
+  estado ('continuacao', 'expired', False) 11
+  estado ('continuacao', 'expired', True) 656
+  estado ('continuacao', 'invalidated', False) 114
+  estado ('continuacao', 'invalidated', True) 4198
+  estado ('continuacao', 'stop', False) 55
+  estado ('continuacao', 'stop', True) 1974
+  estado ('continuacao', 'target', False) 103
+  estado ('continuacao', 'target', True) 2359
+  estado ('outras', 'expired', True) 38
+  estado ('outras', 'invalidated', True) 75
+  estado ('outras', 'stop', True) 55
+  estado ('outras', 'target', True) 31
+  estado ('reversao', 'expired', False) 373
+  estado ('reversao', 'expired', True) 2117
+  estado ('reversao', 'stop', False) 366
+  estado ('reversao', 'stop', True) 1673
+  estado ('reversao', 'target', False) 207
+  estado ('reversao', 'target', True) 1340
+
+## 1. Continuação — d_high pelo moinho (saída mecânica; o rótulo H-023 é o do §6)
+# H-023 — d_high na continuação (tercil alto − baixo, dentro da estratégia) — REFUTA
+
+> Origem: KB-0004 (George & Hwang), Strategy Backlog item 8, Dicionário item 1  ·  impressão digital do pré-registo: `a8ad515e928e`
+> Limiar congelado: **0.5**  ·  efeito mínimo relevante (MRE): **+0.0500**
+
+## Pré-registo (escrito antes de correr)
+
+- **Previsão:** nos sinais de continuação o tercil mais perto da máxima de 24 h rende ≥ +0,05 R líquido a mais que o mais longe, IC 95 % bootstrap por mercado acima de zero, com patamar
+- **Refutação:** IC sup < +0,01 R → REFUTA pelo tamanho; efeito oposto sustentado (IC sup < −0,01) → REFUTA; a leitura literal 'IC inf < −0,01' sozinha dá NÃO CONFIRMA (errata do R76); pico → NÃO CONFIRMA
+- **Regra de decisão:** rótulo externo (h023.fila_label): guardas de potência do moinho; CONFIRMA com D ≥ 0,05, IC inf > 0, p do portão (máx. de episódios e bootstrap por mercado) < 0,05, Holm ≤ 0,05, alto > 0 em nível e patamar em partições distintas da grade q ∈ {1/5..1/2}; require_plateau desligado no moinho porque sobre o indicador a curva é degenerada
+- **Política de limiar:** tercis de posto dentro de cada estratégia (stats.terciles), cortes pela variável só, antes de ler desfechos; limiar 0,5 sobre o indicador separa alto de baixo
+- **Congelado em:** 2026-09-27
+
+## Os números
+
+| # | o quê | valor |
+|---|---|---|
+| 1 | população usada (de 6125 linhas lidas) | **6125** em 279 clusters |
+| 2 | selecionados / resto no limiar congelado | 3059 / 3066 |
+| 3 | média do desfecho: selecionados / resto | -0.2482 / -0.2158 |
+| 4 | **D = média(selecionados) − média(resto)** | **-0.0324** |
+| 5 | IC 95 % de D (bootstrap de cluster por `market`) | [-0.1131, +0.0376]  P(D≤0) = 0.803 |
+| 6 | p de permutação (estratificada por `stratum`) | 0.4076 |
+
+Censura: 0 linhas sem desfecho, 0 sem a variável, 0 recusadas pela guarda anti-antecipação. Ausente nunca virou zero.
+
+## VEREDITO: REFUTA
+
+- IC 95 % superior +0.0376 abaixo do MRE +0.0500: evidência CONTRA uma vantagem útil desse tamanho — não é refutação de qualquer efeito, é refutação de um efeito que pague a mesa.
+
+## Curva de limiares — planalto ou pico?
+
+Diagnóstico: **ausente** (0 limiares avaliáveis; maior corrida positiva 0 (0 com IC acima de zero)).
+
+| limiar | n sel/resto | D | IC 95 % |
+|---|---|---|---|
+
+## Baldes por tercis (descritivo, não decide nada)
+
+| balde | n | média | mediana |
+|---|---|---|---|
+| -0 | 3066 | -0.2158 | -0.4823 |
+| 0-1 | 3059 | -0.2482 | -0.4752 |
+
+## A ressalva que mais importa
+
+22.0 linhas por cluster: a permutação troca rótulos linha a linha e, com linhas dependentes dentro do cluster, o p sai otimista — leia o IC de cluster/blocos antes do p
+
+Outras ressalvas:
+
+- sem fatia de teste reservada: o resultado é dentro da amostra
+
+## Suposições numéricas declaradas
+
+- R = signal_outcomes.r_multiple (R_net: fee 4 bps, spread 2 bps, derrapagem 5 bps + funding)
+- feature reconstruída das velas com a fórmula de produção (price.py:106), validada 337/337
+
+Estatística em `float` (contrastes de retorno); dinheiro publicado em `Decimal`. Tempo em UTC.
+
+> Nada aqui autoriza dinheiro real. Um CONFIRMA é candidato a **braço de papel pré-registado**, nunca parâmetro de mesa.
+
+d_high conferência (mesmas linhas): alto 3059 × baixo 3066 | alto -0.2482 baixo -0.2158 | D -0.0324 IC mercado [-0.1131, +0.0376] (279 mercados) | IC dia [-0.1319, +0.0928] | p linha 0.4076
+d_high: p episódios 0.4970 | p bootstrap mercado 0.3668 | p do portão 0.4970 | p linha a linha (moinho, descritivo) 0.4076
+d_high composição (alto/baixo): breakout 2/3, momentum 1849/1853, session_orb 18/19, volume_anomaly 1190/1191
+  d_high q=0.200: 1834×1843 D -0.0500 IC [-0.1532, +0.0442]
+  d_high q=0.250: 2290×2300 D -0.0506 IC [-0.1451, +0.0353]
+  d_high q=0.300: 2754×2758 D -0.0560 IC [-0.1410, +0.0192]
+  d_high q=0.333: 3059×3066 D -0.0324 IC [-0.1113, +0.0379]
+  d_high q=0.400: 3670×3677 D -0.0218 IC [-0.1023, +0.0485]
+  d_high q=0.450: 4132×4136 D -0.0379 IC [-0.1182, +0.0352]
+  d_high q=0.500: 4588×4599 D -0.0361 IC [-0.1107, +0.0295]
+  d_high partições distintas 7 de 7 — forma: Shape(form='ausente', longest_run=0, ci_clear=0, detail='7 limiares avaliáveis; maior corrida positiva 0 (0 com IC acima de zero)')
+
+## 1. Continuação — d_low pelo moinho (saída mecânica; o rótulo H-023 é o do §6)
+# H-023 — d_low na continuação (tercil alto − baixo, dentro da estratégia) — NÃO CONFIRMA
+
+> Origem: KB-0004 (George & Hwang), Strategy Backlog item 8, Dicionário item 1  ·  impressão digital do pré-registo: `0b981610d2d0`
+> Limiar congelado: **0.5**  ·  efeito mínimo relevante (MRE): **+0.0500**
+
+## Pré-registo (escrito antes de correr)
+
+- **Previsão:** nos sinais de continuação o tercil mais perto da máxima de 24 h rende ≥ +0,05 R líquido a mais que o mais longe, IC 95 % bootstrap por mercado acima de zero, com patamar
+- **Refutação:** IC sup < +0,01 R → REFUTA pelo tamanho; efeito oposto sustentado (IC sup < −0,01) → REFUTA; a leitura literal 'IC inf < −0,01' sozinha dá NÃO CONFIRMA (errata do R76); pico → NÃO CONFIRMA
+- **Regra de decisão:** rótulo externo (h023.fila_label): guardas de potência do moinho; CONFIRMA com D ≥ 0,05, IC inf > 0, p do portão (máx. de episódios e bootstrap por mercado) < 0,05, Holm ≤ 0,05, alto > 0 em nível e patamar em partições distintas da grade q ∈ {1/5..1/2}; require_plateau desligado no moinho porque sobre o indicador a curva é degenerada
+- **Política de limiar:** tercis de posto dentro de cada estratégia (stats.terciles), cortes pela variável só, antes de ler desfechos; limiar 0,5 sobre o indicador separa alto de baixo
+- **Congelado em:** 2026-09-27
+
+## Os números
+
+| # | o quê | valor |
+|---|---|---|
+| 1 | população usada (de 6127 linhas lidas) | **6127** em 284 clusters |
+| 2 | selecionados / resto no limiar congelado | 3060 / 3067 |
+| 3 | média do desfecho: selecionados / resto | -0.0974 / -0.3043 |
+| 4 | **D = média(selecionados) − média(resto)** | **+0.2069** |
+| 5 | IC 95 % de D (bootstrap de cluster por `market`) | [+0.1206, +0.2841]  P(D≤0) = 0.000 |
+| 6 | p de permutação (estratificada por `stratum`) | 0.0001 |
+
+Censura: 0 linhas sem desfecho, 0 sem a variável, 0 recusadas pela guarda anti-antecipação. Ausente nunca virou zero.
+
+## VEREDITO: NÃO CONFIRMA
+
+- o braço selecionado perde em nível (-0.0974); perder menos que o resto não é vantagem
+
+## Curva de limiares — planalto ou pico?
+
+Diagnóstico: **ausente** (0 limiares avaliáveis; maior corrida positiva 0 (0 com IC acima de zero)).
+
+| limiar | n sel/resto | D | IC 95 % |
+|---|---|---|---|
+
+## Baldes por tercis (descritivo, não decide nada)
+
+| balde | n | média | mediana |
+|---|---|---|---|
+| -0 | 3067 | -0.3043 | -0.4563 |
+| 0-1 | 3060 | -0.0974 | -0.4482 |
+
+## A ressalva que mais importa
+
+21.6 linhas por cluster: a permutação troca rótulos linha a linha e, com linhas dependentes dentro do cluster, o p sai otimista — leia o IC de cluster/blocos antes do p
+
+Outras ressalvas:
+
+- sem fatia de teste reservada: o resultado é dentro da amostra
+
+## Suposições numéricas declaradas
+
+- R = signal_outcomes.r_multiple (R_net: fee 4 bps, spread 2 bps, derrapagem 5 bps + funding)
+- feature reconstruída das velas com a fórmula de produção (price.py:106), validada 337/337
+
+Estatística em `float` (contrastes de retorno); dinheiro publicado em `Decimal`. Tempo em UTC.
+
+> Nada aqui autoriza dinheiro real. Um CONFIRMA é candidato a **braço de papel pré-registado**, nunca parâmetro de mesa.
+
+d_low conferência (mesmas linhas): alto 3060 × baixo 3067 | alto -0.0974 baixo -0.3043 | D +0.2069 IC mercado [+0.1206, +0.2841] (284 mercados) | IC dia [+0.1191, +0.3289] | p linha 0.0001
+d_low: p episódios 0.0001 | p bootstrap mercado 0.0002 | p do portão 0.0002 | p linha a linha (moinho, descritivo) 0.0001
+d_low composição (alto/baixo): breakout 2/3, momentum 1850/1854, session_orb 18/19, volume_anomaly 1190/1191
+  d_low q=0.200: 1836×1840 D +0.2530 IC [+0.1293, +0.3709]
+  d_low q=0.250: 2292×2300 D +0.2324 IC [+0.1280, +0.3270]
+  d_low q=0.300: 2754×2758 D +0.2254 IC [+0.1348, +0.3046]
+  d_low q=0.333: 3060×3067 D +0.2069 IC [+0.1228, +0.2836]
+  d_low q=0.400: 3673×3678 D +0.1903 IC [+0.1190, +0.2553]
+  d_low q=0.450: 4132×4136 D +0.1813 IC [+0.1111, +0.2440]
+  d_low q=0.500: 4588×4599 D +0.1669 IC [+0.1030, +0.2250]
+  d_low partições distintas 7 de 7 — forma: Shape(form='planalto', longest_run=7, ci_clear=7, detail='7 limiares avaliáveis; maior corrida positiva 7 (7 com IC acima de zero)')
+
+Holm {d_high, d_low} sobre o p do portão: (0.49695030496950304, 0.0002) → (0.49695030496950304, 0.0004) sobrevive (False, True)
+
+## 2. Tercis (n, média R_net) na continuação
+d_high {'alto': (3059, -0.2482), 'baixo': (3066, -0.2158), 'meio': (3062, -0.2133)}
+d_low {'alto': (3060, -0.0974), 'baixo': (3067, -0.3043), 'meio': (3060, -0.2754)}
+
+## 6. Rótulo H-023 (regra congelada §2.7 + §2b.3)
+H-023 (continuação, d_high): NÃO CONFIRMA | cláusula literal 'IC inf < −0,01' aciona (IC inf -0.1131) — pela errata sozinha não refuta; D -0.0324 < +0.05; IC inf -0.1131 ≤ 0; p 0.4970; Holm 0.4970; tercil alto -0.2482 ≤ 0 em nível; curva ausente
+secundária d_low (mesma regra, leitura): NÃO CONFIRMA | tercil alto -0.0974 ≤ 0 em nível
+
+## 4. Sensibilidades (descritivas; não mudam o rótulo)
+r_ex_funding, mesmas linhas e cortes da primária: alto 3059 × baixo 3066 | alto -0.2477 baixo -0.2161 | D -0.0315 IC mercado [-0.1124, +0.0386] (279 mercados) | IC dia [-0.1309, +0.0938] | p linha 0.4230
+r_ex_funding, cortes recalculados em todos: alto 3150 × baixo 3159 | alto -0.2496 baixo -0.2131 | D -0.0366 IC mercado [-0.1156, +0.0326] (279 mercados) | IC dia [-0.1326, +0.0886] | p linha 0.3544
+sem a guarda de persistência: alto 3081 × baixo 3090 | alto -0.2463 baixo -0.2173 | D -0.0290 IC mercado [-0.1078, +0.0402] (279 mercados) | IC dia [-0.1200, +0.0919] | p linha 0.4414
+só prospectiva: alto 2243 × baixo 2250 | alto -0.2921 baixo -0.2038 | D -0.0882 IC mercado [-0.1767, -0.0029] (280 mercados) | IC dia [-0.1871, +0.0383] | p linha 0.0049
+só replay: alto 810 × baixo 819 | alto -0.0963 baixo -0.1839 | D +0.0876 IC mercado [-0.0373, +0.1764] (16 mercados) | IC dia [-0.0868, +0.2572] | p linha 0.5225
+só momentum: alto 1849 × baixo 1853 | alto -0.0964 baixo -0.1934 | D +0.0971 IC mercado [+0.0276, +0.1615] (260 mercados) | IC dia [-0.0298, +0.2330] | p linha 0.1504
+só volume_anomaly: alto 1190 × baixo 1191 | alto -0.4877 baixo -0.2563 | D -0.2314 IC mercado [-0.3633, -0.0938] (257 mercados) | IC dia [-0.4051, -0.0334] | p linha 0.0007
+só momentum v3 (paper): alto 483 × baixo 485 | alto -0.1522 baixo -0.2143 | D +0.0621 IC mercado [-0.0395, +0.1628] (210 mercados) | IC dia [-0.0632, +0.1741] | p linha 0.1591
+tercis do agregado: alto 3057 × baixo 3063 | alto -0.1892 baixo -0.2108 | D +0.0215 IC mercado [-0.0644, +0.1006] (283 mercados) | IC dia [-0.0740, +0.1416] | p linha 0.9928
+tercis por versão: alto 3052 × baixo 3071 | alto -0.2573 baixo -0.2091 | D -0.0482 IC mercado [-0.1325, +0.0280] (280 mercados) | IC dia [-0.1364, +0.0707] | p linha 0.1408
+uma por (estratégia, mercado, barra): alto 2402 × baixo 2407 | alto -0.2975 baixo -0.2130 | D -0.0844 IC mercado [-0.1668, -0.0023] (278 mercados) | IC dia [-0.1700, +0.0372] | p linha 0.0073
+KB-0004 d_high ≥ −0,005 × resto (momentum): alto 1660 × baixo 3891 | alto -0.1008 baixo -0.1691 | D +0.0683 IC mercado [+0.0080, +0.1307] (274 mercados) | IC dia [-0.0613, +0.2098] | p linha 0.5360
+tercis d_high momentum: {'alto': (1849, -0.0964), 'baixo': (1853, -0.1934), 'meio': (1849, -0.156)}
+tercis d_high volume_anomaly: {'alto': (1190, -0.4877), 'baixo': (1191, -0.2563), 'meio': (1191, -0.2977)}
+
+## 5. Reversão (sem sinal previsto), v14 e outras — descritivo
+reversão d_high: alto 1702 × baixo 1717 | alto -0.0346 baixo -0.0420 | D +0.0074 IC mercado [-0.1005, +0.1433] (97 mercados) | IC dia [-0.1670, +0.1548] | p linha 0.9952 | p ep 0.9780 p bt 0.8668
+reversão d_low: alto 1704 × baixo 1718 | alto -0.0020 baixo -0.0829 | D +0.0809 IC mercado [-0.0621, +0.2175] (90 mercados) | IC dia [-0.0966, +0.2703] | p linha 0.7324 | p ep 0.4732 p bt 0.2516
+  reversão tercis d_high: {'alto': (1702, -0.0346), 'baixo': (1717, -0.042), 'meio': (1710, 0.0464)}
+mean_reversion (só a estratégia) d_high: alto 1510 × baixo 1522 | alto -0.0032 baixo -0.0331 | D +0.0298 IC mercado [-0.0908, +0.1757] (96 mercados) | IC dia [-0.1665, +0.1957] | p linha 0.9969 | p ep 0.9476 p bt 0.6192
+mean_reversion (só a estratégia) d_low: alto 1512 × baixo 1523 | alto +0.0133 baixo -0.0685 | D +0.0818 IC mercado [-0.0707, +0.2264] (89 mercados) | IC dia [-0.1172, +0.2914] | p linha 0.8634 | p ep 0.5664 p bt 0.2844
+  mean_reversion (só a estratégia) tercis d_high: {'alto': (1510, -0.0032), 'baixo': (1522, -0.0331), 'meio': (1517, 0.0641)}
+mean_reversion v14 (spot/1) d_high: alto 60 × baixo 62 | alto +0.1347 baixo -0.0937 | D +0.2284 IC mercado [-0.0993, +0.5970] (46 mercados) | IC dia [-0.3050, +0.6455] | p linha 0.2107 | p ep 0.2221 p bt 0.1560
+mean_reversion v14 (spot/1) d_low: alto 60 × baixo 62 | alto -0.1807 baixo -0.0175 | D -0.1632 IC mercado [-0.5530, +0.1656] (43 mercados) | IC dia [-0.5357, +0.3500] | p linha 0.4232 | p ep 0.4147 p bt 0.3362
+  mean_reversion v14 (spot/1) tercis d_high: {'alto': (60, 0.1347), 'baixo': (62, -0.0937), 'meio': (61, -0.0099)}
+outras d_high: alto 64 × baixo 69 | alto -0.1573 baixo -0.2372 | D +0.0800 IC mercado [-0.2921, +0.2726] (46 mercados) | IC dia [-0.3467, +0.5324] | p linha 0.8452 | p ep 0.8449 p bt 0.6248
+outras d_low: alto 64 × baixo 69 | alto -0.1407 baixo -0.2173 | D +0.0766 IC mercado [-0.3468, +0.5865] (44 mercados) | IC dia [-0.6667, +0.4868] | p linha 0.5076 | p ep 0.5117 p bt 0.6934
+  outras tercis d_high: {'alto': (64, -0.1573), 'baixo': (69, -0.2372), 'meio': (66, -0.0806)}
+reversão curva d_high (q, D, IC): [(0.2, 0.0069, -0.1328, 0.1775), (0.25, -0.0234, -0.1469, 0.1401), (0.3, 0.0038, -0.1035, 0.1448), (0.333, 0.0074, -0.0992, 0.145), (0.4, 0.0093, -0.0773, 0.1265), (0.45, 0.0248, -0.0641, 0.1375), (0.5, 0.0248, -0.0604, 0.1295)] pico

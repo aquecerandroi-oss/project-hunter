@@ -4,7 +4,7 @@ tipo: consolidado
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-26
+updated: 2026-09-28
 ---
 
 # Dicionário de Variáveis
@@ -31,7 +31,7 @@ arquivo que a calcula.
 | variável | o que mede | onde vive | desde quando | cobertura / limites | já testada? | resultado |
 |---|---|---|---|---|---|---|
 | `return_1m/5m/15m/1h/4h` (+ `_live`) | retorno no horizonte, com sufixo `_live` quando a vela ainda está se formando | `features/price.py:53` | M2 (2026-09-06) | `return_24h` **não existe**; `_live` não tem coverage própria de book/trade (tem timestamp próprio) | `momentum_15m` via H-005; `return_4h` via H-008 (ambas em população **substituta**, não a verbatim) | H-005 [[Fila de Hipoteses|nao_confirma]] · H-008 [[Fila de Hipoteses|em_curso]] (estudo inválido por censura) |
-| `distance_from_24h_high` / `_low` | distância percentual da máxima/mínima de 24 h | `features/price.py:106` | M2 | existe mas **não estava no envelope da v1** da `momentum` — bloqueada por medição de redundância nunca feita ([[Strategy Backlog]] item 8) | não | — |
+| `distance_from_24h_high` / `_low` | distância percentual da máxima/mínima de 24 h (máximas/mínimas intrabar, 1 440 velas 1m finais contíguas) | `features/price.py:106` | M2 | **não está no envelope de nenhum sinal** do Lab; no `feature_snapshots` o valor `ok` no minuto do sinal só aparece em 360 de 6 738 sinais recentes (janela do scanner com buraco/aquecimento). O R83 reconstruiu das velas (idêntico à produção em 337/337). Redundância medida (R83): `_high` |ρ| máx 0,385 (ATR%) na continuação, 0,69 (ATR%) na reversão; `_low` anda com ATR% (0,77) e retorno 4 h (0,70) | [[Fila de Hipoteses#H-023 — Proximidade da máxima de 24 h nos sinais do Lab de cripto (segunda frente, custo baixo)\|H-023]] (R83, [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]]) | **nao_confirma** — perto − longe da máxima −0,032 R [−0,113, +0,038] em 9 187 sinais de continuação (momentum +0,097 × volume_anomaly −0,231, descritivo); `_low`: longe da mínima +0,207 R [+0,121, +0,284], Holm 0,0004, mas o melhor tercil perde −0,097 R — pista para coorte nova |
 | `atr_14_pct` | ATR de 14 períodos, em % do preço | `features/trend.py:78` | M2 | é o **checkpoint ancorado do M2**; a `momentum_v1` de fato consome outro instrumento (`rolling_window_v1`, `atr_bars=97`) — dois instrumentos com o mesmo apelido ([[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]]) | diagnóstico por decil (item 3 do backlog) | especificada, nunca rodada |
 | `momentum_15m` | retorno de 15 min, feature nomeada (distinta de `return_15m`) | `features/trend.py:130` | M2 | — | [[Fila de Hipoteses#H-005 — Piso de impulso recente (momentum_15m ≤ 2,0)\|H-005]] | **nao_confirma** — 0 sinais têm a variável no envelope verbatim; medida em população substituta (censura 51,7 %) |
 | `momentum_acceleration` | 2ª derivada do momentum | `features/trend.py:169` | M2 | — | não | — |
@@ -113,7 +113,7 @@ outra (`equilibrio`, `flow`, pedigree) sem nunca ter sido isolada, ou foi descar
 antes de qualquer teste (`orderbook_imbalance`). As dez mais prontas para virar hipótese
 pré-registrada (dado já existe, ninguém mediu):
 
-1. `distance_from_24h_high`/`_low` (cripto) — bloqueada só por uma medição de redundância nunca feita.
+1. ~~`distance_from_24h_high`/`_low` (cripto) — bloqueada só por uma medição de redundância nunca feita.~~ Virou a H-023 (R83, 28/09): redundância medida (não é redundante) e **NÃO CONFIRMA** na continuação; `_low` ficou como pista, só em coorte nova e com a feature gravada no envelope ([[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]]).
 2. `open_interest` **em nível** (não a variação) como profundidade — item 14 do [[Strategy Backlog]], nunca rodado.
 3. `{buy,sell}_pressure_{Nm}` e `trade_velocity_{Nm}` (cripto) — disponibilidade operacional nunca medida desde que o bloqueio de `covered_until` caiu.
 4. ~~`higher_lows`/`breakout_15m`/`distance_to_support_pct` (meme, bloco `line`) — nunca isolado de um conjunto que já os usa.~~ Virou a H-021 (R81, 26/09): **limite de dado** — a porta compra moedas de 1–4 min, não há gráfico de 5 min; volta só com a estrutura do preço marginal gravada na fita da decisão ([[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]]).

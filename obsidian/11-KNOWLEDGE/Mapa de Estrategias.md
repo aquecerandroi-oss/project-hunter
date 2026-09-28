@@ -4,7 +4,7 @@ tipo: consolidado
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-27
+updated: 2026-09-28
 ---
 
 # Mapa de Estratégias
@@ -57,6 +57,7 @@ SORT mercado ASC
 | `buys_1m ≤ 25` (fluxo baixo no minuto) | R65 → R67 | tercil favorável na amostra original (34 % de alvos, MFE +28,1 %) | **não confirmou fora da amostra**: 473 moedas independentes, D=+0,036, IC [−0,058,+0,136], p=0,43, curva **pico** — [[KB-0147-custo-e-o-prejuizo-e-buys-1m-e-a-unica-pista]] |
 | Percentil de `sells/buys` dentro da coorte viva (`p_sb`) | R69 → H-004 | sobrevivente isolado em família de 17 (p=0,014) | reproduziu (D=+0,106, p=0,0145) mas a curva é **pico**: só 1 de 7 limiares exclui zero — [[KB-0154-subir-o-alvo-nao-paga]] não se aplica aqui, ver [[Fila de Hipoteses#H-004 — Percentil de sells/buys dentro da coorte viva\|H-004]] |
 | Célula `P3_vol_surge`, h=120 (cripto) | R68 → H-003 | D=+0,25 % líquido, IC de cluster [+0,16 %,+0,34 %] (aperta) | IC de **permutação** é largo (p=0,1478) — carregado por poucas barras extremas — [[Fila de Hipoteses#H-003 — Horizontes de 1 a 4 h no lado à vista\|H-003]] |
+| Longe da mínima de 24 h (`distance_from_24h_low`, cripto) | secundária da [[Fila de Hipoteses#H-023 — Proximidade da máxima de 24 h nos sinais do Lab de cripto (segunda frente, custo baixo)\|H-023]] (nao_confirma) | tercil longe − perto da mínima **+0,207 R** [+0,121,+0,284], Holm 0,0004, patamar 7/7, nos 9 187 sinais de continuação | sem sinal pré-registrado; o melhor tercil **perde −0,097 R** em nível; anda com ATR% (ρ 0,77) e retorno 4 h (0,70); só volta em coorte nova, com a feature no envelope e teste incremental conjunto — [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]] |
 | Estrutura do gráfico na compra (distância do suporte, fundos mais altos, rompimento) | [[Fila de Hipoteses#H-021 — Estrutura do gráfico na hora da compra (distância do suporte, fundos mais altos, rompimento)\|H-021]] | **nada de desempenho** — desfechos não abertos; o achado é estrutural: a porta compra com 1,6 min de vida (`max_age_s = 300`), só 1 de 885 decisões tem 5 min de fita | **limite_de_dado** (estrutural): o bloco pede 150; o arquivo de trocas não reconstrói a estrutura; volta só como H-021b prospectiva com o preço marginal gravado na fita da decisão — [[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]] |
 
 ## Cemitério — refutadas ou não confirmadas
@@ -99,6 +100,7 @@ SORT veredito ASC, mercado ASC
 | [[Fila de Hipoteses#H-005 — Piso de impulso recente (momentum_15m ≤ 2,0)\|H-005]] | `momentum_15m ≤ 2,0` | **nao_confirma** | 0 sinais com a variável no envelope verbatim; braço selecionado perde em nível |
 | [[Fila de Hipoteses#H-006 — Desequilíbrio agressor na barra do sinal\|H-006]] | `taker_imbalance_5m` | **nao_confirma** | D=+0,09 % líquido, 1 ponto-base abaixo do MRE de +0,10 % |
 | [[Fila de Hipoteses#H-007 — Teto de volume relativo (exaustão)\|H-007]] | teto de `volume_ratio_5m` em 12 | **refuta** | limite superior do IC (+0,0155) abaixo do MRE de +0,10 R |
+| [[Fila de Hipoteses#H-023 — Proximidade da máxima de 24 h nos sinais do Lab de cripto (segunda frente, custo baixo)\|H-023]] | perto da máxima de 24 h nos sinais de continuação do Lab (`distance_from_24h_high`, tercis) | **nao_confirma** | D=−0,032 R, IC [−0,113,+0,038] em 9 187 sinais; curva sem nenhum corte positivo; momentum +0,097 × volume_anomaly −0,231 (descritivo) ([[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]]) |
 | `return_4h > 0` como gate de tendência | redundância lógica com a própria entrada | descartada antes de testar | gate não filtraria nada, exceto por indisponibilidade da feature ([[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]]) |
 | `orderbook_imbalance_20 ≥ 0` como filtro de book | profundidade do livro | descartada antes de testar | a feature é razão invariante a escala, não mede profundidade ([[KB-0012-ofi-nao-e-o-nosso-orderbook-imbalance]]) |
 | Funding como filtro direcional de entrada | funding prevê retorno | nunca entrou na fila | evidência direta aponta poder preditivo ~zero por ativo ([[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]]) |

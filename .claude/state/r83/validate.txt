@@ -1,0 +1,18 @@
+snapshots no minuto obs: 6738
+d_high: n 360 | idênticos (|Δ|<1e-12) 0.9417 | |Δ| p99 2.04e-03 máx 4.13e-03 | ρ 0.99985
+   só snapshots cuja última vela fecha em obs: n 337 idênticos 1.0000
+d_low: n 360 | idênticos (|Δ|<1e-12) 0.9417 | |Δ| p99 2.56e-03 máx 5.57e-03 | ρ 0.99972
+   só snapshots cuja última vela fecha em obs: n 337 idênticos 1.0000
+ret15: n 6295 | idênticos (|Δ|<1e-12) 0.9384 | |Δ| p99 4.44e-03 máx 2.73e-02 | ρ 0.99582
+   só snapshots cuja última vela fecha em obs: n 5901 idênticos 1.0000
+ret240: n 3463 | idênticos (|Δ|<1e-12) 0.9599 | |Δ| p99 2.70e-03 máx 1.04e-02 | ρ 0.99983
+   só snapshots cuja última vela fecha em obs: n 3324 idênticos 1.0000
+continuacao ρ(d_high, s_mom15 produção) = +0.302 (n 2362)
+continuacao ρ(d_high, s_r4h produção) = +0.269 (n 2376)
+continuacao ρ(d_high, s_r15 produção) = +0.188 (n 4982)
+continuacao ρ(d_high, s_atr produção) = -0.272 (n 2456)
+reversao ρ(d_high, s_mom15 produção) = +0.103 (n 1028)
+reversao ρ(d_high, s_r4h produção) = +0.498 (n 1028)
+reversao ρ(d_high, s_r15 produção) = +0.028 (n 1243)
+reversao ρ(d_high, s_atr produção) = -0.693 (n 1044)
+return_15m do envelope × reconstruído: n 5823 idênticos(<1e-12) 1.0000 máx 0.00e+00

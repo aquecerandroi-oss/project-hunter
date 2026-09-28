@@ -1,0 +1,6 @@
+d_low dentro de estratégia × tercil de atr_pct: alto 3053 × baixo 3068 | alto -0.1603 baixo -0.2865 | D +0.1263 IC mercado [+0.0285, +0.2110] (281 mercados) | IC dia [+0.0465, +0.2712] | p linha 0.1760
+d_high dentro de estratégia × tercil de atr_pct: alto 3049 × baixo 3067 | alto -0.2199 baixo -0.2414 | D +0.0215 IC mercado [-0.0600, +0.0952] (284 mercados) | IC dia [-0.0567, +0.1275] | p linha 0.6546
+d_low dentro de estratégia × tercil de ret240: alto 3053 × baixo 3066 | alto -0.1475 baixo -0.3056 | D +0.1581 IC mercado [+0.0715, +0.2358] (280 mercados) | IC dia [+0.1010, +0.2778] | p linha 0.0001
+d_high dentro de estratégia × tercil de ret240: alto 3052 × baixo 3072 | alto -0.2445 baixo -0.2155 | D -0.0290 IC mercado [-0.1029, +0.0422] (283 mercados) | IC dia [-0.1416, +0.0929] | p linha 0.3543
+d_low só momentum: alto 1850 × baixo 1854 | alto -0.0386 baixo -0.2211 | D +0.1825 IC mercado [+0.0940, +0.2733] (251 mercados) | IC dia [+0.0892, +0.2925] | p linha 0.0001
+d_low só volume_anomaly: alto 1190 × baixo 1191 | alto -0.1889 baixo -0.4399 | D +0.2510 IC mercado [+0.0987, +0.3786] (251 mercados) | IC dia [+0.0867, +0.5773] | p linha 0.0014

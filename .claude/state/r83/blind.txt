@@ -1,0 +1,52 @@
+# R83 passo cego — sem desfechos
+export: {'fora_duplicada': 1494, 'fora_spot': 133, 'dentro': 15824}
+guarda (check_observable, t = emitted_at): {'recusada_prosp': 79} mantidas 15745
+emitted_at − obs (prospectiva) s: mediana 12.40 p99 113.29
+
+## contagens por família / estratégia (perp, terminal, dedup, pós-guarda)
+('continuacao', 'breakout') {'n': 8, 'com_R': 8, 'com_feature': 8, 'R_e_feature': 8, 'prosp': 0}
+('continuacao', 'momentum') {'n': 5804, 'com_R': 5551, 'com_feature': 5804, 'R_e_feature': 5551, 'prosp': 3516}
+('continuacao', 'session_orb') {'n': 58, 'com_R': 56, 'com_feature': 58, 'R_e_feature': 56, 'prosp': 38}
+('continuacao', 'volume_anomaly') {'n': 3600, 'com_R': 3572, 'com_feature': 3600, 'R_e_feature': 3572, 'prosp': 3263}
+('outras', 'sweep_reclaim') {'n': 49, 'com_R': 49, 'com_feature': 49, 'R_e_feature': 49, 'prosp': 1}
+('outras', 'trendline_bounce') {'n': 33, 'com_R': 33, 'com_feature': 33, 'R_e_feature': 33, 'prosp': 0}
+('outras', 'trendline_breakout') {'n': 117, 'com_R': 117, 'com_feature': 117, 'R_e_feature': 117, 'prosp': 70}
+('reversao', 'mean_reversion') {'n': 5492, 'com_R': 4549, 'com_feature': 5492, 'R_e_feature': 4549, 'prosp': 1989}
+('reversao', 'mean_reversion_h1') {'n': 211, 'com_R': 211, 'com_feature': 211, 'R_e_feature': 211, 'prosp': 88}
+('reversao', 'mean_reversion_m5') {'n': 373, 'com_R': 370, 'com_feature': 371, 'R_e_feature': 369, 'prosp': 0, 'aus_janela_incompleta': 2}
+R e feature por família: {'reversao': 5129, 'continuacao': 9187, 'outras': 199}
+R nulo, motivo (top): [('funding_schedule_unknown', 1113), ('funding_ambiguous_exit', 18), ('funding_missing:2026-09-07T16:00:00+00:00', 9), ('funding_missing:2026-09-09T00:00:00.002000+00:00', 9)]
+
+## versões (R e feature)
+{'breakout/v2': 8, 'mean_reversion/v1': 574, 'mean_reversion/v10': 581, 'mean_reversion/v11': 11, 'mean_reversion/v12': 7, 'mean_reversion/v13': 5, 'mean_reversion/v14': 183, 'mean_reversion/v15': 209, 'mean_reversion/v16': 169, 'mean_reversion/v17': 222, 'mean_reversion/v18': 538, 'mean_reversion/v19': 315, 'mean_reversion/v2': 422, 'mean_reversion/v3': 204, 'mean_reversion/v4': 13, 'mean_reversion/v5': 12, 'mean_reversion/v6': 373, 'mean_reversion/v7': 229, 'mean_reversion/v8': 482, 'mean_reversion_h1/v1': 211, 'mean_reversion_m5/v1': 369, 'momentum/v1': 911, 'momentum/v10': 346, 'momentum/v11': 1166, 'momentum/v12': 21, 'momentum/v13': 29, 'momentum/v2': 499, 'momentum/v3': 1452, 'momentum/v4': 234, 'momentum/v5': 1, 'momentum/v6': 356, 'momentum/v7': 190, 'momentum/v8': 346, 'session_orb/v1': 56, 'sweep_reclaim/v1': 49, 'trendline_bounce/v1': 33, 'trendline_breakout/v1': 117, 'volume_anomaly/v1': 2019, 'volume_anomaly/v2': 1553}
+continuacao mercados: 289
+reversao mercados: 119
+outras mercados: 60
+
+## redundância: Spearman ρ de d_high (e d_low) contra as features do envelope/reconstruídas
+continuacao d_high {'ret15': (0.124, 9187), 'ret60': (0.143, 9187), 'ret240': (0.176, 9187), 'mom15': (0.324, 8841), 'atr_pct': (-0.385, 9187), 'env_ret15': (-0.119, 5551), 'env_rvol': (-0.094, 9187)}
+continuacao d_low {'ret15': (0.427, 9187), 'ret60': (0.518, 9187), 'ret240': (0.698, 9187), 'mom15': (0.058, 8841), 'atr_pct': (0.767, 9187), 'env_ret15': (0.55, 5551), 'env_rvol': (0.168, 9187)}
+continuacao ρ(d_high, d_low) = -0.002
+reversao d_high {'ret15': (-0.056, 5129), 'ret60': (0.465, 5129), 'ret240': (0.517, 5129), 'mom15': (0.014, 2503), 'atr_pct': (-0.578, 5129), 'env_z15': (0.097, 4549)}
+reversao d_low {'ret15': (-0.002, 5129), 'ret60': (-0.301, 5129), 'ret240': (-0.207, 5129), 'mom15': (0.01, 2503), 'atr_pct': (0.406, 5129), 'env_z15': (0.092, 4549)}
+reversao ρ(d_high, d_low) = -0.413
+outras d_high {'ret15': (0.06, 199), 'ret60': (0.141, 199), 'ret240': (0.314, 199), 'mom15': (0.171, 199), 'atr_pct': (-0.458, 199), 'env_rvol': (0.081, 199)}
+outras d_low {'ret15': (0.064, 199), 'ret60': (0.121, 199), 'ret240': (0.324, 199), 'mom15': (-0.057, 199), 'atr_pct': (0.602, 199), 'env_rvol': (-0.171, 199)}
+outras ρ(d_high, d_low) = 0.02
+momentum d_high {'ret15': (-0.119, 5551), 'ret60': (-0.19, 5551), 'ret240': (-0.029, 5551), 'mom15': (0.097, 5205), 'atr_pct': (-0.297, 5551), 'env_ret15': (-0.119, 5551), 'env_rvol': (0.14, 5551)}
+volume_anomaly d_high {'ret15': (0.312, 3572), 'ret60': (0.445, 3572), 'ret240': (0.384, 3572), 'mom15': (0.434, 3572), 'atr_pct': (-0.469, 3572), 'env_rvol': (-0.043, 3572)}
+mean_reversion d_high {'ret15': (-0.09, 4549), 'ret60': (0.533, 4549), 'ret240': (0.614, 4549), 'mom15': (0.014, 2503), 'atr_pct': (-0.598, 4549), 'env_z15': (0.097, 4549)}
+
+## distribuição de d_high e cortes dos tercis (dentro de cada estratégia)
+breakout 8 quantis d_high: [-0.0619, -0.0474, -0.0342, -0.0185, -0.0096, -0.0068, -0.0037] retenção de d_high >= -0,005: 0.125
+mean_reversion 4549 quantis d_high: [-0.227, -0.0861, -0.0463, -0.0365, -0.0287, -0.0176, -0.0075] retenção de d_high >= -0,005: 0.0
+mean_reversion_h1 211 quantis d_high: [-0.168, -0.1014, -0.0649, -0.0514, -0.0382, -0.024, -0.0142] retenção de d_high >= -0,005: 0.0
+mean_reversion_m5 369 quantis d_high: [-0.3594, -0.097, -0.0511, -0.0377, -0.0299, -0.022, -0.0133] retenção de d_high >= -0,005: 0.0
+momentum 5551 quantis d_high: [-0.5222, -0.0516, -0.0195, -0.0106, -0.0057, -0.0017, 0.0] retenção de d_high >= -0,005: 0.299
+session_orb 56 quantis d_high: [-0.149, -0.0893, -0.0353, -0.0221, -0.0146, -0.0046, -0.0018] retenção de d_high >= -0,005: 0.143
+sweep_reclaim 49 quantis d_high: [-0.1261, -0.0607, -0.0481, -0.0317, -0.0271, -0.0153, -0.0003] retenção de d_high >= -0,005: 0.02
+trendline_bounce 33 quantis d_high: [-0.1323, -0.0418, -0.0222, -0.0203, -0.0167, -0.0092, -0.0037] retenção de d_high >= -0,005: 0.03
+trendline_breakout 117 quantis d_high: [-0.3551, -0.0949, -0.0416, -0.0276, -0.0209, -0.0111, -0.0037] retenção de d_high >= -0,005: 0.043
+volume_anomaly 3572 quantis d_high: [-0.5535, -0.1098, -0.0413, -0.0243, -0.0124, -0.0024, 0.0] retenção de d_high >= -0,005: 0.184
+continuacao tercis: {'baixo': 3066, 'meio': 3062, 'alto': 3059}
+reversao tercis: {'baixo': 1717, 'alto': 1702, 'meio': 1710}
