@@ -99,6 +99,22 @@ Fora da tabela: H-001 e H-002 estão `em_curso` (amostra insuficiente ainda, sem
   qualquer hipótese semanal nova de cripto pode nascer sobre eles, pré-registrada, com poder declarado (dp de d_t
   medido aqui: 6,7 p.p./semana → só efeitos de ~1 p.p./semana têm 80 % de poder em ~400 semanas).
 
+### Figuras do Everton — H-025 e H-026 concluídas (R85, 28/09/2026)
+
+- **H-025 — primeira retração de 50–61,8 % no diário (top-20 à vista): `nao_confirma`.** D +0,69 p.p. por 10 d
+  [−1,43; +2,95] contra as moedas do mesmo dia sem recuo; as faixas vizinhas de 45 % e 55 % deram negativo (pico, não
+  patamar) e a faixa de Fibonacci não bate as vizinhas de forma confirmável; o alvo 1,618 com stop abaixo do fundo rende
+  o mesmo que segurar 10 d (+0,009 p.p. nas mesmas entradas). **Não reabrir** com outro k, outra faixa, outro H ou outra
+  amplitude: seriam escolhas depois de ver ([[KB-0169-fibonacci-e-lta-diaria-no-dado]]).
+- **H-026 A — retorno na LTA diária: `refuta`** (−1,09 p.p. [−2,08; −0,02], negativo em todas as tolerâncias, períodos,
+  horizontes e blocos). Não volta como compra; o mesmo repique já tinha perdido no 15 min ([[EXP-0016-trendline-breakout]]).
+- **H-026 B — rompimento do topo depois do teste da LTA: `nao_confirma`**, pista descritiva (+1,09 p.p. [−0,76; +2,89],
+  Holm 0,22; patamar e corte passam). Só volta em **coorte prospectiva** com H = 10 d (não 20) e contraste
+  incremental contra um rompimento de topo **sem** LTA no mesmo dia; e, antes de qualquer ideia de `spot/1`, a taxa fixa
+  real por perna em ficha de 0,05 SOL tem de ser medida.
+- **Elliott:** sem hipótese — nenhuma operacionalização causal publicada que eu tenha conseguido ler
+  ([[KB-0168-fibonacci-elliott-e-lta-diaria]]).
+
 ### Candidatas de análise gráfica (28/09/2026) — não registradas
 
 Da leitura [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] (literatura aberta, nenhum preço nem desfecho
@@ -166,4 +182,5 @@ Regra da casa (Fila de Hipoteses.md, regra 2): **hipótese que morreu não volta
 
 [[Dicionario de Variaveis]] · [[Mapa de Estrategias]] · [[Fila de Hipoteses]] · [[Ideias do Everton]] ·
 [[Perdas/Index|Perdas]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] ·
+[[KB-0168-fibonacci-elliott-e-lta-diaria]] · [[KB-0169-fibonacci-e-lta-diaria-no-dado]] ·
 `docs/RESEARCH.md` · `.claude/rules/obsidian-first.md`

@@ -334,6 +334,7 @@ orquestrador — não criei variável nem mexi em experimento numa leitura. **Di
 ## Relacionados
 
 [[Proximas Hipoteses]] · [[Mapa de Estrategias]] · [[Dicionario de Variaveis]] · [[Fila de Hipoteses]] ·
+[[KB-0168-fibonacci-elliott-e-lta-diaria]] · [[KB-0169-fibonacci-e-lta-diaria-no-dado]] ·
 [[Registro de Tentativas]] · [[KB-0003-rompimento-de-canal-e-data-snooping]] ·
 [[KB-0004-proximidade-da-maxima-e-confirmacao-por-volume]] · [[KB-0014-taker-buy-volume-o-que-temos-medido]] ·
 [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] · [[KB-0077-linhas-de-tendencia]] ·

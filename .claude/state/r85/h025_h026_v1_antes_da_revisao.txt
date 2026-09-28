@@ -1,0 +1,70 @@
+# R85 — H-025/H-026 no dado real (as_of 2026-09-28; sinais 2019-02-24 → 2026-09-16)
+velas 843542; séries 755; painel carregado em 10 s
+dias de sinal 2762; contagens {'fib_band0_raw': 299, 'fib_band1_raw': 386, 'fib_band2_raw': 448, 'fib_band3_raw': 462, 'fib_band4_raw': 386, 'lta0.15_A_raw': 1326, 'lta0.15_B_raw': 254, 'lta0.25_A_raw': 1632, 'lta0.25_B_raw': 336, 'lta0.35_A_raw': 1919, 'lta0.35_B_raw': 422, 'no_entry_open': 1, 'series_scanned': 256}
+atraso de venda (H=10) além de e+10: [(0, 23409), (1, 2), (2, 1)]
+
+## H-025 — Fibonacci 50–61,8 %
+eventos sem controle no dia: 88; estrutural sem controle: 88
+primária [opt]: D +0.691 p.p. [-1.429; +2.946], p 0.2737, Holm 0.5473, nível +2.729 %, n 360, cobertura 85
+primária [pes]: D +0.691 p.p. [-1.429; +2.946], p 0.2737, Holm 0.5473, nível +2.729 %, n 360, cobertura 85
+faixa [0.40; 0.518]: D +1.063 / +1.063 p.p., n 248
+faixa [0.45; 0.568]: D -0.217 / -0.217 p.p., n 331
+faixa [0.50; 0.618]: D +0.691 / +0.691 p.p., n 360
+faixa [0.55; 0.668]: D -0.675 / -0.675 p.p., n 343
+faixa [0.70; 0.818]: D -2.512 / -2.512 p.p., n 259
+patamar (0,45 e 0,55 > 0 nos dois limites): False
+opt: antes de 2022 +0.698 p.p. (n 151) · depois +0.687 (n 209)
+pes: antes de 2022 +0.698 p.p. (n 151) · depois +0.687 (n 209)
+corte ok: True
+K6 (diagnóstico): maior moeda XRPUSDT 20/360 = 5.6 %
+por moeda: 97 moedas; maiores contribuições ao D otimista: BNBUSDT +0.447 p.p. (n 18), SOLUSDT +0.421 p.p. (n 14), LINKUSDT +0.362 p.p. (n 16); menores: CHZUSDT -0.126 (n 1), SANDUSDT -0.157 (n 3); D sem cada moeda de +0.257 a +0.856 p.p. (soma +248.92)
+estrutural [opt] (bloco 120 d): D +0.176 p.p. [-3.173; +3.591], p 0.4078, Holm 0.5473, nível +2.046 %, n 355, cobertura 23
+estrutural [pes] (bloco 120 d): D +0.176 p.p. [-3.173; +3.591], p 0.4078, Holm 0.5473, nível +2.046 %, n 355, cobertura 23
+opt: antes de 2022 +0.095 p.p. (n 151) · depois +0.236 (n 204)
+pes: antes de 2022 +0.095 p.p. (n 151) · depois +0.236 (n 204)
+descritivo: mesmas entradas, estrutural − fixa 10 d: +0.009 / +0.009 p.p. (n 443); m mediano 31 d
+especificidade de Fibonacci (principal − média das 4 vizinhas, otimista): +1.277 p.p. [-0.111; +2.634] → não especial
+verdito H-025: primária NÃO CONFIRMA · estrutural NÃO CONFIRMA
+
+## H-026 — LTA diária (tolerância 0,25 decide; 0,15/0,35 = patamar)
+-- braço A: eventos sem controle 101
+   [opt]: D -1.079 p.p. [-2.071; -0.017], p 0.9830, Holm 0.9830, nível -0.507 %, n 1531, cobertura 96
+   [pes]: D -1.079 p.p. [-2.071; -0.017], p 0.9830, Holm 0.9830, nível -0.507 %, n 1531, cobertura 96
+   patamar: tol 0.15: -0.942/-0.942 (n 1204) · tol 0.25: -1.079/-1.079 (n 1531) · tol 0.35: -0.951/-0.951 (n 1827) → False
+   opt: antes de 2022 -0.900 p.p. (n 601) · depois -1.195 (n 930)
+   pes: antes de 2022 -0.900 p.p. (n 601) · depois -1.195 (n 930)
+   K6: maior moeda BNBUSDT 90/1531 = 5.9 % → False
+   por moeda: 140 moedas; maiores contribuições ao D otimista: BNBUSDT +0.137 p.p. (n 90), DOGEUSDT +0.090 p.p. (n 58), ADAUSDT +0.082 p.p. (n 57); menores: EOSUSDT -0.111 (n 30), LINKUSDT -0.117 (n 58); D sem cada moeda de -1.292 a -0.988 p.p. (soma -1652.65)
+-- braço B: eventos sem controle 13
+   [opt]: D +1.060 p.p. [-0.799; +2.869], p 0.1185, Holm 0.2370, nível +4.369 %, n 323, cobertura 77
+   [pes]: D +1.060 p.p. [-0.799; +2.869], p 0.1185, Holm 0.2370, nível +4.369 %, n 323, cobertura 77
+   patamar: tol 0.15: +0.545/+0.545 (n 239) · tol 0.25: +1.060/+1.060 (n 323) · tol 0.35: +0.265/+0.265 (n 407) → True
+   opt: antes de 2022 +1.562 p.p. (n 140) · depois +0.676 (n 183)
+   pes: antes de 2022 +1.562 p.p. (n 140) · depois +0.676 (n 183)
+   K6: maior moeda ETHUSDT 23/323 = 7.1 % → False
+   por moeda: 79 moedas; maiores contribuições ao D otimista: XRPUSDT +0.510 p.p. (n 17), BNBUSDT +0.368 p.p. (n 15), DOGEUSDT +0.354 p.p. (n 12); menores: LINKUSDT -0.351 (n 17), MATICUSDT -0.376 (n 15); D sem cada moeda de +0.580 a +1.505 p.p. (soma +342.35)
+veredito H-026: A REFUTA · B NÃO CONFIRMA
+
+## Sensibilidade (não decide)
+H-025 H=5: D -0.276 / -0.276 p.p. (n 360)
+H-025 H=20: D +1.045 / +0.836 p.p. (n 359)
+H-025 bloco 1 d (otimista): [-1.220; +2.648], p 0.2370
+H-025 bloco 14 d (otimista): [-1.460; +2.805], p 0.2494
+H-025 bloco 56 d (otimista): [-1.380; +3.064], p 0.3022
+H-025 cluster por moeda (otimista): [-1.370; +2.496]
+H-026 A H=5: D -1.256 / -1.256 p.p. (n 1531)
+H-026 A H=20: D -0.590 / -0.590 p.p. (n 1524)
+H-026 A bloco 1 d (otimista): [-1.972; -0.177], p 0.9912
+H-026 A bloco 14 d (otimista): [-2.069; -0.044], p 0.9824
+H-026 A bloco 56 d (otimista): [-2.094; -0.042], p 0.9811
+H-026 A cluster por moeda (otimista): [-2.087; -0.254]
+H-026 B H=5: D +0.415 / +0.415 p.p. (n 323)
+H-026 B H=20: D +3.687 / +3.687 p.p. (n 323)
+H-026 B bloco 1 d (otimista): [-1.012; +3.249], p 0.1622
+H-026 B bloco 14 d (otimista): [-0.834; +3.075], p 0.1377
+H-026 B bloco 56 d (otimista): [-0.772; +2.809], p 0.1125
+H-026 B cluster por moeda (otimista): [-1.131; +3.202]
+
+antecipação no dado real: 25 dias de sinal reconstruídos só com velas de abertura ≤ d (universo + bandeiras de todas as faixas, controles e tolerâncias); divergências: nenhuma
+VEREDITOS: {'H-025 primária': 'NÃO CONFIRMA', 'H-025 estrutural': 'NÃO CONFIRMA', 'H-026 A': 'REFUTA', 'H-026 B': 'NÃO CONFIRMA'}
+tempo total 201 s

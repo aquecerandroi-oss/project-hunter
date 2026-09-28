@@ -1,0 +1,4 @@
+# R85 — H-025/H-026 no dado real (as_of 2026-09-28; sinais 2019-02-24 → 2026-09-16)
+velas 843542; séries 755; painel carregado em 13 s
+## CONTAGENS (sem retorno)
+{'fib_band0_raw': 299, 'fib_band1_raw': 386, 'fib_band2_raw': 448, 'fib_band3_raw': 462, 'fib_band4_raw': 386, 'lta0.15_A_raw': 1326, 'lta0.15_B_raw': 254, 'lta0.25_A_raw': 1632, 'lta0.25_B_raw': 336, 'lta0.35_A_raw': 1919, 'lta0.35_B_raw': 422, 'no_entry_open': 1, 'series_scanned': 256}

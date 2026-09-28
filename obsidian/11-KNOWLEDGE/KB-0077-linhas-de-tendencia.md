@@ -286,3 +286,14 @@ amostra.
 `.claude/state/brief-T3.34b-trendline-breakout-strategy.md` ·
 `.claude/state/astra-review-T3.34-trendlines.md` ·
 `packages/indicators/hunter_indicators/patterns/` · commit `db798b8`
+
+## Acrescentado em 2026-09-28 — a LTA diária medida (R85)
+
+A mesma geometria (pivô conhecido k velas depois, "dois pontos traçam, o terceiro confirma") foi reescrita no diário
+com as regras literais do artigo do InfoMoney e medida na H-026 ([[KB-0168-fibonacci-elliott-e-lta-diaria]] →
+[[KB-0169-fibonacci-e-lta-diaria-no-dado]]): o retorno na LTA **refuta** (−1,09 p.p. por 10 d, IC inteiro abaixo de
+zero), o rompimento do topo depois do teste **não confirma**. Duas regras que a revisão da Astra obrigou a escrever e
+que valem para qualquer versão futura: a linha **morre em b + vida** (não em b + vida + 1 — era um defeito de fronteira
+no código do R85, com teste), e **proximidade geométrica ≠ toque distinto** — um toque só conta com uma vela
+**estritamente entre** os toques fechando ≥ 1 ATR acima da linha, e o topo P do rompimento fica congelado no fechamento
+do toque.

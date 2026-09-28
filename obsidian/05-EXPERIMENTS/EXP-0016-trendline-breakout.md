@@ -315,3 +315,12 @@ que o dia um tem de publicar" existe para medir.
 `.claude/state/astra-review-T3.34-trendlines.md` · `infra/scripts/seed_reference.py` ·
 `infra/scripts/activate_strategy_version.py` ·
 `services/strategy-worker/hunter_strategy_worker/replay/run.py`
+
+## Referência cruzada (acrescentada em 2026-09-28 — não é avaliação desta coorte)
+
+O mesmo par de ideias foi medido **no diário e à vista**, fora do Lab, na H-026 (R85,
+[[KB-0169-fibonacci-e-lta-diaria-no-dado]]): top-20 da Binance, 2019–2026, com deslistados, regras literais do artigo
+que o Everton trouxe ([[KB-0168-fibonacci-elliott-e-lta-diaria]]). O **retorno na LTA** (o "repique em suporte
+ascendente" que dominou esta versão com 89,4 %) rendeu **−1,09 p.p. por 10 d [−2,08; −0,02]** contra as moedas do mesmo
+dia com LTA confirmada longe da linha — `REFUTA`; o **rompimento do topo depois do teste** deu +1,09 [−0,76; +2,89] —
+`NÃO CONFIRMA`. Nada disto reabre a `trendline_breakout v1` nem autoriza versão nova.

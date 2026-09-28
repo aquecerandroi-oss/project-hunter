@@ -1,0 +1,164 @@
+AVISO: a Astra alterou a árvore de trabalho num modo que não permite alterações:
+29a30
+>  M packages/core/hunter_core/db/models/__init__.py
+30a32
+>  M packages/core/tests/integration/test_schema_privileges.py
+55a58
+> ?? .claude/state/astra-review-H-025-prereg.md
+542c545,546
+< ?? infra/migrations/versions/0068_meme_mature_chart_arms.py
+---
+> ?? infra/migrations/versions/0068_meme_wallet_exceptions.py
+> ?? infra/migrations/versions/0069_meme_mature_chart_arms.py
+550a555
+> ?? packages/core/hunter_core/db/models/meme_wallet_exceptions.py
+551a557
+> ?? packages/core/tests/integration/test_migration_wallet_exceptions.py
+**RESUMO**
+
+**Eu pediria uma emenda ao pré-registro antes de calcular os eventos.** Não encontrei antecipação inevitável nas fórmulas, mas há ambiguidades capazes de mudar a população, uma saída sem preço executável e uma inferência estrutural insuficientemente definida.
+
+Os controles atuais medem comparações legítimas entre estados de preço. **Não isolam, por si, uma vantagem da geometria de Fibonacci ou da LTA.** Um resultado positivo pode decorrer de reversão ou momentum transversal.
+
+Atuei como `quant-engineer`, em OPINIÃO. Abaixo, `F` designa o [pré-registro congelado](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md).
+
+**ARQUIVOS**
+
+Nenhum arquivo criado ou modificado; nenhum commit.
+
+**TESTES**
+
+Revisão estática do texto e dos quatro módulos indicados do R84. Não executei testes, backtest, contagem de eventos, cálculo de pivôs ou retornos. Os cenários abaixo são exemplos hipotéticos de falha.
+
+**MUST-FIX**
+
+**1. H-025: definir exatamente quando começa a procura da primeira retração.**
+
+“Todos os fechamentos anteriores da perna” não determina se a janela começa no fundo, em `h` ou em `h+5`. Isso altera radicalmente o evento. ([F:5](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:5))
+
+**Cenário:** `L=100`, `H=120`, fechamento perto do fundo em 102: `r=0,90`. Se esse fechamento ascendente entrar no histórico exigido, a perna já infringiu `r<0,50` antes de alcançar o topo. Outra implementação pode começar somente em `h+5` e aceitar uma segunda visita à faixa, ignorando a primeira em `h+2`.
+
+**Correção concreta proposta:**
+
+- Fixar `L`, sua data `l`, `H` e `ATR14(h)` quando o pivô for confirmado.
+- Definir `j` como o primeiro índice **a partir de `h`** com `r_j≥0,500`.
+- Emitir somente se `j≥h+5`, `r_j≤0,618` e a perna estiver viva. Travessia anterior à confirmação consome a oportunidade; não há emissão retroativa nem rearme.
+- Fixar os extremos inclusivos da busca de `L`, desempate de mínimas e a ordem de processamento quando outro pivô é confirmado no mesmo dia.
+
+Essa é uma proposta conservadora de operacionalização; deve constar da emenda, sem substituir silenciosamente o texto congelado.
+
+**2. H-026: fechar a regra dos toques distintos e o estado pendente do braço B.**
+
+O intervalo da excursão que separa os toques não está explícito. ([F:15](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:15))
+
+**Cenário:** duas velas consecutivas têm mínima junto à linha e fechamento `1,1 ATR` acima dela. Se o fechamento da própria vela do segundo toque servir como “afastamento desde o anterior”, os dois dias contam como visitas distintas sem uma vela intermediária de separação. Isso muda confirmação, eventos A e referências P de B.
+
+**Correção:** exigir um índice `s` estritamente entre os toques: `q<s<t`, com `C_s≥ℓ(s)+ATR14(s)`. Na primeira visita adicional, usar `b<s<t`. Declarar que `a` e `b` são âncoras contadas por definição, ou exigir também uma separação entre elas.
+
+Para B, congelar **`P_t=max(high[q+1:t])` no fechamento de `t`** e manter cada candidato até primeiro rompimento, morte da linha ou expiração. Um novo toque não deve cancelar ou substituir o anterior sem regra explícita.
+
+**Cenário adicional:** recalcular P incluindo a vela candidata ao rompimento torna `C_d>P_d` impossível, pois `P_d≥high_d≥C_d`. A fórmula escrita evita isso se implementada literalmente; convém tornar o congelamento inequívoco.
+
+**3. Restringir a conclusão dos controles ou acrescentar um contraste que isole a geometria.**
+
+Na H-025, evento e controle são deliberadamente diferentes em profundidade do recuo. Na H-026, A inclui o terceiro toque, enquanto os controles já precisam ter uma linha confirmada e não tocar naquele dia. B também seleciona força recente que o controle não precisa apresentar. ([F:6](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:6), [F:16](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:16))
+
+**Cenário:** qualquer queda recente tende a recuperar, independentemente de Fibonacci. As moedas próximas das máximas corrigem. H-025 obtém D positivo, vizinhos positivos e lucro absoluto positivo, mesmo sem informação específica nos níveis. Em B, momentum genérico pode produzir o resultado equivalente.
+
+Isso **não invalida D para a comparação literalmente registrada**. Invalida interpretá-lo como efeito incremental da geometria.
+
+**Correção mínima:** limitar o significado de CONFIRMA a “esta regra supera este controle nesta população”. Manter explícito que não identifica mecanismo nem especificidade.
+
+**Se a pergunta desejada for incremental**, proponho congelar outro contraste:
+
+- H-025: comparar retrações com estados semelhantes de tendência, volatilidade, idade e amplitude da perna; incluir faixas placebo de mesma largura.
+- H-026 A: comparar visitas à LTA com recuperações semelhantes após recuo, usando níveis placebo definidos antes da visita.
+- H-026 B: comparar rompimentos após teste de LTA com rompimentos horizontais semelhantes sem esse teste.
+- Parear no mesmo dia por retornos prévios, ATR%, liquidez e idade da estrutura, com distância, tolerância e regra de ausência de par congeladas. **Sem suporte comum, declarar ausência de identificação.**
+
+Não tentaria “corrigir por regressão” a ausência de sobreposição entre `r<0,236` e `r∈[0,50;0,618]`. E não trocaria o controle original depois de ver o resultado.
+
+**4. Especificar a reamostragem e o que significa “40 blocos”.**
+
+“Blocos móveis de 28 dias de calendário sobre datas de sinal” precisa preservar também os dias sem sinal. O requisito de 40 blocos não diz se conta janelas sobrepostas ou períodos distintos. ([F:7](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:7), [F:8](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:8), [F:18](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:18))
+
+**Cenário:** duas concentrações breves de eventos, separadas por meses, pertencem a dezenas de janelas móveis diferentes. A contagem passa de 40 sem representar 40 períodos distintos de informação.
+
+**Correção:**
+
+- Calendário completo, incluindo dias com zero eventos.
+- Em cada dia, guardar soma dos contrastes `S_d` e número de eventos `N_d`.
+- Em cada réplica, calcular `D*=ΣS_d*/ΣN_d*`. A média simples das médias diárias mudaria o estimando registrado.
+- Reamostrar conjuntamente todos os eventos, braços, variantes e controles associados ao dia.
+- Para o piso de cobertura, contar intervalos **não sobrepostos**, de 28 dias, ancorados numa data fixa. Isso mede dispersão temporal, sem declarar independência.
+- Fixar tratamento de réplicas vazias, bordas, p unilateral centrado e precedência dos limites de dado sobre o veredito.
+
+**28 dias para holding de 10 dias:** defensável como escolha inicial, não certificadamente adequado. A dependência pode durar além do holding; a escolha do bloco afeta a inferência. Essa ressalva é compatível com a [literatura sobre seleção de blocos](https://arxiv.org/abs/1403.3275).
+
+**Para a saída estrutural de até 60 dias, eu não aceitaria herdar 28 sem uma justificativa adicional.** Entradas separadas por mais de 28 dias podem compartilhar grande parte do mesmo caminho futuro. Proponho bloco estrutural de 120 dias, sensibilidades 60/180 e piso de cobertura próprio, todos congelados antes dos resultados. São convenções propostas, não comprimentos “ótimos” demonstrados.
+
+**5. Fecho carregado não pode ser tratado como venda executável.**
+
+A população prevê venda em `e+10` com “fecho carregado em lacuna”. ([F:6](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:6))
+
+No R84, `open_ff` pode ser o fechamento anterior carregado; a simulação mantém posições congeladas quando não existe abertura real. ([panel.py:96](/C:/dev/project-hunter/.claude/state/r84/panel.py:96), [engine.py:91](/C:/dev/project-hunter/.claude/state/r84/engine.py:91))
+
+**Cenário:** a moeda para de negociar antes de `e+10` e retorna muito abaixo. Liquidar pela marca anterior evita uma perda que não seria evitável. Os dois limites de **fim de série** não resolvem necessariamente uma suspensão temporária.
+
+**Correção:** separar retorno marcado em 10 dias de retorno realizado. Sem preço executável, manter a posição até a primeira abertura real e publicar o atraso; aplicar uma regra explícita de censura/limites se ela não voltar. Não excluir essas posições por indisponibilidade futura. Aplicar a mesma regra aos controles.
+
+**6. A saída estrutural precisa de unidade econômica e relógio de comparação próprios.**
+
+A secundária herda “mesmas cláusulas”, mas o MRE é expresso por operação de **10 dias**, enquanto ela pode durar até 60. “Controles segurados o mesmo número de dias” não especifica o preço de saída quando o alvo/stop é atingido intradiariamente. ([F:7](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:7))
+
+**Cenário:** o evento atinge o alvo durante uma vela; o controle é vendido na abertura daquele dia, anterior ao gatilho, ou no fechamento, posterior. As exposições diferem e o resultado passa a depender de uma escolha não registrada.
+
+**Correção:**
+
+- Definir MRE estrutural em **p.p. por operação estrutural**, ou adotar outra métrica econômica explícita. Não herdar automaticamente “por 10 d”.
+- Congelar stop e alvo na entrada; esclarecer abertura de entrada já fora da geometria, expiração em `e+60` e precedência de abertura versus extremos intradiários.
+- Definir um relógio executável para os controles. Com apenas OHLC diário, a hora exata do toque não está disponível.
+- Se os controles forem encerrados quando o evento dispara sua saída, chamar o resultado de **contraste pareado com parada determinada pelo evento**. Isso pode ser uma regra observável, mas não isola o mérito da saída estrutural.
+- Para testar a saída em si, comparar **as mesmas entradas** sob saída fixa e estrutural, numa janela comum, com a política de caixa após encerramento definida.
+
+Igualar durações realizadas não é automaticamente antecipação: depende de como a saída do controle seria acionada. Também não elimina, sozinho, a diferença entre políticas.
+
+**NICE-TO-HAVE**
+
+- **MRE de +1 p.p.:** não torna CONFIRMA impossível. Porém, estimativa ≥1 e IC inferior >0 demonstram evidência contra zero, não que o efeito verdadeiro seja ≥1. Essa distinção deve acompanhar o rótulo da casa. ([RESEARCH.md:65](/C:/dev/project-hunter/docs/RESEARCH.md:65))
+- **Patamar:** as faixas de Fibonacci se sobrepõem; positividade nos vizinhos é robustez local, não replicação independente. Nas LTAs, mudar tolerância altera também nascimento, sobrevivência e controles: publicar a mudança de população. ([F:7](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:7), [F:17](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:17))
+- **Corte 2022:** bom teste de estabilidade de sinal, mas não é validação prospectiva. Publicar tamanho e cobertura de cada fatia; uma fatia vazia não passa.
+- **K6:** 60% por moeda impede concentração extrema, mas 59% pode passar e poucos ganhos de uma moeda podem dominar D. Acrescentaria contribuição por moeda e retirada de uma moeda por vez como diagnósticos, sem escolher exclusões após o resultado. ([F:18](/C:/dev/project-hunter/.claude/state/r85/prereg_frozen.md:18))
+- **Multiplicidade:** as duas famílias separadas são defensáveis para conclusões separadas. Se a decisão for “promover qualquer vencedor entre H-025, estrutural, A e B”, prefiro uma família de quatro. “Fibonacci especial” com IC positivo também é uma alegação inferencial, embora declarada descritiva.
+- **Instrumento:** o CSV tem `high` e `low`, mas o carregador e as ligações do R84 só transportam abertura, fechamento e volume. A adaptação deve preservar e ajustar OHLC inteiro nas migrações, antes de calcular ATR e pivôs. ([panel.py:107](/C:/dev/project-hunter/.claude/state/r84/panel.py:107), [config.py:61](/C:/dev/project-hunter/.claude/state/r84/config.py:61))
+
+**O QUE EU FARIA DIFERENTE**
+
+Preservaria o congelado e registraria uma emenda datada, ainda sem olhar eventos, contendo: máquina de estados das duas hipóteses, interpretação dos controles, política de lacunas, relógio estrutural e algoritmo de inferência.
+
+Antes do painel real, exigiria exemplos sintéticos para primeira retração antes da confirmação, toque sem separação, P congelado, morte de linha, migração, suspensão e colisão stop/alvo. A prova principal de temporalidade seria reconstruir cada decisão usando apenas o prefixo disponível naquele instante.
+
+**CONCORDO COM**
+
+Sobre a pergunta de antecipação, especificamente:
+
+- **H/L:** buscar L no passado é permitido; ele não precisa ser pivô confirmado. `ATR14(h)` também já está disponível em `h+5`. Não se pode atualizar L usando mínimas posteriores.
+- **Nascimento em `b+5`:** verificar retrospectivamente o respeito à reta até seu nascimento é causal. O que não pode ocorrer é emitir sinais anteriores ao nascimento ou exigir sobrevivência futura.
+- **Terceiro toque:** pode confirmar e emitir A no mesmo fechamento; ele não foi definido como um novo pivô que exigiria mais cinco barras.
+- **P de B:** incluir a máxima do toque é causal; basta congelá-la em `t` e procurar o rompimento depois.
+- **Controle do mesmo dia:** é conhecido no fechamento. A questão principal é comparabilidade, não futuro.
+- **Universo em `e=d+1`:** volume até `e−1=d` é passado no instante da entrada. O ranking do R84 usa precisamente uma janela anterior a `t`; não filtra elegibilidade por `ended` futuro. ([engine.py:34](/C:/dev/project-hunter/.claude/state/r84/engine.py:34), [engine.py:41](/C:/dev/project-hunter/.claude/state/r84/engine.py:41)) Executar exatamente na abertura seguinte continua sendo uma idealização de latência.
+
+Também concordo com custo explícito, universo com deslistados auditados, lucro absoluto além de D, dois cenários de término e **REFUTA restrito ao tamanho previsto**. A auditoria anterior é uma base útil, com seus limites documentados. ([KB-0166:69](/C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0166-evitar-as-moedas-em-queda-nao-bate-a-cesta.md:69))
+
+O resultado de 15 minutos justifica cautela e separar A/B; não refuta previamente o diário. ([EXP-0016:250](/C:/dev/project-hunter/obsidian/05-EXPERIMENTS/EXP-0016-trendline-breakout.md:250))
+
+**OBSIDIAN**
+
+- **Fila de Hipóteses:** acrescentar eventual emenda datada de H-025/H-026, preservando o congelado original.
+- **Revisões Astra — R85 / pré-registro H-025 e H-026:** registrar os seis achados, decisões aceitas e divergências.
+- **KB-0166 — Evitar as moedas em queda de 14 dias não bate a cesta:** explicitar os cuidados ao reutilizar o painel para OHLC diário e saídas por evento.
+- **KB-0077 — Linhas de tendência:** documentar intervalos estritos entre toques e o congelamento de P.
+- **KB-0167 — Análise gráfica: o que sobra depois do custo:** distinguir superioridade contra um controle de evidência incremental da geometria.
+
+Nenhuma dessas páginas foi alterada.

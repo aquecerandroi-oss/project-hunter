@@ -91,6 +91,8 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 - [[R82-recuo-controle]] — H-017, o recuo pequeno empata com comprar na hora (KB-0162) (27/09)
 - [[R83-maxima-24h]] — H-023, perto da máxima de 24 h não separa os sinais do Lab de cripto (KB-0163) (28/09)
 - [[R84-momentum-semanal]] — H-024, evitar as moedas em queda de 14 dias não bate a cesta; sobrevivência auditada em 153 cópias históricas (KB-0166) (28/09)
+- [[H-025-H-026-prereg]] — R85, desenho da retração de Fibonacci e da LTA diária: 6 must-fix aceitos numa emenda datada antes de qualquer evento (KB-0168) (28/09)
+- [[H-025-H-026-resultado]] — R85, resultado: Fibonacci não confirma, retorno na LTA refuta, rompimento do topo não confirma; 4 defeitos de código corrigidos sem mudar rótulo (KB-0169) (28/09)
 - [[T4.96-escopo-teste-pequeno]] — corte do débito do escopo, diagnóstico da parada de 26/09 (26/09)
 - [[T4.96b-scope-debit]] — corrida SigningLocked/admitted_orphan_expired (26/09)
 - [[T4.97b-identity-breaker]] — disjuntor da identidade por mint (26/09)
