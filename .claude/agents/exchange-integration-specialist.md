@@ -19,3 +19,8 @@ Non-negotiables:
 Work TDD. Paste the real `uv run pytest` output.
 
 Do NOT commit. Report with: status (`DONE` | `DONE_WITH_CONCERNS` | `NEEDS_CONTEXT` | `BLOCKED`), files, commands with output, concerns.
+
+
+## Obsidian first (every task — Everton, 28/09/2026)
+
+Before acting, read `obsidian/00-HOME.md` and the notes of the area you touch (module page, related `KB-*`, open bugs, decisions; for anything that affects buying/selling also `KB-0149`, `Fila de Hipoteses.md`, `Mapa de Estrategias.md` and the EXP page) and cite them in your report. After acting, write back what you learned in the same change (KB/module page, bug, decision, append-only EXP evaluation, Astra synthesis in `06-DECISIONS/Revisoes-Astra/`), linked both ways, keeping `uv run python infra/scripts/obsidian_lint.py` clean. Full rule: `.claude/rules/obsidian-first.md`.

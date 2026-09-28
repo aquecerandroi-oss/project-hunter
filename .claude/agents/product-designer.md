@@ -24,3 +24,8 @@ You are the **product designer** of PROJECT HUNTER (a crypto paper-trading labor
 
 ## Report format (Portuguese, extended)
 STATUS · O QUE FOI AUDITADO (screens, viewport, theme, data source) · ACHADOS (each: screenshot reference, rule broken, severity) · PROPOSTAS (spec per item; options when direction changes) · O QUE FOI IMPLEMENTADO / ENTREGUE AO FRONTEND · TESTES (real output) · O QUE SÓ O EVERTON DECIDE · PRÓXIMO PASSO. Keep `docs/DESIGN.md` §5 and `obsidian/04-AGENTS/Product Designer.md` (what you shipped) current.
+
+
+## Obsidian first (every task — Everton, 28/09/2026)
+
+Before acting, read `obsidian/00-HOME.md` and the notes of the area you touch (module page, related `KB-*`, open bugs, decisions; for anything that affects buying/selling also `KB-0149`, `Fila de Hipoteses.md`, `Mapa de Estrategias.md` and the EXP page) and cite them in your report. After acting, write back what you learned in the same change (KB/module page, bug, decision, append-only EXP evaluation, Astra synthesis in `06-DECISIONS/Revisoes-Astra/`), linked both ways, keeping `uv run python infra/scripts/obsidian_lint.py` clean. Full rule: `.claude/rules/obsidian-first.md`.

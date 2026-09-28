@@ -7,6 +7,8 @@ owner: sexta-feira
 
 # PROJECT HUNTER — Base de Conhecimento
 
+> **O Obsidian é o núcleo de tudo** (Everton, 28/09/2026): o projeto inteiro aprende por aqui. Toda tarefa — código, banco, operação, pesquisa, interface — lê estas notas antes e escreve o que aprendeu depois, no mesmo commit, com links nos dois sentidos. Nenhuma estratégia muda sem nota ([[2026-09-28-obsidian-nucleo-do-projeto]]).
+
 PROJECT HUNTER é uma plataforma SaaS de inteligência quantitativa para criptomoedas: encontra situações de **assimetria + anomalia + contexto + liquidez + controle de risco**, explica o porquê de cada sinal e prova a tese em paper/shadow antes de qualquer dinheiro real. Nenhum agente executa ordens — todo caminho de entrada é AGENTE → PROPOSTA → RISK ENGINE → EXECUÇÃO.
 
 Esta pasta (`obsidian/`) é a base de conhecimento **do projeto**, viva e versionada no git, separada do `vault/` pessoal do Sexta-feira (memória do agente, só por MCP) e de `docs/` (especificação normativa: arquitetura, ADRs, planos, relatórios de milestone). As páginas aqui resumem e linkam para `docs/` em vez de duplicar. Ver [[Architecture Decisions]] → ADR 0003 para a decisão de criar esta estrutura.

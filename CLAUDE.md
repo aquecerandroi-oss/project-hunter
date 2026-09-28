@@ -14,7 +14,7 @@
 4. **Goal-driven execution** — turn tasks into verifiable goals ("fix the bug" becomes "write a test that reproduces it, then make it pass"). For multi-step work, state a brief plan with a verify check per step, then loop until every step is verified. Never claim "done" or "tests pass" without running the command in the same turn and reading its output.
 5. **Orchestrator, not implementer** — the main session plans, decides, coordinates and commits; it does not implement. Delegable implementation and analysis goes to a specialist subagent (table below), dispatched in parallel waves when task scopes don't conflict. Rule: `@.claude/rules/parallel-subagent-driven-development.md`.
 6. **Astra shares the reasoning** — every agent asks Astra (GPT-6 via Codex, read-only) for a second opinion on unsure designs and on its own diff before reporting DONE; reviewers reconcile with her; disagreements are written down. Rule: `@.claude/rules/astra-second-opinion.md`.
-7. **Obsidian first for strategy** — before proposing, implementing or applying any strategy change, read `obsidian/11-KNOWLEDGE/KB-0149-o-que-a-mesa-real-ensinou.md`, `Fila de Hipoteses.md` and the EXP page, cite them, and write the outcome back; the audited change tools refuse without `--note obsidian/...`. Rule: `@.claude/rules/obsidian-first.md`.
+7. **Obsidian first, for every task** — the whole project learns through `obsidian/`: before any task, read `obsidian/00-HOME.md` and the notes of the area (for anything that affects buying/selling also `KB-0149`, `Fila de Hipoteses.md`, `Mapa de Estrategias.md` and the EXP page) and cite them; after it, write back what was learned in the same commit, linked both ways, lint clean. Strategy changes are also gated by the audited tools (`--note obsidian/...`). Rule: `@.claude/rules/obsidian-first.md`.
 8. **Brainstorm → plan → implement → review.** Classify every request as *spike* (answer, no permanent code), *bounded* (≤ 3 files inside an existing flow: two-sentence design in chat, approval, implement) or *architectural* (new subsystem or interface change: design doc in `docs/`, explicit approval, then a plan in `docs/plans/`). When in doubt, pick the heavier path. Never downgrade mid-task.
 
 ## Hard rules of this product (from the spec; non-negotiable)
@@ -53,6 +53,7 @@ Always use exactly these; never guess alternatives.
 
 ## Read these first (in this order) before any design or implementation work
 
+0. `obsidian/00-HOME.md` and the notes of the area — **the Obsidian base is the core of the project** (Everton, 28/09/2026): what was learned, decided, refuted and what to test next lives there
 1. `docs/ARCHITECTURE.md` — stack, topology, services, module interfaces, monorepo tree
 2. `docs/PIPELINE.md` — Market → Features → Anomaly → Regime → Opportunity → Agent → Risk → Execution
 3. `docs/DATABASE.md` — schema, RLS, partitioning, retention
