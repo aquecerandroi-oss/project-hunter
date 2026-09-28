@@ -1,0 +1,30 @@
+# R84 — H-024 no dado real (as_of 2026-09-28, último T 2026-09-14)
+## Principal (continuidades documentadas ligadas; lacunas longas classificadas — notes §4)
+semanas: 395 (2019-02-25 → 2026-09-14); avaliáveis (N_T ≥ 15): 395; buracos de calendário entre avaliáveis: 0; N_T médio 19.98
+TS: semanas 100 % caixa 25; exposição média 0.493
+VEREDITO primária (D_ts): NÃO CONFIRMA
+veredito secundária (D_cs, com a mesma família): NÃO CONFIRMA
+D_ts [opt] n=395: +0.137 p.p./sem, IC95 [-0.495; +0.864], p=0.3695 (Holm 0.3695), dp(d_t)=6.71 p.p.; nível ts +0.566 (EW +0.430); patamar 7d -0.112 28d +0.268; antes-2022 -0.284 (n=149) depois +0.391 (n=246); IC b4 [-0.480; +0.813] b16 [-0.530; +0.897]; Sharpe 0.59 DD -70.9 %
+D_ts [pes] n=395: +0.150 p.p./sem, IC95 [-0.481; +0.873], p=0.3539 (Holm 0.3539), dp(d_t)=6.72 p.p.; nível ts +0.566 (EW +0.416); patamar 7d -0.098 28d +0.281; antes-2022 -0.249 (n=149) depois +0.391 (n=246); IC b4 [-0.470; +0.827] b16 [-0.519; +0.904]; Sharpe 0.59 DD -70.9 %
+D_cs [opt] n=395: +0.354 p.p./sem, IC95 [-0.081; +0.696], p=0.0218 (Holm 0.0436), dp(d_t)=4.71 p.p.; nível cs +0.783 (EW +0.430); patamar 7d -0.134 28d -0.142; antes-2022 +0.428 (n=149) depois +0.309 (n=246); IC b4 [-0.108; +0.758] b16 [-0.048; +0.644]; Sharpe 0.48 DD -93.4 %
+D_cs [pes] n=395: +0.367 p.p./sem, IC95 [-0.070; +0.712], p=0.0192 (Holm 0.0384), dp(d_t)=4.71 p.p.; nível cs +0.783 (EW +0.416); patamar 7d -0.121 28d -0.129; antes-2022 +0.463 (n=149) depois +0.309 (n=246); IC b4 [-0.094; +0.778] b16 [-0.043; +0.655]; Sharpe 0.48 DD -93.4 %
+EW [opt]: média +0.430 %/sem, Sharpe 0.28, DD -96.0 %
+eventos/giro (lb 14): ew14_opt: fim-de-série 2, congeladas 44, giro 89.8; ew14_pes: fim-de-série 2, congeladas 44, giro 89.8; ts14_opt: fim-de-série 0, congeladas 0, giro 156.0; ts14_pes: fim-de-série 0, congeladas 0, giro 156.0; cs14_opt: fim-de-série 0, congeladas 0, giro 372.2; cs14_pes: fim-de-série 0, congeladas 0, giro 372.2
+## Sensibilidade (não decide): sem ligações de migração e com toda lacuna ≥ 14 d partida
+semanas: 395 (2019-02-25 → 2026-09-14); avaliáveis (N_T ≥ 15): 395; buracos de calendário entre avaliáveis: 0; N_T médio 19.98
+TS: semanas 100 % caixa 25; exposição média 0.494
+VEREDITO primária (D_ts): NÃO CONFIRMA
+veredito secundária (D_cs, com a mesma família): NÃO CONFIRMA
+D_ts [opt] n=395: +0.134 p.p./sem, IC95 [-0.500; +0.866], p=0.3753 (Holm 0.3753), dp(d_t)=6.74 p.p.; nível ts +0.562 (EW +0.427); patamar 7d -0.115 28d +0.264; antes-2022 -0.285 (n=149) depois +0.388 (n=246); IC b4 [-0.486; +0.813] b16 [-0.536; +0.893]; Sharpe 0.59 DD -70.8 %
+D_ts [pes] n=395: +0.186 p.p./sem, IC95 [-0.448; +0.919], p=0.3204 (Holm 0.3204), dp(d_t)=6.73 p.p.; nível ts +0.562 (EW +0.376); patamar 7d -0.063 28d +0.316; antes-2022 -0.213 (n=149) depois +0.428 (n=246); IC b4 [-0.432; +0.860] b16 [-0.488; +0.937]; Sharpe 0.59 DD -70.8 %
+D_cs [opt] n=395: +0.352 p.p./sem, IC95 [-0.080; +0.695], p=0.0225 (Holm 0.0450), dp(d_t)=4.71 p.p.; nível cs +0.780 (EW +0.427); patamar 7d -0.151 28d -0.159; antes-2022 +0.421 (n=149) depois +0.311 (n=246); IC b4 [-0.111; +0.758] b16 [-0.047; +0.638]; Sharpe 0.48 DD -93.3 %
+D_cs [pes] n=395: +0.404 p.p./sem, IC95 [-0.034; +0.752], p=0.0124 (Holm 0.0248), dp(d_t)=4.75 p.p.; nível cs +0.780 (EW +0.376); patamar 7d -0.135 28d -0.143; antes-2022 +0.493 (n=149) depois +0.351 (n=246); IC b4 [-0.060; +0.813] b16 [-0.015; +0.690]; Sharpe 0.48 DD -93.3 %
+EW [opt]: média +0.427 %/sem, Sharpe 0.27, DD -96.0 %
+eventos/giro (lb 14): ew14_opt: fim-de-série 5, congeladas 0, giro 90.4; ew14_pes: fim-de-série 5, congeladas 0, giro 90.4; ts14_opt: fim-de-série 0, congeladas 0, giro 156.2; ts14_pes: fim-de-série 0, congeladas 0, giro 156.2; cs14_opt: fim-de-série 0, congeladas 0, giro 373.0; cs14_pes: fim-de-série 0, congeladas 0, giro 373.0
+descritivo TS [opt]: média +0.566 %/sem, Sharpe anual 0.59, DD máx -70.9 %
+descritivo TS [pes]: média +0.566 %/sem, Sharpe anual 0.59, DD máx -70.9 %
+descritivo EW [opt]: média +0.430 %/sem, Sharpe anual 0.28, DD máx -96.0 %
+descritivo BTC comprado-e-segurado: média +1.117 %/sem, Sharpe anual 0.98, DD máx -75.2 %
+descritivo caixa: média +0.000 %/sem, Sharpe anual nan, DD máx 0.0 %
+moeda-semanas no universo: 7893; símbolos distintos 238; bStocks: 13 moeda-semanas ['MUBUSDT', 'SNDKBUSDT', 'SPCXBUSDT']
+antecipação no dado real: 25 semanas × 3 lookbacks × 3 braços reconstruídas só com velas < T; divergências: nenhuma

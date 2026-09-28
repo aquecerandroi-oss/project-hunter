@@ -88,9 +88,16 @@ Fora da tabela: H-001 e H-002 estão `em_curso` (amostra insuficiente ainda, sem
 | **Longe da mínima de 24 h** nos sinais de continuação do Lab de cripto | +0,207 R [+0,121, +0,284], Holm 0,0004, patamar nos 7 cortes ([[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]]) | secundária de uma hipótese que não confirmou; anda com ATR% (ρ 0,77); o melhor tercil ainda perde −0,097 R | pré-registrar em coorte prospectiva, com ATR% controlado e a comparação contra "não operar" |
 | **`mean_reversion v14`** (a da `spot/1`) | +0,228 R [−0,099, +0,597] no contraste da máxima, 183 sinais | amostra pequena, IC largo, só descritivo | seguir acumulando na `spot/1` (limite pequeno) até ter amostra para pré-registrar |
 
-### Em curso — segunda frente (28/09/2026)
+### Segunda frente — H-024 concluída (R84, 28/09/2026)
 
-- **H-024 — momentum semanal de série temporal em cripto grande (à vista, só compra)**: literatura e desenho em [[KB-0164-momentum-semanal-em-cripto-grande]]; registrada antes de baixar qualquer vela. Poder declarado baixo: o desfecho esperado sem efeito grande é NÃO CONFIRMA.
+- **H-024 — momentum semanal de série temporal em cripto grande (à vista, só compra): `nao_confirma`.** D_ts +0,14
+  p.p./sem [−0,50; +0,86] em 395 semanas; a secundária transversal D_cs (+0,35, Holm 0,04) é **pico** na grade 7/14/28 d
+  e não vira pista ([[KB-0166-evitar-as-moedas-em-queda-nao-bate-a-cesta]]). **Não reabrir** com outro lookback, só
+  pós-2022, outro N ou outro universo: seriam escolhas depois de ver. O que sobra de útil é **ferramenta**, não
+  sinal: o painel diário de 750 pares USDT à vista com deslistados (`.claude/state/r84/cache/`, sobrevivência auditada
+  contra 153 cópias históricas de cadastro) e o código de universo ponto-no-tempo (`.claude/state/r84/engine.py`) —
+  qualquer hipótese semanal nova de cripto pode nascer sobre eles, pré-registrada, com poder declarado (dp de d_t
+  medido aqui: 6,7 p.p./semana → só efeitos de ~1 p.p./semana têm 80 % de poder em ~400 semanas).
 
 ### Candidatas de análise gráfica (28/09/2026) — não registradas
 

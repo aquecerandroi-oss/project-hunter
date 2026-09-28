@@ -1,0 +1,26 @@
+AGIXUSDT → FETUSDT: 1.ª vela 2019-02-28; top-20 nas 10 semanas após idade 35 d: ['2019-04-08', '2019-04-15', '2019-04-22', '2019-04-29', '2019-05-06', '2019-05-13', '2019-05-20', '2019-05-27', '2019-06-03', '2019-06-10']
+AVAOLDUSDT → AVAUSDT: 1.ª vela 2020-11-24; top-20 nas 10 semanas após idade 35 d: não
+DARUSDT → DUSDT: 1.ª vela 2025-01-09; top-20 nas 10 semanas após idade 35 d: não
+DEGOOLDUSDT → DEGOUSDT: 1.ª vela 2021-03-10; top-20 nas 10 semanas após idade 35 d: não
+EOSUSDT → AUSDT: 1.ª vela 2025-05-28; top-20 nas 10 semanas após idade 35 d: não
+FRONTUSDT → SLFUSDT: 1.ª vela 2024-08-30; top-20 nas 10 semanas após idade 35 d: não
+FTMUSDT → SUSDT: 1.ª vela 2025-01-16; top-20 nas 10 semanas após idade 35 d: ['2025-03-03', '2025-03-10', '2025-03-17', '2025-03-24', '2025-03-31', '2025-04-07', '2025-04-14', '2025-04-21', '2025-04-28']
+FXSUSDT → FRAXUSDT: 1.ª vela 2026-01-15; top-20 nas 10 semanas após idade 35 d: não
+GALUSDT → GUSDT: 1.ª vela 2024-07-19; top-20 nas 10 semanas após idade 35 d: não
+KLAYUSDT → KAIAUSDT: 1.ª vela 2024-10-31; top-20 nas 10 semanas após idade 35 d: não
+LITUSDT → HEIUSDT: 1.ª vela 2025-02-13; top-20 nas 10 semanas após idade 35 d: não
+LOKAUSDT → A2ZUSDT: 1.ª vela 2025-07-30; top-20 nas 10 semanas após idade 35 d: não
+LOOMOLDUSDT → LOOMUSDT: 1.ª vela 2023-03-24; top-20 nas 10 semanas após idade 35 d: não
+MATICUSDT → POLUSDT: 1.ª vela 2024-09-13; top-20 nas 10 semanas após idade 35 d: não
+MCUSDT → BEAMXUSDT: 1.ª vela 2023-11-14; top-20 nas 10 semanas após idade 35 d: não
+MKRUSDT → SKYUSDT: 1.ª vela 2025-09-17; top-20 nas 10 semanas após idade 35 d: não
+NPXSUSDT → PUNDIXUSDT: 1.ª vela 2021-04-09; top-20 nas 10 semanas após idade 35 d: não
+OCEANUSDT → FETUSDT: 1.ª vela 2019-02-28; top-20 nas 10 semanas após idade 35 d: ['2019-04-08', '2019-04-15', '2019-04-22', '2019-04-29', '2019-05-06', '2019-05-13', '2019-05-20', '2019-05-27', '2019-06-03', '2019-06-10']
+OMNIUSDT → NOMUSDT: 1.ª vela 2025-10-01; top-20 nas 10 semanas após idade 35 d: não
+OMUSDT → MANTRAUSDT: 1.ª vela 2026-03-04; top-20 nas 10 semanas após idade 35 d: não
+ORNUSDT → LUMIAUSDT: 1.ª vela 2024-10-18; top-20 nas 10 semanas após idade 35 d: não
+PLAUSDT → PDAUSDT: 1.ª vela 2024-03-01; top-20 nas 10 semanas após idade 35 d: não
+RNDRUSDT → RENDERUSDT: 1.ª vela 2024-07-26; top-20 nas 10 semanas após idade 35 d: não
+STGUSDT → ZROUSDT: 1.ª vela 2024-06-20; top-20 nas 10 semanas após idade 35 d: ['2024-07-29', '2024-08-05', '2024-08-12', '2024-08-19']
+STPTUSDT → AWEUSDT: 1.ª vela 2025-05-21; top-20 nas 10 semanas após idade 35 d: não
+TVKUSDT → VANRYUSDT: 1.ª vela 2023-12-01; top-20 nas 10 semanas após idade 35 d: não

@@ -54,6 +54,7 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 - 2026-09-28 — [[Staking-sol-parado]] (staking do SOL parado; checagem de ativos estranhos inerte)
 - 2026-09-28 — [[Token-state-history]] (histórico de estado das moedas; must-fix 2 do J fechado)
 - 2026-09-28 — [[KB-momentum-semanal]] (H-024, momentum semanal em cripto grande)
+- 2026-09-28 — [[Wallet-unrecognized-holdings]] (checagem de ativos estranhos na carteira ligada; adiar sem veredito, slots por programa)
 - 2026-09-28 — [[KB-analise-grafica]] (KB-0167, análise gráfica depois do custo; candidatas C1–C3, nada registrado)
 
 - [[T4.74-spot-desk]] — fundações, perfil, sinal, dinheiro e saídas da mesa `spot/1` (19/09)
@@ -87,6 +88,7 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 - [[R81-grafico-5min]] — H-021, gráfico de 5 minutos não existe na porta (26/09)
 - [[R82-recuo-controle]] — H-017, o recuo pequeno empata com comprar na hora (KB-0162) (27/09)
 - [[R83-maxima-24h]] — H-023, perto da máxima de 24 h não separa os sinais do Lab de cripto (KB-0163) (28/09)
+- [[R84-momentum-semanal]] — H-024, evitar as moedas em queda de 14 dias não bate a cesta; sobrevivência auditada em 153 cópias históricas (KB-0166) (28/09)
 - [[T4.96-escopo-teste-pequeno]] — corte do débito do escopo, diagnóstico da parada de 26/09 (26/09)
 - [[T4.96b-scope-debit]] — corrida SigningLocked/admitted_orphan_expired (26/09)
 - [[T4.97b-identity-breaker]] — disjuntor da identidade por mint (26/09)

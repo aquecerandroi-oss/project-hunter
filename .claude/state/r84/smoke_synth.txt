@@ -1,0 +1,59 @@
+## EFEITO DE SÉRIE TEMPORAL (fator comum + moeda persistentes) (semente 11)
+semanas: 448 (2018-02-19 → 2026-09-14); avaliáveis (N_T ≥ 15): 448; buracos de calendário entre avaliáveis: 0; N_T médio 19.99
+TS: semanas 100 % caixa 42; exposição média 0.457
+VEREDITO primária (D_ts): CONFIRMA
+veredito secundária (D_cs, com a mesma família): CONFIRMA
+D_ts [opt] n=448: +1.294 p.p./sem, IC95 [+0.365; +2.112], p=0.0027 (Holm 0.0027), dp(d_t)=7.07 p.p.; nível ts +1.214 (EW -0.080); patamar 7d +0.847 28d +1.218; antes-2022 +1.165 (n=202) depois +1.400 (n=246); IC b4 [+0.470; +2.086] b16 [+0.300; +2.175]; Sharpe 1.26 DD -56.2 %
+D_ts [pes] n=448: +1.327 p.p./sem, IC95 [+0.393; +2.166], p=0.0025 (Holm 0.0025), dp(d_t)=7.09 p.p.; nível ts +1.214 (EW -0.112); patamar 7d +0.880 28d +1.251; antes-2022 +1.213 (n=202) depois +1.419 (n=246); IC b4 [+0.495; +2.135] b16 [+0.313; +2.227]; Sharpe 1.26 DD -56.2 %
+D_cs [opt] n=448: +0.761 p.p./sem, IC95 [+0.397; +1.036], p=0.0001 (Holm 0.0002), dp(d_t)=3.49 p.p.; nível cs +0.681 (EW -0.080); patamar 7d +0.344 28d +0.855; antes-2022 +0.890 (n=202) depois +0.656 (n=246); IC b4 [+0.407; +1.085] b16 [+0.372; +0.995]; Sharpe 0.40 DD -99.3 %
+D_cs [pes] n=448: +0.794 p.p./sem, IC95 [+0.425; +1.078], p=0.0001 (Holm 0.0002), dp(d_t)=3.53 p.p.; nível cs +0.681 (EW -0.112); patamar 7d +0.313 28d +0.855; antes-2022 +0.938 (n=202) depois +0.676 (n=246); IC b4 [+0.433; +1.125] b16 [+0.390; +1.034]; Sharpe 0.40 DD -99.3 %
+EW [opt]: média -0.080 %/sem, Sharpe -0.05, DD -99.8 %
+eventos/giro (lb 14): ew14_opt: fim-de-série 3, congeladas 0, giro 46.1; ew14_pes: fim-de-série 3, congeladas 0, giro 46.1; ts14_opt: fim-de-série 0, congeladas 0, giro 134.3; ts14_pes: fim-de-série 0, congeladas 0, giro 134.3; cs14_opt: fim-de-série 0, congeladas 0, giro 393.1; cs14_pes: fim-de-série 0, congeladas 0, giro 393.1
+
+## EFEITO SÓ TRANSVERSAL (deriva só por moeda; D_ts não deve achar) (semente 15)
+semanas: 448 (2018-02-19 → 2026-09-14); avaliáveis (N_T ≥ 15): 448; buracos de calendário entre avaliáveis: 0; N_T médio 19.98
+TS: semanas 100 % caixa 15; exposição média 0.472
+VEREDITO primária (D_ts): NÃO CONFIRMA
+veredito secundária (D_cs, com a mesma família): CONFIRMA
+D_ts [opt] n=448: -0.142 p.p./sem, IC95 [-0.646; +0.429], p=0.7313 (Holm 0.7313), dp(d_t)=5.93 p.p.; nível ts +0.189 (EW +0.331); patamar 7d -0.036 28d -0.008; antes-2022 -0.685 (n=202) depois +0.304 (n=246); IC b4 [-0.669; +0.405] b16 [-0.606; +0.496]; Sharpe 0.25 DD -80.3 %
+D_ts [pes] n=448: -0.109 p.p./sem, IC95 [-0.624; +0.473], p=0.6887 (Holm 0.6887), dp(d_t)=5.98 p.p.; nível ts +0.157 (EW +0.266); patamar 7d +0.008 28d +0.037; antes-2022 -0.685 (n=202) depois +0.364 (n=246); IC b4 [-0.644; +0.447] b16 [-0.584; +0.546]; Sharpe 0.21 DD -81.2 %
+D_cs [opt] n=448: +0.802 p.p./sem, IC95 [+0.481; +1.108], p=0.0001 (Holm 0.0002), dp(d_t)=3.40 p.p.; nível cs +1.133 (EW +0.331); patamar 7d +0.453 28d +0.747; antes-2022 +0.506 (n=202) depois +1.046 (n=246); IC b4 [+0.486; +1.073] b16 [+0.476; +1.152]; Sharpe 0.79 DD -92.8 %
+D_cs [pes] n=448: +0.809 p.p./sem, IC95 [+0.473; +1.127], p=0.0001 (Holm 0.0002), dp(d_t)=3.54 p.p.; nível cs +1.075 (EW +0.266); patamar 7d +0.459 28d +0.756; antes-2022 +0.486 (n=202) depois +1.075 (n=246); IC b4 [+0.477; +1.099] b16 [+0.467; +1.169]; Sharpe 0.74 DD -92.8 %
+EW [opt]: média +0.331 %/sem, Sharpe 0.24, DD -97.0 %
+eventos/giro (lb 14): ew14_opt: fim-de-série 6, congeladas 0, giro 46.7; ew14_pes: fim-de-série 6, congeladas 0, giro 46.7; ts14_opt: fim-de-série 3, congeladas 0, giro 158.5; ts14_pes: fim-de-série 3, congeladas 0, giro 158.5; cs14_opt: fim-de-série 2, congeladas 0, giro 388.8; cs14_pes: fim-de-série 2, congeladas 0, giro 389.0
+
+## NULO (semente 12)
+semanas: 448 (2018-02-19 → 2026-09-14); avaliáveis (N_T ≥ 15): 448; buracos de calendário entre avaliáveis: 0; N_T médio 19.99
+TS: semanas 100 % caixa 12; exposição média 0.462
+VEREDITO primária (D_ts): REFUTA
+veredito secundária (D_cs, com a mesma família): NÃO CONFIRMA
+D_ts [opt] n=448: -0.314 p.p./sem, IC95 [-0.746; +0.196], p=0.9250 (Holm 0.9250), dp(d_t)=5.91 p.p.; nível ts -0.099 (EW +0.215); patamar 7d -0.352 28d -0.273; antes-2022 -0.457 (n=202) depois -0.196 (n=246); IC b4 [-0.782; +0.215] b16 [-0.734; +0.161]; Sharpe -0.13 DD -82.2 %
+D_ts [pes] n=448: -0.282 p.p./sem, IC95 [-0.720; +0.233], p=0.9053 (Holm 0.9363), dp(d_t)=5.93 p.p.; nível ts -0.112 (EW +0.170); patamar 7d -0.320 28d -0.241; antes-2022 -0.437 (n=202) depois -0.155 (n=246); IC b4 [-0.752; +0.248] b16 [-0.700; +0.193]; Sharpe -0.15 DD -83.2 %
+D_cs [opt] n=448: +0.025 p.p./sem, IC95 [-0.301; +0.323], p=0.4068 (Holm 0.8135), dp(d_t)=3.22 p.p.; nível cs +0.240 (EW +0.215); patamar 7d +0.086 28d +0.186; antes-2022 -0.054 (n=202) depois +0.090 (n=246); IC b4 [-0.291; +0.335] b16 [-0.310; +0.309]; Sharpe 0.17 DD -91.7 %
+D_cs [pes] n=448: +0.000 p.p./sem, IC95 [-0.332; +0.306], p=0.4682 (Holm 0.9363), dp(d_t)=3.24 p.p.; nível cs +0.170 (EW +0.170); patamar 7d +0.131 28d +0.161; antes-2022 -0.088 (n=202) depois +0.073 (n=246); IC b4 [-0.317; +0.311] b16 [-0.355; +0.299]; Sharpe 0.12 DD -93.9 %
+EW [opt]: média +0.215 %/sem, Sharpe 0.16, DD -88.5 %
+eventos/giro (lb 14): ew14_opt: fim-de-série 4, congeladas 0, giro 52.5; ew14_pes: fim-de-série 4, congeladas 0, giro 52.5; ts14_opt: fim-de-série 1, congeladas 0, giro 161.4; ts14_pes: fim-de-série 1, congeladas 0, giro 161.5; cs14_opt: fim-de-série 2, congeladas 0, giro 406.3; cs14_pes: fim-de-série 2, congeladas 0, giro 406.6
+
+## NULO (semente 13)
+semanas: 448 (2018-02-19 → 2026-09-14); avaliáveis (N_T ≥ 15): 448; buracos de calendário entre avaliáveis: 0; N_T médio 19.99
+TS: semanas 100 % caixa 10; exposição média 0.474
+VEREDITO primária (D_ts): REFUTA
+veredito secundária (D_cs, com a mesma família): NÃO CONFIRMA
+D_ts [opt] n=448: -0.413 p.p./sem, IC95 [-0.970; +0.120], p=0.9232 (Holm 0.9232), dp(d_t)=6.10 p.p.; nível ts -0.190 (EW +0.223); patamar 7d -0.366 28d -0.099; antes-2022 -0.226 (n=202) depois -0.567 (n=246); IC b4 [-0.945; +0.136] b16 [-0.985; +0.113]; Sharpe -0.27 DD -85.7 %
+D_ts [pes] n=448: -0.372 p.p./sem, IC95 [-0.938; +0.170], p=0.8941 (Holm 0.8941), dp(d_t)=6.14 p.p.; nível ts -0.203 (EW +0.169); patamar 7d -0.332 28d -0.069; antes-2022 -0.178 (n=202) depois -0.531 (n=246); IC b4 [-0.912; +0.189] b16 [-0.948; +0.162]; Sharpe -0.29 DD -86.5 %
+D_cs [opt] n=448: +0.058 p.p./sem, IC95 [-0.238; +0.370], p=0.3704 (Holm 0.7407), dp(d_t)=3.47 p.p.; nível cs +0.281 (EW +0.223); patamar 7d -0.180 28d -0.013; antes-2022 +0.122 (n=202) depois +0.005 (n=246); IC b4 [-0.253; +0.400] b16 [-0.239; +0.368]; Sharpe 0.20 DD -93.8 %
+D_cs [pes] n=448: +0.042 p.p./sem, IC95 [-0.282; +0.375], p=0.4147 (Holm 0.8293), dp(d_t)=3.58 p.p.; nível cs +0.211 (EW +0.169); patamar 7d -0.186 28d +0.007; antes-2022 +0.096 (n=202) depois -0.003 (n=246); IC b4 [-0.289; +0.396] b16 [-0.270; +0.368]; Sharpe 0.15 DD -94.7 %
+EW [opt]: média +0.223 %/sem, Sharpe 0.17, DD -94.2 %
+eventos/giro (lb 14): ew14_opt: fim-de-série 5, congeladas 0, giro 49.5; ew14_pes: fim-de-série 5, congeladas 0, giro 49.5; ts14_opt: fim-de-série 1, congeladas 0, giro 163.7; ts14_pes: fim-de-série 1, congeladas 0, giro 163.7; cs14_opt: fim-de-série 2, congeladas 0, giro 403.8; cs14_pes: fim-de-série 2, congeladas 0, giro 404.1
+
+## NULO COM DERIVA > 0 (ilustrativo) (semente 14)
+semanas: 448 (2018-02-19 → 2026-09-14); avaliáveis (N_T ≥ 15): 448; buracos de calendário entre avaliáveis: 0; N_T médio 20.00
+TS: semanas 100 % caixa 11; exposição média 0.488
+VEREDITO primária (D_ts): NÃO CONFIRMA
+veredito secundária (D_cs, com a mesma família): NÃO CONFIRMA
+D_ts [opt] n=448: -0.275 p.p./sem, IC95 [-0.811; +0.300], p=0.8335 (Holm 0.8335), dp(d_t)=5.70 p.p.; nível ts +0.560 (EW +0.834); patamar 7d -0.485 28d -0.240; antes-2022 -0.175 (n=202) depois -0.356 (n=246); IC b4 [-0.773; +0.267] b16 [-0.757; +0.292]; Sharpe 0.67 DD -57.2 %
+D_ts [pes] n=448: -0.251 p.p./sem, IC95 [-0.799; +0.312], p=0.7990 (Holm 0.7990), dp(d_t)=5.70 p.p.; nível ts +0.560 (EW +0.811); patamar 7d -0.462 28d -0.217; antes-2022 -0.175 (n=202) depois -0.314 (n=246); IC b4 [-0.760; +0.278] b16 [-0.743; +0.305]; Sharpe 0.67 DD -57.2 %
+D_cs [opt] n=448: +0.045 p.p./sem, IC95 [-0.250; +0.335], p=0.3498 (Holm 0.6995), dp(d_t)=3.31 p.p.; nível cs +0.879 (EW +0.834); patamar 7d -0.318 28d +0.060; antes-2022 +0.059 (n=202) depois +0.034 (n=246); IC b4 [-0.266; +0.325] b16 [-0.248; +0.367]; Sharpe 0.60 DD -92.3 %
+D_cs [pes] n=448: +0.068 p.p./sem, IC95 [-0.235; +0.347], p=0.2692 (Holm 0.5383), dp(d_t)=3.32 p.p.; nível cs +0.879 (EW +0.811); patamar 7d -0.294 28d +0.084; antes-2022 +0.059 (n=202) depois +0.076 (n=246); IC b4 [-0.247; +0.336] b16 [-0.236; +0.375]; Sharpe 0.60 DD -92.3 %
+EW [opt]: média +0.834 %/sem, Sharpe 0.60, DD -86.6 %
+eventos/giro (lb 14): ew14_opt: fim-de-série 2, congeladas 0, giro 55.0; ew14_pes: fim-de-série 2, congeladas 0, giro 55.0; ts14_opt: fim-de-série 0, congeladas 0, giro 163.5; ts14_pes: fim-de-série 0, congeladas 0, giro 163.5; cs14_opt: fim-de-série 0, congeladas 0, giro 415.9; cs14_pes: fim-de-série 0, congeladas 0, giro 415.9

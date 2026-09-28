@@ -1,0 +1,56 @@
+candles_1d.csv sha256 e591a81f0159bf4058ffae375b2733f1c2dc4ed91388b624eec4f65103e2773e
+velas finais (< 2026-09-28): 843543 em 750 símbolos; fontes {'archive': 829787, 'api': 14255}
+pares no inventário sem nenhuma vela final: 0 []
+cópias históricas lidas: 153 (por ano [('2017', 1), ('2018', 11), ('2019', 18), ('2020', 24), ('2021', 34), ('2022', 29), ('2023', 10), ('2024', 8), ('2025', 6), ('2026', 12)]); pares nelas que NÃO estão no nosso dado: 0
+cobertura: 6491 (par TRADING × cópia) conferidos; sem vela real em ±3 d: 0 []
+pares USDT com vela por mês (jan/jul): 2018-01:6 2018-07:20 2019-01:25 2019-07:54 2020-01:96 2020-07:135 2021-01:231 2021-07:284 2022-01:343 2022-07:345 2023-01:334 2023-07:360 2024-01:375 2024-07:387 2025-01:396 2025-07:412 2026-01:446 2026-07:484
+símbolos não TRADING hoje: 254; fins por mês (top 8): [('2026-04', 18), ('2025-04', 14), ('2021-12', 13), ('2020-03', 10), ('2022-01', 10), ('2024-02', 10), ('2022-11', 8), ('2024-07', 8)]
+fins exatamente em 2026-08-31 (suspeita de fim de arquivo): []
+TRADING hoje mas sem vela nos últimos 3 d: []
+lacunas internas (≥ 1 d): 24; por tamanho: [(30, 9), (3, 5), (16, 2), (2, 1), (4, 1), (5, 1), (27, 1), (17, 1), (19, 1), (7, 1), (8, 1)]
+  LACUNA ≥ 14 d: USDSUSDT 2020-06-24 → 2026-04-09 (2114 d)
+  LACUNA ≥ 14 d: FTTUSDT 2022-11-15 → 2023-09-22 (310 d)
+  LACUNA ≥ 14 d: USDPUSDT 2022-09-26 → 2023-03-11 (165 d)
+  LACUNA ≥ 14 d: USDCUSDT 2022-09-26 → 2023-03-11 (165 d)
+  LACUNA ≥ 14 d: TUSDUSDT 2022-09-26 → 2023-03-11 (165 d)
+  LACUNA ≥ 14 d: BCHUPUSDT 2020-11-09 → 2021-04-14 (155 d)
+  LACUNA ≥ 14 d: BCHDOWNUSDT 2020-11-09 → 2021-04-14 (155 d)
+  LACUNA ≥ 14 d: CVCUSDT 2022-12-09 → 2023-05-12 (153 d)
+  LACUNA ≥ 14 d: VENUSDT 2018-07-23 → 2018-10-19 (87 d)
+  LACUNA ≥ 14 d: KEYUSDT 2023-02-10 → 2023-03-10 (27 d)
+  LACUNA ≥ 14 d: NBTUSDT 2022-09-11 → 2022-10-01 (19 d)
+  LACUNA ≥ 14 d: LUNAUSDT 2022-05-13 → 2022-05-31 (17 d)
+  LACUNA ≥ 14 d: ETHBULLUSDT 2020-01-17 → 2020-02-03 (16 d)
+  LACUNA ≥ 14 d: ETHBEARUSDT 2020-01-17 → 2020-02-03 (16 d)
+semanas: 395 de 2019-02-25 a 2026-09-14
+séries que já estiveram no top-20 (universo): 239
+  migração AGIXUSDT → FETUSDT (novo com dado: True); fim 2024-07-01; no universo nas semanas finais: não
+  migração BNXUSDT → FORMUSDT (novo com dado: True); fim 2025-03-18; no universo nas semanas finais: ['2025-03-03', '2025-03-10']
+  migração DAIUSDT → USDSUSDT (novo com dado: True); fim 2020-08-12; no universo nas semanas finais: não
+  migração DARUSDT → DUSDT (novo com dado: True); fim 2025-01-06; no universo nas semanas finais: não
+  migração EOSUSDT → AUSDT (novo com dado: True); fim 2025-05-26; no universo nas semanas finais: não
+  migração FRONTUSDT → SLFUSDT (novo com dado: True); fim 2024-08-27; no universo nas semanas finais: não
+  migração FTMUSDT → SUSDT (novo com dado: True); fim 2025-01-13; no universo nas semanas finais: não
+  migração FXSUSDT → FRAXUSDT (novo com dado: True); fim 2026-01-13; no universo nas semanas finais: não
+  migração GALUSDT → GUSDT (novo com dado: True); fim 2024-07-15; no universo nas semanas finais: não
+  migração KLAYUSDT → KAIAUSDT (novo com dado: True); fim 2024-10-30; no universo nas semanas finais: não
+  migração LITUSDT → HEIUSDT (novo com dado: True); fim 2025-02-10; no universo nas semanas finais: não
+  migração LOKAUSDT → A2ZUSDT (novo com dado: True); fim 2025-07-28; no universo nas semanas finais: não
+  migração MATICUSDT → POLUSDT (novo com dado: True); fim 2024-09-10; no universo nas semanas finais: não
+  migração MCUSDT → BEAMXUSDT (novo com dado: True); fim 2023-11-07; no universo nas semanas finais: não
+  migração MKRUSDT → SKYUSDT (novo com dado: True); fim 2025-09-15; no universo nas semanas finais: não
+  migração NPXSUSDT → PUNDIXUSDT (novo com dado: True); fim 2021-04-05; no universo nas semanas finais: não
+  migração OCEANUSDT → FETUSDT (novo com dado: True); fim 2024-07-01; no universo nas semanas finais: não
+  migração OMUSDT → MANTRAUSDT (novo com dado: True); fim 2026-03-02; no universo nas semanas finais: não
+  migração OMNIUSDT → NOMUSDT (novo com dado: True); fim 2025-09-29; no universo nas semanas finais: não
+  migração ORNUSDT → LUMIAUSDT (novo com dado: True); fim 2024-10-15; no universo nas semanas finais: não
+  migração PLAUSDT → PDAUSDT (novo com dado: True); fim 2024-02-26; no universo nas semanas finais: não
+  migração RNDRUSDT → RENDERUSDT (novo com dado: True); fim 2024-07-22; no universo nas semanas finais: não
+  migração STGUSDT → ZROUSDT (novo com dado: True); fim 2026-09-27; no universo nas semanas finais: não
+  migração STPTUSDT → AWEUSDT (novo com dado: True); fim 2025-05-19; no universo nas semanas finais: não
+  migração TONUSDT → GRAMUSDT (novo com dado: True); fim 2026-06-30; no universo nas semanas finais: ['2026-06-15', '2026-06-22', '2026-06-29']
+  migração TVKUSDT → VANRYUSDT (novo com dado: True); fim 2023-11-27; no universo nas semanas finais: não
+séries com fim que estavam no universo nas 3 semanas finais: 2 ['BCHSVUSDT fim 2019-04-22', 'LUNAUSDT#0 fim 2022-05-13']
+excluídos presentes no dado: ['1INCHDOWN', '1INCHUP', 'AAVEDOWN', 'AAVEUP', 'ADADOWN', 'ADAUP', 'AEUR', 'AUD', 'BCHDOWN', 'BCHUP', 'BEAR', 'BETH', 'BFUSD', 'BKRW', 'BNBBEAR', 'BNBBULL', 'BNBDOWN', 'BNBUP', 'BNSOL', 'BTCDOWN', 'BTCUP', 'BULL', 'BUSD', 'DAI', 'DOTDOWN', 'DOTUP', 'EOSBEAR', 'EOSBULL', 'EOSDOWN', 'EOSUP', 'ETHBEAR', 'ETHBULL', 'ETHDOWN', 'ETHUP', 'EUR', 'EURI', 'FDUSD', 'FILDOWN', 'FILUP', 'GBP', 'INTWB', 'KGST', 'KORUB', 'LINKDOWN', 'LINKUP', 'LTCDOWN', 'LTCUP', 'MUUB', 'MVLLB', 'PAX', 'RLUSD', 'SNXXB', 'SOXLB', 'SOXSB', 'SQQQB', 'SUSD', 'SUSHIDOWN', 'SUSHIUP', 'SXPDOWN', 'SXPUP', 'TQQQB', 'TRXDOWN', 'TRXUP', 'TUSD', 'U', 'UNIDOWN', 'UNIUP', 'USD1', 'USDC', 'USDE', 'USDP', 'USDS', 'USDSB', 'USDSOLD', 'UST', 'USTC', 'WBETH', 'WBTC', 'XLMDOWN', 'XLMUP', 'XRPBEAR', 'XRPBULL', 'XRPDOWN', 'XRPUP', 'XTZDOWN', 'XTZUP', 'XUSD', 'YFIDOWN', 'YFIUP']
+excluídos da lista sem dado (inofensivos): ['ARS', 'BIDR', 'BRL', 'BVND', 'COP', 'CZK', 'GUSD', 'HUSD', 'IDRT', 'JPY', 'LUSD', 'MXN', 'NGN', 'PLN', 'PYUSD', 'RON', 'RUB', 'TRY', 'UAH', 'USDB', 'USDD', 'VAI', 'ZAR']
+último T 2026-09-14

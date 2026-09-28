@@ -1,0 +1,87 @@
+**RESUMO**
+
+**Concordo com NÃO CONFIRMA para D_ts e D_cs.** Reproduzi o relatório principal em memória: mesmos números, 395 semanas avaliáveis nos três lookbacks e nenhum buraco de calendário. Não encontrei erro demonstrado que mude esses vereditos. Há ajustes necessários na interpretação, especialmente “falta de poder” e “sobretudo timing do fator comum”.
+
+Revisão como `quant-engineer`, em modo OPINIÃO. **DONE_WITH_CONCERNS**.
+
+**ARQUIVOS**
+
+Nenhum arquivo criado ou modificado. Sem rede, downloads ou commit.
+
+**TESTES**
+
+`uv run pytest .claude/state/r84/test_r84.py -q`
+
+```text
+18 passed, 1 warning in 5.71s
+```
+
+O aviso foi `Unknown config option: asyncio_mode`, porque desativei o carregamento automático de plugins. Também desativei sincronização, rede, caches e bytecode.
+
+Recomputação com `uv run python -`, chamando `run()` diretamente, sem executar os gravadores de artefatos:
+
+```text
+VEREDITO primária (D_ts): NÃO CONFIRMA
+veredito secundária (D_cs, com a mesma família): NÃO CONFIRMA
+evaluable_by_lookback {7: 395, 14: 395, 28: 395}
+```
+
+A primeira tentativa falhou somente ao imprimir a seta Unicode; a repetição com UTF-8 terminou normalmente.
+
+**MUST-FIX**
+
+**Não identifiquei must-fix de implementação que comprovadamente altere o veredito deste R84.** A conferência dos pontos perguntados ficou assim:
+
+| Ponto | Parecer |
+|---|---|
+| Custo e peso efetivo | O giro compara alvo com peso após valorização, incluindo saídas; aplica a fórmula multiplicativa registrada. Coerente com essa convenção. [engine.py:100](C:/dev/project-hunter/.claude/state/r84/engine.py:100), [engine.py:113](C:/dev/project-hunter/.claude/state/r84/engine.py:113). |
+| Lacunas | Sem abertura real, a posição existente fica presa e compra nova não ocorre; há redução dos demais alvos para acomodá-la. FTT é mantida como a mesma série. Existe uma ressalva contábil abaixo. [engine.py:92](C:/dev/project-hunter/.claude/state/r84/engine.py:92), [gaps.py:15](C:/dev/project-hunter/.claude/state/r84/gaps.py:15). |
+| Migrações | As cinco ligações dividem preços pela razão e preservam volume em USDT, sem duplicar a série nova. ERD 1.000:1, LEND 100:1 e as três demais 1:1 estão implementadas como descritas. Isso verifica a aplicação das razões; não é uma nova autenticação documental delas. [config.py:52](C:/dev/project-hunter/.claude/state/r84/config.py:52), [config.py:61](C:/dev/project-hunter/.claude/state/r84/config.py:61). |
+| BCHSV/LUNA clássica | Fim de série realiza último fechamento menos custo ou perda total. O relatório registra duas ocorrências na EW, nenhuma na TS/CS; portanto o cenário pessimista pode **melhorar o contraste**. [engine.py:69](C:/dev/project-hunter/.claude/state/r84/engine.py:69), [h024.txt:12](C:/dev/project-hunter/.claude/state/r84/h024.txt:12). |
+| Calendário e elegibilidade | Segunda-feira, idade ≥35 dias em T−1, volume de T−30 a T−1, sinal sábado/sábado−14 e exclusão sem reposição correspondem ao desenho. [analyze.py:17](C:/dev/project-hunter/.claude/state/r84/analyze.py:17), [engine.py:34](C:/dev/project-hunter/.claude/state/r84/engine.py:34). |
+| Bootstrap/p/Holm | Blocos móveis sobrepostos, truncamento, semente, p centrado e Holm estão implementados conforme o registro. Os braços principais compartilham índices; a recomputação confirmou as mesmas 395 semanas também nos patamares. [stats84.py:23](C:/dev/project-hunter/.claude/state/r84/stats84.py:23), [stats84.py:41](C:/dev/project-hunter/.claude/state/r84/stats84.py:41), [analyze.py:59](C:/dev/project-hunter/.claude/state/r84/analyze.py:59), [stats.py:153](C:/dev/project-hunter/infra/research/stats.py:153). |
+
+**Antes de publicar, corrigiria duas afirmações interpretativas:**
+
+1. **“Falta de poder” não está demonstrada como causa exclusiva.** Além do IC largo, falharam magnitude pontual, patamar de 7 dias e corte anterior a 2022. [notes-R84.md:225](C:/dev/project-hunter/.claude/state/notes-R84.md:225).
+
+   **Cenário de falha:** transformar o resultado em “o efeito existe; basta esperar mais dados”, justificando promoção ou coleta indefinida. Redação defensável: **“Não confirmou; a precisão é insuficiente para excluir +0,25 p.p./semana, e as condições de robustez também falharam.”**
+
+2. **A fumaça não demonstra que D_ts real seja “quase só timing do fator comum”.** O cenário chamado “só transversal” contém deriva idiossincrática **persistente no tempo**, AR(1). Ele também contém previsibilidade temporal por moeda; uma realização sem confirmação da TS não demonstra incapacidade de capturá-la. [smoke_synthetic.py:41](C:/dev/project-hunter/.claude/state/r84/smoke_synthetic.py:41), [smoke_synthetic.py:59](C:/dev/project-hunter/.claude/state/r84/smoke_synthetic.py:59).
+
+   **Cenário de falha:** atribuir causalmente o resultado real ao mercado comum, descartar seleção entre moedas ou redesenhar a estratégia com base nessa atribuição. Dizer: **“Nos cenários sintéticos executados, a TS confirmou com persistência do fator comum; isso não identifica a origem do resultado real.”** Pelo mesmo motivo, substituir “o nulo nunca dá CONFIRMA” por “nenhum dos nulos executados confirmou”. [notes-R84.md:172](C:/dev/project-hunter/.claude/state/notes-R84.md:172).
+
+**NICE-TO-HAVE**
+
+- **Congelamento com custo merece teste contábil específico.** O multiplicador global de custo reduz implicitamente também o valor da posição presa. Exemplo: posição congelada de 50% e giro de 100% nos ativos líquidos dão fator 0,9985; a parcela presa passa implicitamente de 0,5 para 0,49925, embora não tenha sido negociada. É uma aproximação da fórmula registrada, não uma carteira exata por quantidades. Não quantifiquei sua repercussão no R84; não a apresento como mudança demonstrada de veredito. O teste de congelamento usa custo zero. [engine.py:115](C:/dev/project-hunter/.claude/state/r84/engine.py:115), [test_r84.py:222](C:/dev/project-hunter/.claude/state/r84/test_r84.py:222).
+- **Auditar também o começo do ticker novo nas migrações omitidas.** Ausência do antigo no top-20 ao terminar não prova irrelevância de reiniciar idade/volume. Conferi MATIC/POL, RNDR/RENDER, FTM/S, EOS/A e TVK/VANRY: nenhum teria entrada antecipada no top-20 nessa checagem. Não estendi a conclusão às demais migrações. [config.py:48](C:/dev/project-hunter/.claude/state/r84/config.py:48).
+- **Rotular BTC como bruto de custos.** Sua série descritiva é a razão entre aberturas, sem taxa inicial/final. Não invalida o veredito, mas merece transparência na comparação com TS líquida. [run_real.py:58](C:/dev/project-hunter/.claude/state/r84/run_real.py:58).
+
+**O QUE EU FARIA DIFERENTE**
+
+**Secundária:** manteria exatamente NÃO CONFIRMA. O bloco exige as mesmas cláusulas, conjuntamente; Holm não substitui IC nem patamar. [Fila de Hipóteses:286](<C:/dev/project-hunter/obsidian/11-KNOWLEDGE/Fila de Hipoteses.md:286>).
+
+Não há contradição matemática obrigatória: o IC percentil usa quantis de \(D^*\); o p usa a cauda de \(D^*-\hat D\). Com distribuição assimétrica, não são inversões do mesmo procedimento. Aqui, usando os números arredondados, \(2×0,354-0,696=0,012\), enquanto o percentil inferior é −0,081. **Não escolher depois o procedimento favorável.** “Pico observado na grade 7/14/28” é adequado; “artefato comprovado” seria excessivo. [stats84.py:36](C:/dev/project-hunter/.claude/state/r84/stats84.py:36), [h024.txt:9](C:/dev/project-hunter/.claude/state/r84/h024.txt:9).
+
+**Antes de 2022:** escreveria “o contraste foi negativo em 2019–2021 e positivo desde 2022”. Não “contrariou a literatura”: os trabalhos favoráveis resumidos na KB usam sobretudo dados até 2018, outros universos, custos e estimandos. Tampouco foi demonstrada diferença estatisticamente significativa entre os períodos. [h024.txt:7](C:/dev/project-hunter/.claude/state/r84/h024.txt:7), [KB-0164:84](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0164-momentum-semanal-em-cripto-grande.md:84).
+
+**Não concluir:**
+
+- Que momentum semanal inexiste, ou que +0,25 foi refutado.
+- Que D_cs pode substituir a primária ou ser promovido por Holm.
+- Que 28 dias, somente pós-2022 ou outro universo “resolvem” a hipótese: seriam escolhas após observar resultados.
+- Que retorno positivo em nível demonstra vantagem incremental, alfa ou viabilidade na Jupiter.
+- Que duas sementes nulas validam tamanho do teste/poder, ou que os cenários otimista/pessimista ordenam necessariamente D_ts.
+- Que a porta para papel foi aprovada: ela nem deveria ser avaliada neste resultado. [Fila de Hipóteses:286](<C:/dev/project-hunter/obsidian/11-KNOWLEDGE/Fila de Hipoteses.md:286>).
+
+**CONCORDO COM**
+
+Manter os dois vereditos, preservar o bloco congelado, não recalibrar lookback e distinguir não confirmação de refutação. A auditoria de inventários melhora substancialmente a evidência de cobertura; continua sendo evidência auditada, não prova absoluta de censo completo. A própria nota registra essa limitação. [notes-R84.md:191](C:/dev/project-hunter/.claude/state/notes-R84.md:191).
+
+**OBSIDIAN**
+
+- **Fila de Hipóteses — H-024:** registrar NÃO CONFIRMA e vincular o resultado, preservando o protocolo.
+- **KB-0164 — Momentum semanal em cripto grande:** acrescentar a avaliação R84, distinguindo literatura, medição e limites interpretativos.
+- **Mapa de Estratégias:** registrar H-024 como não confirmada, sem promover D_cs.
+- **Revisões-Astra — R84/H-024:** guardar esta revisão, os testes reproduzidos e as ressalvas contábeis/documentais.
+- **KB-0149 — O que a mesa real ensinou:** atualizar “nunca medimos acima de 5 minutos”: agora houve medição semanal, sem confirmação.

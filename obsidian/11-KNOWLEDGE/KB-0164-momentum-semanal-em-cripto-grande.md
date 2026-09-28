@@ -18,7 +18,7 @@ populacao: semanas de rebalanceamento (segunda 00:00 UTC) com universo ponto-no-
 efeito: —
 ic: —
 veredito: —
-proximo_passo: orquestrador registra H-024 na fila; antes de qualquer retorno, obter a lista completa de pares USDT a vista da Binance (incluindo deslistados) e as velas diarias publicas; sem isso a primaria e limite de dado
+proximo_passo: feito — H-024 testada no R84 (28/09/2026), NAO CONFIRMA; resultado em KB-0166-evitar-as-moedas-em-queda-nao-bate-a-cesta (esta nota continua sendo a leitura da literatura, sem veredito proprio)
 classe_de_perda: —
 mercado: cripto
 ---
