@@ -54,6 +54,9 @@ export interface CandlesParams {
   limit?: number;
   /** `GET .../candles?before=` (ISO datetime) -- the `limit` most recent final candles strictly before this instant (`hunter_api/repositories/markets.py::list_candles`). Needed by the Lab's trend-line overlay (T3.49) to fetch a real historical window around a past decision, rather than always "the latest N". */
   before?: string;
+  /** T4.82: half-open `[since, until)` -- the confluence screen's own period, ANDed with `before`/`limit` (whichever bound is tighter wins). */
+  since?: string;
+  until?: string;
 }
 
 function candlesQuery(params: CandlesParams): string {
@@ -61,6 +64,8 @@ function candlesQuery(params: CandlesParams): string {
   if (params.timeframe !== undefined) search.set("timeframe", params.timeframe);
   if (params.limit !== undefined) search.set("limit", String(params.limit));
   if (params.before !== undefined) search.set("before", params.before);
+  if (params.since !== undefined) search.set("since", params.since);
+  if (params.until !== undefined) search.set("until", params.until);
   const value = search.toString();
   return value ? `?${value}` : "";
 }

@@ -71,6 +71,14 @@ describe("getLabSignals: query building, including `include=envelope`", () => {
     const [path] = apiFetchMock.mock.calls[0] as [string];
     expect(new URLSearchParams(path.split("?")[1]).get("cursor")).toBe("abc123");
   });
+
+  it("serializes `market_id` alongside `market` (T4.82 review, must-fix 1/4 -- additive, not a replacement)", async () => {
+    await getLabSignals({ market: "NEARUSDT", market_id: "11111111-1111-1111-1111-111111111111" });
+    const [path] = apiFetchMock.mock.calls[0] as [string];
+    const query = new URLSearchParams(path.split("?")[1]);
+    expect(query.get("market")).toBe("NEARUSDT");
+    expect(query.get("market_id")).toBe("11111111-1111-1111-1111-111111111111");
+  });
 });
 
 describe("getLabSignals: T3.37 contract additions (state + page_size)", () => {

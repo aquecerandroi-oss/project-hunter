@@ -56,6 +56,7 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 - 2026-09-28 — [[KB-momentum-semanal]] (H-024, momentum semanal em cripto grande)
 - 2026-09-28 — [[Wallet-unrecognized-holdings]] (checagem de ativos estranhos na carteira ligada; adiar sem veredito, slots por programa)
 - 2026-09-28 — [[KB-analise-grafica]] (KB-0167, análise gráfica depois do custo; candidatas C1–C3, nada registrado)
+- 2026-09-28 — [[Confluencia-tela]] (T4.82, correções de code review pré-commit: `market_id` no filtro de sinais, status mutável de ordem antes/depois do cursor nos blocos A/B/C, notícia tardia sem destino, virtualização com altura variável — 5 rodadas até fechar; achou uma regressão real (recusa na criação sem `settled_at`) e um resíduo de pixels (Badge + padding > rowHeight compacto))
 
 - [[T4.74-spot-desk]] — fundações, perfil, sinal, dinheiro e saídas da mesa `spot/1` (19/09)
 - [[T4.77-close-atas-token2022]] — fechar ATAs cheias, extensão ao Token-2022 (19/09)

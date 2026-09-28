@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
+import Link from "next/link";
 
 import { AnomalyTimeline } from "@/components/anomalies/anomaly-timeline";
 import { CandlesChart } from "@/components/markets/candles-chart";
@@ -18,6 +19,8 @@ export interface MarketDetailViewProps {
   candles: Candle[];
   /** Set when the candles fetch itself failed (H5) -- isolated from `detail` so a 503 on `/candles` degrades only this section, never the whole page. `null`/absent means the fetch succeeded (an empty `candles` array is then the honest "no candles yet" case `CandlesChart` already renders). */
   candlesError?: string | null;
+  /** T4.82: for the "Ver confluência" link -- the tab lives at `/[orgSlug]/markets/[exchange]/[symbol]/confluencia`, so it needs the org slug the same way every other cross-page link in this app does (`market-row.tsx`, `command-palette.tsx`). */
+  orgSlug: string;
 }
 
 /**
@@ -104,7 +107,7 @@ function SnapshotLabel({ ts, serverNow }: { ts: string | null | undefined; serve
 }
 
 /** `/[orgSlug]/markets/[exchange]/[symbol]` (docs/plans/M1.md T1.5): header + candles + book + trades + derivatives, live price via `rt:market:{exchange}:{symbol}`. */
-export function MarketDetailView({ detail, candles, candlesError = null }: MarketDetailViewProps) {
+export function MarketDetailView({ detail, candles, candlesError = null, orgSlug }: MarketDetailViewProps) {
   const { getToken } = useAuth();
   const channel = `rt:market:${detail.exchange}:${detail.symbol}`;
   const { messages } = useMarketChannels({ channels: [channel], getAuthToken: () => getToken() });
@@ -137,6 +140,12 @@ export function MarketDetailView({ detail, candles, candlesError = null }: Marke
           bid {formatPrice(bid)} · ask {formatPrice(ask)}
         </span>
         <AsOf ts={components.ticker.ts} serverNow={detail.server_now} />
+        <Link
+          href={`/${orgSlug}/markets/${encodeURIComponent(detail.exchange)}/${encodeURIComponent(detail.symbol)}/confluencia`}
+          className="ml-auto rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:border-gold hover:text-gold"
+        >
+          Ver confluência
+        </Link>
       </header>
 
       <section className="rounded-lg border border-border bg-bg-elevated p-4">

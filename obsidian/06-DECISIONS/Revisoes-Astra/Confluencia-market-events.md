@@ -1,7 +1,7 @@
 ---
 tags: [revisao-astra, spot, eventos, spec]
 date: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-28
 status: registro
 owner: sexta-feira
 decided_on: 2026-09-23
@@ -19,4 +19,4 @@ três coisas: o que aconteceu, o que a mesa sabia naquele instante, e o que se d
 três não podem ser misturadas numa única tabela sem carimbo de quando cada uma ficou conhecida.
 
 **Bruto:** `.claude/state/astra-review-confluencia.md`
-**Relacionado:** [[03-TRADING/Spot/Mesa-spot-1|Mesa spot/1]]
+**Relacionado:** [[03-TRADING/Spot/Mesa-spot-1|Mesa spot/1]] · [[Confluencia-tela]] (revisões de código da implementação, 28/09)

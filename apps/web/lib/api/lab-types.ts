@@ -19,6 +19,7 @@ import type { components } from "@hunter/shared-types/api";
 export type StrategyVersionStatus = "draft" | "active" | "deprecated";
 export type OutcomeResult = "target" | "stop" | "expired" | "invalidated" | "open";
 export type ShadowTrackingState = "pending_entry" | "active" | "terminal" | "no_entry" | "censored";
+export type TradeDirection = "long" | "short" | "neutral";
 
 /** A rate/expectancy that is `null` with a reason instead of a silent zero. */
 export interface NullableMetric {
@@ -165,6 +166,10 @@ export interface SignalListItemOut {
   market: string;
   cohort: string;
   decision_at: string;
+  /** T4.82: `agent_signals.direction` -- the confluence screen's entry arrow (design §3, overlay 1). */
+  direction: TradeDirection;
+  /** T4.82: `agent_signals.expires_at` -- `null` when the worker never set one, never read as "already expired". */
+  expires_at: string | null;
   source_bar_close: string;
   reference_price: string | null;
   stop: string | null;

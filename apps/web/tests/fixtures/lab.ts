@@ -88,6 +88,8 @@ export function exampleSignal(): SignalListItemOut {
     market: "AAAAUSDT",
     cohort: "prospective",
     decision_at: "2026-09-06T00:25:01.939152Z",
+    direction: "long",
+    expires_at: null,
     source_bar_close: "2026-09-06T00:25:00Z",
     reference_price: "27453.1200000000",
     stop: "27100.0000000000",
@@ -132,10 +134,8 @@ export function exampleSignal(): SignalListItemOut {
     },
     purpose: "research_only",
     supporting_features: null,
-    // Contrato T3.38: fixo por padrão (nenhum teste pré-existente varia
-    // `strategy_version_id` entre duas `makeSignal()` do mesmo array, então
-    // um valor compartilhado nunca aciona o agrupamento por engano --
-    // `hasMultipleVersions` exige mais de uma versão distinta no grupo).
+    // Contrato T3.38: fixo por padrão -- um valor compartilhado nunca aciona o agrupamento por
+    // engano (`hasMultipleVersions` exige mais de uma versão distinta no grupo).
     identity_key: "idk-07984643-default",
   };
 }

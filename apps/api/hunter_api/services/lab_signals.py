@@ -64,6 +64,8 @@ def _to_out(row: SignalRow, *, include_envelope: bool) -> SignalListItemOut:
         market=row.market,
         cohort=row.cohort,
         decision_at=row.decision_at,
+        direction=row.direction,
+        expires_at=row.expires_at,
         source_bar_close=source_bar_close,
         reference_price=_dec(meta.get("reference_price")),
         stop=row.stop,

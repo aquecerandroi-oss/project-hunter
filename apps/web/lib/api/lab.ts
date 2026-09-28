@@ -32,6 +32,8 @@ export async function getLabSummary(params: LabSummaryParams = {}): Promise<LabS
 export interface LabSignalsParams {
   strategy_version_id?: string;
   market?: string;
+  /** T4.82 review (must-fix 1/4): additive on top of `market` -- a symbol alone cannot tell a spot market apart from a perpetual one (or the same symbol on two exchanges) that happen to share a ticker. The confluence screen always has a resolved market id and must pass it so its overlay never draws another market's geometry. */
+  market_id?: string;
   tracking_state?: string;
   result?: string;
   cohort?: string;
@@ -42,12 +44,16 @@ export interface LabSignalsParams {
   page_size?: LabSignalsPageSize;
   /** `["envelope"]` includes `supporting_features` -- omitted by default (contract-S3-lab.md). */
   include?: string[];
+  /** T4.82: half-open `[emitted_from, emitted_to)` on `agent_signals.emitted_at` -- the confluence screen's window, so the totals/tabs are scoped to the period asked about rather than the market's whole history. */
+  emitted_from?: string;
+  emitted_to?: string;
 }
 
 function signalsQuery(params: LabSignalsParams): string {
   const search = new URLSearchParams();
   if (params.strategy_version_id !== undefined) search.set("strategy_version_id", params.strategy_version_id);
   if (params.market !== undefined) search.set("market", params.market);
+  if (params.market_id !== undefined) search.set("market_id", params.market_id);
   if (params.tracking_state !== undefined) search.set("tracking_state", params.tracking_state);
   if (params.result !== undefined) search.set("result", params.result);
   if (params.cohort !== undefined) search.set("cohort", params.cohort);
@@ -55,6 +61,8 @@ function signalsQuery(params: LabSignalsParams): string {
   if (params.state !== undefined) search.set("state", params.state);
   if (params.page_size !== undefined) search.set("page_size", String(params.page_size));
   for (const item of params.include ?? []) search.append("include", item);
+  if (params.emitted_from !== undefined) search.set("emitted_from", params.emitted_from);
+  if (params.emitted_to !== undefined) search.set("emitted_to", params.emitted_to);
   const value = search.toString();
   return value ? `?${value}` : "";
 }

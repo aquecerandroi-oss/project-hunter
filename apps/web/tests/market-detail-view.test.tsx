@@ -100,7 +100,7 @@ describe("MarketDetailView: a stale tick must not shadow a fresher server-fetche
     const staleTick = tickAt(new Date(now.getTime() - 60_000).toISOString(), "1.00");
     mockTick(staleTick);
 
-    render(<MarketDetailView detail={detail} candles={[]} />);
+    render(<MarketDetailView detail={detail} candles={[]} orgSlug="acme" />);
 
     expect(screen.getByText("65000.00")).toBeInTheDocument();
     expect(screen.queryByText("1.00")).not.toBeInTheDocument();
@@ -110,7 +110,7 @@ describe("MarketDetailView: a stale tick must not shadow a fresher server-fetche
     const freshTick = tickAt(new Date(now.getTime() + 60_000).toISOString(), "65500.00");
     mockTick(freshTick);
 
-    render(<MarketDetailView detail={detail} candles={[]} />);
+    render(<MarketDetailView detail={detail} candles={[]} orgSlug="acme" />);
 
     expect(screen.getByText("65500.00")).toBeInTheDocument();
     expect(screen.queryByText("65000.00")).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ describe("MarketDetailView: the price and the book age off their OWN timestamps,
     const bookOnlyTick = tickAt(new Date(now.getTime() + 60_000).toISOString(), "99999.00", { price_ts: null });
     mockTick(bookOnlyTick);
 
-    render(<MarketDetailView detail={detail} candles={[]} />);
+    render(<MarketDetailView detail={detail} candles={[]} orgSlug="acme" />);
 
     // The tick's aggregate `ts` is fresh, but `price_ts` is missing -- the
     // old, honest price must still be shown, not the tick's price.
@@ -136,7 +136,7 @@ describe("MarketDetailView: the price and the book age off their OWN timestamps,
     });
     mockTick(bookOnlyTick);
 
-    render(<MarketDetailView detail={detail} candles={[]} />);
+    render(<MarketDetailView detail={detail} candles={[]} orgSlug="acme" />);
 
     expect(screen.getByText("65000.00")).toBeInTheDocument();
     expect(screen.queryByText("1.00")).not.toBeInTheDocument();
@@ -148,7 +148,7 @@ describe("MarketDetailView: honest states for a failed hot-state read (H3)", () 
     useMarketChannelsMock.mockReturnValue({ status: "closed", messages: {} });
     const failedDetail: MarketDetail = { ...detail, hot_state_ok: false, book: null, recent_trades: null };
 
-    render(<MarketDetailView detail={failedDetail} candles={[]} />);
+    render(<MarketDetailView detail={failedDetail} candles={[]} orgSlug="acme" />);
 
     expect(screen.getByText(/Book indisponível: falha ao ler/)).toBeInTheDocument();
     expect(screen.getByText(/Trades indisponíveis: falha ao ler/)).toBeInTheDocument();
@@ -164,7 +164,7 @@ describe("MarketDetailView: book/trades are labelled as a snapshot, not a live f
       recent_trades: [],
     };
 
-    render(<MarketDetailView detail={withBook} candles={[]} />);
+    render(<MarketDetailView detail={withBook} candles={[]} orgSlug="acme" />);
 
     const snapshotLabels = screen.getAllByText(/^Snapshot ·/);
     expect(snapshotLabels).toHaveLength(2);
@@ -174,9 +174,20 @@ describe("MarketDetailView: book/trades are labelled as a snapshot, not a live f
     useMarketChannelsMock.mockReturnValue({ status: "closed", messages: {} });
     const noTrades: MarketDetail = { ...detail, book: null, recent_trades: [] };
 
-    render(<MarketDetailView detail={noTrades} candles={[]} />);
+    render(<MarketDetailView detail={noTrades} candles={[]} orgSlug="acme" />);
 
     expect(screen.getAllByText(/Snapshot · sem dado/)).toHaveLength(2);
+  });
+});
+
+describe("MarketDetailView: the confluência tab link (T4.82 review, must-fix 5)", () => {
+  it("links to the org-scoped confluência route with the right label", () => {
+    useMarketChannelsMock.mockReturnValue({ status: "closed", messages: {} });
+
+    render(<MarketDetailView detail={detail} candles={[]} orgSlug="acme" />);
+
+    const link = screen.getByRole("link", { name: "Ver confluência" });
+    expect(link).toHaveAttribute("href", "/acme/markets/binance/BTCUSDT/confluencia");
   });
 });
 
@@ -184,7 +195,7 @@ describe("MarketDetailView: candles isolated from the rest of the page (H5)", ()
   it("shows an honest candles-unavailable message without hiding price/book/trades", () => {
     useMarketChannelsMock.mockReturnValue({ status: "closed", messages: {} });
 
-    render(<MarketDetailView detail={detail} candles={[]} candlesError="timeout" />);
+    render(<MarketDetailView detail={detail} candles={[]} candlesError="timeout" orgSlug="acme" />);
 
     expect(screen.getByText(/Candles indisponíveis: timeout/)).toBeInTheDocument();
     expect(screen.getByText("65000.00")).toBeInTheDocument();

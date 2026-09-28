@@ -113,7 +113,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Shadow Lab decisions and tracked outcomes */
+        /**
+         * Shadow Lab decisions and tracked outcomes
+         * @description T4.82 adds the optional half-open window ``[emitted_from, emitted_to)``
+         *     on ``agent_signals.emitted_at``. It narrows the segment **totals** too, not
+         *     just the page: the confluence screen asks about fifteen minutes, and a tab
+         *     counting the market's whole history next to three rows would read as a
+         *     pager, not as a period. Neither bound given is the pre-T4.82 listing,
+         *     unchanged. The cap is :data:`SIGNALS_WINDOW_MAX_SPAN`.
+         *
+         *     ``market_id`` (T4.82 review, must-fix 1/4) is additive on top of
+         *     ``market``: the symbol-only filter cannot tell a spot market apart from a
+         *     perpetual one (or the same symbol on two exchanges) that happen to share a
+         *     ticker -- the confluence screen always has a resolved ``market_id`` and
+         *     passes it so its overlay never draws another market's geometry.
+         */
         get: operations["list_signals_api_v1_lab_shadow_signals_get"];
         put?: never;
         post?: never;
@@ -222,7 +236,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read final candles */
+        /**
+         * Read final candles
+         * @description T4.82 adds the optional half-open window ``[since, until)``; every
+         *     pre-existing parameter keeps its meaning, and a call with neither bound is
+         *     byte-for-byte the query that shipped before. ``before`` (the cursor) and
+         *     ``until`` are both upper bounds and are ANDed, so the earlier one wins
+         *     without a precedence rule. Still ``is_final = true`` only.
+         */
         get: operations["get_candles_api_v1_markets__exchange___symbol__candles_get"];
         put?: never;
         post?: never;
@@ -379,6 +400,67 @@ export interface paths {
         };
         /** How far the Lab is from the day's R$ profit goal, and why */
         get: operations["get_daily_goal_api_v1_orgs__org_id__lab_daily_goal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/markets/{exchange}/{symbol}/desk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the spot/1 desk trail for one market
+         * @description Orders and positions of the ``spot/1`` desk on this market.
+         *
+         *     ``positions`` is an **interval intersection**, not a point query: one
+         *     opened at 10:00 and still open is part of what was true at 11:45, and a
+         *     query on ``entry_at`` alone would answer that the desk held nothing
+         *     (design §4A). ``orders`` is a plain cut on ``received_at`` — an attempt is
+         *     an instant — and refusals are *not* filtered out: they are the screen's
+         *     most valuable line.
+         *
+         *     Outside Binance the trail is empty by construction:
+         *     ``spot_desk_markets`` is keyed on ``binance_symbol``, so answering a
+         *     ``bybit`` symbol from it would be an invented trail, not a translated one.
+         */
+        get: operations["get_market_desk_api_v1_orgs__org_id__markets__exchange___symbol__desk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/markets/{exchange}/{symbol}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the recorded news for one market
+         * @description Headlines recorded for this market, newest first.
+         *
+         *     A row whose ``exchange`` is ``NULL`` is not about one venue and reaches
+         *     this symbol's screen whatever ``{exchange}`` says. ``published_at`` and
+         *     ``ingested_at`` both travel, because "what was known at 11:45" must not
+         *     absorb what we only read at 13:00 (design §4C).
+         *
+         *     An empty list means "nothing was recorded for this market in this period",
+         *     never "this market has no news": today the only source is the plantão's own
+         *     hand through ``infra/scripts/market_event.py`` (design §8), and saying so
+         *     is the screen's job, not this payload's.
+         */
+        get: operations["get_market_events_api_v1_orgs__org_id__markets__exchange___symbol__events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2023,6 +2105,103 @@ export interface components {
             summary: components["schemas"]["DeskSummaryOut"];
         };
         /**
+         * DeskMarketOut
+         * @description The executable map row — ``null`` at the caller means the desk does not
+         *     operate this market (design §5, "fora do mapa, ou desligado"), which is an
+         *     answer, not an absence of data.
+         */
+        DeskMarketOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Kind */
+            kind: string;
+            /** Mint */
+            mint: string;
+            /** Note */
+            note: string | null;
+            /** Round Trip Cost Pct At Seed */
+            round_trip_cost_pct_at_seed: string;
+            /** Tier */
+            tier: string;
+        };
+        /**
+         * DeskOrderOut
+         * @description One attempt of the lane. A ``refused`` row is the point, not noise: the
+         *     design's most valuable line (§4A) is "olhamos e recusamos", and it is built
+         *     from ``status``/``reason`` plus the ``admission`` decomposition.
+         */
+        DeskOrderOut: {
+            /** Admission */
+            admission: {
+                [key: string]: unknown;
+            };
+            /** Admitted At */
+            admitted_at: string | null;
+            /** Attempt */
+            attempt: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Quote */
+            quote: {
+                [key: string]: unknown;
+            } | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Settled At */
+            settled_at: string | null;
+            /** Side */
+            side: string;
+            /**
+             * Signal Id
+             * Format: uuid
+             */
+            signal_id: string;
+            /** Status */
+            status: string;
+            /** Tx Signature */
+            tx_signature: string | null;
+        };
+        /** DeskOut */
+        DeskOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            desk_market: components["schemas"]["DeskMarketOut"] | null;
+            /**
+             * Label
+             * @default REAL — mesa spot/1: transações assinadas na carteira Solana dedicada; a chave vive só no meme-executor, a API nunca assina
+             */
+            label: string;
+            /** Orders */
+            orders: components["schemas"]["DeskOrderOut"][];
+            /** Orders Truncated */
+            orders_truncated: boolean;
+            /** Positions */
+            positions: components["schemas"]["DeskPositionOut"][];
+            /** Positions Truncated */
+            positions_truncated: boolean;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
+        };
+        /**
          * DeskParamsOut
          * @description ``suggested``/``decision``/``params`` as the loop or the API wrote
          *     them; a missing key is ``None`` (contract: the operator may change any of
@@ -2043,6 +2222,57 @@ export interface components {
             trailing_arm_x?: string | null;
             /** Trailing Pct */
             trailing_pct: string | null;
+        };
+        /**
+         * DeskPositionOut
+         * @description One real position whose life overlaps the requested window.
+         */
+        DeskPositionOut: {
+            /** Entry */
+            entry: {
+                [key: string]: unknown;
+            };
+            /**
+             * Entry At
+             * Format: date-time
+             */
+            entry_at: string;
+            /** Exit */
+            exit: {
+                [key: string]: unknown;
+            } | null;
+            /** Exit At */
+            exit_at: string | null;
+            /** High Water Sol */
+            high_water_sol: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Initial Risk Sol */
+            initial_risk_sol: string;
+            /** Mark At */
+            mark_at: string | null;
+            /** Mark Sol */
+            mark_sol: string | null;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Pnl Sol */
+            pnl_sol: string | null;
+            /** R Multiple */
+            r_multiple: string | null;
+            /**
+             * Signal Id
+             * Format: uuid
+             */
+            signal_id: string;
+            /** Sol Spent Lamports */
+            sol_spent_lamports: number;
+            /** Status */
+            status: string;
         };
         /**
          * DeskRowOut
@@ -3041,6 +3271,70 @@ export interface components {
             /** Volume 24H */
             volume_24h?: string | null;
         };
+        /** MarketEventOut */
+        MarketEventOut: {
+            /** Confidence */
+            confidence: string;
+            /** Exchange */
+            exchange: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ingested At
+             * Format: date-time
+             */
+            ingested_at: string;
+            /** Kind */
+            kind: string;
+            /** Market Id */
+            market_id: string | null;
+            /** Notes */
+            notes: {
+                [key: string]: unknown;
+            };
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Published At */
+            published_at: string | null;
+            /** Recorded By */
+            recorded_by: string;
+            /** Source */
+            source: string;
+            /** Symbol */
+            symbol: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string | null;
+        };
+        /** MarketEventsOut */
+        MarketEventsOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["MarketEventOut"][];
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /** Truncated */
+            truncated: boolean;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
+        };
         /** MarketHalfOut */
         MarketHalfOut: {
             /** Evaluable */
@@ -3547,10 +3841,7 @@ export interface components {
             budget_60s: number | null;
             /** Connected */
             connected: boolean | null;
-            /**
-             * Consecutive Failures
-             * @default null
-             */
+            /** Consecutive Failures */
             consecutive_failures?: number | null;
             /** Enabled */
             enabled: boolean | null;
@@ -4715,6 +5006,21 @@ export interface components {
             row: components["schemas"]["DeskRowOut"];
         };
         /**
+         * PullbackOut
+         * @description T4.91/EXP-M24: the one entry-timing knob a pullback arm turns on — the
+         *     gate, exit and size are copied from the rule set it was seeded from
+         *     (``code_ref``/``ceilings`` say so); only *when* it buys differs. Present
+         *     exactly when the rule set's ``params`` carry ``entry_pullback_pct`` (the
+         *     switch, ``hunter_meme_worker.entry_pullback``); ``None`` on a set that
+         *     still enters at ``t0``.
+         */
+        PullbackOut: {
+            /** Pct */
+            pct: string;
+            /** Window S */
+            window_s: number;
+        };
+        /**
          * QuoteOut
          * @description The snapshot a proposal was priced on (``meme_proposals.quote``).
          *     Keys are the ones the manual path writes and the desk reads (contract
@@ -5392,6 +5698,7 @@ export interface components {
             code_ref: string;
             /** Days */
             days: components["schemas"]["DayScoreOut"][];
+            entry_pullback: components["schemas"]["PullbackOut"] | null;
             /** Exp Ref */
             exp_ref: string | null;
             /**
@@ -5717,6 +6024,7 @@ export interface components {
              * Format: date-time
              */
             decision_at: string;
+            direction: components["schemas"]["TradeDirection"];
             /** Entry Plan */
             entry_plan: {
                 [key: string]: unknown;
@@ -5731,6 +6039,8 @@ export interface components {
             exit_price: string | null;
             /** Exit Ts */
             exit_ts: string | null;
+            /** Expires At */
+            expires_at: string | null;
             /** Identity Key */
             identity_key: string;
             /** Market */
@@ -7332,6 +7642,7 @@ export interface operations {
             query?: {
                 strategy_version_id?: string | null;
                 market?: string | null;
+                market_id?: string | null;
                 tracking_state?: components["schemas"]["ShadowTrackingState"] | null;
                 result?: components["schemas"]["OutcomeResult"] | null;
                 cohort?: string;
@@ -7339,6 +7650,8 @@ export interface operations {
                 cursor?: string | null;
                 page_size?: 50 | 100 | 200 | 500;
                 include?: string[] | null;
+                emitted_from?: string | null;
+                emitted_to?: string | null;
             };
             header?: never;
             path?: never;
@@ -7524,6 +7837,8 @@ export interface operations {
                 timeframe?: components["schemas"]["Timeframe"];
                 limit?: number;
                 before?: string | null;
+                since?: string | null;
+                until?: string | null;
             };
             header?: never;
             path: {
@@ -7905,6 +8220,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DailyGoalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_desk_api_v1_orgs__org_id__markets__exchange___symbol__desk_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+                until?: string | null;
+            };
+            header?: never;
+            path: {
+                exchange: string;
+                symbol: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_events_api_v1_orgs__org_id__markets__exchange___symbol__events_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+                until?: string | null;
+            };
+            header?: never;
+            path: {
+                exchange: string;
+                symbol: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketEventsOut"];
                 };
             };
             /** @description Validation Error */

@@ -59,6 +59,30 @@ async def seed_lab_market(session_factory: async_sessionmaker[AsyncSession]) -> 
         return market.id
 
 
+async def seed_lab_market_sibling(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    exchange_id: uuid.UUID,
+    symbol: str,
+    market_type: MarketType,
+) -> uuid.UUID:
+    """A second ``markets`` row sharing ``exchange_id``+``symbol`` with an
+    existing one but differing by ``market_type`` -- the real spot/perp
+    duplication T4.82's ``market_id`` filter guards against
+    (``.claude/state/notes-T3.73.md``: 340 historical spot-cohort signals,
+    NEARUSDT duplicated spot+perp). ``uq_markets_exchange_symbol`` is
+    ``(exchange_id, symbol, market_type)``, so this is a legitimate distinct
+    row, not a constraint violation.
+    """
+    async with session_factory() as session:
+        market = Market(
+            exchange_id=exchange_id, symbol=symbol, market_type=market_type, is_monitored=True
+        )
+        session.add(market)
+        await session.commit()
+        return market.id
+
+
 async def seed_strategy_version(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -149,6 +173,8 @@ def build_shadow_signal(
     target1: Decimal = Decimal("103"),
     excursions: dict[str, Any] | None = None,
     signal_id: uuid.UUID | None = None,
+    direction: TradeDirection = TradeDirection.LONG,
+    expires_at: datetime | None = None,
 ) -> tuple[AgentSignal, SignalOutcome]:
     """One ``agent_signals`` + ``signal_outcomes`` pair, shaped exactly like
     ``hunter_strategy_worker.record``/``persist`` would write it — **built**,
@@ -186,7 +212,7 @@ def build_shadow_signal(
         strategy_version_id=strategy_version_id,
         market_id=market_id,
         params_hash="test-hash",
-        direction=TradeDirection.LONG,
+        direction=direction,
         confidence=Decimal("0.5"),
         stop=stop,
         targets=[str(target1)],
@@ -194,6 +220,7 @@ def build_shadow_signal(
             decision_at=decision_at, source_bar_close=source_bar_close, cohort=cohort
         ),
         emitted_at=decision_at,
+        expires_at=expires_at,
         status=SignalStatus.ACTIVE,
     )
     outcome = SignalOutcome(

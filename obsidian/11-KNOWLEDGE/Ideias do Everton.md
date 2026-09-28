@@ -4,7 +4,7 @@ tipo: consolidado
 mercado: meme
 status: vivo
 owner: sexta-feira
-updated: 2026-09-27
+updated: 2026-09-28
 ---
 
 # Ideias do Everton — inbox
@@ -18,7 +18,7 @@ responda.
 | data | ideia (palavras dele) | status |
 |---|---|---|
 | 23/09/2026 ~19h BRT | "e se sairmos da pump.fun?" | **testada** — R66/[[KB-0148-a-graduacao-nao-e-a-saida-barata\|KB-0148]]: a graduação não é a saída barata (pós-graduação cobra 2,40 % de ida-e-volta contra 2,23 % da curva); **veredito: não abrir frente pós-graduação** |
-| 23/09/2026 12:0x BRT | "na moeda sem ser meme precisamos analisar via gráfico colocando linha do tempo, notícias e tudo — lembra, junção de coisas" | **em aberto** — virou o desenho da tela de confluência (`docs/design/tela-confluencia-mercado.md`, T4.82); status do desenho em 25/09: **"nenhuma linha de componente, endpoint ou migração foi escrita"** — desenho aprovado, implementação ainda não despachada |
+| 23/09/2026 12:0x BRT | "na moeda sem ser meme precisamos analisar via gráfico colocando linha do tempo, notícias e tudo — lembra, junção de coisas" | **aplicada, em correção pré-commit** — virou o desenho da tela de confluência (`docs/design/tela-confluencia-mercado.md`, T4.82); a implementação (API + web, sem commit ainda) chegou a duas rodadas de revisão de código + Astra, e a rodada de 28/09 fechou os 5 achados restantes (`market_id` no filtro de sinais, status mutável de ordem antes/depois do cursor nos blocos A/B, notícia tardia fora do bloco B, virtualização da lista do período, teste do link) — ver [[Revisoes-Astra/Confluencia-tela]] |
 | ~19–23/09/2026 (conversas da mesa real) | prever a próxima vela, comprando antes e vendendo na alta | **testada** — [[KB-0150-a-proxima-vela-e-menor-que-o-pedagio]] (R68): a 1 minuto o custo de ida-e-volta é **3,1× a 12×** o movimento típico da vela seguinte; a taxa de acerto necessária para empatar (`p*`) já passa de 1 no horizonte de 1 min — nem acertar sempre empataria com esse custo |
 | ~19–23/09/2026 | acompanhar a vela em tempo real, em milissegundos, e integrar mais sistemas de gráfico | **testada/aplicada parcialmente** — [[KB-0145-binance-como-sinal-solana-como-execucao]] (R63): a Binance lidera a Solana por **menos de 15 s**; em cripto normal a vantagem tem de vir do sinal, não da velocidade. A parte de integrar mais gráficos ficou para a tela de confluência (linha acima), ainda em desenho |
 | 23/09/2026 17:1x BRT | "conforme vai acompanhando o gráfico, vai comprando e vendendo muito rápido: desceu comprou, subiu vendeu, desceu comprou, subiu vendeu, e lucra antes de alguém vender tudo" | **testada** — virou [[Fila de Hipoteses#H-009 — Giro rápido na oscilação (comprar a queda, vender o repique, repetir)\|H-009]]/[[KB-0152-a-oscilacao-existe-o-giro-nao-paga]]: a oscilação **existe** (mediana 3,5–4 giros de 3 % por posição), mas a política de giro **não confirma** — 0 de 12 células, melhor IC superior +0,103 contra a previsão de +0,05 |

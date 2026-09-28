@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from hunter_api.schemas.lab_common import DecimalStr
-from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState
+from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState, TradeDirection
 
 
 class SignalListItemOut(BaseModel):
@@ -20,6 +20,15 @@ class SignalListItemOut(BaseModel):
     market: str
     cohort: str
     decision_at: datetime
+    direction: TradeDirection
+    """T4.82: ``agent_signals.direction`` — the confluence screen's entry
+    arrow (design §3, overlay 1) needs this; nothing before it did."""
+    expires_at: datetime | None
+    """T4.82: ``agent_signals.expires_at`` — with ``tracking_state`` in
+    ``pending_entry``/``active``, the ``emitted_at <= cursor < expires_at``
+    test the confluence screen's "sinal ativo" block runs (design §4A).
+    ``null`` when the worker never set one (older rows, or a signal type with
+    no expiry) — that is never read as "already expired"."""
     source_bar_close: datetime
     reference_price: DecimalStr | None
     stop: DecimalStr | None

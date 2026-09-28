@@ -17,7 +17,13 @@ from sqlalchemy.exc import OperationalError
 
 from hunter_api.repositories import lab_signals as lab_signals_repo
 from hunter_api.repositories import lab_versions as lab_versions_repo
-from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState, StrategyVersionStatus
+from hunter_core.domain.enums import (
+    MarketType,
+    OutcomeResult,
+    ShadowTrackingState,
+    StrategyVersionStatus,
+    TradeDirection,
+)
 
 from . import lab_fixtures as fx
 from .conftest import Actor
@@ -738,6 +744,123 @@ async def test_signals_filters_by_tracking_state_and_result_and_pages(
         item["signal_id"] for item in second_body["items"]
     }
     assert seen == set(ids)
+
+
+async def test_signals_carry_direction_and_expiry(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """T4.82: the confluence screen's "sinal ativo" block (design §4A) needs
+    ``direction`` (the entry arrow) and ``expires_at`` (the
+    ``emitted_at <= cursor < expires_at`` test) -- neither reached this
+    payload before. One row with an explicit expiry, one without: the
+    ``null`` case must round-trip as ``null``, never as an invented value.
+    """
+    _, version_id = await fx.seed_strategy_version(
+        session_factory, activated_at=NOW - timedelta(days=1)
+    )
+    market_id = await fx.seed_lab_market(session_factory)
+    expires_at = NOW - timedelta(hours=1) + timedelta(minutes=15)
+    with_expiry = await fx.seed_shadow_signal(
+        session_factory,
+        strategy_version_id=version_id,
+        market_id=market_id,
+        decision_at=NOW - timedelta(hours=1),
+        tracking_state=ShadowTrackingState.ACTIVE,
+        result=OutcomeResult.OPEN,
+        entry_ts=NOW - timedelta(hours=1) + timedelta(minutes=1),
+        direction=TradeDirection.SHORT,
+        expires_at=expires_at,
+    )
+    without_expiry = await fx.seed_shadow_signal(
+        session_factory,
+        strategy_version_id=version_id,
+        market_id=market_id,
+        decision_at=NOW - timedelta(hours=2),
+        tracking_state=ShadowTrackingState.PENDING_ENTRY,
+        result=OutcomeResult.OPEN,
+        direction=TradeDirection.LONG,
+    )
+    actor: Actor = make_actor("lab-signals-direction-expiry")
+
+    response = await client.get(
+        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&page_size=50",
+        headers=actor.headers,
+    )
+
+    assert response.status_code == 200, response.text
+    by_id = {item["signal_id"]: item for item in response.json()["items"]}
+    assert by_id[str(with_expiry)]["direction"] == "short"
+    assert by_id[str(with_expiry)]["expires_at"] is not None
+    assert by_id[str(without_expiry)]["direction"] == "long"
+    assert by_id[str(without_expiry)]["expires_at"] is None
+
+
+async def test_signals_market_id_excludes_a_same_symbol_sibling_market(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """T4.82 review (must-fix 1/4): the confluence screen resolves a market by
+    exchange+symbol and must only ever see that market's own signals. Filtering
+    by ``market`` (symbol) alone cannot tell apart a spot and a perpetual
+    market that share one ticker -- exactly the real NEARUSDT spot/perp
+    duplication (``.claude/state/notes-T3.73.md``). ``market_id`` must exclude
+    the sibling even though both rows match the same symbol.
+    """
+    from sqlalchemy import select
+
+    from hunter_core.db.models.markets import Market
+
+    _, version_id = await fx.seed_strategy_version(
+        session_factory, activated_at=NOW - timedelta(days=1)
+    )
+    perp_market_id = await fx.seed_lab_market(session_factory)
+    async with session_factory() as session:
+        perp_market = (
+            await session.execute(select(Market).where(Market.id == perp_market_id))
+        ).scalar_one()
+        exchange_id, symbol = perp_market.exchange_id, perp_market.symbol
+    spot_market_id = await fx.seed_lab_market_sibling(
+        session_factory, exchange_id=exchange_id, symbol=symbol, market_type=MarketType.SPOT
+    )
+    perp_signal = await fx.seed_shadow_signal(
+        session_factory,
+        strategy_version_id=version_id,
+        market_id=perp_market_id,
+        decision_at=NOW - timedelta(hours=1),
+        tracking_state=ShadowTrackingState.PENDING_ENTRY,
+        result=OutcomeResult.OPEN,
+    )
+    spot_signal = await fx.seed_shadow_signal(
+        session_factory,
+        strategy_version_id=version_id,
+        market_id=spot_market_id,
+        decision_at=NOW - timedelta(hours=1),
+        tracking_state=ShadowTrackingState.PENDING_ENTRY,
+        result=OutcomeResult.OPEN,
+    )
+    actor: Actor = make_actor("lab-signals-market-id")
+
+    by_symbol = await client.get(
+        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&market={symbol}",
+        headers=actor.headers,
+    )
+    assert by_symbol.status_code == 200, by_symbol.text
+    ids_by_symbol = {item["signal_id"] for item in by_symbol.json()["items"]}
+    assert ids_by_symbol == {str(perp_signal), str(spot_signal)}, (
+        "sanity: symbol alone matches both markets -- the fixture is only "
+        "meaningful if this is true"
+    )
+
+    by_market_id = await client.get(
+        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&market_id={perp_market_id}",
+        headers=actor.headers,
+    )
+    assert by_market_id.status_code == 200, by_market_id.text
+    ids_by_market_id = {item["signal_id"] for item in by_market_id.json()["items"]}
+    assert ids_by_market_id == {str(perp_signal)}
 
 
 async def test_signals_cursor_tie_breaks_by_id_when_decision_at_matches_across_markets(

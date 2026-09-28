@@ -175,6 +175,7 @@ async def list_signals(
     session: LabSession,
     strategy_version_id: uuid.UUID | None = None,
     market: Annotated[str | None, Query(max_length=32)] = None,
+    market_id: uuid.UUID | None = None,
     tracking_state: ShadowTrackingState | None = None,
     result: OutcomeResult | None = None,
     cohort: CohortParam = ShadowCohort.PROSPECTIVE,
@@ -190,13 +191,21 @@ async def list_signals(
     just the page: the confluence screen asks about fifteen minutes, and a tab
     counting the market's whole history next to three rows would read as a
     pager, not as a period. Neither bound given is the pre-T4.82 listing,
-    unchanged. The cap is :data:`SIGNALS_WINDOW_MAX_SPAN`."""
+    unchanged. The cap is :data:`SIGNALS_WINDOW_MAX_SPAN`.
+
+    ``market_id`` (T4.82 review, must-fix 1/4) is additive on top of
+    ``market``: the symbol-only filter cannot tell a spot market apart from a
+    perpetual one (or the same symbol on two exchanges) that happen to share a
+    ticker -- the confluence screen always has a resolved ``market_id`` and
+    passes it so its overlay never draws another market's geometry.
+    """
     check_window(
         since=emitted_from, until=emitted_to, now=utcnow(), max_span=SIGNALS_WINDOW_MAX_SPAN
     )
     page = await LabSignalsRepository(session).list_page(
         strategy_version_id=strategy_version_id,
         market=market,
+        market_id=market_id,
         tracking_state=tracking_state,
         result=result,
         cohort=cohort,

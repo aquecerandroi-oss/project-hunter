@@ -85,6 +85,7 @@ export default async function MarketDetailPage({ params }: MarketDetailPageProps
         detail={detailResult.detail}
         candles={candlesResult.ok ? candlesResult.candles : []}
         candlesError={candlesResult.ok ? null : candlesResult.reason}
+        orgSlug={orgSlug}
       />
     </>
   );

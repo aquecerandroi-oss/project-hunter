@@ -23,7 +23,7 @@ from hunter_api.repositories.lab_common import (
 from hunter_api.repositories.lab_signals_identity import IDENTITY_KEY_TEXT
 from hunter_core.db.models.agents import AgentSignal, SignalOutcome
 from hunter_core.db.models.markets import Market
-from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState
+from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState, TradeDirection
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,6 +43,14 @@ class SignalRow:
     market: str
     cohort: str
     decision_at: datetime
+    direction: TradeDirection
+    expires_at: datetime | None
+    """T4.82 confluence screen, design §4A: "sinal ativo" needs both the
+    direction (for the entry arrow, overlay 1) and the expiry (the
+    ``emitted_at <= cursor < expires_at`` test) — neither reached
+    ``SignalListItemOut`` before this, even though ``agent_signals`` has
+    carried both columns since T1 (``0002_shadow_lab``/base schema). Additive
+    only: every existing caller of this dataclass/schema keeps working."""
     stop: Decimal | None
     targets: list[Any]
     supporting_features: dict[str, Any]
@@ -110,6 +118,7 @@ class LabSignalsRepository:
         *,
         strategy_version_id: uuid.UUID | None,
         market: str | None,
+        market_id: uuid.UUID | None = None,
         tracking_state: ShadowTrackingState | None,
         result: OutcomeResult | None,
         cohort: str,
@@ -121,6 +130,15 @@ class LabSignalsRepository:
             filters.append(AgentSignal.strategy_version_id == strategy_version_id)
         if market is not None:
             filters.append(Market.symbol == market)
+        if market_id is not None:
+            # T4.82 review (must-fix 1/4): `market` alone matches by symbol
+            # only, so a spot and a perpetual market sharing one symbol (or
+            # two exchanges) are indistinguishable to it -- 340 historical
+            # spot-cohort signals are documented as still present
+            # (`.claude/state/notes-T3.73.md:68,100,235`, NEARUSDT
+            # duplicated spot+perp). Additive: callers that only pass `market`
+            # keep their pre-existing behaviour unchanged.
+            filters.append(AgentSignal.market_id == market_id)
         if tracking_state is not None:
             filters.append(SignalOutcome.tracking_state == tracking_state)
         if result is not None:
@@ -224,6 +242,7 @@ class LabSignalsRepository:
         state: LabSignalState,
         cursor: str | None,
         page_size: int,
+        market_id: uuid.UUID | None = None,
         emitted_from: datetime | None = None,
         emitted_to: datetime | None = None,
     ) -> SignalsPageResult:
@@ -231,6 +250,7 @@ class LabSignalsRepository:
         base_filters = self._base_filters(
             strategy_version_id=strategy_version_id,
             market=market,
+            market_id=market_id,
             tracking_state=tracking_state,
             result=result,
             cohort=cohort,
@@ -290,6 +310,8 @@ def _row_from(
         market=symbol,
         cohort=signal.supporting_features.get("cohort", ""),
         decision_at=decision_at,
+        direction=signal.direction,
+        expires_at=signal.expires_at,
         stop=signal.stop,
         targets=list(signal.targets or []),
         supporting_features=signal.supporting_features,
