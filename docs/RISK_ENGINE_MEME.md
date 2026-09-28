@@ -226,13 +226,122 @@ motor um `dev_share` medido, **datado** e com ≤ 600 s (`DEV_SHARE_MAX_AGE_S`, 
 ### 3.2 A carteira dedicada
 
 - **Uma carteira, um uso.** Ela existe só para este motor: não recebe aporte de outro lugar, não é
-  `exchange_connection`, não guarda nada além de SOL e das posições que este motor abriu.
+  `exchange_connection`, não guarda nada além de SOL, das posições que este motor abriu e das duas
+  moedas de cotação que ele mesmo usa — o USDC da tesouraria (§16) e o WSOL que Jupiter/PumpSwap
+  embrulham e fecham. (Correção de 28/09/2026, KB-0165: a versão anterior dizia "só SOL e
+  posições", mas a §16 põe USDC aqui desde a T4.54.)
 - **Saldo acima do teto recusa entradas** (`wallet_over_max_sol`). O teto é o que o dono aceitou
   perder; um saldo maior significa que alguém depositou além do combinado, e o motor não decide
   sozinho operar mais dinheiro. A varredura do excesso é ato manual auditado.
 - **Token desconhecido na carteira recusa entradas** (`wallet_unrecognized_holdings`) e **nunca é
   vendido automaticamente**: airdrop e token envenenado existem, e vender um mint que não abrimos é
   assinar uma transação contra um programa que não está na allowlist da §1.
+  **Como o executor alimenta a checagem** (KB-0165, 28/09/2026 — até aqui o insumo chegava sempre
+  vazio nos três montadores e a checagem nunca disparava; `services/meme-executor/.../wallet_holdings.py`):
+  - **Lê** todas as contas de token da carteira (`getTokenAccountsByOwner`, SPL Token **e**
+    Token-2022, `jsonParsed`, `confirmed`) no tique do kill switch (10 s) e sob demanda na admissão;
+    **depois** lê do Postgres o conjunto reconhecido — cadeia primeiro, para que um mint comprado pelo
+    motor já esteja numa linha quando a leitura o viu.
+  - **Reconhecido** = WSOL e o USDC da tesouraria ∪ mints de posição aberta (`meme_live_positions`
+    — pump.fun, PumpSwap e lançamento — e `spot_positions`), de compra em voo (`admitted`,
+    `simulated`, `submitted_unconfirmed`, nas duas tabelas de ordens) e de posição fechada/compra
+    confirmada — ou linha de posição atualizada (`updated_at`) — há ≤ 60 s da leitura (a leitura pode
+    ser anterior ao fechamento). Uma sobra de venda nesse mint só passa a recusar depois dessa
+    carência (e dos até 30 s de validade do veredito).
+  - **Não reconhecido** = qualquer outro mint cujo **total** somado entre as contas passe de um
+    milionésimo de token (`átomos × 1 000 000 > 10^decimais`, só inteiros; política deliberada e
+    cega a preço — o motor não lê preço aqui) ou cujo saldo seja **opaco** (extensão de
+    transferência confidencial do Token-2022). Conta zerada (ATA não fechada) não conta.
+  - **Reconhecimento é por mint, não por quantidade:** unidades a mais de um mint que o motor já
+    segura (um swap manual no mesmo token, `infra/scripts/meme_spot_swap.py`) **não** são detectadas.
+    Um swap manual para um mint **fora** do conjunto recusa entradas até o humano desfazê-lo — a
+    equity não o conta. Um airdrop acima da poeira também recusa: é o preço declarado desta regra
+    (quem mandar um token trava as entradas até o saldo público daquele mint ser zerado — fechar a
+    ATA não é necessário). **O remédio é zerar o saldo** (transferir ou queimar) — e ele só existe
+    para token que não esteja congelado por terceiro: conta congelada não transfere, não queima e
+    não fecha. Para esse caso, e só por decisão registrada do dono, existe a exceção abaixo.
+  - **Exceção auditada por mint** (F1, decisão do Everton de 28/09/2026,
+    `obsidian/06-DECISIONS/2026-09-28-excecao-auditada-token-golpe.md`; tabela
+    `meme_wallet_holding_exceptions`, `docs/DATABASE.md` §71). Uma linha no Postgres por
+    **carteira + programa + mint**, com a evidência lida na cadeia (contas, estado, autoridades,
+    slots, horário, como foi lida), o motivo, a nota do Obsidian que a cobre (caminho + sha256) e
+    quem/quando. Só entra pela ferramenta auditada `infra/scripts/wallet_holding_exception.py`
+    (linha + `audit_logs` na mesma transação; `--note` tem de mencionar o mint); nunca é apagada,
+    só revogada (gatilho). **Por padrão a ferramenta recusa** (`account_not_frozen_by_third_party`)
+    a menos que toda conta do mint esteja `frozen` e a autoridade de congelamento do mint exista e
+    não seja a carteira: um token que não está congelado por terceiro tem o remédio acima, e uma
+    exceção ali só esconderia um saldo removível (o argumento que derrubou a opção de ignorar
+    congelados automaticamente). `--allow-unfrozen` dispensa isso de forma explícita e gravada na
+    evidência. Recusa também, pelo nome: mint reconhecido ou de cotação (`mint_recognized`), conta
+    inexistente, outro programa, saldo de poeira, saldo opaco, decimais divergentes, estado
+    desconhecido, exceção já ativa.
+    **O que a exceção faz no executor:** o SELECT das exceções ativas **desta** carteira roda na
+    mesma transação do conjunto reconhecido, depois da leitura da cadeia; um mint nomeado sai de
+    `unrecognized` **só enquanto a cadeia mostra o que foi verificado** — toda conta do mint no
+    programa gravado, com os decimais gravados, não opaca, total ≤ `max_atoms` (o total observado,
+    sem margem: uma compra por cima volta a nomear) e `frozen` quando a linha exige (descongelou →
+    o remédio voltou a existir → volta a nomear); um estado que o parser não reconhece nunca passa.
+    Qualquer outra coisa mantém o mint em `unrecognized` (fecha). O mint dispensado é **relatado à
+    parte**, nunca reconhecido: `admission.wallet_holdings.excepted` (uma entrada por mint com
+    `mint`, `exception_id` e `created_at` da linha usada) e `excepted_count`; no heartbeat,
+    `wallet_excepted_mints` (5) e `wallet_excepted_count`. O id vai na admissão porque o veredito é
+    reusado por até 30 s sem reler o banco: a linha que decidiu **não** é reconstruível só pelo
+    intervalo `created_at`/`revoked_at` (revisão do database-architect, 28/09). O banco carimba
+    `created_at = now()` na inserção e exige `revoked_at = now()` na revogação. A exceção **nunca** autoriza
+    comprar, vender ou interagir: o único leitor em tempo de execução é
+    `hunter_meme_executor/wallet_exceptions.py`, chamado só pelo veredito de carteira (teste por
+    varredura do código). Revogar vale a partir da próxima leitura publicada: normalmente o próximo
+    tique (≤ 10 s mais a leitura); se as leituras falharem, o último veredito ainda vale até
+    completar 30 s de idade. A revogação limita o veredito usado nas admissões seguintes; **não**
+    cancela uma compra já admitida ou em voo (essa segue o caminho normal de ordem e saída).
+  - **Runbook (Everton) — a exceção do token-golpe `DgY9…`** (conta
+    `CX7sPvh759HBN7Hd9hfXqWEyD5nN292YzLzv15Hxrj9i`, Token-2022, 100 000 tokens = `100000000000`
+    átomos, 6 decimais, congelada por `DZ1zmeQYweJmhhuBu2ZLoR179sw47nAPMrtLJqvHLrX6` — leitura
+    pública só-leitura de 28/09 13:24Z). Pré-requisitos: o commit desta mudança implantado
+    (`compose.sh update`, que roda `alembic upgrade head`) **num release cuja cabeça seja a
+    `0068_meme_wallet_exceptions`** — a semente do EXP-M26 (`0069_meme_mature_chart_arms`, §69 do
+    `docs/DATABASE.md`) tem pré-requisitos próprios e não pode ir junto: se ela já estiver no
+    commit implantado, o `update` a aplica (Astra, revisão do diff). Conferir antes com
+    `git log --oneline -- infra/migrations/versions/0069_meme_mature_chart_arms.py` vazio na VPS.
+    E a nota no `obsidian/` da VPS. Do PowerShell, primeiro o ensaio (não grava nada), depois o
+    mesmo com `--apply`:
+
+    ```
+    ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/wallet_holding_exception.py --add --wallet ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4 --mint DgY9Z8xPG1346Ydrq98ASAZcVdyrurT4tCQ7TDapHcJg --program token-2022 --reason 'token de phishing FOMPOSIT.TOP congelado pelo emissor, impossivel zerar' --actor Everton --note obsidian/06-DECISIONS/2026-09-28-excecao-auditada-token-golpe.md"
+    ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/wallet_holding_exception.py --add --wallet ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4 --mint DgY9Z8xPG1346Ydrq98ASAZcVdyrurT4tCQ7TDapHcJg --program token-2022 --reason 'token de phishing FOMPOSIT.TOP congelado pelo emissor, impossivel zerar' --actor Everton --note obsidian/06-DECISIONS/2026-09-28-excecao-auditada-token-golpe.md --apply"
+    ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/wallet_holding_exception.py --list"
+    ```
+
+    Conferir depois no heartbeat do executor: `wallet_excepted_mints` = `DgY9…`,
+    `wallet_unrecognized_count` = `0`. Para revogar (não precisa de cadeia nem de nota):
+    `... wallet_holding_exception.py --revoke --wallet <carteira> --mint <mint> --reason '<motivo>' --actor Everton --apply`.
+    Código de saída: 0 feito/ensaio, 2 uso (argparse), 65 recusa (o motivo sai no stderr).
+  - **Falha:** um veredito só é publicado quando as duas chamadas **e** o SELECT responderam, de
+    slots que **avançaram** nos dois programas (SPL Token e Token-2022, cada um contra o seu —
+    uma RPC atrasada repetindo a mesma fotografia não renova nada). As duas chamadas
+    `getTokenAccountsByOwner` correm **em paralelo** e o carimbo da leitura é tomado **antes**
+    delas (a idade conta do dado mais velho possível). O coletor tem **prazo próprio**,
+    `MEME_WALLET_HOLDINGS_TIMEOUT_S` (padrão **5 s**, limitado a [0,1; 10]), que cobre a espera
+    pelo lock, as duas chamadas e o SELECT — o prazo do saldo de SOL
+    (`MEME_WALLET_REFRESH_TIMEOUT_S`, 1,5 s) **não** mudou. Por que 5 s: uma chamada na RPC
+    pública foi medida entre 0,95 e 4,76 s (revisão do guardião, 28/09/2026); em paralelo a
+    leitura custa a chamada mais lenta, e 5 s ainda cabe dentro do tique de 10 s. Acima de 10 s
+    uma leitura atravessaria dois tiques e um terço da validade de 30 s. A leitura roda **no fim**
+    do tique do kill switch, depois do saldo, da tesouraria e do blockhash do lançamento: uma
+    leitura lenta não atrasa nada do mesmo tique (mas o `forever` dorme **depois** do trabalho: o
+    intervalo entre dois tiques periódicos cresce até o prazo da leitura; as três entradas relêem o
+    kill switch antes de decidir). **Recuo depois de falha:** com `n` falhas seguidas **de
+    leitura** (quem só esperou na fila do lock e estourou o prazo não conta como outra falha)
+    ninguém lê — nem o tique, nem a admissão sob demanda, nem quem esperava na fila do
+    lock — por `min(10 × 2^(n−1), 60)` s (10, 20, 40, 60…); a primeira falha não custa nada além
+    do tique normal, e uma RPC morta recebe uma leitura por minuto (o cliente RPC é o mesmo das
+    saídas, KB-0149 §4). Um veredito publicado zera o recuo; o heartbeat publica
+    `wallet_holdings_retry_at`. Falha nunca renova o carimbo; veredito com mais de
+    **30 s** não vale e a entrada **adia** (§8.2 — sem linha, a aprovação conserva o TTL e expira
+    pelo nome se a leitura não voltar). A admissão grava o veredito em que decidiu
+    (`admission.wallet_holdings`, com `excepted` à parte); o heartbeat publica
+    `wallet_holdings_state`, `wallet_unrecognized_mints` (5), `wallet_unrecognized_count`,
+    `wallet_excepted_mints` (5) e `wallet_excepted_count`. **Saídas nunca leem nada disto.**
 - **Reserva de aluguel.** SOL preso em rent de ATA não é caixa: `available_sol` desconta rent
   estimado e taxas (§5). A doc oficial cita, por exemplo, `0,0018444` SOL para criar
   `user_volume_accumulator` (T4.0d §6) — o número exato por conta vem do caminho de execução, nunca
@@ -490,7 +599,7 @@ Todos os checks avaliáveis são registrados em `decision.checks[]` como
 | 14 | `rug_history` | mint já marcado como rug; carteira em cooldown de rug | `token_rugged_no_reentry`, `rug_cooldown_active` |
 | 15 | `duplicate_position` | já existe posição ou pendência neste mint | `duplicate_position` |
 | 16 | `concurrent_positions` | abertas + pendentes ≥ `max_open_positions` | `max_open_positions` |
-| 17 | `wallet_cap` | saldo > `MEME_WALLET_MAX_SOL`; holdings não reconhecidos | `wallet_over_max_sol`, `wallet_unrecognized_holdings` |
+| 17 | `wallet_cap` | saldo > `MEME_WALLET_MAX_SOL`; holdings não reconhecidos (mint fora do conjunto reconhecido acima da poeira, §3.2; a mensagem lista até 5; um mint com exceção auditada válida do dono sai da lista e é relatado à parte, §3.2). Sem veredito válido (≤ 30 s) a entrada **adia** antes do motor (§8.2) | `wallet_over_max_sol`, `wallet_unrecognized_holdings` |
 | 18 | `daily_loss` | perda do dia ≥ `MEME_DAILY_LOSS_CAP_SOL` (**também aciona** a trava, §7); a perda é `equity_inicio_do_dia + entrada_da_tesouraria_hoje − equity` (T4.60, §16.3) | `daily_loss_cap_reached` |
 | 19 | `slippage_cap` | `max_slippage_pct` pedido > teto do perfil | `slippage_above_cap` |
 | 20 | `fee_caps` | priority fee > teto absoluto ou > fração da compra; tip > teto | `priority_fee_above_cap`, `jito_tip_above_cap` |
@@ -912,6 +1021,7 @@ kill switch, saldo da carteira.
 | `confirmed` | mínimo para **decidir** |
 | `finalized` | exigido para **contabilizar** posição como real antes de uma entrada nova no mesmo mint |
 | RPC/WS ilegível | adia a entrada (`rpc_unreachable`), **nunca** derruba o passe de proteção |
+| contas de token da carteira sem veredito válido (nunca lidas, ou leitura com mais de 30 s — §3.2) | adia a entrada (log `meme_live_entry_deferred`, `wallet_holdings_deferrals` no heartbeat) — nunca "carteira limpa"; durante o recuo depois de falha (`wallet_holdings_retry_at`) a admissão adia **sem** reler |
 
 ### 8.3 Mayhem — política separada, porque o ruído é injetado por construção
 

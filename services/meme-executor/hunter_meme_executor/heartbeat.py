@@ -250,6 +250,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
     }
     fields.update(daily_loss_fields(anchor, equity, ctx.treasury_inflow.inflow_sol))
     fields.update(ctx.treasury_inflow.describe())
+    fields.update(ctx.holdings.describe(now))  # KB-0165: unrecognized mints (5 + count)
     fields.update(gates_fields(ctx))
     fields.update(auto)
     fields.update(ctx.kill.describe())

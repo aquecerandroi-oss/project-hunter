@@ -59,6 +59,7 @@ from hunter_meme_executor.send_path import (
     priority_fee_for,
 )
 from hunter_meme_executor.treasury_inflow import ensure_anchor
+from hunter_meme_executor.wallet_holdings import admission_holdings
 
 __all__ = ["entries_once", "handle_candidate"]
 
@@ -165,6 +166,9 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     conviction = await conviction_for(
         ctx, built, reads.curve, proposal=proposal, limits=cfg.limits, now=now
     )
+    holdings = await admission_holdings(ctx)  # KB-0165: §3.2's check 17, read last
+    if holdings is None:
+        return  # §8.2: an unread wallet defers — nothing written, the approval keeps its TTL
     inputs = AdmissionInputs(
         proposal=proposal,
         wallet=wallet_from(
@@ -177,6 +181,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             limits=cfg.limits,
             treasury_inflow_today_sol=inflow,
             recent_losses=built.recent_losses,  # T4.78: check 28
+            unrecognized=holdings.unrecognized,
         ),
         curve=curve_from(reads.curve),
         context=built.context,
@@ -191,6 +196,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     admission = decision.to_jsonable()
     admission.update(built.extras)  # T4.45: what this admission read for itself
     admission["conviction"] = conviction.as_json()
+    admission["wallet_holdings"] = holdings.as_json()
     if scope is not None:
         admission["small_test"] = scope.as_json()
     if not decision.approved or decision.sizing is None:

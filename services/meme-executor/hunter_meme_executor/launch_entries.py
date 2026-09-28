@@ -64,6 +64,7 @@ from hunter_meme_executor.scope import (
 from hunter_meme_executor.send_path import curve_fee_accounts, priority_fee_for
 from hunter_meme_executor.spot_brake import brake_positions, spot_pending_intents
 from hunter_meme_executor.treasury_inflow import ensure_anchor
+from hunter_meme_executor.wallet_holdings import admission_holdings
 from hunter_risk_meme.profile import launch_floor
 
 __all__ = ["handle_launch_candidate", "launch_entries_once", "launch_inert_reason"]
@@ -191,6 +192,9 @@ async def handle_launch_candidate(
         candidate, token, curve, global_account, participation_used_sol=used, now=now
     )
     fees = fee_bps(global_account)
+    holdings = await admission_holdings(ctx)  # KB-0165: §3.2's check 17, read last
+    if holdings is None:
+        return  # §8.2: an unread wallet defers — nothing written, the proposal keeps its age
     inputs = AdmissionInputs(
         proposal=launch_proposal(
             candidate,
@@ -210,6 +214,7 @@ async def handle_launch_candidate(
             limits=cfg.limits,
             treasury_inflow_today_sol=inflow,
             recent_losses=losses,
+            unrecognized=holdings.unrecognized,
         ),
         curve=curve_from(curve),
         context=context,
@@ -224,6 +229,7 @@ async def handle_launch_candidate(
         await ctx.kill.latch("daily_loss_cap_reached")
     admission = decision.to_jsonable()
     admission["launch"] = {**extras, "config": launch.as_json(cfg.limits)}
+    admission["wallet_holdings"] = holdings.as_json()
     if scope is not None:
         admission["small_test"] = scope.as_json()
     if not decision.approved or decision.sizing is None:

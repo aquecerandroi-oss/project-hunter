@@ -258,14 +258,15 @@ def wallet_from(
     pending: list[PendingAttempt],
     anchor: DayAnchor,
     limits: MemeLimits,
-    unrecognized: tuple[str, ...] = (),
+    unrecognized: tuple[str, ...],
     treasury_inflow_today_sol: Decimal = _ZERO,
     recent_losses: Mapping[str, datetime] | None = None,
 ) -> MemeWalletState:
     """T4.60: ``treasury_inflow_today_sol`` is what the treasury added since
     ``anchor.day_start_utc`` (``treasury_inflow.py``) — check 18 measures the
     day's loss against ``day_start + inflow``, not against the refilled equity.
-    T4.78: ``recent_losses`` (``repo_positions.recent_losses``) feeds check 28."""
+    T4.78: ``recent_losses`` (``repo_positions.recent_losses``) feeds check 28.
+    KB-0165: ``unrecognized`` has no default — a ``()`` default kept check 17 dead."""
     return MemeWalletState(
         wallet_id=wallet_id,
         as_of=now,

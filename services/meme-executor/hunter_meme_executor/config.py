@@ -117,6 +117,10 @@ class ExecutorConfig:
     """T4.51 - ``MEME_WALLET_REFRESH_TIMEOUT_S``: the hard deadline of the
     kill-switch tick's own ``getBalance`` read (``wallet_refresh.py``). Past it
     the read is a failure — the last known balance is kept, never zeroed."""
+    wallet_holdings_timeout_s: float = 5.0
+    """KB-0165 (guardian F2) - ``MEME_WALLET_HOLDINGS_TIMEOUT_S``: the holdings
+    read's own deadline (lock + both ``getTokenAccountsByOwner``, concurrent, + the
+    SELECT). 5 s: one public-RPC call measured 0.95-4.76 s; clamped to [0.1, 10]."""
     creator_sell_tolerance_pct: Decimal = Decimal("0.02")
     """T4.45 - ``MEME_CREATOR_SELL_TOLERANCE_PCT``: how much of his recorded
     allocation a creator may be missing before the chain read calls it a sale."""
@@ -284,6 +288,9 @@ def boot(
         ),
         risk_read_timeout_s=max(0.1, float_env(env, "MEME_RISK_READ_TIMEOUT_S", 1.5)),
         wallet_read_timeout_s=max(0.1, float_env(env, "MEME_WALLET_REFRESH_TIMEOUT_S", 1.5)),
+        wallet_holdings_timeout_s=min(
+            10.0, max(0.1, float_env(env, "MEME_WALLET_HOLDINGS_TIMEOUT_S", 5.0))
+        ),
         creator_sell_tolerance_pct=tolerance(env),
         gates_file=(env.get(ENV_GATES_FILE) or "").strip() or None if mode.live else None,
         env_limits=env_limits,

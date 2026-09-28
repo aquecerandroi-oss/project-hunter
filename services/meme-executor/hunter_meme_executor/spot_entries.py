@@ -41,6 +41,7 @@ from hunter_meme_executor.spot_send_rules import spot_client_order_id
 from hunter_meme_executor.spot_signals import signal_inputs
 from hunter_meme_executor.spot_stats import SpotStats
 from hunter_meme_executor.treasury_inflow import ensure_anchor
+from hunter_meme_executor.wallet_holdings import admission_holdings
 from hunter_risk_meme import evaluate_spot_entry
 from hunter_risk_meme.spot_profile import SPOT_LANE
 
@@ -195,6 +196,9 @@ async def handle_spot_candidate(
             now=now,
         )
         return
+    holdings = await admission_holdings(ctx)  # KB-0165: §3.2's check 17, read last
+    if holdings is None:
+        return  # §8.2: an unread wallet defers — no row, the signal is retried while fresh
     wallet = wallet_from(
         wallet_id=ctx.signer.pubkey,
         now=now,
@@ -204,6 +208,7 @@ async def handle_spot_candidate(
         anchor=anchor,
         limits=limits,
         treasury_inflow_today_sol=inflow,
+        unrecognized=holdings.unrecognized,
     )
     decision = evaluate_spot_entry(
         wallet, limits, cfg.profile(limits), signal, ctx.kill.inputs(), now
@@ -213,6 +218,7 @@ async def handle_spot_candidate(
     admission = decision.to_jsonable()
     admission["decided_by"] = SPOT_DECIDED_BY
     admission["spot1"] = readings
+    admission["wallet_holdings"] = holdings.as_json()
     # The gate is ``approved`` — the sizing is published on refusals too (T4.74-2).
     approved = decision.approved and decision.sizing is not None
     reason = None if approved else (decision.first_refusal or "refused")

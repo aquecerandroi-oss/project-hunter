@@ -19,6 +19,7 @@ from hunter_meme_executor.spot_config import SpotConfig
 from hunter_meme_executor.spot_repo import ClosedStats, candidate_from_row
 from hunter_meme_executor.spot_signals import FinalClose
 from hunter_meme_executor.spot_stats import SpotStats
+from hunter_meme_executor.wallet_holdings import HoldingsVerdict
 from hunter_risk_meme import MemeKillSwitchInputs, limits_from_env
 
 from .spot_fakes import (
@@ -118,6 +119,10 @@ class Store:
     anchor: DayAnchor | None = field(
         default_factory=lambda: DayAnchor(DAY_START, Decimal("0.5"), Decimal("0.5"), NOW)
     )
+    holdings: HoldingsVerdict | None = field(
+        default_factory=lambda: HoldingsVerdict((), 0, (1, 1), NOW)
+    )
+    """KB-0165: what ``admission_holdings`` answers — a clean wallet unless a test says so."""
 
 
 class _Session:
@@ -165,6 +170,10 @@ def _wire(monkeypatch: pytest.MonkeyPatch, store: Store) -> None:
     async def ensure_anchor(ctx: Any, now: Any, equity: Decimal) -> DayAnchor | None:
         return store.anchor
 
+    async def admission_holdings(_ctx: Any) -> HoldingsVerdict | None:
+        return store.holdings
+
+    monkeypatch.setattr(spot_entries, "admission_holdings", admission_holdings)
     for module in (spot_entries, spot_entry_reads, spot_entry_writes):
         monkeypatch.setattr(module, "role_session", session)
     monkeypatch.setattr(spot_entries, "utcnow", lambda: NOW)  # the signal's age is measured here

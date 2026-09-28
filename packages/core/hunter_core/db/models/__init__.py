@@ -109,6 +109,7 @@ from hunter_core.db.models.meme_mature_opportunities import MemeMatureOpportunit
 from hunter_core.db.models.meme_series import MemeCurveSnapshot, MemeTrade
 from hunter_core.db.models.meme_token_state_history import MemeTokenStateHistory
 from hunter_core.db.models.meme_treasury import MemeTreasurySwap
+from hunter_core.db.models.meme_wallet_exceptions import MemeWalletHoldingException
 from hunter_core.db.models.meme_wallets import MemeWalletPosition, MemeWalletTrade
 from hunter_core.db.models.paper_execution import ParticipationConsumption, PortfolioExitIntent
 from hunter_core.db.models.paper_wallet import PortfolioCurrencyAnchor, PortfolioRiskState
@@ -246,6 +247,7 @@ __all__ = [
     "MemeTokenStateHistory",
     "MemeTrade",
     "MemeTreasurySwap",
+    "MemeWalletHoldingException",
     "MemeWalletPosition",
     "MemeWalletTrade",
     "Notification",

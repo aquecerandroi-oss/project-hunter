@@ -88,6 +88,7 @@ from hunter_meme_executor.spot_reconcile import spot_reconcile_once
 from hunter_meme_executor.treasury import treasury_once
 from hunter_meme_executor.treasury_inflow import treasury_inflow_once
 from hunter_meme_executor.wake import ProposalWakeListener
+from hunter_meme_executor.wallet_holdings import holdings_once
 from hunter_meme_executor.wallet_refresh import wallet_refresh_once
 
 if TYPE_CHECKING:
@@ -183,6 +184,7 @@ async def kill_switch_once(ctx: ExecutorContext) -> None:
     # refreshes it every 5 s on its own; this is the second writer, never raises).
     if ctx.config.launch.enabled and ctx.signer is not None:
         await asyncio.to_thread(ctx.launch.blockhash.refresh_if_stale, ctx.chain, now=utcnow())
+    await holdings_once(ctx)  # KB-0165 §3.2 check 17; last: a slow read delays nothing above
 
 
 def build_context(

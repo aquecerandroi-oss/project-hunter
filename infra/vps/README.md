@@ -317,6 +317,145 @@ passada de 2 d e o `VACUUM FULL` que devolve o espaço ao `df` são o roteiro da
 `docs/design/retencao-e-disco-2026-09-27.md` — a única exceção, com os escritores
 parados, à regra "nunca `VACUUM FULL`" acima.
 
+## Recuperar o aluguel das contas de token vazias (`close_empty_token_accounts.py`)
+
+**Só o Everton roda o `--apply`.** Em 28/09/2026 a carteira do robô
+(`ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4`) tinha 80 contas de token vazias
+(5 do SPL Token, 75 do Token-2022) prendendo **cerca de 0,1210 SOL** de aluguel, e 1
+conta congelada com o token de phishing (`DgY9Z8xPG1346Ydrq98ASAZcVdyrurT4tCQ7TDapHcJg`),
+que **nunca** é tocada (`obsidian/07-BUGS/Open Bugs.md`;
+`obsidian/06-DECISIONS/2026-09-28-excecao-auditada-token-golpe.md`). Esse mint está numa
+lista fixa no código (`NEVER_TOUCH_MINTS`) e sai sempre como
+`skipped:never_touch:phishing`, conferido antes de qualquer outra regra e de novo em
+cada lote. Congelamento e saldo não servem de proteção, porque quem decide os dois é o
+emissor: se ele descongelar a conta e queimar os tokens, ela passaria em todas as outras
+checagens. O script reusa o
+caminho já revisado da T4.77 (`meme_close_atas_*`). Esse caminho monta só `CloseAccount`
+com destino e autoridade iguais à carteira, confere a mensagem antes de assinar, simula e
+exige que o saldo suba, grava a assinatura antes de enviar e mede o recuperado pelo meta
+da transação. Por cima disso, o script põe as regras desta tarefa:
+
+- **Uma conta só entra se tudo isto valer:** o dono é a carteira; o saldo é exatamente
+  0 em átomos; a conta não está congelada; não tem delegado; a autoridade de fechamento
+  é a carteira ou está vazia; é a ATA do mint. No Token-2022, a conta só pode ter a
+  extensão `immutableOwner`, e o tamanho tem de bater. Taxa de transferência retida
+  (`transferFeeAmount`) ou qualquer outra extensão sai como
+  `skipped:token_2022_extension:<nome>`.
+- **Contas mantidas de propósito:**
+  - `skipped:kept_quote_mint:wsol` e `:usdc`. A ATA de WSOL é onde a Jupiter e a
+    PumpSwap embrulham SOL no swap, e a de USDC é onde a tesouraria recebe. Fechar
+    qualquer uma só joga o aluguel para o próximo swap ou a próxima entrada, que
+    teriam de recriar a conta.
+  - `skipped:recognized_mint`. É o mint de uma posição aberta, de uma compra em voo ou
+    de algo fechado há 60 s ou menos, pelo mesmo SQL que o executor usa
+    (`wallet_holdings.recognized_mints`).
+- **O `--apply` recusa com nome (código 65) e não assina nada no lote corrente quando:**
+  - há compra da mesa meme ou da `spot/1` em voo (`buy_in_flight:…`);
+  - o kill switch está em `EMERGENCY` ou ilegível. `TRADING_DISABLED` não bloqueia,
+    porque fechar conta vazia não é entrada;
+  - a leitura da cadeia falha (`chain_read_failed:…`, que inclui uma resposta RPC sem
+    lista) ou a leitura do banco falha (`db_read_failed:…`);
+  - falta a nota (`note_required`) ou a nota não cita `close_empty_token_accounts` nem o
+    endereço da carteira;
+  - a chave carregada não é a carteira do `--user` (`destination_not_wallet`);
+  - uma leitura da RPC falha dentro do lote antes da assinatura (`batch_unsent:…`). Nesse
+    caso nada saiu da máquina.
+- **Em cada lote, antes de enviar:** o script relê o kill switch, as compras em voo, a
+  carteira inteira e os mints reconhecidos. Uma conta que mudou desde o plano sai do lote
+  com `dropped:<motivo>`. Depois grava a linha de intenção em `audit_logs` e só então
+  envia.
+- **Tamanho do lote:** 8 `CloseAccount`, que é o teto do verificador. Uma transação de 8
+  fechamentos tem 530 bytes, contra o limite de 1 232. Isso dá 11 transações para as 80
+  contas.
+- **Códigos de saída:**
+  - 0: terminou, ou dry run limpo, ou nada a fechar;
+  - 64: erro de uso;
+  - 65: recusado por nome, **nada assinado no lote corrente**. Lotes anteriores da mesma
+    execução, se houver, confirmaram normalmente e estão impressos;
+  - 66: lote enviado e não confirmado em 20 s;
+  - 67: lote falhou na cadeia (só a taxa foi gasta);
+  - 68: um lote foi **assinado, enviado e confirmado**, e depois a execução parou. Ou a
+    linha `….batch` não foi gravada (`audit_unwritten`), ou o lote recuperou menos que o
+    aluguel menos as taxas (`recovered_below_expected`).
+
+  **Com 66, 67, 68 ou `crashed_mid_batch`, não rode de novo antes de reconciliar:** abra
+  na Solscan a assinatura impressa (ou a do `close_atas_submitted` em `system_events`) e
+  confira o que aconteceu. Só um 0 é sucesso completo.
+- **O que fica gravado em `audit_logs`:**
+  - `wallet.close_empty_token_accounts.intent`, antes de cada envio;
+  - `….batch`, com a assinatura, as contas e os lamports de cada lote;
+  - `….run`, com o resultado, as assinaturas e o total, inclusive quando a execução é
+    recusada.
+
+  Todas levam o ator (`--actor`, padrão `everton`) e o motivo. O sha256 da nota entra a
+  partir do momento em que ela passa no portão; uma recusa anterior, como compra em voo,
+  fica registrada sem nota. Cada lote também grava `system_events` (componente
+  `meme_close_atas`), com o id da execução. Se o processo cair depois de assinar, o script
+  imprime `crashed_mid_batch batch=… run_id=…`. Nesse caso, procure a assinatura em
+  `system_events` e confira na Solscan antes de rodar de novo.
+
+**Fechar uma conta só devolve o aluguel (SOL) para a carteira. Nenhum token é movido,
+vendido ou queimado:** o programa recusa fechar conta com saldo, e o script nem monta o
+pedido.
+
+Pré-requisitos: o commit com o script e a nota do Obsidian precisa estar implantado
+(`compose.sh update`, porque o `ops` roda só a imagem implantada e lê `obsidian/` do
+checkout). Os comandos abaixo foram escritos para o PowerShell do PC: aspas simples por
+fora, sem `$` e sem aspas duplas por dentro. Para rodar direto na VPS, use só o trecho
+entre as aspas.
+
+1. **Dry run.** Leia a lista inteira. Cada conta aparece com endereço, programa, mint,
+   lamports e veredito. A de phishing tem de sair como `skipped:never_touch:phishing`,
+   qualquer que seja o estado dela na cadeia. No fim vêm
+   `total_recoverable_sol`, `estimated_fee_lamports`, `expected_net_sol` e
+   `wallet_balance_sol`. **Anote o `wallet_balance_lamports` e o
+   `expected_net_lamports`.**
+
+   ```powershell
+   ssh hunter-vps 'cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/close_empty_token_accounts.py --user ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4'
+   ```
+
+2. **Confirme que a `spot/1` não tem posição aberta.** No mesmo dry run, a linha
+   `open_positions meme=… spot=…` tem de mostrar `spot=0`, e `in_flight_buys` tem de
+   mostrar `meme=0 spot=0`. Uma posição aberta não quebra nada, porque o mint dela fica de
+   fora como `recognized_mint`. Mesmo assim, o combinado é rodar com a `spot/1` vazia: se
+   houver posição, espere ela sair e repita o passo 1.
+
+3. **Aplique com a nota, em dois tempos.** A nota
+   `obsidian/06-DECISIONS/Revisoes-Astra/Fechar-contas-vazias.md` cita a ferramenta e a
+   carteira, e precisa estar no checkout da VPS. Cada lote imprime uma linha JSON com a
+   assinatura.
+
+   **3a. Um lote só.** Rode e espere terminar:
+
+   ```powershell
+   ssh hunter-vps 'cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/close_empty_token_accounts.py --user ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4 --apply --max-batches 1 --note obsidian/06-DECISIONS/Revisoes-Astra/Fechar-contas-vazias.md'
+   ```
+
+   **Pare e confira antes de seguir.** A última linha tem de ser
+   `done: closed=… lamports_recovered=… signatures=…`. Abra a assinatura na Solscan. Ela
+   tem de mostrar **duas instruções do ComputeBudget** (`SetComputeUnitLimit` e
+   `SetComputeUnitPrice`, a taxa de prioridade) e, depois delas, só `CloseAccount`, com o
+   SOL voltando para a carteira. Qualquer outra instrução é motivo para parar e avisar. Se
+   o código de saída for 66, 67 ou 68, ou se aparecer `crashed_mid_batch`, **não rode de
+   novo** antes de reconciliar essa assinatura.
+
+   **3b. O resto**, só depois da conferência acima:
+
+   ```powershell
+   ssh hunter-vps 'cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/close_empty_token_accounts.py --user ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4 --apply --note obsidian/06-DECISIONS/Revisoes-Astra/Fechar-contas-vazias.md'
+   ```
+
+   Se o dry run do passo 1 mostrou `wallet_balance_lamports=unreadable`, ele termina com
+   o código 65: rode de novo até o saldo aparecer, porque o passo 4 depende dele.
+
+4. **Confira o saldo.** Rode o dry run do passo 1 de novo. O `wallet_balance_lamports`
+   novo menos o anotado no passo 1 tem de dar aproximadamente o `expected_net_lamports`
+   anotado. A taxa real fica abaixo da estimada, que é um teto; uma compra ou um depósito
+   no meio mudaria a conta. O mesmo número aparece em `lamports_recovered`, lido do meta
+   de cada transação. As contas fechadas não aparecem mais na lista, e a de phishing
+   continua lá como `skipped:never_touch:phishing`.
+
 ## O que fica exposto
 
 | Porta | Onde escuta | Quem alcança |

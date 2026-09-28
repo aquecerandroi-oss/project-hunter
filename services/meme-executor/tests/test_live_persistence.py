@@ -54,8 +54,10 @@ from hunter_meme_executor.build import decode_fills
 from hunter_meme_executor.chain import (
     ChainReader,
     CurveRead,
+    HoldingsRead,
     PoolRead,
     TokenAccountRead,
+    TokenHolding,
     WalletRead,
 )
 from hunter_meme_executor.config import ExecutorConfig
@@ -167,6 +169,8 @@ class FakeChain(ChainReader):
         self.migrated = False
         self.pool_read: PoolRead | None = None
         self._pumpswap_config: Any = None
+        self.holdings: list[TokenHolding] = []
+        self.holdings_slot = 0
 
     @property
     def rpc(self) -> Any:  # type: ignore[override]
@@ -217,6 +221,11 @@ class FakeChain(ChainReader):
 
     def token_account(self, owner: str, mint: str, token_program: str) -> TokenAccountRead:
         return TokenAccountRead(exists=self.tokens_on_chain > 0, amount=self.tokens_on_chain)
+
+    def token_holdings(self, owner: str) -> HoldingsRead:
+        """KB-0165: what the wallet holds besides SOL — nothing unless a test plants it."""
+        self.holdings_slot += 1  # every read sees newer slots, as a live cluster would
+        return HoldingsRead(tuple(self.holdings), (self.holdings_slot,) * 2, datetime.now(UTC))
 
     def blockhash(self) -> tuple[str, int]:
         return "BQ8v5pyUzayNkgPghSBd36pVgG14SGLExT5kwWkmYZWJ", 150

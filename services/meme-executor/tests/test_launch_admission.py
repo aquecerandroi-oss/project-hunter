@@ -325,6 +325,7 @@ def _inputs(
             pending=[],
             anchor=DayAnchor(DAY_START, Decimal("0.3"), Decimal("0.3"), NOW),
             limits=LIMITS,
+            unrecognized=(),
         ),
         curve=curve_from(curve),
         context=context,

@@ -28,6 +28,7 @@ from hunter_meme_executor.spot_exit_rules import LaneState
 from hunter_meme_executor.spot_heartbeat import spot1_fields
 from hunter_meme_executor.spot_repo import ClosedStats
 from hunter_meme_executor.spot_stats import SpotStats
+from hunter_meme_executor.wallet_holdings import WalletHoldingsReader
 from hunter_risk_meme import MEME_PAPER_V0
 
 from .spot_entries_rig import FakeInflow
@@ -73,6 +74,7 @@ class Ctx:
     treasury_inflow: FakeInflow = field(default_factory=FakeInflow)
     event_exits: EventExitsStats = field(default_factory=EventExitsStats)
     launch: LaunchStats = field(default_factory=LaunchStats)
+    holdings: WalletHoldingsReader = field(default_factory=WalletHoldingsReader)  # KB-0165
     treasury_client: NoJupiter = field(default_factory=NoJupiter)
     signer: Any = None
     priority_fees: Any = None

@@ -573,6 +573,12 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         tuple[str, ...],
         migration_ddl("meme_token_state_history").MEME_TOKEN_STATE_HISTORY_APP_READ_ONLY_TABLES,
     )
+    # F1 (0068): Everton's audited per-mint wallet exceptions — read-only for the app
+    # (the owner's CLI writes; test_migration_wallet_exceptions proves both roles).
+    wallet_exceptions_read_only = cast(
+        tuple[str, ...],
+        migration_ddl("meme_wallet_exceptions").MEME_WALLET_EXCEPTIONS_APP_READ_ONLY_TABLES,
+    )
 
     classified = (
         list(write)
@@ -610,6 +616,9 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(decision_tapes_read_only)
         + list(mature_opportunities_read_only)
         + list(token_state_history_read_only)
+        + list(wallet_exceptions_read_only)
+        # 0059: market_events (read-only for the app) was never classified — red on HEAD.
+        + [cast(str, migration_ddl("market_events").MARKET_EVENTS_TABLE_0059)]
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

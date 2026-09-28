@@ -40,6 +40,7 @@ from hunter_meme_executor.launch_config import LaunchConfig
 from hunter_meme_executor.launch_stats import LaunchStats
 from hunter_meme_executor.priority_fee import PriorityFeeChoice
 from hunter_meme_executor.send_tuning import SendTuning
+from hunter_meme_executor.wallet_holdings import HoldingsVerdict
 from hunter_risk_meme import MemeKillSwitchInputs, limits_from_env
 
 from .test_launch_admission import CREATOR, LIMITS, MINT, POLICY, WALLET, _candidate
@@ -194,6 +195,10 @@ class Db:
     losses: dict[str, datetime] = field(default_factory=lambda: dict[str, datetime]())
     """T4.78: what ``recent_losses`` answers (mint → exit_at of the last losing close)."""
     losses_windows: list[int] = field(default_factory=lambda: list[int]())
+    holdings: HoldingsVerdict | None = field(
+        default_factory=lambda: HoldingsVerdict((), 0, (1, 1), datetime.now(UTC))
+    )
+    """KB-0165: what ``admission_holdings`` answers — a clean wallet unless a test says so."""
 
 
 @dataclass
@@ -278,6 +283,10 @@ def _wire(monkeypatch: pytest.MonkeyPatch, db: Db, submitter: FakeSubmitter) -> 
     def session(*_a: Any, **_k: Any) -> _Session:
         return _Session()
 
+    async def admission_holdings(_ctx: Any) -> HoldingsVerdict | None:
+        return db.holdings
+
+    monkeypatch.setattr(le, "admission_holdings", admission_holdings)
     monkeypatch.setattr(le, "role_session", session)
     monkeypatch.setattr(lsub, "role_session", session)
     monkeypatch.setattr(le, "launch_candidates", launch_candidates)

@@ -187,6 +187,7 @@ def _wallet(losses: dict[str, datetime]):
         pending=[],
         anchor=anchor,
         limits=MEME_PAPER_V0,
+        unrecognized=(),
         recent_losses=losses,
     )
 

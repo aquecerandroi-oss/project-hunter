@@ -183,3 +183,22 @@ def test_the_spot_lane_is_on_only_with_flag_live_and_signer(tmp_path: Path) -> N
     assert config.spot.ticket(config.limits) == Decimal("0.02"), "clamped by max_sol_per_trade"
     off, _mode, _signer = _boot({**env, ENV_SECRET_KEY: _test_key()})
     assert off.spot.inert_reason == "disabled", "SPOT1_ENABLED is born false"
+
+
+# ------------------------------------------------ KB-0165 guardian F2: the holdings deadline
+def test_the_holdings_collector_has_its_own_deadline_and_the_balance_keeps_its() -> None:
+    config, _mode, _signer = _boot({})
+    assert config.wallet_holdings_timeout_s == 5.0
+    assert config.wallet_read_timeout_s == 1.5, "the SOL balance's deadline is not raised"
+    tuned, _mode, _signer = _boot({"MEME_WALLET_HOLDINGS_TIMEOUT_S": "3"})
+    assert (tuned.wallet_holdings_timeout_s, tuned.wallet_read_timeout_s) == (3.0, 1.5)
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("0", 0.1), ("-5", 0.1), ("60", 10.0)])
+def test_the_holdings_deadline_is_clamped_to_a_tenth_and_one_tick(
+    raw: str, expected: float
+) -> None:
+    """Above one kill-switch tick (10 s) a single read would span two ticks and
+    a third of the verdict's 30 s validity; ≤ 0 would fail every read."""
+    config, _mode, _signer = _boot({"MEME_WALLET_HOLDINGS_TIMEOUT_S": raw})
+    assert config.wallet_holdings_timeout_s == expected

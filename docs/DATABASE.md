@@ -8798,3 +8798,65 @@ o recusado, o de depois lê o valor carimbado; escritora com `track_activities` 
 com a conclusão registrada em L + 10 min; registrada em L − 10 min, as 168 vendas `true` viram C —;
 `test_token_sem_estado_em_l_censura_a_venda_…`: `token_ausente`, `current_row_pre_history` e `historico_diverge` viram
 C; `test_export_sem_prova_de_visibilidade_em_l_e_recusado`).
+
+## 71. A exceção auditada por mint da carteira da mesa — `meme_wallet_holding_exceptions` — F1 (`0068_meme_wallet_exceptions`)
+
+**Por quê.** A checagem `wallet_unrecognized_holdings` (`docs/RISK_ENGINE_MEME.md` §3.2, check 17) passou a ler a
+carteira de verdade e achou um token de phishing (`DgY9Z8xPG1346Ydrq98ASAZcVdyrurT4tCQ7TDapHcJg`, Token-2022) congelado
+pelo emissor: ninguém consegue movê-lo, queimá-lo nem fechar a conta, e com a checagem ligada toda entrada pararia. A
+decisão do Everton de 28/09/2026 (`obsidian/06-DECISIONS/2026-09-28-excecao-auditada-token-golpe.md`) é uma exceção
+**durável e auditada por mint**, no Postgres — nunca arquivo nem `.env`.
+
+**O que a `0068` faz:** **uma tabela nova**, global e sem RLS (§1.1, o mesmo modelo das tabelas da carteira
+`meme_live_*` e de `meme_treasury_swaps`: a carteira da mesa não é de nenhuma organização, não há `organization_id`).
+Nenhuma coluna em tabela existente, nenhuma view, enum, política, partição ou semente. Tudo em
+`infra/migrations/ddl/meme_wallet_exceptions.py`; o modelo em `hunter_core/db/models/meme_wallet_exceptions.py`
+(`alembic check` limpo).
+
+| Coluna | Tipo | O quê |
+|---|---|---|
+| `id` | `uuid` | UUID v7 gerado pela ferramenta |
+| `wallet`, `token_program`, `mint` | `text` | a chave: uma carteira, um programa (SPL Token ou Token-2022, `CHECK`), um mint (32–44 caracteres) |
+| `max_atoms` | `numeric(20,0)` | o total verificado na cadeia, em átomos, somado entre as contas do mint — sem margem |
+| `decimals` | `smallint` | os decimais verificados (conta = mint) |
+| `require_frozen` | `boolean` | `true` salvo `--allow-unfrozen` explícito: a exceção só vale enquanto toda conta estiver `frozen` |
+| `evidence` | `jsonb` (objeto) | contas (endereço, estado, átomos, decimais, delegado, extensões), autoridades de mint e de congelamento, slots, `observed_at`, como foi lida, `allow_unfrozen` |
+| `reason` | `text` (≥ 10) | o motivo |
+| `note_path`, `note_sha256` | `text` | a nota do Obsidian que cobre a exceção (`obsidian/%.md`) e o sha256 dos bytes lidos |
+| `created_by`, `created_at` | `text`, `timestamptz` | quem (`--actor`) e quando (UTC, `now()`) |
+| `revoked_at`, `revoked_by`, `revoke_reason` | anuláveis | a revogação, inteira ou nada (`CHECK`), com motivo ≥ 10 e depois da criação |
+
+**Índice:** `ux_meme_wallet_holding_exceptions_active` — único em `(wallet, mint) WHERE revoked_at IS NULL`: no máximo
+uma exceção ativa por mint; revogar libera o lugar.
+
+**Quem escreve o quê.** Só o dono do schema, pela ferramenta `infra/scripts/wallet_holding_exception.py` (`--add` /
+`--revoke` / `--list`, ensaio por padrão; `--apply` grava a linha **e** um `audit_logs` de escopo de sistema —
+`organization_id` NULL, `entity_type = 'wallet_holding_exception'`, `entity_id` = a exceção — na mesma transação).
+`hunter_worker` e `hunter_app`: **só `SELECT`** (`MEME_WALLET_EXCEPTIONS_*_READ_ONLY_TABLES`; classificada em
+`test_schema_privileges`). `DELETE`/`TRUNCATE`/`UPDATE` para ninguém além do dono — e o dono também é segurado por dois
+gatilhos (`meme_wallet_holding_exceptions_revoke_only`, `BEFORE UPDATE OR DELETE`, por linha;
+`meme_wallet_holding_exceptions_no_truncate`, `BEFORE TRUNCATE`, por comando; função
+`meme_wallet_holding_exceptions_guard`): a única mudança que uma linha aceita é a sua revogação, uma vez, com toda
+coluna original igual. É proteção contra acidente, não a pretensão de que o dono não possa desligar os próprios gatilhos.
+
+**Quem lê.** Em tempo de execução, um único módulo: `hunter_meme_executor/wallet_exceptions.py`, chamado pelo veredito
+de carteira (`wallet_holdings.py`) na mesma transação do conjunto reconhecido, filtrando a carteira do executor e
+`revoked_at IS NULL`. A exceção tira o mint da lista de "estranhos" enquanto a cadeia mostra o que foi verificado e
+**nunca** o reconhece para mais nada (compra, venda, saída, sizing, equity) — um teste varre `apps/`, `packages/` e
+`services/` e só aceita esse módulo e o modelo ORM.
+
+**Downgrade:** recusa enquanto existir **qualquer** linha, revogadas incluídas (§17.7 — uma exceção revogada ainda
+explica as admissões que cobriu), sob `LOCK TABLE ... ACCESS EXCLUSIVE` antes da contagem; sem linhas, remove tabela,
+gatilhos e função.
+
+**Numeração.** A semente do EXP-M26 que estava parada como `0068_meme_mature_chart_arms` (§69, ainda não commitada)
+passou a **`0069_meme_mature_chart_arms`**, com `down_revision = 0068_meme_wallet_exceptions`; só os identificadores de
+revisão e o nome do arquivo mudaram (e as constantes de revisão em `test_migrations.py`/`test_migration_0068.py`). As
+menções a "`0068`" no texto da §69 descrevem essa semente.
+
+Provado em `packages/core/tests/integration/test_migration_wallet_exceptions.py` (global, só `SELECT` para os dois
+papéis e nada para `hunter_runtime`, o worker não escreve, nunca apagada nem truncada, só uma revogação inteira, uma
+ativa por carteira+mint, checagens nomeadas, downgrade recusado com uma linha revogada e limpo sem linhas,
+`alembic check` em `head`); a ferramenta em `infra/scripts/tests/test_wallet_holding_exception.py` e
+`test_wallet_holding_exception_rules.py`; o executor em `services/meme-executor/tests/test_wallet_exceptions.py` e
+`test_wallet_exceptions_integration.py`.

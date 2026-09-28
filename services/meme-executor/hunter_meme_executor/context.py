@@ -21,6 +21,7 @@ from hunter_meme_executor.event_exits_stats import EventExitsStats
 from hunter_meme_executor.launch_stats import LaunchStats
 from hunter_meme_executor.spot_stats import SpotStats
 from hunter_meme_executor.treasury_inflow import TreasuryInflowReader
+from hunter_meme_executor.wallet_holdings import WalletHoldingsReader
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -207,6 +208,10 @@ class ExecutorContext:
     launch: LaunchStats = field(default_factory=LaunchStats)
     """T4.67b: the launch lane's counters and its blockhash cache
     (``launch_stats.py``, ``launch_send.py``), published by the heartbeat in every mode."""
+    holdings: WalletHoldingsReader = field(default_factory=WalletHoldingsReader)
+    """KB-0165: the wallet's token accounts judged against what the engine can
+    account for (``wallet_holdings.py``) — §3.2's check 17 input, read on the
+    kill-switch tick and on demand; no valid verdict defers the entry."""
     spot: SpotStats = field(default_factory=SpotStats)
     """T4.74: the ``spot/1`` desk's counters (``spot_stats.py``), published as the
     heartbeat's ``spot1`` field in every mode (``inert:<reason>`` is a value)."""
