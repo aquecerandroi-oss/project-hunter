@@ -18,6 +18,7 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 
 - **Cenário:** com a checagem ligada, o veredito nomeia `DgY9…` e as três pistas (mesa, lançamento, `spot/1`) recusam toda entrada. O remédio que o contrato prometia ("zerar o saldo") é impossível: conta congelada não transfere, não queima e não fecha.
 - **Decisão pendente do Everton:** exceção durável e auditada por mint (recomendação do guardião e da Astra) ou outra política. Revisão: [[Wallet-unrecognized-holdings]]; origem do defeito original: [[KB-0165-staking-do-sol-parado]].
+- **30/09/2026 17:18Z — resolvido sozinho:** depois do deploy `a72296a0` (checagem ligada), o heartbeat do executor mostra `wallet_holdings_state=valid`, `wallet_unrecognized_count=0`; a RPC pública (`getTokenAccountsByOwner` por mint, só leitura) responde `value: []` — a conta do token-golpe **foi fechada por terceiro** (a autoridade de fechamento era dele). A exceção auditada não foi cadastrada nem é mais necessária; a ferramenta existe para o próximo caso. Ver [[2026-09-28-excecao-auditada-token-golpe]].
 - **Achado lateral:** 80 contas de token vazias prendem **0,1210 SOL** de aluguel; fechá-las devolve o SOL e exige assinatura (decisão do Everton).
 
 ## O fechamento noturno morre há 8 noites — um conjunto sem `wallet_max_sol` derruba o registro de pesquisa inteiro (plantão 27/09, 02:3x BRT)

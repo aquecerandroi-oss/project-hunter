@@ -25,3 +25,7 @@ by: Everton
 ## Relacionado
 
 [[Wallet-unrecognized-holdings]] · [[KB-0165-staking-do-sol-parado]] · [[Open Bugs]] · [[2026-09-28]]
+
+## Execução
+
+- **30/09/2026:** código no ar no deploy `a72296a0` (o primeiro deploy, `190a9ecb`, subiu sem as flags de perfil e não atualizou o executor — lição em `.claude/memory/deploy-vps-comando-completo.md`). Na primeira leitura a carteira já **não tinha** a conta do token-golpe: fechada pelo terceiro que detinha a autoridade de fechamento. `wallet_unrecognized_count=0`; nenhuma exceção cadastrada. Listagem das contas vazias (ensaio de `close_empty_token_accounts`, 17:2xZ): 82 contas, 80 fecháveis, **0,120815 SOL líquidos** a recuperar em 11 lotes; a USDC da tesouraria e a posição UNI da `spot/1` ficam.
