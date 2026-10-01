@@ -55,7 +55,7 @@ from sqlalchemy.exc import DBAPIError
 from hunter_core.logging import get_logger
 from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.pedigree_e2b import E2bFeatures
-from hunter_meme_worker.lab_repo_fast import pedigree_for
+from hunter_meme_worker.lab_repo_pedigree import pedigree_for
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -192,11 +192,29 @@ async def lineage_for(
     **No set on this clock → no read** (24/09/2026): with every active set on
     ``15s``, the minute lane paid the pedigree of ~320 mints (14 s on the VPS,
     cut at 8 s — ``meme_pedigree_read_failed``) for a result no gate received.
+
+    **Two counts on the minute lane, unless a set asks for more** (EXP-M26 F, 01/10/2026): when
+    every set of the lane is on the ``1m`` clock and none has ``pedigree_repeat_dumper``, nobody
+    reads ``creator_prior_dump_count`` (nor the diagnostic ``creator_prior_dead_count``) and the
+    read leaves both **absent** — the full read took 6-14 s for ~385 mints, was cut at 8 s and
+    turned every row into ``pedigree_unknown`` (:func:`pedigree_for`). Any set on another clock
+    (the 15 s lane, the real desk) or with the switch on gets the full read, as before.
+
+    **Do not switch ``pedigree_repeat_dumper`` on for a ``1m`` set** without a measured index or
+    load proof: that puts the whole lane back on the full read (6-14 s, cut at 8 s most minutes)
+    and every row of the minute is ``pedigree_unknown``. The log
+    ``meme_pedigree_full_read_on_1m_lane`` names the set when it happens.
     """
     judged, lane = list(rows), tuple(specs)
     if not lane:
         return {}, None
-    pedigree = await pedigree_for(session, sorted({row.mint for row in judged}))
+    full = not all(spec.clock == "1m" and not spec.pedigree_repeat_dumper for spec in lane)
+    mints = sorted({row.mint for row in judged})
+    dumpers = [spec.label for spec in lane if spec.clock == "1m" and spec.pedigree_repeat_dumper]
+    if dumpers:
+        # The minute lane back on the 6-14 s read (cut at 8 s at ~385 mints): say so, by set.
+        _logger.warning("meme_pedigree_full_read_on_1m_lane", sets=dumpers, mints=len(mints))
+    pedigree = await pedigree_for(session, mints, full=full)
     if not any(spec.pedigree_e2b for spec in lane):
         return pedigree, None
     return pedigree, await e2b_for(session, [(row.mint, row.end_time) for row in judged])

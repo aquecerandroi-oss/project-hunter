@@ -216,9 +216,11 @@ async def test_the_first_pass_is_recorded_once_with_the_inputs_of_its_tick(
     assert row["coverage_status"] == "covered_from_birth"
     assert row["coverage"]["truncated_at_birth"] is True
     assert row["gate"][0] == {"rule": "grafico_maduro_teste/1"}
+    # EXP-M26 F (01/10/2026): the minute lane of sets without ``pedigree_repeat_dumper`` reads
+    # only the two counts of PEDIGREE_V1; the two diagnostics are *absent* (null), never 0.
     assert row["pedigree"] == {
         "creator_prior_mints_1h": 0, "symbol_dup_24h": 0,
-        "creator_prior_dump_count": 0, "creator_prior_dead_count": 0,
+        "creator_prior_dump_count": None, "creator_prior_dead_count": None,
     }  # fmt: skip
     assert row["inputs"]["mint"] == mint and row["inputs"]["mcap_sol"] == "36.0000000000"
     assert ctx.state.mature.written_total == 1

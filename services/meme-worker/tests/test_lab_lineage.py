@@ -34,7 +34,9 @@ class _Recorder:
         self.pedigree_calls: list[Sequence[str]] = []
         self.e2b_calls: list[Sequence[tuple[str, datetime]]] = []
 
-    async def pedigree_for(self, _session: Any, mints: Sequence[str]) -> dict[str, Any]:
+    async def pedigree_for(
+        self, _session: Any, mints: Sequence[str], *, full: bool = True
+    ) -> dict[str, Any]:
         self.pedigree_calls.append(mints)
         return dict(_PEDIGREE)
 

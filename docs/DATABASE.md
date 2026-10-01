@@ -8570,6 +8570,16 @@ LEFT JOIN meme_mature_opportunities o ON o.rule_set_id = p.rule_set_id AND o.min
 WHERE o.id IS NULL GROUP BY 1, 2;
 ```
 
+**Correção de 2026-10-01 — o terceiro estado de `pedigree` (conserto do funil F, §69).** A coluna `pedigree` tem **três**
+estados, não dois: (1) `NULL` = o pedigree não foi lido (a leitura devolveu `{}`, por exemplo cortada aos 8 s; a recusa
+`pedigree_unknown` diz isso); (2) objeto com as quatro chaves preenchidas (a leitura completa); (3) **objeto presente com
+`creator_prior_dump_count` e `creator_prior_dead_count` em JSON `null`** = a leitura leve da pista de 1 min (só as duas
+contagens de `PEDIGREE_V1`), isto é, "não lidos", **nunca zero**. Nesse terceiro estado a identidade do criador desconhecida
+aparece como `creator_prior_mints_1h IS NULL`, e não como `creator_prior_dump_count IS NULL`. Quem soma ou compara os dois
+diagnósticos tem de filtrar `pedigree ->> 'creator_prior_dump_count' IS NOT NULL` antes. O mesmo vale para o bloco
+`{"feature": "pedigree", …}` de `meme_proposals.reasons` dos conjuntos `1m` sem `pedigree_repeat_dumper`: os dois campos
+saem `null`. Sem migração: a coluna é `jsonb` livre e nenhuma restrição olha esses campos.
+
 ## 69. Os três braços do gráfico maduro — `grafico_ctrl_v1/1`, `grafico_v1/1`, `grafico_v1/2` — M19 (`0068_meme_mature_chart_arms`)
 
 **Por quê (EXP-M26 S, desenho §2, H-022).** A população nova (moedas de 15–120 min ainda na curva, retidas por I1)
@@ -8617,6 +8627,40 @@ depende de L1 no código: sem `RuleSetSpec.line_support_*`, o carregador **ignor
 conjunto daquele relógio julga (§66); com C/L/H ativos, a leitura de ~320 mints por minuto volta (medida em §66: ~3 s
 frio com o índice da `0064`, dentro do timeout de 8 s). Uma falha dela vira `pedigree_unknown` em todas as linhas do
 minuto — na H-022, "sem proposta por instrumento" (teto de 5 %). Medir `meme_pedigree_read_failed` no piloto P.
+
+**Correção de 2026-10-01 (funil F do EXP-M26; a frase "~3 s frio com o índice da `0064`, dentro do timeout de 8 s" acima é
+FALSA hoje).** A §66 mediu 3,3 s frio / 2,9 s quente
+para 329 mints **sem** a subconsulta `symbol_dup_24h` e **com** as contagens de dump/dead; o "~3 s com o índice" da §69 era
+uma **inferência**, não uma medição da leitura completa. O salto para 6–14 s **não foi decomposto**: coincide com ~385 mints
+(I1), ~165 moedas anteriores por mint em 7 dias (63 559 ÷ 386) e 0,72 M de buffers lidos do disco só no `SubPlan 9`; qual
+desses fatores pesou mais é hipótese, não medida. Medido na VPS só com `SELECT`
+(`default_transaction_read_only=on`), com `lab_repo_fast._PEDIGREE` renderizado para os mints de um minuto fechado de
+`meme_features_1m`: **6,2–13,7 s** em 42 minutos (26 acima do corte de 8 s, 24 de 30 na 2.ª rodada) e `EXPLAIN (ANALYZE,
+BUFFERS)` de **7,89 s**; **9,15 s** na repetição feita ao medir este conserto. O custo estava em duas subconsultas: `creator_prior_dump_count`
+(`SubPlan 9`: 63 559 moedas anteriores dos mesmos criadores percorridas, cada uma com três `EXISTS` em
+`meme_features_1m`/`meme_paper_bets`; 1,03 M buffers em hit + 0,72 M lidos) e `creator_prior_dead_count` (`SubPlan 11`: 63 559
+agregados de 30 min em `meme_features_1m`, 1,0 M hit + 0,19 M lidos). As duas contagens de `PEDIGREE_V1` levam **28–69 ms**.
+Um corte aos 8 s devolve `{}` e todas as linhas do minuto viram `pedigree_unknown` (EXP-M26: "sem proposta por instrumento").
+**Conserto (sem migração, sem índice):** `lab_repo_pedigree.py` (extraído de `lab_repo_fast.py`, que já estava em 350
+linhas) tem duas consultas. `_PEDIGREE` (completa, **idêntica byte a byte** à anterior; o hash está pinado em
+`test_pedigree_light.py`) segue sendo o que a pista de 15 s (a mesa real) lê. `_PEDIGREE_COUNTS` lê só
+`creator_prior_mints_1h` e `symbol_dup_24h`, sem tocar `meme_features_1m` nem `meme_paper_bets` (o plano só abre
+`meme_tokens`; provado por `EXPLAIN (FORMAT JSON)` em `test_pedigree_light_integration.py`). `lineage_for` escolhe a leve
+só quando **todo** conjunto da pista é do relógio `1m` e **nenhum** tem `pedigree_repeat_dumper`; qualquer conjunto de outro
+relógio ou com a chave ligada recebe a completa. Os dois campos não lidos chegam **ausentes** (`None`, nunca `0`).
+Medição depois (mesmo minuto fechado, 387 mints, mesma sessão só de leitura, 5 rodadas alternadas): completa **6,93 / 7,53 /
+7,37 / 7,69 / 7,16 s** contra só as duas contagens **50,6 / 48,5 / 49,7 / 68,7 / 46,8 ms**, com as mesmas somas nas duas
+colunas comuns (2 952 e 10 906, 0 desconhecidos); `EXPLAIN ANALYZE`: **9 154 ms → 39 ms**. Brutos em
+`.claude/state/m26/f/f5_explain.out` e `f5_time.out`. A leitura completa da pista de 1 min continua lenta para quem a pedir
+(`pedigree_repeat_dumper: true` num conjunto `1m`): nenhum conjunto ativo faz isso hoje.
+
+**Condição de ativação (2026-10-01).** Ligar `pedigree_repeat_dumper` em **qualquer** conjunto `1m` devolve a pista inteira à
+leitura completa, cortada aos 8 s na maioria dos minutos, e todas as linhas do minuto viram `pedigree_unknown` (inclusive as
+de C/L/H). **Não ligar sem um índice medido ou uma prova de carga** da leitura completa a ~385 mints. O laço avisa com o log
+`meme_pedigree_full_read_on_1m_lane` (nomeando os conjuntos) a cada minuto em que isso acontece. A leitura da própria pista
+de 15 s também já estoura às vezes (`obsidian/07-BUGS/Open Bugs.md`, 01/10: 2–5 `meme_pedigree_read_failed` por hora, 57014,
+~127–133 mints, 3,09–3,24 s para 126 mints): um índice parcial em `meme_features_1m (mint, end_time) WHERE creator_sold` é
+**hipótese não medida**.
 
 **Downgrade (§17.7):** recusa enquanto uma linha de `meme_proposals`, `meme_paper_bets`,
 `meme_rule_set_param_history`, `meme_gate_refusals_by_mint` ou `meme_mature_opportunities` referencia um braço; senão

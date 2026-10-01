@@ -1,0 +1,149 @@
+Timing is on.
+ mints_do_minuto 
+-----------------
+             387
+(1 row)
+
+Time: 10.393 ms
+===== ANTES (_PEDIGREE, leitura completa)
+                                                                                                                                                                                                                                  QUERY PLAN                                                                                                                                                                                                                                   
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using pk_meme_tokens on meme_tokens t  (cost=77.00..1197.01 rows=10 width=76) (actual rows=387 loops=1)
+   Index Cond: (mint = ANY ($20))
+   Buffers: shared hit=1991479 read=1130425 dirtied=65 written=2146
+   InitPlan 12 (returns $20)
+     ->  Index Only Scan using meme_features_1m_2026_10_pkey on meme_features_1m_2026_10 meme_features_1m  (cost=0.42..76.57 rows=427 width=44) (actual rows=387 loops=1)
+           Index Cond: ((end_time = '2026-10-01 03:25:00+00'::timestamp with time zone) AND (features_version = 'meme_features_v3'::text))
+           Heap Fetches: 387
+           Buffers: shared hit=381
+   SubPlan 1
+     ->  Aggregate  (cost=8.45..8.46 rows=1 width=8) (actual rows=1 loops=387)
+           Buffers: shared hit=1904 read=3023 dirtied=9 written=2
+           ->  Index Scan using ix_meme_tokens_creator_created_at on meme_tokens o  (cost=0.43..8.45 rows=1 width=0) (actual rows=8 loops=387)
+                 Index Cond: ((creator = t.creator) AND (created_at <= t.created_at) AND (created_at > (t.created_at - '01:00:00'::interval)))
+                 Filter: (mint <> t.mint)
+                 Rows Removed by Filter: 1
+                 Buffers: shared hit=1904 read=3023 dirtied=9 written=2
+   SubPlan 2
+     ->  Aggregate  (cost=8.45..8.46 rows=1 width=8) (actual rows=1 loops=387)
+           Buffers: shared hit=2838 read=10710 dirtied=13 written=5
+           ->  Index Scan using ix_meme_tokens_symbol_created_at on meme_tokens o_1  (cost=0.43..8.45 rows=1 width=0) (actual rows=28 loops=387)
+                 Index Cond: ((symbol = t.symbol) AND (created_at <= t.created_at) AND (created_at > (t.created_at - '24:00:00'::interval)))
+                 Filter: (mint <> t.mint)
+                 Rows Removed by Filter: 1
+                 Buffers: shared hit=2838 read=10710 dirtied=13 written=5
+   SubPlan 9
+     ->  Aggregate  (cost=44.77..44.78 rows=1 width=8) (actual rows=1 loops=387)
+           Buffers: shared hit=1022114 read=811882 dirtied=1 written=1906
+           ->  Index Scan using ix_meme_tokens_creator_created_at on meme_tokens o_2  (cost=0.43..44.77 rows=1 width=0) (actual rows=1 loops=387)
+                 Index Cond: ((creator = t.creator) AND (created_at <= t.created_at) AND (created_at > (t.created_at - '168:00:00'::interval)))
+                 Filter: ((mint <> t.mint) AND ((SubPlan 3) OR (SubPlan 5) OR (SubPlan 7)))
+                 Rows Removed by Filter: 173
+                 Buffers: shared hit=1022114 read=811882 dirtied=1 written=1906
+                 SubPlan 3
+                   ->  Append  (cost=0.56..77.05 rows=4 width=0) (actual rows=0 loops=66922)
+                         Buffers: shared hit=739933 read=755297 written=1796
+                         ->  Index Scan using meme_features_1m_2026_09_mint_end_time_idx on meme_features_1m_2026_09 pf_1  (cost=0.56..36.72 rows=1 width=0) (actual rows=0 loops=66922)
+                               Index Cond: ((mint = o_2.mint) AND (end_time < t.created_at))
+                               Filter: creator_sold
+                               Rows Removed by Filter: 15
+                               Buffers: shared hit=549293 read=695893 written=1719
+                         ->  Bitmap Heap Scan on meme_features_1m_2026_10 pf_2  (cost=4.47..23.99 rows=1 width=0) (actual rows=0 loops=66590)
+                               Recheck Cond: ((mint = o_2.mint) AND (end_time < t.created_at))
+                               Filter: creator_sold
+                               Rows Removed by Filter: 1
+                               Heap Blocks: exact=50202
+                               Buffers: shared hit=190640 read=59404 written=77
+                               ->  Bitmap Index Scan on meme_features_1m_2026_10_mint_end_time_idx  (cost=0.00..4.47 rows=5 width=0) (actual rows=1 loops=66590)
+                                     Index Cond: ((mint = o_2.mint) AND (end_time < t.created_at))
+                                     Buffers: shared hit=171746 read=28096 written=59
+                         ->  Index Scan using meme_features_1m_2026_11_mint_end_time_idx on meme_features_1m_2026_11 pf_3  (cost=0.14..8.16 rows=1 width=0) (never executed)
+                               Index Cond: ((mint = o_2.mint) AND (end_time < t.created_at))
+                               Filter: creator_sold
+                         ->  Index Scan using meme_features_1m_2026_12_mint_end_time_idx on meme_features_1m_2026_12 pf_4  (cost=0.14..8.16 rows=1 width=0) (never executed)
+                               Index Cond: ((mint = o_2.mint) AND (end_time < t.created_at))
+                               Filter: creator_sold
+                 SubPlan 5
+                   ->  Index Scan using ix_meme_paper_bets_mint on meme_paper_bets pb  (cost=0.28..8.31 rows=1 width=0) (actual rows=0 loops=66569)
+                         Index Cond: (mint = o_2.mint)
+                         Filter: ((creator_sold_seen_at IS NOT NULL) AND (rule_set_id <> '01994d00-6c1a-7000-8000-00000000001c'::uuid) AND (rule_set_id <> '01994d00-6c1a-7000-8000-00000000001d'::uuid) AND (rule_set_id <> '01994d00-6c1a-7000-8000-00000000001e'::uuid) AND (creator_sold_seen_at < t.created_at) AND (rule_set_id <> ALL ('{01994d00-6c1a-7000-8000-00000000001f,01994d00-6c1a-7000-8000-000000000020,01994d00-6c1a-7000-8000-000000000021}'::uuid[])))
+                         Rows Removed by Filter: 0
+                         Buffers: shared hit=133153 read=149
+                 SubPlan 7
+                   ->  Index Scan using ix_meme_paper_bets_mint on meme_paper_bets pb2  (cost=0.28..8.32 rows=1 width=0) (actual rows=0 loops=66569)
+                         Index Cond: (mint = o_2.mint)
+                         Filter: ((rule_set_id <> '01994d00-6c1a-7000-8000-00000000001c'::uuid) AND (rule_set_id <> '01994d00-6c1a-7000-8000-00000000001d'::uuid) AND (rule_set_id <> '01994d00-6c1a-7000-8000-00000000001e'::uuid) AND (exit_at < t.created_at) AND (rule_set_id <> ALL ('{01994d00-6c1a-7000-8000-00000000001f,01994d00-6c1a-7000-8000-000000000020,01994d00-6c1a-7000-8000-000000000021}'::uuid[])) AND ((exit ->> 'reason'::text) = 'creator_dump'::text))
+                         Rows Removed by Filter: 0
+                         Buffers: shared hit=133318 read=62
+   SubPlan 11
+     ->  Aggregate  (cost=41.88..41.89 rows=1 width=8) (actual rows=1 loops=387)
+           Buffers: shared hit=963453 read=304037 dirtied=24 written=232
+           ->  Index Scan using ix_meme_tokens_creator_created_at on meme_tokens o_3  (cost=0.43..41.88 rows=1 width=0) (actual rows=31 loops=387)
+                 Index Cond: ((creator = t.creator) AND (created_at <= t.created_at) AND (created_at > (t.created_at - '168:00:00'::interval)))
+                 Filter: ((mint <> t.mint) AND (SubPlan 10))
+                 Rows Removed by Filter: 143
+                 Buffers: shared hit=963453 read=304037 dirtied=24 written=232
+                 SubPlan 10
+                   ->  Subquery Scan on window_30m  (cost=33.40..33.43 rows=1 width=0) (actual rows=0 loops=66922)
+                         Buffers: shared hit=917552 read=277854 dirtied=24 written=213
+                         ->  Aggregate  (cost=33.40..33.42 rows=1 width=64) (actual rows=0 loops=66922)
+                               Filter: ((max(w.mcap_sol) IS NOT NULL) AND (max(w.mcap_sol) > '0'::numeric) AND (min(w.mcap_sol) < (max(w.mcap_sol) * 0.2)))
+                               Rows Removed by Filter: 1
+                               Buffers: shared hit=917552 read=277854 dirtied=24 written=213
+                               ->  Append  (cost=0.56..33.38 rows=4 width=17) (actual rows=13 loops=66922)
+                                     Buffers: shared hit=917552 read=277854 dirtied=24 written=213
+                                     ->  Index Scan using meme_features_1m_2026_09_mint_end_time_idx on meme_features_1m_2026_09 w_1  (cost=0.56..8.58 rows=1 width=10) (actual rows=13 loops=62394)
+                                           Index Cond: ((mint = o_3.mint) AND (end_time > o_3.created_at) AND (end_time <= (o_3.created_at + '00:30:00'::interval)))
+                                           Filter: (mcap_sol IS NOT NULL)
+                                           Rows Removed by Filter: 1
+                                           Buffers: shared hit=858449 read=266850 written=206
+                                     ->  Index Scan using meme_features_1m_2026_10_mint_end_time_idx on meme_features_1m_2026_10 w_2  (cost=0.42..8.44 rows=1 width=10) (actual rows=11 loops=4945)
+                                           Index Cond: ((mint = o_3.mint) AND (end_time > o_3.created_at) AND (end_time <= (o_3.created_at + '00:30:00'::interval)))
+                                           Filter: (mcap_sol IS NOT NULL)
+                                           Rows Removed by Filter: 0
+                                           Buffers: shared hit=59103 read=11004 dirtied=24 written=7
+                                     ->  Index Scan using meme_features_1m_2026_11_mint_end_time_idx on meme_features_1m_2026_11 w_3  (cost=0.14..8.17 rows=1 width=24) (never executed)
+                                           Index Cond: ((mint = o_3.mint) AND (end_time > o_3.created_at) AND (end_time <= (o_3.created_at + '00:30:00'::interval)))
+                                           Filter: (mcap_sol IS NOT NULL)
+                                     ->  Index Scan using meme_features_1m_2026_12_mint_end_time_idx on meme_features_1m_2026_12 w_4  (cost=0.14..8.17 rows=1 width=24) (never executed)
+                                           Index Cond: ((mint = o_3.mint) AND (end_time > o_3.created_at) AND (end_time <= (o_3.created_at + '00:30:00'::interval)))
+                                           Filter: (mcap_sol IS NOT NULL)
+ Planning:
+   Buffers: shared hit=806 read=68
+ Planning Time: 19.168 ms
+ Execution Time: 9154.456 ms
+(104 rows)
+
+Time: 9184.471 ms (00:09.184)
+===== DEPOIS (_PEDIGREE_COUNTS, so as duas contagens)
+                                                                                QUERY PLAN                                                                                
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using pk_meme_tokens on meme_tokens t  (cost=77.00..330.30 rows=10 width=60) (actual rows=387 loops=1)
+   Index Cond: (mint = ANY ($6))
+   Buffers: shared hit=15143 read=5262 dirtied=134
+   InitPlan 3 (returns $6)
+     ->  Index Only Scan using meme_features_1m_2026_10_pkey on meme_features_1m_2026_10 meme_features_1m  (cost=0.42..76.57 rows=427 width=44) (actual rows=387 loops=1)
+           Index Cond: ((end_time = '2026-10-01 03:25:00+00'::timestamp with time zone) AND (features_version = 'meme_features_v3'::text))
+           Heap Fetches: 387
+           Buffers: shared hit=358 read=23
+   SubPlan 1
+     ->  Aggregate  (cost=8.45..8.46 rows=1 width=8) (actual rows=1 loops=387)
+           Buffers: shared hit=4132 read=793 dirtied=34
+           ->  Index Scan using ix_meme_tokens_creator_created_at on meme_tokens o  (cost=0.43..8.45 rows=1 width=0) (actual rows=8 loops=387)
+                 Index Cond: ((creator = t.creator) AND (created_at <= t.created_at) AND (created_at > (t.created_at - '01:00:00'::interval)))
+                 Filter: (mint <> t.mint)
+                 Rows Removed by Filter: 1
+                 Buffers: shared hit=4132 read=793 dirtied=34
+   SubPlan 2
+     ->  Aggregate  (cost=8.45..8.46 rows=1 width=8) (actual rows=1 loops=387)
+           Buffers: shared hit=9615 read=3927 dirtied=20
+           ->  Index Scan using ix_meme_tokens_symbol_created_at on meme_tokens o_1  (cost=0.43..8.45 rows=1 width=0) (actual rows=28 loops=387)
+                 Index Cond: ((symbol = t.symbol) AND (created_at <= t.created_at) AND (created_at > (t.created_at - '24:00:00'::interval)))
+                 Filter: (mint <> t.mint)
+                 Rows Removed by Filter: 1
+                 Buffers: shared hit=9615 read=3927 dirtied=20
+ Planning Time: 0.564 ms
+ Execution Time: 39.034 ms
+(26 rows)
+
+Time: 40.305 ms

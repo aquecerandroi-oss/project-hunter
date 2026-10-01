@@ -298,3 +298,61 @@ muda: **F (de novo) → J congelado → S → P → T0**.
 - A semente `0069_meme_mature_chart_arms` (não commitada) **não foi tocada**.
 
 **Rótulo desta etapa:** F **não aprovado — instrumento**. Não é veredito da H-022, que segue `aberta`.
+
+### Conserto do instrumento do F (2026-10-01, à tarde) — a leitura de pedigree do minuto leva 40 ms, não 7–14 s
+
+> **Resultado:** o defeito que reprovou o F por instrumento (a leitura de pedigree do minuto passando do corte de 8 s)
+> foi consertado **no código**; o F **ainda não foi repetido**, o J **não** foi congelado e a semente `0069` **segue
+> intocada**. Nenhum limiar foi mexido. Esta seção não reescreve a avaliação acima: a corrige no que ela deixou
+> aberto. Detalhe do banco em `docs/DATABASE.md` §69 ("Correção de 2026-10-01").
+
+**O que foi lido antes:** [[00-HOME]]; esta página (avaliação de 2026-10-01 e Protocolo); o desenho
+(`docs/design/exp-m26-grafico-moedas-maduras.md` §2.2, em que o pedigree **desconhecido** conta como I
+("`sem_proposta` por instrumento"), e §4 funil F, "se falhar: por instrumento… conserta-se e repete-se");
+[[KB-0149-o-que-a-mesa-real-ensinou]] §5 (item 24: antecipação mente com convicção; item 25: não se escolhe limiar
+olhando o resultado, então nenhum piso do F foi mexido para a leitura caber); `docs/DATABASE.md` §66 e §69; a entrada
+de [[Open Bugs]] "A leitura de pedigree do minuto leva 6–14 s…"; [[06-DECISIONS/Revisoes-Astra/EXP-M26-F|EXP-M26-F]]
+(o conserto recomendado) e [[Workers]] (onde o `meme-worker` está descrito).
+
+**O que mudou (código):**
+- `lab_repo_pedigree.py` (extraído de `lab_repo_fast.py`, que estava em 350 linhas) tem duas consultas. A completa,
+  `_PEDIGREE`, é **byte a byte a de antes** (hash pinado em teste) e é o que a pista de 15 s (a mesa real) segue lendo.
+  A leve, `_PEDIGREE_COUNTS`, lê só `creator_prior_mints_1h` e `symbol_dup_24h`.
+- `lab_repo_e2b.lineage_for` usa a leve quando **todo** conjunto da pista é do relógio `1m` e **nenhum** tem
+  `pedigree_repeat_dumper`. Qualquer conjunto de outro relógio, ou com a chave ligada, recebe a completa.
+- `creator_prior_dump_count` e `creator_prior_dead_count` não lidos chegam **ausentes** (`None`), nunca `0`. Nada filtra
+  pela porta pura, então a trilha de recusas das outras pistas não muda.
+
+**O que foi medido na VPS (só leitura, mesmo minuto fechado de 387 mints):** completa 6,93–7,69 s em 5 rodadas
+(`EXPLAIN ANALYZE` 9 154 ms); só as duas contagens 46,8–68,7 ms (`EXPLAIN ANALYZE` 39 ms); mesmas somas nas duas colunas
+comuns (2 952 e 10 906, 0 desconhecidos). Armadilha de medição registrada: ao envolver a consulta em
+`SELECT … FROM (consulta) q`, o Postgres **poda** da subconsulta as colunas que o externo não referencia, e a leitura
+"completa" cronometrou ~40 ms. O externo precisa referenciar as quatro colunas (`f5_pedigree_after.py`).
+
+**O que o F repetido herda como obrigação (não é feito aqui):** relógio do tique para `completed_at`/`migrated_at`;
+≥ 24 h pela via corrigida com o corte de 8 s real; união U/I por oportunidade; e a leitura leve **deixa os dois
+diagnósticos como `null` em `meme_mature_opportunities.pedigree` e no bloco `pedigree` das razões** dos conjuntos
+`1m` (não é zero: "não lido"). Quem ler esses campos na pista de 1 min sem olhar a chave `null` os leria como
+"criador sem despejo", e não é isso.
+
+**Segunda opinião:** [[06-DECISIONS/Revisoes-Astra/EXP-M26-pedigree-fix|EXP-M26-pedigree-fix]].
+
+**Rótulo desta etapa:** instrumento consertado e medido; **F a repetir**. Não é veredito da H-022, que segue `aberta`.
+
+#### Acréscimo de 2026-10-01 (revisões do conserto): o que o F repetido não consegue provar sozinho
+
+Origem: [[06-DECISIONS/Revisoes-Astra/EXP-M26-pedigree-fix-revisoes|as três revisões do conserto]] (quant-engineer, §3).
+
+- **A leitura leve não é exercitada em produção antes da semente.** Nenhum conjunto `1m` está ativo até a `0069`, então
+  `lineage_for` não chama `pedigree_for(full=False)` hoje; o F repetido, sozinho, só mede o que a consulta faz fora do laço
+  (como esta tarefa fez), não o laço real sob carga.
+- **Próxima tarefa (não feita aqui): um medidor de produção.** Chamar `pedigree_for(full=False)` a cada minuto fechado
+  durante ≥ 24 h, sobre **todos** os mints das linhas do portão, dentro de `begin_nested` + `SET LOCAL
+  statement_timeout = 8000`, gravando **todo** minuto, inclusive as falhas e os minutos sem leitura. Dono sugerido:
+  backend-specialist, com revisão do database-architect e do quant-engineer. **Não está implementado.**
+- **A guarda do §6.8 é ambígua e tem de ser corrigida por texto antes de semear.** "Apostas abertas do EXP-M26 ≤ 10 em
+  qualquer janela de 15 min" (desenho, §6, item 8) pode significar **simultâneas** ou **em qualquer momento da janela**. Pela
+  segunda leitura, ~5 % das janelas passariam de 10, numa contagem às cegas (feita sem olhar desfecho). A redação precisa
+  dizer qual das duas vale, e o texto congelado do desenho só muda por esse caminho, antes da semente.
+- **Condição de ativação do conserto:** ligar `pedigree_repeat_dumper` em qualquer conjunto `1m` devolve a pista à leitura
+  completa (ver `docs/DATABASE.md` §69, "Condição de ativação"); não se liga sem índice medido ou prova de carga.

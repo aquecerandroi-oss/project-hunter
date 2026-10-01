@@ -7,6 +7,9 @@ not judged yet, and the pedigree of a mint at proposal time (EXP-M6).
 already bounded its inputs by ``received_at <= as_of`` — and the pedigree
 counts only coins created **at or before** the coin judged (a launch that
 came later is not a prior mint).
+
+The pedigree read itself lives in :mod:`hunter_meme_worker.lab_repo_pedigree` (EXP-M26 F, 350-line
+budget); ``pedigree_for``, ``_PEDIGREE`` and ``PRIOR_WINDOW_S`` stay importable from here.
 """
 
 from __future__ import annotations
@@ -16,18 +19,16 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError
 
-from hunter_core.logging import get_logger
-from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, PedigreeGate
-from hunter_meme_worker.db_errors import db_error_fields
-from hunter_meme_worker.entry_pullback import PULLBACK_ARM_RULE_SET_ID, PULLBACK_CONTROL_RULE_SET_ID
 from hunter_meme_worker.gate_refusal_trail import RefusalTrailRow
-from hunter_meme_worker.lab_opportunities import MATURE_CHART_RULE_SET_IDS
 from hunter_meme_worker.lab_repo_drawdown import with_recent_drawdown
+from hunter_meme_worker.lab_repo_pedigree import (
+    _PEDIGREE as _PEDIGREE,  # pyright: ignore[reportPrivateUsage]  # re-export: tests name it here
+)
+from hunter_meme_worker.lab_repo_pedigree import PRIOR_WINDOW_S as PRIOR_WINDOW_S
+from hunter_meme_worker.lab_repo_pedigree import pedigree_for
 from hunter_meme_worker.lab_rows import snapshot_from_row
 from hunter_meme_worker.proposals import SERIES_15S, GateRow
-from hunter_meme_worker.refused_probe import PROBE_RULE_SET_ID
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,84 +77,6 @@ _FAST_ROWS = text(
     "WHERE f.as_of > :since AND f.as_of <= :until AND f.features_version = :version "
     "ORDER BY f.as_of, f.mint"
 )
-
-_logger = get_logger(__name__)
-
-PRIOR_WINDOW_S = 7 * 86_400
-"""T4.24b (hotfix, 15/09/2026 19:3x BRT): the prior-coin counts look back **7 days**, not
-forever — the unbounded version scanned ``meme_tokens`` (105 k rows, no creator index)
-once per judged mint per tick and hit the statement timeout, killing the Lab loop
-(11 restarts after deploy 8293c2b). ``0040`` adds the ``(creator, created_at)`` index."""
-_PRIOR_MINTS = (
-    "SELECT count(*) FROM meme_tokens o WHERE o.creator = t.creator "
-    "  AND o.mint <> t.mint AND o.created_at IS NOT NULL AND o.created_at <= t.created_at "
-    "  AND o.created_at > t.created_at - make_interval(secs => :prior_window_s)"
-)
-"""Every prior coin of this creator, any window — the base ``creator_prior_dump_count``
-and ``creator_prior_dead_count`` (T4.24) both start from and narrow with an ``AND``."""
-_PEDIGREE = text(
-    "SELECT t.mint, "  # noqa: S608 - every interpolation below is this module's own frozen SQL text
-    "       CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("
-    "         SELECT count(*) FROM meme_tokens o WHERE o.creator = t.creator "
-    "           AND o.mint <> t.mint AND o.created_at IS NOT NULL "
-    "           AND o.created_at <= t.created_at "
-    "           AND o.created_at > t.created_at - make_interval(secs => :creator_window_s)"
-    "       ) END AS creator_prior_mints_1h, "
-    "       CASE WHEN t.symbol IS NULL OR t.created_at IS NULL THEN NULL ELSE ("
-    "         SELECT count(*) FROM meme_tokens o WHERE o.symbol = t.symbol "
-    "           AND o.mint <> t.mint AND o.created_at IS NOT NULL "
-    "           AND o.created_at <= t.created_at "
-    "           AND o.created_at > t.created_at - make_interval(secs => :symbol_window_s)"
-    "       ) END AS symbol_dup_24h, "
-    "       CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("
-    f"        {_PRIOR_MINTS}"
-    "           AND ("
-    "             EXISTS (SELECT 1 FROM meme_features_1m pf WHERE pf.mint = o.mint "
-    "                       AND pf.creator_sold = true AND pf.end_time < t.created_at)"
-    "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb WHERE pb.mint = o.mint "
-    "                          AND pb.rule_set_id <> :probe_rule_set_id "
-    "                          AND pb.rule_set_id <> :pullback_rule_set_id "
-    "                          AND pb.rule_set_id <> :pullback_control_rule_set_id "
-    "                          AND pb.rule_set_id <> ALL(CAST(:mature_rule_set_ids AS uuid[])) "
-    "                          AND pb.creator_sold_seen_at IS NOT NULL "
-    "                          AND pb.creator_sold_seen_at < t.created_at)"
-    "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb2 WHERE pb2.mint = o.mint "
-    "                          AND pb2.rule_set_id <> :probe_rule_set_id "
-    "                          AND pb2.rule_set_id <> :pullback_rule_set_id "
-    "                          AND pb2.rule_set_id <> :pullback_control_rule_set_id "
-    "                          AND pb2.rule_set_id <> ALL(CAST(:mature_rule_set_ids AS uuid[])) "
-    "                          AND pb2.exit ->> 'reason' = 'creator_dump' "
-    "                          AND pb2.exit_at < t.created_at)"
-    "           )"
-    "       ) END AS creator_prior_dump_count, "
-    "       CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("
-    f"        {_PRIOR_MINTS}"
-    "           AND EXISTS ("
-    "             SELECT 1 FROM ("
-    "               SELECT max(w.mcap_sol) AS peak, min(w.mcap_sol) AS trough "
-    "               FROM meme_features_1m w WHERE w.mint = o.mint AND w.mcap_sol IS NOT NULL "
-    "                 AND w.end_time > o.created_at "
-    "                 AND w.end_time <= o.created_at + interval '30 minutes'"
-    "             ) window_30m "
-    "             WHERE window_30m.peak IS NOT NULL AND window_30m.peak > 0 "
-    "               AND window_30m.trough < window_30m.peak * 0.2"
-    "           )"
-    "       ) END AS creator_prior_dead_count "
-    "FROM meme_tokens t WHERE t.mint = ANY(:mints)"
-)
-"""Four correlated counts over ``meme_tokens``, index ranges on ``(symbol, created_at)`` (``0064``;
-329 mints took 14 s without it) and ``(creator, created_at)`` (``0040``). ``NULL`` when the identity
-is unknown — the gate refuses that by name, never reads it as zero.
-
-T4.24 (EXP-M6, braço 2): ``creator_prior_dump_count`` counts **any** window
-(unlike the 1 h/24 h of the two above) up to the judged coin's own creation,
-over three sources of evidence — the tape (``meme_features_1m.creator_sold``),
-the chain watch (``meme_paper_bets.creator_sold_seen_at``, T4.2h) or one of
-our own bets exiting ``creator_dump``. ``creator_prior_dead_count`` is
-diagnostic only (never a refusal): a prior coin whose ``mcap_sol`` fell under
-20 % of its own 30-minute peak; a coin with **no** ``meme_features_1m`` row in
-that window is excluded from the count either way (declared "not measured"),
-never read as alive nor as dead."""
 
 
 async def load_fast_gate_rows(
@@ -236,57 +159,6 @@ async def load_fast_gate_rows(
             )
         )
     return await with_recent_drawdown(session, out)
-
-
-async def pedigree_for(
-    session: AsyncSession, mints: Sequence[str], *, gate: PedigreeGate = PEDIGREE_V1
-) -> dict[str, PedigreeFeatures]:
-    """The two counts of EXP-M6 per mint, from ``meme_tokens`` at this instant."""
-    if not mints:
-        return {}
-    params = {
-        "mints": list(mints),
-        "creator_window_s": gate.creator_window_s,
-        "symbol_window_s": gate.symbol_window_s,
-        "prior_window_s": PRIOR_WINDOW_S,
-        # T4.85 (EXP-M23): the probe's own paper bets are evidence the desk would
-        # never have had — its bets make the creator watcher stamp
-        # ``creator_sold_seen_at`` on mints nobody was watching, which would
-        # change the real desk's ``creator_repeat_dumper`` refusals. Excluded by id.
-        "probe_rule_set_id": PROBE_RULE_SET_ID,
-        # T4.91 (EXP-M24): the same for recuo_v1/1 — its bets could witness a creator sale.
-        "pullback_rule_set_id": PULLBACK_ARM_RULE_SET_ID,
-        "pullback_control_rule_set_id": PULLBACK_CONTROL_RULE_SET_ID,  # T4.95: and its control
-        "mature_rule_set_ids": list(MATURE_CHART_RULE_SET_IDS),  # EXP-M26 (0068): the 3 arms
-    }
-    try:
-        async with session.begin_nested():
-            await session.execute(text("SET LOCAL statement_timeout = 8000"))
-            rows = (await session.execute(_PEDIGREE, params)).mappings().all()
-    except DBAPIError as exc:
-        # T4.24b: the savepoint rolled back; the tick goes on with the pedigree unread
-        # (every gate refuses ``pedigree_unknown`` by name) instead of dying.
-        _logger.warning("meme_pedigree_read_failed", mints=len(mints), **db_error_fields(exc))
-        return {}
-    return {
-        str(r["mint"]): PedigreeFeatures(
-            creator_prior_mints_1h=(
-                None if r["creator_prior_mints_1h"] is None else int(r["creator_prior_mints_1h"])
-            ),
-            symbol_dup_24h=None if r["symbol_dup_24h"] is None else int(r["symbol_dup_24h"]),
-            creator_prior_dump_count=(
-                None
-                if r["creator_prior_dump_count"] is None
-                else int(r["creator_prior_dump_count"])
-            ),
-            creator_prior_dead_count=(
-                None
-                if r["creator_prior_dead_count"] is None
-                else int(r["creator_prior_dead_count"])
-            ),
-        )
-        for r in rows
-    }
 
 
 def fast_window(now: datetime, last: datetime | None, *, backlog_s: int) -> datetime:

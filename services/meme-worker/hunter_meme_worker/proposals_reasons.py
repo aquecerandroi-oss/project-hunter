@@ -131,6 +131,7 @@ def gate_reasons(
                 "max_symbol_dup_24h": pedigree_gate.max_symbol_dup_24h,
                 # T4.24 (EXP-M6, braço 2): recorded whenever the pedigree block
                 # is, regardless of whether this set applies the exclusion.
+                # None on the light 1m read (EXP-M26 F): not read, never zero.
                 "creator_prior_dump_count": pedigree.creator_prior_dump_count,
                 "creator_prior_dead_count": pedigree.creator_prior_dead_count,
             }

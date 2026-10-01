@@ -69,7 +69,6 @@ from hunter_indicators.opportunity.model import ComponentScore
 
 HISTORY_POLICY_VERSION = "history_v1"
 HISTORY_POLICY_V2 = "history_v2"
-HISTORY_POLICY_V2 = "history_v2"
 
 REASON_FIRST = "first_sample"
 REASON_SCORE_DELTA = "score_delta"
@@ -118,17 +117,6 @@ class HistoryPolicy:
 DEFAULT_HISTORY_POLICY = HistoryPolicy()
 """The shipped ``history_v1`` policy, as a module singleton (a call in a default
 argument is evaluated once anyway, and ruff's B008 asks for it to be visible)."""
-
-
-def sparse_history_policy(interval: timedelta) -> HistoryPolicy:
-    """``history_v2``: first sample, status or stage change, or ``interval`` elapsed."""
-    if interval <= timedelta(0):
-        raise ValueError(f"history interval must be positive, got {interval}")
-    return HistoryPolicy(
-        interval=interval,
-        version=HISTORY_POLICY_V2,
-        triggers=frozenset({REASON_STATUS, REASON_STAGE, REASON_INTERVAL}),
-    )
 
 
 def sparse_history_policy(interval: timedelta) -> HistoryPolicy:

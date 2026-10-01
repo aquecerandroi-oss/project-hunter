@@ -119,13 +119,16 @@ class PedigreeFeatures:
     creator_prior_dump_count: int | None = None
     """T4.24: prior coins of the same creator (any window) where the creator
     sold, by our own database (see :data:`REPEAT_DUMPER_INPUTS`). ``None``
-    only when the creator or its creation time is unknown — the same
+    when the creator or its creation time is unknown — the same
     condition that already makes :func:`evaluate_pedigree` refuse
-    ``creator_unknown``."""
+    ``creator_unknown`` — **or when the read did not ask for it** (EXP-M26 F:
+    the minute lane of sets without ``pedigree_repeat_dumper`` reads only the
+    two counts of :data:`PEDIGREE_V1`). ``None`` is "not known", never zero."""
     creator_prior_dead_count: int | None = None
     """T4.24: of the coins counted above, how many fell under 20 % of their
     own peak inside their first 30 minutes — diagnostic only, never a
-    refusal; a coin with no series in that window is not counted either way."""
+    refusal; a coin with no series in that window is not counted either way.
+    ``None`` also when the read did not ask for it (see above)."""
 
 
 PEDIGREE_V1: Final = PedigreeGate(
@@ -161,9 +164,14 @@ def evaluate_repeat_dumper(features: PedigreeFeatures) -> tuple[str, ...]:
     in **our own** database. Pure, and independent of :data:`PEDIGREE_V1` —
     the caller applies it only when the rule set's own
     ``pedigree_repeat_dumper`` switch is on. An unknown count (``None``)
-    refuses nothing here: whenever this check runs beside
-    :func:`evaluate_pedigree` (T4.24's only wiring), that one already refuses
-    the same row by name (``creator_unknown``)."""
+    refuses nothing here. ``None`` means one of two things: the creator is
+    unknown (then :func:`evaluate_pedigree`, which always runs beside this
+    check, already refuses the row by name, ``creator_unknown``) **or the read
+    did not ask for the count** (EXP-M26 F: the minute lane's light read, with
+    the creator known). The second case is safe only because the caller runs
+    this check just for a set with ``pedigree_repeat_dumper`` and such a set
+    is never served the light read (``lab_repo_e2b.lineage_for``; pinned by
+    ``test_a_set_with_the_dumper_switch_never_receives_the_light_read``)."""
     if features.creator_prior_dump_count is None:
         return ()
     return (REPEAT_DUMPER_REFUSAL,) if features.creator_prior_dump_count >= 1 else ()
