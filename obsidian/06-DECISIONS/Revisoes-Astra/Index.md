@@ -98,3 +98,4 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 - [[T4.97b-identity-breaker]] — disjuntor da identidade por mint (26/09)
 - [[Confluencia-market-events]] — desenho de confluência de eventos de mercado (23/09)
 - [[EXP-M26-design-R1]] — opinião pontual de database-architect sobre o desenho do EXP-M26 (26/09)
+- 2026-10-01 — [[Roster-advogado-defensor]] (cartões do Advogado de Jesus e do Defensor: anti-resgate com histórico de exposição, desfecho "não verificável", Astra chamada pela orquestradora)

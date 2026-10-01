@@ -1,6 +1,6 @@
 ---
 tags: [changelog, historico]
-updated: 2026-09-11
+updated: 2026-10-01
 status: vivo
 owner: sexta-feira
 ---
@@ -8,6 +8,10 @@ owner: sexta-feira
 # Changelog
 
 Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado por dia, mais novo primeiro. Todo o histórico até agora é do Milestone 0 (fundação) — ver `docs/plans/M0.md` para as ondas T01–T13 e [[Resolved Bugs]] para o detalhe das correções de segurança/qualidade citadas aqui.
+
+## 2026-10-01
+
+- Roster de pesquisa cresce em par, a pedido do Everton: [[Advogado de Jesus]] (red team antes de todo veredito) e [[Defensor]] (steelman com pré-registro novo, nunca refatiar os mesmos dados) — cartões em `.claude/agents/`, linhas na tabela do `CLAUDE.md`.
 
 ## 2026-09-11
 

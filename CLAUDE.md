@@ -82,6 +82,8 @@ Dispatch the specialist whose row matches; never a generic agent for delegable w
 | `explorer-agent` | Read-only mapping of the codebase or a dependency's API before planning. Never edits. | haiku |
 | `product-designer` | The SaaS product designer (Everton, 2026-09-08): owns `docs/DESIGN.md` (themes, palette, type, spacing, states, copy), audits every screen in the browser with real data, proposes specs/mockups (options for Everton when the direction changes), writes the brief for `frontend-specialist` and reviews the rendered result. Second opinion from Astra. | sonnet |
 | `documentation-writer` | `docs/*.md` (Portuguese), READMEs, runbooks, ADRs in `docs/decisions/`. | sonnet |
+| `advogado-de-jesus` | Red team of every research result before a verdict (Everton named it, 01/10/2026): look-ahead, period luck, concentration, overlap, real costs, forking paths, confounds. Read-only. Runs on every hypothesis that reaches a verdict, paired with `defensor`. | opus |
+| `defensor` | Steelman of every refuted / not-confirmed hypothesis: was the test able to see it, right control, right cost; proposals only as NEW pre-registrations on unused data (never re-slicing). Read-only. Paired with `advogado-de-jesus`. | opus |
 
 ## Conventions
 

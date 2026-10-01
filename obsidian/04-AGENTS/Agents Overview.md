@@ -39,3 +39,5 @@ Um `agent` é uma instância de uma `strategy_version` dentro de um portfolio: `
 ## Fontes
 
 `docs/DATABASE.md` §6, `docs/PIPELINE.md` §6–7, `docs/ROADMAP.md` (Milestone 4), `CLAUDE.md`
+
+- 01/10/2026 — pesquisa ganhou dois papéis em par: [[Advogado de Jesus]] (derruba o resultado antes do dinheiro) e [[Defensor]] (impede que uma ideia boa morra por um teste ruim, sempre com pré-registro novo).
