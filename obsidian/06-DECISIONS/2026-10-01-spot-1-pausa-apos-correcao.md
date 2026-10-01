@@ -30,3 +30,9 @@ by: Everton
 A pausa é feita mercado a mercado pela ferramenta auditada `infra/scripts/spot_desk_markets.py --disable <símbolo> --note <esta nota> --apply` (o portão exige que esta nota cite cada símbolo). Desligar um mercado só tira ele das **entradas**; as posições abertas seguem com stop, alvo, saída por tempo e venda manual.
 
 1000BONKUSDT · 1000PEPEUSDT · AAVEUSDT · ARBUSDT · BIOUSDT · BNBUSDT · BOMEUSDT · BTCUSDT · CHIPUSDT · DOGEUSDT · ETHUSDT · FARTCOINUSDT · HYPEUSDT · INJUSDT · JTOUSDT · JUPUSDT · LINKUSDT · LITUSDT · METUSDT · MONUSDT · NEARUSDT · ORCAUSDT · PENGUUSDT · PONSUSDT · PUMPUSDT · PYTHUSDT · RENDERUSDT · SKRUSDT · SPXUSDT · TAOUSDT · TRUMPUSDT · TRXUSDT · UNIUSDT · USELESSUSDT · WIFUSDT · WUSDT · XMRUSDT · ZECUSDT
+
+## Execução (01/10/2026)
+
+- **12:3xZ — deploy `9622f087`** com o comando completo (16 contêineres na imagem nova): aluguel da ATA lido da transação, stop/alvo com segunda cotação, conserto do scanner e do pedigree do EXP-M26.
+- **~12:45Z — pausa aplicada pela Sexta-feira:** os 38 mercados acima desligados com `spot_desk_markets.py --disable … --note <esta nota> --actor Sexta-feira --apply` (38 × `applied: updated; system_events written`; `--list` com 0 ligados). Antes: 0 posições `spot/1` abertas. Depois: heartbeat `spot1.mode=on`, `exits_active=true`, `markets_enabled=0` — saídas seguem vivas.
+- **Ensaio da correção do placar** (`spot_fix_ata_rent.py`, sem `--apply`): 4 posições `[CORRECT]` (TAO, NEAR, LINK, UNI), aluguel 2 039 280 → 1 488 440 cada, **Δ Σ pnl_sol = −0,00220336 SOL**, Δ Σ R = −2,48 — exatamente o previsto pela [[KB-0171-custo-real-da-spot-1]]. O `--apply` é do Everton.
