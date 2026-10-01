@@ -38,3 +38,13 @@ avaliada, `Σ R +14,90` em 23 sinais, R63) levada à Solana por uma pista fixa (
 4 h, sizing "ficha ou nada"). A parada é uma regra de código, não uma troca de conjunto: 20 operações
 com expectância líquida ≤ 0 R, ou perda acumulada ≥ 0,15 SOL, e a pista entra em `refuted`
 (desenho §8) até uma linha nova do Everton no `.env`.
+
+## Correções de execução de 01/10/2026
+
+- **Aluguel de ATA lido da transação, não de constante** — o placar das 4 primeiras posições que criaram ATA estava
+  0,00055 SOL alto cada; o script auditado `spot_fix_ata_rent.py` corrige (o `--apply` é do Everton). A refutação
+  relê `closed_stats` do banco a cada tique de entradas: a correção entra sem reiniciar o executor.
+  [[KB-0171-custo-real-da-spot-1]] · [[06-DECISIONS/Revisoes-Astra/Spot-ata-rent-fix|Spot-ata-rent-fix]].
+- **Stop/alvo confirmados por uma segunda cotação** (a que a venda executa), stop com prazo de 60 s.
+  [[KB-0172-perdas-da-spot-1]] · [[06-DECISIONS/Revisoes-Astra/Spot-exit-confirm|Spot-exit-confirm]].
+- Contrato: `docs/RISK_ENGINE_MEME.md` §19.1 e §19.2.

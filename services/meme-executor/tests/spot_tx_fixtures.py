@@ -27,6 +27,21 @@ from hunter_exchanges.pumpfun.solana_codec import (
 from hunter_meme_executor.treasury_rules import JUP_PROGRAM_ID
 from hunter_meme_executor.treasury_verify import ROUTE_DISCRIMINATOR
 
+
+def create_account_ix(
+    keys: list[str], *, source: str, new: str, lamports: int, space: int = 165
+) -> dict[str, object]:
+    """Labeled test data: a raw (``encoding: json``) ``system::createAccount``
+    inner instruction — ``u32 0, u64 lamports, u64 space, owner`` — the shape the
+    ATA program's create emits and ``pumpfun.rent.rent_funded_by`` reads."""
+    data = struct.pack("<IQQ", 0, lamports, space) + pubkey_bytes(TOKEN_PROGRAM_ID)
+    return {
+        "programIdIndex": keys.index(SYSTEM_PROGRAM_ID),
+        "accounts": [keys.index(source), keys.index(new)],
+        "data": b58encode(data),
+    }
+
+
 WALLET = "ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4"
 WSOL = "So11111111111111111111111111111111111111112"
 WIF = "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"
@@ -38,7 +53,9 @@ OUT = 26_005_682
 THRESHOLD = OUT * 9950 // 10_000
 SIG_BYTES = bytes([7]) * 64
 SIGNATURE = b58encode(SIG_BYTES)
-ATA_RENT = 2_039_280
+ATA_RENT = 1_488_440
+"""Labeled test data: what a 165-byte token account costs on mainnet today
+((165 + 128) × 5 080, KB-0171) — read back from the meta, never a constant."""
 _TAIL = struct.Struct("<QQHB")
 
 

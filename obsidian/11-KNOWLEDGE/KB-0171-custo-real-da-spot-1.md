@@ -192,3 +192,13 @@ proporcional não cai" → "sem evidência de diluição".
 Jupiter era cotação ida-e-volta instantânea; o realizado é 0,29 % proporcional + 0,20 % fixo) ·
 [[KB-0169-fibonacci-e-lta-diaria-no-dado]] (parte D) · [[03-TRADING/Spot/Mesa-spot-1|Mesa-spot-1]] · [[Open Bugs]] ·
 `docs/design/spot1-lab-solana.md` §3 (o check `cost_r` estimava 0,3–0,5 R; medido 0,28 R)
+
+## Correção no código (01/10/2026, risk-engine-guardian)
+
+O executor passou a ler o aluguel da **própria transação** (delta de lamports da ATA nova da carteira no `meta`),
+nunca uma constante; aluguel ilegível é dobrado no gasto e marcado `signature_delta_rent_unknown` (PnL pessimista,
+nunca otimista); fill antigo sem proveniência não é acreditado na reabertura de órfão. As 4 posições afetadas
+(`01a0d8f9`, `01a0db2c`, `01a0eb0d`, `01a0ed92`) são corrigidas pelo script auditado
+`infra/scripts/spot_fix_ata_rent.py` (ensaio por padrão; o `--apply` é do Everton, com esta nota como `--note`) —
+runbook em `docs/RISK_ENGINE_MEME.md` §19.1. Enquanto o `--apply` não rodar, o banco continua com os números
+otimistas. Revisão: [[06-DECISIONS/Revisoes-Astra/Spot-ata-rent-fix|Spot-ata-rent-fix]].

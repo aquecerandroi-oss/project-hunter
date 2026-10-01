@@ -28,9 +28,14 @@ __all__ = [
     "MAX_EXIT_ATTEMPTS",
     "PANIC_FROM_ATTEMPT",
     "PANIC_REASONS",
+    "STOP_CONFIRM_DEADLINE_S",
+    "TRIGGER_REASONS",
     "LaneState",
+    "TriggerConfirmation",
     "backoff_s",
+    "confirm_trigger",
     "decide_exit",
+    "overdue_stop",
     "lane_state",
     "r_now",
     "slippage_for",
@@ -46,6 +51,12 @@ MAX_EXIT_ATTEMPTS: Final = 6
 """Past this the position is ``blocked_exits[id]`` (design §4) — still marked."""
 PANIC_FROM_ATTEMPT: Final = 3
 PANIC_REASONS: Final[frozenset[str]] = frozenset({"stop", "emergency"})
+TRIGGER_REASONS: Final[frozenset[str]] = frozenset({"stop", "target"})
+"""The price-decided exits a second quote must confirm (KB-0172)."""
+STOP_CONFIRM_DEADLINE_S: Final = 60
+"""A stop the confirmation keeps contradicting (or cannot read) is sold anyway
+at the first mark this long after the episode began — an operating budget,
+not an optimum (Astra, design review). A target is never forced."""
 _ZERO = Decimal(0)
 _MINUS_ONE = Decimal(-1)
 
@@ -106,6 +117,79 @@ def decide_exit(
         if horizon_s is not None and (now - position.entry_at).total_seconds() >= horizon_s:
             return "time"
     return None
+
+
+@dataclass(frozen=True, slots=True)
+class TriggerConfirmation:
+    """``reason``: what to sell for now, or ``None`` (wait for the next mark);
+    ``use_quote``: the confirming quote is the one the leg executes;
+    ``stop_since``: the stop episode's start to keep (``None`` = no episode)."""
+
+    reason: str | None
+    use_quote: bool
+    outcome: str
+    stop_since: datetime | None
+
+
+def confirm_trigger(
+    position: SpotPosition,
+    reason: str,
+    confirm_mark: Decimal | None,
+    now: datetime,
+    kill: KillSwitchState,
+    *,
+    auto_close_on_emergency: bool = False,
+    stop_since: datetime | None = None,
+    deadline_s: int = STOP_CONFIRM_DEADLINE_S,
+    decided_on_mark: bool = True,
+) -> TriggerConfirmation:
+    """KB-0172: a ``stop``/``target`` decided on the mark holds only if the same
+    rule says the same on a second quote of the lot — the one then executed.
+    Otherwise: a price-independent exit (``emergency``/``sell_requested``/
+    ``time``) still goes; a stop seen by either quote opens (or continues) an
+    episode that is sold anyway once ``deadline_s`` passed since it began (an
+    unreadable confirmation spends that wait, never counts as a recovery); a
+    target alone is never forced."""
+    again = decide_exit(
+        position, confirm_mark, now, kill, auto_close_on_emergency=auto_close_on_emergency
+    )
+    if again == reason:
+        return TriggerConfirmation(reason, True, "confirmed", None)
+    outcome = "unavailable" if confirm_mark is None else f"disagreed:{again or 'none'}"
+    independent = decide_exit(
+        position, None, now, kill, auto_close_on_emergency=auto_close_on_emergency
+    )
+    if independent is not None:
+        return TriggerConfirmation(independent, False, f"{outcome}->{independent}", None)
+    # A ``stop`` the loop injected for an overdue episode without a mark is not
+    # evidence (code review): only the mark itself, an unreadable confirmation
+    # (no data either way) or a confirmation that says stop keep the episode.
+    mark_says_stop = reason == "stop" and (decided_on_mark or confirm_mark is None)
+    if not mark_says_stop and again != "stop":
+        # A readable quote that is no stop ends an episode; an unreadable one is
+        # absence of data and keeps it (Astra, diff review).
+        kept = stop_since if confirm_mark is None else None
+        return TriggerConfirmation(None, False, outcome, kept)
+    since = stop_since or now
+    waited = int((now - since).total_seconds())
+    if waited >= deadline_s:
+        return TriggerConfirmation("stop", False, f"{outcome}->forced_after_{waited}s", None)
+    return TriggerConfirmation(None, False, outcome, since)
+
+
+def overdue_stop(
+    stop_since: datetime | None,
+    mark_sol: Decimal | None,
+    now: datetime,
+    *,
+    deadline_s: int = STOP_CONFIRM_DEADLINE_S,
+) -> bool:
+    """A stop episode past its deadline whose mark just failed still gets its
+    attempt (Astra, diff review): without a mark ``decide_exit`` says nothing,
+    and a mark that keeps failing must not hold the bounded stop for ever."""
+    if mark_sol is not None or stop_since is None:
+        return False
+    return (now - stop_since).total_seconds() >= deadline_s
 
 
 def slippage_for(attempt: int, reason: str, *, normal_bps: int = 50, panic_bps: int = 300) -> int:

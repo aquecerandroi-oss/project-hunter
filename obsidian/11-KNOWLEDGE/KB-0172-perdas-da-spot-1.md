@@ -130,3 +130,15 @@ fill.
 tem vantagem fora da amostra" — 10 operações não respondem, os 202 sinais do Lab dizem ≈ 0) ·
 [[KB-0145-binance-como-sinal-solana-como-execucao]] · [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]] ·
 [[03-TRADING/Spot/Mesa-spot-1|Mesa-spot-1]] · [[Open Bugs]] · [[Fila de Hipoteses]] · [[Mapa de Estrategias]]
+
+## Correções no código (01/10/2026, risk-engine-guardian)
+
+- **Cotação única (achado 5):** stop/alvo decididos na marca só vendem se uma **segunda** cotação do lote, a que a
+  perna executa, disser o mesmo; senão nada é vendido no tique (nenhuma ordem, nenhuma tentativa gasta). Stop tem
+  prazo de 60 s por episódio (início gravado na linha, sobrevive a reinício) e depois sai assim mesmo; alvo nunca é
+  forçado; `time`/`sell_requested`/`emergency` não esperam. A Binance **não** virou portão (é a H-b, hipótese).
+  Testado com as cotações do UNI 29/09 e do NEAR 26/09. `docs/RISK_ENGINE_MEME.md` §19.2; revisão
+  [[06-DECISIONS/Revisoes-Astra/Spot-exit-confirm|Spot-exit-confirm]].
+- **Aluguel constante (achado 1):** ver [[KB-0171-custo-real-da-spot-1]] (correção no código) e
+  [[06-DECISIONS/Revisoes-Astra/Spot-ata-rent-fix|Spot-ata-rent-fix]].
+- O que **não** muda: nada disto cria vantagem; a H-c continua sendo a pergunta que decide se a mesa continua.

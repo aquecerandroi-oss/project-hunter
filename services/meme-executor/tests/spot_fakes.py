@@ -16,7 +16,11 @@ import pytest
 from hunter_core.domain.enums import KillSwitchState
 from hunter_exchanges.jupiter import JupiterQuote, JupiterSwapTransaction
 from hunter_exchanges.jupiter.versioned_tx import VersionedMessage
-from hunter_exchanges.pumpfun.solana_codec import TOKEN_PROGRAM_ID
+from hunter_exchanges.pumpfun.solana_codec import (
+    SYSTEM_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    associated_token_address,
+)
 from hunter_exchanges.pumpfun.tx_rpc import SimulationResult
 from hunter_meme_executor import spot_send
 from hunter_meme_executor.chain import TokenAccountRead, WalletRead
@@ -36,6 +40,7 @@ from .spot_tx_fixtures import (
     WSOL,
     as_swap,
     buy_message,
+    create_account_ix,
     quote,
 )
 
@@ -144,10 +149,13 @@ def tx_meta(
     fee: int = 5_000,
     err: Any = None,
     payer: str = WALLET,
+    ata_rent: int | None = ATA_RENT,
 ) -> dict[str, Any]:
     """A ``getTransaction`` (``encoding=json``) result: the fee payer first in
     ``accountKeys``; a token account absent from ``preTokenBalances`` and present
-    in ``postTokenBalances`` is one the transaction created."""
+    in ``postTokenBalances`` is one the transaction created. KB-0171: the
+    wallet's ATA of ``mint`` sits at index 4 and a created one holds ``ata_rent``
+    lamports after (``None`` = its balance missing from the meta: unreadable)."""
 
     def entry(amount: int) -> dict[str, Any]:
         return {
@@ -157,16 +165,31 @@ def tx_meta(
             "uiTokenAmount": {"amount": str(amount), "decimals": 6},
         }
 
+    try:
+        ata = associated_token_address(WALLET, mint, token_program=TOKEN_PROGRAM_ID)
+    except (ValueError, KeyError):
+        ata = "not-a-pubkey-ata"
+    created = token_pre is None and token_post is not None
+    ata_pre, ata_post = (0, ata_rent) if created else (ATA_RENT, ATA_RENT)
+    pre, post = [wallet_pre, 0, 0, 0, ata_pre], [wallet_post, 0, 0, 0, ata_post]
+    if ata_post is None:
+        pre, post = pre[:4], post[:4]
+    keys = [payer, JUP_PROGRAM_ID, SYSTEM_PROGRAM_ID, "filler-3", ata]
+    funded = created and ata_rent is not None
+    create = (
+        [create_account_ix(keys, source=payer, new=ata, lamports=ata_rent or 0)] if funded else []
+    )
     return {
         "slot": 1,
-        "transaction": {"message": {"accountKeys": [payer, JUP_PROGRAM_ID], "instructions": []}},
+        "transaction": {"message": {"accountKeys": keys, "instructions": []}},
         "meta": {
             "err": err,
             "fee": fee,
-            "preBalances": [wallet_pre, 0],
-            "postBalances": [wallet_post, 0],
+            "preBalances": pre,
+            "postBalances": post,
             "preTokenBalances": [] if token_pre is None else [entry(token_pre)],
             "postTokenBalances": [] if token_post is None else [entry(token_post)],
+            "innerInstructions": [{"index": 2, "instructions": create}] if create else [],
         },
     }
 

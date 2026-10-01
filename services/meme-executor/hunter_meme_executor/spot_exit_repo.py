@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = [
+    "STOP_EPISODE_KEY",
     "TRANSIENT_EXIT_REFUSALS",
     "SellAttempts",
     "SpotOrderRow",
@@ -38,6 +39,7 @@ __all__ = [
     "pending_exits_on_terminal_orders",
     "sell_attempts",
     "set_exit_pending",
+    "set_stop_episode",
     "unconfirmed_spot_orders",
 ]
 
@@ -97,12 +99,14 @@ _SELL_ATTEMPTS = text(
 )
 _SET_EXIT_PENDING = text(
     "UPDATE spot_positions SET exit_order_id = :order_id, "
-    "  exit_intent = CAST(:intent AS jsonb), updated_at = :now "
+    "  exit_intent = CAST(:intent AS jsonb) || jsonb_strip_nulls(jsonb_build_object("
+    "    'stop_unconfirmed_since', exit_intent -> 'stop_unconfirmed_since')), updated_at = :now "
     "WHERE id = :id AND status = 'open' RETURNING id"
 )
 _CLEAR_EXIT_PENDING = text(
     "UPDATE spot_positions SET exit_order_id = NULL, "
-    "  exit_intent = CAST(:intent AS jsonb), updated_at = :now "
+    "  exit_intent = CAST(:intent AS jsonb) || jsonb_strip_nulls(jsonb_build_object("
+    "    'stop_unconfirmed_since', exit_intent -> 'stop_unconfirmed_since')), updated_at = :now "
     "WHERE id = :id AND status = 'open' AND exit_order_id = :order_id RETURNING id"
 )
 _UNCONFIRMED = text(
@@ -204,6 +208,28 @@ async def clear_exit_pending(
     intent = {"status": outcome, "order_id": order_id, "settled_at": now.isoformat()}
     params = {"id": position_id, "order_id": order_id, "intent": json.dumps(intent), "now": now}
     return (await session.execute(_CLEAR_EXIT_PENDING, params)).scalar() is not None
+
+
+STOP_EPISODE_KEY = "stop_unconfirmed_since"
+"""``exit_intent`` key of a stop the confirmation has not confirmed yet (KB-0172)."""
+_SET_STOP_EPISODE = text(
+    "UPDATE spot_positions SET exit_intent = CASE WHEN CAST(:since AS text) IS NULL "
+    "    THEN coalesce(exit_intent, '{}'::jsonb) - 'stop_unconfirmed_since' "
+    "    ELSE coalesce(exit_intent, '{}'::jsonb) "
+    "      || jsonb_build_object('stop_unconfirmed_since', CAST(:since AS text)) END, "
+    "  updated_at = :now "
+    "WHERE id = :id AND status = 'open' AND exit_order_id IS NULL RETURNING id"
+)
+
+
+async def set_stop_episode(
+    session: AsyncSession, position_id: str, *, since: datetime | None, now: datetime
+) -> bool:
+    """KB-0172: the start of a stop the second quote keeps contradicting, kept on
+    the row so a restart does not reset the wait (``None`` closes the episode).
+    Only while no sell is in flight; the pending marker's own keys are untouched."""
+    params = {"id": position_id, "since": None if since is None else since.isoformat(), "now": now}
+    return (await session.execute(_SET_STOP_EPISODE, params)).scalar() is not None
 
 
 def _order_row(r: Any) -> SpotOrderRow:

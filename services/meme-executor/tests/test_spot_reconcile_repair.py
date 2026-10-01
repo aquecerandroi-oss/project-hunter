@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from hunter_meme_executor import spot_reconcile
-from hunter_meme_executor.spot_send_rules import ATA_RENT_LAMPORTS
+from hunter_meme_executor.spot_send_rules import ATA_RENT_SOURCE
 
 from .spot_exits_rig import (
     NOW,
@@ -28,6 +28,7 @@ from .spot_exits_rig import (
     position,
     sell_row,
 )
+from .spot_tx_fixtures import ATA_RENT as ATA_RENT_LAMPORTS
 
 pytestmark = pytest.mark.unit
 
@@ -40,6 +41,7 @@ async def test_a_confirmed_buy_without_a_position_is_opened_from_its_own_fill(
     fill = {
         "filled_atoms": UNI_OUT,
         "ata_rent_lamports": ATA_RENT_LAMPORTS,
+        "ata_rent_source": ATA_RENT_SOURCE,  # KB-0171: a legacy fill is tested apart
         "sol_delta_lamports": -(TICKET + ATA_RENT_LAMPORTS + 5_050),
         "quoted_out_atoms": UNI_OUT,
     }

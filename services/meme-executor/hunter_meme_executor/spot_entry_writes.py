@@ -17,7 +17,7 @@ from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.spot_config import SPOT_DECIDED_BY, SpotConfig
 from hunter_meme_executor.spot_entry_reads import EntryReads, text
 from hunter_meme_executor.spot_repo import SpotCandidate, insert_order, insert_position
-from hunter_meme_executor.spot_send_rules import LegResult, spot_client_order_id
+from hunter_meme_executor.spot_send_rules import LegResult, entry_spend, spot_client_order_id
 
 if TYPE_CHECKING:
     from hunter_exchanges.jupiter import JupiterQuote
@@ -82,15 +82,12 @@ async def open_position(
 ) -> str | None:
     """The confirmed buy as a position with the signal's geometry (design §4)."""
     tokens = result.filled_atoms
-    rent = result.ata_rent_lamports
-    spent = -result.sol_delta_lamports - rent
-    spent_source = "signature_delta_minus_rent"
-    if spent <= 0:
-        # The leg only confirms a buy whose signature spent SOL (``sol_delta < 0``);
-        # a delta smaller than the rent it says it locked is a contradiction — keep
-        # the whole outflow as the cost, rent folded in, and say so. Never the ticket.
-        spent, rent, spent_source = -result.sol_delta_lamports, 0, "signature_delta_rent_folded"
-        logger.warning("meme_spot_rent_folded_into_spent", order_id=order_id, delta=-spent)
+    # KB-0171: the rent the transaction itself locked (never a constant). An
+    # unknown or contradictory rent is folded into the cost and named — a
+    # pessimistic PnL, never an optimistic one. Never the ticket.
+    spent, rent, spent_source = entry_spend(result.sol_delta_lamports, result.ata_rent_lamports)
+    if spent_source != "signature_delta_minus_rent":
+        logger.warning("meme_spot_rent_folded_into_spent", order_id=order_id, source=spent_source)
     geo, parity = reads.geo, reads.parity
     stop_frac = geo.stop_frac or Decimal(0)
     r_unit = ticket * stop_frac

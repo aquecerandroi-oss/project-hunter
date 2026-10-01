@@ -24,3 +24,9 @@ by: Everton
 ## Relacionado
 
 [[2026-09-30]] · [[Mapa de Estrategias]] · [[KB-0149-o-que-a-mesa-real-ensinou]]
+
+## Mercados a desligar na pausa (lista lida em 01/10/2026, `spot_desk_markets.py --list`, `enabled = yes`)
+
+A pausa é feita mercado a mercado pela ferramenta auditada `infra/scripts/spot_desk_markets.py --disable <símbolo> --note <esta nota> --apply` (o portão exige que esta nota cite cada símbolo). Desligar um mercado só tira ele das **entradas**; as posições abertas seguem com stop, alvo, saída por tempo e venda manual.
+
+1000BONKUSDT · 1000PEPEUSDT · AAVEUSDT · ARBUSDT · BIOUSDT · BNBUSDT · BOMEUSDT · BTCUSDT · CHIPUSDT · DOGEUSDT · ETHUSDT · FARTCOINUSDT · HYPEUSDT · INJUSDT · JTOUSDT · JUPUSDT · LINKUSDT · LITUSDT · METUSDT · MONUSDT · NEARUSDT · ORCAUSDT · PENGUUSDT · PONSUSDT · PUMPUSDT · PYTHUSDT · RENDERUSDT · SKRUSDT · SPXUSDT · TAOUSDT · TRUMPUSDT · TRXUSDT · UNIUSDT · USELESSUSDT · WIFUSDT · WUSDT · XMRUSDT · ZECUSDT

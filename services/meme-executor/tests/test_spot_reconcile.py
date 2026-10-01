@@ -15,7 +15,6 @@ from decimal import Decimal
 import pytest
 
 from hunter_meme_executor import spot_reconcile
-from hunter_meme_executor.spot_send_rules import ATA_RENT_LAMPORTS
 
 from .spot_exits_rig import (
     FEES,
@@ -35,6 +34,7 @@ from .spot_exits_rig import (
     sell_row,
 )
 from .spot_fakes import tx_meta
+from .spot_tx_fixtures import ATA_RENT as ATA_RENT_LAMPORTS
 from .spot_tx_fixtures import SIGNATURE
 
 pytestmark = pytest.mark.unit

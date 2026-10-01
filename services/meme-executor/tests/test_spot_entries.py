@@ -23,7 +23,7 @@ from hunter_meme_executor.spot_config import SpotConfig
 from hunter_meme_executor.spot_repo import ClosedStats
 
 from .spot_entries_rig import NOW, UNI_OUT, Store, candidate, entries_rig
-from .spot_tx_fixtures import SIGNATURE, TICKET, WIF
+from .spot_tx_fixtures import ATA_RENT, SIGNATURE, TICKET, WIF
 
 pytestmark = pytest.mark.unit
 
@@ -133,7 +133,7 @@ async def test_an_approved_decision_signs_exactly_once_and_opens_the_position(
     assert pos["entry_order_id"] == "order-1" and pos["mint"] == WIF
     assert pos["tokens"] == UNI_OUT
     assert pos["sol_spent_lamports"] == TICKET + 5_050, "the signature's delta, rent out"
-    assert pos["ata_rent_lamports"] == 2_039_280
+    assert pos["ata_rent_lamports"] == ATA_RENT, "read from the meta (KB-0171)"
     assert pos["initial_risk_sol"] == Decimal("0.05") * Decimal("0.015")
     params = pos["params"]
     assert params["ref"] == "7.5" and params["horizon_s"] == 14_400

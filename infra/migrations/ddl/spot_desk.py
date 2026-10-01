@@ -24,9 +24,10 @@ Jupiter route belongs to no organization. No enum, no partition, no view.
   produced the transaction). ``fill`` is the **real deltas** read from the
   chain after ``confirmed`` — never the quote.
 - ``spot_positions``: ``meme_live_positions``' shape with ``signal_id``
-  unique, ``market_symbol``, ``mint``, ``ata_rent_lamports`` (the 0,00204 SOL
-  a sell through Jupiter leaves in the token ATA — kept **out** of
-  ``pnl_sol``), ``mark_source IN ('jupiter_quote')`` and
+  unique, ``market_symbol``, ``mint``, ``ata_rent_lamports`` (the rent the
+  buy's transaction deposited in the token ATA, which a sell through Jupiter
+  leaves there — kept **out** of ``pnl_sol``; read from the transaction, not
+  the 0,00204 SOL assumed here at first, KB-0171), ``mark_source IN ('jupiter_quote')`` and
   ``initial_risk_sol = r_unit_sol`` (the R of the row is the signal's R).
 
 **Who writes what** (the ``0028`` shape). ``hunter_worker`` (the executor):

@@ -318,6 +318,13 @@ async def test_the_sell_quote_the_leg_uses_is_for_this_pair_and_lot(
     rig.store.positions = [position()]
     await spot_exits.spot_exits_once(rig.ctx)
     assert "sign" not in rig.log, "a quote for another amount never reaches the signature"
+    # KB-0172: for a stop the confirmation reads it first — unavailable, no row at all
+    assert rig.db.statuses() == [] and rig.store.orders == []
+    assert rig.store.marks[-1][2] == "trigger_unconfirmed:stop:unavailable"
+    # an exit that needs no confirmation still meets the leg's own check
+    rig.store.positions = [position(entry_at=NOW - timedelta(hours=5))]
+    await spot_exits.spot_exits_once(rig.ctx)
+    assert "sign" not in rig.log
     assert rig.db.statuses() == ["refused"]
     assert rig.store.pending_cleared[0]["outcome"] == "refused:quote_mismatch:in_amount"
 

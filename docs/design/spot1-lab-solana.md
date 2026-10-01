@@ -109,7 +109,9 @@ painel), continua marcada, e a venda manual é `meme_spot_swap.py --from <mint> 
 carteira são em SOL; `sol_usd_at_entry/exit` ficam gravados para a análise separar as duas coisas.
 **Rent de ATA:** a venda pela Jupiter não fecha a ATA do token (o verificador só aceita `CloseAccount` da WSOL própria):
 0,00204 SOL fica preso por mint (≤ 50 mints = 0,10 SOL, recuperável à mão); `ata_rent_lamports` gravado na posição e
-**não** entra no `pnl_sol` — declarado, não escondido.
+**não** entra no `pnl_sol` — declarado, não escondido. **Correção de 01/10/2026 (KB-0171):** a rede cobra hoje
+0,00148844 SOL por conta (não 0,00204), e o valor gravado é o que a própria transação depositou na ATA, nunca uma
+constante — `docs/RISK_ENGINE_MEME.md` §19.1.
 
 ## 5. Persistência — tabelas próprias (rejeitado: `meme_live_*` com discriminador)
 **`0057_spot_desk`** (`revises 0056_meme_spot_swaps`; `HEAD_REVISION` do `test_migrations.py` → `0057_spot_desk`;

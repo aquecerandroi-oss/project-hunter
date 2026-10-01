@@ -17,6 +17,7 @@ from hunter_core.logging import get_logger
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.spot_exit_rules import lane_state
 from hunter_meme_executor.spot_repo import close_position, closed_stats, insert_position
+from hunter_meme_executor.spot_send_rules import entry_spend, stored_fill_rent
 
 if TYPE_CHECKING:
     from hunter_meme_executor.context import ExecutorContext
@@ -110,11 +111,11 @@ async def open_from_order(
     """The late-confirmed buy as a position (design §4), from what the order
     kept: ``admission.spot1.geometry`` (``stop_frac``/``target_frac``/
     ``horizon_s``), ``admission.spot1.parity`` and ``intent.ticket_sol``."""
-    tokens, rent = int(fill.get("filled_atoms") or 0), int(fill.get("ata_rent_lamports") or 0)
-    delta = int(fill.get("sol_delta_lamports") or 0)
-    spent, spent_source = -delta - rent, "signature_delta_minus_rent"
-    if spent <= 0:
-        spent, rent, spent_source = -delta, 0, "signature_delta_rent_folded"
+    tokens, delta = int(fill.get("filled_atoms") or 0), int(fill.get("sol_delta_lamports") or 0)
+    # KB-0171: the rule of the entries loop; a legacy fill's constant is never believed.
+    spent, rent, spent_source = entry_spend(delta, stored_fill_rent(fill))
+    if spent_source == "signature_delta_rent_unknown":
+        logger.error("meme_spot_ata_rent_unknown", order_id=row.id, delta=delta)
     spot1 = dict(row.admission.get("spot1") or {})
     geometry = dict(spot1.get("geometry") or {})
     parity = dict(spot1.get("parity") or {})

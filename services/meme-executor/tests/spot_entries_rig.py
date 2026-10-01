@@ -32,6 +32,7 @@ from .spot_fakes import (
     buy_rig,
     quote,
 )
+from .spot_tx_fixtures import ATA_RENT
 from .test_spot_repo import candidate_row
 
 NOW = datetime(2026, 9, 19, 15, 0, 1, tzinfo=UTC)
@@ -47,7 +48,7 @@ LIMITS = limits_from_env(POLICY)
 ON = SpotConfig(requested=True, live=True, signer_present=True)
 # UNIUSDT at 7,5 USD, SOL at 200 USD: 0,05 SOL = 10 USD buys 1,3333 UNI (decimals 8).
 UNI_OUT = 133_333_333
-EXTRA = 2_039_280 + 5_050
+EXTRA = ATA_RENT + 5_050
 """What the buy costs beyond the ticket: the UNI ATA's rent, the base fee and 50 of priority."""
 WSOL = "So11111111111111111111111111111111111111112"
 

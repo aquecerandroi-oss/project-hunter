@@ -186,10 +186,10 @@ def test_the_fill_is_read_from_the_signature_s_own_meta() -> None:
     fill = spot_send_rules.fill_from_transaction(created, wallet=WALLET, mint=WIF)
     assert fill is not None
     assert (fill.sol_delta_lamports, fill.token_delta_atoms) == (-60, 26)
-    assert fill.ata_created is True and fill.network_fee_lamports == 5
+    assert fill.ata_rent_lamports == 1_488_440 and fill.network_fee_lamports == 5
     sold = tx_meta(wallet_pre=440, wallet_post=495, token_pre=26, token_post=0)
     fill = spot_send_rules.fill_from_transaction(sold, wallet=WALLET, mint=WIF)
-    assert fill is not None and fill.ata_created is False
+    assert fill is not None and fill.ata_rent_lamports == 0
     assert (fill.sol_delta_lamports, fill.token_delta_atoms) == (55, -26)
     parsed = tx_meta(wallet_pre=500, wallet_post=440, token_pre=None, token_post=26)
     parsed["transaction"]["message"]["accountKeys"][0] = {"pubkey": WALLET, "signer": True}

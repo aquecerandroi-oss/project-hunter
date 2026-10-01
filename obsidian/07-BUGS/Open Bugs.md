@@ -12,6 +12,12 @@ closed: ""
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## `scanner-worker` não persiste nada desde 30/09 ~13:36Z e vira 2 h de lag no stream (01/10)
+
+**`scanner-worker` não persiste nada desde 30/09 ~13:36Z e vira 2 h de lag no stream (achado em 01/10).** `flush_batch` falha em ~100 % dos ciclos com `uq_anomalies_active_per_market_type` (`writers.write_anomalies` só trata conflito em `id`). A memória esquece o id da anomalia antes do commit (`collect.py:85`, `watchdog.py:115`) e o lote que falha é descartado (`runners.py:121`); o par `(mercado, tipo)` fica com a linha X ativa no banco e o scanner tenta abrir Y — veto permanente do lote inteiro e dos ACKs. O PEL (17 mil) é reclaimado pelo próprio consumidor antes de cada leitura nova (`hunter_core/events/consume.py`), reentregando ~88× o volume e saturando um núcleo. `/ready` e o heartbeat continuam verdes. Gatilho do primeiro erro não identificado (logs rotacionados). Mitigação: `supersede_orphan_anomalies` em `writers.py` (aguarda deploy). Aberto: reter o lote em falha e serializar watchdog × avaliação; limitar o reclaim; alarme de `last_commit_at`. Dono: `services/scanner-worker`, `packages/core`. Nota: [[Scanner-lag-2026-10-01]].
+
+**Estado em 01/10:** mitigação em código 01/10, aguarda deploy; reinício do `scanner-worker` pedido ao Everton (o reinício sozinho não carrega o conserto). Revisão da Astra: [[2026-10-01-scanner-lag]].
+
 ## A leitura de pedigree do minuto leva 6–14 s e é cortada aos 8 s — volta assim que um conjunto `1m` (EXP-M26) ficar ativo (01/10)
 
 **HIGH para o EXP-M26 (bloqueia o funil F e, com ele, o seed). Sem efeito hoje,** porque nenhum conjunto `1m` está
@@ -32,6 +38,32 @@ ativo e a leitura não roda. Medido em 2026-10-01, 03:02–03:10Z, no banco da V
   diagnósticos ficam ausentes, nunca zero. A pista de 15 s (a mesa) continua com a leitura completa. Depois,
   repetir o F. Revisão: [[06-DECISIONS/Revisoes-Astra/EXP-M26-F|EXP-M26-F]].
 
+**Atualização de 2026-10-01 (à tarde): corrigido em código, não implantado; F a repetir.** A pista de 1 min lê só as
+duas contagens quando todo conjunto dela é `1m` e nenhum tem `pedigree_repeat_dumper` (`lab_repo_pedigree._PEDIGREE_COUNTS`;
+medido na VPS, 387 mints: `EXPLAIN ANALYZE` 9 154 ms → 39 ms). A pista de 15 s não mudou (SQL idêntico byte a byte).
+Falta deploy e repetir o F. Revisões: [[06-DECISIONS/Revisoes-Astra/EXP-M26-pedigree-fix|EXP-M26-pedigree-fix]] e
+[[06-DECISIONS/Revisoes-Astra/EXP-M26-pedigree-fix-revisoes|as três revisões (banco, quant, código)]]. Condição de ativação:
+ligar `pedigree_repeat_dumper` em qualquer conjunto `1m` devolve a pista à leitura completa; não ligar sem índice medido ou
+prova de carga (o log `meme_pedigree_full_read_on_1m_lane` avisa).
+
+**Correção de 2026-10-01 (ao texto acima):** a frase "Em 24/09, com ~320 mints, a leitura toda levava ~3 s (DATABASE §66)"
+é falsa como escrita. A §66 mediu 3,3 s frio / 2,9 s quente para 329 mints **sem** `symbol_dup_24h` e **com** dump/dead; o
+"~3 s com o índice" foi inferência. O salto para 6–14 s não foi decomposto (coincide com ~385 mints, ~165 moedas anteriores
+por mint em 7 dias e 0,72 M de buffers lidos no `SubPlan 9`). Também é falso que "nenhum conjunto 1m ativo = sem efeito":
+ver o defeito seguinte, que já acontece na pista de 15 s.
+
+## A leitura de pedigree COMPLETA da pista de 15 s já estoura o corte de 8 s algumas vezes por hora (01/10)
+
+**MEDIUM (já em produção; achado pela revisão do banco, não corrigido).** Desde 30/09 ~15h, o worker registra 2–5
+`meme_pedigree_read_failed` por hora, com `sqlstate` 57014 (`statement_timeout`) e `mints` ≈ 127–133. A mesma leitura
+mediu 3,09–3,24 s para 126 mints. É a leitura **completa**, a que a mesa real usa.
+- **Cenário.** Em ~1–2 % dos ticks, a leitura volta `{}` e **todos** os conjuntos da pista de 15 s (operator v5/v6,
+  flow_v2 v9/v10) recusam o tique com `pedigree_unknown`: nenhuma proposta por instrumento naquele tique.
+- **Hipótese não medida:** índice parcial em `meme_features_1m (mint, end_time) WHERE creator_sold` para o `EXISTS` do
+  `SubPlan 3` de `creator_prior_dump_count`. Não foi criado nem testado; qualquer índice novo passa pelo database-architect.
+- **Dono:** database-architect + backend-specialist. O conserto do funil F **não** mexe nesta leitura (a pista de 15 s ficou
+  idêntica de propósito). Ver [[06-DECISIONS/Revisoes-Astra/EXP-M26-pedigree-fix-revisoes|as três revisões]].
+
 ## `spot/1` desconta aluguel de ATA velho (2 039 280) e infla o PnL de 4 posições em 0,00055 SOL cada (01/10)
 
 **MEDIUM (contabilidade da mesa real; nenhuma ordem errada), medido em 2026-10-01** na pesquisa [[KB-0171-custo-real-da-spot-1]] (banco da VPS só leitura + RPC pública só leitura). `spot_send_rules.ATA_RENT_LAMPORTS = 2_039_280`, mas a rede cobra hoje **1 488 440** lamports por conta de 165 bytes (`getMinimumBalanceForRentExemption(165)` = 1488440; o `createAccount` real das 4 compras que criaram ATA pagou 1 488 440; as 4 ATAs seguem abertas com 1 488 440 cada).
@@ -39,6 +71,7 @@ ativo e a leitura não roda. Medido em 2026-10-01, 03:02–03:10Z, no banco da V
 - **Cenário:** `spot_entry_writes.py:85` (e `spot_settle.py:113`) fazem `spent = −Δ − 2 039 280`; o gasto fica 550 840 lamports menor e `pnl_sol`/`r_multiple` maiores pelo mesmo valor nas posições `01a0d8f9` (TAO), `01a0db2c` (NEAR), `01a0eb0d` (LINK), `01a0ed92` (UNI). Placar: Σ `pnl_sol` −0,001735 SOL (Σ R −1,92) contra o real **−0,003938 SOL (Σ R −4,40)**. A regra de refutação da pista (20 operações com expectância ≤ 0 R ou perda ≥ 0,15 SOL) lê esses números otimistas. `ata_rent_lamports` também está gravado como 2 039 280.
 - **Mesma constante, outros lugares:** `hunter_risk_meme/limits.py:191` (`ata_rent_sol=0.00203928`, conservador no sizing) e a docstring de `spot_desk.py:255`.
 - **Remédio (dono: risk-engine-guardian + backend):** ler o depósito do próprio `createAccount` da transação em vez da constante, e reprocessar as 4 posições pelo caminho auditado. Revisão: [[06-DECISIONS/Revisoes-Astra/KB-0171-custo-spot1|KB-0171-custo-spot1]].
+- **01/10 — corrigido no código, aguarda deploy + `--apply` do Everton** (`infra/scripts/spot_fix_ata_rent.py`, runbook em `docs/RISK_ENGINE_MEME.md` §19.1; nota para o `--note`: [[KB-0171-custo-real-da-spot-1]]). Aluguel lido do `createAccount` da carteira na transação; desconhecido = incorporado ao gasto e marcado. Fechar só depois do `--apply` conferido. Revisão: [[06-DECISIONS/Revisoes-Astra/Spot-ata-rent-fix|Spot-ata-rent-fix]].
 - **Adendo 01/10 ([[KB-0172-perdas-da-spot-1]]): muda decisão, não só placar.** `r_now = (mark − spent) ÷ initial_risk_sol` usa o gasto subestimado: nas 4 posições, o stop registrado em −1 R dispara perto de −1,53…−1,75 R verdadeiros e o alvo de +1,5 R perto de +0,75…+0,97 R. No LINK (`01a0eb0d`) o stop saiu em `r_now` −1,023 registrado = **−1,64 R verdadeiro**, aos 79 min. A razão alt/SOL da Binance tinha cruzado −1 R aos 51 min. A mesma constante também está em `spot_reconcile.py:320`. A Astra avisa para não trocar por outra constante. Detalhe em [[Perdas-spot-1]].
 
 ## `spot/1` decide stop/alvo numa cotação só, e a venda não revalida o gatilho (01/10)
@@ -48,6 +81,7 @@ ativo e a leitura não roda. Medido em 2026-10-01, 03:02–03:10Z, no banco da V
 - **Cenário real 1 (UNI `01a0ed92`, 29/09 16:01Z):** a marca deu 0,043310 SOL (−13,6 % sobre o gasto, `r_now` −8,55) e no mesmo minuto o alt/SOL da Binance estava **+0,39 %** sobre a entrada. A venda "stop" recotou normal e saiu a 0,049838, 2 h 29 min antes do prazo.
 - **Cenário real 2 (NEAR `01a0db2c`, 26/09 04:30:56Z):** a marca deu +3,6 % (alt/SOL Binance +0,25 %). A venda "target" foi recusada na simulação (`Custom 6001`), sem dano neste caso.
 - **Remédio (dono: risk-engine-guardian + backend; correção, não hipótese):** reavaliar `stop`/`target` sobre a cotação que vai ser executada e gravar as duas no `intent`. Confirmar com várias observações ou paridade com a Binance já é hipótese (risco: travar uma saída numa desancoragem verdadeira). Revisão: [[06-DECISIONS/Revisoes-Astra/KB-0172-perdas-spot-1|KB-0172-perdas-spot-1]].
+- **01/10 — corrigido no código, aguarda deploy** (`docs/RISK_ENGINE_MEME.md` §19.2): a segunda cotação é a executada; stop forçado após 60 s de episódio durável; alvo nunca forçado; Binance não é portão (H-b segue hipótese). Revisão: [[06-DECISIONS/Revisoes-Astra/Spot-exit-confirm|Spot-exit-confirm]].
 
 ## Token de phishing congelado na carteira travaria todas as entradas quando a checagem de moedas estranhas for ao ar (28/09)
 

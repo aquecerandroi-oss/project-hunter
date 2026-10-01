@@ -2492,3 +2492,84 @@ gravado com decomposição; entrada ausente recusa `*_unavailable`, nunca zero; 
 Provas: `packages/risk-core/tests/test_spot_profile.py` (cada recusa na tabela, aprovado por `requested`,
 posição spot ocupa vaga global e reduz `daily_cap`, indisponível ≠ zero, guarda AST contra `float`). Astra
 (19/09) revisou a ordem: carimbo futuro e impacto negativo eram furos — fechados acima.
+
+### 19.1 Contabilidade da compra: o aluguel da ATA vem da própria transação (KB-0171, 01/10/2026)
+
+`sol_spent_lamports = −Δ SOL da carteira na assinatura − aluguel que essa transação depositou na ATA nova do
+token` (`spot_send_rules.entry_spend`, a mesma regra nos dois caminhos que abrem posição — `spot_entry_writes` e o
+`open_from_order` do reconcile — e no script de correção). O aluguel é lido do `meta` da transação: o delta
+`postBalances − preBalances` de cada conta de token da carteira para o mint que aparece em `postTokenBalances` com
+um `accountIndex` ausente de `preTokenBalances` (por conta, não por "o mint não estava lá"), e só se essa conta for
+a ATA da carteira para o mint **e** um `system::createAccount` interno com a carteira como origem a tiver financiado
+com exatamente esse delta (`pumpfun.rent.rent_funded_by`; `TxFill.ata_rent_lamports`). Endereço pré-financiado
+(completado por transferência, sem `createAccount`) ou depósito de terceiro: desconhecido. **Nunca uma constante:** até 01/10 o
+executor descontava 2 039 280 lamports (o mínimo antigo) enquanto a rede cobrava 1 488 440 — o gasto ficava
+550 840 lamports menor e `pnl_sol`/`r_multiple` maiores pelo mesmo valor nas 4 posições que criaram ATA
+(`01a0d8f9`, `01a0db2c`, `01a0eb0d`, `01a0ed92`; placar −0,001735 SOL contra o real −0,003938, KB-0171).
+
+- **Aluguel desconhecido** (conta criada sem saldo legível, que não é a ATA da carteira, ou sem a prova de
+  financiamento acima): o aluguel é **incorporado ao gasto** (`sol_spent = −Δ`, `ata_rent_lamports = 0`) e a posição sai marcada
+  `entry.sol_spent_source = signature_delta_rent_unknown` (log `meme_spot_rent_folded_into_spent`). O PnL fica
+  pessimista, nunca otimista; `pnl_sol` nunca fica nulo (a soma da refutação o ignoraria).
+- **Fill gravado antes da correção** (sem `fill.ata_rent_source = tx_meta_ata_balance`) que diz ter travado aluguel:
+  não é acreditado na reabertura de órfão do reconcile — vira aluguel desconhecido (revisão da Astra).
+- `limits.ata_rent_sol = 0,00203928` continua como **reserva** de sizing/`available`/escopo: um valor acima do cobrado
+  só aperta essas contas. `spot_send_rules.ATA_RENT_MAX_LAMPORTS = 2 039 280` continua como parcela da **tolerância
+  da simulação** — aqui o efeito é o contrário: afrouxa em 550 840 lamports por ATA o limite de débito simulado
+  (nunca recusa uma compra legítima; apertar exige prova independente do depósito, revisão da Astra). Nenhum dos dois
+  cobre conta Token-2022 com extensões. Nada que calcula PnL os lê.
+- **Runbook (Everton) — corrigir as 4 posições já fechadas.** `infra/scripts/spot_fix_ata_rent.py` relê a transação
+  de entrada de cada posição candidata (`getTransaction`, só leitura), confere que os deltas de SOL e de token batem
+  com o gravado, recalcula com a mesma regra e mostra antes/depois e o Δ das somas; ensaio por padrão; `--apply` exige
+  `--note` (uma nota em `obsidian/` que cite cada posição corrigida — id completo ou os 8 primeiros caracteres) e grava
+  as posições e uma linha de `audit_logs` por posição numa transação só. Qualquer recusa (aluguel ilegível, delta que
+  não bate, transação não servida, nota que não cobre) não grava nada; rodar de novo não muda nada. Posição aberta é
+  pulada com aviso e **nunca é travada** (só as fechadas recebem `FOR UPDATE`; revisão do guardião). Falha da RPC ou
+  coluna nula vira recusa nomeada (`rpc_failed`, `position_not_closable`, saída 65). `spot_orders.fill` fica como o executor gravou (o antes/depois vai no `audit_logs` e em
+  `entry.rent_correction`). Não precisa reiniciar o executor: a refutação relê `closed_stats` a cada tique de
+  entradas. Pré-requisito: o commit desta correção implantado na VPS (o script e a nota). Do PowerShell, primeiro o
+  ensaio, depois o mesmo com `--apply`:
+
+  ```
+  ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/spot_fix_ata_rent.py"
+  ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/spot_fix_ata_rent.py --apply --actor Everton --note obsidian/11-KNOWLEDGE/KB-0171-custo-real-da-spot-1.md"
+  ```
+
+  O esperado no ensaio (KB-0171): 4 linhas `[CORRECT]`, cada uma com `sol_spent` +550 840, e `Δ Σ pnl_sol`
+  = −0,00220336 SOL (4 × 550 840 lamports); depois do `--apply`, Σ `pnl_sol` das 10 fechadas ≈ −0,003938 SOL.
+  Código de saída: 0 feito/ensaio, 2 uso, 65 recusa (motivo no stderr). Provas:
+  `services/meme-executor/tests/test_spot_ata_rent.py`, `test_spot_ata_rent_openers.py`,
+  `infra/scripts/tests/test_spot_fix_ata_rent.py` (integração).
+
+### 19.2 Saída: stop/alvo só com a segunda cotação concordando (KB-0172, 01/10/2026)
+
+A marca é **uma** cotação da Jupiter do lote inteiro; duas vezes em dez operações ela veio fantasma (UNI 29/09:
+−13,6 %, `r_now` −8,55, com a Binance alt/SOL +0,39 % — vendida como "stop" 2 h 29 min antes do prazo; NEAR 26/09:
++3,6 % contra +0,25 %, a venda "alvo" morreu na simulação). Agora (`spot_exit_confirm.plan_exit` +
+`spot_exit_rules.confirm_trigger`), quando a marca diz `stop` ou `target`, **antes de qualquer linha** o executor
+pede outra cotação do lote com a mesma tolerância que a perna vai usar e roda a mesma regra sobre ela:
+
+- **concorda** → vende, e a perna executa **essa** cotação (a cotação executada é a que confirmou o gatilho);
+- **não concorda** (ou não deu para ler) → nada é vendido neste tique: nenhuma ordem, nenhuma tentativa gasta,
+  nenhum backoff; a marca da linha vira a da confirmação, com `mark_reason = trigger_unconfirmed:<motivo>:<resultado>`;
+- uma saída que não depende de preço (`emergency`, `sell_requested`, `time`) continua valendo: um alvo fantasma
+  repetido nunca segura a saída por tempo;
+- **stop tem prazo**: quando qualquer uma das duas cotações diz stop e a outra não confirma (ou falha), abre-se um
+  episódio cujo início fica na linha (`exit_intent.stop_unconfirmed_since`, sobrevive a reinício); na primeira marca
+  depois de `STOP_CONFIRM_DEADLINE_S` = 60 s a venda sai assim mesmo (`forced_after_<n>s`, a perna recota). Com o
+  episódio vencido e a **marca** ilegível nesse tique, a confirmação decide: diz stop → vende confirmado; ilegível →
+  forçado; legível acima da linha do stop → fecha o episódio, sem venda (o `stop` injetado pelo prazo não é
+  evidência — revisão de código). Na prática a tentativa forçada cai entre 60 e 80 s (laço de marca de 20 s). Uma marca legível
+  que não dispara nada fecha o episódio; marca ou confirmação ilegível não conta como recuperação (nem quando a marca
+  dizia alvo). O episódio sobrevive à venda em voo e à falha dela (`set_exit_pending`/`clear_exit_pending` preservam
+  a chave): uma venda forçada que falha não ganha outros 60 s. **Alvo nunca é forçado.** Forçar o stop contra uma confirmação contrária pode repetir o UNI depois do prazo — é a troca escolhida
+  entre os dois riscos (Astra).
+- Cada venda grava em `intent.trigger_confirmation`: motivo decidido, resultado, `confirm_mark_sol`, `confirm_r_now`,
+  erro da confirmação, início do episódio e instante; `mark_sol`/`r_now` continuam sendo os da decisão.
+- **Fora do escopo, de propósito:** a Binance como portão (travaria uma saída numa desancoragem real do lado Solana —
+  é hipótese, não correção) e a tolerância de pânico de 300 bp desde a 1.ª tentativa do stop (política do desenho §4).
+  O kill switch e o fechamento manual (`--close-manual`) não mudam.
+
+Provas: `services/meme-executor/tests/test_spot_exit_confirm.py` (os dois incidentes com cotações no formato real,
+stop genuíno, prazo, cotação indisponível, troca stop↔alvo, tempo vencido, emergência, tentativa não gasta),
+`test_spot_stop_episode_integration.py` (o SQL do episódio no Postgres real).

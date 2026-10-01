@@ -252,7 +252,9 @@ class SpotPosition(Base, UUIDPrimaryKeyMixin):
     """The geometry written at entry: ``ref``, ``stop_frac``, ``target_frac``,
     ``horizon_s``, ``entry_sol_per_atom``, ``r_unit_sol``, the three prices."""
     ata_rent_lamports: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
-    """The 0,00204 SOL a Jupiter sell leaves in the token ATA; out of ``pnl_sol``."""
+    """The rent the buy's own transaction deposited in the token ATA (read from its
+    meta, never a constant — KB-0171; 1 488 440 lamports in 2026-10); a Jupiter sell
+    leaves it there. Out of ``pnl_sol``."""
     mark_sol: Mapped[Decimal | None]
     mark_at: Mapped[datetime | None]
     mark_source: Mapped[str | None] = mapped_column(Text)

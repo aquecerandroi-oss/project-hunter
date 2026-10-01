@@ -41,6 +41,7 @@ from hunter_meme_executor.exit_common import exit_lock
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.spot_config import SPOT_DECIDED_BY, SpotConfig
 from hunter_meme_executor.spot_entries import spot_config_of, spot_stats_of
+from hunter_meme_executor.spot_exit_confirm import plan_exit, settle_stop_episode
 from hunter_meme_executor.spot_exit_repo import (
     PENDING_EXIT_STATUS,
     TRANSIENT_EXIT_REFUSALS,
@@ -48,13 +49,7 @@ from hunter_meme_executor.spot_exit_repo import (
     sell_attempts,
     set_exit_pending,
 )
-from hunter_meme_executor.spot_exit_rules import (
-    MAX_EXIT_ATTEMPTS,
-    backoff_s,
-    decide_exit,
-    r_now,
-    slippage_for,
-)
+from hunter_meme_executor.spot_exit_rules import MAX_EXIT_ATTEMPTS, backoff_s, decide_exit, r_now
 from hunter_meme_executor.spot_repo import SpotPosition, insert_order, open_spot_positions, set_mark
 from hunter_meme_executor.spot_send import spot_leg
 from hunter_meme_executor.spot_send_rules import spot_client_order_id
@@ -142,6 +137,7 @@ async def manage_position(
         ctx.kill.effective,
         auto_close_on_emergency=ctx.config.auto_close_on_emergency,
     )
+    reason = await settle_stop_episode(ctx, position, mark, reason, now=now)
     if reason is None:
         return
     await _sell(ctx, cfg, stats, position, reason, mark, now=now)
@@ -208,10 +204,11 @@ async def _sell(
         _block(stats, position.id, reason, attempts)
         return
     attempt = attempts + 1
+    plan = await plan_exit(ctx, cfg, position, reason, attempt=attempt, now=now, decided_mark=mark)
+    if plan.reason is None:
+        return  # KB-0172: the second quote did not confirm — no row, no attempt spent
+    reason, slippage = plan.reason, plan.slippage_bps
     stats.exit_attempts[position.id] = attempt
-    slippage = slippage_for(
-        attempt, reason, normal_bps=cfg.exit_slippage_bps, panic_bps=cfg.panic_slippage_bps
-    )
     r = r_now(position, mark)
     intent: dict[str, Any] = {
         "lane": SPOT_LANE,
@@ -225,6 +222,7 @@ async def _sell(
         "attempt": attempt,
         "mark_sol": None if mark is None else str(mark),
         "r_now": None if r is None else str(r),
+        "trigger_confirmation": plan.record,
         "market_symbol": position.market_symbol,
     }
     admission = {
@@ -284,6 +282,7 @@ async def _sell(
         amount_atoms=position.tokens,
         slippage_bps=slippage,
         max_priority_fee_lamports=cfg.priority_fee_max_lamports,
+        quote=plan.quote,
     )
     if result.signature:
         stats.last_signature = result.signature

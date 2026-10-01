@@ -50,7 +50,7 @@ from hunter_meme_executor.spot_exit_repo import (
 )
 from hunter_meme_executor.spot_exit_rules import backoff_s
 from hunter_meme_executor.spot_repo import mark_confirmed, mark_failed
-from hunter_meme_executor.spot_send_rules import ATA_RENT_LAMPORTS, TxFill, fill_from_transaction
+from hunter_meme_executor.spot_send_rules import ATA_RENT_SOURCE, TxFill, fill_from_transaction
 from hunter_meme_executor.spot_settle import open_from_order, settle_closed
 from hunter_meme_executor.treasury_rules import SUBMITTED_MAX_AGE_S
 
@@ -317,7 +317,8 @@ def _fill_payload(row: SpotOrderRow, landed: TxFill, is_buy: bool) -> dict[str, 
         "token_before_atoms": landed.token_before_atoms,
         "token_after_atoms": landed.token_after_atoms,
         "filled_atoms": landed.token_delta_atoms if is_buy else landed.sol_delta_lamports,
-        "ata_rent_lamports": ATA_RENT_LAMPORTS if is_buy and landed.ata_created else 0,
+        "ata_rent_lamports": landed.ata_rent_lamports if is_buy else 0,  # KB-0171: read
+        "ata_rent_source": ATA_RENT_SOURCE,
         "network_fee_lamports": landed.network_fee_lamports,
         "quoted_out_atoms": None if quoted is None else int(str(quoted)),
     }

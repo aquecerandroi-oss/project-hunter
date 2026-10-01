@@ -15,12 +15,11 @@ from typing import Any, cast
 import pytest
 
 from hunter_core.domain.enums import KillSwitchState
-from hunter_meme_executor import spot_exits, spot_reconcile, spot_settle
+from hunter_meme_executor import spot_exit_confirm, spot_exits, spot_reconcile, spot_settle
 from hunter_meme_executor.chain import TokenAccountRead
 from hunter_meme_executor.spot_config import SpotConfig
 from hunter_meme_executor.spot_exit_repo import SellAttempts, SpotOrderRow
 from hunter_meme_executor.spot_repo import ClosedStats, spot_position_from_row
-from hunter_meme_executor.spot_send_rules import ATA_RENT_LAMPORTS
 from hunter_meme_executor.spot_stats import SpotStats
 from hunter_risk_meme import MemeKillSwitchInputs
 
@@ -38,6 +37,7 @@ from .spot_fakes import (
     tx_meta,
     wire_db,
 )
+from .spot_tx_fixtures import ATA_RENT as ATA_RENT_LAMPORTS
 from .spot_tx_fixtures import SIGNATURE, WIF, WSOL, as_swap, quote, sell_message
 from .test_spot_repo import position_row
 
@@ -110,6 +110,10 @@ class Store:
     failed: list[tuple[str, str]] = field(default_factory=lambda: list[tuple[str, str]]())
     abandoned_failed: list[str] = field(default_factory=lambda: list[str]())
     duplicate_order_keys: set[str] = field(default_factory=lambda: set[str]())
+    episodes: list[tuple[str, datetime | None]] = field(
+        default_factory=lambda: list[tuple[str, datetime | None]]()
+    )
+    """KB-0172: ``set_stop_episode`` writes, ``(position_id, since)``."""
 
 
 class _Session:
@@ -195,10 +199,17 @@ def wire_store(monkeypatch: pytest.MonkeyPatch, store: Store) -> None:
                 return p
         return None
 
-    for module in (spot_exits, spot_settle, spot_reconcile):
+    async def set_stop_episode(_s: Any, position_id: str, *, since: Any, now: Any) -> bool:
+        store.episodes.append((position_id, since))
+        return True
+
+    for module in (spot_exits, spot_settle, spot_reconcile, spot_exit_confirm):
         monkeypatch.setattr(module, "role_session", session)
     monkeypatch.setattr(spot_exits, "open_spot_positions", open_positions)
     monkeypatch.setattr(spot_exits, "set_mark", set_mark)
+    monkeypatch.setattr(spot_exit_confirm, "set_mark", set_mark)
+    monkeypatch.setattr(spot_exit_confirm, "set_stop_episode", set_stop_episode)
+    monkeypatch.setattr(spot_exit_confirm, "utcnow", lambda: NOW)
     monkeypatch.setattr(spot_exits, "sell_attempts", sell_attempts)
     monkeypatch.setattr(spot_exits, "insert_order", insert_order)
     monkeypatch.setattr(spot_exits, "set_exit_pending", set_exit_pending)

@@ -121,7 +121,11 @@ class MemeLimits(MemeModel):
     """Below this a buy cannot pay its own fees and rent (check 23)."""
     network_fee_sol: Decimal = Field(ge=0)
     ata_rent_sol: Decimal = Field(ge=0)
-    """Rent of the buyer's token account when it has to be created (§3.2)."""
+    """Rent of the buyer's token account when it has to be created (§3.2) — a
+    **reserve**, never accounting: sizing, ``available`` and the scope debit
+    subtract it, so a value above what the chain charges only makes them
+    stricter. What a buy actually locked is read from its transaction
+    (KB-0171; ``spot_send_rules.TxFill.ata_rent_lamports``, ``fills.py``)."""
     day_timezone: str = "America/Sao_Paulo"
     max_leverage: Literal[1] = 1
     quote: Literal["SOL"] = "SOL"
@@ -188,6 +192,11 @@ MEME_PAPER_V0 = MemeLimits(
     warning_size_multiplier=Decimal("0.5"),
     min_trade_sol=Decimal("0.001"),
     network_fee_sol=Decimal("0.000005"),
+    # Upper bound on purpose (KB-0171): (165 + 128) × 6 960, the pre-reduction
+    # minimum; the network charged 0.00148844 on 2026-10-01. Kept, not sourced
+    # from config: a lower number would loosen every reserve that reads it, and
+    # nothing that computes PnL reads it any more. Not a ceiling for Token-2022
+    # accounts with extensions (larger than 165 bytes).
     ata_rent_sol=Decimal("0.00203928"),
 )
 """§3.1's paper column. **Not** an approved live limit: the live profile is

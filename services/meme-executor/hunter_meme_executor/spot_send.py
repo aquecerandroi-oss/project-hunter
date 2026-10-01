@@ -43,7 +43,7 @@ from hunter_meme_executor import spot_repo
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.spot_alt import account_keys_for
 from hunter_meme_executor.spot_send_rules import (
-    ATA_RENT_LAMPORTS,
+    ATA_RENT_SOURCE,
     LegResult,
     check_simulated_leg,
     fee_allowance_lamports,
@@ -295,7 +295,7 @@ async def spot_leg(
         logger.warning("meme_spot_fill_inconsistent", order_id=order_id, signature=signature)
         return _unconfirmed("fill_inconsistent", signature, quote, fee)
     filled = token_delta if is_buy else sol_delta
-    ata_rent = ATA_RENT_LAMPORTS if is_buy and landed.ata_created else 0
+    ata_rent = landed.ata_rent_lamports if is_buy else 0  # KB-0171: read, never a constant
     fill: dict[str, Any] = {
         "signature": signature,
         "side": "buy" if is_buy else "sell",
@@ -305,6 +305,7 @@ async def spot_leg(
         "token_after_atoms": landed.token_after_atoms,
         "filled_atoms": filled,
         "ata_rent_lamports": ata_rent,
+        "ata_rent_source": ATA_RENT_SOURCE,
         "priority_fee_lamports": fee,
         "network_fee_lamports": landed.network_fee_lamports,
         "quoted_out_atoms": int(quote.out_amount),
