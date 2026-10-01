@@ -1,0 +1,1 @@
+substituído em 2026-10-01T03:33:12Z antes de qualquer detecção: a 1.ª corrida real caiu na busca (símbolo USDT com caracteres CJK na URL, UnicodeEncodeError, run_2026-10-01.log); nada foi gravado (sem log.jsonl, sem klines_fwd.csv); correção em archive.fetch_klines (urllib.parse.quote) com teste que falhou antes; PREREG.md inalterado (mesmo sha256)

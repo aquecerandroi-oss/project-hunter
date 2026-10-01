@@ -1,0 +1,8 @@
+# contagem cega (sem retorno) — sinais 2019-02-24 → 2026-09-16; painel R84 843542 velas, 755 séries; tol 0.25
+dias 2762 (7.56 anos); B brutos 336 em 269 dias; rompimentos simples 1123; B que também são rompimento simples (evento P): 181; comparadores P (rompimento sem toque A nas 21 velas) 685
+contraste R (B × controle LTA do dia): 323 eventos (42.7/ano), 77 de 98 intervalos de 28 d com evento
+contraste P (B∩rompimento × rompimento sem teste no dia): 90 eventos (11.9/ano), 44 intervalos; nos dias com evento P, comparadores média 0.85, mediana 0, dias com 0: 86 de 150
+evento P que também tem controle R no dia: 85; maior moeda nos eventos P: ('ETHUSDT', 7) de 90
+controles LTA nos dias com B: média 5.37
+fidelidade: 12 dias (2019-07-02, 2019-11-01, 2020-04-27, 2020-06-11, 2020-10-26, 2021-01-30, 2021-09-04, 2022-06-17, 2022-11-04, 2023-12-27, 2024-01-10, 2025-02-21) — detect_day só com velas ≤ d × varredura do painel inteiro: divergências nenhuma
+tempo 32 s

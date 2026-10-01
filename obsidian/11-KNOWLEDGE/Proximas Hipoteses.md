@@ -138,6 +138,11 @@ contra e evidência externa fraca), distância à VWAP (nenhum estudo revisado a
 (BTC sem padrão de retorno depois), canal diário como estratégia própria na `spot/1` (mesmo objeto da H-024) e o
 momento intradiário de primeira/última janela (custo de equilíbrio publicado de 3–10 bps por operação).
 
+
+### Rompimento do topo depois do teste da LTA diária (H-026 B) — coorte futura arquivada (01/10/2026)
+
+Instrumento e rascunho de pré-registro prontos ([[H-028-forward-prereg]], `.claude/state/h026b-forward/`, congelado; 3 rodadas da Astra). Contagem cega do painel do R85: o contraste incremental honesto (B contra rompimento sem LTA no mesmo dia) teve **90 eventos em 7,56 anos (~12/ano)** — até a parada dura de 2030 esperam-se ~48 contra o piso de 150, ou seja, **LIMITE DE DADO** como desfecho esperado. **Decisão da Sexta-feira (pesquisa, sem dinheiro):** não montar a coorte em produção (tabelas + job) agora; o bloco não entra na Fila como hipótese aberta. Reabre só se aparecer um universo muito maior (ex.: todos os pares USDT líquidos) com poder calculado antes.
+
 ## (c) Cemitério — não repetir
 
 Uma linha, o porquê. Lista completa e o número exato de cada uma: [[Mapa de Estrategias]] §Cemitério.
