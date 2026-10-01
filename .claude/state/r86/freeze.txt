@@ -1,0 +1,3 @@
+congelado em 2026-10-01T03:04:58+00:00 | guarda recusou 79
+elegíveis por estratégia: {'momentum': 964, 'volume_anomaly': 66, 'mean_reversion_v14': 152}
+sha256 eligible.csv: f6fb22012cccf5b11744d72f75af5421c34c9682e9f1b78239fdbbe2ef2a2436

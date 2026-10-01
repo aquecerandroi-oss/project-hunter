@@ -1,15 +1,15 @@
 ---
 tags: [experimento, meme, pumpfun, curva, paper, pre-registro, fluxo, holders, relogio-15s, m4]
-updated: 2026-09-16
-status: pre-registrado
+updated: 2026-10-01
+status: "pre-registrado; coleta iniciada (retificado em 2026-10-01)"
 owner: quant-engineer
 exp: EXP-M5
 strategy: "meme/pumpfun — fluxo e holders: comprar só a moeda jovem com demanda líquida, compradores distintos, holders e progresso subindo, decidida por fotografia de 15 s (carteira paper, sem ordem real)"
 version: "gate fluxo_e_holders v1 + saida alvo_3x_trailing_35_apos_1_5x_tempo_30m v1 (conjunto flow_v2/1, relógio 15 s) e gate sonda_de_hype v2 (conjunto hype_probe_v0/2, relógio 1 min), migração 0030"
-result: nao-iniciado
+result: inconclusivo
 evaluable: 0
 days: 0
-last_eval: ""
+last_eval: "2026-09-14"
 tipo: pesquisa
 hipotese: —
 variavel: —
@@ -259,3 +259,9 @@ cortes olhando os primeiros dias prospectivos (KB-0092).
 `infra/migrations/versions/0030_meme_gate_v2.py` · `docs/DATABASE.md` §43 · `docs/plans/T4-MEME-RADAR.md` §T4.16 ·
 `docs/RISK_ENGINE_MEME.md` §10.7 · `.claude/state/brief-T4.16-porta-v2-e-relogio-de-15s.md` ·
 `infra/scripts/sql/research/2026-09-12-t416-caso-das-21-apostas.sql`.
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status`, `result`, `last_eval` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+Retificação: o braço 1 (`flow_v2/1`) **iniciou coleta e tem observações registradas**; `nao-iniciado` é resumo obsoleto. Prova: fechamentos diários de 13 e 14/09 (acumulado de 3 apostas em 3 dias até 14/09, régua **não atingida**). Não há aqui novo julgamento nem nova contagem. Os números anteriores a 16/09 permanecem históricos e sujeitos à reclassificação Mayhem (seção "Avaliação 2026-09-16 (T4.27)"); não devem ser promovidos a contagem atual sem nova extração. `evaluable` e `days` do frontmatter não foram recalculados.

@@ -1,0 +1,33 @@
+# R86 / H-027 — tendência diária (razao_mm20d) como estado dos sinais de continuação do Lab
+ANÁLISE RETROSPECTIVA PRÉ-ESPECIFICADA (emenda 03:02Z, item 5) — não é a validação em coorte futura da C1
+sha256 eligible.csv: f6fb22012cccf5b11744d72f75af5421c34c9682e9f1b78239fdbbe2ef2a2436
+desfechos lidos em 2026-10-01 03:06:15.108959+00 | linhas 7269 | signal_id únicos 7269
+divergência de disponibilidade de R_net (cego × agora): {'ok': 1182}
+
+## momentum: n 874 unidades | 23 dias | 16 mercados | razão>0 676 · ≤0 198
+modelo conjunto (z robusto): b0 -0.2034 | razão -0.0262 | d_low +0.0207 | ATR% +0.0279 | ret4h +0.0018
+PRIMÁRIA β_razao = -0.0262 R/desvio | IC dia [-0.0828, +0.0290] p 0.8171 | IC mercado [-0.0721, +0.0137] p 0.8855 | p do portão 0.8855 | Holm 1.0000 | réplicas inválidas 0.0000%
+nível: razão>0 -0.1941 R (IC dia [-0.2827, -0.1135]) | razão≤0 -0.1950 | todos -0.1943
+patamar 1[razão>c]: c=-0.050: β +0.0648 (n>c 821) · c=-0.025: β -0.0098 (n>c 755) · c=+0.000: β -0.0260 (n>c 676) · c=+0.025: β -0.0180 (n>c 625) · c=+0.050: β -0.0171 (n>c 532) → sequência 1 → sem patamar
+metades por data (n 427/447): β +0.0092 / -0.0459
+secundária 1[razão>0] ajustada: -0.0260 [-0.2363, +0.1795] p 0.6086
+covariáveis (IC dia, descritivo): d_low +0.0207 [-0.0475, +0.0803] · atr_pct +0.0279 [-0.0736, +0.1610] · ret4h +0.0018 [-0.0569, +0.0522]
+diagnósticos: cond 4.93 | fração da razão não explicada pelos controles 0.827 | maior mercado 8.4% · maior dia 9.3% | β sem cada mercado [-0.0361, -0.0172] · sem cada dia [-0.0433, -0.0158]
+RÓTULO momentum: REFUTA  | cláusulas {'dado_ok': True, 'instrumento_ok': True, 'beta>=MRE': False, 'IC_inf>0 (dia)': False, 'IC_inf>0 (mercado)': False, 'Holm<0,05': False, 'nivel_favoravel>0': False, 'patamar': False, 'metade1>0': True, 'metade2>0': False, 'IC_sup<MRE (dia)': True, 'IC_sup<MRE (mercado)': True}
+versões nas unidades: {'v2': 41, 'v3': 869, 'v4': 15, 'v6': 14, 'v8': 14, 'v10': 11}
+
+## volume_anomaly: n 66 unidades | 2 dias | 14 mercados | razão>0 66 · ≤0 0
+RÓTULO volume_anomaly: LIMITE DE DADO  | cláusulas {'dado_ok': False, 'instrumento_ok': False, 'beta>=MRE': False, 'IC_inf>0 (dia)': False, 'IC_inf>0 (mercado)': False, 'Holm<0,05': False, 'nivel_favoravel>0': False, 'patamar': False, 'metade1>0': False, 'metade2>0': False, 'IC_sup<MRE (dia)': False, 'IC_sup<MRE (mercado)': False}
+versões nas unidades: {'v2': 66}
+
+### RÓTULO H-027 (regra global da emenda): NÃO CONFIRMA — por estratégia {'momentum': 'REFUTA', 'volume_anomaly': 'LIMITE DE DADO'}
+
+## Sensibilidades da momentum (não decidem)
+- só momentum v3 (paper): n 869 dias 23 | β_razao -0.0230 IC dia [-0.0818, +0.0319] IC mercado [-0.0728, +0.0198] | nível razão>0 -0.1958 · ≤0 -0.1950
+- r_ex_funding (mesmas linhas): n 874 dias 23 | β_razao -0.0262 IC dia [-0.0829, +0.0260] IC mercado [-0.0738, +0.0142] | nível razão>0 -0.1938 · ≤0 -0.1944
+- pós-R83 (emitidas depois de 28/09 01:58:45Z): n 91 dias 3 (razão>0 91, ≤0 0) — abaixo do piso, sem ajuste
+- pré-R83: n 783 dias 21 | β_razao -0.0302 IC dia [-0.0962, +0.0287] IC mercado [-0.0839, +0.0135] | nível razão>0 -0.1892 · ≤0 -0.1950
+- sem a guarda de chegada dos 20 dias: n 940 dias 25 | β_razao -0.0425 IC dia [-0.0977, +0.0081] IC mercado [-0.0782, -0.0109] | nível razão>0 -0.2103 · ≤0 -0.1950
+
+## spot/1 — sinais mean_reversion v14 (descritivo, sem rótulo; reversão, não continuação)
+unidades 152 | razão>0 136: média R_net +0.0104 | razão≤0 16: média +0.2523 | todos +0.0359

@@ -1,7 +1,7 @@
 ---
 tags: [experimento, meme, pumpfun, curva, paper, pre-registro, m4]
-updated: 2026-09-16
-status: pre-registrado
+updated: 2026-10-01
+status: descartado
 owner: quant-engineer
 exp: EXP-M1
 strategy: "meme/pumpfun — conjunto de regras sobre a curva de bonding (carteira paper, sem ordem real)"
@@ -280,3 +280,9 @@ o valor inteiro), §6 (marca honesta), §10 (o simulador de papel) ·
 `docs/plans/T4-MEME-RADAR.md` §3–§5 · `.claude/state/astra-review-t40-pumpfun.md` (taxa de 1,25 %,
 `Δ` de custo, critério de graduação) · `.claude/state/notes-T4.0.md`, `.claude/state/notes-T4.1.md` ·
 `.claude/state/exp-drafts/t362b/blocos90.py` (IC por blocos de dia).
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+Este experimento foi **executado e o conjunto `meme_paper_v0/1` aposentado em 12/09** (seção "Avaliação 2026-09-12 (T4.16)", aposentadoria por script auditado `meme_rule_set.py --deprecate`). A decisão foi `descartar` o **desenho**: 9 apostas fechadas, 9 negativas, das quais 5 são artefato `rug_no_snapshot` (reclassificadas `indeterminate`); 4 medidas, 0 acertos. O rótulo `result: reprovada` do frontmatter registra esse descarte; a régua de população (1 dia, 4 apostas medidas) não alcança, sozinha, refutação estatística. O estado inicial de pré-registro (e o texto "nenhuma coorte" da seção "Avaliações") não representa o ciclo atual.

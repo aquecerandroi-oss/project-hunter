@@ -1,6 +1,6 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-28
+updated: 2026-10-01
 status: aberto
 owner: sexta-feira
 severity: misto
@@ -12,6 +12,43 @@ closed: ""
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## A leitura de pedigree do minuto leva 6–14 s e é cortada aos 8 s — volta assim que um conjunto `1m` (EXP-M26) ficar ativo (01/10)
+
+**HIGH para o EXP-M26 (bloqueia o funil F e, com ele, o seed). Sem efeito hoje,** porque nenhum conjunto `1m` está
+ativo e a leitura não roda. Medido em 2026-10-01, 03:02–03:10Z, no banco da VPS em modo só leitura, no funil F de
+[[EXP-M26-grafico-em-moedas-maduras]].
+- **A medição.** `lab_repo_fast._PEDIGREE`, com os parâmetros de `pedigree_for` e os mints de um minuto fechado
+  de `meme_features_1m` (375–416 mints), levou **6,24–13,71 s**. **26 de 42** minutos passaram do
+  `statement_timeout` de 8 s; o `EXPLAIN ANALYZE` deu 7,89 s.
+- **Onde está o custo.** `creator_prior_dump_count` e o diagnóstico `creator_prior_dead_count` percorreram 63 559
+  moedas anteriores dos mesmos criadores para 386 mints. As duas contagens de `PEDIGREE_V1` sozinhas levam
+  **28–69 ms**. Em 24/09, com ~320 mints, a leitura toda levava ~3 s (DATABASE §66); o I1 subiu o minuto para
+  ~385 mints.
+- **Cenário.** Com C/L/H ativos, `lab_repo_e2b.lineage_for` lê o pedigree de **todos** os mints do minuto. Quando
+  a leitura é cortada, devolve `{}`, e cada linha vira `pedigree_unknown`. A 1.ª oportunidade de C perde a
+  proposta, e isso é `sem_proposta` por instrumento, que tem teto de 5 % na H-022.
+- **Remédio (dono: backend-specialist; revisão: quant-engineer, code-reviewer, database-architect).** Na via de
+  1 min, quando nenhum conjunto do relógio pede `pedigree_repeat_dumper`, ler só as duas contagens. Os
+  diagnósticos ficam ausentes, nunca zero. A pista de 15 s (a mesa) continua com a leitura completa. Depois,
+  repetir o F. Revisão: [[06-DECISIONS/Revisoes-Astra/EXP-M26-F|EXP-M26-F]].
+
+## `spot/1` desconta aluguel de ATA velho (2 039 280) e infla o PnL de 4 posições em 0,00055 SOL cada (01/10)
+
+**MEDIUM (contabilidade da mesa real; nenhuma ordem errada), medido em 2026-10-01** na pesquisa [[KB-0171-custo-real-da-spot-1]] (banco da VPS só leitura + RPC pública só leitura). `spot_send_rules.ATA_RENT_LAMPORTS = 2_039_280`, mas a rede cobra hoje **1 488 440** lamports por conta de 165 bytes (`getMinimumBalanceForRentExemption(165)` = 1488440; o `createAccount` real das 4 compras que criaram ATA pagou 1 488 440; as 4 ATAs seguem abertas com 1 488 440 cada).
+
+- **Cenário:** `spot_entry_writes.py:85` (e `spot_settle.py:113`) fazem `spent = −Δ − 2 039 280`; o gasto fica 550 840 lamports menor e `pnl_sol`/`r_multiple` maiores pelo mesmo valor nas posições `01a0d8f9` (TAO), `01a0db2c` (NEAR), `01a0eb0d` (LINK), `01a0ed92` (UNI). Placar: Σ `pnl_sol` −0,001735 SOL (Σ R −1,92) contra o real **−0,003938 SOL (Σ R −4,40)**. A regra de refutação da pista (20 operações com expectância ≤ 0 R ou perda ≥ 0,15 SOL) lê esses números otimistas. `ata_rent_lamports` também está gravado como 2 039 280.
+- **Mesma constante, outros lugares:** `hunter_risk_meme/limits.py:191` (`ata_rent_sol=0.00203928`, conservador no sizing) e a docstring de `spot_desk.py:255`.
+- **Remédio (dono: risk-engine-guardian + backend):** ler o depósito do próprio `createAccount` da transação em vez da constante, e reprocessar as 4 posições pelo caminho auditado. Revisão: [[06-DECISIONS/Revisoes-Astra/KB-0171-custo-spot1|KB-0171-custo-spot1]].
+- **Adendo 01/10 ([[KB-0172-perdas-da-spot-1]]): muda decisão, não só placar.** `r_now = (mark − spent) ÷ initial_risk_sol` usa o gasto subestimado: nas 4 posições, o stop registrado em −1 R dispara perto de −1,53…−1,75 R verdadeiros e o alvo de +1,5 R perto de +0,75…+0,97 R. No LINK (`01a0eb0d`) o stop saiu em `r_now` −1,023 registrado = **−1,64 R verdadeiro**, aos 79 min. A razão alt/SOL da Binance tinha cruzado −1 R aos 51 min. A mesma constante também está em `spot_reconcile.py:320`. A Astra avisa para não trocar por outra constante. Detalhe em [[Perdas-spot-1]].
+
+## `spot/1` decide stop/alvo numa cotação só, e a venda não revalida o gatilho (01/10)
+
+**MEDIUM (saída da mesa real), medido em 2026-10-01** em [[KB-0172-perdas-da-spot-1]] (banco da VPS só leitura + velas 1 m da Binance). `spot_exits._mark` faz **uma** cotação do lote e `decide_exit` decide `stop`/`target` sobre ela. `spot_leg` recota para vender, mas não confere se a condição ainda vale. Para `stop`, a tolerância de pânico (300 bp) vale desde a 1.ª tentativa.
+
+- **Cenário real 1 (UNI `01a0ed92`, 29/09 16:01Z):** a marca deu 0,043310 SOL (−13,6 % sobre o gasto, `r_now` −8,55) e no mesmo minuto o alt/SOL da Binance estava **+0,39 %** sobre a entrada. A venda "stop" recotou normal e saiu a 0,049838, 2 h 29 min antes do prazo.
+- **Cenário real 2 (NEAR `01a0db2c`, 26/09 04:30:56Z):** a marca deu +3,6 % (alt/SOL Binance +0,25 %). A venda "target" foi recusada na simulação (`Custom 6001`), sem dano neste caso.
+- **Remédio (dono: risk-engine-guardian + backend; correção, não hipótese):** reavaliar `stop`/`target` sobre a cotação que vai ser executada e gravar as duas no `intent`. Confirmar com várias observações ou paridade com a Binance já é hipótese (risco: travar uma saída numa desancoragem verdadeira). Revisão: [[06-DECISIONS/Revisoes-Astra/KB-0172-perdas-spot-1|KB-0172-perdas-spot-1]].
+
 ## Token de phishing congelado na carteira travaria todas as entradas quando a checagem de moedas estranhas for ao ar (28/09)
 
 **HIGH (bloqueia o deploy da checagem `wallet_unrecognized_holdings`), medido às 06:17Z de 2026-09-28** pelo guardião de risco (RPC público, só leitura, nenhuma transação). A carteira do robô tem 81 contas de token; uma só com saldo: mint `DgY9Z8xPG1346Ydrq98ASAZcVdyrurT4tCQ7TDapHcJg`, 100 000 tokens, nome "FOMPOSIT.TOP CLAIM YOUR REWARD 1000 USDC" (phishing), recebido em 2026-09-23 20:54Z, conta **congelada** pelo emissor (autoridades de terceiro). Conferido no banco da VPS (`BEGIN READ ONLY`): 0 linhas em `meme_live_positions` e `spot_positions` para esse mint; 0 posições `spot` abertas (o NEAR foi vendido às 04:00Z).
@@ -20,6 +57,7 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 - **Decisão pendente do Everton:** exceção durável e auditada por mint (recomendação do guardião e da Astra) ou outra política. Revisão: [[Wallet-unrecognized-holdings]]; origem do defeito original: [[KB-0165-staking-do-sol-parado]].
 - **30/09/2026 17:18Z — resolvido sozinho:** depois do deploy `a72296a0` (checagem ligada), o heartbeat do executor mostra `wallet_holdings_state=valid`, `wallet_unrecognized_count=0`; a RPC pública (`getTokenAccountsByOwner` por mint, só leitura) responde `value: []` — a conta do token-golpe **foi fechada por terceiro** (a autoridade de fechamento era dele). A exceção auditada não foi cadastrada nem é mais necessária; a ferramenta existe para o próximo caso. Ver [[2026-09-28-excecao-auditada-token-golpe]].
 - **Achado lateral:** 80 contas de token vazias prendem **0,1210 SOL** de aluguel; fechá-las devolve o SOL e exige assinatura (decisão do Everton).
+- **Encerramento (curadoria de 2026-10-01):** este incidente **não integra a fila aberta**; o título e a severidade acima ("bloqueia o deploy", "decisão pendente") descrevem 28/09. Everton decidiu pela exceção auditada em 28/09 ([[2026-09-28-excecao-auditada-token-golpe]]); em 30/09 a conta já tinha sido fechada por terceiro, o que dispensou o cadastro; a checagem está implantada (`a72296a0`) e válida na leitura registrada ([[Diario/2026-09-30]]). Diagnóstico e decisão originais ficam preservados acima. O achado lateral segue como decisão do Everton ([[Fechar-contas-vazias]]). Registro em [[Resolved Bugs]].
 
 ## O fechamento noturno morre há 8 noites — um conjunto sem `wallet_max_sol` derruba o registro de pesquisa inteiro (plantão 27/09, 02:3x BRT)
 
@@ -145,6 +183,8 @@ hora: 23 às 22 h → 11 às 23 h; `meme_proposals.proposed_at`).
   ler um Lab parado desde 23:24Z; as avaliações datadas de 18/09 saem com esse buraco declarado.
 - Ligações: [[Diario/2026-09-18]], [[03-TRADING/Meme/README]], `docs/plans/T4-MEME-RADAR.md`.
 
+- **Encerramento do incidente específico (curadoria de 2026-10-01):** o reinício por `trailing_arm_x = 1.0` foi resolvido pela T4.65 (`c569ae7f`): a leitura normaliza `trailing_arm_x ≤ 1 → None` (`services/meme-worker/hunter_meme_worker/lab_params.py:61`, `arm_multiple_or_none`) e [[KB-0140-set-param-valida-antes-de-gravar]] registra o incidente como terminado após ~3,5 h. Os dois comandos da "Correção de dado" acima são **histórico de recuperação, não ação pendente** — não reverifiquei o deploy na VPS nesta curadoria, a prova é o KB-0140 e o código. **Continua aberta, separada:** a T4.65b (isolar a falha de uma aposta para não derrubar o `TaskGroup`); esta evidência não a encerra. Registro em [[Resolved Bugs]].
+
 ## Disco da VPS em 88 % — o banco cresce ~6 GB/dia e ninguém poda a outbox (plantão 18/09, 19:5x BRT)
 
 **HIGH (operação), medido às 22:46Z de 2026-09-18 na VPS.** `df -h /` = **306 G de 348 G (88 %)**;
@@ -194,6 +234,8 @@ Tabelas que puxam o banco (`pg_total_relation_size`, 22:5xZ):
   as partições de 2026_10 e 2026_11 já existem (25 cada), criadas pelas migrações.
 - Ligações: [[Diario/2026-09-18]], [[System Overview]], `docs/DATABASE.md` §1.3, `infra/vps/README.md`
   "Poda da outbox".
+
+- **Atualização — emergência de disco (curadoria de 2026-10-01):** o alerta de **88 %** é histórico (18/09). Linha do tempo registrada: 27/09 `docker builder prune` (−34 G) e `docker image prune -a --filter until=48h` (−21 G) → 86 % ([[Diario/2026-09-27]]); a política de retenção foi **autorizada pelo Everton em 27/09** ([[2026-09-27-retencao-de-dados-e-backup]]); em 28/09 foram executados o `TRUNCATE opportunity_history_2026_09` (65 GB → 16 kB; disco 72 % → 53 %) e a poda manual da outbox a 2 d (35.725.398 linhas apagadas); a leitura registrada em 30/09 foi **41 %** (207 G livres, [[Diario/2026-09-30]]). Portanto os itens 1, 3 e 4 de "Não feito" acima já não são "decisão não tomada". **Sem comprovação de conclusão nesta auditoria (seguem abertos):** a instalação dos crons `hunter-partitions`/`hunter-outbox` (o [[Diario/2026-09-28]] e a decisão os listam como pendentes do Everton; nada posterior encontrado), o `VACUUM FULL outbox_events` (~29 GB, exige parar o executor) e o item 2 (poda permanente de imagens no `compose.sh update`, T4.63b). **Não repetir os comandos já executados.** Registro parcial em [[Resolved Bugs]].
 
 ## Código corrigido na T3.87 (2026-09-11) — o portão do replay ficou cego quando o worker vivo foi shardado, pendente de deploy
 

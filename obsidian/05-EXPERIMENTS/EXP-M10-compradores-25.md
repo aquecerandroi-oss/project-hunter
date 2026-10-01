@@ -1,12 +1,12 @@
 ---
 tags: [experimento, meme, pumpfun, paper, pre-registro, compradores, porta, m5]
-updated: 2026-09-16
-status: pre-registrado
+updated: 2026-10-01
+status: "pre-registrado; coleta iniciada (retificado em 2026-10-01)"
 owner: astra-quant
 exp: EXP-M10
 strategy: "meme/pumpfun — porta calibrada com o piso de compradores únicos em 25 aplicado na escolha da barra (reentrada), clone exato do conjunto vivo em todo o resto"
 version: "gate fluxo_e_holders v2 (min_unique_buyers 25, reentrada) + exit alvo_3x_trailing_35_apos_1_5x_tempo_30m v1 (flow_v2/7; porta no relógio de 15 s, entrada na barra de 1 min)"
-result: nao-iniciado
+result: inconclusivo
 evaluable: 0
 days: 0
 last_eval: ""
@@ -170,3 +170,9 @@ _(append-only; o fechamento diário acrescenta uma seção datada por dia com ap
 `infra/scripts/sql/research/2026-09-16-r28-q01-compradores-por-moeda-e-r.sql` ·
 `...-r28-q02-*.sql` (reentrada) · `...-r28-q03-*.sql` (redundância com holders) ·
 `packages/indicators/hunter_indicators/meme/rules.py` · `docs/RISK_ENGINE_MEME.md`.
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status`, `result` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+Retificação: o braço `flow_v2/7` foi semeado (migração `0049`, T4.48) e **tem observações registradas** — o [[Experiments Index]] (acréscimo de 17–18/09) registra o braço vivo ao lado do pai, R54 −0,053 SOL em 7 apostas e R56 +0,0237 SOL em 8 apostas, "ainda inconclusivo pela régua". `nao-iniciado` é resumo obsoleto. Esta página ainda não tem avaliação datada própria (a seção "Avaliação" está vazia); não há aqui novo julgamento nem nova contagem. A leitura única segue como pré-registrada (≥ 150 propostas **E** 10 dias corridos). `evaluable`, `days` e `last_eval` do frontmatter não foram recalculados.

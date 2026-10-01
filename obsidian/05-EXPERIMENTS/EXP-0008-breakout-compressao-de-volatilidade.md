@@ -1,7 +1,7 @@
 ---
 tags: [experimento, breakout, volatilidade, shadow-lab]
-updated: 2026-09-08
-status: em-andamento
+updated: 2026-10-01
+status: avaliado
 owner: sexta-feira
 exp: EXP-0008
 strategy: breakout
@@ -508,3 +508,9 @@ zero decisão nova. O roster do `strategy-worker` as descartou na recarga seguin
 `.claude/state/notes-T3.33.md` · `.claude/state/brief-T3.33a-breakout_v1.md` ·
 `infra/scripts/activate_strategy_version.py` ·
 `services/strategy-worker/hunter_strategy_worker/replay/run.py`
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+`status: em-andamento` descrevia a abertura de 08/09. **Estado consolidado:** as duas coortes foram aposentadas por via auditada em 2026-09-08 — `breakout v1` às 19:35:34Z e `breakout v2` às 19:35:36Z (seção "Avaliação de 2026-09-08 (3) — as duas aposentadorias auditadas"). Resultado segue `inconclusivo` por insuficiência de população (`v1`: 0 decisões em 11 904 barras, 14/14 recusadas pela guarda de geometria; `v2`: 8 decisões, líquida −0,0810 R). O encerramento das **duas parametrizações** não refuta a hipótese de compressão de volatilidade; a pista de `squeeze_max` menor está em [[Strategy Backlog]]. Não esperar observações novas dessas versões.

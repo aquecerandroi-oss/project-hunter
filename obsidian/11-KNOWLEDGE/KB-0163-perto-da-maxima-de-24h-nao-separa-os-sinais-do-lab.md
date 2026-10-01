@@ -112,6 +112,8 @@ errata escrita antes. Pediu a redação sobre o +0,05 fora do IC só por mercado
 
 ## Relacionados
 
+[[KB-0170-tendencia-diaria-nao-separa-os-sinais-do-lab]] (H-027 usou `distance_from_24h_low` só como **controle** do modelo conjunto, sobre unidades que quase todas já estavam aqui — não é replicação da pista) ·
+
 [[KB-0004-proximidade-da-maxima-e-confirmacao-por-volume]] · [[KB-0145-binance-como-sinal-solana-como-execucao]] ·
 [[Strategy Backlog]] (item 8) · [[Dicionario de Variaveis]] · [[Mapa de Estrategias]] · [[Fila de Hipoteses]] ·
 [[R83-maxima-24h]]

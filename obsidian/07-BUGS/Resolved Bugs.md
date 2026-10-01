@@ -1,6 +1,6 @@
 ---
 tags: [bugs, resolvidos]
-updated: 2026-09-08
+updated: 2026-10-01
 status: registro
 owner: sexta-feira
 severity: misto
@@ -11,6 +11,14 @@ closed: 2026-09-08
 # Resolved Bugs
 
 Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
+
+## Encerramentos reconciliados na curadoria de 2026-10-01
+
+Itens que [[Open Bugs]] ainda descrevia como abertos. Nenhuma medição nova: é reconciliação de registro com a prova já escrita ([[Curadoria-2026-10-01]]); o detalhe fica em Open Bugs e nas notas citadas.
+
+- **Token de phishing congelado na carteira (HIGH, aberto em 28/09) — encerrado em 30/09.** A conta foi fechada por terceiro (RPC: `value: []`), `wallet_unrecognized_count=0`; a exceção auditada não precisou ser cadastrada. Decisão: [[2026-09-28-excecao-auditada-token-golpe]]; leitura: [[Diario/2026-09-30]].
+- **`meme-worker` em laço de reinício por `trailing_arm_x = 1.0` (HIGH, 18/09) — incidente encerrado pela T4.65 (`c569ae7f`).** Prova: [[KB-0140-set-param-valida-antes-de-gravar]] e `lab_params.py:61`. A T4.65b (isolamento de falha por aposta) **não** fecha com isto e segue em Open Bugs.
+- **Disco da VPS em 88 % (18/09) — encerramento parcial.** Executados: poda de imagens (27/09), `TRUNCATE opportunity_history_2026_09` e poda da outbox a 2 d (28/09); 41 % em 30/09. Pendentes (crons, `VACUUM FULL`, T4.63b) seguem em Open Bugs. Decisão: [[2026-09-27-retencao-de-dados-e-backup]].
 
 ## Fechados no plantão da noite de 2026-09-08 (T3.32b)
 

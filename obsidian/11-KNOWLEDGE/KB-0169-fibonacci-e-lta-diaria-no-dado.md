@@ -146,3 +146,5 @@ pista descritiva, não um quarto veredito, e não autoriza trocar H depois de ve
 [[EXP-0016-trendline-breakout]] · [[KB-0077-linhas-de-tendencia]] · [[KB-0166-evitar-as-moedas-em-queda-nao-bate-a-cesta]] ·
 [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] · [[KB-0149-o-que-a-mesa-real-ensinou]] ·
 [[KB-0145-binance-como-sinal-solana-como-execucao]]
+
+**Atualização (01/10/2026):** a taxa fixa real por perna da `spot/1` foi medida — média 0,00005 SOL (0,10 % da ficha de 0,05 SOL), não 0,001 SOL (2 %); o custo total medido é ~0,25 %/perna (0,49 % ida-e-volta, IC [0,32; 0,67]), acima dos 0,15 %/perna usados aqui. Com isso o pré-requisito (3) da parte D está cumprido. Como D = evento líquido − controles líquidos do mesmo dia (os dois pagam o mesmo custo), o custo maior **não muda D** (+1,09 p.p.) nem o rótulo NÃO CONFIRMA; muda o **nível** do B, de +4,37 % para ~+4,18 % (−0,19 p.p. de custo extra por ida-e-volta na ficha de 0,05 SOL). Ver [[KB-0171-custo-real-da-spot-1]].

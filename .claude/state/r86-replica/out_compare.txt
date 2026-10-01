@@ -1,0 +1,6 @@
+elegíveis: meus 1182 deles 1182 só meus 0 só deles 0
+  por estratégia meus Counter({'momentum': 964, 'mean_reversion': 152, 'volume_anomaly': 66}) deles Counter({'momentum': 964, 'mean_reversion_v14': 152, 'volume_anomaly': 66})
+diário: (mercado, dia) em comum 7308; n_final ≠ 0; fechamento 23:59 ≠ 0; max_recv ≠ 0; meus sem par 0
+feat.csv deles: 8527 sinais; meus win: 7151 ; em comum 7151
+janela 24 h, divergências por campo: {'n': 0, 'lo': 0, 'max_recv': 0, 'c_m1': 0, 'c_m241': 0, 'atr': 0}
+guarda 24 h (não exclusiva): {'volume_anomaly': 60, 'momentum': 19} total 79

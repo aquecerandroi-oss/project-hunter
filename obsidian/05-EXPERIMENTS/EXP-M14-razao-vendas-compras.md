@@ -1,12 +1,12 @@
 ---
 tags: [experimento, meme, pumpfun, paper, pre-registro, vendas-compras, porta, m5]
-updated: 2026-09-17
-status: pre-registrado
+updated: 2026-10-01
+status: "pre-registrado; coleta iniciada (retificado em 2026-10-01)"
 owner: astra-quant
 exp: EXP-M14
 strategy: "meme/pumpfun - porta calibrada com teto de sells/buys em 1.0 aplicado na escolha da barra, clone exato do conjunto vivo em todo o resto"
 version: "gate fluxo_e_holders v2 (max_sell_buy_ratio 1.0, reentrada) + exit alvo_3x_trailing_35_apos_1_5x_tempo_30m v1 (flow_v2/x; porta no relogio de 15 s, entrada na barra de 1 min)"
-result: nao-iniciado
+result: inconclusivo
 evaluable: 0
 days: 0
 last_eval: ""
@@ -141,3 +141,9 @@ docs/DATABASE.md § meme_features_1m (definicao buy_sell_ratio)
 packages/indicators/hunter_indicators/meme/rules.py
 docs/RISK_ENGINE_MEME.md
 
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status`, `result` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+Retificação: o braço `flow_v2/8` foi semeado (migração `0050`, T4.49) e **tem observações registradas** — o [[Experiments Index]] (acréscimo de 17–18/09) registra o primeiro dia com apostas fechadas (18/09: +0,063 SOL em 10 apostas), "muito abaixo da régua". `nao-iniciado` é resumo obsoleto. Esta página ainda não tem avaliação datada própria (a seção "Avaliação" está vazia); não há aqui novo julgamento nem nova contagem. A leitura única segue como pré-registrada (≥ 150 propostas **E** 10 dias corridos). `evaluable`, `days` e `last_eval` do frontmatter não foram recalculados.

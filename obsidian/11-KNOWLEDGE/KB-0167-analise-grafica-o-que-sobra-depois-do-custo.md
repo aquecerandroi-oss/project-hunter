@@ -215,6 +215,8 @@ não só trocar o nome ou o comprimento da janela (regras 1 e 2 da Fila). Estuda
 
 ### C1 — Tendência diária como estado dos sinais de continuação do Lab (cripto)
 
+> **Rodada em 01/10/2026 como H-027 (R86), análise retrospectiva:** `NÃO CONFIRMA`; na `momentum` (16 mercados, 874 unidades) β −0,026 R por desvio, IC [−0,083; +0,029] — o tamanho previsto fica fora; a coorte futura pedida abaixo não foi feita. Ver [[KB-0170-tendencia-diaria-nao-separa-os-sinais-do-lab]]. Vale só para esse recorte, não para a tendência diária como família.
+
 - **Variável:** `razao_mm20d = C_d / média(C_{d−19}, …, C_d) − 1`, com `C_d` o fechamento da **última vela diária
   UTC completa antes da decisão** (dia de calendário, 00:00–24:00 UTC), dobrada de velas de 1 min `is_final` com
   os **1.440 minutos presentes** em cada um dos 20 dias — dia com minuto faltando torna a medida **indisponível**,
@@ -341,3 +343,5 @@ orquestrador — não criei variável nem mexi em experimento numa leitura. **Di
 [[KB-0080-candlestick-evidencia]] · [[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]] ·
 [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]] · [[KB-0164-momentum-semanal-em-cripto-grande]] ·
 [[EXP-M26-grafico-em-moedas-maduras]] · [[EXP-0017-sweep-reclaim]]
+
+**Base de evidência da C1/H-027 (01/10/2026):** [[KB-0173-tendencia-diaria-em-cripto-o-tamanho-publicado]] · [[KB-0174-o-filtro-de-tendencia-corta-queda-nao-acrescenta-alta]] · [[KB-0175-estado-de-mercado-condiciona-momentum-mas-em-que-direcao]] · [[KB-0176-momento-intradiario-condicionado-o-vizinho-mais-perto]] · [[KB-0177-decaimento-e-regime-o-que-a-literatura-de-cripto-mostra]] · [[KB-0178-data-snooping-e-poucos-clusters-o-que-vale-para-a-h-027]] · síntese em [[KB-0179-o-que-um-resultado-da-c1-pode-e-nao-pode-dizer]]

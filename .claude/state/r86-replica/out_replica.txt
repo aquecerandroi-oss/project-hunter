@@ -1,0 +1,63 @@
+sinais terminais long perp prospectivos: 7151 Counter({'momentum': 3626, 'volume_anomaly': 3323, 'mean_reversion': 202})
+
+## cascata (nível de sinal) momentum: {'1_sem_R_net:funding_ambiguous_exit': 5, '1_sem_R_net:funding_missing': 41, '2_razao:dia_ausente': 2538, '2_razao:guarda_chegada': 78, 'ok': 964}
+
+## cascata (nível de sinal) volume_anomaly: {'1_sem_R_net:funding_ambiguous_exit': 2, '1_sem_R_net:funding_missing': 26, '2_razao:dia_ausente': 3102, '2_razao:guarda_chegada': 127, 'ok': 66}
+
+## cascata (nível de sinal) mean_reversion: {'2_razao:dia_ausente': 50, 'ok': 152}
+
+### momentum: unidades 874
+dias UTC 23 · razão>0 676 (média R -0.1941) · ≤0 198 (média R -0.1950) · limite de dado: False
+β [1, z_razao, z_dlow, z_atr, z_r4] = -0.2034, -0.0262, +0.0207, +0.0279, +0.0018
+β_razao -0.0262 IC95 dia [-0.0828; +0.0290] p_unilateral 0.8171
+  IC95 por mercado [-0.0721; +0.0137]
+secundária β 1[razão>0] -0.0260 IC95 [-0.2363; +0.1795]
+patamar: c=-0.050 β=+0.0648 n>821 · c=-0.025 β=-0.0098 n>755 · c=+0.000 β=-0.0260 n>676 · c=+0.025 β=-0.0180 n>625 · c=+0.050 β=-0.0171 n>532 → ok=False
+metades: +0.0092 / -0.0459
+p Holm 1.0000 → VEREDITO momentum: REFUTA
+
+### volume_anomaly: unidades 66
+dias UTC 2 · razão>0 66 (média R -0.3823) · ≤0 0 (média R +nan) · limite de dado: True
+p Holm 1.0000 → VEREDITO volume_anomaly: LIMITE DE DADO
+
+### mean_reversion v14 (descritivo): unidades 152
+dias UTC 21 · razão>0 136 (média R +0.0104) · ≤0 16 (média R +0.2523) · limite de dado: True
+β [1, z_razao, z_dlow, z_atr, z_r4] = +0.0359, -0.1263, +0.1195, +0.0495, +0.1125
+β_razao -0.1263 IC95 dia [-0.3146; +0.0679] p_unilateral 0.9094
+secundária β 1[razão>0] -0.2649 IC95 [-1.0183; +0.2723]
+patamar: c=-0.050 β=-0.3153 n>146 · c=-0.025 β=-0.4086 n>140 · c=+0.000 β=-0.2649 n>136 · c=+0.025 β=-0.1904 n>131 · c=+0.050 β=-0.0648 n>123 → ok=False
+metades: -0.0613 / -0.1383
+
+## distribuição de razao_mm20d por estratégia (unidades completas)
+momentum 874 -0.0848 -0.0551 +0.0129 +0.0782 +0.1708 +0.3846 +0.6276 média +0.1106
+volume_anomaly 66 +0.0003 +0.0011 +0.0415 +0.1016 +0.2618 +0.4033 +0.4095 média +0.1527
+mean_reversion 152 -0.0729 -0.0362 +0.0732 +0.1668 +0.2887 +0.5016 +0.5936 média +0.1884
+
+## disponibilidade sem olhar R_net (unidades com as 4 variáveis): {('momentum', True): 682, ('volume_anomaly', True): 67, ('mean_reversion', True): 136, ('momentum', False): 202, ('mean_reversion', False): 16}
+sinais com as 4 variáveis (sem exigir R): Counter({'momentum': 974, 'mean_reversion': 152, 'volume_anomaly': 67})
+mercados momentum com unidade completa: 16
+
+## descritivos
+### momentum SEM guardas: unidades 944
+dias UTC 25 · razão>0 746 (média R -0.2125) · ≤0 198 (média R -0.1950) · limite de dado: False
+β [1, z_razao, z_dlow, z_atr, z_r4] = -0.2066, -0.0442, -0.0021, +0.0711, +0.0036
+β_razao -0.0442 IC95 dia [-0.0978; +0.0084] p_unilateral 0.9490
+secundária β 1[razão>0] -0.0507 IC95 [-0.2593; +0.1520]
+patamar: c=-0.050 β=+0.0510 n>891 · c=-0.025 β=-0.0274 n>825 · c=+0.000 β=-0.0507 n>746 · c=+0.025 β=-0.0404 n>693 · c=+0.050 β=-0.0266 n>591 → ok=False
+metades: -0.0350 / -0.0546
+### momentum r_ex_funding: unidades 884
+dias UTC 23 · razão>0 682 (média R -0.1919) · ≤0 202 (média R -0.1907) · limite de dado: False
+β [1, z_razao, z_dlow, z_atr, z_r4] = -0.2002, -0.0291, +0.0194, +0.0276, +0.0038
+β_razao -0.0291 IC95 dia [-0.0885; +0.0289] p_unilateral 0.8306
+secundária β 1[razão>0] -0.0272 IC95 [-0.2476; +0.1828]
+patamar: c=-0.050 β=+0.0410 n>829 · c=-0.025 β=-0.0186 n>762 · c=+0.000 β=-0.0272 n>682 · c=+0.025 β=-0.0184 n>631 · c=+0.050 β=-0.0185 n>537 → ok=False
+metades: +0.0097 / -0.0539
+### momentum só v3: unidades 869
+dias UTC 23 · razão>0 671 (média R -0.1958) · ≤0 198 (média R -0.1950) · limite de dado: False
+β [1, z_razao, z_dlow, z_atr, z_r4] = -0.2062, -0.0230, +0.0222, +0.0236, +0.0026
+β_razao -0.0230 IC95 dia [-0.0808; +0.0330] p_unilateral 0.7891
+secundária β 1[razão>0] -0.0284 IC95 [-0.2400; +0.1760]
+patamar: c=-0.050 β=+0.0627 n>816 · c=-0.025 β=-0.0121 n>750 · c=+0.000 β=-0.0284 n>671 · c=+0.025 β=-0.0172 n>621 · c=+0.050 β=-0.0143 n>528 → ok=False
+metades: +0.0190 / -0.0465
+### momentum pós-R83: unidades 91
+dias UTC 3 · razão>0 91 (média R -0.2260) · ≤0 0 (média R +nan) · limite de dado: True

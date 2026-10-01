@@ -1,7 +1,7 @@
 ---
 tags: [experimento, meme, pumpfun, curva, paper, pesquisa, linhas, moedas-maduras, h-022, m26]
-updated: 2026-09-26
-status: desenho congelado (decisão conjunta com a Astra, 5 rodadas); construção em andamento — I1/L1/R1; nenhum braço semeado, nenhuma proposta
+updated: 2026-10-01
+status: "desenho congelado (decisão conjunta com a Astra, 5 rodadas); I1/I2/L1/R1/C1 no ar desde 27/09; F não aprovado por instrumento em 01/10 (leitura de pedigree do minuto > 8 s); nenhum braço semeado, nenhuma proposta"
 owner: quant-engineer
 exp: EXP-M26
 strategy: "meme/pumpfun — gráfico em moedas maduras (15–120 min, ainda na curva): grafico_ctrl_v1/1 (C, sem linha), grafico_v1/1 (L, linha + saída atual), grafico_v1/2 (H, linha + pacote de saída do EXP-M2) — os três research_only, carteira paper do Lab meme"
@@ -9,7 +9,7 @@ version: "porta comum grafico_maduro v1 (min_age_s/max_age_s 900/7200, progresso
 result: nao-iniciado
 evaluable: 0
 days: 0
-last_eval: ""
+last_eval: "2026-10-01"
 tipo: pesquisa
 hipotese: H-022
 variavel: "linha_ok na 1.ª oportunidade por mint do controle grafico_ctrl_v1/1 — três classes congeladas (true/false/desconhecida), lida dos insumos gravados em meme_mature_opportunities (R1) no tique da 1.ª avaliação"
@@ -17,7 +17,7 @@ populacao: "oportunidades prospectivas com evaluated_at entre T0 e o corte — m
 efeito: —
 ic: —
 veredito: em_curso
-proximo_passo: "I1+I2+L1+R1 (com testes de integração) -> C1 -> 24 h -> F -> J congelado -> S -> P (48 h) -> T0 -> corte (>= 7 d, <= 21 d) -> leitura (corte + 2 h)"
+proximo_passo: "consertar a leitura de pedigree da via de 1 min (só as duas contagens quando nenhum conjunto 1m pede repeat_dumper) -> F de novo -> J congelado -> S -> P (48 h) -> T0 -> corte (>= 7 d, <= 21 d) -> leitura (corte + 2 h)"
 classe_de_perda: comprou_no_topo
 mercado: meme
 ---
@@ -125,9 +125,9 @@ No repositório, hoje:
 | L1 | causalidade da saída `line_broken` (`line_support_causal`, `line_support_max_age_s`, `support_stale`) | backend-specialist | quant-engineer, risk-engine-guardian | **feito** (`191647ec`, 27/09 — padrão global, não só EXP-M26) |
 | R1 | registro durável `meme_mature_opportunities` (1.ª avaliação, insumos do tique, recusas, `proposal_id`) | backend-specialist | database-architect, quant-engineer | **feito** (`ee5ffaa6`, 27/09 — migração `0066`) |
 | C1 | `MEME_TRACK_MATURE_TOP_K=60` no compose de produção | devops-engineer | — | **feito** (`f5e75ef9`, 27/09) |
-| F | funil de viabilidade de 24 h (sem desfecho), depois de I1/I2/L1/R1/C1 | quant-engineer | Astra | **pendente** |
+| F | funil de viabilidade de 24 h (sem desfecho), depois de I1/I2/L1/R1/C1 | quant-engineer | Astra | **não aprovado — instrumento (01/10)**: mercado passa os pisos, a leitura de pedigree do minuto passa do corte de 8 s; consertar e repetir (avaliação de 2026-10-01) |
 | J | spec do moinho, congelado com impressão digital antes do seed | quant-engineer | Astra | **pendente** |
-| S | migração de semente dos três conjuntos `research_only` (`grafico_ctrl_v1/1`, `grafico_v1/1`, `grafico_v1/2`) | backend-specialist | database-architect | **pronto, retido** (migração `0067` escrita e testada; só entra depois de F e J, pela decisão conjunta) |
+| S | migração de semente dos três conjuntos `research_only` (`grafico_ctrl_v1/1`, `grafico_v1/1`, `grafico_v1/2`) | backend-specialist | database-architect | **pronto, retido** (escrita como `0067`, renumerada para `0068` e depois `0069_meme_mature_chart_arms`, ainda fora do commit; só entra depois de F e J, pela decisão conjunta) |
 | P | piloto técnico de 48 h (só contagens e motivos, fora da inferência) | quant-engineer | — | **pendente** |
 
 Ordem congelada: I1 + I2 + L1 + R1 (com testes de integração) → C1 → 24 h → F → J congelado → S → P (48 h) →
@@ -172,3 +172,129 @@ consultas cegas em `.claude/state/m26/`) · `.claude/state/dialogue-EXP-M26.md` 
 {tracker,tracker_mature,tracker_types,tracker_pins,lines_exit,lab_repo_lines,lab_params,lab_models,lab_bets}.py`
 
 ## Avaliações (acrescentadas, nunca reescritas)
+
+### Avaliação 2026-10-01 (F, 02:48–03:16Z) — o mercado passa os pisos, o instrumento não: F NÃO PASSA; J e S parados
+
+> **Resultado:** a etapa F do funil **falhou por instrumento**. A população madura existe e enche os pisos com
+> folga, menos o `true`, que passa com pouca folga. Mas a leitura de pedigree do minuto, que volta a rodar
+> quando C/L/H ficarem ativos, levou **6,2–13,7 s** para os ~385 mints de cada minuto. O laço corta essa leitura
+> aos **8 s**, e **26 dos 42 minutos** cronometrados passaram do corte. Cada leitura cortada vira
+> `pedigree_unknown` em todas as linhas do minuto, isto é, `sem_proposta` **por instrumento**, que tem teto de
+> 5 %. Pelo desenho (§4, "Se falhar: por instrumento… conserta-se e repete-se o F"), **nenhum limiar foi
+> mexido**. O J não foi congelado e a semente `0069` ficou **intocada**. Nenhum desfecho foi lido: nenhuma
+> aposta, PnL ou saída.
+
+**O que foi lido antes:**
+- esta página: Protocolo, Braços e "Estado da construção";
+- o desenho, `docs/design/exp-m26-grafico-moedas-maduras.md`: §2.2 ("a primeira oportunidade, definição única
+  para F, J e a leitura") e §4 ("Funil F", pisos e o "se falhar");
+- [[Fila de Hipoteses]] H-022;
+- [[KB-0149-o-que-a-mesa-real-ensinou]], §5: antecipação mente com convicção, e não se escolhe limiar olhando;
+- [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]]: a C2 só vem depois do veredito da H-022;
+- [[KB-0169-fibonacci-e-lta-diaria-no-dado]]: contexto do diário, não muda nada aqui;
+- `docs/RESEARCH.md`;
+- [[06-DECISIONS/Revisoes-Astra/Token-state-history|Token-state-history]] (a 0067 e a pergunta do J em aberto);
+- a seção §69 do `docs/DATABASE.md`, que já avisava: "Custo que volta com um conjunto `1m` ativo… medir
+  `meme_pedigree_read_failed` no piloto P". O F mediu antes.
+
+**Como foi medido.** O banco da VPS foi lido só em modo leitura (`BEGIN READ ONLY`,
+`default_transaction_read_only=on`). R1 está vazia, porque nada foi semeado. Por isso a porta pura de
+`grafico_ctrl_v1/1` foi avaliada **fora do Lab, com o código de R1** (desenho §4):
+- **Porta:** `evaluate_entry(entry_features_of(row, spec), spec.gate)`, com o `spec` montado dos parâmetros
+  congelados da semente (`infra/migrations/ddl/meme_mature_chart_arms.py`).
+- **1.ª passagem por mint:** ordenada por `end_time` **antes** de olhar a linha, desde 27/09 06:00Z (K = 60 no
+  ar).
+- **Janela F:** [28/09 06:30Z; 01/10 00:00Z), 65,5 h. Ela começa 2 h depois da `0067` (28/09 04:24:42Z): todo
+  mint com idade ≤ 7 200 s dentro da janela nasceu com o histórico instalado.
+- **`completed_at`/`migrated_at`:** os conhecidos no `computed_at` da linha, lidos do histórico da `0067`.
+- **Cobertura:** `coverage_of` (o mesmo de R1), sobre as fotos de (T − 16 min, T] recebidas até T.
+- **Classe:** `classe_linha` do J.
+- **Pedigree:** as duas contagens de `PEDIGREE_V1`. E = `creator_serial`/`symbol_clone`; I = o resto.
+
+Arquivos em `.claude/state/m26/f/`: `f1_superset.sql`, `f2_modelo.sql`, `f_funil.py`, `f_saida.txt`,
+`f3_pedigree_render.py`, `f3_pedigree{,_b}.out`, `f3_explain.out`, `f3_duas_contagens.out` e
+`f4_sensibilidade.out`.
+
+**Números do mercado (provisórios; ver as ressalvas da Astra abaixo):**
+
+| dia (UTC) | oportunidades | E | não-E | `true` | `false` | `desconhecida` (U) | I (offline) |
+|---|---|---|---|---|---|---|---|
+| 28/09 (desde 06:30Z, 17,5 h) | 372 | 141 | 231 | 10 | 210 | 11 | 0 |
+| 29/09 | 391 | 152 | 239 | 13 | 216 | 10 | 0 |
+| 30/09 | 377 | 163 | 214 | 10 | 194 | 10 | 0 |
+| **janela (65,5 h)** | **1 140** | **456** | **684** | **33** | **620** | **31** | **0** |
+
+- **Pisos do F contra a medição:**
+  - C ≥ 50 oportunidades/dia: **417,7/dia** (não-E 250,6/dia). Passa.
+  - `true` ≥ 8/dia: **12,1/dia** (dias inteiros: 13 e 10). Passa, com pouca folga.
+  - `false` ≥ 24/dia: **227,2/dia**. Passa.
+  - `desconhecida` + instrumento ≤ 15 % das não-E: **4,5 % offline** (31/684, todas `cobertura:gap`). Passa
+    **só sem o corte de 8 s**; ver abaixo.
+- **Classes:**
+  - `false` traçada 489, `flat` 115, `out_of_range` 16;
+  - `true` 33;
+  - cobertura das não-E: `covered` 371, `covered_from_birth` 282, `gap` 31.
+- **Idade na 1.ª oportunidade:** p10/p50/p90 = 915 / 994 / 2 333 s.
+- **Estratos:** 11 de 11 blocos de 6 h têm os dois grupos. O `true` vai de 1 a 6 por bloco.
+- **E = 40 % (456/1 140).** Por nome: `symbol_clone` 380 e `creator_serial` 164. Pela conta da Astra, isso dá 88
+  com as duas, 292 só `clone` e 76 só `serial`. É uma exclusão por regra conhecida, que **não dilui** os tetos.
+- **Instrumento:**
+  - atraso do fold (`computed_at − end_time`) nas 1.ªs oportunidades: p50 3,1 s, p99 5,5 s, máximo 6,0 s; nenhuma
+    acima de 60 s;
+  - via do estado do token: `history` 202, `sem_mudanca` 938;
+  - recusas da porta antes da 1.ª passagem: `curve_complete` 648 e `already_migrated` 623 (moedas graduadas que
+    continuam com série);
+  - I1: 46–76 maduras/min por bloco desde 27/09 06:00Z. As linhas de `meme_features_1m` por minuto foram de
+    ~320–328 para ~375–394, +15–23 % (o desenho previa +18,5 %).
+- **Ritmo.** Com 12,1 `true`/dia, as 150 `true` do corte levam **~12–13 dias**, dentro do teto de 21 dias. É
+  abaixo da estimativa do desenho (15–30/dia), que avisava ter fator 3 de incerteza.
+
+**O que reprova o F: a leitura de pedigree do minuto.**
+- **O que a lê.** `lab_repo_e2b.lineage_for` só lê o pedigree no relógio de 1 min quando algum conjunto desse
+  relógio julga (24/09, `954f0a50`). Com C/L/H ativos, a leitura volta para **todos** os mints do minuto, e não
+  só para os que passam a porta. O laço a corta aos 8 s (`lab_repo_fast.pedigree_for`).
+- **Cronometragem:** `lab_repo_fast._PEDIGREE` renderizado com os parâmetros de `pedigree_for` e os mints de um
+  minuto fechado (375–416 mints), em duas rodadas seguidas:
+  - 1.ª rodada (03:02–03:04Z): **2 de 12** acima de 8 s, entre 6,24 e 8,74 s;
+  - 2.ª rodada (03:04–03:10Z): **24 de 30**, entre 7,16 e 13,71 s;
+  - `EXPLAIN ANALYZE`: 7,89 s.
+- **Onde está o custo.** Ele está em `creator_prior_dump_count` e no **diagnóstico** `creator_prior_dead_count`:
+  63 559 moedas anteriores dos mesmos criadores, em 7 dias, percorridas para 386 mints (~1,1 M buffers). Nenhuma
+  das duas contagens é usada por C/L/H, que têm `pedigree_repeat_dumper false`. **Só as duas contagens que eles
+  usam levam 28–69 ms.**
+- **Por que piorou desde 24/09.** Naquele dia a mesma leitura levou ~3 s com ~320 mints (DATABASE §66). Hoje são
+  ~385 mints por minuto, em parte **pelo próprio I1**, e há mais moedas por criador serial.
+- **Consequência.** Nos minutos cortados, toda 1.ª oportunidade de C vira I, e a seguinte não a substitui
+  (desenho §2.2). O que se mediu foi a fração de **consultas lentas**, não a de oportunidades perdidas (ressalva
+  da Astra). Mesmo assim, o trecho mais rápido (2/12 ≈ 17 %) já passa três vezes do teto de 5 %. Além disso, uma
+  E que só se soube pela leitura offline não seria conhecida no tique cortado.
+
+**Segunda opinião (Astra, [[06-DECISIONS/Revisoes-Astra/EXP-M26-F|EXP-M26-F]]):**
+- **Ela concorda:** F não passa por instrumento, conserta-se e repete-se antes de J/S. P não serve para adiar um
+  bloqueio que já se conhece.
+- **Must-fix 2 (relógio).** O laço lê o estado do token no tique (≥ T + 60 s), e não no `computed_at`.
+  - Medido (`f4_sensibilidade.out`): das 1 140 1.ªs oportunidades, **3 / 6 / 15** tiveram a conclusão ou a
+    migração carimbada depois do `computed_at` e até T + 60 / 120 / 180 s. Mudaria ≤ 1,3 % delas. Não muda
+    nenhum piso, mas o F repetido deve usar o relógio do tique.
+- **Must-fix 3 (Mayhem, criador e símbolo como eram no tique).** Não medido.
+  - As 10 028 linhas do superconjunto têm `mayhem_enabled = false`, mas isso não prova **quando** o `false` foi
+    aprendido. Uma moeda antiga descoberta depois pode empurrar uma contagem de pedigree.
+  - Isso afeta E e a 1.ª oportunidade. Fica como **desconhecido** declarado.
+- **Conserto que ela recomenda, e eu também.** Na via de 1 min, quando nenhum conjunto desse relógio pede
+  `pedigree_repeat_dumper`, ler só as duas contagens. O caminho completo da pista de 15 s (a mesa) não muda.
+  - Os diagnósticos que não foram lidos ficam **ausentes**, nunca zero.
+  - Filtrar primeiro pela porta pura mudaria a trilha de recusas das outras pistas.
+- **O F repetido precisa de:**
+  - o relógio do tique e a auditoria do que só se soube depois;
+  - ≥ 24 h pela via corrigida, com o corte real e sob carga, contando a união U/I por oportunidade;
+  - testes de equivalência das decisões e de preservação da pista de 15 s;
+  - a duração do ciclo do Lab e as guardas das outras pistas (§6.8).
+
+**Próximo passo.** Antes de repetir o F: uma tarefa do backend-specialist, com revisão do quant-engineer, do
+code-reviewer e do database-architect, que conserte a leitura de pedigree da via de 1 min. A ordem congelada não
+muda: **F (de novo) → J congelado → S → P → T0**.
+- A pergunta aberta do J (o que fazer se a janela [L, L + 1 h] fechar sem export com prova) **não** foi levada
+  à Astra nesta tarefa, porque a ordem manda parar no F.
+- A semente `0069_meme_mature_chart_arms` (não commitada) **não foi tocada**.
+
+**Rótulo desta etapa:** F **não aprovado — instrumento**. Não é veredito da H-022, que segue `aberta`.

@@ -76,3 +76,7 @@ Ganho: **+3 sinais v14 long por semana** sobre os 41 atuais (+7 %). Liberando XR
 Lição nova: **wrappers com outro ticker (wNEAR, wXRP) escapam do casamento por símbolo exato**. Também não basta paridade, porque oráculo e cotação da Jupiter olham as mesmas pools. A identidade de uma ponte se fecha na fonte: registro da ponte, PDA da mint authority, site do custodiante. E a regra `enabled` não enxerga freeze authority nem concentração de supply.
 
 Detalhes: `.claude/state/notes-R71.md` · revisão da Astra: `.claude/state/astra-review-r71.md`.
+
+## Atualização KB-0171 (01/10/2026) — custo medido nas 10 operações reais da `spot/1`
+
+A premissa "0,001 SOL de taxas por perna" acima está **~20× alta**: nas 20 pernas reais (ficha 0,05 SOL) a taxa de rede média foi 49 634 lamports (0,00005 SOL; 5 de 20 no teto de 100 000 de prioridade). O custo total medido foi **0,49 % por ida-e-volta** [0,32; 0,67] = 0,20 % fixo + 0,29 % proporcional (contra o último close perp da Binance), ~0,25 %/perna; a cotação da Jupiter se cumpriu (slippage ≈ 0) e nenhuma taxa de plataforma foi identificada. Aluguel de ATA hoje é 1 488 440 lamports, não 0,00204 SOL. Ver [[KB-0171-custo-real-da-spot-1]].

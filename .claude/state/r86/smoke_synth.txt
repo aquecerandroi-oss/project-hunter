@@ -1,0 +1,34 @@
+# FUMAÇA SINTÉTICA — desfechos inventados, nada aqui é resultado
+
+## SINTÉTICO efeito +0,25 R/desvio, nível +0,10: n 874 unidades | 23 dias | 16 mercados | razão>0 676 · ≤0 198
+modelo conjunto (z robusto): b0 -0.0466 | razão +0.2140 | d_low -0.0202 | ATR% -0.0709 | ret4h +0.1220
+PRIMÁRIA β_razao = +0.2140 R/desvio | IC dia [+0.1311, +0.2783] p 0.0000 | IC mercado [+0.1727, +0.2986] p 0.0000 | p do portão 0.0000 | Holm 0.0000 | réplicas inválidas 0.0000%
+nível: razão>0 +0.1291 R (IC dia [+0.0052, +0.2549]) | razão≤0 -0.2437 | todos +0.0447
+patamar 1[razão>c]: c=-0.050: β +0.7952 (n>c 821) · c=-0.025: β +0.3742 (n>c 755) · c=+0.000: β +0.2674 (n>c 676) · c=+0.025: β +0.2672 (n>c 625) · c=+0.050: β +0.2082 (n>c 532) → sequência 5 → patamar
+metades por data (n 427/447): β +0.2698 / +0.1762
+secundária 1[razão>0] ajustada: +0.2674 [+0.0200, +0.4972] p 0.0115
+covariáveis (IC dia, descritivo): d_low -0.0202 [-0.0987, +0.0399] · atr_pct -0.0709 [-0.1913, +0.0836] · ret4h +0.1220 [+0.0627, +0.1882]
+diagnósticos: cond 4.93 | fração da razão não explicada pelos controles 0.827 | maior mercado 8.4% · maior dia 9.3% | β sem cada mercado [+0.2023, +0.2478] · sem cada dia [+0.1936, +0.2308]
+RÓTULO SINTÉTICO efeito +0,25 R/desvio, nível +0,10: CONFIRMA  | cláusulas {'dado_ok': True, 'instrumento_ok': True, 'beta>=MRE': True, 'IC_inf>0 (dia)': True, 'IC_inf>0 (mercado)': True, 'Holm<0,05': True, 'nivel_favoravel>0': True, 'patamar': True, 'metade1>0': True, 'metade2>0': True, 'IC_sup<MRE (dia)': False, 'IC_sup<MRE (mercado)': False}
+
+## SINTÉTICO nulo (β = 0, nível −0,20): n 874 unidades | 23 dias | 16 mercados | razão>0 676 · ≤0 198
+modelo conjunto (z robusto): b0 -0.2017 | razão -0.0231 | d_low -0.0184 | ATR% -0.0327 | ret4h +0.0427
+PRIMÁRIA β_razao = -0.0231 R/desvio | IC dia [-0.1131, +0.0555] p 0.6720 | IC mercado [-0.0934, +0.0650] p 0.7690 | p do portão 0.7690 | Holm 1.0000 | réplicas inválidas 0.0000%
+nível: razão>0 -0.2106 R (IC dia [-0.3209, -0.0986]) | razão≤0 -0.1821 | todos -0.2041
+patamar 1[razão>c]: c=-0.050: β -0.1350 (n>c 821) · c=-0.025: β -0.0603 (n>c 755) · c=+0.000: β -0.0116 (n>c 676) · c=+0.025: β +0.0179 (n>c 625) · c=+0.050: β +0.0258 (n>c 532) → sequência 2 → sem patamar
+metades por data (n 427/447): β +0.1094 / -0.0691
+secundária 1[razão>0] ajustada: -0.0116 [-0.1908, +0.1707] p 0.5280
+covariáveis (IC dia, descritivo): d_low -0.0184 [-0.1227, +0.0717] · atr_pct -0.0327 [-0.1754, +0.1306] · ret4h +0.0427 [-0.0216, +0.1270]
+diagnósticos: cond 4.93 | fração da razão não explicada pelos controles 0.827 | maior mercado 8.4% · maior dia 9.3% | β sem cada mercado [-0.0435, +0.0001] · sem cada dia [-0.0436, +0.0064]
+RÓTULO SINTÉTICO nulo (β = 0, nível −0,20): NÃO CONFIRMA  | cláusulas {'dado_ok': True, 'instrumento_ok': True, 'beta>=MRE': False, 'IC_inf>0 (dia)': False, 'IC_inf>0 (mercado)': False, 'Holm<0,05': False, 'nivel_favoravel>0': False, 'patamar': False, 'metade1>0': True, 'metade2>0': False, 'IC_sup<MRE (dia)': False, 'IC_sup<MRE (mercado)': False}
+
+## SINTÉTICO nulo 2 (β = 0, nível +0,10): n 874 unidades | 23 dias | 16 mercados | razão>0 676 · ≤0 198
+modelo conjunto (z robusto): b0 +0.1090 | razão +0.0051 | d_low +0.0593 | ATR% -0.1003 | ret4h -0.0188
+PRIMÁRIA β_razao = +0.0051 R/desvio | IC dia [-0.0802, +0.0843] p 0.4170 | IC mercado [-0.0959, +0.1076] p 0.4815 | p do portão 0.4815 | Holm 0.9630 | réplicas inválidas 0.0000%
+nível: razão>0 +0.0978 R (IC dia [+0.0132, +0.1796]) | razão≤0 +0.1931 | todos +0.1194
+patamar 1[razão>c]: c=-0.050: β -0.1185 (n>c 821) · c=-0.025: β +0.0511 (n>c 755) · c=+0.000: β -0.0625 (n>c 676) · c=+0.025: β -0.0938 (n>c 625) · c=+0.050: β +0.0400 (n>c 532) → sequência 1 → sem patamar
+metades por data (n 427/447): β -0.0424 / +0.0442
+secundária 1[razão>0] ajustada: -0.0625 [-0.2609, +0.1406] p 0.7115
+covariáveis (IC dia, descritivo): d_low +0.0593 [-0.0140, +0.1087] · atr_pct -0.1003 [-0.2373, +0.0617] · ret4h -0.0188 [-0.0857, +0.0554]
+diagnósticos: cond 4.93 | fração da razão não explicada pelos controles 0.827 | maior mercado 8.4% · maior dia 9.3% | β sem cada mercado [-0.0122, +0.0305] · sem cada dia [-0.0229, +0.0193]
+RÓTULO SINTÉTICO nulo 2 (β = 0, nível +0,10): NÃO CONFIRMA  | cláusulas {'dado_ok': True, 'instrumento_ok': True, 'beta>=MRE': False, 'IC_inf>0 (dia)': False, 'IC_inf>0 (mercado)': False, 'Holm<0,05': False, 'nivel_favoravel>0': True, 'patamar': False, 'metade1>0': False, 'metade2>0': True, 'IC_sup<MRE (dia)': False, 'IC_sup<MRE (mercado)': False}

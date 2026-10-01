@@ -1,7 +1,7 @@
 ---
 tags: [experimento, meme, pumpfun, curva, paper, pre-registro, hype, sonda, m4]
-updated: 2026-09-16
-status: pre-registrado
+updated: 2026-10-01
+status: descartado
 owner: quant-engineer
 exp: EXP-M3
 strategy: "meme/pumpfun — semi-comprado por hype: sonda de 1/5 do tamanho antes de a linha existir, escalada para a perna 2 quando a linha confirma (carteira paper, sem ordem real)"
@@ -207,3 +207,9 @@ o número de apostas medidas pode cair; nenhum limiar foi mexido. Braço que qui
 `test_meme_rules_lines.py` · `services/meme-worker/hunter_meme_worker/{proposals_scale,paper_fill,lab,lab_repo_lines}.py` ·
 `services/meme-worker/tests/{test_proposals_scale,test_lab_lines}.py` · `infra/migrations/versions/0026_meme_lines.py` ·
 `docs/DATABASE.md` §38 · `docs/plans/T4-MEME-RADAR.md` §T4.10 · `.claude/state/brief-T4.10-tracado-de-linhas-e-sonda-de-hype.md`.
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+Este experimento foi **executado e o conjunto `hype_probe_v0/1` aposentado em 12/09** (seção "Avaliação 2026-09-12 (T4.16)", aposentadoria por script auditado `meme_rule_set.py --deprecate`). A decisão foi `descartar` o **desenho**: 8 sondas fechadas, 8 negativas, 0 escalas; o score comprou giro de robô, não demanda líquida. O rótulo `result: reprovada` do frontmatter registra esse descarte; a régua de população (1 dia, 8 sondas) não alcança, sozinha, refutação estatística. O estado inicial de pré-registro (e o texto "nenhuma coorte" da seção "Avaliações") não representa o ciclo atual.

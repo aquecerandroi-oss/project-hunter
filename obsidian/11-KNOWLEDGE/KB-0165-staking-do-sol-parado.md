@@ -9,7 +9,7 @@ hipotese_testavel: não
 astra: concorda com correções (4 must-fix aceitos: checagem wallet_unrecognized_holdings não alimentada, taxa de resgate da Jito, mínimo de saque da mSOL, época e rent invertidos)
 status: curada
 owner: sexta-feira
-updated: 2026-09-27
+updated: 2026-10-01
 confiança: "?"
 tipo: leitura
 hipotese: —
@@ -234,3 +234,12 @@ acompanhamento próprio — não uma correção desta nota de leitura.
 
 [[Ideias do Everton]] · [[Proximas Hipoteses]] · [[2026-09-26-mesa-meme-real-pausada-no-escopo]] ·
 [[KB-0149-o-que-a-mesa-real-ensinou]]
+
+## Atualização operacional — 2026-10-01 (acréscimo; o texto acima é o corte de 27/09)
+
+> Retificação da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi apagado: a §5, a abertura ("hoje", "sem nenhuma posição aberta") e a correção nº 1 da "Segunda opinião" descrevem o código e a carteira **de 26–27/09**.
+
+- **A proteção deixou de ser inerte.** Os três caminhos de entrada agora passam `unrecognized=holdings.unrecognized` a `wallet_from()`: `services/meme-executor/hunter_meme_executor/entries.py:184`, `launch_entries.py:217` e `spot_entries.py:211` (conferido em 2026-10-01; commit `190a9ecb`). A checagem foi ao ar no deploy `a72296a0` (30/09) e a primeira leitura registrada deu `wallet_holdings_state=valid`, `wallet_unrecognized_count=0` ([[Diario/2026-09-30]]; contrato em [[Wallet-unrecognized-holdings]]).
+- **"Sem posições" e o saldo de 0,3845 SOL da abertura são desse corte histórico.** Em 30/09 a `spot/1` teve posição UNI aberta (entrada 14:45Z, saída 18:45Z, [[Diario/2026-09-30]]), e a decisão [[2026-09-28-excecao-auditada-token-golpe]] registra a posição UNI da `spot/1` entre o que não é tocado no ensaio de fechamento de contas.
+- **Consequência para a pergunta do LST:** a ressalva "falso hoje" do item 1 da "Segunda opinião" também caiu. Com a checagem ligada, todo mint que o banco não explica recusa/adia entradas, salvo exceção auditada por mint (migração `0068`); introduzir outro ativo na carteira passou a ter custo operacional. A recomendação (manter SOL líquido nesta carteira) não muda; a premissa "um LST não travaria nada" é que não vale mais.
+- Esta nota **não** é leitura atual da carteira. Para o saldo e as posições vigentes: o diário mais recente e o heartbeat do executor.

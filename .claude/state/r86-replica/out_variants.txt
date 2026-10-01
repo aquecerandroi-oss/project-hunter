@@ -1,0 +1,9 @@
+- só v3 (reps 10000): n 869 dias 23 | β -0.0230 IC dia [-0.0808, +0.0330] IC mercado [-0.0713, +0.0186] | nível >0 -0.1958 ≤0 -0.1950
+- só v3 (reps 2000): n 869 dias 23 | β -0.0230 IC dia [-0.0818, +0.0319] IC mercado [-0.0728, +0.0198] | nível >0 -0.1958 ≤0 -0.1950
+- r_ex_funding mesmas linhas (reps 2000): n 874 dias 23 | β -0.0262 IC dia [-0.0829, +0.0260] IC mercado [-0.0738, +0.0142] | nível >0 -0.1938 ≤0 -0.1944
+- pré-R83 (reps 2000): n 783 dias 21 | β -0.0302 IC dia [-0.0962, +0.0287] IC mercado [-0.0839, +0.0135] | nível >0 -0.1892 ≤0 -0.1950
+- sem guarda de chegada (mantém 24 h) (reps 2000): n 940 dias 25 | β -0.0425 IC dia [-0.0977, +0.0081] IC mercado [-0.0782, -0.0109] | nível >0 -0.2103 ≤0 -0.1950
+covariável d_low +0.0207 [-0.0475, +0.0803]
+covariável atr +0.0279 [-0.0736, +0.1610]
+covariável r4 +0.0018 [-0.0569, +0.0522]
+secundária -0.0260 p unilateral centrado 0.6086

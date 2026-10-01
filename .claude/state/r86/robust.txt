@@ -1,0 +1,58 @@
+# R86 — robustez PÓS-DESFECHO (não muda o rótulo; afirmação generalizada só se todas passarem)
+momentum: 874 unidades, β_razao pooled -0.0262
+
+## RT1 — dentro da moeda / do dia (efeitos fixos)
+- FE mercado: β_razao -0.0621 | IC blocos de 3 dias [-0.1604, -0.0213] (2 000 réplicas, inválidas 0)
+- FE dia: β_razao -0.0107 | IC blocos de 3 dias [-0.0666, +0.0579] (2 000 réplicas, inválidas 0)
+- FE mercado + dia: β_razao -0.0597 | IC blocos de 3 dias [-0.1581, +0.0041] (2 000 réplicas, inválidas 0)
+
+## RT3 — bootstrap de blocos de calendário (todos os mercados do dia juntos), modelo primário
+- blocos de 3 dias: IC [-0.0914, +0.0283] | réplicas inválidas 0
+- blocos de 5 dias: IC [-0.0885, +0.0356] | réplicas inválidas 0
+- blocos de 7 dias: IC [-0.0887, +0.0389] | réplicas inválidas 0
+- metade 1 (sem purga): n 427 dias 12 β +0.0092 | datas 2026-09-08 → 2026-09-19
+- metade 1 purgada (saída antes de 2026-09-20): n 427 dias 12 β +0.0092 | datas 2026-09-08 → 2026-09-19
+- metade 2: n 447 dias 11 β -0.0459 | datas 2026-09-20 → 2026-09-30
+
+## RT4 — datas distintas por braço (piso proposto: 15)
+- c=-0.050: razão>c 23 datas · razão≤c 10 datas
+- c=-0.025: razão>c 23 datas · razão≤c 11 datas
+- c=+0.000: razão>c 23 datas · razão≤c 13 datas
+- c=+0.025: razão>c 23 datas · razão≤c 19 datas
+- c=+0.050: razão>c 23 datas · razão≤c 21 datas
+- metade 1: razão>0 12 datas (245 un.) · razão≤0 8 datas (182 un.)
+- metade 2: razão>0 11 datas (431 un.) · razão≤0 5 datas (16 un.)
+unidades razão≤0 por data: {'2026-09-11': 18, '2026-09-13': 13, '2026-09-14': 35, '2026-09-15': 3, '2026-09-16': 33, '2026-09-17': 25, '2026-09-18': 53, '2026-09-19': 2, '2026-09-20': 1, '2026-09-21': 2, '2026-09-22': 1, '2026-09-23': 3, '2026-09-24': 9}
+
+## RT5 — sem cada mercado (β e nível do grupo razão>0)
+- sem ARBUSDT        (n  62): β -0.0304 | nível razão>0 -0.2024
+- sem BNBUSDT        (n  40): β -0.0289 | nível razão>0 -0.1937
+- sem BTCUSDT        (n  28): β -0.0241 | nível razão>0 -0.1892
+- sem DASHUSDT       (n  53): β -0.0172 | nível razão>0 -0.2004
+- sem DOGEUSDT       (n  59): β -0.0298 | nível razão>0 -0.1901
+- sem ETHUSDT        (n  57): β -0.0219 | nível razão>0 -0.1803
+- sem LINKUSDT       (n  58): β -0.0214 | nível razão>0 -0.2015
+- sem NEARUSDT       (n  73): β -0.0257 | nível razão>0 -0.2104
+- sem PROMUSDT       (n  55): β -0.0243 | nível razão>0 -0.1846
+- sem SAHARAUSDT     (n   5): β -0.0233 | nível razão>0 -0.1972
+- sem SOLUSDT        (n  63): β -0.0250 | nível razão>0 -0.1865
+- sem SUIUSDT        (n  58): β -0.0361 | nível razão>0 -0.1929
+- sem TAOUSDT        (n  68): β -0.0250 | nível razão>0 -0.1929
+- sem UNIUSDT        (n  61): β -0.0352 | nível razão>0 -0.2029
+- sem XRPUSDT        (n  64): β -0.0290 | nível razão>0 -0.1902
+- sem ZECUSDT        (n  70): β -0.0233 | nível razão>0 -0.1925
+
+## RT6 — custo: o nível do grupo razão>0 sob o custo ASSUMIDO do Lab já é negativo (ver h027.txt, IC dia
+   inteiro < 0); um cenário mais caro só o reduz. Reconstrução por perna não feita (não verificável aqui).
+
+## Auditoria — contagens
+fora por tipo de mercado (market_id → markets.market_type, nunca por símbolo): {'momentum': 163, 'volume_anomaly': 97, 'mean_reversion_v14': 7}
+fora por não entrada (no_entry, result=open — não são posições): {'volume_anomaly': 151, 'momentum': 925, 'mean_reversion_v14': 33}
+guarda da janela de 24 h recusou: 79
+terminais completos SEM R_net (fora, nunca zero), por grupo: {('volume_anomaly', 'razão>0'): 1, ('momentum', 'razão≤0'): 4, ('momentum', 'razão>0'): 6} | motivos: {'funding_missing': 9, 'funding_ambiguous_exit': 2}
+símbolos na população momentum: {'BNBUSDT': 40, 'PROMUSDT': 55, 'ETHUSDT': 57, 'XRPUSDT': 64, 'SOLUSDT': 63, 'SUIUSDT': 58, 'ZECUSDT': 70, 'DOGEUSDT': 59, 'TAOUSDT': 68, 'DASHUSDT': 53, 'LINKUSDT': 58, 'BTCUSDT': 28, 'ARBUSDT': 62, 'NEARUSDT': 73, 'SAHARAUSDT': 5, 'UNIUSDT': 61}
+- ARKUSDT: terminais momentum 0 | razão: {}
+- MOVRUSDT: terminais momentum 4 | razão: {'dia_incompleto': 4}
+- QNTUSDT: terminais momentum 0 | razão: {}
+- SOONUSDT: terminais momentum 0 | razão: {}
+unidades cuja janela de 20 dias usa ≥ 1 dia completado > 5 min depois do fim do dia (backfill antes da emissão): 685 de 874 — o estado diário é RECONSTRUÇÃO, não o que o scanner tinha na memória

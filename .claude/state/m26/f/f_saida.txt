@@ -1,0 +1,23 @@
+## fase1
+linhas do superconjunto: 10028; mints com 1.a passagem desde 27/09 06:00Z: 1473; com a 1.a na janela F: 1140
+recusas da porta pura nas linhas do superconjunto (antes da 1.a passagem): {'curve_complete': 648, 'already_migrated': 623, 'progress_above_max': 45, 'participation_above_cap': 29, 'age_below_min': 11, 'progress_below_min': 3}
+## fase2
+2026-09-28 {'E': 141, 'U': 11, 'desconhecida': 11, 'false': 210, 'nao_E': 231, 'oportunidades': 372, 'true': 10}
+2026-09-29 {'E': 152, 'U': 10, 'desconhecida': 10, 'false': 216, 'nao_E': 239, 'oportunidades': 391, 'true': 13}
+2026-09-30 {'E': 163, 'U': 10, 'desconhecida': 10, 'false': 194, 'nao_E': 214, 'oportunidades': 377, 'true': 10}
+TOTAL {'E': 456, 'U': 31, 'desconhecida': 31, 'false': 620, 'nao_E': 684, 'oportunidades': 1140, 'true': 33}
+janela 2026-09-28T06:30:00+00:00 -> 2026-10-01T00:00:00+00:00 = 65.5 h
+  oportunidades/dia (janela inteira) = 417.7
+  true/dia (janela inteira) = 12.1
+  false/dia (janela inteira) = 227.2
+  (U + I) / nao_E = 31/684 = 4.5 %
+  U / nao_E = 4.5 %; I / nao_E = 0.0 %
+classe:detalhe {'false:tracada': 489, 'false:flat': 115, 'true:tracada': 33, 'desconhecida:cobertura:gap': 31, 'false:out_of_range': 16}
+recusas da camada de propostas (por nome, todas): {'symbol_clone': 380, 'creator_serial': 164}
+via do estado do token: {'sem_mudanca': 938, 'history': 202}
+computed_at - end_time (s): p50 3.1 p90 5.0 p99 5.5 max 6.0; > 60 s: 0
+## extra
+cobertura (nao_E): {'covered_from_birth': 282, 'covered': 371, 'gap': 31}
+idade na 1.a oportunidade (s): p10/p50/p90 = [915, 994, 2333]
+blocos de 6 h (true/false): {'2026-09-28T06': '2/37', '2026-09-28T12': '6/97', '2026-09-28T18': '2/76', '2026-09-29T00': '1/60', '2026-09-29T06': '2/41', '2026-09-29T12': '5/53', '2026-09-29T18': '5/62', '2026-09-30T00': '5/37', '2026-09-30T06': '2/40', '2026-09-30T12': '1/48', '2026-09-30T18': '2/69'}
+blocos com os dois grupos: 11 de 11

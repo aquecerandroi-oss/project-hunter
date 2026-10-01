@@ -1,0 +1,28 @@
+# R86 passo cego — sem desfechos
+mercados no painel diário: 525 | arquivos: ['daily_06.csv', 'daily_07.csv', 'daily_08.csv', 'daily_09.csv', 'daily_10.csv']
+fora (não perp / não terminal): {('mean_reversion_v14', 'fora_no_entry'): 33, ('mean_reversion_v14', 'fora_spot'): 7, ('momentum', 'fora_no_entry'): 925, ('momentum', 'fora_spot'): 163, ('volume_anomaly', 'fora_no_entry'): 151, ('volume_anomaly', 'fora_spot'): 97}
+terminais perp: 7151 | guarda da janela de 24 h recusou 79 | mantidas 7072
+
+## momentum: terminais 3607 | razao: {'dia_incompleto': 2559, 'chegou_depois': 74, 'disponivel': 974}
+   com R (nulidade) 3562 | d_low 3607 | ret4h 3607 | atr 3607
+   completas (R + 4 variáveis): sinais 964 | unidades (mercado, barra) 874 | dias 23 | mercados 16
+   1.º/último dia 2026-09-08 → 2026-09-30 | versões {'v2': 41, 'v3': 869, 'v4': 15, 'v8': 14, 'v6': 14, 'v10': 11}
+   unidades por sinal da razão: >0 676 | ≤0 198
+   pós-R83 (emitted > 2026-09-28T01:58:45+00:00): unidades 91 dias 3
+   razão sem a guarda de chegada: 1048 disponíveis
+
+## volume_anomaly: terminais 3263 | razao: {'chegou_depois': 116, 'dia_incompleto': 3080, 'disponivel': 67}
+   com R (nulidade) 3235 | d_low 3263 | ret4h 3263 | atr 3263
+   completas (R + 4 variáveis): sinais 66 | unidades (mercado, barra) 66 | dias 2 | mercados 14
+   1.º/último dia 2026-09-08 → 2026-09-09 | versões {'v2': 66}
+   unidades por sinal da razão: >0 66 | ≤0 0
+   pós-R83 (emitted > 2026-09-28T01:58:45+00:00): unidades 0 dias 0
+   razão sem a guarda de chegada: 183 disponíveis
+
+## mean_reversion_v14: terminais 202 | razao: {'disponivel': 152, 'dia_incompleto': 50}
+   com R (nulidade) 202 | d_low 202 | ret4h 202 | atr 202
+   completas (R + 4 variáveis): sinais 152 | unidades (mercado, barra) 152 | dias 21 | mercados 13
+   1.º/último dia 2026-09-09 → 2026-09-30 | versões {'v14': 152}
+   unidades por sinal da razão: >0 136 | ≤0 16
+   pós-R83 (emitted > 2026-09-28T01:58:45+00:00): unidades 18 dias 2
+   razão sem a guarda de chegada: 152 disponíveis

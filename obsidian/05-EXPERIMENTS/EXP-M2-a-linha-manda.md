@@ -1,15 +1,15 @@
 ---
 tags: [experimento, meme, pumpfun, curva, paper, pre-registro, linhas, m4]
-updated: 2026-09-16
-status: pre-registrado
+updated: 2026-10-01
+status: avaliado
 owner: quant-engineer
 exp: EXP-M2
 strategy: "meme/pumpfun — a linha manda: suporte pelos dois últimos fundos, rompimento da máxima da janela anterior (carteira paper, sem ordem real)"
 version: "gate a_linha_manda v1 + saida alvo_2x_trailing_30_tempo_15m_linha v1 (conjunto trendline_v0/1, migração 0026)"
-result: nao-iniciado
+result: inconclusivo
 evaluable: 0
 days: 0
-last_eval: ""
+last_eval: "2026-09-26"
 tipo: pesquisa
 hipotese: —
 variavel: —
@@ -213,3 +213,9 @@ durável (R1) que vai até à proposta e ao fill, em vez de reconstruída depois
 `test_meme_rules_lines.py` · `services/meme-worker/hunter_meme_worker/{features_lines,repo_lines,lines_exit,lab_bets}.py` ·
 `infra/migrations/versions/0026_meme_lines.py` · `docs/DATABASE.md` §38 · `docs/plans/T4-MEME-RADAR.md` §T4.10 ·
 `.claude/state/brief-T4.10-tracado-de-linhas-e-sonda-de-hype.md`.
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status`, `result`, `last_eval` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+O conjunto `trendline_v0/1` **operou entre 12/09 15:03Z e 20/09 01:24Z, sem propostas**. A "Avaliação de 2026-09-26" reconstruiu o funil e achou limitação de **instrumento** (275 dos 287 minutos que passaram a linha tinham criador desconhecido): a hipótese da linha **não foi julgada por desfecho**. Resultado `inconclusivo`, não `nao-iniciado`; ausência de propostas não é ausência de operação nem refutação da linha. Continuação de pesquisa: [[EXP-M26-grafico-em-moedas-maduras]].

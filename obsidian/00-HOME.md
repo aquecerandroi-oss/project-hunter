@@ -1,6 +1,6 @@
 ---
 tags: [home, hunter, indice]
-updated: 2026-09-08
+updated: 2026-10-01
 status: vivo
 owner: sexta-feira
 ---
@@ -14,6 +14,13 @@ PROJECT HUNTER é uma plataforma SaaS de inteligência quantitativa para criptom
 Esta pasta (`obsidian/`) é a base de conhecimento **do projeto**, viva e versionada no git, separada do `vault/` pessoal do Sexta-feira (memória do agente, só por MCP) e de `docs/` (especificação normativa: arquitetura, ADRs, planos, relatórios de milestone). As páginas aqui resumem e linkam para `docs/` em vez de duplicar. Ver [[Architecture Decisions]] → ADR 0003 para a decisão de criar esta estrutura.
 
 ## Onde estamos agora
+
+> **Onde estamos agora — corte 2026-10-01 (leia primeiro). Tudo o que está abaixo desta caixa, até o fim da seção, é histórico de 07–08/09 e fica como registro.**
+>
+> - **Operação:** [[Diario/2026-09-30]] (29–30/09). A VPS não caiu; deploy completo `a72296a0` (alembic `0068`); a checagem de moedas estranhas da carteira está no ar (`wallet_holdings_state=valid`); disco em 41 % (207 G livres). A **mesa meme real segue pausada**; a **`spot/1` operou** (10 operações, Σ −0,0017 SOL pelo diário — mas [[Open Bugs]] registra um defeito aberto de aluguel de ATA que piora esse número, ver [[KB-0171-custo-real-da-spot-1]]). Paper, memes reais e spot são operações distintas: não ler como uma única parada.
+> - **Resolvido desde o resumo de 07–08/09:** os quatro furos do caminho de replicação (T3.18c) foram fechados em `c8c9dc6` ([[Resolved Bugs]]); o token-golpe congelado deixou de bloquear — a conta foi fechada por terceiro em 30/09 ([[2026-09-28-excecao-auditada-token-golpe]]). Os números de 07–08/09 abaixo (154 sinais, "quatro furos", "revisão mais recente") são históricos.
+> - **Pesquisa vigente:** [[Fila de Hipoteses]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[Mapa de Estrategias]] · [[03-TRADING/Meme/README]].
+> - **Decisões e revisões recentes:** [[Revisoes-Astra/Index|índice das revisões da Astra]] (por exemplo [[T4.98-fechamento-noturno]] e [[Roster-advogado-defensor]]) · curadoria desta data: [[Curadoria-2026-10-01]].
 
 > **Atualizado em 2026-09-08 (fim da tarde) — leia isto antes do resto da seção, que é de 2026-09-07.**
 >

@@ -1,0 +1,8 @@
+BEGIN
+Timing is on.
+383|12093
+Time: 68.795 ms
+386|12907
+Time: 27.824 ms
+COMMIT
+Time: 0.155 ms

@@ -1,0 +1,6 @@
+momentum 3607 {'dia_ausente': 2559, 'guarda_chegada': 74, 'disponivel': 974} R nulo 45
+   razão sem guarda de chegada: 1048
+volume_anomaly 3263 {'guarda_chegada': 116, 'dia_ausente': 3080, 'disponivel': 67} R nulo 28
+   razão sem guarda de chegada: 183
+mean_reversion 202 {'dia_ausente': 50, 'disponivel': 152} R nulo 0
+   razão sem guarda de chegada: 152

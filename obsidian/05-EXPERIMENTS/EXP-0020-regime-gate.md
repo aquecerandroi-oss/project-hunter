@@ -1,15 +1,15 @@
 ---
 tags: [experimento, regime, elegibilidade, populacao, mean-reversion, momentum]
-updated: 2026-09-09
-status: implementado, replay pendente
+updated: 2026-10-01
+status: avaliado
 owner: quant-engineer
 exp: EXP-0020
 strategy: "mean_reversion + momentum"
-version: "mean_reversion v9 (de v6) + momentum v9 (de v8) — ainda não derivadas"
+version: "mean_reversion v11 (de v6) + momentum v11 (de v8) — derivadas e replayadas na T3.52d (o pré-registro previa v9)"
 result: inconclusivo
 evaluable: 0
 days: 0
-last_eval: "—"
+last_eval: "2026-09-09"
 tipo: pesquisa
 hipotese: —
 variavel: —
@@ -193,3 +193,9 @@ item 12 e em `docs/plans/SHADOW-LAB.md` (funil, item 3).
 dois braços passa o portão C1–C8 do funil de validação com retorno demonstrado; a infraestrutura
 do portão de regime está correta (reproduz o pai bit a bit nas barras elegíveis) e o retorno
 continua não demonstrado.
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status`, `version`, `last_eval` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+O resumo desta página ("replay pendente", variantes "ainda não derivadas", `last_eval: —`) descrevia o estado **anterior** ao "Adendo T3.52d — 2026-09-09". Houve avaliação em 09/09 (T3.52d): os braços saíram `v11`, não `v9`; **G1** terminou `inconclusivo` por população (1 decisão; `SIDEWAYS` só 6 h na primeira metade da janela); **G2** ficou `frágil a custos` (Δ de expectativa +0,1104 R, IC 95 % [−0,0605; +0,2859] cruza zero; `custos_x2` reverte o sinal) — **não promover**. O G2 executado usou **dois** rótulos de regime (`BTC_BULL,HIGH_VOLATILITY`) e **não é exatamente o G2 pré-registrado** (`BTC_BULL`); não confundir os dois. "Replay pendente" vale só para o período anterior ao adendo. `evaluable` e `days` não foram recalculados aqui: a contagem por braço está no adendo (G1 1 decisão/1 dia; G2 101 decisões/14 dias), não num número único. Prova: seção "Adendo T3.52d — 2026-09-09 (medido)", tabela dos braços e "Vereditos finais desta corrida".

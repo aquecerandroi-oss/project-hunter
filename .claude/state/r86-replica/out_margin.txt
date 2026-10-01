@@ -1,0 +1,2 @@
+20 dias folga emitted_at - max(received_at) em s: min 0.96 p1 855.29 p5 3980.64 mediana 42176.7; <1s: 1; <5s: 5
+janela 24h folga emitted_at - max(received_at) em s: min 0.18 p1 0.25 p5 0.45 mediana 1.6; <1s: 317; <5s: 990

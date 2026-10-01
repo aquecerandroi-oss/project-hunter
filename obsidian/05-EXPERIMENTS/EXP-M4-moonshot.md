@@ -1,15 +1,15 @@
 ---
 tags: [experimento, meme, pumpfun, curva, pool, pumpswap, paper, pre-registro, moonshot, cauda, m4]
-updated: 2026-09-16
-status: pre-registrado
+updated: 2026-10-01
+status: "pre-registrado; coleta iniciada (retificado em 2026-10-01)"
 owner: quant-engineer
 exp: EXP-M4
 strategy: "meme/pumpfun — moonshot: a mesma porta da sonda de hype, alvo 10× (braço 1) e 25× (braço 2), trailing 50 % só depois de 3×, espera 2 h, posição que sobrevive à migração e é marcada pela fita da pool PumpSwap (carteira paper, sem ordem real)"
 version: "gate sonda_de_hype v1 + saida alvo_10x_trailing_50_apos_3x_tempo_2h v1 (moonshot_v0/1) e alvo_25x_trailing_50_apos_3x_tempo_2h v1 (moonshot_v0/2), migração 0029"
-result: nao-iniciado
+result: inconclusivo
 evaluable: 0
 days: 0
-last_eval: ""
+last_eval: "2026-09-14"
 tipo: pesquisa
 hipotese: —
 variavel: —
@@ -217,3 +217,9 @@ o número de apostas medidas pode cair; nenhum limiar foi mexido. Braço que qui
 `services/meme-worker/tests/{test_pool_mark,test_lab_params_moonshot,test_lab_moonshot}.py` ·
 `infra/migrations/versions/0029_meme_moonshot.py` · `docs/DATABASE.md` §41 · `docs/PUMPFUN.md` §4.1 ·
 `docs/plans/T4-MEME-RADAR.md` §T4.11 · `.claude/state/brief-T4.11-moonshot-e-pos-migracao.md`.
+
+## Retificação do resumo — 2026-10-01
+
+> Acréscimo da curadoria ([[Curadoria-2026-10-01]]). Nada acima foi editado; do frontmatter só `status`, `result`, `last_eval` e `updated` foram alinhados ao que as avaliações desta página já provam.
+
+Retificação: este experimento **iniciou coleta e tem observações registradas**; `nao-iniciado` é resumo obsoleto. Prova: fechamentos diários de 12, 13 e 14/09 (`moonshot_v0/1`; acumulado de 23 apostas em 3 dias até 14/09, régua de 100 apostas e 30 dias **não atingida**). Não há aqui novo julgamento nem nova contagem. Os números anteriores a 16/09 permanecem históricos e sujeitos à reclassificação Mayhem (seção "Avaliação 2026-09-16 (T4.27)"); não devem ser promovidos a contagem atual sem nova extração. `evaluable` e `days` do frontmatter não foram recalculados.
