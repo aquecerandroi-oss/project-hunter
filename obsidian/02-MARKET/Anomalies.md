@@ -42,6 +42,10 @@ Persiste em `anomalies` com `feature_snapshot` — ainda não escrito em produç
 
 Implementados em T2.3: detectores com spikes sintéticos injetados na série (`test_anomaly_detectors.py`), ciclo de vida (`test_anomaly_lifecycle.py`, 513 linhas), pipeline ponta a ponta em memória (`test_anomaly_pipeline.py`), severidade (`test_anomaly_severity.py`), baselines (`test_baselines_bootstrap.py`, `test_baselines_collect.py`, `test_baselines_compute.py`, `test_baselines_sql.py`, `test_baselines_store.py`), anti-look-ahead específico do T2.3 (`test_no_lookahead_t23.py`), estágio (`test_stage.py`, 613 linhas) e o contrato dos pesos (`test_weights_contract.py`). O que falta é a prova operacional — scanner rodando 5 min/24 h contra o `market-worker` real (T2.5/T2.8), ainda não feita.
 
+## Expirada por `superseded` (01/10/2026)
+
+O índice `uq_anomalies_active_per_market_type` admite uma linha `active` por `(mercado, tipo)`. Se o scanner perde o fechamento de uma linha (lote descartado depois de a memória avançar), o `writers.supersede_orphan_anomalies` fecha a linha antiga **na mesma transação** da nova: `status = expired`, `resolved_at` = `detected_at` da nova, `metadata.superseded_by` e `metadata.state.reason = "superseded"`. É diferente de `resolved` (o detector viu calma por cinco leituras) e do `expired` de quatro horas (expiração absoluta da máquina de estados): quem lê histórico de anomalias deve tratar `superseded` como "fechada por reconciliação", não como veredito do detector. O `resolved_at` de uma linha `superseded` é o `detected_at` da linha mais nova — um **limite superior**, não o fim real da anomalia; o motivo anterior fica em `metadata.state.previous_reason`. Contexto e limites: [[Scanner-lag-2026-10-01]].
+
 ## Relacionadas
 
 [[Features]] · [[Data Flow]] · [[Workers]] · [[Risk Engine]] (componente "Anomalies" no Opportunity Engine)

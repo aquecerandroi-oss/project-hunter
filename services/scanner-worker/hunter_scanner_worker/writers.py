@@ -22,6 +22,7 @@ from hunter_core.db.models.analysis import (
     Opportunity,
     OpportunityHistory,
 )
+from hunter_core.domain.enums import AnomalyStatus
 from hunter_core.domain.types import uuid7
 from hunter_core.logging import get_logger
 from hunter_indicators.baselines import insert_revisions
@@ -37,6 +38,7 @@ logger = get_logger(__name__)
 __all__ = [
     "dedupe",
     "probe_baseline_lock",
+    "supersede_orphan_anomalies",
     "surviving_baselines",
     "touch_episodes",
     "write_anomalies",
@@ -147,10 +149,79 @@ async def write_snapshots(session: AsyncSession, rows: list[dict[str, Any]]) -> 
     )
 
 
+_SUPERSEDE_ORPHANS = text(
+    """
+    UPDATE anomalies AS old
+       SET status = 'expired',
+           resolved_at = incoming.at,
+           metadata = (old.metadata || jsonb_build_object('superseded_by', incoming.id::text))
+                      || jsonb_build_object(
+                           'state',
+                           COALESCE(old.metadata -> 'state', '{}'::jsonb)
+                           || jsonb_build_object(
+                                'status', 'expired', 'reason', 'superseded',
+                                'previous_reason', old.metadata #> '{state,reason}',
+                                'resolved_at', to_char(
+                                    incoming.at AT TIME ZONE 'UTC',
+                                    'YYYY-MM-DD"T"HH24\\:MI\\:SS.US"+00\\:00"')))
+      FROM unnest(
+               CAST(:market_ids AS uuid[]), CAST(:types AS text[]),
+               CAST(:ids AS uuid[]), CAST(:ats AS timestamptz[])
+           ) AS incoming(market_id, type, id, at)
+     WHERE old.market_id = incoming.market_id
+       AND old.type = incoming.type::anomaly_type
+       AND old.status = 'active'
+       AND old.detected_at < incoming.at
+       AND old.id <> ALL(CAST(:batch_ids AS uuid[]))
+    """
+)
+
+
+async def supersede_orphan_anomalies(session: AsyncSession, rows: list[dict[str, Any]]) -> int:
+    """Close the ``active`` rows an incoming ``active`` row replaces without saying so.
+
+    The table allows one active row per ``(market, type)``. The scanner forgets an
+    anomaly's id the moment its state machine closes it -- *before* the commit -- so
+    when a flush fails and the batch is dropped, the close never reaches the table,
+    the next ``OPEN`` arrives under a new id and ``uq_anomalies_active_per_market_type``
+    rejects it, and every later batch containing the pair, and with it 200 markets'
+    rows and their ACKs (production, 2026-10-01: 14 h without a single persisted
+    minute). The writer holds both sides of the comparison, so it restores the
+    invariant in the same transaction: an active row **the batch does not mention**
+    is superseded by the one that is.
+
+    Two guards (Astra, 2026-10-01): a row the batch does mention is left to its own
+    transition (``[X resolved, Y open]`` keeps X resolved), and only an **older**
+    episode is superseded -- a late batch carrying X must never expire a newer Y, it
+    keeps failing loudly instead. Returns how many rows were closed; never silent.
+    """
+    opening = [row for row in rows if row["status"] is AnomalyStatus.ACTIVE]
+    if not opening:
+        return 0
+    result = await session.execute(
+        _SUPERSEDE_ORPHANS,
+        {
+            "market_ids": [row["market_id"] for row in opening],
+            "types": [row["type"].value for row in opening],
+            "ids": [row["id"] for row in opening],
+            "ats": [row["detected_at"] for row in opening],
+            "batch_ids": [row["id"] for row in rows],
+        },
+    )
+    closed = int(getattr(result, "rowcount", 0) or 0)
+    if closed:
+        logger.warning("scanner_anomalies_superseded", closed=closed)
+    return closed
+
+
 async def write_anomalies(session: AsyncSession, rows: list[dict[str, Any]]) -> None:
     if not rows:
         return
-    statement = pg_insert(Anomaly).values(dedupe(rows, "id"))
+    # Closes before opens: the index is checked row by row inside one statement, so
+    # ``[Y open, X resolved]`` would fail where ``[X resolved, Y open]`` does not.
+    rows = sorted(dedupe(rows, "id"), key=lambda row: row["status"] is AnomalyStatus.ACTIVE)
+    await supersede_orphan_anomalies(session, rows)
+    statement = pg_insert(Anomaly).values(rows)
     await session.execute(
         statement.on_conflict_do_update(
             index_elements=["id"],

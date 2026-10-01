@@ -244,7 +244,7 @@ O grupo do **`scanner-worker`** em `market.candles.closed` está **~2 h atrás**
 cerca de 11 min de stream a cada 5 min de relógio, mas o lag em entradas **não encolhe** (o stream recebe ~465
 entradas/min e ele lê ~476/min). O processo está a ~99 % de um núcleo. O stream retém ~3,3 h (50.004
 entradas), então a margem até o `MAXLEN` é de ~1 h. Não afeta o Lab (o `strategy-worker` tem grupo próprio e
-está em `lag 0`), mas afeta o Radar/oportunidades — **não diagnosticado aqui**; vale tarefa própria.
+está em `lag 0`), mas afeta o Radar/oportunidades — **não diagnosticado aqui** — diagnosticado na mesma data em [[Scanner-lag-2026-10-01]] (o scanner não grava nada desde 30/09 ~13:36Z; o lag é sintoma).
 
 ## Relacionadas
 
