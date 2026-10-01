@@ -40,7 +40,8 @@ Não estimar win rate, PnL ou drawdown a partir de intuição, backtest informal
 
 ## Relacionadas
 
-[[Agent Performance]] · [[Strategy Performance]] · [[Experiments Index]]
+[[Agent Performance]] · [[Strategy Performance]] · [[Experiments Index]] ·
+[[Late-delay-do-Lab-diagnostico-2026-10-01]] (latência de decisão do Lab: por que 1.927 sinais não entraram, 01/10/2026)
 
 ## Fontes
 
