@@ -39,7 +39,7 @@ Tudo abaixo foi lido de um worker rodando contra a Binance ao vivo; a prova est�
 
 ## Relacionadas
 
-[[Deployment]] · [[Infrastructure]] · [[Environment Variables]]
+[[Deployment]] · [[Infrastructure]] · [[Environment Variables]] · [[Alarme-de-disponibilidade]] (sonda externa de VPS fora do ar, 05/10)
 
 ## Fontes
 

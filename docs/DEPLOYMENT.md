@@ -1893,3 +1893,45 @@ docker exec hunter-redis-1 sh -c 'redis-cli --scan --pattern "mkt:*:candles:1m" 
 ```
 
 O hot state é reconstruível (§6); o durável em Postgres não é afetado.
+
+## Alarme externo de disponibilidade (2026-10-05)
+
+Motivo: a VPS travou em 04/10 ~09:15Z e ninguém soube por ~29 h; o `scanner-worker` já tinha parado de gravar duas vezes (30/09 e 02/10) com `/ready` verde. Nada dentro da VPS pode avisar que a VPS morreu, então a sonda roda **fora**, no GitHub Actions (repo público: minutos agendados são grátis; nenhum serviço novo, nenhuma conta nova, nenhum segredo além do `GITHUB_TOKEN` padrão). Nota na base: `obsidian/09-OPERATIONS/Alarme-de-disponibilidade.md`.
+
+**Arquivos:** `.github/workflows/uptime.yml` (agenda, issue, falha do job) e `infra/scripts/uptime_check.sh` (as checagens; roda igual na mão: `bash infra/scripts/uptime_check.sh`).
+
+### O que checa (a cada 10 min, minutos 3, 13, 23…)
+
+| Checagem | Pedido | Passa quando |
+|---|---|---|
+| site | `GET https://<ip>/` | HTTP 200–399 (hoje 307 para `/sign-in`); 5xx ou sem resposta = Caddy ou `web` fora |
+| api | `GET https://<ip>/api/v1/system/info` | 200 com `environment` e `git_sha` no corpo |
+
+- **Por que `/api/v1/system/info` e não `/ready`:** o Caddy só encaminha `/api/*` e `/ws` para a api (`infra/vps/Caddyfile`); `/health`, `/ready` e `/metrics` **não** são expostos, de propósito (`/api/ready` dá 404). `system/info` é a única rota pública da api, sem autenticação e sem segredo, mas **não toca Postgres nem Redis**: prova borda + processo da api, não o banco.
+- **Três tentativas** antes de declarar falha (espera de 30 s e 60 s; cada pedido com limite de 20 s): de ~1 min a ~3,5 min por execução. Uma oscilação de rede de segundos não abre alarme.
+- **TLS com `curl -k`:** a borda é um IP com certificado da CA interna do Caddy (`tls internal`), que nenhum sistema confia (sem `-k` o curl falha com `SEC_E_UNTRUSTED_ROOT`, verificado em 05/10). A sonda só mede disponibilidade e não envia nada sensível, mas `-k` não prova a identidade do servidor: alguém no caminho poderia fingir o `200`. Endurecimento (não feito): obter o certificado **raiz** público do Caddy por canal confiável (`/data/caddy/pki/authorities/local/root.crt` dentro do contêiner do Caddy), versioná-lo e passar `--cacert` na variável `UPTIME_CURL_TLS_ARGS`; ou, melhor, um domínio com Let's Encrypt (`UPTIME_BASE_URL` + `UPTIME_CURL_TLS_ARGS` sem `-k`).
+
+### O que NÃO checa ainda: frescor dos dados
+
+Nenhum endpoint público traz carimbo de dado: todas as rotas com `last_*`/heartbeat (`/api/v1/system/workers`, `/market-status`, `/latency`, `/markets`, `/radar`) exigem login Clerk (401 sem token). **Não foi inventado nada.** Para fechar o buraco do scanner parado com `/ready` verde, o mínimo necessário (mudança na API, tarefa à parte) é um `GET /api/v1/system/freshness` público, sem autenticação, `Cache-Control: no-store`, timeout curto, sem símbolos/tenants/posições/hosts: `status` (`ok`/`degraded`/`unknown`), `observed_at`, `market.final_candle_at` (agregado pelo universo esperado, não um `MAX` global que um mercado saudável esconda), `scanner.last_commit_at`, `scanner.oldest_uncommitted_at`, `reason_codes` (`stale_market`, `scanner_stalled`, `missing_worker`, `dependency_unavailable`); `200` só quando fresco, `503` quando degradado/desconhecido. Aí a sonda ganha uma terceira checagem (`age < N min`). Os campos do scanner já nascem de `scanner_persistence`/`last_commit_at` em `hunter_scanner_worker/health.py` (na árvore de trabalho, ainda não verificado no deploy da VPS).
+
+### Como o Everton é avisado
+
+1. **Job vermelho.** Se as três tentativas falham, o job termina com erro. O GitHub manda e-mail de execução **agendada** falha para quem **modificou por último a linha do `cron`** do workflow (e, se alguém desabilitar e reabilitar o workflow, para quem reabilitou) — **não** para todos os administradores. Portanto o commit que traz/altera o `cron` deve ser da conta do Everton, e em *Settings → Notifications → System → Actions* as notificações de workflows falhos precisam estar ligadas por e-mail. Numa queda longa chega um e-mail por execução vermelha (até 6 por hora; a entrega não é garantida).
+2. **Issue "VPS fora do ar"** (label `uptime-alarm`, criada pelo próprio workflow): aberta na primeira falha, **editada no lugar** a cada nova execução vermelha (hora da primeira falha, hora da última, qual checagem e com qual código) — sem comentário a cada 10 min — e, quando tudo volta, recebe um comentário de recuperação e é **fechada**. Quem assiste ao repositório (*Watch → Custom → Issues*) recebe e-mail na abertura. Nenhum webhook externo.
+3. A página *Actions → Uptime* mostra o histórico; o resumo de cada execução traz o relatório.
+
+**Provar a entrega (uma vez, depois do commit na `main`):** em *Settings → Secrets and variables → Actions → Variables* crie `UPTIME_BASE_URL` com um endereço que não responde (ex.: `https://192.0.2.1`), espere a próxima execução **agendada** (até ~15 min + as tentativas), confira o e-mail e a issue, e **apague a variável**; a execução seguinte fecha a issue.
+
+### Silenciar durante manutenção
+
+- **Pausar:** variável do repositório `UPTIME_PAUSED=true` (o job é pulado, não fica vermelho, não manda e-mail) — ou `gh workflow disable uptime.yml`. **Desfazer ao terminar** (apagar a variável / `gh workflow enable uptime.yml`): a pausa não expira sozinha e uma issue aberta continua aberta até a próxima execução saudável.
+- Rodar na hora: *Actions → Uptime → Run workflow* (`workflow_dispatch`).
+
+### Limites conhecidos
+
+- O agendador do GitHub é *best effort*: pode atrasar ou pular execuções; 10 min não é garantia.
+- Em repositório público o GitHub **desativa os workflows agendados após 60 dias sem atividade no repositório**. Com commits frequentes isso não ocorre; se o projeto ficar parado, reabilite em *Actions*. Um monitor parado não avisa da própria parada.
+- Se o GitHub falhar antes da sonda (ex.: o checkout), o passo da sonda é pulado: o job fica vermelho, **mas nenhuma issue é aberta** (não prova queda da VPS).
+- Se as issues forem desabilitadas ou o `GITHUB_TOKEN` perder `issues: write`, o passo da issue falha e o job fica vermelho mesmo com a VPS saudável.
+- A sonda vê a borda e a api, **não** o banco, o Redis, os workers nem a gravação dos dados (ver "O que NÃO checa").

@@ -21,11 +21,14 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 - **Estado em 05/10:** 0 posições abertas (meme e `spot/1`), 0 ordens `submitted_unconfirmed`, mesas pausadas. **Não mover o pino** antes da T4.8e (checklist da T4.8d, passo 4). Enquanto isso o executor fica fora: sem checagem de holdings nem heartbeat (aceitável com 0 posições).
 - **T4.8e (em curso, 05/10):** cauda conhecida aceita depois dos campos variáveis; SellEvent consertado; contador e `mark_gap` no meme-worker; fixtures `t48e_*`; simulação na mainnet; teste envio → falha de decode → reinício → fechamento único; só então o pino. Desenho à parte: guarda escopado às pistas pump, com PumpSwap e `pfeeUx` no detector.
 - Avaliar a cobertura das EXP da pista de eventos de 02/10 15:47Z até o deploy do conserto (acréscimo datado).
-Revisão: [[T4.8e-upgrade-02-10]].
+- **T4.8e — decodificadores consertados em código (05/10), sem commit/deploy e com o pino em T4.8d:** `TradeEvent` aceita a cauda de 24 B depois dos campos variáveis (`trailing_u64`, nunca somada), `SellEvent` decodifica os 41 B + 8 B, o fallback da PumpSwap pelo delta roda de verdade e as três pistas contam e marcam `mark_gap` (heartbeat `*_undecodable_*`). Falta: simulação mainnet, teste de fechamento único, revisão do guardião e só então o pino ([[T4.8e-decoders]]).
+- **Abertos pela revisão da T4.8e (preexistentes, não regressão):** (1) a `launch_lane` segue fechando apostas paper com resultado normal depois de perder o gatilho de saída — `mark_gap` limpa trades mas preserva preços; é preciso censurar/invalidar a medição afetada (EXP-M18); (2) `event_gate`/`launch_lane` aplicam eventos de **outros mints** da mesma transação (o `event_exits` filtra por mint, o worker não); (3) `MintEventState.covered_from_birth` tolera 5 s, então uma venda do criador perdida nos primeiros 5 s ainda deixa `sold_any = False` depois do aquecimento; (4) a perda de decode ainda não é gravada em `ingestion_gaps` (só heartbeat + log + gap em memória).
+Revisão: [[T4.8e-upgrade-02-10]] · [[T4.8e-decoders]].
 
 ## A VPS travou em 04/10 ~09:15Z e ficou ~29 h fora (05/10)
 
 **HIGH (operação).** O journal do boot anterior termina em 04/10 11:15 CEST (09:15Z) sem OOM, pane ou "hung task"; último sinal do Lab 04/10 09:15:03Z; reinício em 05/10 14:35Z com kernel novo (6.8.0-142). Nenhuma posição aberta no período (mesas pausadas); backups de 02, 03 e 04/10 íntegros. Causa provável do lado do provedor — **não confirmada**. O scanner já tinha parado de gravar em 02/10 10:12Z, antes do travamento (diagnóstico em curso, [[Scanner-lag-2026-10-01]]). Falta: alarme externo de "VPS fora do ar" (hoje ninguém fica sabendo até alguém olhar). Diário: [[2026-10-05]].
+Alarme externo (05/10, escrito, ainda não commitado/executado): sonda do GitHub Actions a cada 10 min no site e na api, com issue "VPS fora do ar"; **não cobre frescor dos dados** (falta endpoint público): [[Alarme-de-disponibilidade]].
 
 ## `scanner-worker` não persiste nada desde 30/09 ~13:36Z e vira 2 h de lag no stream (01/10)
 
