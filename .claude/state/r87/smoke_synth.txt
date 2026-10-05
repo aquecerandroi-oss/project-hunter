@@ -1,0 +1,12 @@
+## positivo 0,03 %/8 h: 379 semanas
+A0: CONFIRMA (todas as cláusulas nos dois limites e nas duas convenções de fronteira); pes/after anual +0.1553 IC [+0.1534; +0.1582] Holm 0.0015 episódios 20
+A1: CONFIRMA (todas as cláusulas nos dois limites e nas duas convenções de fronteira); pes/after anual +0.1546 IC [+0.1526; +0.1576] Holm 0.0015 episódios 45
+A2: CONFIRMA (todas as cláusulas nos dois limites e nas duas convenções de fronteira); pes/after anual +0.1410 IC [+0.1378; +0.1456] Holm 0.0015 episódios 169
+## nulo 0: 379 semanas
+A0: REFUTA (IC superior < 5 % a.a. nos dois limites e nas duas convenções); pes/after anual -0.0065 IC [-0.0084; -0.0036] Holm 1.0000 episódios 20
+A1: REFUTA (IC superior < 5 % a.a. nos dois limites e nas duas convenções); pes/after anual -0.0003 IC [-0.0015; +0.0010] Holm 1.0000 episódios 711
+A2: NÃO CONFIRMA — LIMITE DE DADO (cobertura 12 blocos de 13 sem. (6 antes, 6 depois)); pes/after anual +0.0002 IC [+0.0000; +0.0004] Holm 0.1304 episódios 14
+## negativo −0,02 %/8 h: 379 semanas
+A0: REFUTA (IC superior < 5 % a.a. nos dois limites e nas duas convenções); pes/after anual -0.1169 IC [-0.1190; -0.1140] Holm 1.0000 episódios 20
+A1: REFUTA (IC superior < 5 % a.a. nos dois limites e nas duas convenções); pes/after anual -0.0011 IC [-0.0014; -0.0008] Holm 1.0000 episódios 50
+A2: NÃO CONFIRMA — LIMITE DE DADO (cobertura 0 blocos de 13 sem. (0 antes, 0 depois)); pes/after anual +0.0000 IC [+0.0000; +0.0000] Holm 1.0000 episódios 0

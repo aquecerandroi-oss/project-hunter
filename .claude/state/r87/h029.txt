@@ -1,0 +1,73 @@
+# R87 — H-029 (registrada como H-028) no dado real (spot as_of 2026-09-28; T 2019-09-09 → 2026-09-14)
+séries à vista 760; com perpétuo mapeado 480; contratos com multiplicador ['1000BONKUSDT', '1000BTTCUSDT', '1000FLOKIUSDT', '1000LUNCUSDT', '1000PEPEUSDT', '1000SHIBUSDT', '1000XECUSDT']; perpétuos com lacuna ≥ 14 d partidos []; carregado em 14 s
+semanas 340 (2020-03-16 → 2026-09-14); símbolos distintos no universo 202; N_T médio 19.99; semanas com N_T < 15: 0
+A1: entradas pela regra (só decisão, sem liquidação/fim de série) 602 em 249 semanas
+A2: entradas pela regra (só decisão, sem liquidação/fim de série) 200 em 57 semanas
+semanas 340 (2020-03-16 → 2026-09-14), antes de 2023: 146; N_T médio 19.99; semanas com N_T < 15 depois do início: 0
+## Veredito por braço (Holm sobre A0/A1/A2 em cada célula; rótulo exige as 4 células)
+A0: NÃO CONFIRMA — nem todas as cláusulas, e o IC não exclui 5 % a.a. em todas as células
+A1: NÃO CONFIRMA — nem todas as cláusulas, e o IC não exclui 5 % a.a. em todas as células
+A2: NÃO CONFIRMA — LIMITE DE DADO — cobertura 12 blocos de 13 sem. (7 antes, 5 depois)
+## Células (anualizado aritmético = 52 × média semanal sobre o capital total)
+[opt/after] A0: +2.39 % IC [-3.01 %; +10.30 %] p 0.2465 Holm 0.2465 | antes 2023 +10.41 % depois -3.65 % | patamar — | cobertura (26, 11, 15) | episódios 592 em 291 sem. | funding ausente 0.044%
+[opt/after] A1: +5.92 % IC [+1.34 %; +13.25 %] p 0.0501 Holm 0.1503 | antes 2023 +12.65 % depois +0.86 % | patamar +5.60 %, +5.97 % | cobertura (26, 11, 15) | episódios 624 em 251 sem. | funding ausente 0.000%
+[opt/after] A2: +5.12 % IC [+0.79 %; +12.15 %] p 0.0658 Holm 0.1503 | antes 2023 +11.35 % depois +0.43 % | patamar +5.41 %, +4.85 % | cobertura (12, 7, 5) | episódios 211 em 59 sem. | funding ausente 0.000%
+[opt/before] A0: +2.33 % IC [-3.06 %; +10.26 %] p 0.2517 Holm 0.2517 | antes 2023 +10.33 % depois -3.69 % | patamar — | cobertura (26, 11, 15) | episódios 592 em 291 sem. | funding ausente 0.044%
+[opt/before] A1: +5.93 % IC [+1.36 %; +13.24 %] p 0.0497 Holm 0.1491 | antes 2023 +12.66 % depois +0.87 % | patamar +5.61 %, +5.98 % | cobertura (26, 11, 15) | episódios 624 em 251 sem. | funding ausente 0.000%
+[opt/before] A2: +5.14 % IC [+0.80 %; +12.17 %] p 0.0652 Holm 0.1491 | antes 2023 +11.38 % depois +0.44 % | patamar +5.42 %, +4.87 % | cobertura (12, 7, 5) | episódios 211 em 59 sem. | funding ausente 0.000%
+[pes/after] A0: +1.38 % IC [-3.84 %; +9.01 %] p 0.3379 Holm 0.3379 | antes 2023 +9.07 % depois -4.40 % | patamar — | cobertura (26, 11, 15) | episódios 592 em 291 sem. | funding ausente 0.044%
+[pes/after] A1: +5.32 % IC [+1.00 %; +12.27 %] p 0.0584 Holm 0.1752 | antes 2023 +11.64 % depois +0.57 % | patamar +4.97 %, +5.49 % | cobertura (26, 11, 15) | episódios 624 em 251 sem. | funding ausente 0.000%
+[pes/after] A2: +4.75 % IC [+0.66 %; +11.44 %] p 0.0684 Holm 0.1752 | antes 2023 +10.62 % depois +0.33 % | patamar +5.01 %, +4.51 % | cobertura (12, 7, 5) | episódios 211 em 59 sem. | funding ausente 0.000%
+[pes/before] A0: +1.33 % IC [-3.91 %; +8.96 %] p 0.3442 Holm 0.3442 | antes 2023 +9.00 % depois -4.44 % | patamar — | cobertura (26, 11, 15) | episódios 592 em 291 sem. | funding ausente 0.044%
+[pes/before] A1: +5.33 % IC [+1.00 %; +12.26 %] p 0.0581 Holm 0.1743 | antes 2023 +11.65 % depois +0.57 % | patamar +4.98 %, +5.49 % | cobertura (26, 11, 15) | episódios 624 em 251 sem. | funding ausente 0.000%
+[pes/before] A2: +4.77 % IC [+0.67 %; +11.46 %] p 0.0681 Holm 0.1743 | antes 2023 +10.65 % depois +0.35 % | patamar +5.03 %, +4.52 % | cobertura (12, 7, 5) | episódios 211 em 59 sem. | funding ausente 0.000%
+## Descritivo [opt/after]
+A0: funding +4.40 % basis -0.15 % à vista descoberta +14.43 % custos -1.74 % liquidação -14.55 % = +2.39 %; exposição média 0.998; Sharpe 0.53; DD máx -19.81 %; pior semana -2.27 %; liquidações 38; fim à vista 1; fim perp 0; presas 9; guarda 7; marca ausente→negociado 0
+   por ano: 2020 +7.55 % (42 sem.); 2021 +28.85 % (52 sem.); 2022 -5.73 % (52 sem.); 2023 -6.60 % (52 sem.); 2024 +1.78 % (53 sem.); 2025 -3.28 % (52 sem.); 2026 -7.80 % (37 sem.)
+   episódios: n 592, média +0.44 % da vaga, mediana -0.11 %, > 0 em 41%, IC por semana de entrada [-0.42 %; +1.48 %], duração média 11.5 sem., censurados 20
+   funding nas 3 maiores: ['XRPUSDT', 'ETHUSDT', 'ADAUSDT'] = 24% do funding
+A1: funding +6.63 % basis +0.00 % à vista descoberta +10.85 % custos -1.54 % liquidação -10.03 % = +5.92 %; exposição média 0.622; Sharpe 1.43; DD máx -1.52 %; pior semana -1.08 %; liquidações 26; fim à vista 0; fim perp 0; presas 0; guarda 7; marca ausente→negociado 0
+   por ano: 2020 +9.37 % (42 sem.); 2021 +28.83 % (52 sem.); 2022 -0.88 % (52 sem.); 2023 +1.38 % (52 sem.); 2024 +2.44 % (53 sem.); 2025 +0.17 % (52 sem.); 2026 -1.16 % (37 sem.)
+   episódios: n 624, média +1.24 % da vaga, mediana +0.02 %, > 0 em 51%, IC por semana de entrada [+0.70 %; +1.92 %], duração média 6.8 sem., censurados 16
+   funding nas 3 maiores: ['XRPUSDT', 'ETHUSDT', 'ADAUSDT'] = 15% do funding
+A2: funding +4.27 % basis +0.04 % à vista descoberta +7.49 % custos -0.50 % liquidação -6.18 % = +5.12 %; exposição média 0.167; Sharpe 1.26; DD máx -0.79 %; pior semana -0.79 %; liquidações 16; fim à vista 0; fim perp 0; presas 0; guarda 0; marca ausente→negociado 0
+   por ano: 2020 +6.56 % (42 sem.); 2021 +26.57 % (52 sem.); 2022 +0.00 % (52 sem.); 2023 +0.30 % (52 sem.); 2024 +1.26 % (53 sem.); 2025 +0.00 % (52 sem.); 2026 +0.00 % (37 sem.)
+   episódios: n 211, média +3.17 % da vaga, mediana +1.07 %, > 0 em 83%, IC por semana de entrada [+1.53 %; +5.29 %], duração média 5.4 sem., censurados 0
+   funding nas 3 maiores: ['XRPUSDT', 'ADAUSDT', 'ETHUSDT'] = 15% do funding
+A1 − A0: +3.54 % IC [+2.08 %; +5.22 %]
+A2 − A0: +2.73 % IC [+0.76 %; +4.75 %]
+## Descritivo [pes/after]
+A0: funding +3.37 % basis -0.15 % à vista descoberta +14.43 % custos -1.74 % liquidação -14.52 % = +1.38 %; exposição média 0.998; Sharpe 0.31; DD máx -23.56 %; pior semana -2.28 %; liquidações 38; fim à vista 1; fim perp 0; presas 9; guarda 7; marca ausente→negociado 0
+   por ano: 2020 +6.58 % (42 sem.); 2021 +26.60 % (52 sem.); 2022 -6.44 % (52 sem.); 2023 -7.59 % (52 sem.); 2024 +1.14 % (53 sem.); 2025 -3.83 % (52 sem.); 2026 -8.66 % (37 sem.)
+   episódios: n 592, média +0.23 % da vaga, mediana -0.13 %, > 0 em 39%, IC por semana de entrada [-0.63 %; +1.23 %], duração média 11.5 sem., censurados 20
+   funding nas 3 maiores: ['XRPUSDT', 'ETHUSDT', 'ADAUSDT'] = 29% do funding
+A1: funding +6.01 % basis +0.00 % à vista descoberta +10.85 % custos -1.54 % liquidação -10.01 % = +5.32 %; exposição média 0.622; Sharpe 1.31; DD máx -1.90 %; pior semana -1.11 %; liquidações 26; fim à vista 0; fim perp 0; presas 0; guarda 7; marca ausente→negociado 0
+   por ano: 2020 +8.63 % (42 sem.); 2021 +26.87 % (52 sem.); 2022 -1.15 % (52 sem.); 2023 +1.11 % (52 sem.); 2024 +1.88 % (53 sem.); 2025 +0.03 % (52 sem.); 2026 -1.34 % (37 sem.)
+   episódios: n 624, média +1.11 % da vaga, mediana -0.01 %, > 0 em 49%, IC por semana de entrada [+0.58 %; +1.79 %], duração média 6.8 sem., censurados 16
+   funding nas 3 maiores: ['XRPUSDT', 'ETHUSDT', 'ADAUSDT'] = 16% do funding
+A2: funding +3.89 % basis +0.04 % à vista descoberta +7.49 % custos -0.50 % liquidação -6.17 % = +4.75 %; exposição média 0.167; Sharpe 1.20; DD máx -0.87 %; pior semana -0.87 %; liquidações 16; fim à vista 0; fim perp 0; presas 0; guarda 0; marca ausente→negociado 0
+   por ano: 2020 +6.05 % (42 sem.); 2021 +24.94 % (52 sem.); 2022 +0.00 % (52 sem.); 2023 +0.24 % (52 sem.); 2024 +0.99 % (53 sem.); 2025 +0.00 % (52 sem.); 2026 +0.00 % (37 sem.)
+   episódios: n 211, média +2.95 % da vaga, mediana +0.93 %, > 0 em 81%, IC por semana de entrada [+1.34 %; +5.01 %], duração média 5.4 sem., censurados 0
+   funding nas 3 maiores: ['XRPUSDT', 'ADAUSDT', 'ETHUSDT'] = 15% do funding
+A1 − A0: +3.94 % IC [+2.37 %; +5.73 %]
+A2 − A0: +3.37 % IC [+1.30 %; +5.47 %]
+## Robustez (não decide)
+blocos de 8 sem. [pes/after] A0: IC [-3.34 %; +7.59 %]
+blocos de 8 sem. [pes/after] A1: IC [+1.29 %; +11.00 %]
+blocos de 8 sem. [pes/after] A2: IC [+0.88 %; +10.19 %]
+blocos de 26 sem. [pes/after] A0: IC [-4.82 %; +10.68 %]
+blocos de 26 sem. [pes/after] A1: IC [+0.38 %; +13.69 %]
+blocos de 26 sem. [pes/after] A2: IC [+0.32 %; +12.70 %]
+custos dobrados [pes/after] A0: -0.35 % IC [-5.50 %; +7.23 %]
+custos dobrados [pes/after] A1: +3.78 % IC [-0.42 %; +10.61 %]
+custos dobrados [pes/after] A2: +4.24 % IC [+0.33 %; +10.69 %]
+sem ['XRPUSDT', 'ETHUSDT', 'ADAUSDT'] [pes/after] A0: +0.37 % IC [-4.84 %; +7.58 %]
+sem ['XRPUSDT', 'ETHUSDT', 'ADAUSDT'] [pes/after] A1: +4.66 % IC [+0.45 %; +11.10 %]
+sem ['XRPUSDT', 'ADAUSDT', 'ETHUSDT'] [pes/after] A2: +4.12 % IC [+0.18 %; +10.26 %]
+## Diagnóstico de cauda (NÃO pré-registrado; depois de ver as liquidações; não decide)
+A0: resultado contabilizado das 38 vagas liquidadas (semana da liquidação, sem o custo de reajuste) -0.07 % a.a.; subtraído, restam +1.46 % (não é estratégia contrafactual sem liquidações); as 30 semanas inteiras com alguma liquidação somam +1.84 % e o resto das semanas (mesmo denominador) -0.46 %; 5 melhores semanas = +2.89 % a.a.; sem 2021 -3.17 %; desde 2023: funding -0.21 % basis -0.11 % à vista descoberta +6.37 % custos -1.83 % liquidação -8.63 % = -4.40 %
+A1: resultado contabilizado das 26 vagas liquidadas (semana da liquidação, sem o custo de reajuste) +0.89 % a.a.; subtraído, restam +4.44 % (não é estratégia contrafactual sem liquidações); as 20 semanas inteiras com alguma liquidação somam +2.78 % e o resto das semanas (mesmo denominador) +2.54 %; 5 melhores semanas = +2.89 % a.a.; sem 2021 +1.43 %; desde 2023: funding +3.10 % basis +0.01 % à vista descoberta +3.62 % custos -1.47 % liquidação -4.70 % = +0.57 %
+A2: resultado contabilizado das 16 vagas liquidadas (semana da liquidação, sem o custo de reajuste) +1.36 % a.a.; subtraído, restam +3.40 % (não é estratégia contrafactual sem liquidações); as 13 semanas inteiras com alguma liquidação somam +2.92 % e o resto das semanas (mesmo denominador) +1.83 %; 5 melhores semanas = +2.89 % a.a.; sem 2021 +1.11 %; desde 2023: funding +0.91 % basis +0.03 % à vista descoberta +0.31 % custos -0.25 % liquidação -0.67 % = +0.33 %
+antecipação no dado real: 25 semanas reconstruídas só com velas < T e funding ≤ T − 1 h; divergências de universo/S7/entradas A1-A2 (por símbolo, sem o sufixo #k): nenhuma
+trajetória (A0/A1/A2, pes/after) refeita com o dado cortado até a semana anterior a T — posições abertas e P&L semanal idênticos: divergências ['2022-12-19 A0', '2023-03-13 A0', '2023-05-08 A0', '2023-06-26 A0']
+tempo total 134 s

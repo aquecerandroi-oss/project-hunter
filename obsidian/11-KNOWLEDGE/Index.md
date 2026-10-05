@@ -212,6 +212,8 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0177-decaimento-e-regime-o-que-a-literatura-de-cripto-mostra]] | modos de falha / decaimento pós-publicação, regime, sobrevivência, caudas pesadas | McLean & Pontiff 2016; Anghel 2021; Grobys & Shahzad 2026 (resumos); Deprez & Frömmel 2024 | estudo revisado | não |
 | [[KB-0178-data-snooping-e-poucos-clusters-o-que-vale-para-a-h-027]] | estatística / Reality Check, SPA, t > 3, Sharpe deflacionado e poucos clusters aplicados à H-027 | White 2000; Hansen 2005; Harvey et al. 2016; Bailey & López de Prado 2014; Cameron et al. 2008 (resumos) | estudo revisado | não |
 | [[KB-0179-o-que-um-resultado-da-c1-pode-e-nao-pode-dizer]] | síntese / que resultado da C1 (H-027) é compatível com a literatura e qual seria suspeito | KB-0173 a KB-0178 + conta de ordem de grandeza | ? (síntese) | não |
+| [[KB-0180-carry-de-funding]] | carry de funding protegido / mecânica da Binance (0,01 %/8 h, 4 h em 467 de 801 contratos, tetos), rentabilidade publicada, encolhimento e cauda (base da H-029) | He, Manela, Ross & von Wachter 2024 (lido); Schmeling, Schrimpf & Todorov (BIS 1087, resumo); `fapi/v1/fundingInfo` | backtest do autor | H-029 |
+| [[KB-0181-carry-de-funding-no-dado]] | H-029: carry protegido no top-20 da Binance 2020–2026 — A1 +5,3 % a.a. mas Holm 0,15–0,175 e +0,6 % desde 2023; A0 −4,4 % desde 2023; NÃO CONFIRMA | R87 (05/10/2026) | backtest do autor | H-029 |
 
 ## O que a primeira rodada mudou de fato
 

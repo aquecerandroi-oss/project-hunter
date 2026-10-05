@@ -1,0 +1,5 @@
+# R87 — H-028 no dado real (spot as_of 2026-09-28; T 2019-09-09 → 2026-09-14)
+séries à vista 760; com perpétuo mapeado 480; contratos com multiplicador ['1000BONKUSDT', '1000BTTCUSDT', '1000FLOKIUSDT', '1000LUNCUSDT', '1000PEPEUSDT', '1000SHIBUSDT', '1000XECUSDT']; perpétuos com lacuna ≥ 14 d partidos []; carregado em 15 s
+semanas 340 (2020-03-16 → 2026-09-14); símbolos distintos no universo 202; N_T médio 19.99; semanas com N_T < 15: 0
+A1: entradas pela regra (só decisão, sem liquidação/fim de série) 602 em 249 semanas
+A2: entradas pela regra (só decisão, sem liquidação/fim de série) 200 em 57 semanas

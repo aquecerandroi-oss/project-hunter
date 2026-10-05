@@ -1,0 +1,150 @@
+**RESUMO**
+
+**Os rótulos estão corretos para a saída atual: A0 e A1 NÃO CONFIRMA; A2 NÃO CONFIRMA — LIMITE DE DADO.** Reproduzi o cálculo. Entretanto, há duas inconsistências de orçamento e duas correções necessárias na apresentação. Não encontrei dupla contagem da perda na liquidação. [analyze87.py:116](C:/dev/project-hunter/.claude/state/r87/analyze87.py:116), [sim87.py:123](C:/dev/project-hunter/.claude/state/r87/sim87.py:123)
+
+Atuei como `quant-engineer`, considerando também os cartões do advogado-de-jesus e do defensor.
+
+**ARQUIVOS**
+
+Nenhum arquivo criado ou modificado. As verificações adicionais rodaram em memória, sem executar os caminhos que gravam relatórios.
+
+**TESTES**
+
+Executei, com sincronização, bytecode, cache do pytest e carregamento automático de plugins desabilitados:
+
+```text
+uv run pytest .claude/state/r87/test_r87.py -q -p no:cacheprovider
+20 passed, 1 warning in 0.72s
+```
+
+O aviso foi `Unknown config option: asyncio_mode`, decorrente dos plugins desabilitados.
+
+Também executei:
+
+- O cálculo real pelas funções `load_market → mondays → run`: reproduziu as quatro células e os três rótulos.
+- `lookahead_real`: 25 semanas, nenhuma divergência de universo/S7/entradas A1-A2.
+- `uv run python -B .claude/state/r87/check_funding.py`: por exemplo, 2023 retornou `simulador -0.69 % ... soma direta -0.61 %`; 2024, `+6.68 % ... +6.20 %`.
+- Reproduções sintéticas e diagnósticos em memória descritos abaixo.
+
+**MUST-FIX**
+
+**1. A reserva de uma posição presa contradiz seu próprio saldo de margem.**
+
+O orçamento reserva `q·(S + F/m)`, mas a liquidação usa margem inicial `q·(2·f_ref − F)/m`. Enquanto `f_ref` não é atualizado, nocional atual e margem remanescente são diferentes. [sim87.py:78](C:/dev/project-hunter/.claude/state/r87/sim87.py:78), [sim87.py:164](C:/dev/project-hunter/.claude/state/r87/sim87.py:164)
+
+**Cenário comprovado:** 21 moedas, top-20; uma posição entra com S=F=100, cai para 50, fica sem abertura spot e sai do universo. Sem funding:
+
+```text
+reported_exposure 0.9999999999999997
+reserved_stuck 0.025
+actual_stuck_equity_without_funding 0.05
+new_positions_plus_actual_stuck 1.0249999999999997
+```
+
+O motor informa 100%, mas mantém **102,5% de capital comprometido segundo sua própria conta de margem**. Se a intenção é retirar a margem excedente, essa transferência precisa também atualizar o saldo usado na liquidação.
+
+**Impacto real delimitado:** as nove ocorrências presas foram FTT no A0; A1 não teve posições presas. Trocando **somente em memória** a reserva pelo saldo usado na liquidação, A0 pessimista/principal mudou:
+
+```text
+original:                    1.3868715627 % a.a.
+reserva de margem corrigida: 1.3864299260 % a.a.
+diferença:                  -0.0004416367 p.p. a.a.
+```
+
+Portanto, é um defeito real, mas esse diagnóstico não explica a rentabilidade nem ameaça materialmente o veredito apresentado. Não equivale a uma correção completa do ledger. [h029.txt:40](C:/dev/project-hunter/.claude/state/r87/h029.txt:40), [h029.txt:44](C:/dev/project-hunter/.claude/state/r87/h029.txt:44)
+
+**2. Os custos são descontados do retorno, mas não reservados no orçamento.**
+
+O dimensionamento consome todo `w` em spot e margem; o custo entra depois, apenas no PnL. [sim87.py:179](C:/dev/project-hunter/.claude/state/r87/sim87.py:179), [sim87.py:215](C:/dev/project-hunter/.claude/state/r87/sim87.py:215)
+
+**Cenário comprovado:** carteira inicialmente toda ligada, preços iguais e funding zero:
+
+```text
+entry_assets_and_margin 1.0
+entry_cost 0.00125
+entry_cash_needed 1.00125
+```
+
+Faltam **0,125% de caixa na entrada**. Não é custo omitido da rentabilidade; é uma inconsistência de financiamento com “custos saem do capital”. É necessário reconciliar dimensionamento, caixa e margem — inclusive custos de saída/rebalanceamento — e repetir o protocolo sem escolher parâmetros novos.
+
+**3. “Sem semanas de liquidação” não descreve o cálculo executado.**
+
+`tails()` subtrai a soma dos resultados das **vagas liquidadas**, mantendo as outras posições dessas semanas e o denominador original. Além disso, `liq_events.net` não inclui o custo de entrada/rebalanceamento debitado fora de `week_outcome`. [run_real.py:168](C:/dev/project-hunter/.claude/state/r87/run_real.py:168), [sim87.py:128](C:/dev/project-hunter/.claude/state/r87/sim87.py:128), [sim87.py:185](C:/dev/project-hunter/.claude/state/r87/sim87.py:185)
+
+Recalculei A1 pessimista/principal:
+
+| Diagnóstico | Contribuição anualizada |
+|---|---:|
+| Vagas liquidadas, como no relatório | +0,888 p.p. |
+| Semanas inteiras com alguma liquidação | +2,781 p.p. |
+| Restante após retirar essas semanas, mantendo o denominador original | +2,548% |
+
+**Cenário de falha:** o leitor interpreta +4,44% como retorno sem as semanas de cauda, mas essa remoção produziria outro número.
+
+Corrigir para: **“Subtraindo a contribuição contabilizada das vagas liquidadas, restam +4,44% a.a.; não é uma estratégia contrafactual sem liquidações.”** A formulação incorreta já está na nota. [KB-0181:85](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0181-carry-de-funding-no-dado.md:85)
+
+**4. Restringir a conclusão histórica ao objeto medido.**
+
+“O A1 deste modelo teve retorno líquido pequeno desde 2023” é honesto. **“O carry da Binance foi um negócio de 2020–2021”** e **“exatamente o que a literatura avisava”** generalizam demais. [KB-0181:33](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0181-carry-de-funding-no-dado.md:33), [KB-0181:97](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0181-carry-de-funding-no-dado.md:97)
+
+Dois motivos concretos:
+
+- Desde 2023, A1 recebeu **+3,11% a.a. de funding**, chegando a **+0,57% líquido** depois dos outros componentes. Funding recebido e retorno líquido da estratégia não são intercambiáveis. [h029.txt:69](C:/dev/project-hunter/.claude/state/r87/h029.txt:69)
+- Os −1,94% e −0,94% de He et al. estão corretos, mas são a contribuição do funding **na estratégia de convergência deles**. A mesma tabela mostra BTC **+6,03% em 2024**. Isso sustenta variação temporal; não demonstra desaparecimento permanente do carry. [He et al., tabela 8](https://arxiv.org/html/2212.06888v5#S4.T8)
+
+Eu escreveria:
+
+> Neste backtest do top-20, com seleção por funding passado, margem a 1× e custos assumidos de varejo, o retorno do A1 concentrou-se em 2020–2021. Desde 2023, sua média líquida foi +0,6% a +0,9% a.a., abaixo do MRE. O padrão é qualitativamente compatível com a variação temporal documentada por He et al., mas não replica a estratégia deles nem prova que o carry deixou de existir.
+
+**NICE-TO-HAVE**
+
+- **Ampliar a guarda de antecipação para manutenção e saída.** O teste real compara decisões com `on_prev=set()`: cobre entradas, não a trajetória de posições já abertas. A correção do sufixo é aceitável para essa comparação por símbolo, mas não certifica toda a máquina de estados. [run_real.py:81](C:/dev/project-hunter/.claude/state/r87/run_real.py:81)
+- **Separar economicamente basis e spot descoberto.** Nas liquidações, o campo `basis` recebe o resultado da perna spot; o nome pode induzir leitura de convergência protegida. [sim87.py:124](C:/dev/project-hunter/.claude/state/r87/sim87.py:124)
+- **Tratar `check_funding.py` como conferência de plausibilidade.** Ele usa metade do capital por vaga e soma taxas sem preços nem a trajetória efetiva de posições. É útil, mas não é reconciliação independente exata do caixa. [check_funding.py:30](C:/dev/project-hunter/.claude/state/r87/check_funding.py:30)
+- Acrescentar testes de conservação de capital com substituição de vaga presa e custos, além de funding negativo nos dois extremos de marca.
+
+**O QUE EU FARIA DIFERENTE**
+
+O primeiro ataque de cada perspectiva seria:
+
+| Perspectiva | Primeiro ataque |
+|---|---|
+| **Advogado-de-jesus** | “Quanto do ganho depende de exposição direcional depois da liquidação, concentração em 2021 e financiamento não reconciliado?” |
+| **Defensor** | “Por que transformar falha em Holm numa sentença contra todo carry, se o IC ainda comporta efeitos economicamente relevantes e o teste mede uma implementação específica?” |
+
+O advogado tem apoio concreto: sem 2021, A1 cai para +1,43% a.a.; os componentes após liquidação precisam ser identificados corretamente. O defensor também: o IC superior do A1 continua muito acima de 5%, e A2 falha primeiro em cobertura. [h029.txt:69](C:/dev/project-hunter/.claude/state/r87/h029.txt:69), [h029.txt:19](C:/dev/project-hunter/.claude/state/r87/h029.txt:19), [h029.txt:10](C:/dev/project-hunter/.claude/state/r87/h029.txt:10)
+
+Eu corrigiria a contabilidade e a redação, preservando o protocolo e a saída original. Não trocaria agora o teste estatístico, o bloco, os limiares ou a política pós-liquidação para tentar confirmar.
+
+**CONCORDO COM**
+
+**IC percentil positivo e p centrado próximo de 0,05 são coerentes.** Eles não são procedimentos inversos entre si. O percentil usa os quantis de `μ*`; o p implementado conta `μ*−μ̂ ≥ μ̂`, equivalente a `μ* ≥ 2μ̂`. [stats84.py:36](C:/dev/project-hunter/.claude/state/r84/stats84.py:36), [stats84.py:41](C:/dev/project-hunter/.claude/state/r84/stats84.py:41)
+
+No A1 pessimista/principal, reproduzi:
+
+```text
+estimativa anual:             5.3287%
+quantil 2,5%:                 0.9991%
+quantil 95%:                 10.9499%
+quantil 97,5%:               12.2848%
+duas vezes a estimativa:     10.6574%
+réplicas acima desse valor:  583 / 10000
+p com correção +1:            0.058394
+```
+
+A cauda direita explica matematicamente a coexistência. Como diagnóstico, o intervalo básico refletido seria **[−1,63%; +9,66%]**, mas não deve substituir o intervalo congelado. A concentração em 2021 é compatível com essa assimetria; não prova, sozinha, toda sua origem.
+
+**A1 NÃO CONFIRMA está certo.** Holm falha nas quatro células; o IC superior não exclui 5%. Inclusive a célula com p bruto 0,0497 continua com Holm 0,1491. [h029.txt:16](C:/dev/project-hunter/.claude/state/r87/h029.txt:16)
+
+**A2 está corretamente em limite de dado.** São 12 blocos com exposição, abaixo de 15, e a implementação verifica esse piso antes de confirmar ou refutar. Não são necessariamente “12 trimestres civis”. [analyze87.py:39](C:/dev/project-hunter/.claude/state/r87/analyze87.py:39), [analyze87.py:118](C:/dev/project-hunter/.claude/state/r87/analyze87.py:118)
+
+**A contabilidade terminal da liquidação não duplica a perda:** `funding + liq = −margin0`; o spot continua até a saída prevista, com seu custo. A exposição descoberta é uma premissa explícita, não dinheiro inventado por essa fórmula. [sim87.py:101](C:/dev/project-hunter/.claude/state/r87/sim87.py:101), [sim87.py:123](C:/dev/project-hunter/.claude/state/r87/sim87.py:123)
+
+Também concordo com S7 defasado, valorização adversa/favorável conforme o sinal da taxa, custo das duas saídas no encerramento da amostra e A1−A0 mantido como descritivo. [engine87.py:68](C:/dev/project-hunter/.claude/state/r87/engine87.py:68), [engine87.py:168](C:/dev/project-hunter/.claude/state/r87/engine87.py:168), [sim87.py:207](C:/dev/project-hunter/.claude/state/r87/sim87.py:207), [pré-registro:6](C:/dev/project-hunter/.claude/state/r87/prereg_with_amendment.md:6)
+
+**OBSIDIAN**
+
+- **KB-0181 — Carry de funding no dado:** corrigir vagas versus semanas, restringir a conclusão ao A1 testado e registrar as ressalvas contábeis.
+- **KB-0180 — Carry de funding:** distinguir contribuição na estratégia de He et al. de funding geral do mercado; mencionar a recuperação de 2024.
+- **Fila de Hipóteses — H-029:** preservar protocolo e resultado original; acrescentar revisão e eventual recálculo contábil identificado.
+- **Revisões-Astra — H-029-carry-resultado:** registrar reproduções, achados, impacto medido e justificativa dos três rótulos.

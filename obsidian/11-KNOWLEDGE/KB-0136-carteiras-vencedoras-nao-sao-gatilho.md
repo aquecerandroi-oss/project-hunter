@@ -33,3 +33,5 @@ mercado: meme
 **Ressalvas.** Fita cobre 5,3 % dos mints e ~100 s por mint; universo já filtrado pela mesa (16 % graduaram vs 3,1 % da população); 30 % das trajetórias censuradas.
 
 Ligações: [[EXP-M15-carteiras-vencedoras]] · [[KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] · [[KB-0135-a-vantagem-nao-esta-na-saida]]
+
+**Desdobramento (05/10/2026).** O pedido do Everton de "seguir quem faz dinheiro de verdade" virou desenho + rascunho H-030, com ranking por PnL **copiável** no nosso atraso, entidades e feed do programa inteiro. Esta nota continua valendo até haver veredito. Ver [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]].

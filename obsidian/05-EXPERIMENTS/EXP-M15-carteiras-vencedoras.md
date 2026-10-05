@@ -100,3 +100,13 @@ R57 (`.claude/state/notes-R57.md`: análise bruta, SQL, caveats — cobertura da
 EXP-M14 (régua de R, clone de `flow_v2/6`, forma do pré-registro)
 docs/DATABASE.md § 33 (`meme_trades`), § 43.2 (portão de evento lê `meme_features_15s`, `meme_event_gate_v1`)
 docs/RISK_ENGINE_MEME.md § 9 (desenho do portão de evento)
+
+## Linhagem (05/10/2026)
+
+O pedido do Everton "seguir quem faz dinheiro de verdade" gerou um desenho novo, `docs/design/seguir-carteiras-lucrativas.md`, e o rascunho **H-030** (`.claude/state/carteiras-lucro/PREREG.md`, ainda fora da Fila). Ele **não substitui** este rascunho sem aprovação e difere em quatro pontos:
+- ranqueia pelo PnL **copiável** (a própria política simulada com o nosso atraso medido de 5/13 slots), não pelo PnL realizado deles;
+- trabalha com **entidade** (gêmeas fundidas), não com carteira;
+- a saída **espelha a venda** deles;
+- roda num coletor do programa inteiro, com cobertura por slot.
+
+Síntese: [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]]. Revisão: [[06-DECISIONS/Revisoes-Astra/carteiras-lucro-design|carteiras-lucro-design]].

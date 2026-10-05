@@ -1,0 +1,45 @@
+C:\dev\project-hunter\.claude\state\r87\audit87.py:30: RuntimeWarning: All-NaN slice encountered
+  sp_hi = np.nanmax(mk.p.close[i, e["t"]: e["day"] + 1])
+liquidações A0 opt/after: 38
+       VETUSDT T 2020-06-29 dia 2020-07-05 f0 0.008673 f_ref 0.008673 marca_max 0.0165929 (1.91x) negociado_max 0.017061 (1.97x) à vista fecho máx até o dia 1.65x s1/s0 1.65 resultado da vaga -0.177
+       DOTUSDT T 2020-12-28 dia 2021-01-03 f0 5.151 f_ref 5.151 marca_max 10.5409 (2.05x) negociado_max 10.558 (2.05x) à vista fecho máx até o dia 1.97x s1/s0 1.97 resultado da vaga -0.016
+       XLMUSDT T 2021-01-04 dia 2021-01-06 f0 0.13688 f_ref 0.13688 marca_max 0.387675 (2.83x) negociado_max 0.395 (2.89x) à vista fecho máx até o dia 2.49x s1/s0 2.08 resultado da vaga +0.039
+       DOTUSDT T 2021-01-11 dia 2021-01-16 f0 9.306 f_ref 9.306 marca_max 19.4195 (2.09x) negociado_max 19.492 (2.09x) à vista fecho máx até o dia 1.94x s1/s0 1.84 resultado da vaga -0.083
+      DOGEUSDT T 2021-01-25 dia 2021-01-28 f0 0.008722 f_ref 0.008722 marca_max 0.0371067 (4.25x) negociado_max 0.038 (4.36x) à vista fecho máx até o dia 4.19x s1/s0 4.24 resultado da vaga +1.116
+       ADAUSDT T 2021-02-01 dia 2021-02-06 f0 0.34519 f_ref 0.34519 marca_max 0.66659 (1.93x) negociado_max 0.66801 (1.94x) à vista fecho máx até o dia 1.84x s1/s0 1.92 resultado da vaga -0.043
+      DOGEUSDT T 2021-02-01 dia 2021-02-07 f0 0.036868 f_ref 0.036868 marca_max 0.0870887 (2.36x) negociado_max 0.08781 (2.38x) à vista fecho máx até o dia 2.11x s1/s0 2.11 resultado da vaga +0.055
+       BNBUSDT T 2021-02-08 dia 2021-02-10 f0 68.259 f_ref 68.259 marca_max 148.503 (2.18x) negociado_max 148.9 (2.18x) à vista fecho máx até o dia 1.89x s1/s0 1.99 resultado da vaga -0.007
+       GRTUSDT T 2021-02-08 dia 2021-02-11 f0 0.91957 f_ref 0.91957 marca_max 2.18097 (2.37x) negociado_max 2.1763 (2.37x) à vista fecho máx até o dia 2.22x s1/s0 2.36 resultado da vaga +0.176
+       BNBUSDT T 2021-02-15 dia 2021-02-19 f0 135.89 f_ref 135.89 marca_max 348.335 (2.56x) negociado_max 350 (2.58x) à vista fecho máx até o dia 2.45x s1/s0 2.17 resultado da vaga +0.084
+       TRXUSDT T 2021-03-29 dia 2021-04-04 f0 0.06365 f_ref 0.06365 marca_max 0.128459 (2.02x) negociado_max 0.1285 (2.02x) à vista fecho máx até o dia 2.01x s1/s0 2.01 resultado da vaga +0.001
+       XRPUSDT T 2021-04-05 dia 2021-04-10 f0 0.6353 f_ref 0.6353 marca_max 1.40076 (2.20x) negociado_max 1.4063 (2.21x) à vista fecho máx até o dia 2.16x s1/s0 2.13 resultado da vaga +0.062
+      DOGEUSDT T 2021-04-12 dia 2021-04-14 f0 0.074551 f_ref 0.074551 marca_max 0.145564 (1.95x) negociado_max 0.145678 (1.95x) à vista fecho máx até o dia 1.63x s1/s0 4.34 resultado da vaga +1.163
+       VETUSDT T 2021-04-12 dia 2021-04-17 f0 0.139676 f_ref 0.139676 marca_max 0.279711 (2.00x) negociado_max 0.279824 (2.00x) à vista fecho máx até o dia 1.68x s1/s0 1.82 resultado da vaga -0.093
+      DOGEUSDT T 2021-05-03 dia 2021-05-07 f0 0.374575 f_ref 0.374575 marca_max 0.733927 (1.96x) negociado_max 0.735 (1.96x) à vista fecho máx até o dia 1.84x s1/s0 1.52 resultado da vaga -0.239
+       EOSUSDT T 2021-05-03 dia 2021-05-06 f0 6.535 f_ref 6.535 marca_max 12.8343 (1.96x) negociado_max 12.885 (1.97x) à vista fecho máx até o dia 1.76x s1/s0 1.61 resultado da vaga -0.195
+       ETCUSDT T 2021-05-03 dia 2021-05-05 f0 44.897 f_ref 44.897 marca_max 99.608 (2.22x) negociado_max 99.8 (2.22x) à vista fecho máx até o dia 2.09x s1/s0 2.63 resultado da vaga +0.311
+     MATICUSDT T 2021-05-10 dia 2021-05-15 f0 0.97113 f_ref 0.97113 marca_max 1.88921 (1.95x) negociado_max 1.89 (1.95x) à vista fecho máx até o dia 1.64x s1/s0 1.78 resultado da vaga -0.113
+     MATICUSDT T 2021-05-24 dia 2021-05-26 f0 1.07015 f_ref 1.07015 marca_max 2.4318 (2.27x) negociado_max 2.43499 (2.28x) à vista fecho máx até o dia 2.06x s1/s0 1.74 resultado da vaga -0.131
+       AXSUSDT T 2021-07-19 dia 2021-07-23 f0 18.588 f_ref 18.588 marca_max 48.806 (2.63x) negociado_max 48.99 (2.64x) à vista fecho máx até o dia 2.28x s1/s0 2.36 resultado da vaga +0.178
+      SHIBUSDT T 2021-10-25 dia 2021-10-27 f0 0.036082 f_ref 0.036082 marca_max 0.0882047 (2.44x) negociado_max 0.089575 (2.48x) à vista fecho máx até o dia 2.19x s1/s0 1.86 resultado da vaga -0.073
+      GALAUSDT T 2021-11-22 dia 2021-11-25 f0 0.37053 f_ref 0.37053 marca_max 0.783753 (2.12x) negociado_max 0.787 (2.12x) à vista fecho máx até o dia 2.00x s1/s0 1.92 resultado da vaga -0.042
+      SANDUSDT T 2021-11-22 dia 2021-11-24 f0 4.01353 f_ref 4.01353 marca_max 8.00872 (2.00x) negociado_max 8.05555 (2.01x) à vista fecho máx até o dia 1.86x s1/s0 1.87 resultado da vaga -0.065
+     WAVESUSDT T 2022-03-28 dia 2022-03-31 f0 32.486 f_ref 32.486 marca_max 63.3668 (1.95x) negociado_max 63.463 (1.95x) à vista fecho máx até o dia 1.67x s1/s0 1.44 resultado da vaga -0.280
+      DOGEUSDT T 2022-10-24 dia 2022-10-29 f0 0.06036 f_ref 0.06036 marca_max 0.15094 (2.50x) negociado_max 0.15187 (2.52x) à vista fecho máx até o dia 2.02x s1/s0 1.95 resultado da vaga -0.026
+       APTUSDT T 2023-01-09 dia 2023-01-14 f0 3.9307 f_ref 3.9307 marca_max 8.29201 (2.11x) negociado_max 8.3 (2.11x) à vista fecho máx até o dia 1.96x s1/s0 2.02 resultado da vaga +0.006
+       FTTUSDT T 2023-01-16 dia 2023-01-16 f0 1.59 f_ref 1.4758 marca_max 2.84844 (1.79x) negociado_max 1.59 (1.00x) à vista fecho máx até o dia nanx s1/s0 1.00 resultado da vaga -0.451
+       FILUSDT T 2023-02-13 dia 2023-02-19 f0 4.917 f_ref 4.917 marca_max 9.48062 (1.93x) negociado_max 9.55 (1.94x) à vista fecho máx até o dia 1.72x s1/s0 1.72 resultado da vaga -0.140
+       XRPUSDT T 2023-07-10 dia 2023-07-13 f0 0.4678 f_ref 0.4678 marca_max 0.929968 (1.99x) negociado_max 0.965 (2.06x) à vista fecho máx até o dia 1.74x s1/s0 1.60 resultado da vaga -0.203
+      SHIBUSDT T 2024-03-04 dia 2024-03-05 f0 0.022559 f_ref 0.022559 marca_max 0.0456993 (2.03x) negociado_max 0.045797 (2.03x) à vista fecho máx até o dia 1.59x s1/s0 1.46 resultado da vaga -0.272
+      DOGEUSDT T 2024-11-04 dia 2024-11-10 f0 0.15129 f_ref 0.15129 marca_max 0.29789 (1.97x) negociado_max 0.298 (1.97x) à vista fecho máx até o dia 1.83x s1/s0 1.84 resultado da vaga -0.084
+     NEIROUSDT T 2024-11-04 dia 2024-11-09 f0 0.0013367 f_ref 0.0013367 marca_max 0.00268398 (2.01x) negociado_max 0.0026896 (2.01x) à vista fecho máx até o dia 1.94x s1/s0 2.03 resultado da vaga +0.014
+      PEPEUSDT T 2024-11-11 dia 2024-11-14 f0 0.0123258 f_ref 0.0123258 marca_max 0.025719 (2.09x) negociado_max 0.026 (2.11x) à vista fecho máx até o dia 1.69x s1/s0 1.72 resultado da vaga -0.141
+       XRPUSDT T 2024-11-11 dia 2024-11-16 f0 0.5888 f_ref 0.5888 marca_max 1.26483 (2.15x) negociado_max 1.27 (2.16x) à vista fecho máx até o dia 1.90x s1/s0 1.79 resultado da vaga -0.106
+     TRUMPUSDT T 2025-04-21 dia 2025-04-23 f0 8.171 f_ref 8.171 marca_max 16.0535 (1.96x) negociado_max 16.092 (1.97x) à vista fecho máx até o dia 1.62x s1/s0 1.82 resultado da vaga -0.093
+     PENGUUSDT T 2025-07-07 dia 2025-07-13 f0 0.015906 f_ref 0.015906 marca_max 0.0325281 (2.05x) negociado_max 0.032715 (2.06x) à vista fecho máx até o dia 1.89x s1/s0 1.89 resultado da vaga -0.058
+       TONUSDT T 2026-05-04 dia 2026-05-07 f0 1.3519 f_ref 1.3519 marca_max 2.9039 (2.15x) negociado_max 2.9078 (2.15x) à vista fecho máx até o dia 2.00x s1/s0 1.83 resultado da vaga -0.084
+       TUTUSDT T 2026-08-17 dia 2026-08-22 f0 0.03428 f_ref 0.03428 marca_max 0.07997 (2.33x) negociado_max 0.08082 (2.36x) à vista fecho máx até o dia 1.78x s1/s0 1.86 resultado da vaga -0.074
+2021-09-06: ids iguais sem sufixo? True; só no completo ['LUNAUSDT#0']; só no cortado ['LUNAUSDT']; S7 iguais por base? True
+2021-12-13: ids iguais sem sufixo? True; só no completo ['LUNAUSDT#0']; só no cortado ['LUNAUSDT']; S7 iguais por base? True
+2022-01-17: ids iguais sem sufixo? True; só no completo ['LUNAUSDT#0']; só no cortado ['LUNAUSDT']; S7 iguais por base? True
+2022-04-04: ids iguais sem sufixo? True; só no completo ['LUNAUSDT#0']; só no cortado ['LUNAUSDT']; S7 iguais por base? True
