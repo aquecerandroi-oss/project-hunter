@@ -16,7 +16,7 @@ hipotese: H-029
 variavel: S7 (soma do funding liquidado de 7 dias, fundingTime ≤ T − 1 h)
 populacao: "top-20 pares USDT à vista com perpétuo USDⓈ-M (ponto-no-tempo, deslistados incluídos), segundas de 2020-03-16 a 2026-09-14"
 efeito: "A1 +5,3 a +5,9 % a.a. sobre o capital total (antes de 2023 +11,6/+12,7 %; desde 2023 +0,6/+0,9 %); A0 +1,3 a +2,4 %; A2 +4,8 a +5,1 %"
-ic: "A1 [+1,0 %; +13,2 %] percentil, p centrado 0,050–0,058, Holm 0,15–0,175; A0 [−3,9 %; +10,3 %]"
+ic: "pior célula (pes/antes): A1 [+1,00 %; +12,26 %] percentil, p centrado 0,050–0,058, Holm 0,15–0,175; A0 [−3,91 %; +8,96 %] (corrigido em 05/10 — o valor anterior misturava células, ver Revisão do advogado e do defensor)"
 veredito: nao_confirma
 proximo_passo: "nenhum braço de papel; perpétuo real proibido até a Fase 4. Só volta como hipótese nova em coorte prospectiva (ver Proximas Hipoteses)"
 classe_de_perda: —
@@ -124,9 +124,60 @@ rendimento do USDT parado; quebra de corretora e perda de paridade não modelada
 ordem de grandeza (não é teste): desde 2023, mesmo com custo zero o A1 daria ~+2,0 % a.a. (0,57 + 1,47); dobrar isso
 pela margem cruzada daria ~+4 %, ainda abaixo de 5 % e com mais liquidação.
 
+## Revisão do advogado de Jesus e do defensor (05/10/2026)
+
+Acrescentada; o texto acima fica como estava, exceto a correção de frontmatter descrita no fim. Revisores:
+[[Advogado de Jesus]] (red team) e [[Defensor]] (steelman). Resumo na [[Fila de Hipoteses#H-029 — Carry de funding protegido (à vista comprado + perpétuo USDT-M vendido, Binance, top-20)|Fila, H-029]].
+**O rótulo NÃO CONFIRMA fica** para A0, A1 e A2.
+
+**Concentração (o +5,3 % do A1 não vale como tamanho).** +1,74 % a.a. dos +5,32 % vêm de **duas vagas-semana da DOGE em 2021**,
+com o à vista descoberto depois da liquidação (a regra pré-registrada deixa a perna à vista segurar até a segunda seguinte);
+sem elas o A1 fica em ≈ +3,6 %. As **5 melhores semanas são as mesmas nos três braços, todas de 2021**. Com o ano como unidade
+t = 1,34; com blocos de 52 semanas p 0,105.
+
+**Correção da lição 3 e dos Limites (a anterior fica; esta a corrige).** A lição 3 ("1× não é sem risco… no nosso dado, pesa tanto
+quanto o próprio funding") e a frase de *De onde veio o dinheiro* sugerem que as liquidações custaram dinheiro ao A1. **Não custaram:
+as liquidações somaram +0,89 % a.a. no A1** (perda de margem −10,0 % mais perna à vista descoberta +10,9 %): foi **sorte**, não
+custo (desde 2023 a soma foi −1,1 %: perna descoberta +3,6 % menos margem −4,7 %, como já escrito acima). **Sem liquidação
+(estimativa pessimista) o A1 = +4,54 %**, abaixo do MRE de 5 %. Risco direcional escondido existe (a loteria liquidação/perna
+descoberta), mas o sinal médio no nosso dado foi positivo e pequeno, não negativo. Nos **Limites**, "a margem cruzada com o à vista
+como garantia… aumentaria a chance de liquidação" está errado no sentido: com margem de portfólio ou o à vista como garantia a
+liquidação **praticamente desaparece**, não aumenta (o que muda é o capital por vaga e o risco de contraparte, não medidos). A conta
+de ordem de grandeza dos Limites ("dobrar pela margem cruzada daria ~+4 %") **não é um teste** e não vale como teto.
+
+**Diagnósticos NÃO pré-registrados** (escritos depois de ver o resultado; não decidem): MMR 1 % (Holm 0,13–0,15); sem liquidação
+(+4,54 % pes); custo ×0 (Holm 0,084) e ×0,5; blocos de 52 semanas (p 0,105); t com o ano como unidade (1,34). Nenhum muda o rótulo.
+**Caminho que se bifurca, não resultado:** só a combinação de **duas folgas escolhidas depois de ver** (sem liquidação **e** metade
+do custo) passaria em todas as cláusulas (Holm 0,02; desde 2023 +2,4 %). Escolher essa combinação agora seria o jardim das
+bifurcações; não vira confirmação, nem pista para parâmetro nestes dados.
+
+**Furo de dado.** **SXP, BTCST e AERGO** caíram do universo por **vela de perpétuo vazia**, embora marca e funding estivessem completos;
+o tamanho do efeito **não foi medido** (não se sabe se estavam no top-20 nas semanas relevantes). Não verificável: o **rendimento do
+USDT parado** (a favor do carry, ~+1 a +1,5 % a.a., não creditado).
+
+**Leitura do defensor (poder e estrutura).** Poder na amostra inteira para 5 % a.a. ≈ **35 %** (EP realizado ~2,9 p.p., cerca de 2×
+o palpite do pré-registro; 80 % só a ~8,5 %) — o desfecho NÃO CONFIRMA era o esperado, e **não é prova de ausência**. Mas **desde
+2023 a implementação testada ficou medida: +0,6 % [−0,5; +1,7]** (aproximação normal, descritivo): a falta de poder não explica o
+regime recente. O desenho foi **mais duro que o carry praticado**: 1× isolado em USDT-M dobra o capital por nocional e cria a loteria
+liquidação/perna descoberta; o **perpétuo COIN-M vendido a 1× com a moeda como margem não é liquidável pela alta** (capital = nocional)
+e **não foi testado**. O obstáculo absoluto de 5 % não é excesso sobre T-bill (corrigir em pré-registros futuros).
+**Propostas** (só pesquisa/roteiro; perpétuo real proibido até a Fase 4; **prioridade baixa**, decisão da Sexta-feira em 05/10):
+**P1** carry de juro-base em BTC/ETH COIN-M sempre ligado, MRE +3 % a.a. sobre o T-bill, 104 semanas de coorte futura; **P2** base do
+futuro trimestral COIN-M; família = H-029 (3 testes) + novos, Holm sobre a união. T₀ da coorte: primeira segunda com
+T₀ − 7 d − 1 h > max(congelamento, 2026-10-05 08:00Z) (ver [[Proximas Hipoteses]]).
+
+**Inconsistências de texto encontradas (e o que foi feito).**
+
+- **`ic` do frontmatter** dizia "A1 [+1,0 %; +13,2 %]" e "A0 [−3,9 %; +10,3 %]", enquanto o texto e a tabela usam a **pior célula**
+  (pes/antes: A1 [+1,00; +12,26], A0 [−3,91; +8,96]). Os valores antigos eram o **envelope** das quatro células (menor inferior, maior
+  superior; +13,25 e +10,30 vêm de opt/depois). **Frontmatter corrigido para a pior célula** e dito no próprio campo.
+- **IC do A0:** a tabela deste KB mostra **[−3,91; +8,96]** (célula pes/antes, a pior); o veredito da [[Fila de Hipoteses]] mostra
+  **[−3,91; +10,30]** (inferior da pes/antes e superior da opt/depois — envelope, não uma célula). Nenhum dos dois muda o rótulo; o da
+  Fila não foi editado (fora do escopo desta revisão, que só acrescenta linhas ao bloco); vale o da tabela deste KB para "pior célula".
+
 ## Relacionados
 
-[[KB-0180-carry-de-funding]] · [[Fila de Hipoteses]] (H-029) · [[Proximas Hipoteses]] · [[Mapa de Estrategias]] ·
+[[Advogado de Jesus]] · [[Defensor]] · [[KB-0180-carry-de-funding]] · [[Fila de Hipoteses]] (H-029) · [[Proximas Hipoteses]] · [[Mapa de Estrategias]] ·
 [[06-DECISIONS/Revisoes-Astra/H-029-carry-prereg|H-029-carry-prereg]] ·
 [[06-DECISIONS/Revisoes-Astra/H-029-carry-resultado|H-029-carry-resultado]] · [[KB-0166-evitar-as-moedas-em-queda-nao-bate-a-cesta]]
 (painel) · [[KB-0021-funding-como-preco-de-posicionamento-nao-como-previsao]] · [[KB-0149-o-que-a-mesa-real-ensinou]] §5
