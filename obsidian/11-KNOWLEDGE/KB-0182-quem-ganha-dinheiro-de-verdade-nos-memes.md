@@ -124,4 +124,4 @@ sintéticos.
 [[KB-0138-explosao-de-compradores-nao-tem-vantagem]] · [[KB-0141-sniper-de-lancamento]] ·
 [[KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos|KB-0124]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] ·
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[KB-0156-o-despejo-em-bloco-nao-e-uma-rede-de-financiamento]] ·
-[[KB-0171-custo-real-da-spot-1]] · [[Fila de Hipoteses]]
+[[KB-0171-custo-real-da-spot-1]] · [[Fila de Hipoteses]] · [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar|KB-0183]] (a medição da onda 0: volume, RPC e disco)

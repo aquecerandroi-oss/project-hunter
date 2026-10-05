@@ -110,3 +110,7 @@ O pedido do Everton "seguir quem faz dinheiro de verdade" gerou um desenho novo,
 - roda num coletor do programa inteiro, com cobertura por slot.
 
 Síntese: [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]]. Revisão: [[06-DECISIONS/Revisoes-Astra/carteiras-lucro-design|carteiras-lucro-design]].
+
+## Avaliação de 05/10/2026 — onda 0 (infraestrutura, não resultado de estratégia)
+
+Sondagem de leitura do programa inteiro (pump + PumpSwap) por RPC público, 144 min válidos em três janelas (19:03Z 90 min com feed degradado, 22:01Z 39 min e 22:46Z 15 min limpos). **Nada sobre carteiras foi medido e nenhum desfecho foi olhado.** Resultado de infraestrutura: 330–353 swaps/s (28,5–30,5 M/dia, 5–10× a hipótese do desenho), 217–254 GB/dia de WS sem compressão, RPC público **reprovado** para 24/7 (uma janela em três degradou: 79 quedas, atraso até ~30 s), Helius ≈ US$ 650–760/mês (estimativa de preço de tabela), linha estimada em 529 B → 136–149 GB em 9 dias. Decodificadores da T4.8e: 0 falhas em ~1,2 milhão de eventos; `BuyEvent` da PumpSwap (36 % dos swaps) sem decodificador. Decisão: **go** para um piloto de WS pago e para as ondas 1a e 1c; **segura** a 1b e a 2 até rever retenção/formato. Auditoria do exemplo "sadcrissy": não feita (endereço completo ausente). A previsão de H-030 (**NÃO CONFIRMA**) não muda. Detalhe: seção 8 de `docs/design/seguir-carteiras-lucrativas.md`, [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar|KB-0183]], revisão [[wallet-tape-probe]].

@@ -1,0 +1,2015 @@
+{
+ "chain_truth_from_block_audit": {
+  "slots_sampled": 75,
+  "blocks_ok": 75,
+  "pump": {
+   "mentioning_tx_per_s": 212.23333333333332,
+   "successful_mentioning_tx_per_s": 59.46666666666666,
+   "events_per_s": {
+    "TradeEvent": 46.766666666666666,
+    "CollectCreatorFeeEvent": 0.3,
+    "DistributeFeeToHoldersEvent": 1.7666666666666666,
+    "CloseUserVolumeAccumulatorEvent": 1.1,
+    "CreateEvent": 0.5,
+    "InitUserVolumeAccumulatorEvent": 0.13333333333333333,
+    "DistributeCreatorFeesEvent": 0.8999999999999999,
+    "ExtendAccountEvent": 0.3333333333333333,
+    "unknown:742b4dbd117a482b": 0.13333333333333333,
+    "ClaimCashbackEvent": 0.03333333333333333,
+    "MigrateBondingCurveCreatorEvent": 0.06666666666666667
+   },
+   "events_per_day": {
+    "TradeEvent": 4040640,
+    "CollectCreatorFeeEvent": 25920,
+    "DistributeFeeToHoldersEvent": 152640,
+    "CloseUserVolumeAccumulatorEvent": 95040,
+    "CreateEvent": 43200,
+    "InitUserVolumeAccumulatorEvent": 11520,
+    "DistributeCreatorFeesEvent": 77760,
+    "ExtendAccountEvent": 28800,
+    "unknown:742b4dbd117a482b": 11520,
+    "ClaimCashbackEvent": 2880,
+    "MigrateBondingCurveCreatorEvent": 5760
+   }
+  },
+  "amm": {
+   "mentioning_tx_per_s": 590.5,
+   "successful_mentioning_tx_per_s": 341.0333333333333,
+   "events_per_s": {
+    "SellEvent": 107.6,
+    "BuyEvent": 88.06666666666666,
+    "CloseUserVolumeAccumulatorEvent": 3.2,
+    "CollectCoinCreatorFeeEvent": 0.13333333333333333,
+    "BoostBuyAndBurnEvent": 0.3333333333333333,
+    "ClaimCashbackEvent": 0.06666666666666667,
+    "ExtendAccountEvent": 0.03333333333333333,
+    "WithdrawEvent": 0.03333333333333333,
+    "InitUserVolumeAccumulatorEvent": 0.03333333333333333
+   },
+   "events_per_day": {
+    "SellEvent": 9296640,
+    "BuyEvent": 7608960,
+    "CloseUserVolumeAccumulatorEvent": 276480,
+    "CollectCoinCreatorFeeEvent": 11520,
+    "BoostBuyAndBurnEvent": 28800,
+    "ClaimCashbackEvent": 5760,
+    "ExtendAccountEvent": 2880,
+    "WithdrawEvent": 2880,
+    "InitUserVolumeAccumulatorEvent": 2880
+   }
+  }
+ },
+ "ws_url_host": "api.mainnet-beta.solana.com",
+ "commitment": "confirmed",
+ "getTransaction_sampler": {
+  "compared": 1099,
+  "equal": 1099,
+  "diff": [],
+  "unavailable": 0,
+  "slot_delta": {
+   "0": 1099
+  },
+  "http": {
+   "getSlot_requests": 455,
+   "getTransaction_requests": 1099,
+   "getBlock_requests": 75
+  },
+  "http_events": []
+ },
+ "independent_block_audit": {
+  "blocks_requested": 75,
+  "blocks_skipped_or_unavailable": 0,
+  "blocks_before_both_subscriptions_flowed": 0,
+  "pending_censored_at_end": 1,
+  "at_fetch": {
+   "pump": {
+    "txs": 6367,
+    "received": 6361
+   },
+   "amm": {
+    "txs": 17715,
+    "received": 17715
+   }
+  },
+  "settled": {
+   "clean": {
+    "blocks": 74,
+    "pump": {
+     "txs": 6320,
+     "received": 6314,
+     "missed": 6,
+     "missed_failed": 6
+    },
+    "amm": {
+     "txs": 17373,
+     "received": 17373,
+     "missed": 0,
+     "missed_failed": 0
+    }
+   },
+   "affected_by_reconnect": {
+    "blocks": 0,
+    "pump": {
+     "txs": 0,
+     "received": 0,
+     "missed": 0,
+     "missed_failed": 0
+    },
+    "amm": {
+     "txs": 0,
+     "received": 0,
+     "missed": 0,
+     "missed_failed": 0
+    }
+   }
+  },
+  "truth": {
+   "blocks_ok": 75,
+   "pump": {
+    "txs": 6367,
+    "success_txs": 1784,
+    "events": {
+     "TradeEvent": 1403,
+     "CollectCreatorFeeEvent": 9,
+     "DistributeFeeToHoldersEvent": 53,
+     "CloseUserVolumeAccumulatorEvent": 33,
+     "CreateEvent": 15,
+     "InitUserVolumeAccumulatorEvent": 4,
+     "DistributeCreatorFeesEvent": 27,
+     "ExtendAccountEvent": 10,
+     "unknown:742b4dbd117a482b": 4,
+     "ClaimCashbackEvent": 1,
+     "MigrateBondingCurveCreatorEvent": 2
+    }
+   },
+   "amm": {
+    "txs": 17715,
+    "success_txs": 10231,
+    "events": {
+     "SellEvent": 3228,
+     "BuyEvent": 2642,
+     "CloseUserVolumeAccumulatorEvent": 96,
+     "CollectCoinCreatorFeeEvent": 4,
+     "BoostBuyAndBurnEvent": 10,
+     "ClaimCashbackEvent": 2,
+     "ExtendAccountEvent": 1,
+     "WithdrawEvent": 1,
+     "InitUserVolumeAccumulatorEvent": 1
+    }
+   }
+  },
+  "per_block": [
+   [
+    453707392,
+    false,
+    [
+     53,
+     0,
+     0
+    ],
+    [
+     175,
+     0,
+     0
+    ]
+   ],
+   [
+    453707499,
+    false,
+    [
+     247,
+     0,
+     0
+    ],
+    [
+     306,
+     0,
+     0
+    ]
+   ],
+   [
+    453707642,
+    false,
+    [
+     60,
+     0,
+     0
+    ],
+    [
+     179,
+     0,
+     0
+    ]
+   ],
+   [
+    453707759,
+    false,
+    [
+     51,
+     0,
+     0
+    ],
+    [
+     289,
+     0,
+     0
+    ]
+   ],
+   [
+    453707874,
+    false,
+    [
+     91,
+     0,
+     0
+    ],
+    [
+     253,
+     0,
+     0
+    ]
+   ],
+   [
+    453707990,
+    false,
+    [
+     45,
+     0,
+     0
+    ],
+    [
+     223,
+     0,
+     0
+    ]
+   ],
+   [
+    453708106,
+    false,
+    [
+     68,
+     0,
+     0
+    ],
+    [
+     260,
+     0,
+     0
+    ]
+   ],
+   [
+    453708222,
+    false,
+    [
+     90,
+     2,
+     2
+    ],
+    [
+     262,
+     0,
+     0
+    ]
+   ],
+   [
+    453708341,
+    false,
+    [
+     184,
+     0,
+     0
+    ],
+    [
+     217,
+     0,
+     0
+    ]
+   ],
+   [
+    453708456,
+    false,
+    [
+     13,
+     0,
+     0
+    ],
+    [
+     86,
+     0,
+     0
+    ]
+   ],
+   [
+    453708567,
+    false,
+    [
+     102,
+     0,
+     0
+    ],
+    [
+     238,
+     0,
+     0
+    ]
+   ],
+   [
+    453708680,
+    false,
+    [
+     8,
+     0,
+     0
+    ],
+    [
+     22,
+     0,
+     0
+    ]
+   ],
+   [
+    453708801,
+    false,
+    [
+     190,
+     0,
+     0
+    ],
+    [
+     172,
+     0,
+     0
+    ]
+   ],
+   [
+    453708917,
+    false,
+    [
+     74,
+     0,
+     0
+    ],
+    [
+     138,
+     0,
+     0
+    ]
+   ],
+   [
+    453709034,
+    false,
+    [
+     70,
+     0,
+     0
+    ],
+    [
+     139,
+     0,
+     0
+    ]
+   ],
+   [
+    453709146,
+    false,
+    [
+     64,
+     0,
+     0
+    ],
+    [
+     162,
+     0,
+     0
+    ]
+   ],
+   [
+    453709286,
+    false,
+    [
+     66,
+     0,
+     0
+    ],
+    [
+     185,
+     0,
+     0
+    ]
+   ],
+   [
+    453709400,
+    false,
+    [
+     148,
+     0,
+     0
+    ],
+    [
+     182,
+     0,
+     0
+    ]
+   ],
+   [
+    453709514,
+    false,
+    [
+     79,
+     0,
+     0
+    ],
+    [
+     148,
+     0,
+     0
+    ]
+   ],
+   [
+    453709634,
+    false,
+    [
+     74,
+     0,
+     0
+    ],
+    [
+     132,
+     0,
+     0
+    ]
+   ],
+   [
+    453709752,
+    false,
+    [
+     60,
+     0,
+     0
+    ],
+    [
+     182,
+     0,
+     0
+    ]
+   ],
+   [
+    453709864,
+    false,
+    [
+     46,
+     0,
+     0
+    ],
+    [
+     228,
+     0,
+     0
+    ]
+   ],
+   [
+    453709979,
+    false,
+    [
+     34,
+     0,
+     0
+    ],
+    [
+     131,
+     0,
+     0
+    ]
+   ],
+   [
+    453710097,
+    false,
+    [
+     116,
+     0,
+     0
+    ],
+    [
+     121,
+     0,
+     0
+    ]
+   ],
+   [
+    453710214,
+    false,
+    [
+     74,
+     2,
+     2
+    ],
+    [
+     107,
+     0,
+     0
+    ]
+   ],
+   [
+    453710329,
+    false,
+    [
+     214,
+     0,
+     0
+    ],
+    [
+     228,
+     0,
+     0
+    ]
+   ],
+   [
+    453710446,
+    false,
+    [
+     145,
+     0,
+     0
+    ],
+    [
+     180,
+     0,
+     0
+    ]
+   ],
+   [
+    453710563,
+    false,
+    [
+     102,
+     0,
+     0
+    ],
+    [
+     122,
+     0,
+     0
+    ]
+   ],
+   [
+    453710681,
+    false,
+    [
+     33,
+     0,
+     0
+    ],
+    [
+     87,
+     0,
+     0
+    ]
+   ],
+   [
+    453710803,
+    false,
+    [
+     146,
+     0,
+     0
+    ],
+    [
+     210,
+     0,
+     0
+    ]
+   ],
+   [
+    453710916,
+    false,
+    [
+     146,
+     0,
+     0
+    ],
+    [
+     183,
+     0,
+     0
+    ]
+   ],
+   [
+    453711032,
+    false,
+    [
+     120,
+     0,
+     0
+    ],
+    [
+     109,
+     0,
+     0
+    ]
+   ],
+   [
+    453711143,
+    false,
+    [
+     99,
+     0,
+     0
+    ],
+    [
+     183,
+     0,
+     0
+    ]
+   ],
+   [
+    453711278,
+    false,
+    [
+     25,
+     0,
+     0
+    ],
+    [
+     59,
+     0,
+     0
+    ]
+   ],
+   [
+    453711396,
+    false,
+    [
+     147,
+     0,
+     0
+    ],
+    [
+     173,
+     0,
+     0
+    ]
+   ],
+   [
+    453711513,
+    false,
+    [
+     39,
+     0,
+     0
+    ],
+    [
+     187,
+     0,
+     0
+    ]
+   ],
+   [
+    453711630,
+    false,
+    [
+     55,
+     0,
+     0
+    ],
+    [
+     109,
+     0,
+     0
+    ]
+   ],
+   [
+    453711740,
+    false,
+    [
+     67,
+     0,
+     0
+    ],
+    [
+     249,
+     0,
+     0
+    ]
+   ],
+   [
+    453711858,
+    false,
+    [
+     27,
+     0,
+     0
+    ],
+    [
+     156,
+     0,
+     0
+    ]
+   ],
+   [
+    453711972,
+    false,
+    [
+     40,
+     0,
+     0
+    ],
+    [
+     116,
+     0,
+     0
+    ]
+   ],
+   [
+    453712090,
+    false,
+    [
+     54,
+     0,
+     0
+    ],
+    [
+     216,
+     0,
+     0
+    ]
+   ],
+   [
+    453712209,
+    false,
+    [
+     28,
+     0,
+     0
+    ],
+    [
+     263,
+     0,
+     0
+    ]
+   ],
+   [
+    453712325,
+    false,
+    [
+     80,
+     0,
+     0
+    ],
+    [
+     396,
+     0,
+     0
+    ]
+   ],
+   [
+    453712441,
+    false,
+    [
+     125,
+     0,
+     0
+    ],
+    [
+     376,
+     0,
+     0
+    ]
+   ],
+   [
+    453712559,
+    false,
+    [
+     124,
+     0,
+     0
+    ],
+    [
+     296,
+     0,
+     0
+    ]
+   ],
+   [
+    453712662,
+    false,
+    [
+     76,
+     0,
+     0
+    ],
+    [
+     213,
+     0,
+     0
+    ]
+   ],
+   [
+    453712781,
+    false,
+    [
+     41,
+     0,
+     0
+    ],
+    [
+     184,
+     0,
+     0
+    ]
+   ],
+   [
+    453712899,
+    false,
+    [
+     120,
+     0,
+     0
+    ],
+    [
+     440,
+     0,
+     0
+    ]
+   ],
+   [
+    453713040,
+    false,
+    [
+     31,
+     0,
+     0
+    ],
+    [
+     190,
+     0,
+     0
+    ]
+   ],
+   [
+    453713141,
+    false,
+    [
+     84,
+     0,
+     0
+    ],
+    [
+     245,
+     0,
+     0
+    ]
+   ],
+   [
+    453713263,
+    false,
+    [
+     17,
+     0,
+     0
+    ],
+    [
+     434,
+     0,
+     0
+    ]
+   ],
+   [
+    453713384,
+    false,
+    [
+     173,
+     0,
+     0
+    ],
+    [
+     283,
+     0,
+     0
+    ]
+   ],
+   [
+    453713519,
+    false,
+    [
+     161,
+     0,
+     0
+    ],
+    [
+     315,
+     0,
+     0
+    ]
+   ],
+   [
+    453713617,
+    false,
+    [
+     79,
+     0,
+     0
+    ],
+    [
+     418,
+     0,
+     0
+    ]
+   ],
+   [
+    453713754,
+    false,
+    [
+     65,
+     0,
+     0
+    ],
+    [
+     360,
+     0,
+     0
+    ]
+   ],
+   [
+    453713857,
+    false,
+    [
+     92,
+     0,
+     0
+    ],
+    [
+     469,
+     0,
+     0
+    ]
+   ],
+   [
+    453713989,
+    false,
+    [
+     42,
+     0,
+     0
+    ],
+    [
+     455,
+     0,
+     0
+    ]
+   ],
+   [
+    453714108,
+    false,
+    [
+     56,
+     0,
+     0
+    ],
+    [
+     231,
+     0,
+     0
+    ]
+   ],
+   [
+    453714224,
+    false,
+    [
+     27,
+     0,
+     0
+    ],
+    [
+     288,
+     0,
+     0
+    ]
+   ],
+   [
+    453714340,
+    false,
+    [
+     39,
+     0,
+     0
+    ],
+    [
+     685,
+     0,
+     0
+    ]
+   ],
+   [
+    453714461,
+    false,
+    [
+     79,
+     0,
+     0
+    ],
+    [
+     384,
+     0,
+     0
+    ]
+   ],
+   [
+    453714579,
+    false,
+    [
+     51,
+     0,
+     0
+    ],
+    [
+     405,
+     0,
+     0
+    ]
+   ],
+   [
+    453714689,
+    false,
+    [
+     80,
+     0,
+     0
+    ],
+    [
+     339,
+     0,
+     0
+    ]
+   ],
+   [
+    453714815,
+    false,
+    [
+     50,
+     0,
+     0
+    ],
+    [
+     428,
+     0,
+     0
+    ]
+   ],
+   [
+    453714930,
+    false,
+    [
+     33,
+     0,
+     0
+    ],
+    [
+     252,
+     0,
+     0
+    ]
+   ],
+   [
+    453715044,
+    false,
+    [
+     132,
+     0,
+     0
+    ],
+    [
+     259,
+     0,
+     0
+    ]
+   ],
+   [
+    453715163,
+    false,
+    [
+     166,
+     0,
+     0
+    ],
+    [
+     158,
+     0,
+     0
+    ]
+   ],
+   [
+    453715280,
+    false,
+    [
+     123,
+     0,
+     0
+    ],
+    [
+     245,
+     0,
+     0
+    ]
+   ],
+   [
+    453715404,
+    false,
+    [
+     92,
+     0,
+     0
+    ],
+    [
+     155,
+     0,
+     0
+    ]
+   ],
+   [
+    453715520,
+    false,
+    [
+     130,
+     0,
+     0
+    ],
+    [
+     260,
+     0,
+     0
+    ]
+   ],
+   [
+    453715638,
+    false,
+    [
+     126,
+     0,
+     0
+    ],
+    [
+     212,
+     0,
+     0
+    ]
+   ],
+   [
+    453715751,
+    false,
+    [
+     91,
+     0,
+     0
+    ],
+    [
+     248,
+     0,
+     0
+    ]
+   ],
+   [
+    453715866,
+    false,
+    [
+     108,
+     2,
+     2
+    ],
+    [
+     218,
+     0,
+     0
+    ]
+   ],
+   [
+    453715978,
+    false,
+    [
+     33,
+     0,
+     0
+    ],
+    [
+     165,
+     0,
+     0
+    ]
+   ]
+  ],
+  "missed_examples": [
+   {
+    "slot": 453708222,
+    "program": "pump",
+    "sigs": [
+     "5TH7Z7a8HyjWFyvdiv4yS7QCwhWnxkg5nissjBDc9oAspj8Kfbx1EMmTUDE2iAatnBkK6AkDxTJ9KqWs8SXCmvVr",
+     "4vu5czSSiZZKG7SUcGQEpyDrhtQz255wpZh7jvoNreS9QcqwvMHUD5Zkh4z5faiGiWYZZddbnGiLLxxMErNDthu3"
+    ]
+   },
+   {
+    "slot": 453710214,
+    "program": "pump",
+    "sigs": [
+     "21s9X6hnRuqQ5AcTL3jteAyeyVKeN1LFuncDrv1zvJ9S6hRisMkqN6i1oo7mpC15teyA5hmQLD9Jx2pU6fnmNneo",
+     "4CDsVHvCNaP9V4uFerr6odfyHCmLSf3bTFvbySPAxjr543agy7UbPrqAYE2YKZxrFLXvKsNCDkb323aangW5S8xM"
+    ]
+   },
+   {
+    "slot": 453715866,
+    "program": "pump",
+    "sigs": [
+     "2YA91x52MatGyFDUYjEP6Tp2zQx8GYrrd4QjGaSJeYn29bCjsRsP9Dq6bonTagaED5UEddBJK6XYQpNY1ZRTB7gf",
+     "5EqGbczKPwUjehkxZXHxxuXj4Y8tLwesyTs6Gyfo8w6maz6SyFfhBNjk81sm6qd22jZJnRjjJni1HLByNXu3Fdmh"
+    ]
+   }
+  ]
+ },
+ "pipeline": {
+  "received_frames": {
+   "amm": 1973313,
+   "pump": 759510
+  },
+  "received_bytes": {
+   "amm": 4988598914,
+   "pump": 1028936743
+  },
+  "processed_frames": {
+   "amm": 1973313,
+   "pump": 759510
+  },
+  "queue_max_depth": {
+   "amm": 176,
+   "pump": 141
+  },
+  "queue_dropped": {},
+  "queue_residual_at_end": {
+   "pump": 0,
+   "amm": 0
+  },
+  "worker_busy_share": {
+   "amm": 0.16731006216710143,
+   "pump": 0.042272218014409293
+  },
+  "malformed_frames": {},
+  "process_cpu_share_of_one_core": 0.16123249409347729,
+  "rss_mb": null
+ },
+ "started_utc": "2026-10-05T22:01:47Z",
+ "ended_utc": "2026-10-05T22:41:58Z",
+ "elapsed_s": 2410.9,
+ "rates": {
+  "amm": {
+   "frames_per_s": 818.4894004137489,
+   "bytes_per_s": 2069167.604948905,
+   "gb_per_day_uncompressed": 178.77608106758538,
+   "notifications_per_s_total_time": 814.8040862630409,
+   "notifications_per_s_active_time": 815.158150974655,
+   "active_s": 2409.9,
+   "downtime_s_incl_open": 1.0,
+   "failed_share": 0.4176396386123594,
+   "gb_per_day_uncompressed_active_time": 178.8079025548824
+  },
+  "pump": {
+   "frames_per_s": 315.0290321445439,
+   "bytes_per_s": 426781.670136337,
+   "gb_per_day_uncompressed": 36.873936299779515,
+   "notifications_per_s_total_time": 311.34413277314377,
+   "notifications_per_s_active_time": 311.4784503437439,
+   "active_s": 2409.9,
+   "downtime_s_incl_open": 1.0,
+   "failed_share": 0.7430544638741531,
+   "gb_per_day_uncompressed_active_time": 36.844622779705055
+  }
+ },
+ "swap_events_per_s": 327.9182991375943,
+ "row_size": {
+  "decoded_rows": 506369,
+  "json_bytes_per_row": 489.5539636115165,
+  "pg_heap_bytes_per_row_estimate": 342.16009471353897,
+  "pg_with_indexes_bytes_per_row_estimate": 592.8445935671417,
+  "hypothesis_bytes_per_row": 350,
+  "rows_per_day": 28332141,
+  "gb_per_day_at_hypothesis_350B": 9.916249365920853,
+  "gb_per_day_at_measured_indexed_estimate": 16.796556642999356
+ },
+ "extrapolation_wallets_per_day": {
+  "swap_events_per_day_at_window_rate": 28332141,
+  "heaps_k": 37.3364975433327,
+  "heaps_beta": 0.5961112035961434,
+  "curve_is_the_primary_result": "see snapshot/curve (every minute)",
+  "scenario_wallets_day_if_no_new_after_window": 121705,
+  "scenario_wallets_day_heaps_fit": 1034001,
+  "scenario_wallets_day_linear_at_last_quarter_marginal_rate": 2732688
+ },
+ "liquidity_join": {
+  "events": {
+   "CreatePoolEvent": 126,
+   "WithdrawEvent": 107,
+   "DepositEvent": 7
+  },
+  "on_a_pool_that_swapped_in_window": {
+   "CreatePoolEvent": 126,
+   "WithdrawEvent": 106,
+   "DepositEvent": 7
+  },
+  "pools_known": 3158
+ },
+ "snapshot": {
+  "elapsed_s": 2410.9,
+  "frames": {
+   "amm": {
+    "frames": 1973313,
+    "bytes": 4988598914
+   },
+   "pump": {
+    "frames": 759510,
+    "bytes": 1028936743
+   }
+  },
+  "notifications": {
+   "pump": {
+    "n": 750626,
+    "bytes": 1027675422,
+    "failed": 557756,
+    "truncated": 0,
+    "bad_base64_lines": 702
+   },
+   "amm": {
+    "n": 1964428,
+    "bytes": 4987319678,
+    "failed": 820423,
+    "truncated": 0,
+    "bad_base64_lines": 629
+   }
+  },
+  "tx": {
+   "unique": 2708893,
+   "success": 1331521,
+   "pump_only": 178740,
+   "success_pump_only": 156229,
+   "amm_only": 1081707,
+   "success_amm_only": 617212,
+   "failed": 1377372,
+   "neither": 1446006,
+   "success_neither": 555659,
+   "both_programs": 2440,
+   "success_both_programs": 2421
+  },
+  "delivery_both_programs": {
+   "expected": 2408,
+   "delivered_by_both": 2408,
+   "only_pump": 0,
+   "only_amm": 0
+  },
+  "events": {
+   "pAMM.BoostBuyAndBurnEvent": {
+    "n": 1222,
+    "payload_bytes": 254176,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1222,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.BuyEvent": {
+    "n": 284216,
+    "payload_bytes": 141555438,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 284216,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.ClaimCashbackEvent": {
+    "n": 249,
+    "payload_bytes": 17928,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 249,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CloseUserVolumeAccumulatorEvent": {
+    "n": 17036,
+    "payload_bytes": 1362880,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 17036,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CollectCoinCreatorFeeEvent": {
+    "n": 401,
+    "payload_bytes": 48120,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 401,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CreatePoolEvent": {
+    "n": 126,
+    "payload_bytes": 43344,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 126,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.DepositEvent": {
+    "n": 7,
+    "payload_bytes": 1792,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 7,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.ExtendAccountEvent": {
+    "n": 78,
+    "payload_bytes": 7488,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 78,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.InitBoostEvent": {
+    "n": 41,
+    "payload_bytes": 5576,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 41,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.InitUserVolumeAccumulatorEvent": {
+    "n": 258,
+    "payload_bytes": 20640,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 258,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.MigratePoolCoinCreatorEvent": {
+    "n": 1,
+    "payload_bytes": 176,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.SellEvent": {
+    "n": 359923,
+    "payload_bytes": 158726043,
+    "decoded_ok": 359923,
+    "decode_failed": 0,
+    "not_attempted_raw": 0,
+    "failure_reasons": {},
+    "layouts": {
+     "2026-10-02/idl_extension_trailing_u64": 359923
+    }
+   },
+   "pAMM.WithdrawEvent": {
+    "n": 107,
+    "payload_bytes": 27392,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 107,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.unknown:82a42461e48287a5": {
+    "n": 566,
+    "payload_bytes": 104710,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 566,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.ClaimCashbackEvent": {
+    "n": 110,
+    "payload_bytes": 7920,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 110,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CloseUserVolumeAccumulatorEvent": {
+    "n": 6507,
+    "payload_bytes": 520560,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 6507,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CollectCreatorFeeEvent": {
+    "n": 987,
+    "payload_bytes": 86856,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 987,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CompleteEvent": {
+    "n": 53,
+    "payload_bytes": 7632,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 53,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CompletePumpAmmMigrationEvent": {
+    "n": 53,
+    "payload_bytes": 10600,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 53,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CreateEvent": {
+    "n": 1658,
+    "payload_bytes": 596806,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1658,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.DistributeCreatorFeesEvent": {
+    "n": 3390,
+    "payload_bytes": 776176,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 3390,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.DistributeFeeToHoldersEvent": {
+    "n": 7076,
+    "payload_bytes": 679296,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 7076,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.ExtendAccountEvent": {
+    "n": 866,
+    "payload_bytes": 83136,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 866,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.InitUserVolumeAccumulatorEvent": {
+    "n": 310,
+    "payload_bytes": 24800,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 310,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.MigrateBondingCurveCreatorEvent": {
+    "n": 205,
+    "payload_bytes": 36080,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 205,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.TradeEvent": {
+    "n": 146446,
+    "payload_bytes": 56877912,
+    "decoded_ok": 146446,
+    "decode_failed": 0,
+    "not_attempted_raw": 0,
+    "failure_reasons": {},
+    "layouts": {
+     "2026-10-02/trailing_u64": 146446
+    }
+   },
+   "pump.unknown:742b4dbd117a482b": {
+    "n": 1043,
+    "payload_bytes": 159579,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1043,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.unknown:a943276d6686b6e8": {
+    "n": 48,
+    "payload_bytes": 6144,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 48,
+    "failure_reasons": {},
+    "layouts": {}
+   }
+  },
+  "instructions_top": {
+   "pump": {
+    "Sell": 51715,
+    "Buy": 44174,
+    "BuyExactQuoteInV2": 20005,
+    "SellV2": 19509,
+    "BuyExactSolIn": 18557,
+    "DistributeFeeToHolders": 10973,
+    "CloseUserVolumeAccumulator": 6585,
+    "BuyV2": 5092,
+    "BuyExactQuoteInV3": 3500,
+    "SweepCreatorFee": 2595,
+    "SellV3": 2470,
+    "DistributeCreatorFeesV2": 2054
+   },
+   "pAMM": {
+    "Sell": 541113,
+    "BuyExactQuoteIn": 422297,
+    "Buy": 144027,
+    "CloseUserVolumeAccumulator": 17167,
+    "BuyExactQuoteInV2": 2101,
+    "SellV2": 1468,
+    "SyncUserVolumeAccumulator": 1454,
+    "BoostBuyAndBurn": 1317,
+    "CollectCoinCreatorFee": 550,
+    "ExtendAccount": 471,
+    "TransferCreatorFeesToPump": 451,
+    "SweepProtocolFee": 338
+   }
+  },
+  "foreign_data_lines_by_program": {
+   "Prism8hsRo6Ww5jiN5Zeh3YDPLZHqHduCPSAV7JF7qv": 332720,
+   "MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e": 21605,
+   "BiSoNHVpsVZW2F7rx2eQ59yQwKxzU5NvBcmKshCSUypi": 17394,
+   "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH": 16042,
+   "DRVSpZ2YUYYKgZP8XtLhAGtT1zYSCKzeHfb4DgRnrgqD": 13117,
+   "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 9659,
+   "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 9541,
+   "3TK9D8aoBFYjYZtKCjciPrVrRStsnvo7KmpcJqDavpaU": 8754
+  },
+  "liquidity": {
+   "tx_without_swap_instruction": 230,
+   "tx_with_swap_instruction": 10,
+   "instructions": {
+    "CreatePool": 126,
+    "Withdraw": 107,
+    "Deposit": 7
+   }
+  },
+  "silence_gaps": {
+   "amm": {
+    "n": 1,
+    "max_s": 6.2420573234558105,
+    "total_s": 6.2
+   }
+  },
+  "lag_slots_ws_slotsubscribe_same_pipe_NOT_independent": {
+   "amm": {
+    "n": 1964428,
+    "p50": 1.0,
+    "p90": 1.0,
+    "p99": 1.0,
+    "max": 1.0
+   },
+   "pump": {
+    "n": 750601,
+    "p50": 1.0,
+    "p90": 1.0,
+    "p99": 1.0,
+    "max": 2.0
+   }
+  },
+  "lag_slots_ws_slotsubscribe_same_pipe_by_10min": {
+   "amm": [
+    {
+     "w": 0,
+     "n": 443227,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 1,
+     "n": 348659,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 2,
+     "n": 624465,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 3,
+     "n": 547563,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 4,
+     "n": 514,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    }
+   ],
+   "pump": [
+    {
+     "w": 0,
+     "n": 219768,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 1,
+     "n": 178774,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 2,
+     "n": 163527,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 3,
+     "n": 188370,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 4,
+     "n": 162,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    }
+   ]
+  },
+  "lag_slots_vs_http_tip": {
+   "pump": {
+    "n": 455,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 1.0,
+    "max": 10.0
+   },
+   "amm": {
+    "n": 455,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 5.0,
+    "max": 23.0
+   }
+  },
+  "age_of_last_log_s_at_poll": {
+   "pump": {
+    "n": 455,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.5,
+    "max": 0.5
+   },
+   "amm": {
+    "n": 455,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.5,
+    "max": 2.5
+   }
+  },
+  "observations": {
+   "event_loop_lateness_s": {
+    "n": 22810,
+    "p50": 0.0,
+    "p90": 0.02,
+    "p99": 0.08,
+    "max": 1.43
+   },
+   "queue_age_s.amm": {
+    "n": 1973313,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.0,
+    "max": 0.9
+   },
+   "queue_age_s.pump": {
+    "n": 759510,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.0,
+    "max": 1.3
+   },
+   "http_rtt_s.getSlot": {
+    "n": 455,
+    "p50": 0.15000000000000002,
+    "p90": 0.5,
+    "p99": 1.1500000000000001,
+    "max": 2.35
+   },
+   "http_rtt_s.getTransaction": {
+    "n": 1099,
+    "p50": 0.15000000000000002,
+    "p90": 0.2,
+    "p99": 0.45,
+    "max": 0.6000000000000001
+   },
+   "http_rtt_s.getBlock": {
+    "n": 75,
+    "p50": 1.55,
+    "p90": 1.85,
+    "p99": 3.9000000000000004,
+    "max": 3.9000000000000004
+   }
+  },
+  "suspensions": [],
+  "swap_events_per_minute": {
+   "pump": {
+    "seconds_with_events": 41,
+    "n": 41,
+    "p50": 3658.0,
+    "p90": 4115.0,
+    "p99": 4502.0,
+    "max": 4502.0
+   },
+   "pAMM": {
+    "seconds_with_events": 41,
+    "n": 41,
+    "p50": 15896.0,
+    "p90": 17505.0,
+    "p99": 19315.0,
+    "max": 19315.0
+   }
+  },
+  "lag_slots_vs_http_tip_by_10min": {
+   "pump": [
+    {
+     "w": 0,
+     "n": 113,
+     "p50": 0.0,
+     "p90": 0.0,
+     "p99": 1.0,
+     "max": 4.0
+    },
+    {
+     "w": 1,
+     "n": 116,
+     "p50": 0.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 2,
+     "n": 112,
+     "p50": 0.0,
+     "p90": 0.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 3,
+     "n": 114,
+     "p50": 0.0,
+     "p90": 0.0,
+     "p99": 5.0,
+     "max": 10.0
+    }
+   ],
+   "amm": [
+    {
+     "w": 0,
+     "n": 113,
+     "p50": 0.0,
+     "p90": 0.0,
+     "p99": 3.0,
+     "max": 8.0
+    },
+    {
+     "w": 1,
+     "n": 116,
+     "p50": 0.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 16.0
+    },
+    {
+     "w": 2,
+     "n": 112,
+     "p50": 0.0,
+     "p90": 1.0,
+     "p99": 9.0,
+     "max": 23.0
+    },
+    {
+     "w": 3,
+     "n": 114,
+     "p50": 0.0,
+     "p90": 0.0,
+     "p99": 2.0,
+     "max": 4.0
+    }
+   ]
+  },
+  "lag_event_ts_s": {
+   "pump": {
+    "n": 146446,
+    "p50": 1.5,
+    "p90": 1.5,
+    "p99": 2.0,
+    "max": 6.5
+   },
+   "pAMM": {
+    "n": 644139,
+    "p50": 1.5,
+    "p90": 2.0,
+    "p99": 3.0,
+    "max": 8.0
+   }
+  },
+  "reconnects": {
+   "amm": {
+    "connects": 1,
+    "disconnects": 0,
+    "rejects": 0,
+    "downtime_s": 1.0471856594085693,
+    "gap_slots_total": 0,
+    "events": [],
+    "downtime_s_incl_open": 1.0471856594085693
+   },
+   "pump": {
+    "connects": 1,
+    "disconnects": 0,
+    "rejects": 0,
+    "downtime_s": 1.0396513938903809,
+    "gap_slots_total": 0,
+    "events": [],
+    "downtime_s_incl_open": 1.0396513938903809
+   }
+  },
+  "wallets": {
+   "pump": 17196,
+   "amm": 83679,
+   "amm_buy_inferred": 56949,
+   "all": 121705
+  },
+  "keys": {
+   "mints": 3375,
+   "pools": 3158
+  },
+  "rows": {
+   "n": 506369,
+   "json": 247894951,
+   "heap": 173259265,
+   "indexed": 300198124
+  },
+  "per_second_swap_events": {
+   "pump": {
+    "seconds_with_events": 2398,
+    "n": 2398,
+    "p50": 59.0,
+    "p90": 86.0,
+    "p99": 126.0,
+    "max": 352.0
+   },
+   "pAMM": {
+    "seconds_with_events": 2396,
+    "n": 2396,
+    "p50": 264.0,
+    "p90": 368.0,
+    "p99": 494.0,
+    "max": 817.0
+   }
+  }
+ }
+}

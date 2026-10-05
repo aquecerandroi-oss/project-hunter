@@ -87,6 +87,8 @@ bytes, não pelas fixtures. O builder (`pumpswap/tx.py`) e o `GlobalConfig` deco
 seguem isso; `program_watch.py` vigia o slot de deploy da PumpSwap e do programa de taxas ao lado do pump. Detalhe,
 simulações e limites em [[T4.8f-pumpswap-guard]].
 
+**Programa inteiro, por `logsSubscribe` (onda 0 de H-030, 05/10):** um `logsSubscribe` com `mentions` no programa entrega a transação inteira, com os eventos como linhas `Program data:` (os dois programas as emitem antes do self-CPI), e **53 % das transações entregues só mencionam o programa**. A identidade correta do evento é `(assinatura, programa, ordinal)` e a atribuição vem da pilha de `invoke` do próprio log. Os decodificadores da T4.8e leram 100 % dos `TradeEvent` e `SellEvent` ao vivo (~1,2 milhão de eventos); o `BuyEvent` da PumpSwap (36 % dos swaps) ainda não tem decodificador. Números, custo do RPC pago e achados laterais (tx versão 1; slot de ≈ 268 ms) em [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar|KB-0183]].
+
 ## Relacionadas
 
 [[Market Collector]] · [[WebSockets]] · [[System Overview]]

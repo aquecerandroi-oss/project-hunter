@@ -277,3 +277,113 @@ T4.8e-upgrade-02-10, T4.8e-decoders, KB-0182 (síntese desta pesquisa). Estado: 
 Externas: Solana, `logsSubscribe` e clusters (https://solana.com/docs/rpc/websocket/logssubscribe,
 https://solana.com/docs/references/clusters); Cameron & Miller, *A Practitioner's Guide to Cluster-Robust Inference*
 (JHR 2015).
+
+## 8. Onda 0 — medição (05/10/2026)
+
+> Acrescentada em 05/10/2026 pelo `exchange-integration-specialist`. **Substitui, para volume, disco e RPC, os números de
+> §2 e §7** (3–6 M linhas/dia, 9,5–19 GB, "cobrança desconhecida"); o resto do desenho não muda. Revisão da Astra (duas
+> rodadas): [[wallet-tape-probe]] (`obsidian/06-DECISIONS/Revisoes-Astra/wallet-tape-probe.md`). Síntese de conhecimento:
+> [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]]. Avaliação datada: [[EXP-M15-carteiras-vencedoras]].
+
+**O que foi medido.** Sondagem de leitura desta máquina (não da VPS), RPC **público** `api.mainnet-beta.solana.com`, uma
+conexão `logsSubscribe` (`mentions` = o programa, `confirmed`) por programa, os decodificadores **commitados** (T4.8e) e
+nenhuma transação enviada. Script `infra/scripts/research/2026-10-05-wallet-tape-probe.py` (+ `infra/scripts/wallet_tape_probe_*.py`,
+40 testes offline), leitura reproduzível com `…/2026-10-05-wallet-tape-probe-read.py --run <dir>`; saídas em
+`.claude/state/carteiras-lucro/probe/{run1,run2,run3}/`. **Não é uma corrida contínua de 2 h**, e isto precisa ficar escrito:
+
+| Corrida | Início (UTC) | Janela válida | O que é |
+|---|---|---|---|
+| run 1 | 19:03:16 | **90,1 min** (5 408 s) | A máquina **dormiu 4 651 s** logo depois (o resumo final tem relógio de parede corrompido: os contadores abaixo vêm do snapshot 90, antes do salto). A auditoria de blocos desta corrida julgava no instante do fetch, o que confunde **atraso** com **perda** |
+| run 2 | 22:01:47 | **39,1 min** limpos | Com a auditoria independente corrigida (julgamento 180 s depois do fetch) e `--keep-awake` |
+| run 3 | 22:46:42 | **15,0 min** limpos | Sem auditoria; mede concentração de carteiras e tamanho dos swaps |
+
+Total válido: **144 min** em três janelas e dois horários, **não** 2 h contínuas. Um regime só: segunda-feira, 05/10/2026, das 16h às 20h BRT.
+
+### 8.1 Resultado em quatro linhas
+
+1. **RPC público: NO-GO para 24/7.** Na run 1 (19:03Z) a conexão da PumpSwap caiu **60 vezes** em 90 min (a do pump, 19),
+   na maioria por *keepalive ping timeout* do servidor, o atraso contra a ponta HTTP chegou a **p50 112 slots** (≈ 30 s) e ela
+   entregou ~43 % do que a cadeia produziu. Na run 2 e na run 3 (a partir de 22:01Z) **0 quedas** e atraso p50 de 0 slots. Uma
+   janela ruim em três basta para não pôr o coletor nisto; a causa (horário, rota, balanceador) **não** está isolada.
+2. **Volume: 28–31 milhões de eventos de swap por dia** (330–353/s entregues; 31 M/dia pela contagem dos blocos), **5 a 10 vezes** a hipótese de §2. Em bytes,
+   **217–254 GB/dia** de WS sem compressão (pump 37–42 GB, PumpSwap 180–212 GB).
+3. **Armazenamento como aprovado (10–20 GB de fita): NO-GO.** A linha estimada em **529 B** com três índices (278 B só de
+   heap; estimativa por tipo de coluna, **não** tabela medida) dá **15–17 GB/dia** e **136–149 GB em 9 dias** (a 350 B: 90–99 GB). Cabe
+   no papel nos 207 G livres de 30/09, mas sem margem para WAL, `lots`, `fills_kept` e crescimento.
+4. **Helius: GO para o piloto pago**, com custo estimado de **US$ 650–760/mês** (§8.4). **Go para as ondas 1a e 1c**;
+   **ondas 1b e 2 seguram** até o Everton escolher o formato/retenção (§8.5).
+
+### 8.2 Fluxo, decodificação e cobertura
+
+| | pump (`6EF8…`) | PumpSwap (`pAMM…`) |
+|---|---|---|
+| Notificações/s, run 2 (run 3) | 315 (396) | 822 (1 064) |
+| Transações falhas | 74 % (78 %) | 42 % (48 %) |
+| Bytes por notificação | 1 366 | 2 538 |
+| MB/s sem compressão, run 2 (run 3) | 0,43 (0,49) | 2,09 (2,45) |
+| Eventos de swap/s, run 2 | `TradeEvent` 61 | `SellEvent` 150 + `BuyEvent` 118 (**cru**) |
+| Picos por segundo (run 2) | p99 126, máx 352 | p99 494, **máx 817** |
+
+- **Decodificação:** 0 falhas em 143 170 `TradeEvent` e 352 242 `SellEvent` (run 2) e em 335 365 / 377 536 (run 1): os
+  decodificadores da T4.8e leem o layout de 02/10 em escala. O **`BuyEvent` da PumpSwap é 36 % dos eventos de swap** e ainda
+  não tem decodificador: a onda 1a deixa de ser opcional. A carteira e a pool dele, lidas por deslocamento (120/152), batem com as contas 0 e 1
+  da instrução `buy` em três compras reais (uma roteada); o IDL não está fixado por hash.
+- **Eventos sem IDL:** pump `742b4dbd117a482b` (~0,4/s, 1 931 na run 1) e `a943276d6686b6e8`; PumpSwap `82a42461e48287a5`
+  (702 na run 1). Contados crus, nunca interpretados.
+- **Fidelidade dos logs:** 1 099 de 1 099 transações amostradas por `getTransaction` têm **a mesma contagem de eventos** nos
+  logs e nas inner instructions, e `context.slot` = slot da transação em todas (delta 0). É contagem, não identidade de payload (onda 1a).
+- **Cobertura independente (run 2):** `getBlock` de 75 slots escolhidos sem olhar o websocket, cada bloco julgado ≥ 180 s depois
+  do fetch (exceto ~5 no fim, julgados mais cedo, e 1 censurado): **pump 6 314 de 6 320 menções entregues, PumpSwap 17 373 de 17 373**; as 6 que
+  faltaram são transações falhas. No instante do fetch, 6 361/6 367 e 17 715/17 715. Isso vale para **39 min de um horário**, não para 24/7.
+- **Tx em que o pump e a PumpSwap aparecem juntos:** 2 440 de 2 708 893 únicas (0,09 %; 0,19 % das que invocam ao menos um programa) na run 2; **53 % das
+  transações únicas vistas só *mencionam* um programa e não o invocam** (custo de banda sem evento). Na run 2, 2 408 de 2 408 tx esperadas nas duas assinaturas
+  chegaram nas duas; na run 1, 5 465 de 10 775.
+- **Liquidez de pool sem swap** (contagem de instruções): run 2, em 39 min: `CreatePool` 126 (3,2/min), `Withdraw` 107 (2,7/min), `Deposit` 7
+  (0,2/min); 230 tx com liquidez e **sem** swap contra 10 com swap. 106 dos 107 `Withdraw` e os 7 `Deposit` são de pools que também fizeram swap na
+  janela (heurística: o endereço da pool aparece no payload). São ~0,03 % dos eventos, mas até 3,4 % das pools ativas tiveram retirada em 39 min (107 `Withdraw` em 3 158 pools): a regra de §3.1 (estado da conta ou **censura**) vale e custa pouco em volume.
+- **Concentração (run 3, 15 min, 73 235 carteiras):** 58 % das carteiras fizeram **1** swap (13 % dos eventos); 3 135 carteiras (4 %) com ≥ 20 swaps
+  fazem 46 % dos eventos; 8 carteiras com ≥ 500 swaps fazem 5 %. Dos swaps decodificados, **29 % valem < 0,01 SOL** e 14 % valem ≥ 10 SOL.
+- **Carteiras distintas** (união de `TradeEvent`, `SellEvent` e `BuyEvent` com carteira inferida): run 2, 54 mil em 10 min e **121 mil em 39 min**; run 1
+  (feed degradado) 157 mil em 90 min. Cenários por dia (um horário, **não** limites): Heaps 0,9–1,8 M; linear 1,7–5,3 M; sem novas 0,07–0,16 M. A curva
+  é o resultado; a ordem de grandeza é de **milhão por dia**.
+
+### 8.3 Atraso e queda do RPC público (run 1 contra run 2)
+
+Atraso medido contra `getSlot(confirmed)` por HTTP menos o **maior** slot recebido (o `slotSubscribe` vai pelo mesmo cano e não vê o atraso), por janela de 10 min na
+run 1: pump p50 3–69 slots, PumpSwap p50 18–112 (p90 até 218). Com 268 ms/slot (§8.6), 112 slots ≈ 30 s. O carimbo de hora do evento (relógio da cadeia, ±1 s) confirma:
+p50 de 6 s no pump e 13 s na PumpSwap na run 1, contra 1,5 s nas duas na run 2. A fila local não foi o gargalo: idade na fila p99 0 s, 16 % de um núcleo.
+Silêncios > 3 s: 22 por programa na run 1 (máx 24 s, PumpSwap); 1 na run 2 (6 s). HTTP: 55 respostas `413` em ~3 000 chamadas na run 1 (1,8 %), nenhuma na run 2.
+
+### 8.4 Custo estimado da Helius (24/7, programa inteiro)
+
+**Estimativa de 05/10/2026**, a partir das páginas públicas da Helius lidas hoje (https://www.helius.dev/docs/billing/credits e https://www.helius.dev/pricing): *LaserStream WSS* (métodos
+padrão do Solana, todos os planos) cobra **2 créditos por 0,1 MB de dados transmitidos, sem compressão** (≈ 20 000 créditos/GB). Planos: Developer US$ 49 (10 M), **Business US$ 499 (100 M)**,
+Professional US$ 999 (200 M); créditos extras US$ 5 por milhão nos pagos. Com 217–254 GB/dia: **4,3–5,1 M créditos/dia = 130–152 M/mês** → Business + 30–52 M extras = **≈ US$ 650–760/mês**
+(ou Professional a US$ 999 com folga). Sem contar HTTP (≈ 3 000 créditos/dia de financiadores, ≤ 300 leituras/dia) nem recuperação de lacunas. O plano gratuito (1 M) acabaria em ~5 h.
+**Hipótese não medida:** um filtro no servidor só para transações com sucesso (gRPC com `failed = false`, Business+; ou o `transactionSubscribe` da Helius) cortaria ~51 % das notificações (≈ 47 % dos bytes, se proporcionais):
+≈ 114 GB/dia = 68 M créditos/mês, dentro do Business sem extras. O tamanho do payload dessas interfaces não foi medido.
+
+### 8.5 Decisão (go/no-go)
+
+| Item | Decisão | Por quê |
+|---|---|---|
+| RPC público para 24/7 | **NO-GO** | 1 de 3 janelas degradou (60 + 19 quedas, até ~30 s de atraso); sem SLA; a Solana diz que não é para produção |
+| WS pago (Helius) | **GO para um piloto** de pelo menos um ciclo diário, no ambiente final | O Everton autorizou o plano pago. O piloto mede cobertura, atraso, reconexão, **custo faturado** e escrita real; não dá para atribuir a degradação ao provedor ou à rota sem ele |
+| Onda 1a (`BuyEvent` + leitor `logsSubscribe` do programa inteiro) | **GO** | `BuyEvent` = 36 % dos swaps; identidade `(assinatura, programa, ordinal)` e atribuição ao mint do evento já estão provadas na leitura |
+| Onda 1c (motor puro) | **GO** | Independe do formato de armazenamento |
+| Onda 1b (7 tabelas, partição diária, 9 dias) e onda 2 | **SEGURAR** | O volume é 5–10× o aprovado e a linha física não foi medida. Decisão do Everton/database-architect entre: (a) retenção de 2–3 dias da fita bruta (≈ 45–50 GB a 529 B), (b) agregar no ingresso (lotes e estado por carteira) e guardar bruto só de carteiras candidatas, (c) formato colunar fora do Postgres, (d) mais disco. Um filtro por tamanho ou por atividade não deve ser aplicado antes de provar que não apaga compras e vendas que o E-PnL precisa |
+
+### 8.6 Achados laterais (fora do escopo, registrados)
+
+- **O slot dura ≈ 268 ms hoje** (3,73 slots/s; mediana de 224 amostras de 60 s de `getRecentPerformanceSamples`), não 400 ms. As conversões "5 slots ≈ 2 s" de §0 e do KB-0182 valem ≈ **1,34 s**.
+  O desenho define o atraso em **slots**, e isso se mantém; as frases em segundos precisam ser relidas (a medição dos 62 pousos de 24–26/09 pode ter sido feita com outra duração de slot, que não consta).
+- **Transação versão 1:** `getBlock`/`getTransaction` com `maxSupportedTransactionVersion = 0` recusam a resposta (`-32015`) quando o bloco tem tx v1 (147 de 1 104 num bloco amostrado, 13 %). `tx_rpc.py:191` e `rpc_wallet.py:82` usam `0`.
+  Evidência em `.claude/state/carteiras-lucro/probe/side-findings-v1-tx-and-slot-time.json`; a sondagem usa `1`. Registrado em [[Open Bugs]].
+- **Auditoria do exemplo "sadcrissy": não feita** — o endereço completo não está no repositório nem nas notas (§7, item 4).
+
+### 8.7 O que a medição não vê
+
+Um regime, um dia, dois horários; RPC público sem garantia de entrega (a cobertura de 39 min não é cobertura de 24/7); eventos truncados em logs longos (0 na medida, mas a contagem só vê
+o que o servidor entregou); WAL, escrita real no Postgres, RSS, cache de resolução de pool, recuperação de lacunas e períodos de reserva de pool inválida (**não medidos**); identidade do payload do evento (só contagem);
+a linha de 529 B é uma fórmula por tipo de coluna, não uma tabela medida. Limitações do instrumento reconhecidas na revisão: a deduplicação de 60 s da run 1 e 2 pode ter contado de novo uma entrega muito atrasada
+(janela depois subida para 300 s; nas corridas limpas nenhuma tx esperada nas duas assinaturas chegou só em uma, então não há cópia tardia a duplicar); na run 2 o fechamento julgou cedo ~5 blocos (conservador: só podia somar perdas, e não somou).

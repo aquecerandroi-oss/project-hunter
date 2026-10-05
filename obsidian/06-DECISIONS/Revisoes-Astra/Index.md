@@ -124,3 +124,4 @@ Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre u
 - [[H-029-carry-resultado]] — R87, resultado: A0 e A1 NÃO CONFIRMA, A2 limite de dado; rótulos reproduzidos por ela, 2 defeitos de contabilidade corrigidos sem mudar rótulo, conclusão restringida ao A1 medido (KB-0181) (05/10)
 
 - [[wallets-engine]] — onda 1c do H-030: motor puro de seguir carteiras (FIFO, E-PnL de liquidação com errata, entidades por `known_at`, C-PnL = a própria política, `follow`/`control`/`control2` puros, contrato de preço §3.1, testes de vazamento e trapaças pegas); REQUEST_CHANGES em duas rodadas (7 + 2), tudo consertado com teste (05/10)
+- [[wallet-tape-probe]] — onda 0 do H-030: desenho da medição da sondagem do programa inteiro (7 pontos antes da corrida, 6 depois; auditoria independente por bloco, "atrasado não é perdido", downtime até o primeiro log, fórmula de linha corrigida) (05/10)

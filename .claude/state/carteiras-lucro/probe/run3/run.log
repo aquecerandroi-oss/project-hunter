@@ -1,0 +1,16 @@
+[     60s] notif pump=19167 amm=42106 wallets=12273 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    120s] notif pump=39744 amm=79812 wallets=18752 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    180s] notif pump=61409 amm=117933 wallets=24983 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    240s] notif pump=97003 amm=158629 wallets=29687 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    300s] notif pump=134812 amm=195131 wallets=33300 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    360s] notif pump=152968 amm=240010 wallets=38549 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    420s] notif pump=186274 amm=309423 wallets=41599 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    481s] notif pump=207322 amm=383248 wallets=45183 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    541s] notif pump=237609 amm=464975 wallets=51322 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    601s] notif pump=267872 amm=549706 wallets=56045 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    661s] notif pump=283735 amm=633399 wallets=59988 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    721s] notif pump=301702 amm=714424 wallets=63214 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    781s] notif pump=318887 amm=794169 wallets=66050 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    841s] notif pump=333261 amm=866755 wallets=70881 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+[    901s] notif pump=356315 amm=957107 wallets=73193 lag_vs_http p50 pump=0.0 amm=0.0 disconnects={'pump': 0, 'amm': 0}
+DONE .claude\state\carteiras-lucro\probe\run3\summary.json

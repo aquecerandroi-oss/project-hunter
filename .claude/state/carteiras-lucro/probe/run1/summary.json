@@ -1,0 +1,2821 @@
+{
+ "ws_url_host": "api.mainnet-beta.solana.com",
+ "commitment": "confirmed",
+ "getTransaction_sampler": {
+  "compared": 1907,
+  "equal": 1907,
+  "diff": [],
+  "unavailable": 39,
+  "slot_delta": {
+   "0": 1907
+  },
+  "http": {
+   "getSlot_requests": 979,
+   "getTransaction_requests": 1947,
+   "getBlock_requests": 101,
+   "getTransaction_http_413": 36,
+   "getSlot_http_413": 17,
+   "getBlock_http_413": 2,
+   "getSlot_errors": 6,
+   "getTransaction_errors": 3
+  },
+  "http_events": [
+   {
+    "t": 4311,
+    "tag": "getSlot",
+    "error": ""
+   },
+   {
+    "t": 4351,
+    "tag": "getTransaction",
+    "error": ""
+   },
+   {
+    "t": 4895,
+    "tag": "getSlot",
+    "error": ""
+   },
+   {
+    "t": 4916,
+    "tag": "getSlot",
+    "error": ""
+   },
+   {
+    "t": 4923,
+    "tag": "getTransaction",
+    "error": ""
+   },
+   {
+    "t": 5008,
+    "tag": "getSlot",
+    "error": ""
+   },
+   {
+    "t": 5009,
+    "tag": "getTransaction",
+    "error": ""
+   },
+   {
+    "t": 5102,
+    "tag": "getSlot",
+    "error": ""
+   },
+   {
+    "t": 5462,
+    "tag": "getSlot",
+    "error": ""
+   }
+  ]
+ },
+ "independent_block_audit": {
+  "blocks_requested": 101,
+  "blocks_skipped_or_unavailable": 2,
+  "blocks_before_both_subscriptions_flowed": 0,
+  "per_block": [
+   [
+    453667502,
+    false,
+    [
+     162,
+     0
+    ],
+    [
+     542,
+     0
+    ]
+   ],
+   [
+    453667681,
+    false,
+    [
+     86,
+     0
+    ],
+    [
+     284,
+     0
+    ]
+   ],
+   [
+    453667860,
+    false,
+    [
+     197,
+     0
+    ],
+    [
+     235,
+     0
+    ]
+   ],
+   [
+    453668061,
+    false,
+    [
+     248,
+     248
+    ],
+    [
+     352,
+     0
+    ]
+   ],
+   [
+    453668249,
+    true,
+    [
+     123,
+     123
+    ],
+    [
+     136,
+     0
+    ]
+   ],
+   [
+    453668444,
+    true,
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    453668618,
+    true,
+    [
+     142,
+     142
+    ],
+    [
+     390,
+     0
+    ]
+   ],
+   [
+    453668813,
+    true,
+    [
+     88,
+     0
+    ],
+    [
+     393,
+     0
+    ]
+   ],
+   [
+    453669059,
+    true,
+    [
+     146,
+     0
+    ],
+    [
+     175,
+     0
+    ]
+   ],
+   [
+    453669239,
+    false,
+    [
+     80,
+     0
+    ],
+    [
+     175,
+     0
+    ]
+   ],
+   [
+    453669408,
+    false,
+    [
+     81,
+     0
+    ],
+    [
+     175,
+     0
+    ]
+   ],
+   [
+    453669606,
+    false,
+    [
+     134,
+     0
+    ],
+    [
+     178,
+     0
+    ]
+   ],
+   [
+    453669791,
+    false,
+    [
+     156,
+     0
+    ],
+    [
+     148,
+     0
+    ]
+   ],
+   [
+    453669966,
+    false,
+    [
+     89,
+     0
+    ],
+    [
+     227,
+     0
+    ]
+   ],
+   [
+    453670143,
+    false,
+    [
+     107,
+     0
+    ],
+    [
+     209,
+     0
+    ]
+   ],
+   [
+    453670336,
+    false,
+    [
+     152,
+     0
+    ],
+    [
+     225,
+     0
+    ]
+   ],
+   [
+    453670514,
+    false,
+    [
+     190,
+     0
+    ],
+    [
+     162,
+     0
+    ]
+   ],
+   [
+    453670684,
+    false,
+    [
+     157,
+     0
+    ],
+    [
+     263,
+     0
+    ]
+   ],
+   [
+    453671085,
+    true,
+    [
+     86,
+     0
+    ],
+    [
+     139,
+     139
+    ]
+   ],
+   [
+    453671261,
+    true,
+    [
+     53,
+     0
+    ],
+    [
+     131,
+     0
+    ]
+   ],
+   [
+    453671448,
+    true,
+    [
+     144,
+     0
+    ],
+    [
+     148,
+     148
+    ]
+   ],
+   [
+    453671664,
+    true,
+    [
+     179,
+     0
+    ],
+    [
+     219,
+     219
+    ]
+   ],
+   [
+    453671878,
+    true,
+    [
+     298,
+     0
+    ],
+    [
+     217,
+     0
+    ]
+   ],
+   [
+    453672106,
+    true,
+    [
+     103,
+     0
+    ],
+    [
+     161,
+     161
+    ]
+   ],
+   [
+    453672272,
+    true,
+    [
+     36,
+     0
+    ],
+    [
+     222,
+     0
+    ]
+   ],
+   [
+    453672466,
+    true,
+    [
+     61,
+     0
+    ],
+    [
+     135,
+     0
+    ]
+   ],
+   [
+    453672648,
+    false,
+    [
+     127,
+     0
+    ],
+    [
+     41,
+     0
+    ]
+   ],
+   [
+    453672833,
+    false,
+    [
+     151,
+     0
+    ],
+    [
+     371,
+     0
+    ]
+   ],
+   [
+    453673036,
+    false,
+    [
+     109,
+     0
+    ],
+    [
+     256,
+     256
+    ]
+   ],
+   [
+    453673238,
+    true,
+    [
+     162,
+     0
+    ],
+    [
+     217,
+     0
+    ]
+   ],
+   [
+    453673437,
+    true,
+    [
+     105,
+     0
+    ],
+    [
+     337,
+     337
+    ]
+   ],
+   [
+    453673621,
+    true,
+    [
+     50,
+     0
+    ],
+    [
+     331,
+     0
+    ]
+   ],
+   [
+    453673822,
+    true,
+    [
+     35,
+     0
+    ],
+    [
+     229,
+     229
+    ]
+   ],
+   [
+    453674002,
+    true,
+    [
+     109,
+     0
+    ],
+    [
+     176,
+     0
+    ]
+   ],
+   [
+    453674198,
+    true,
+    [
+     122,
+     122
+    ],
+    [
+     188,
+     188
+    ]
+   ],
+   [
+    453674380,
+    true,
+    [
+     60,
+     0
+    ],
+    [
+     106,
+     106
+    ]
+   ],
+   [
+    453674575,
+    true,
+    [
+     75,
+     75
+    ],
+    [
+     123,
+     123
+    ]
+   ],
+   [
+    453674754,
+    true,
+    [
+     54,
+     0
+    ],
+    [
+     107,
+     107
+    ]
+   ],
+   [
+    453674945,
+    true,
+    [
+     139,
+     0
+    ],
+    [
+     156,
+     156
+    ]
+   ],
+   [
+    453675116,
+    true,
+    [
+     118,
+     0
+    ],
+    [
+     133,
+     0
+    ]
+   ],
+   [
+    453675308,
+    true,
+    [
+     98,
+     0
+    ],
+    [
+     262,
+     262
+    ]
+   ],
+   [
+    453675520,
+    true,
+    [
+     40,
+     0
+    ],
+    [
+     94,
+     94
+    ]
+   ],
+   [
+    453675687,
+    true,
+    [
+     148,
+     0
+    ],
+    [
+     120,
+     120
+    ]
+   ],
+   [
+    453675866,
+    true,
+    [
+     75,
+     0
+    ],
+    [
+     124,
+     0
+    ]
+   ],
+   [
+    453676068,
+    true,
+    [
+     137,
+     0
+    ],
+    [
+     124,
+     124
+    ]
+   ],
+   [
+    453676270,
+    true,
+    [
+     111,
+     0
+    ],
+    [
+     167,
+     0
+    ]
+   ],
+   [
+    453676484,
+    true,
+    [
+     78,
+     0
+    ],
+    [
+     305,
+     305
+    ]
+   ],
+   [
+    453676666,
+    true,
+    [
+     99,
+     0
+    ],
+    [
+     259,
+     259
+    ]
+   ],
+   [
+    453676846,
+    true,
+    [
+     52,
+     0
+    ],
+    [
+     208,
+     0
+    ]
+   ],
+   [
+    453677037,
+    true,
+    [
+     30,
+     0
+    ],
+    [
+     234,
+     234
+    ]
+   ],
+   [
+    453677239,
+    true,
+    [
+     35,
+     0
+    ],
+    [
+     119,
+     0
+    ]
+   ],
+   [
+    453677426,
+    true,
+    [
+     203,
+     203
+    ],
+    [
+     98,
+     0
+    ]
+   ],
+   [
+    453677798,
+    true,
+    [
+     103,
+     0
+    ],
+    [
+     126,
+     126
+    ]
+   ],
+   [
+    453677978,
+    true,
+    [
+     38,
+     0
+    ],
+    [
+     101,
+     101
+    ]
+   ],
+   [
+    453678202,
+    true,
+    [
+     52,
+     0
+    ],
+    [
+     98,
+     98
+    ]
+   ],
+   [
+    453678435,
+    true,
+    [
+     31,
+     0
+    ],
+    [
+     56,
+     56
+    ]
+   ],
+   [
+    453678610,
+    true,
+    [
+     77,
+     0
+    ],
+    [
+     190,
+     0
+    ]
+   ],
+   [
+    453678809,
+    true,
+    [
+     41,
+     41
+    ],
+    [
+     214,
+     214
+    ]
+   ],
+   [
+    453679015,
+    true,
+    [
+     63,
+     0
+    ],
+    [
+     454,
+     454
+    ]
+   ],
+   [
+    453679230,
+    true,
+    [
+     76,
+     0
+    ],
+    [
+     206,
+     206
+    ]
+   ],
+   [
+    453679411,
+    true,
+    [
+     38,
+     0
+    ],
+    [
+     376,
+     376
+    ]
+   ],
+   [
+    453679620,
+    true,
+    [
+     172,
+     0
+    ],
+    [
+     401,
+     401
+    ]
+   ],
+   [
+    453679796,
+    true,
+    [
+     70,
+     0
+    ],
+    [
+     115,
+     115
+    ]
+   ],
+   [
+    453680000,
+    true,
+    [
+     74,
+     0
+    ],
+    [
+     299,
+     299
+    ]
+   ],
+   [
+    453680191,
+    true,
+    [
+     46,
+     46
+    ],
+    [
+     389,
+     389
+    ]
+   ],
+   [
+    453680374,
+    true,
+    [
+     61,
+     0
+    ],
+    [
+     301,
+     301
+    ]
+   ],
+   [
+    453680596,
+    true,
+    [
+     98,
+     98
+    ],
+    [
+     527,
+     527
+    ]
+   ],
+   [
+    453680797,
+    true,
+    [
+     61,
+     61
+    ],
+    [
+     368,
+     368
+    ]
+   ],
+   [
+    453681066,
+    true,
+    [
+     136,
+     0
+    ],
+    [
+     192,
+     192
+    ]
+   ],
+   [
+    453681270,
+    true,
+    [
+     46,
+     0
+    ],
+    [
+     229,
+     229
+    ]
+   ],
+   [
+    453681482,
+    true,
+    [
+     122,
+     2
+    ],
+    [
+     229,
+     229
+    ]
+   ],
+   [
+    453681674,
+    true,
+    [
+     47,
+     0
+    ],
+    [
+     228,
+     0
+    ]
+   ],
+   [
+    453681882,
+    true,
+    [
+     151,
+     0
+    ],
+    [
+     251,
+     251
+    ]
+   ],
+   [
+    453682067,
+    true,
+    [
+     143,
+     0
+    ],
+    [
+     102,
+     102
+    ]
+   ],
+   [
+    453682243,
+    true,
+    [
+     71,
+     71
+    ],
+    [
+     260,
+     260
+    ]
+   ],
+   [
+    453682447,
+    true,
+    [
+     81,
+     0
+    ],
+    [
+     360,
+     360
+    ]
+   ],
+   [
+    453682630,
+    true,
+    [
+     271,
+     0
+    ],
+    [
+     298,
+     0
+    ]
+   ],
+   [
+    453682848,
+    true,
+    [
+     155,
+     0
+    ],
+    [
+     242,
+     0
+    ]
+   ],
+   [
+    453683057,
+    true,
+    [
+     188,
+     0
+    ],
+    [
+     291,
+     0
+    ]
+   ],
+   [
+    453683277,
+    true,
+    [
+     211,
+     0
+    ],
+    [
+     220,
+     220
+    ]
+   ],
+   [
+    453683458,
+    true,
+    [
+     199,
+     0
+    ],
+    [
+     170,
+     170
+    ]
+   ],
+   [
+    453683763,
+    true,
+    [
+     141,
+     0
+    ],
+    [
+     366,
+     366
+    ]
+   ],
+   [
+    453683977,
+    true,
+    [
+     117,
+     0
+    ],
+    [
+     144,
+     144
+    ]
+   ],
+   [
+    453684180,
+    true,
+    [
+     131,
+     0
+    ],
+    [
+     271,
+     271
+    ]
+   ],
+   [
+    453684444,
+    true,
+    [
+     186,
+     0
+    ],
+    [
+     238,
+     238
+    ]
+   ],
+   [
+    453684642,
+    true,
+    [
+     126,
+     0
+    ],
+    [
+     295,
+     0
+    ]
+   ],
+   [
+    453684830,
+    true,
+    [
+     124,
+     0
+    ],
+    [
+     298,
+     298
+    ]
+   ],
+   [
+    453685150,
+    true,
+    [
+     171,
+     0
+    ],
+    [
+     342,
+     342
+    ]
+   ],
+   [
+    453685327,
+    true,
+    [
+     250,
+     0
+    ],
+    [
+     402,
+     402
+    ]
+   ],
+   [
+    453685530,
+    true,
+    [
+     59,
+     0
+    ],
+    [
+     238,
+     238
+    ]
+   ],
+   [
+    453685879,
+    true,
+    [
+     67,
+     67
+    ],
+    [
+     248,
+     248
+    ]
+   ],
+   [
+    453686193,
+    true,
+    [
+     147,
+     0
+    ],
+    [
+     193,
+     0
+    ]
+   ],
+   [
+    453686382,
+    true,
+    [
+     63,
+     63
+    ],
+    [
+     438,
+     438
+    ]
+   ],
+   [
+    453686664,
+    true,
+    [
+     100,
+     100
+    ],
+    [
+     424,
+     424
+    ]
+   ],
+   [
+    453686867,
+    true,
+    [
+     158,
+     158
+    ],
+    [
+     488,
+     488
+    ]
+   ],
+   [
+    453687122,
+    true,
+    [
+     66,
+     66
+    ],
+    [
+     237,
+     237
+    ]
+   ],
+   [
+    453687342,
+    true,
+    [
+     45,
+     0
+    ],
+    [
+     129,
+     129
+    ]
+   ],
+   [
+    453687546,
+    true,
+    [
+     67,
+     0
+    ],
+    [
+     204,
+     0
+    ]
+   ]
+  ],
+  "clean": {
+   "blocks": 16,
+   "pump": {
+    "txs": 2226,
+    "received": 1978,
+    "missed": 248,
+    "missed_failed": 198
+   },
+   "amm": {
+    "txs": 3843,
+    "received": 3587,
+    "missed": 256,
+    "missed_failed": 79
+   }
+  },
+  "affected_by_reconnect": {
+   "blocks": 82,
+   "pump": {
+    "txs": 8534,
+    "received": 7096,
+    "missed": 1438,
+    "missed_failed": 1046
+   },
+   "amm": {
+    "txs": 18931,
+    "received": 5313,
+    "missed": 13618,
+    "missed_failed": 5135
+   }
+  },
+  "missed_examples": [
+   {
+    "slot": 453668061,
+    "program": "pump",
+    "sigs": [
+     "3tfPG4CqgqkGh9V3VBtT5449QdStsPEsdi6tdTcRJ58JXnLT2BvT8RX2RybVS1LvHcNnDgmbLjwbHhtuhYHdUhKT",
+     "4npRYqmMfxvjKdqhq9yxATGKJXgy5mpX5mCUc4wc1cG1eXpL3E6NoGUpCDFrpS24y4AXxwkErDsLpinCPs2wiSeu",
+     "4MeFmfREuHaMk9ahfbWQ8UZYdHjeiTViwMxkEyR6z5SV6Rvy9EXZ7jgEb8grY5fwzfxXyv5d8kye6p1nGookqYyL"
+    ]
+   },
+   {
+    "slot": 453668249,
+    "program": "pump",
+    "sigs": [
+     "3P6WvWigWrjmwPdRDiKJ1rBdyzCFdATgNFSytrfemD5KvJgiAf47Sao2Uk5za3n33wzobYvXfByitEaUETF7VzaA",
+     "4SfwbcLor1xxGrBvVqDhvcn3xWVq9w9SBtKZE45EywxrPvKWM5UryBycvLNgpRHg9gnzy6Dhi6srcoWa6G76pNBh",
+     "4U34coBbscEFzdvqsfKFcWycLnGysaFg4GgXpNBgZQZMXp2zoBRevzGzDwJndBVnnMWYAgPRgYRK4fchaAfe3cTU"
+    ]
+   },
+   {
+    "slot": 453668618,
+    "program": "pump",
+    "sigs": [
+     "28bMpnQMbevFx17FVoX8J5WYd2o7kct3VdVXYFdj671WKo62nGSmphUaAqgPjcRCyUMfusYhJujJdzq5D4wqfWGe",
+     "RDTMjQddkqm1R8xitgpLfNjGsu7upuBodpzYxRLRuN2AaUb3CpfqDnSEe1jCDxjUmhXYS39cqpxSfAt75xx44L8",
+     "2y47K17rcnPiQi33NLciqkHi1dZoEPagVCiap5weC8ZWH3TZvwotSDajtWTg4zwz29vcJZ9Y8ebFCv67QtK1BwFt"
+    ]
+   },
+   {
+    "slot": 453671085,
+    "program": "amm",
+    "sigs": [
+     "289QG6bu1QjhUqGLEiYudMUMhnDVe9WXSnfRqyCszBt8CnbwAWmEQZEfdZqVryHuPU5Z8pmbcwqM9pPXzqtYjJ4V",
+     "4Ru9aFQctD62BjY2QDfvePL87U69GKRLiJkYsJjqGU8U3bFJTa25y3EYzKMtFBaeJ9auunKrNg9WZVG9VriFFRte",
+     "24muQLF4ZR7EiGd76H39bfuaqQhgBEjCuy4bzGbU2TzrpnD3zKWh1JfGUCLi5nPPKg5GJ1RCwtwNwUMgadSbeQWk"
+    ]
+   },
+   {
+    "slot": 453671448,
+    "program": "amm",
+    "sigs": [
+     "3i5EvmXQFjRFMTQgCbyVeDykts4r7B4Mmxd5SdbzbGAkqHEMQ45ConUMNwsuEqX5dfGvLpT4LLqnGSALnu3vR1Q2",
+     "3gYMWD7jjMtj9R13KHVHcvwmy46NLAMXf1pmmNLKGCGH5E2QwVCV1RksFJk4yLCgQK1Uf8CdgrNYi8vqdF4PdsMS",
+     "4tSdj1mcgBYwkXRzfYvsVRFeCm7QTziRM9r5fJ3bJtkrrF8LVad3yj2RadrzPBmw4GGLPMojYPMV9y2extNayq1J"
+    ]
+   },
+   {
+    "slot": 453671664,
+    "program": "amm",
+    "sigs": [
+     "5N8EFKCTj6c7TaH8EcWfwbFhybTENXvHnCVccb3WH9tSxipLGoSXCRyHKUEL3vF2jdfz6624onQE8pdZPVUXbYRp",
+     "4Yw5YFBFtm8yinrumGQbTszUFnqs9D7u6R1hKSe5CDfvJcr7GWtTnZBzk31Pzu6RBhwSKFnfUvchAxzEUQ5WtoY3",
+     "4jJz8z27yM3qmk4JWXeG5y23gLL2HZhvDwJ2PFhWcS1jWnzxfALRzPTeaMkcENgHRcenBiqhrBcFmdEcZS8JtHEr"
+    ]
+   },
+   {
+    "slot": 453672106,
+    "program": "amm",
+    "sigs": [
+     "5JMJ1nAX7hwBh36QkNwp6bq8EbBL7E2jUXkGttFnSdMyHDZLZxZwG4EmtyHFreSLWmhLFpJdVUVFvVZisdGWagF9",
+     "3No4m4YvPHBUiFtuns2x3cQ8yfm4P3W3qseW13VCmoZm4fZTrZ93Px1qfDT5oyMgbz784KzT3BpaSYbxHAySCDDK",
+     "1PWGc9KXVX8JxewuHdAf519T6DvMjoKsPLb3Gs8cULCHPeG5BKNHkrTPFhbTG3WrH7zqCnGKmMmyniMFMR5gMDZ"
+    ]
+   },
+   {
+    "slot": 453673036,
+    "program": "amm",
+    "sigs": [
+     "3EkARPUBVdz5NcRuTnZZdoLM5fejFkSDeeeKBsyuCFaLqDrgo3iiiZT2kzU5pGXhttPfjmtSLGUgJJYABriTEg5N",
+     "4pG1sr6rxVMh16YsWArWeLoAD5k6XbvnBuohpxJDkU9PQVkfp32wEQE6kU41bPrgExxKCEFKP7deQt2ttoBxfoG",
+     "65CtG2ydfB7rERm4chvJJSGfgCvR8snFcgd4dVSENyeaTnauomDfByXNDpWV3RdTmWFQDQegDBxVbcXVapHkiDNx"
+    ]
+   },
+   {
+    "slot": 453673437,
+    "program": "amm",
+    "sigs": [
+     "2dNrMbL68YZQKxNeZXRWubPfugEUTrw3vHjWooU53MJ3hQH1df69aXuB6gQZoqfD6NG2Kk4tbLqfNayJVohnroMD",
+     "115MwQRp6x78DcE6ufrRz8JByGFASwLETHdsAzoxh52dQYLWTzWpAH7c5rysSfcPSRwJ1n7r8Po8gxtfJoYPWA",
+     "5UtjFmNYfXUY6z4NjTr5abuLdbe1pg9ae3NdorfHwSMX799a5iJrb5U9MLPDA6qdDrxCPrjwQMMEzMUcoeCZm9T4"
+    ]
+   },
+   {
+    "slot": 453673822,
+    "program": "amm",
+    "sigs": [
+     "4tt1PmGUm3XPJKaMjssC9bqC2zaNi8oKtxB5DuMFb2bCQgxzByFCZ8Kj4Bouhsb8bzzJdkGJeFyyCZ4ZNQq5g6b7",
+     "kL7aSW3YTmhbt34gQMXyTYvYspXdvmErAErbAoY4PPDwwpfi1eK8xW7s9ann8tMatw7cyryHmYjfHnnRdXzRVqa",
+     "2jXd32kmZL3NSdq68DWGVvdfrhccywVwgCziV386wt7v4G7FLtWQVcaYmb1S5oDv3m3DtkESL45KY9EbZ8s3nPDQ"
+    ]
+   },
+   {
+    "slot": 453674198,
+    "program": "pump",
+    "sigs": [
+     "d8UJAPcYNDUmVnj9BThAebtKuPzi9BrXM6Y1kLfmqNMDT5aMsBsVB7TyKxccs1WJfx5tVj6C6q9DRPN7avgwYZo",
+     "5U3ybeLZQ1ECGsvJt1BPZ2g7vm2X65dL3UqZoyGZLPXCoyquiuJp1Uc1QnqQXEgyJGijnDVdGpqzW7KRHp1jKviL",
+     "26WdaqeU4845cTgDJcQFZrxa85fMg9YwodnXDo4rfMiaZFVpH3Nvmqn5bL6KPGFWgrqc3o2kdKm5DN6GxPviBDh7"
+    ]
+   },
+   {
+    "slot": 453674198,
+    "program": "amm",
+    "sigs": [
+     "4MYPTp8CYH4QD3iHsN61kPiDqKyhCCzv6GW8YMovtbTGcj7cEQP6dFJfoG2Et7P4i9YLUKqdcJ3rf7WJH3ToFNrk",
+     "Nh42Eccz8dt8KsKt4wHzTiBmN1NQ3ZdJNQSG4a5aMWABBMN6NroW5oNtvKCVbyDecb5ewVCUGARNXRbpXqnhyqq",
+     "5upx1HAtJcyjE44Kde28P2jFja3dQA54KuuKEWHnfz6mWSGa2GoHGsvip8FiYsJ9kEvSH6u73jjSdRWC9dg3h77L"
+    ]
+   },
+   {
+    "slot": 453674380,
+    "program": "amm",
+    "sigs": [
+     "4dW3gR3PoEfVLHJqNx6xJ1rpwRsRutu8NXqpjCW3cTjT7FZdWA5V9tLj4rYsigWQtYa1jyg1bCZot2C3A18pn6oQ",
+     "3gGJgk8jNsoxtNHacUkh9tr15EAqv5j9tsTnGbCasGCbGixnXnUJTRVNeWnbz9XJeb4o1cFdeZJQSk14ipqaVE3K",
+     "4KC4Jgun5J7gEfoaFnqUK3dsuod6raRuZzCTWFG1kzFpgCeCHRHVHqaa2vh2TB4wgPcEonfnK6sbHA1rp4229eWL"
+    ]
+   },
+   {
+    "slot": 453674575,
+    "program": "pump",
+    "sigs": [
+     "3w48VWSxRKK3fuRPHDWEc1zNXGGrtL5i7gbKGQDtZU9LYd9Ks65ApgGhawVcYAex6rjE4BwQbpCUsxCpMP7VJddg",
+     "JHWKLUN2Rqdw4MuFwGirD1cLkBREvZgCBfZpNMFZpbsdRYy9Wuxt5UGTxwp7yAoQ8LTvG6FzfdGW8xiiVKFAMrN",
+     "2honav5BUEqXRJz6bbdXFaD5nhfPdnDv6t9odGmfPjppbSN31jNFcXDEHoLKMBEQ97uJfJ7kZw9rgDvTE5Wr4bcd"
+    ]
+   },
+   {
+    "slot": 453674575,
+    "program": "amm",
+    "sigs": [
+     "Agx7nVS5HgRd7wBPkVyqW5D6Roo9oYVBzRubVSmp7FQ9RKsbjjiHQDiaBfN1TFqUbHuMj2cJohPrBGesrF499RD",
+     "3fVEgyTDLbi24dvyFj1GiyDTu1aEmyTLGbFVPeBRFyYno9DHujmF1DQHCxwEMx2s42q64hEuGYt4UzpF2miXFoV5",
+     "3h2pzC5BhxDiZErCbT8sQVYxN9bRn2ABRrXFRwgRzK65uYoisXbmTMK98EepUynu47gpsqCPNR5nDvU6tT9skCS2"
+    ]
+   },
+   {
+    "slot": 453674754,
+    "program": "amm",
+    "sigs": [
+     "2CD7oetXrV2S985WgLDBpQTTtFNLfXidWJLw3q8RihPDRMDMRt3VqpgWFJYJPYbhharaSo9Wn5jx8xTy1iRTsT8S",
+     "5Avgf6DSR9HwQnkoa66wr3ZhjQDx62eAieSpmjCGkVACokjaT8hgjbTH8uWStBr8vRMdQNhNB2LAKq6Hu1XR6fxz",
+     "36oJt2YaBgtH1NbuxcksKfS5e6vMUiz9rXmvVUBpuvReCuHB5KdNAbiyuPTwqEAtoFr5bMs63a5XxQLmns4dxUC1"
+    ]
+   },
+   {
+    "slot": 453674945,
+    "program": "amm",
+    "sigs": [
+     "J1DWY43jDKzDVF4KgwDduT8x8BixvcjgDhLVNMNQcXeNxtpMvMA94HU8TLjVf6ahwj9eziagEv5XNGKiZVDLQPM",
+     "2GT29BDS28z6npFFFDG4CbxtDXjjvBjZo8irro2obwJPJbsGZhj2rkFLQWSBpAwMipY13fAVpnt6kXJBKiNGMmdy",
+     "54dX8abYhz3x9rT9M3v1qVzyyb3phGdPoQPr7ddb3c2MntfbU1aLuVEjpBuX4okbYHZZW7PKCwn2gfqNRszA8LtD"
+    ]
+   },
+   {
+    "slot": 453675308,
+    "program": "amm",
+    "sigs": [
+     "wS6bwbt9qSckpps4D9b7H71UaJ9yseu6dBKCtHJvSdKvP2nY5DejUmXHHEFhCAyXsgGzjrwNpKxmb3eRcDRUwLi",
+     "2CCF4765HNHsEmaM4bNVcTqedtcv38xRXzZjVrcRDP8x1uSFNwUt81zxDmJKT36vwjC2ZwMJCgSFpFSoQvtgAzxS",
+     "3UBocHXhRRQRTogpU5Yexjo9WYirdbztKo1FXdqywyHj589Ff4JvTYueeLDSNSXFBuAkYo47sCi5SsphrTh5zG8r"
+    ]
+   },
+   {
+    "slot": 453675520,
+    "program": "amm",
+    "sigs": [
+     "bgkg5mbd3M9htGGy9eLTbzza1jJM9jQwx9HzdKSAqixpGPUNnVj2etcydHoV24f5ZgVp7USAUhwEzBXHtQZ8dSQ",
+     "4ZtkRHzd1x6PuKjRz3wHDADPmvWLCEfiwKYgzdWrqbykiYCq8Xd9cx1W988jKA57TEtDJKMjA2ZPt5r3VXns3aUy",
+     "TXcoVUdktDh3W4wzgU2s6B81CFQjoJjxTEMHo8DLPpFTDDsyTydMEXsRkNk8vmkHG1VKpvvNzhBrunifynqXGEb"
+    ]
+   },
+   {
+    "slot": 453675687,
+    "program": "amm",
+    "sigs": [
+     "38T6rT7Y5UXhWQQXoSbJDGVTmk8f9s6hYkSky8PtCgP5yf1HdqXV9eQwbymVgunNEZkZx8Xn2YKhP34kHcJV7GXE",
+     "itGGfdjd5KG1y9bh7Wgqk21geAHMEnCh9Hcv6FCUzauJoNfgAfzqYhhtxf2QFr2Fs1zo8XBLvvKEQHoU2MXUEXK",
+     "Y3GMAXv9GFL8qDGJzXPXF3bX6RzUw9GvGDtfYAE7XCs3UEYJFqk6tGQ6MDe4v9ugXififvmRrrfYhRuuukpQeVK"
+    ]
+   },
+   {
+    "slot": 453676068,
+    "program": "amm",
+    "sigs": [
+     "42PFRhBuHAL8Ug1UM3XF3vLLYXbK8T3y21sL6kCys2WjD4tozEf2EXm4k1dcdim36F1Ft55UiEXDJ68wB9Kxiuoz",
+     "44ZQkp2iCh9PFJf4AH4vyeC1Vd2q5crnJb5zZ1hyNqoj7ZNpW26cu13SZKhDNHAywmMdVaLwU9RLcpWJRmPebjpR",
+     "4Y396sQCuN5gSXSVc3sui7WndzAr5RjUb2ZK1pG7n7UaugLYbQEbfHv3Y2HU3pVC7WXxQiUMXUMe7ymc8bN3h5qS"
+    ]
+   },
+   {
+    "slot": 453676484,
+    "program": "amm",
+    "sigs": [
+     "5n3MmkDE6HezNKtptE99NADjGgHDfqPWrU5r9z1H2SoeAKNkHScJH8oBg7JGa56DhCtif8D6EzxEBK4HksJp9ELU",
+     "4fwLPTJtNxTXNCM5uhyaM3VkhUitcB7P3cg4qNQ4BQQDLTQhPcQm8V22visocPQnJ1HExsoVnEx8RFhBZhLg4ZpZ",
+     "3f15uzNoDajAfwMMmLwSAnKcq5ov7dnTXJLti2TYZeQBhzXLFh7uPZhxQpQZabZ545wMt7V1mfNYFDqH2UM3xkxJ"
+    ]
+   },
+   {
+    "slot": 453676666,
+    "program": "amm",
+    "sigs": [
+     "6xSJSPP8CvBfB2sjnr4saANQi81dMg7qmDubw5MSAiZXviJm1amfN8vQ4DAgzod8Q6pgTbFK9yi9hEXM7ZmTQeK",
+     "3KjoxRXXRBLMM5Huhr886ZiVVeoGvPu7S9NH5rUrzA3NJ69pVY5og4bjUn8nEixpnQJQMv4qr9skb7mPg5r6eDmZ",
+     "4qpPUCCnNFnqHKoiexTxGQRAbtwdh4uNLqzwvaApNt8vG4Lj5R9xZ5AMr9ZHYZfyWQsenWk11Tb2W1sXoyBoR7ZF"
+    ]
+   },
+   {
+    "slot": 453677037,
+    "program": "amm",
+    "sigs": [
+     "4rKmgTATFo9upEDf4dMjfzkzJ1o7nCcuKgxJNwa9918c3VQYxDUjSgSycxfvZhBptKHPiV3Cujopm68GmMKVsVnW",
+     "4KCstpwiiQ25ATEVK2S9iCapMCz2Xa5ioaSt5eXFKwEQ8mMunxBdnzEJwtt9RT1GPcaFjUkqJ5eYUm1JFFTFa5HA",
+     "4F4NhzVTEHzkxJxUXhe2cnQpwQBB7TUPAbv71xyJq1wucDvfjhqWdUnEpKYVpPaeDzDTDFeBevuERMvo3Mu8wxDv"
+    ]
+   },
+   {
+    "slot": 453677426,
+    "program": "pump",
+    "sigs": [
+     "4PbbWiRm3x3A4RRD4aZ8duhBB9uC7dDSFf4CFaDJam3HHQcDQsD7BDxjrMXHivYHCJ32JLWvW7H1ovKciBu3SLg4",
+     "4eQuRyzJMZ9iuEPtu42UJWUJyncNNCDPBck4aPNXsbz4h3PzVHVMBr5M1AKEz7oQFjBQ5w1HNkq6Eme4PiUtZdWH",
+     "3BncnPhauZ7oYxHyRq22bzHoXgd7jTMtVWDJVr7g53pAuB7hZ7B5JWD9LPrvfJYAZERn6if46rPqKNfw93xYEyQT"
+    ]
+   },
+   {
+    "slot": 453677798,
+    "program": "amm",
+    "sigs": [
+     "rckRX59kzLSx6r2CCqa7v87CyugmTvtUmJeAos5NBxGp7nahjBgg87gNBPC69UXBrj4cLsVKJb4tZ5MKnn2tWxM",
+     "3JcxfFh6hAEFvWR5DF3rH3DNSMoQPnS3CqiYfgQHMCo8zXQ3Jt67qGDWKmM8hyYbwNeWx1tyVyzQ6E8ZxRR3Env4",
+     "4SvsyWpUUFZwXNjmkdLWvDvA23RCMYroGu3vfyA6uwNpWKw5cFC4UJsFftrKoSVQE2r59Qwm8YiLKB6KLXNYd6xh"
+    ]
+   },
+   {
+    "slot": 453677978,
+    "program": "amm",
+    "sigs": [
+     "4YsBd1dYRSfhjjcH4oJtMF7kSReiNUsLrPiGrG7yvgJh4LnSuo9ixPcLvdWDEceqWb8CQckfeN6kpyph47waoRxm",
+     "4Z27c8WerkxuL8KV2KQZAbYVNoSEtZVXQjsruPyPTq4z3jkZy5Bxa54zcbEJ9eAmYqRBkhyEUJpmjFrKGEW6FzjZ",
+     "HGLyrHnafYoE5iFP6yFdoxFZpzXb1j99tVeGQejKvmPxQkQcKZo5v3UGYbyxdeo5BnxVCXagshhhK8oTTCbgXrV"
+    ]
+   },
+   {
+    "slot": 453678202,
+    "program": "amm",
+    "sigs": [
+     "39bEfY9SqqyfkNM9vuCB57CK8TDL2jQ9G1JfEQgpjAQ55M5FfmMuQgtcMRgLYPXpg5xTzWcTciTHSkXbKLAa5ebF",
+     "2bvi6gQsaGHG2UAtmgwd2vxKN5rLkGkFSwE7pKkpdJDMXWDUeWwu2ZrtnuQeZve3VXkHZf6FunEgdUrw9C9ArnDB",
+     "iTTbdtbnMs5sovMs23JGni56wczAUnJPg9Z58WEjxKwAy2fArVxFqpPrATJamhrqPDMxK7KjdoBWDYAdzkXYRDP"
+    ]
+   },
+   {
+    "slot": 453678435,
+    "program": "amm",
+    "sigs": [
+     "2PtxAUQrbeDzJpNzEuoyEQHXMbnuzdDJQsHizNomVfrnj61T16dF6ckt7PGCFUieAb9RqerJJcKMXty8rafqAPJv",
+     "3CEv8p5ebEFW9W4iXEzen5BHmaDG9yut8oj8YZo3eM1jfTMd8C3ZqT1shAytpmwbh78RmGtvzrLZSox2gMbnFsrb",
+     "WyvaGDFgGAqYbxmRG7B9cWQmm5DjnzXa2tBYr3WSawmQanrrSB1Xrou5r1irhQHazR21UMPpXg7HmeCSotBPEKh"
+    ]
+   },
+   {
+    "slot": 453678809,
+    "program": "pump",
+    "sigs": [
+     "4p8oGE6rUmhRQsMeBK1MWK1F9PWuYFomXjvygQnYv9LC9gqumjuRnMGaxn7uB4xEdC38cZ44AbMyXL6FaoWTLBXY",
+     "5oVFyBCjF8siUPNnysiSRC58jLfziwBuaXRxTksZVKUazYzgcAK5S4xYsYbZsK9XyknuPy8KYhtd213qoKBGVTdd",
+     "4sJjKMGyVq3V1kpvMcFff9uxd3wyz8oXXX8C8rDUAUrwAh8YDTq54s1gJFoHTZsCk3abJHBe5LmxQSYYch2kGCwW"
+    ]
+   },
+   {
+    "slot": 453678809,
+    "program": "amm",
+    "sigs": [
+     "UAVgLFwqpehnZ4CJ5pkgqzsfRNKbXhBmWFiNM2G5YrJiapqHncrLLJD9ooUK8PgSuHv4624J8VQC8eNwNKLc7Tf",
+     "3UncUm2tENxnBkw7XmjvwBM6GYAqbdKzzNzyFGP3gVfCidLgfQsAYgMgmoA63wmLwixUDjF2RxVvg9NiBeNaBe4d",
+     "4H7fxNjTj88kuMBWvtmbG9zYLLyVWjAvdcaEJJFbVjVrrSVSQxxKNvH4z85VQoj3wsyk393dZGs43k5ZbP2PTXQJ"
+    ]
+   },
+   {
+    "slot": 453679015,
+    "program": "amm",
+    "sigs": [
+     "MFQG5aCD9KqXceptpP6kr8YgMsmpZVWSQTh5BCKJRcm9U3XjzcRCZM7nfgEXNsagGLdfgdhVFixsUQiLJhH9aiS",
+     "3WU1dz2jnSoJkvvLvaGj6esysYKrjfE6uP4knwKsJmrDTfm8qGs8CPEuGGvC6KnpapRbzGYp5ycDEq3x1y2GrMEH",
+     "2eiN6G9ECpZrCLLjTUyfZwAa5CDaoascUKVfd7cEQNZNPg5xXNQLWuTRqxNs12YvADg4fmd4s1mQJxg88hmBGEUe"
+    ]
+   },
+   {
+    "slot": 453679230,
+    "program": "amm",
+    "sigs": [
+     "2C2AqW6SfqXpti4Ji8ycsjVCUCZJhwnmKs5nXCrB6G9qABmBdyU1uyL9RrA8Y4zxszWwqVkzzuJgjD59UtDQa146",
+     "22Ybc2MRWihDhKUA9nMdy2fvSF7ocxNtBpSuKFevfRzyXWZY4AqEfDmAcMrxAoifSSnyBGifPTHZ5KTrJMrCjaJk",
+     "qFuwfXsuC1jxwSfj3TsR1WdyhosMPu4cZcW9xeJRUbxzgwEwLNBwUoE66CuPdxAXPuaTNndrFtMGnfX1rEDZs4z"
+    ]
+   },
+   {
+    "slot": 453679411,
+    "program": "amm",
+    "sigs": [
+     "JvPW17piYpzMbXrodFvVyZWbuS1xoiz5GT9Zw4GyYN9nvWSPmWfn6yYZzj3yedgdPaTWRjHK18vBpK6UBpyToGs",
+     "3YcsR4XjsukpuhoEaATiCXx2hRh88UbxTERpm58SCCgK9LU1iiR15n91aqSNJpcpH86T3QzzHyXGJfy2JsnuZ8p9",
+     "2CyxdB9ztSp33y5DpiciHTqGJ64SVKs5Ggvhd18y493Fj2Xnj9QyW3fqP28wRZQJxdQtCPCYeYDwuc14xV91nXZF"
+    ]
+   },
+   {
+    "slot": 453679620,
+    "program": "amm",
+    "sigs": [
+     "3MK54QVJmitU28PEbFmmCkeQu2zQPTkVGTU7Rqy4esMnSjSSze5JxnpSUkCoySRepY4VcmkiFUjbmxUmSr1zXjhP",
+     "5eECAGGHRZMuGPQcsWPcgaDtrUubzDf6WYMKswufYLGLyWaWFUpgjm2YWzhSgGprMbupcddTmydjHJ55n4EDeKt8",
+     "46H4NfaTgPNjhBt1uQeZnM7zjfbCam86aNaYhaXRQec7NUW4YMbqodNSiH2UiPg8qzUCCmsBYrzYbidPc7BSJqkD"
+    ]
+   },
+   {
+    "slot": 453679796,
+    "program": "amm",
+    "sigs": [
+     "22w47rTbdikciBYMW8V7tQ3SsTBX38EHMSCfvMqv42HK6mohTPgPnHw4Ko4ibRG47ugdCMAcNc7DKcFJ78FEMrfU",
+     "5e9WP4f2hbPWvir5pd13QfaH45a72YQqunrACna3nTmckRnZuQvoxr51YEapAn5L5QLuxmFUpf4xhzSjoojARQjz",
+     "2qqkZ2pSFyvcvaXQGHuMuFnvZz67oriXWHCVwigcPVRhE9hDXkyNkmfKHTMgu8csPkuZ8VqC6v5Nw39xZ8PKsEbN"
+    ]
+   },
+   {
+    "slot": 453680000,
+    "program": "amm",
+    "sigs": [
+     "593rgJFKyouY9doWfAaotG5huWjZKSMmng5zUoq7vTQkJzG577btp4uZvV2wYh6BUqkyq8GoqJAdJ3LLyREbELK6",
+     "61cpf56AQM5iGiuERRANto3oEGAujdXMKTaYma88664td8VUN3LokJ7BQjt4YtnixKjjq4bGnQZQFLFsaDfHFHFq",
+     "2p82QwFdmdFar5H6nnCQHuEgKmT86So3CUHGZyCZ5EUChjrsk2SmTKRuh4euhmFkyRfgxR7bK9xMBftPVZ9aweFk"
+    ]
+   },
+   {
+    "slot": 453680191,
+    "program": "pump",
+    "sigs": [
+     "3e8t1btaegmQvNDyU8M12miWeZKHxix47exetFambQCEaGAuqENF8T4iokpknD1kFqYBEuhRjVu58dHeCYbDDY3P",
+     "5FRCbGEgbgqWghSBJBLmbDFN1AJ1Fu4DaePdyvCUk2aCPyogvqYUAWGaN2U4Y1FqnBJXjX3E2cwEiaTV7MjTHzfE",
+     "zmcrhrV2sT6PiuBHEEKffiHuQvy5z3E1D297j2EzHxrNGzQjzW1s7amw4aZ1Mcy6m2nqBF2y7FEwRNNegNx6SgK"
+    ]
+   },
+   {
+    "slot": 453680191,
+    "program": "amm",
+    "sigs": [
+     "JGXHUhFnpndFSrWXQMixuiwA9noLaQVHSs6MRn5JGzTnYr6USC9DUdHPKxukPjhiQcsHv91RnXZmvye5U1h1aEm",
+     "4ddGLEewnnq2XyDkxe9P3oHGNYnhpHP6Jqmb6xUwjEPWRbMHMrC1tFUzY4hWhhCX7tbSBX1PiPnwfHLYviphRcfg",
+     "FjHkpBUP5gQdesg86qmTLgxAwCoAGf7dGEP2JYkKp2apKRtqZxNWJcx2qdza2QmjkYf6M1ApMjFUPxdyAUPFbjC"
+    ]
+   },
+   {
+    "slot": 453680374,
+    "program": "amm",
+    "sigs": [
+     "59ftj1nYinbFiEnkaKX5jUnwrK8wkWFiFRrSaN2nSRa97CvD1mrEtXL3MDrdAs1LCGrbiWT6ZDx9FVV3NEgHGFos",
+     "3k1SzHSdTYHZ9htmGuMxn7DgAbyKBubbfnAevgNdBGtfeKcfW5JV6sTWYkd1KXmW3zkij279Zup537AiVFS5vLSJ",
+     "66ZDr3swkwd9HD8EdyCQK9kvDiVcB748syADGm1UWfQYqzKpw5RTpynCrdYGi3bhBVanCSXyJAsrWyRaZYuTpZKz"
+    ]
+   }
+  ]
+ },
+ "pipeline": {
+  "received_frames": {
+   "pump": 2047041,
+   "amm": 1913543
+  },
+  "received_bytes": {
+   "pump": 2639666004,
+   "amm": 4882174240
+  },
+  "processed_frames": {
+   "pump": 2047041,
+   "amm": 1913543
+  },
+  "queue_max_depth": {
+   "pump": 196,
+   "amm": 150
+  },
+  "queue_dropped": {},
+  "queue_residual_at_end": {
+   "pump": 0,
+   "amm": 0
+  },
+  "worker_busy_share": {
+   "pump": 0.03252349598625597,
+   "amm": 0.047708267618788845
+  },
+  "malformed_frames": {},
+  "process_cpu_share_of_one_core": 0.14009162141769296,
+  "rss_mb": null
+ },
+ "started_utc": "2026-10-05T19:03:16Z",
+ "ended_utc": "2026-10-05T21:50:56Z",
+ "elapsed_s": 10059.6,
+ "rates": {
+  "pump": {
+   "frames_per_s": 203.49129909309724,
+   "bytes_per_s": 262402.6896998374,
+   "gb_per_day_uncompressed": 22.671592390065953,
+   "notifications_per_s_total_time": 201.77532623034313,
+   "notifications_per_s_active_time": 204.36654929375624,
+   "active_s": 9932.1,
+   "downtime_s_incl_open": 127.5,
+   "failed_share": 0.7723229967400392,
+   "gb_per_day_uncompressed_active_time": 22.941271622229042
+  },
+  "amm": {
+   "frames_per_s": 190.22059203528536,
+   "bytes_per_s": 485324.90482430725,
+   "gb_per_day_uncompressed": 41.932071776820145,
+   "notifications_per_s_total_time": 189.3257254085612,
+   "notifications_per_s_active_time": 196.37442861227643,
+   "active_s": 9698.5,
+   "downtime_s_incl_open": 361.1,
+   "failed_share": 0.3455231470469788,
+   "gb_per_day_uncompressed_active_time": 43.481814925165686
+  }
+ },
+ "swap_events_per_s": 100.30816689205575,
+ "row_size": {
+  "decoded_rows": 716996,
+  "json_bytes_per_row": 495.96778364174975,
+  "pg_heap_bytes_per_row_estimate": 344.9592884758074,
+  "pg_with_indexes_bytes_per_row_estimate": 595.6436618893272,
+  "hypothesis_bytes_per_row": 350,
+  "rows_per_day": 8666626,
+  "gb_per_day_at_hypothesis_350B": 3.0333189668157665,
+  "gb_per_day_at_measured_indexed_estimate": 5.1622206202071235
+ },
+ "extrapolation_wallets_per_day": {
+  "swap_events_per_day_at_window_rate": 8666626,
+  "heaps_k": 27.139988778067,
+  "heaps_beta": 0.626505683620193,
+  "curve_is_the_primary_result": "see snapshot/curve (every minute)",
+  "scenario_wallets_day_if_no_new_after_window": 158157,
+  "scenario_wallets_day_heaps_fit": 602854,
+  "scenario_wallets_day_linear_at_last_quarter_marginal_rate": 928162
+ },
+ "liquidity_join": {
+  "events": {
+   "CreatePoolEvent": 180,
+   "WithdrawEvent": 83,
+   "DepositEvent": 2
+  },
+  "on_a_pool_that_swapped_in_window": {
+   "CreatePoolEvent": 179,
+   "WithdrawEvent": 83,
+   "DepositEvent": 2
+  },
+  "pools_known": 3355
+ },
+ "snapshot": {
+  "elapsed_s": 10059.6,
+  "frames": {
+   "pump": {
+    "frames": 2047041,
+    "bytes": 2639666004
+   },
+   "amm": {
+    "frames": 1913543,
+    "bytes": 4882174240
+   }
+  },
+  "notifications": {
+   "pump": {
+    "n": 2029779,
+    "bytes": 2637197695,
+    "failed": 1567645,
+    "truncated": 0,
+    "bad_base64_lines": 1659
+   },
+   "amm": {
+    "n": 1904541,
+    "bytes": 4880893288,
+    "failed": 658063,
+    "truncated": 0,
+    "bad_base64_lines": 516
+   }
+  },
+  "tx": {
+   "unique": 3921384,
+   "success": 1700915,
+   "pump_only": 405882,
+   "success_pump_only": 347936,
+   "failed": 2220469,
+   "neither": 2607619,
+   "amm_only": 896957,
+   "success_amm_only": 640987,
+   "success_neither": 701223,
+   "both_programs": 10926,
+   "success_both_programs": 10769
+  },
+  "delivery_both_programs": {
+   "expected": 10926,
+   "delivered_by_both": 5486,
+   "only_pump": 5042,
+   "only_amm": 398
+  },
+  "events": {
+   "pAMM.BoostBuyAndBurnEvent": {
+    "n": 926,
+    "payload_bytes": 192608,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 926,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.BuyEvent": {
+    "n": 292064,
+    "payload_bytes": 145605696,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 292064,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.ClaimCashbackEvent": {
+    "n": 294,
+    "payload_bytes": 21168,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 294,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CloseUserVolumeAccumulatorEvent": {
+    "n": 31762,
+    "payload_bytes": 2540960,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 31762,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CollectCoinCreatorFeeEvent": {
+    "n": 499,
+    "payload_bytes": 59880,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 499,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CreatePoolEvent": {
+    "n": 180,
+    "payload_bytes": 61920,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 180,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.DepositEvent": {
+    "n": 2,
+    "payload_bytes": 512,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 2,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.ExtendAccountEvent": {
+    "n": 90,
+    "payload_bytes": 8640,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 90,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.InitBoostEvent": {
+    "n": 68,
+    "payload_bytes": 9248,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 68,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.InitUserVolumeAccumulatorEvent": {
+    "n": 320,
+    "payload_bytes": 25600,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 320,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.MigratePoolCoinCreatorEvent": {
+    "n": 1,
+    "payload_bytes": 176,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.SellEvent": {
+    "n": 379927,
+    "payload_bytes": 167547807,
+    "decoded_ok": 379927,
+    "decode_failed": 0,
+    "not_attempted_raw": 0,
+    "failure_reasons": {},
+    "layouts": {
+     "2026-10-02/idl_extension_trailing_u64": 379927
+    }
+   },
+   "pAMM.WithdrawEvent": {
+    "n": 83,
+    "payload_bytes": 21248,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 83,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.unknown:82a42461e48287a5": {
+    "n": 702,
+    "payload_bytes": 129870,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 702,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.AddQuoteControlMintEvent": {
+    "n": 2,
+    "payload_bytes": 240,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 2,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.ClaimCashbackEvent": {
+    "n": 356,
+    "payload_bytes": 25632,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 356,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CloseUserVolumeAccumulatorEvent": {
+    "n": 21278,
+    "payload_bytes": 1702240,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 21278,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CollectCreatorFeeEvent": {
+    "n": 2483,
+    "payload_bytes": 218504,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 2483,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CompleteEvent": {
+    "n": 86,
+    "payload_bytes": 12384,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 86,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CompletePumpAmmMigrationEvent": {
+    "n": 90,
+    "payload_bytes": 18000,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 90,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CreateEvent": {
+    "n": 3588,
+    "payload_bytes": 1289579,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 3588,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.DistributeCreatorFeesEvent": {
+    "n": 3079,
+    "payload_bytes": 735286,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 3079,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.DistributeFeeToHoldersEvent": {
+    "n": 15896,
+    "payload_bytes": 1526016,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 15896,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.ExtendAccountEvent": {
+    "n": 1630,
+    "payload_bytes": 156480,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1630,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.InitUserVolumeAccumulatorEvent": {
+    "n": 649,
+    "payload_bytes": 51920,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 649,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.MigrateBondingCurveCreatorEvent": {
+    "n": 342,
+    "payload_bytes": 60192,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 342,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.TradeEvent": {
+    "n": 337069,
+    "payload_bytes": 130483304,
+    "decoded_ok": 337069,
+    "decode_failed": 0,
+    "not_attempted_raw": 0,
+    "failure_reasons": {},
+    "layouts": {
+     "2026-10-02/trailing_u64": 337069
+    }
+   },
+   "pump.unknown:742b4dbd117a482b": {
+    "n": 1933,
+    "payload_bytes": 295749,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1933,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.unknown:a943276d6686b6e8": {
+    "n": 67,
+    "payload_bytes": 8576,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 67,
+    "failure_reasons": {},
+    "layouts": {}
+   }
+  },
+  "instructions_top": {
+   "pump": {
+    "Sell": 117544,
+    "Buy": 100588,
+    "SellV2": 52010,
+    "BuyExactQuoteInV2": 46287,
+    "BuyExactSolIn": 45669,
+    "DistributeFeeToHolders": 24409,
+    "CloseUserVolumeAccumulator": 21482,
+    "BuyV2": 13466,
+    "BuyExactQuoteInV3": 6276,
+    "SellV3": 4476,
+    "CreateV2": 3927,
+    "DistributeCreatorFees": 2813
+   },
+   "pAMM": {
+    "Sell": 475510,
+    "BuyExactQuoteIn": 328751,
+    "Buy": 122215,
+    "CloseUserVolumeAccumulator": 31919,
+    "BuyExactQuoteInV2": 2999,
+    "SellV2": 2051,
+    "TransferCreatorFeesToPump": 1071,
+    "BoostBuyAndBurn": 998,
+    "CollectCoinCreatorFee": 772,
+    "SyncUserVolumeAccumulator": 633,
+    "SweepProtocolFee": 399,
+    "ClaimCashback": 380
+   }
+  },
+  "foreign_data_lines_by_program": {
+   "Prism8hsRo6Ww5jiN5Zeh3YDPLZHqHduCPSAV7JF7qv": 625372,
+   "MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e": 39078,
+   "BiSoNHVpsVZW2F7rx2eQ59yQwKxzU5NvBcmKshCSUypi": 20561,
+   "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH": 18821,
+   "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 17855,
+   "DRVSpZ2YUYYKgZP8XtLhAGtT1zYSCKzeHfb4DgRnrgqD": 16474,
+   "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 14186,
+   "jupeiUmn818Jg1ekPURTpr4mFo29p46vygyykFJ3wZC": 12809
+  },
+  "liquidity": {
+   "tx_without_swap_instruction": 249,
+   "tx_with_swap_instruction": 16,
+   "instructions": {
+    "CreatePool": 180,
+    "Withdraw": 83,
+    "Deposit": 2
+   }
+  },
+  "silence_gaps": {
+   "pump": {
+    "n": 22,
+    "max_s": 11.743102788925171,
+    "total_s": 119.3
+   },
+   "amm": {
+    "n": 22,
+    "max_s": 24.090253114700317,
+    "total_s": 180.7
+   }
+  },
+  "lag_slots_ws_slotsubscribe_same_pipe_NOT_independent": {
+   "pump": {
+    "n": 2029615,
+    "p50": 1.0,
+    "p90": 1.0,
+    "p99": 1.0,
+    "max": 3.0
+   },
+   "amm": {
+    "n": 1904305,
+    "p50": 1.0,
+    "p90": 1.0,
+    "p99": 1.0,
+    "max": 3.0
+   }
+  },
+  "lag_slots_ws_slotsubscribe_same_pipe_by_10min": {
+   "pump": [
+    {
+     "w": 0,
+     "n": 201998,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 3.0
+    },
+    {
+     "w": 1,
+     "n": 243645,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 2,
+     "n": 269394,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 3,
+     "n": 288793,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 4,
+     "n": 165130,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 5,
+     "n": 169293,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 3.0
+    },
+    {
+     "w": 6,
+     "n": 321734,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 7,
+     "n": 279373,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 8,
+     "n": 83438,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 9,
+     "n": 6817,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    }
+   ],
+   "amm": [
+    {
+     "w": 0,
+     "n": 550949,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 3.0
+    },
+    {
+     "w": 1,
+     "n": 274064,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 2,
+     "n": 309377,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 3,
+     "n": 137482,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 4,
+     "n": 200834,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 5,
+     "n": 149669,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 6,
+     "n": 126247,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 7,
+     "n": 84801,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 8,
+     "n": 54019,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 9,
+     "n": 16863,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    }
+   ]
+  },
+  "lag_slots_vs_http_tip": {
+   "pump": {
+    "n": 955,
+    "p50": 22.0,
+    "p90": 96.0,
+    "p99": 295.0,
+    "max": 573.0
+   },
+   "amm": {
+    "n": 955,
+    "p50": 69.0,
+    "p90": 168.0,
+    "p99": 257.0,
+    "max": 402.0
+   }
+  },
+  "age_of_last_log_s_at_poll": {
+   "pump": {
+    "n": 954,
+    "p50": 0.0,
+    "p90": 0.5,
+    "p99": 40.0,
+    "max": 142.0
+   },
+   "amm": {
+    "n": 951,
+    "p50": 0.0,
+    "p90": 6.5,
+    "p99": 15.0,
+    "max": 69.0
+   }
+  },
+  "observations": {
+   "event_loop_lateness_s": {
+    "n": 55468,
+    "p50": 0.0,
+    "p90": 0.01,
+    "p99": 0.02,
+    "max": 4598.5
+   },
+   "queue_age_s.pump": {
+    "n": 2047041,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.0,
+    "max": 0.30000000000000004
+   },
+   "queue_age_s.amm": {
+    "n": 1913543,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.0,
+    "max": 0.30000000000000004
+   },
+   "http_rtt_s.getSlot": {
+    "n": 955,
+    "p50": 0.30000000000000004,
+    "p90": 1.05,
+    "p99": 4.7,
+    "max": 10.0
+   },
+   "http_rtt_s.getTransaction": {
+    "n": 1907,
+    "p50": 0.6000000000000001,
+    "p90": 1.3,
+    "p99": 5.6000000000000005,
+    "max": 22.8
+   },
+   "http_rtt_s.getBlock": {
+    "n": 98,
+    "p50": 6.4,
+    "p90": 17.150000000000002,
+    "p99": 44.800000000000004,
+    "max": 44.800000000000004
+   }
+  },
+  "swap_events_per_minute": {
+   "pump": {
+    "seconds_with_events": 90,
+    "n": 90,
+    "p50": 3952.0,
+    "p90": 5428.0,
+    "p99": 7084.0,
+    "max": 7084.0
+   },
+   "pAMM": {
+    "seconds_with_events": 91,
+    "n": 91,
+    "p50": 5179.0,
+    "p90": 15481.0,
+    "p99": 21845.0,
+    "max": 21845.0
+   }
+  },
+  "lag_slots_vs_http_tip_by_10min": {
+   "pump": [
+    {
+     "w": 0,
+     "n": 111,
+     "p50": 7.0,
+     "p90": 98.0,
+     "p99": 173.0,
+     "max": 182.0
+    },
+    {
+     "w": 1,
+     "n": 105,
+     "p50": 3.0,
+     "p90": 48.0,
+     "p99": 86.0,
+     "max": 92.0
+    },
+    {
+     "w": 2,
+     "n": 111,
+     "p50": 6.0,
+     "p90": 51.0,
+     "p99": 155.0,
+     "max": 175.0
+    },
+    {
+     "w": 3,
+     "n": 105,
+     "p50": 40.0,
+     "p90": 85.0,
+     "p99": 165.0,
+     "max": 186.0
+    },
+    {
+     "w": 4,
+     "n": 106,
+     "p50": 15.0,
+     "p90": 68.0,
+     "p99": 166.0,
+     "max": 295.0
+    },
+    {
+     "w": 5,
+     "n": 108,
+     "p50": 28.0,
+     "p90": 117.0,
+     "p99": 190.0,
+     "max": 201.0
+    },
+    {
+     "w": 6,
+     "n": 110,
+     "p50": 48.0,
+     "p90": 103.0,
+     "p99": 136.0,
+     "max": 137.0
+    },
+    {
+     "w": 7,
+     "n": 103,
+     "p50": 22.0,
+     "p90": 64.0,
+     "p99": 119.0,
+     "max": 123.0
+    },
+    {
+     "w": 8,
+     "n": 85,
+     "p50": 69.0,
+     "p90": 321.0,
+     "p99": 573.0,
+     "max": 573.0
+    },
+    {
+     "w": 9,
+     "n": 11,
+     "p50": 47.0,
+     "p90": 67.0,
+     "p99": 70.0,
+     "max": 70.0
+    }
+   ],
+   "amm": [
+    {
+     "w": 0,
+     "n": 111,
+     "p50": 55.0,
+     "p90": 90.0,
+     "p99": 99.0,
+     "max": 100.0
+    },
+    {
+     "w": 1,
+     "n": 105,
+     "p50": 18.0,
+     "p90": 164.0,
+     "p99": 383.0,
+     "max": 402.0
+    },
+    {
+     "w": 2,
+     "n": 111,
+     "p50": 39.0,
+     "p90": 114.0,
+     "p99": 213.0,
+     "max": 232.0
+    },
+    {
+     "w": 3,
+     "n": 105,
+     "p50": 81.0,
+     "p90": 158.0,
+     "p99": 184.0,
+     "max": 208.0
+    },
+    {
+     "w": 4,
+     "n": 106,
+     "p50": 73.0,
+     "p90": 142.0,
+     "p99": 176.0,
+     "max": 181.0
+    },
+    {
+     "w": 5,
+     "n": 108,
+     "p50": 88.0,
+     "p90": 174.0,
+     "p99": 212.0,
+     "max": 231.0
+    },
+    {
+     "w": 6,
+     "n": 110,
+     "p50": 90.0,
+     "p90": 170.0,
+     "p99": 195.0,
+     "max": 213.0
+    },
+    {
+     "w": 7,
+     "n": 103,
+     "p50": 100.0,
+     "p90": 191.0,
+     "p99": 257.0,
+     "max": 277.0
+    },
+    {
+     "w": 8,
+     "n": 85,
+     "p50": 112.0,
+     "p90": 218.0,
+     "p99": 324.0,
+     "max": 324.0
+    },
+    {
+     "w": 9,
+     "n": 11,
+     "p50": 80.0,
+     "p90": 147.0,
+     "p99": 166.0,
+     "max": 166.0
+    }
+   ]
+  },
+  "lag_event_ts_s": {
+   "pump": {
+    "n": 337069,
+    "p50": 6.0,
+    "p90": 21.0,
+    "p99": 33.5,
+    "max": 66.5
+   },
+   "pAMM": {
+    "n": 671991,
+    "p50": 13.0,
+    "p90": 30.5,
+    "p99": 44.5,
+    "max": 67.0
+   }
+  },
+  "reconnects": {
+   "pump": {
+    "connects": 14,
+    "disconnects": 19,
+    "rejects": 0,
+    "downtime_s": 127.54859685897827,
+    "gap_slots_total": 3030,
+    "events": [
+     {
+      "t": 221.8,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 327.7,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 1256.9,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 1842.4,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 2741.3,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 2746.5,
+      "reason": "InvalidStatus: server rejected WebSocket connection: HTTP 413"
+     },
+     {
+      "t": 2756.6,
+      "reason": "InvalidStatus: server rejected WebSocket connection: HTTP 413"
+     },
+     {
+      "t": 3055.6,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 3462.1,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 3593.1,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4930.1,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4935.3,
+      "reason": "InvalidStatus: server rejected WebSocket connection: HTTP 413"
+     },
+     {
+      "t": 4944.0,
+      "reason": "InvalidStatus: server rejected WebSocket connection: HTTP 413"
+     },
+     {
+      "t": 4960.7,
+      "reason": "InvalidStatus: server rejected WebSocket connection: HTTP 413"
+     },
+     {
+      "t": 5006.4,
+      "reason": "TimeoutError: timed out during opening handshake"
+     },
+     {
+      "t": 5098.9,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5163.9,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5252.3,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5340.0,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     }
+    ],
+    "downtime_s_incl_open": 127.54859685897827
+   },
+   "amm": {
+    "connects": 56,
+    "disconnects": 62,
+    "rejects": 0,
+    "downtime_s": 361.0748698711395,
+    "gap_slots_total": 11278,
+    "events": [
+     {
+      "t": 3669.6,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 3735.4,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 3812.3,
+      "reason": "ConnectionClosedError: sent 1002 (protocol error) invalid status code; no close frame received"
+     },
+     {
+      "t": 3877.1,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 3941.8,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4007.1,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4072.5,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4137.9,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4191.1,
+      "reason": "ConnectionClosedError: sent 1002 (protocol error) invalid status code; no close frame received"
+     },
+     {
+      "t": 4255.9,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4323.8,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4389.8,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4454.8,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4547.8,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4612.7,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4677.9,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4742.9,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4808.2,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4873.5,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4939.0,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 4944.0,
+      "reason": "InvalidStatus: server rejected WebSocket connection: HTTP 413"
+     },
+     {
+      "t": 4952.9,
+      "reason": "InvalidStatus: server rejected WebSocket connection: HTTP 413"
+     },
+     {
+      "t": 5029.6,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5095.1,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5192.8,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5258.1,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5323.2,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5387.9,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 5453.4,
+      "reason": "ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received"
+     },
+     {
+      "t": 10059.6,
+      "reason": "TimeoutError: timed out during opening handshake"
+     }
+    ],
+    "downtime_s_incl_open": 361.08129119873047
+   }
+  },
+  "wallets": {
+   "pump": 38108,
+   "amm": 101742,
+   "amm_buy_inferred": 59524,
+   "all": 158157
+  },
+  "keys": {
+   "mints": 6716,
+   "pools": 3355
+  },
+  "rows": {
+   "n": 716996,
+   "json": 355606917,
+   "heap": 247334430,
+   "indexed": 427074123
+  },
+  "per_second_swap_events": {
+   "pump": {
+    "seconds_with_events": 5006,
+    "n": 5006,
+    "p50": 60.0,
+    "p90": 125.0,
+    "p99": 210.0,
+    "max": 461.0
+   },
+   "pAMM": {
+    "seconds_with_events": 4824,
+    "n": 4824,
+    "p50": 108.0,
+    "p90": 312.0,
+    "p99": 476.0,
+    "max": 700.0
+   }
+  }
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "read_utc": "2026-10-05 (public RPC api.mainnet-beta.solana.com, read-only)",
+ "tx_version_1": {
+  "getBlock_with_maxSupportedTransactionVersion_0_error": "{\"code\":-32015,\"message\":\"Transaction version (1) is not supported by the requesting client. Please try the request again with the following configuration parameter: \\\"maxSupportedTransactionVersion\\\": 1\"}",
+  "one_block_version_histogram": {
+   "legacy": 782,
+   "0": 175,
+   "1": 147
+  },
+  "one_block_txs": 1104,
+  "version_1_share_of_that_block": 0.133,
+  "code_using_0": [
+   "packages/exchange-adapters/hunter_exchanges/pumpfun/tx_rpc.py:191",
+   "packages/exchange-adapters/hunter_exchanges/pumpfun/rpc_wallet.py:82"
+  ]
+ },
+ "slot_time": {
+  "source": "getRecentPerformanceSamples(720) -> 224 samples of 60 s",
+  "slots_per_s_min_median_max": [
+   3.58,
+   3.73,
+   3.83
+  ],
+  "ms_per_slot_median": 268
+ }
+}
