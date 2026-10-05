@@ -357,6 +357,7 @@ def _context(
         heartbeat=heartbeat,
         loop=loop,
     )
+    ctx.state.program_identity_verified = True  # T4.8f F3: born unverified, boot not run here
     return Harness(ctx, rpc, chain, redis)
 
 

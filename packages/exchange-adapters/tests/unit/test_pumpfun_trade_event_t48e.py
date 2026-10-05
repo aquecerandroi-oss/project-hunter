@@ -150,7 +150,7 @@ def test_scan_separates_a_notification_without_a_trade_event_from_an_undecodable
     assert len(good.events) == 1 and good.undecodable == () and not good.lost
     # (c) a TradeEvent of a layout nobody has seen: reported, never silently empty
     unknown = _probe_raw() + b"\x00" * 7
-    scan = scan_trade_event_logs(["Program 111 invoke [1]", _log(unknown)])
+    scan = scan_trade_event_logs([f"Program {PUMP_PROGRAM_ID} invoke [1]", _log(unknown)])
     assert scan.events == () and scan.lost
     assert len(scan.undecodable) == 1 and "7 trailing bytes" in scan.undecodable[0]
     # (d) a truncated one too
@@ -191,3 +191,67 @@ def test_the_tail_is_found_after_a_non_empty_shareholders_vector() -> None:
     assert len(widened + tail) - len(raw) == 68 + 24  # a size no fixed-length rule would accept
     with pytest.raises(ValueError, match="8 trailing bytes"):
         decode_trade_event(widened + tail[:8])
+
+
+# -- T4.8f (guardian): attribute ``Program data`` lines to the pump program ----------------
+
+_OTHER = "DRVSpZ2YUYYKgZP8XtLhAGtT1zYSCKzeHfb4DgRnrgqD"
+
+
+def test_a_trade_event_shaped_line_of_another_program_is_not_ours_and_not_a_loss() -> None:
+    """Another program's ``Program data`` that happens to start with our discriminator and
+    does not decode must not mark a gap on the mint (a spurious, fail-closed gap)."""
+    garbage = _log(_probe_raw() + b"\x00" * 7)
+    foreign = scan_trade_event_logs(
+        [f"Program {_OTHER} invoke [1]", garbage, f"Program {_OTHER} success"]
+    )
+    assert foreign.events == () and foreign.undecodable == () and not foreign.lost
+    # the same line under the pump program is a real loss
+    ours = scan_trade_event_logs(
+        [f"Program {PUMP_PROGRAM_ID} invoke [1]", garbage, f"Program {PUMP_PROGRAM_ID} success"]
+    )
+    assert ours.lost and len(ours.undecodable) == 1
+    # a decodable event of another program is not ours either
+    good = _log(_probe_raw())
+    other_good = scan_trade_event_logs(
+        [f"Program {_OTHER} invoke [1]", good, f"Program {_OTHER} success"]
+    )
+    assert other_good.events == ()
+
+
+def test_attribution_follows_the_invoke_stack_of_the_real_transaction() -> None:
+    """A real post-upgrade sell: the ``TradeEvent`` line sits under the pump program's
+    ``invoke [1]``, after the nested fee-program and token calls returned."""
+    tx = _tx("t48e_rpc_tx_sell_61x6SRWNuLhg_raw.json")
+    scan = scan_trade_event_logs(tx["meta"]["logMessages"])
+    assert len(scan.events) == 1 and not scan.lost
+    # a router (``invoke [1]``) that calls the pump program as ``invoke [2]``
+    wrapped = [
+        f"Program {_OTHER} invoke [1]",
+        f"Program {PUMP_PROGRAM_ID} invoke [2]",
+        _log(_raw_of(tx)),
+        f"Program {PUMP_PROGRAM_ID} success",
+        f"Program {_OTHER} success",
+    ]
+    assert len(scan_trade_event_logs(wrapped).events) == 1
+    # after the pump call returned, the router's own line is the router's
+    after = [*wrapped[:4], _log(_probe_raw() + b"\x00" * 7), *wrapped[4:]]
+    assert not scan_trade_event_logs(after).lost
+
+
+def test_a_line_with_no_invoke_context_is_assumed_ours() -> None:
+    """Truncated or synthetic logs (no ``invoke`` line seen): unknown attribution must err
+    toward counting the loss, never toward silence."""
+    assert scan_trade_event_logs([_log(_probe_raw() + b"\x00" * 7)]).lost
+    assert len(scan_trade_event_logs([_log(_probe_raw())]).events) == 1
+
+
+def test_a_failed_nested_call_pops_the_stack() -> None:
+    lines = [
+        f"Program {PUMP_PROGRAM_ID} invoke [1]",
+        f"Program {_OTHER} invoke [2]",
+        f"Program {_OTHER} failed: custom program error: 0x1",
+        _log(_probe_raw() + b"\x00" * 7),  # back under the pump program
+        f"Program {PUMP_PROGRAM_ID} success",
+    ]
+    assert scan_trade_event_logs(lines).lost

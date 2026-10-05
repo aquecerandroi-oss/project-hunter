@@ -7,12 +7,19 @@ position).
 
 from __future__ import annotations
 
+import random
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from hunter_exchanges.pumpfun.solana_codec import serialize_message
-from hunter_exchanges.pumpswap.decode import GlobalConfig
+from hunter_exchanges.pumpfun.solana_codec import (
+    TOKEN_PROGRAM_ID,
+    associated_token_address,
+    serialize_message,
+)
+from hunter_exchanges.pumpswap.decode import WSOL_MINT, GlobalConfig
+from hunter_exchanges.pumpswap.pdas import user_volume_accumulator_address
 from hunter_exchanges.pumpswap.quote import (
     PoolReserves,
     SellQuote,
@@ -31,6 +38,9 @@ __all__ = [
     "decode_pumpswap_fills",
     "pool_reserves_of",
 ]
+
+
+_RNG = random.SystemRandom()
 
 
 def pool_reserves_of(read: PoolRead) -> PoolReserves:
@@ -55,14 +65,37 @@ class PumpSwapFillRecord:
     event_error: str | None = None
     """Why the ``SellEvent`` could not be decoded (T4.8e) — the record is then keyed on the
     payer's delta alone and says so; ``None`` when the event decoded or there was none."""
+    wsol_ata_pre_lamports: int | None = None
+    """T4.8f: what the payer's WSOL ATA held **before** the transaction (its own
+    ``preBalances``: ``0`` when the sell created it, rent + leftover WSOL when it pre-existed).
+    The closing ``CloseAccount`` pays all of it back to the payer, so it is in the payer's delta
+    but is not this sale: kept out of :attr:`sell_net_lamports`. ``None`` when the ATA is not
+    among the transaction's accounts (not our shape: nothing to subtract)."""
+    cashback_init_lamports: int | None = None
+    """T4.8f: what the payer **funded to create** the cashback ``user_volume_accumulator`` and/or
+    its WSOL ATA in this sale (accounts absent before — ``pre == 0`` — and funded after), read from
+    the transaction's own balances, never a constant. A wallet that never traded on PumpSwap pays
+    it on its first cashback sell (simulated: 0 -> 1 346 200 on the accumulator). It stays inside
+    :attr:`sell_net_lamports` (the real delta) but is *named*, so ``unexplained`` is not polluted."""
 
     @property
     def sell_net_lamports(self) -> int:
+        """What this sale put in the wallet: the payer's real delta minus whatever the WSOL
+        ATA already held (T4.8f) — a pre-existing ATA must not inflate the position's PnL."""
         if self.payer_delta_lamports is not None:
-            return self.payer_delta_lamports
+            return self.payer_delta_lamports - (self.wsol_ata_pre_lamports or 0)
         if self.event is not None:
             return self.event.net_proceeds - self.network_fee_lamports
         return 0
+
+    @property
+    def unexplained_lamports(self) -> int | None:
+        """``sell_net − (user_quote_amount_out − network fee)``: ``0`` on a sell this executor
+        builds and reads back; ``None`` without the event or the balances (T4.8f)."""
+        if self.event is None or self.payer_delta_lamports is None:
+            return None
+        expected = self.event.user_quote_amount_out - self.network_fee_lamports
+        return self.sell_net_lamports - expected + (self.cashback_init_lamports or 0)
 
     def as_json(self) -> dict[str, Any]:
         e = self.event
@@ -82,6 +115,9 @@ class PumpSwapFillRecord:
             "event_error": self.event_error,
             "network_fee_lamports": self.network_fee_lamports,
             "payer_delta_lamports": self.payer_delta_lamports,
+            "wsol_ata_pre_lamports": self.wsol_ata_pre_lamports,
+            "cashback_init_lamports": self.cashback_init_lamports,
+            "unexplained_lamports": self.unexplained_lamports,
             "sell_net_lamports": self.sell_net_lamports,
         }
 
@@ -95,6 +131,64 @@ def _payer_delta(meta: dict[str, Any]) -> int | None:
         return int(post[0]) - int(pre[0])
     except (TypeError, ValueError):
         return None
+
+
+def _balances(
+    transaction: dict[str, Any], meta: dict[str, Any]
+) -> tuple[list[str], list[Any], list[Any]]:
+    """``(account keys, preBalances, postBalances)`` of a ``getTransaction`` result."""
+    message = cast(
+        dict[str, Any], cast(dict[str, Any], transaction.get("transaction") or {}).get("message")
+    )
+    loaded = cast(dict[str, Any], meta.get("loadedAddresses") or {})
+    keys = [
+        *cast(list[str], (message or {}).get("accountKeys") or []),
+        *cast(list[str], loaded.get("writable") or []),
+        *cast(list[str], loaded.get("readonly") or []),
+    ]
+    return (
+        keys,
+        cast(list[Any], meta.get("preBalances") or []),
+        cast(list[Any], meta.get("postBalances") or []),
+    )
+
+
+def _wsol_ata_pre_lamports(transaction: dict[str, Any], meta: dict[str, Any]) -> int | None:
+    """What the payer's WSOL ATA held before the transaction, from its own ``preBalances``."""
+    keys, pre, _post = _balances(transaction, meta)
+    if not keys:
+        return None
+    ata = associated_token_address(keys[0], WSOL_MINT, token_program=TOKEN_PROGRAM_ID)
+    if ata not in keys or keys.index(ata) >= len(pre):
+        return None
+    try:
+        return int(pre[keys.index(ata)])
+    except (TypeError, ValueError):
+        return None
+
+
+def _cashback_init_lamports(transaction: dict[str, Any], meta: dict[str, Any]) -> int | None:
+    """Lamports the payer funded to create the cashback accumulator and/or its WSOL ATA in this
+    transaction: each account among the transaction's accounts with ``pre == 0`` and a balance
+    afterwards. ``None`` when none was created (or they are not among the accounts)."""
+    keys, pre, post = _balances(transaction, meta)
+    if not keys:
+        return None
+    accumulator = user_volume_accumulator_address(keys[0])
+    accumulator_ata = associated_token_address(
+        accumulator, WSOL_MINT, token_program=TOKEN_PROGRAM_ID
+    )
+    funded = 0
+    for address in (accumulator, accumulator_ata):
+        if address not in keys:
+            continue
+        i = keys.index(address)
+        try:
+            if i < len(pre) and i < len(post) and int(pre[i]) == 0 and int(post[i]) > 0:
+                funded += int(post[i])
+        except (TypeError, ValueError):
+            continue
+    return funded or None
 
 
 def decode_pumpswap_fills(transaction: dict[str, Any]) -> list[PumpSwapFillRecord]:
@@ -130,6 +224,8 @@ def decode_pumpswap_fills(transaction: dict[str, Any]) -> list[PumpSwapFillRecor
         event=events[0] if events else None,
         payer_delta_lamports=delta,
         event_error=event_error,
+        wsol_ata_pre_lamports=_wsol_ata_pre_lamports(transaction, meta),
+        cashback_init_lamports=_cashback_init_lamports(transaction, meta),
     )
     return [record]
 
@@ -169,6 +265,7 @@ class BuiltPumpSwapSell:
             "price_impact_bps": q.price_impact_bps,
             "max_slippage_bps": q.max_slippage_bps,
             "net_quote_amount": q.net_quote_amount,
+            "buyback_fee_recipient": self.intent.buyback_fee_recipient,
         }
 
 
@@ -185,7 +282,12 @@ def build_pumpswap_sell(
     compute_unit_limit: int,
     compute_unit_price_micro_lamports: int,
     creates_wsol_ata: bool,
+    pick_recipient: Callable[[Sequence[str]], str] = _RNG.choice,
 ) -> BuiltPumpSwapSell:
+    if not config.buyback_fee_recipients:  # T4.8f: the program refuses a sell without one
+        raise ValueError("pumpswap_buyback_recipients_unavailable")
+    if read.pool.quote_mint != WSOL_MINT:  # the unwrap, fee ATAs and quote maths assume WSOL
+        raise ValueError("pumpswap_quote_not_wsol")
     quote = quote_pool_sell(
         pool_reserves_of(read), token_amount, config, max_slippage_bps=max_slippage_bps
     )
@@ -197,6 +299,7 @@ def build_pumpswap_sell(
         base_amount_in=token_amount,
         min_quote_amount_out=quote.min_quote_amount_out,
         protocol_fee_recipient=config.protocol_fee_recipients[0],
+        buyback_fee_recipient=pick_recipient(config.buyback_fee_recipients),  # T4.8f F5
     )
     message = build_sell_message(
         intent,

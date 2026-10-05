@@ -1127,6 +1127,24 @@ assume:
 > reautoriza dinheiro): simulação mainnet dos nossos bytes, teste envio → falha de decode → reinício →
 > reconciliação → fechamento único e só então o pino — checklist em
 > `obsidian/06-DECISIONS/Revisoes-Astra/T4.8e-decoders.md`.
+>
+> **T4.8f (05/10/2026, o pino continua T4.8d):** a simulação mainnet dos nossos próprios bytes achou a venda
+> PumpSwap recusada (`Custom 6062 InvalidPoolV2`): desde o redeploy de 02/10 o `sell` exige *remaining accounts*
+> — `pool_v2` (PDA `["pool-v2", base_mint]`, só se o pool tem coin creator), um `buyback_fee_recipient` de
+> `GlobalConfig.buyback_fee_recipients` e o ATA dele; em pool cashback o acumulador de volume vai antes (layout provado
+> em 05/10 com 2 vendas cashback reais pós-upgrade e simulação dos nossos bytes). Corrigido (`pumpswap/tx.py`, `pdas.py`, `decode.py`, `pumpswap_build.py`) com
+> paridade conta a conta contra vendas reais; simulações de curva (clássica, holder-reward, cashback) e PumpSwap
+> `err null`, evento decodificado, `unexplained_lamports == 0` (a compra cashback deixa só o aluguel do ATA, que a
+> simulação não nomeia). `PumpSwapFillRecord` ganhou `unexplained_lamports` e tira do PnL o saldo que o ATA WSOL já
+> tinha (`wsol_ata_pre_lamports`). A guarda (`program_watch.py`, `program_check.py`) vigia também PumpSwap e `pfeeUx`
+> por slot de deploy e, com 3 leituras de identidade falhas seguidas em runtime, recusa entradas
+> (`program_identity_unreadable`) — saídas nunca; o bloqueio é relido na fronteira da assinatura
+> (`signing_gate.py`; e `MemeSubmitter(pre_sign_gate)` o relê **depois da simulação, antes de assinar**). O boot live
+> **não morre mais** por identidade de programa: sobe só-saídas (`program_identity_verified` nasce `False`, só uma
+> leitura completa compatível o marca; divergência é pegajosa; entradas pump/launch recusadas por nome; spot/1 é
+> mesa separada). Layout cashback da PumpSwap provado (vendas reais + simulação). Patch do pino preparado e **não
+> aplicado**: `.claude/state/tmp/t48f_pin_move.patch`; abertos: teste de fechamento único em Postgres, decisão sobre
+> admitir compras cashback. Ver `obsidian/06-DECISIONS/Revisoes-Astra/T4.8f-pumpswap-guard.md`.
 
 > **T4.29c (16/09/2026):** as taxas deixaram de ser uma constante datada. `fee_config.py` decodifica
 > a conta `FeeConfig` do **programa de taxas** (`pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ`, PDA

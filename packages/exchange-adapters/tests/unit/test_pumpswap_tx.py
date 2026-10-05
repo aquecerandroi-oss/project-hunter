@@ -43,6 +43,7 @@ FIXTURES = Path(__file__).parents[1] / "fixtures/pumpswap"
 POOL_ADDRESS = "F5MkE4Yf73TkeSKLv3Mr3yrGJpFg3g7sspaCosVYyxaQ"
 USER = "ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4"
 PROTOCOL_FEE_RECIPIENT = "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"
+BUYBACK_FEE_RECIPIENT = "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD"  # GlobalConfig.buyback[0]
 BLOCKHASH = "7Pptc9XnPvGCz2SExsdbLzYAWCXbGmYyewGefDCVU4A6"
 
 
@@ -61,6 +62,7 @@ def _intent() -> PumpSwapSellIntent:
         base_amount_in=1_000_000_000,
         min_quote_amount_out=18_000,
         protocol_fee_recipient=PROTOCOL_FEE_RECIPIENT,
+        buyback_fee_recipient=BUYBACK_FEE_RECIPIENT,
     )
 
 
@@ -69,9 +71,9 @@ def test_sell_instruction_discriminator_matches_onchain_idl() -> None:
     assert SELL_DISCRIMINATOR.hex() == "33e685a4017f83ad"
 
 
-def test_sell_instruction_has_21_accounts_in_idl_order() -> None:
+def test_sell_instruction_has_the_21_idl_accounts_in_order_then_3_remaining() -> None:
     ix = build_pumpswap_sell_instruction(_intent())
-    assert len(ix.accounts) == 21 == len(SELL_ACCOUNT_NAMES)
+    assert len(ix.accounts) == 24 == len(SELL_ACCOUNT_NAMES) + 3  # T4.8f: + pool_v2, buyback x2
     assert ix.accounts[0].pubkey == POOL_ADDRESS
     assert ix.accounts[0].is_writable is True and ix.accounts[0].is_signer is False
     assert ix.accounts[1].pubkey == USER
@@ -102,6 +104,7 @@ def test_sell_rejects_non_positive_amount() -> None:
             base_amount_in=0,
             min_quote_amount_out=1,
             protocol_fee_recipient=PROTOCOL_FEE_RECIPIENT,
+            buyback_fee_recipient=BUYBACK_FEE_RECIPIENT,
         )
 
 
@@ -183,6 +186,7 @@ def test_verifier_refuses_wrong_signer() -> None:
         base_amount_in=1_000_000_000,
         min_quote_amount_out=18_000,
         protocol_fee_recipient=PROTOCOL_FEE_RECIPIENT,
+        buyback_fee_recipient=BUYBACK_FEE_RECIPIENT,
     )
     with pytest.raises(UnverifiedTransaction, match="signer_is_not_our_wallet"):
         verify_pumpswap_sell_message(

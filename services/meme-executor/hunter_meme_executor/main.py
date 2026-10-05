@@ -59,7 +59,7 @@ from hunter_exchanges.pumpfun.tx_rpc import SolanaTxRpcClient
 from hunter_meme_executor.build import decode_fills
 from hunter_meme_executor.chain import ChainReader
 from hunter_meme_executor.config import ExecutorConfig, boot, process_environment
-from hunter_meme_executor.context import ExecutorContext
+from hunter_meme_executor.context import ExecutorContext, program_mode_text
 from hunter_meme_executor.entries import entries_once
 from hunter_meme_executor.event_exits import (
     EventExitsRuntime,
@@ -249,6 +249,7 @@ def _register_health(runtime: WorkerRuntime, ctx: ExecutorContext) -> None:
     )
     runtime.status_details["kill_switch"] = lambda: ctx.kill.effective.value
     runtime.status_details["blocked_exits"] = lambda: str(len(ctx.state.blocked_exits))
+    runtime.status_details["program_identity"] = lambda: program_mode_text(ctx.state)
     runtime.status_details["auto_approve"] = lambda: (
         "stage 1 (no click)" if ctx.config.auto_approve else "off (click required)"
     )

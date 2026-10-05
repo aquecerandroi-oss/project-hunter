@@ -2,7 +2,8 @@
 
 Account order, discriminator and argument layout come straight from the
 program's own on-chain IDL (``tests/fixtures/pumpswap/t429a_idl_pump_amm_onchain.json``,
-sha256 in ``decode.py``'s module docstring): ``sell`` — 21 accounts, args
+sha256 in ``decode.py``'s module docstring): ``sell`` — 21 accounts (+ 3 remaining accounts since
+the 2026-10-02 redeploy, T4.8f: see ``SELL_REMAINING_ACCOUNT_NAMES``), args
 ``base_amount_in: u64, min_quote_amount_out: u64``. The discriminator
 (``33e685a4017f83ad``) is byte-identical to the bonding curve's ``sell`` —
 Anchor discriminators are ``sha256("global:<name>")[:8]``, so any two programs
@@ -49,10 +50,13 @@ from hunter_exchanges.pumpswap.pdas import (
     coin_creator_vault,
     event_authority,
     fee_config_address,
+    pool_v2_address,
+    user_volume_accumulator_address,
 )
 
 __all__ = [
     "SELL_ACCOUNT_NAMES",
+    "SELL_REMAINING_ACCOUNT_NAMES",
     "SELL_DISCRIMINATOR",
     "PumpSwapSellIntent",
     "build_close_wsol_instruction",
@@ -72,6 +76,16 @@ SELL_ACCOUNT_NAMES = (
 ).split()
 assert len(SELL_ACCOUNT_NAMES) == 21
 
+SELL_REMAINING_ACCOUNT_NAMES = ("pool_v2", "buyback_fee_recipient", "buyback_wsol_ata")
+"""T4.8f: after the 21 IDL accounts, in this order (read-only, read-only, writable) — the
+2026-10-02 redeploy refuses a ``sell`` without them (``6062 InvalidPoolV2``); the IDL on chain
+was not republished and the GitHub one still lists 21. Proven by real post-upgrade sells:
+24 accounts with ``pool_v2``; **23** (no ``pool_v2``) when the pool's ``coin_creator`` is the
+default pubkey. A **cashback** pool leads this list with the user's volume accumulator WSOL ATA
+and the accumulator (both writable) — the layout of the official SDK 1.20.0, *not yet seen in a
+real transaction*; a wrong guess is refused by the mandatory simulation, never sold."""
+_DEFAULT_PUBKEY = "11111111111111111111111111111111"
+
 
 @dataclass(frozen=True, slots=True)
 class PumpSwapSellIntent:
@@ -90,6 +104,9 @@ class PumpSwapSellIntent:
     base_amount_in: int
     min_quote_amount_out: int
     protocol_fee_recipient: str
+    buyback_fee_recipient: str
+    """One of ``GlobalConfig.buyback_fee_recipients`` (validated by the caller): the program
+    demands it and its WSOL ATA as remaining accounts (T4.8f)."""
 
     def __post_init__(self) -> None:
         if self.base_amount_in <= 0:
@@ -107,12 +124,32 @@ def _r(pubkey: str) -> AccountMeta:
 
 
 def build_pumpswap_sell_instruction(intent: PumpSwapSellIntent) -> Instruction:
-    """``sell(base_amount_in, min_quote_amount_out)`` — IDL order, 21 accounts."""
+    """``sell(base_amount_in, min_quote_amount_out)`` — the 21 IDL accounts in IDL order, then
+    the remaining accounts the program requires since 2026-10-02 (T4.8f): ``[cashback
+    accumulator ATA, accumulator]`` for a cashback pool, ``pool_v2`` when the pool has a coin
+    creator, then the buyback recipient and its WSOL ATA (``SELL_REMAINING_ACCOUNT_NAMES``)."""
     pool, user = intent.pool, intent.user
     vault_authority, vault_ata = coin_creator_vault(pool.coin_creator)
     protocol_fee_recipient_ata = associated_token_address(
         intent.protocol_fee_recipient, WSOL_MINT, token_program=TOKEN_PROGRAM_ID
     )
+    remaining: list[AccountMeta] = []
+    if pool.is_cashback_coin:
+        accumulator = user_volume_accumulator_address(user)
+        remaining += [
+            _w(associated_token_address(accumulator, WSOL_MINT, token_program=TOKEN_PROGRAM_ID)),
+            _w(accumulator),
+        ]
+    if pool.coin_creator != _DEFAULT_PUBKEY:
+        remaining.append(_r(pool_v2_address(pool.base_mint)))
+    remaining += [
+        _r(intent.buyback_fee_recipient),
+        _w(
+            associated_token_address(
+                intent.buyback_fee_recipient, WSOL_MINT, token_program=TOKEN_PROGRAM_ID
+            )
+        ),
+    ]
     accounts = (
         _w(intent.pool_address),
         AccountMeta(user, True, True),
@@ -135,6 +172,7 @@ def build_pumpswap_sell_instruction(intent: PumpSwapSellIntent) -> Instruction:
         _r(vault_authority),
         _r(fee_config_address()),
         _r(PUMP_FEE_PROGRAM_ID),
+        *remaining,
     )
     data = SELL_DISCRIMINATOR + u64_le(intent.base_amount_in) + u64_le(intent.min_quote_amount_out)
     return Instruction(PUMPSWAP_PROGRAM_ID, accounts, data)

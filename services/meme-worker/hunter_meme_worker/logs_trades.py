@@ -10,7 +10,8 @@ every trade, creator sell and early buyer vanished from the tape, with no gap an
 coverage gap (``MintEventState.mark_gap``: the windows warm again, every reading that needs the
 tape answers "unknown" — fail closed), counts the loss in a :class:`LostTrades` and logs it
 (rate-limited; the counter stays exact). The gap is marked **after** the trades of the same
-notification are applied, so the readable ones do not outlive it.
+notification are applied, so the readable ones do not outlive it, and in a ``finally`` so an
+early exit of the consumer cannot hide the loss (T4.8f).
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.trade_event import normalized_curve_trade, scan_trade_event_logs
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
     from hunter_exchanges.pumpfun.models import NormalizedCurveTrade
     from hunter_exchanges.pumpfun.rpc_ws_models import LogsNotification
@@ -82,28 +83,34 @@ class LostTrades:
 
 def logs_trades(
     lost: LostTrades, state: MintEventState, notif: LogsNotification, *, lane: str, mint: str
-) -> Iterator[NormalizedCurveTrade]:
-    """The trades of one notification; on exhaustion, the gap and the count of any that were lost.
+) -> Generator[NormalizedCurveTrade]:
+    """The trades of one notification and, in a ``finally``, the gap and the count of any that
+    were lost — so a ``break``, an exception in the consumer or a closed generator cannot hide
+    the loss (T4.8f). The gap is marked **after** the readable trades are handed over.
 
-    The caller must iterate it to the end (a ``for`` loop does): the gap is the code after
-    the last ``yield``."""
+    The ``finally`` runs when the generator is closed: at exhaustion, or when a *temporary*
+    generator (the ``for trade in logs_trades(...)`` of both lanes) is dropped by a ``break`` or an
+    exception unwinding the frame (CPython refcounting). A consumer that keeps a reference to the
+    generator must ``close()`` it (or use ``contextlib.closing``) — a late finalization would mark
+    the gap after newer events (Astra, 05/10)."""
     scan = scan_trade_event_logs(notif.logs)
-    for event in scan.events:
-        yield normalized_curve_trade(
-            event, slot=notif.slot, signature=notif.signature, received_at=notif.received_at
-        )
-    if not scan.lost:
-        return
-    state.mark_gap(notif.received_at)
-    if lost.record(notif.received_at, scan):
-        logger.warning(
-            "meme_trade_event_undecodable",
-            lane=lane,
-            mint=mint,
-            slot=notif.slot,
-            signature=notif.signature,
-            lost=len(scan.undecodable),
-            decoded=len(scan.events),
-            error=scan.undecodable[-1],
-            total=lost.trades_total,
-        )
+    try:
+        for event in scan.events:
+            yield normalized_curve_trade(
+                event, slot=notif.slot, signature=notif.signature, received_at=notif.received_at
+            )
+    finally:
+        if scan.lost:
+            state.mark_gap(notif.received_at)
+            if lost.record(notif.received_at, scan):
+                logger.warning(
+                    "meme_trade_event_undecodable",
+                    lane=lane,
+                    mint=mint,
+                    slot=notif.slot,
+                    signature=notif.signature,
+                    lost=len(scan.undecodable),
+                    decoded=len(scan.events),
+                    error=scan.undecodable[-1],
+                    total=lost.trades_total,
+                )

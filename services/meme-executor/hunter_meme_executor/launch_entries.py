@@ -62,6 +62,7 @@ from hunter_meme_executor.scope import (
     scope_refusal,
 )
 from hunter_meme_executor.send_path import curve_fee_accounts, priority_fee_for
+from hunter_meme_executor.signing_gate import signing_block
 from hunter_meme_executor.spot_brake import brake_positions, spot_pending_intents
 from hunter_meme_executor.treasury_inflow import ensure_anchor
 from hunter_meme_executor.wallet_holdings import admission_holdings
@@ -123,8 +124,8 @@ async def handle_launch_candidate(
         return
     if ctx.signer is None or not ctx.mode.live:
         return  # inert: nothing written (``launch_inert_reason``)
-    if ctx.state.program_divergence is not None:
-        await _refuse(ctx, candidate, "program_upgraded", {"detail": ctx.state.program_divergence})
+    if (block := ctx.state.program_block) is not None:  # T4.8b/T4.8f
+        await _refuse(ctx, candidate, block[0], {"detail": block[1]})
         return
     if ctx.kill.blocks_entries:
         await _refuse(ctx, candidate, "kill_switch_blocked", ctx.kill.describe())
@@ -289,12 +290,19 @@ async def handle_launch_candidate(
     if order_id is None:
         return  # another pass already owns this key (idempotent on the proposal)
     await ctx.kill.refresh()
-    if ctx.kill.blocks_entries:
-        reason = "kill_switch_blocked_before_signing"
+    if (late_block := signing_block(ctx)) is not None:  # kill switch, T4.8f: program identity
+        reason, detail = late_block
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
             await refuse_admitted_order(session, key, reason=reason, now=utcnow())
         ctx.launch.record_refusal(reason)
         ctx.state.record_refusal(reason)
+        logger.warning(  # T4.8f: the block's detail survives, like the entry path
+            "meme_launch_entry_refused",
+            proposal_id=candidate.id,
+            mint=candidate.mint,
+            reason=reason,
+            **detail,
+        )
         return
     await submit_launch_buy(
         ctx, candidate, built, key=key, order_id=order_id, curve=curve, age_s=age_s

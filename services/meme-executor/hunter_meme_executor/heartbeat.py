@@ -25,7 +25,7 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_meme_executor.auto_approve import auto_approved_last_hour, auto_refused_last_hour
-from hunter_meme_executor.context import ExecutorContext
+from hunter_meme_executor.context import ExecutorContext, heartbeat_program_fields
 from hunter_meme_executor.event_exits_stats import heartbeat_fields as event_exits_fields
 from hunter_meme_executor.journal_db import WORKER_ROLE
 from hunter_meme_executor.launch_exits import launch_positions
@@ -240,7 +240,7 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         "program_last_deploy_slot": ""
         if state.program_last_deploy_slot is None
         else str(state.program_last_deploy_slot),
-        "program_divergence": state.program_divergence or "",
+        **heartbeat_program_fields(state),  # T4.8f: mode, block, detail, upgrade
         "last_entries_tick_at": ""
         if state.last_entries_tick_at is None
         else state.last_entries_tick_at.isoformat(),

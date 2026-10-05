@@ -25,6 +25,7 @@ from hunter_meme_executor.launch_repo import buy_submitted_at
 from hunter_meme_executor.launch_send import launch_submit_policy
 from hunter_meme_executor.repo import insert_position
 from hunter_meme_executor.send_path import record_send_result
+from hunter_meme_executor.signing_gate import pre_sign_reason
 
 if TYPE_CHECKING:
     from hunter_meme_executor.build import BuiltTrade
@@ -56,6 +57,7 @@ async def submit_launch_buy(
         decode_fill=decode_fills,
         policy=launch_submit_policy(cfg, launch, ctx.chain.rpc),
         now=utcnow,
+        pre_sign_gate=lambda: pre_sign_reason(ctx),  # T4.8f: after the simulation, before signing
     )
     approval = ApprovedSubmission(
         key,

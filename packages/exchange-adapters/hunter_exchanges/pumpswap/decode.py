@@ -111,9 +111,9 @@ class Pool:
 @dataclass(frozen=True, slots=True)
 class GlobalConfig:
     """Only the fields this package needs (fees + the account order up to
-    ``coin_creator_fee_basis_points``); the tail (admin authorities, Mayhem/
-    cashback/buyback recipients, ``boost_*``) is not decoded — nothing here
-    reads them."""
+    ``coin_creator_fee_basis_points``, plus the buyback recipients since T4.8f); the rest of the
+    tail (admin authorities, Mayhem/cashback recipients, ``boost_*``) is not decoded — nothing
+    here reads it."""
 
     admin: str
     lp_fee_basis_points: int
@@ -121,6 +121,10 @@ class GlobalConfig:
     disable_flags: int
     protocol_fee_recipients: tuple[str, ...]
     coin_creator_fee_basis_points: int
+    buyback_fee_recipients: tuple[str, ...] = ()
+    """T4.8f: the eight recipients a ``sell`` must pick one of (``remaining_accounts[1]``) since
+    the 2026-10-02 redeploy. ``()`` when the account ends before them (an older layout): the
+    builder then refuses by name instead of signing a sell the program would reject."""
 
     @property
     def total_fee_basis_points(self) -> int:
@@ -159,8 +163,17 @@ def decode_global_config(data_base64: str, *, owner: str) -> GlobalConfig:
         )
         off += 32 * 8
         coin_creator_fee_basis_points = struct.unpack_from("<Q", raw, off)[0]
+        off += 8
     except (struct.error, IndexError) as exc:
         raise MalformedMessage(f"GlobalConfig truncated: {exc}", exchange="pumpswap") from exc
+    # admin_set_coin_creator_authority, whitelist_pda, reserved_fee_recipient (3 x 32), mayhem
+    # bool, reserved_fee_recipients (7 x 32), is_cashback_enabled bool - then the buyback array.
+    buyback_at = off + 32 * 3 + 1 + 32 * 7 + 1
+    buyback_fee_recipients = (
+        tuple(b58encode(raw[buyback_at + i * 32 : buyback_at + i * 32 + 32]) for i in range(8))
+        if len(raw) >= buyback_at + 32 * 8
+        else ()
+    )
     return GlobalConfig(
         admin=admin,
         lp_fee_basis_points=lp_fee_basis_points,
@@ -168,6 +181,7 @@ def decode_global_config(data_base64: str, *, owner: str) -> GlobalConfig:
         disable_flags=disable_flags,
         protocol_fee_recipients=protocol_fee_recipients,
         coin_creator_fee_basis_points=coin_creator_fee_basis_points,
+        buyback_fee_recipients=buyback_fee_recipients,
     )
 
 

@@ -15,7 +15,8 @@ mark a coverage gap on the first. :func:`trade_events_from_logs` is the events-o
 from __future__ import annotations
 
 import base64
-from collections.abc import Iterable, Sequence
+import re
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -23,6 +24,7 @@ from typing import Any, cast
 
 from hunter_core.domain.types import utcnow
 from hunter_exchanges.pumpfun.curve import raw_lamports_to_sol, raw_subunits_to_tokens
+from hunter_exchanges.pumpfun.decode import PUMP_PROGRAM_ID
 from hunter_exchanges.pumpfun.models import NormalizedCurveTrade
 from hunter_exchanges.pumpfun.solana_codec import b58decode
 from hunter_exchanges.pumpfun.trade_event_codec import (
@@ -51,6 +53,8 @@ __all__ = [
 ]
 
 _LOG_PREFIX = "Program data: "
+_INVOKE = re.compile(r"^Program (\w+) invoke \[(\d+)\]$")
+_RETURN = re.compile(r"^Program (\w+) (?:success|failed)")
 
 
 def _obj(value: Any) -> dict[str, Any]:
@@ -122,24 +126,41 @@ class TradeLogScan:
         return bool(self.undecodable)
 
 
-def scan_trade_event_logs(lines: Sequence[str]) -> TradeLogScan:
+def _data_lines_of(lines: Sequence[str], program_id: str) -> Iterator[str]:
+    """The ``Program data:`` lines that belong to ``program_id``, by the invoke stack the log
+    itself narrates (``Program X invoke [n]`` … ``Program X success|failed``) — T4.8f: another
+    program's line that merely starts with our discriminator is not ours. A line seen with no
+    invoke context (a truncated or synthetic log) is assumed ours: unknown attribution errs
+    toward counting a loss, never toward silence."""
+    stack: list[str] = []
+    for line in lines:
+        if line.startswith(_LOG_PREFIX):
+            if not stack or stack[-1] == program_id:
+                yield line
+        elif m := _INVOKE.match(line):
+            del stack[int(m.group(2)) - 1 :]
+            stack.append(m.group(1))
+        elif _RETURN.match(line) and stack:
+            stack.pop()
+
+
+def scan_trade_event_logs(
+    lines: Sequence[str], *, program_id: str = PUMP_PROGRAM_ID
+) -> TradeLogScan:
     """Every ``TradeEvent`` in one sequence of log lines (T4.52b-1) — typically
     a Solana RPC ``logsSubscribe`` notification's ``value.logs`` — with the lines that
     looked like one and could not be decoded reported apart (T4.8e).
 
-    Unlike :func:`trade_events_from_transaction`'s logs-only fallback, this
-    does **not** filter by ``program_id``: the caller already scoped the
-    subscription to one mint's bonding-curve PDA via ``mentions``, so any
-    ``TradeEvent``-shaped ``Program data:`` line here is that curve's. A notification
+    Only ``Program data:`` lines attributed to ``program_id`` (the invoke stack, see
+    :func:`_data_lines_of`) are read; the caller already scoped the subscription to one
+    mint's bonding-curve PDA via ``mentions``. A notification
     with zero trade events (a non-trade instruction on the same PDA) is a normal, empty
     scan; a line that is not valid base64 or does not start with the discriminator is
     some other event and is not ours to count. Never raises.
     """
     events: list[TradeEvent] = []
     undecodable: list[str] = []
-    for line in lines:
-        if not line.startswith(_LOG_PREFIX):
-            continue
+    for line in _data_lines_of(lines, program_id):
         try:
             data = base64.b64decode(line[len(_LOG_PREFIX) :], validate=True)
         except ValueError:

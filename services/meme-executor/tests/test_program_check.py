@@ -17,13 +17,13 @@ from typing import Any, cast
 
 import pytest
 
-from hunter_core.execution.meme.gates import MemeLiveTradingRefused
 from hunter_exchanges.pumpfun.program_identity import (
     EXPECTED_PUMP_PROGRAM,
     UPGRADE_MESSAGE,
     pump_idl_account_address,
     pump_programdata_address,
 )
+from hunter_exchanges.pumpfun.program_watch import WATCHED_PROGRAMS, programdata_address
 from hunter_meme_executor.context import ExecutorContext, ExecutorState
 from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 
@@ -36,16 +36,42 @@ def _fixture(name: str) -> dict[str, Any]:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
+def _header_value(label: str, slot: int) -> dict[str, Any]:
+    """The recorded ``ProgramData`` header of ``label`` (t48f), with its deploy slot replaced."""
+    value = _fixture(f"t48f_rpc_programdata_{label}_raw.json")["result"]["value"]
+    header = struct.pack("<IQ", 3, slot) + b"\x01" + b"\x00" * 32
+    return {**value, "data": [base64.b64encode(header).decode(), "base64"]}
+
+
 @dataclass
 class FakeRpc:
     deploy_slot: int = EXPECTED_PUMP_PROGRAM.last_deploy_slot
+    pumpswap_slot: int = WATCHED_PROGRAMS[0].last_deploy_slot
+    fees_slot: int = WATCHED_PROGRAMS[1].last_deploy_slot
     down: bool = False
+    multiple_down: bool = False
+    identity_down: bool = False
     calls: list[str] = field(default_factory=lambda: list[str]())
 
     def call(self, method: str, params: list[Any]) -> Any:
         self.calls.append(method)
-        if self.down:
+        if (
+            self.down
+            or (self.multiple_down and method == "getMultipleAccounts")
+            or (self.identity_down and method == "getAccountInfo")
+        ):
             raise RuntimeError("rpc down")
+        if method == "getMultipleAccounts":  # T4.8f: the runtime detector, all programs at once
+            slots = {
+                pump_programdata_address(): ("pump", self.deploy_slot),
+                programdata_address(WATCHED_PROGRAMS[0].program_id): (
+                    "pumpswap",
+                    self.pumpswap_slot,
+                ),
+                programdata_address(WATCHED_PROGRAMS[1].program_id): ("pump_fees", self.fees_slot),
+            }
+            values = [_header_value(*slots[a]) for a in params[0]]
+            return {"context": {"slot": 453627199}, "value": values}
         if params[0] == pump_idl_account_address():
             return _fixture("t48d_rpc_idl_account_raw.json")["result"]
         if params[0] == pump_programdata_address():
@@ -57,6 +83,9 @@ class FakeRpc:
 
     def send_transaction(self, *_: Any, **__: Any) -> str:
         raise AssertionError("never")
+
+    def close(self) -> None:
+        return None
 
 
 @dataclass
@@ -89,25 +118,33 @@ async def test_boot_with_the_program_the_fixtures_were_captured_from_passes() ->
     assert ctx.state.program_divergence is None
     assert ctx.state.program_idl_hash == EXPECTED_PUMP_PROGRAM.idl_sha256
     assert ctx.state.program_last_deploy_slot == EXPECTED_PUMP_PROGRAM.last_deploy_slot
-    assert ctx.chain.rpc.calls == ["getAccountInfo", "getAccountInfo"]
+    assert ctx.state.program_identity_verified is True and ctx.state.program_block is None
+    assert ctx.chain.rpc.calls == ["getAccountInfo", "getAccountInfo", "getMultipleAccounts"]
 
 
-async def test_boot_live_on_an_upgraded_program_is_refused_by_name_and_signs_nothing() -> None:
+async def test_boot_live_on_an_upgraded_program_boots_exits_only_and_signs_nothing() -> None:
+    """T4.8f F3: the process stays up (exits and reconciliation must keep running with a
+    position open) — only entries are refused, by name."""
     ctx = _ctx(live=True, deploy_slot=EXPECTED_PUMP_PROGRAM.last_deploy_slot + 1)
-    with pytest.raises(MemeLiveTradingRefused) as info:
-        await check_program_at_boot(cast(ExecutorContext, ctx))
-    assert info.value.reason == "program_upgraded"
-    assert UPGRADE_MESSAGE in str(info.value) and "last_deploy_slot" in str(info.value)
+    await check_program_at_boot(cast(ExecutorContext, ctx))  # no raise
     assert ctx.state.program_divergence is not None
+    assert UPGRADE_MESSAGE in ctx.state.program_divergence
+    assert "last_deploy_slot" in ctx.state.program_divergence
+    assert ctx.state.program_identity_verified is False
+    assert ctx.state.program_block is not None and ctx.state.program_block[0] == "program_upgraded"
     assert "sendTransaction" not in ctx.chain.rpc.calls
-    assert set(ctx.chain.rpc.calls) == {"getAccountInfo"}
+    assert set(ctx.chain.rpc.calls) <= {"getAccountInfo", "getMultipleAccounts"}
 
 
-async def test_boot_live_with_the_identity_unreadable_fails_closed() -> None:
+async def test_boot_live_with_the_identity_unreadable_boots_exits_only() -> None:
+    """Unknown is not "unchanged": nothing marks the identity verified, so entries stay refused
+    (``program_identity_unverified``) — but the process lives to run the exits."""
     ctx = _ctx(live=True, down=True)
-    with pytest.raises(MemeLiveTradingRefused) as info:
-        await check_program_at_boot(cast(ExecutorContext, ctx))
-    assert info.value.reason == "program_identity_unreadable"
+    await check_program_at_boot(cast(ExecutorContext, ctx))  # no raise
+    assert ctx.state.program_identity_verified is False and ctx.state.program_divergence is None
+    assert ctx.state.rpc_errors == 1
+    assert ctx.state.program_block is not None
+    assert ctx.state.program_block[0] == "program_identity_unverified"
 
 
 async def test_boot_inert_on_an_upgraded_program_keeps_running_and_says_so() -> None:
@@ -123,8 +160,11 @@ async def test_boot_inert_on_an_upgraded_program_keeps_running_and_says_so() -> 
 
 async def test_the_runtime_check_reads_the_deploy_slot_only_and_flips_the_state() -> None:
     ctx = _ctx(live=True)
+    await check_program_at_boot(cast(ExecutorContext, ctx))  # verified: ticks are slots-only now
+    ctx.chain.rpc.calls.clear()
     await program_check_once(cast(ExecutorContext, ctx))
-    assert ctx.chain.rpc.calls == ["getAccountInfo"] and ctx.state.program_divergence is None
+    assert ctx.chain.rpc.calls == ["getMultipleAccounts"], "one call for all three programs"
+    assert ctx.state.program_divergence is None
     ctx.chain.rpc.deploy_slot = EXPECTED_PUMP_PROGRAM.last_deploy_slot + 7
     await program_check_once(cast(ExecutorContext, ctx))
     assert ctx.state.program_divergence is not None

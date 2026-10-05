@@ -58,6 +58,7 @@ from hunter_meme_executor.send_path import (
     curve_fee_accounts,
     priority_fee_for,
 )
+from hunter_meme_executor.signing_gate import signing_block
 from hunter_meme_executor.treasury_inflow import ensure_anchor
 from hunter_meme_executor.wallet_holdings import admission_holdings
 
@@ -103,8 +104,8 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     if ctx.signer is None or not mode.live:
         await _refuse(ctx, candidate, "meme_live_disabled", {"live": mode.live})
         return
-    if ctx.state.program_divergence is not None:  # T4.8b: never sign against an unknown program
-        await _refuse(ctx, candidate, "program_upgraded", {"detail": ctx.state.program_divergence})
+    if (block := ctx.state.program_block) is not None:  # T4.8b/T4.8f: an unknown program
+        await _refuse(ctx, candidate, block[0], {"detail": block[1]})
         return
     scope = await lane_scope(ctx, requested_sol=requested_sol_of(candidate.decision))
     if (late := scope_refusal(scope, cfg.limits.min_trade_sol)) is not None:
@@ -249,8 +250,8 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     # re-read between the admission and the signature, and a switch that moved in
     # between refuses the admitted row by name — nothing is signed, nothing is sent.
     await ctx.kill.refresh()
-    if ctx.kill.blocks_entries:
-        reason = "kill_switch_blocked_before_signing"
+    if (late_block := signing_block(ctx)) is not None:  # kill switch, T4.8f: program identity
+        reason, detail = late_block
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
             refused_at = utcnow()
             await refuse_admitted_order(session, key, reason=reason, now=refused_at)
@@ -261,7 +262,7 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
             proposal_id=candidate.id,
             mint=candidate.mint,
             reason=reason,
-            kill_switch=ctx.kill.effective.value,
+            **detail,
         )
         return
     await submit_entry_buy(ctx, candidate, built, key, order_id, now)

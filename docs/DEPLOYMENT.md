@@ -786,9 +786,17 @@ inteira vai para `meme_live_orders.admission`) → cotação local sobre a curva
 **agora** por RPC → `build_buy` → verificador §9.1 → `simulateTransaction` → kill
 switch **relido** → assinar (assinatura gravada antes do envio) → enviar → confirmar
 pelo `TradeEvent` → `meme_live_positions`. Saídas a cada 5 s: `sell_now` (mesa), alvo,
-trailing, `max_hold_s`, dump do criador. Uma posição cujo mint migrou fica `open` com
-`exit_intent = blocked: pumpswap_sell_not_implemented` (a venda na PumpSwap não existe
-na T4.8 e a T4.14 não a inventou — vender antes da migração é o caminho que existe).
+trailing, `max_hold_s`, dump do criador. Uma posição cujo mint migrou **vende na PumpSwap**
+(`pumpswap_exit.py`, T4.29a): pool canônico lido por RPC, `sell` montado e verificado, simulação
+obrigatória, mesma trava de assinatura e mesmo journal da curva; o bloqueio nomeado que sobrou
+é `exit_intent = blocked: pumpswap_pool_not_found` (pool ainda não existe) — a recusa antiga
+`pumpswap_sell_not_implemented` deixou de existir. Desde o redeploy da PumpSwap de 02/10 o `sell`
+leva *remaining accounts* novas (`pool_v2`, recipient de buyback e o ATA dele; em pool cashback, o
+acumulador antes) e a build recusa por nome sem elas (T4.8f). Se o programa da pump, a PumpSwap
+ou o de taxas mudar, o executor **sobe só-saídas** (T4.8f F3): não morre no boot — as saídas, a
+reconciliação e o spot/1 seguem (a mesa spot/1 tem as suas próprias travas e continua comprando); só as entradas pump/launch são recusadas por nome (`program_upgraded` /
+`program_identity_unverified` / `program_identity_unreadable`). O status do worker mostra `program_identity`
+= `exits-only (<motivo>)` e o heartbeat traz `program_mode`/`program_block`.
 `EMERGENCY` fecha posições **só** com `MEME_AUTO_CLOSE_ON_EMERGENCY=true` (§14.4).
 
 **Como ligar — na ordem, e só o Everton:**

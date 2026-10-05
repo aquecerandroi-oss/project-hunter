@@ -13,6 +13,8 @@ every trade, creator sell and early buyer vanished from the tape, with no gap ma
 from __future__ import annotations
 
 import base64
+import contextlib
+import gc
 import json
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -20,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from hunter_exchanges.pumpfun.decode import PUMP_PROGRAM_ID
 from hunter_exchanges.pumpfun.rpc_ws_models import LogsNotification
 from hunter_exchanges.pumpfun.trade_event import trade_events_from_logs
 from hunter_meme_worker.config import MemeConfig
@@ -35,7 +38,7 @@ from hunter_meme_worker.launch_lane_eval import _fold_logs
 from hunter_meme_worker.launch_lane_runtime import LaunchWatch
 from hunter_meme_worker.launch_lane_stats import LaunchLaneStats
 from hunter_meme_worker.launch_lane_stats import heartbeat_fields as launch_heartbeat
-from hunter_meme_worker.logs_trades import LostTrades
+from hunter_meme_worker.logs_trades import LostTrades, logs_trades
 from hunter_meme_worker.tracker import MintTracker
 
 pytestmark = pytest.mark.unit
@@ -126,7 +129,7 @@ def test_a_notification_without_a_trade_event_is_normal_and_marks_no_gap() -> No
 
 def test_an_undecodable_trade_event_is_counted_and_marks_a_gap() -> None:
     rt = _gate()
-    notif = _notif(("Program 6EF8 invoke [1]", _undecodable()))
+    notif = _notif((f"Program {PUMP_PROGRAM_ID} invoke [1]", _undecodable()))
     assert apply_notification(rt, notif) == MINT  # the lane still evaluates, off a warming tape
     state = rt.book.get(MINT)
     assert state is not None
@@ -231,3 +234,80 @@ def test_a_failed_instruction_is_not_a_lost_trade() -> None:
     failed = replace(_notif((_undecodable(),)), err={"InstructionError": [0, "Custom"]})
     assert apply_notification(rt, failed) is None
     assert rt.stats.lost_trades.trades_total == 0
+
+
+# -- T4.8f (guardian): the loss is marked even when the consumer stops early --------------
+
+
+def _lost_notif_with_a_readable_trade() -> LogsNotification:
+    return _notif((_undecodable(), *_real_logs()))
+
+
+def test_a_break_out_of_the_loop_still_marks_the_gap_and_counts_the_loss() -> None:
+    rt = _gate()
+    state = rt.book.get(MINT)
+    assert state is not None
+    notif = _lost_notif_with_a_readable_trade()
+    for _trade in logs_trades(rt.stats.lost_trades, state, notif, lane="t", mint=MINT):
+        break  # a future consumer that stops at the first trade must not hide the loss
+    assert state.gaps == 1 and rt.stats.lost_trades.trades_total == 1
+
+
+def test_an_exception_in_the_consumer_still_marks_the_gap() -> None:
+    rt = _gate()
+    state = rt.book.get(MINT)
+    assert state is not None
+    notif = _lost_notif_with_a_readable_trade()
+
+    def consumer() -> None:
+        for _trade in logs_trades(rt.stats.lost_trades, state, notif, lane="t", mint=MINT):
+            raise RuntimeError("apply_trade blew up")
+
+    with contextlib.suppress(RuntimeError):
+        consumer()
+    gc.collect()
+    assert state.gaps == 1 and rt.stats.lost_trades.trades_total == 1
+
+
+def test_closing_an_unstarted_generator_marks_nothing() -> None:
+    """A generator that never ran saw nothing: no scan, no gap (the finally is not entered)."""
+    rt = _gate()
+    state = rt.book.get(MINT)
+    assert state is not None
+    gen = logs_trades(
+        rt.stats.lost_trades, state, _lost_notif_with_a_readable_trade(), lane="t", mint=MINT
+    )
+    gen.close()
+    assert state.gaps == 0 and rt.stats.lost_trades.trades_total == 0
+
+
+def test_another_programs_trade_event_shaped_line_marks_no_gap() -> None:
+    """T4.8f: attributed by the invoke stack — it is not the pump program's, so not a loss."""
+    rt = _gate()
+    other = "DRVSpZ2YUYYKgZP8XtLhAGtT1zYSCKzeHfb4DgRnrgqD"
+    notif = _notif((f"Program {other} invoke [1]", _undecodable(), f"Program {other} success"))
+    assert apply_notification(rt, notif) == MINT
+    state = rt.book.get(MINT)
+    assert state is not None and state.gaps == 0
+    assert rt.stats.lost_trades.trades_total == 0
+
+
+def test_a_consumer_that_raises_marks_the_gap_before_the_exception_even_leaves_the_lane(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T4.8f (Astra): the lanes close the generator deterministically (``contextlib.closing``) —
+    the gap is marked when the ``with`` exits, not whenever the garbage collector gets to a
+    generator the traceback is still holding."""
+    rt = _gate()
+    state = rt.book.get(MINT)
+    assert state is not None
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("apply_trade blew up")
+
+    monkeypatch.setattr(MintEventState, "apply_trade", boom)
+    notif = _lost_notif_with_a_readable_trade()
+    with pytest.raises(RuntimeError):
+        apply_notification(rt, notif)
+        pytest.fail("unreachable")
+    assert state.gaps == 1 and rt.stats.lost_trades.trades_total == 1

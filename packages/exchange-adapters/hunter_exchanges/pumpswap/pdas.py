@@ -49,6 +49,8 @@ __all__ = [
     "event_authority",
     "fee_config_address",
     "pool_address",
+    "pool_v2_address",
+    "user_volume_accumulator_address",
     "pool_authority_address",
 ]
 
@@ -72,6 +74,21 @@ def pool_address(mint: str) -> str:
             pubkey_bytes(WSOL_MINT),
         ],
         PUMPSWAP_PROGRAM_ID,
+    )[0]
+
+
+def pool_v2_address(base_mint: str) -> str:
+    """The ``pool_v2`` PDA — ``["pool-v2", base_mint]`` under PumpSwap — that ``sell`` demands as
+    ``remaining_accounts[0]`` since the 2026-10-02 redeploy (``Custom 6062 InvalidPoolV2``
+    without it; read off real post-upgrade sells, T4.8f)."""
+    return find_program_address([b"pool-v2", pubkey_bytes(base_mint)], PUMPSWAP_PROGRAM_ID)[0]
+
+
+def user_volume_accumulator_address(user: str) -> str:
+    """``["user_volume_accumulator", user]`` under PumpSwap — the cashback accumulator a
+    **cashback** pool's ``sell`` leads its remaining accounts with (official SDK 1.20.0)."""
+    return find_program_address(
+        [b"user_volume_accumulator", pubkey_bytes(user)], PUMPSWAP_PROGRAM_ID
     )[0]
 
 

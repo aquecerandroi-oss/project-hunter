@@ -71,7 +71,35 @@ class ExecutorState:
     program_last_deploy_slot: int | None = None
     program_divergence: str | None = None
     """T4.8b: set when the chain's program identity differs from the fixtures' —
-    every entry is refused ``program_upgraded`` while it is set."""
+    every entry is refused ``program_upgraded`` while it is set. T4.8f: the identity covers
+    the pump program, PumpSwap and the fee program."""
+    program_read_failures: int = 0
+    """T4.8f: consecutive runtime identity reads that failed; reset by a good read."""
+    program_identity_verified: bool = False
+    """T4.8f F3: **born ``False``**. Set only by a COMPLETE compatible identity read — the pump
+    IDL hash and slot (``read_program_identity``) plus every watched deploy slot
+    (``read_deploy_slots``) — at boot or in ``program_check_once``; a slots-only read never sets
+    it and a divergence is never undone by one. While ``False`` the executor is *exits-only*."""
+    program_unreadable: str | None = None
+    """T4.8f: set after ``PROGRAM_READ_FAILURES_MAX`` consecutive failed reads, cleared by the
+    next good one — every entry is refused ``program_identity_unreadable`` meanwhile.
+    Exits are never gated by it."""
+
+    @property
+    def program_block(self) -> tuple[str, str] | None:
+        """``(refusal name, detail)`` while entries must be refused on account of the program
+        identity: an upgrade (sticky, outranks) or an identity unreadable for too long."""
+        if self.program_divergence is not None:
+            return "program_upgraded", self.program_divergence
+        if self.program_unreadable is not None:
+            return "program_identity_unreadable", self.program_unreadable
+        if not self.program_identity_verified:
+            return (
+                "program_identity_unverified",
+                "no complete compatible program identity read yet (exits-only until one succeeds)",
+            )
+        return None
+
     auto_approved: int = 0
     """T4.28: proposals this process opened as live on its own (stage 1)."""
     auto_rejected: int = 0
@@ -215,3 +243,26 @@ class ExecutorContext:
     spot: SpotStats = field(default_factory=SpotStats)
     """T4.74: the ``spot/1`` desk's counters (``spot_stats.py``), published as the
     heartbeat's ``spot1`` field in every mode (``inert:<reason>`` is a value)."""
+
+
+def program_mode_text(state: ExecutorState) -> str:
+    """``normal``, or ``exits-only`` with the cause and the **scope** — what the status shows
+    (T4.8f F3). The block gates the pump/launch entries (``entries.py``, ``launch_entries.py``,
+    the stage-1 auto-approval and the signature boundary); spot/1 is a separate desk with its
+    own gates and keeps buying — the text says so instead of promising more."""
+    block = state.program_block
+    if block is None:
+        return "normal"
+    return f"exits-only ({block[0]}): pump/launch entries blocked; spot/1 independent"
+
+
+def heartbeat_program_fields(state: ExecutorState) -> dict[str, str]:
+    """The program-identity fields of ``hb:meme:executor``: the mode, the block's name and
+    detail, and the upgrade detail (sticky) on its own."""
+    block = state.program_block
+    return {
+        "program_mode": "normal" if block is None else "exits_only",
+        "program_block": "" if block is None else block[0],
+        "program_block_detail": "" if block is None else block[1],
+        "program_divergence": state.program_divergence or "",
+    }

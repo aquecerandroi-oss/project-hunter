@@ -158,7 +158,9 @@ class FakeContext:
     mode: FakeMode = field(default_factory=FakeMode)
     session_factory: Any = None
     journal: Any = None
-    state: ExecutorState = field(default_factory=ExecutorState)
+    state: ExecutorState = field(
+        default_factory=lambda: ExecutorState(program_identity_verified=True)
+    )
     launch: LaunchStats = field(default_factory=LaunchStats)
     event_exits: EventExitsStats = field(default_factory=EventExitsStats)
     treasury_inflow: FakeInflow = field(default_factory=FakeInflow)

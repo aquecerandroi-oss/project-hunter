@@ -88,6 +88,7 @@ class MemeSubmitter:
         bundle_sender: BundleSender | None = None,
         sleep: Callable[[float], None] = time.sleep,
         monotonic: Callable[[], float] = time.monotonic,
+        pre_sign_gate: Callable[[], str | None] | None = None,
     ) -> None:
         if policy.jito_bundle and bundle_sender is None:
             raise ValueError("jito_bundle=True needs a bundle_sender")
@@ -101,6 +102,7 @@ class MemeSubmitter:
         self._bundles = bundle_sender
         self._sleep = sleep
         self._monotonic = monotonic
+        self._pre_sign_gate = pre_sign_gate
 
     # ---------------------------------------------------------------- submit
     def submit(self, approval: ApprovedSubmission) -> SubmitResult:
@@ -141,6 +143,11 @@ class MemeSubmitter:
             raise MemeLiveTradingDisabled("allow_send is false: simulated only, nothing signed")
         if self._signer is None:
             return self._fail(pid, "secret_key_missing")
+        # T4.8f: the last point where nothing is signed yet — after the verifier and a simulation
+        # that may have taken seconds. An entry passes a gate (kill switch, program identity);
+        # exits are built without one. Its reason is the refusal reason, verbatim.
+        if self._pre_sign_gate is not None and (blocked := self._pre_sign_gate()) is not None:
+            return self._fail(pid, blocked)
         signature_bytes = self._signer.sign(approval.message)
         signature = b58encode(signature_bytes)
         transaction = _serialize(signature_bytes, approval.message)

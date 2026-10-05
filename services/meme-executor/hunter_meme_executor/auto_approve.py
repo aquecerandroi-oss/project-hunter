@@ -275,8 +275,8 @@ async def auto_approve_once(ctx: ExecutorContext, *, now: datetime) -> list[str]
     if ctx.kill.blocks_entries:
         skip("kill_switch", len(candidates))
         return []
-    if state.program_divergence is not None:
-        skip("program_upgraded", len(candidates))
+    if (block := state.program_block) is not None:  # T4.8b/T4.8f
+        skip(block[0], len(candidates))
         return []
     if scope.exhausted is not None:
         skip(f"scope_exhausted:{scope.exhausted}", len(candidates))
