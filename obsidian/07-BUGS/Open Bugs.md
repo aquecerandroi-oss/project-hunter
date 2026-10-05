@@ -12,6 +12,21 @@ closed: ""
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Upgrade de 02/10 (pump, PumpSwap, taxas) — executor em laço de reinício e decodificadores de evento quebrados (05/10)
+
+**ALTA (dinheiro real latente; dados de pesquisa já afetados).** Em 02/10, em 32 s, foram reimplantados a PumpSwap (15:47:07Z), o pump `6EF8…` (slot 452654932, 15:47:21Z) e o programa de taxas `pfeeUx…` (15:47:39Z). Quando a VPS voltou (05/10 14:35Z), o `meme-executor` passou a recusar o boot com `program_upgraded` (guarda da T4.8b, funcionando como devia).
+- **Builders intactos:** paridade byte a byte de `buy`/`sell` com trades reais posteriores ao deploy; `Global` e `FeeConfig` idênticos; IDL não republicada.
+- **`TradeEvent` +8 B** (`u64` sem nome): `decode_trade_event` recusa 22 de 22 eventos reais; `decode_fills` levanta exceção (o fill ficaria `fill_decode_failed`); `trade_events_from_logs` devolve vazio **em silêncio** — as pistas `event_gate`/`launch_lane` do meme-worker e `event_exits` estão sem trades vindos de logs desde 02/10 15:47Z, sem marca de lacuna.
+- **`SellEvent` da PumpSwap:** 49 B sobrando (41 declarados na IDL do GitHub + 8 sem nome); `decode_pumpswap_fills` levanta exceção antes do fallback pelo delta. Início desconhecido (só havia teste sintético).
+- **Estado em 05/10:** 0 posições abertas (meme e `spot/1`), 0 ordens `submitted_unconfirmed`, mesas pausadas. **Não mover o pino** antes da T4.8e (checklist da T4.8d, passo 4). Enquanto isso o executor fica fora: sem checagem de holdings nem heartbeat (aceitável com 0 posições).
+- **T4.8e (em curso, 05/10):** cauda conhecida aceita depois dos campos variáveis; SellEvent consertado; contador e `mark_gap` no meme-worker; fixtures `t48e_*`; simulação na mainnet; teste envio → falha de decode → reinício → fechamento único; só então o pino. Desenho à parte: guarda escopado às pistas pump, com PumpSwap e `pfeeUx` no detector.
+- Avaliar a cobertura das EXP da pista de eventos de 02/10 15:47Z até o deploy do conserto (acréscimo datado).
+Revisão: [[T4.8e-upgrade-02-10]].
+
+## A VPS travou em 04/10 ~09:15Z e ficou ~29 h fora (05/10)
+
+**HIGH (operação).** O journal do boot anterior termina em 04/10 11:15 CEST (09:15Z) sem OOM, pane ou "hung task"; último sinal do Lab 04/10 09:15:03Z; reinício em 05/10 14:35Z com kernel novo (6.8.0-142). Nenhuma posição aberta no período (mesas pausadas); backups de 02, 03 e 04/10 íntegros. Causa provável do lado do provedor — **não confirmada**. O scanner já tinha parado de gravar em 02/10 10:12Z, antes do travamento (diagnóstico em curso, [[Scanner-lag-2026-10-01]]). Falta: alarme externo de "VPS fora do ar" (hoje ninguém fica sabendo até alguém olhar). Diário: [[2026-10-05]].
+
 ## `scanner-worker` não persiste nada desde 30/09 ~13:36Z e vira 2 h de lag no stream (01/10)
 
 **`scanner-worker` não persiste nada desde 30/09 ~13:36Z e vira 2 h de lag no stream (achado em 01/10).** `flush_batch` falha em ~100 % dos ciclos com `uq_anomalies_active_per_market_type` (`writers.write_anomalies` só trata conflito em `id`). A memória esquece o id da anomalia antes do commit (`collect.py:85`, `watchdog.py:115`) e o lote que falha é descartado (`runners.py:121`); o par `(mercado, tipo)` fica com a linha X ativa no banco e o scanner tenta abrir Y — veto permanente do lote inteiro e dos ACKs. O PEL (17 mil) é reclaimado pelo próprio consumidor antes de cada leitura nova (`hunter_core/events/consume.py`), reentregando ~88× o volume e saturando um núcleo. `/ready` e o heartbeat continuam verdes. Gatilho do primeiro erro não identificado (logs rotacionados). Mitigação: `supersede_orphan_anomalies` em `writers.py` (aguarda deploy). Aberto: reter o lote em falha e serializar watchdog × avaliação; limitar o reclaim; alarme de `last_commit_at`. Dono: `services/scanner-worker`, `packages/core`. Nota: [[Scanner-lag-2026-10-01]].
