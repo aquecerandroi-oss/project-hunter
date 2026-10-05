@@ -17,7 +17,7 @@
 
 - **origem:** pedido do Everton (05/10/2026: "começamos a seguir quem faz dinheiro de verdade"). R57/[[KB-0136-carteiras-vencedoras-nao-sao-gatilho]]: vencedores persistem (ρ ≈ 0,6), mas o lucro é velocidade e pacote, e copiar 3 s depois dá 1,01× (R +0,03 contra −0,04 do controle, IC do Δ [−0,06; +0,21]). A fita cobria 5 % dos mints, com 26 s de atraso. [[KB-0142-kol-e-call-antecipam-ou-confirmam]] mostrou que o selo KOL chega no pico. Síntese: [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]]. Esta hipótese **não reabre** a R57 com outro nome. Ela traz **medida nova** (ranking por PnL copiável, simulado com o nosso atraso medido, em vez do PnL deles; entidade em vez de carteira; filtro de posse; saída espelhando a venda) **e população nova** (o programa inteiro, para frente, com cobertura por slot), que é o que a regra 1 da Fila exige para uma ideia voltar. **Família de tentativas "quem está comprando"** (todas fracassadas ou não confirmadas): R57 (seguir top-30), R61 (KOL), E2-b/EXP-M9 (pedigree, maior comprador), H-010 (concentração do maior comprador), H-014 (rede de financiamento), H-015 (bundle do slot da criação, REFUTA). Esta é a 7.ª; o leitor deve descontar por isso.
 - **variável:** `followed(e, D)`, que diz se a entidade *e* está entre as 30 maiores por **C-PnL** no retrato do dia D. C-PnL é a soma, na janela de 7 dias até `T_D` = D 00:00 UTC, do resultado líquido da **mesma política de cópia** descrita abaixo, aplicada a cada compra-gatilho de *e*. Só entram cópias cujo desfecho completo terminou antes de `T_D`, com todos os eventos `received_at` < `T_D`. Para ser elegível, a entidade precisa ter, todos ao mesmo tempo:
-  - **E-PnL ≥ +2 SOL**, onde E-PnL = W-PnL realizado mais a variação do valor de liquidação do inventário aberto entre o início e o fim da janela; a marcação na última cotação nunca entra;
+  - **E-PnL ≥ +2 SOL**, onde E-PnL = caixa casado da janela + valor de liquidação do inventário no fim − no início (errata de 05/10, onda 1c: a mesma avaliação em toda fronteira; 0 sem estado válido no fim; lote preservado sem estado válido no início deixa o episódio incompleto); a marcação na última cotação nunca entra;
   - ≥ 20 episódios não neutros, em ≥ 15 mints e em ≥ 4 de 7 dias;
   - dias com E-PnL > 0 ≥ 4/7;
   - queda máxima do E-PnL acumulado ≤ max(1 SOL; 50 % do E-PnL);
@@ -49,7 +49,7 @@
     - sem o 1 % maior das apostas, a média é > 0;
     - sem a entidade de maior contribuição, a média é > 0;
     - apostas contaminadas (lacuna no intervalo) ≤ 2 %, e H1 se mantém com as contaminadas a R = −1;
-    - censuradas (migração sem pool decodificável) ≤ 5 %, já entrando no primário a R = −1;
+    - censuradas (migração sem pool decodificável) ≤ 5 %, já entrando no primário a R = −1 — uma imputação pré-registrada, não um limite inferior (a perda total é R = −2) — **e** H1 se mantém com as censuradas a R = −2;
     - com só as ligações fortes, a média é > 0;
     - com rede a 100 000 lamports por perna, a média é > 0.
   - **Previsão honesta (registrada):** **NÃO CONFIRMA**. Ponto previsto para H1 ≈ −0,03 R e para H2 ≈ +0,02 R, porque a fresta da R57 era cauda e a mediana era negativa. **Potência declarada:** SD a priori de 1,2 R (R57; não medido aqui). Com independência, 2 000 apostas detectam ≈ 0,075 R e 4 500 detectam 0,05 R (α unilateral 0,025, 80 %). O cluster em duas vias piora as duas contas, e por isso NÃO CONFIRMA é o desfecho esperado mesmo se o efeito existir.

@@ -43,10 +43,16 @@ inteiros e `Decimal`. São três medidas, **que não se misturam**:
    vendidos na janela. Desconta as taxas que o evento declara e 5 000 lamports por tx. Um lote comprado antes da
    janela vale **se** o custo estiver preservado em `meme_wallet_lots` (§2.2). Sem custo conhecido, o episódio fica
    **incompleto**: não ganha custo zero nem some.
-2. **E-PnL econômico (elegibilidade).** É o W-PnL **mais a variação do valor de liquidação do inventário aberto**
-   entre o início e o fim da janela. Liquidação = venda simulada da quantidade inteira contra as reservas válidas no
-   corte (§3.1), com o teto de SOL real da curva aplicado. Um mint sem estado válido vale **0**. Como é variação
-   entre duas fotos, a perda de um saco entra **uma vez** e não volta a ser descontada quando a venda real acontece.
+2. **E-PnL econômico (elegibilidade).** *(Errata de 05/10, onda 1c, revisão da Astra `wallets-engine`.)* É o
+   **caixa casado da janela mais o valor de liquidação do inventário no fim menos o do início**:
+   E = Σ vendas casadas − Σ compras + V(fim) − V(início). Lido como "W-PnL FIFO + variação da liquidação", um saco
+   comprado por 1 que vale 0,2 daria +0,2. A fórmula acima equivale ao realizado contra a base "custo, se comprado na
+   janela; liquidação no início, se já estava aberto". Liquidação = venda simulada da quantidade inteira contra as
+   reservas válidas na fronteira (§3.1), com o teto de SOL real aplicado, e a **mesma regra vale em toda fronteira**,
+   de modo que os dias somam a janela. Um mint sem estado válido vale **0** no fim; no **início**, um lote preservado
+   sem estado válido deixa o episódio **incompleto**, porque 0 ali transformaria a venda posterior em ganho puro.
+   Como é variação entre duas fotos, a perda de um saco entra **uma vez** e não volta a ser descontada quando a venda
+   real acontece.
    A marcação na última cotação **nunca** entra. O inventário é o líquido *negociado*: transferências não são swaps.
    Uma venda sem compra observada fica `unmatched` e fora. Se mais de 20 % dos tokens vendidos pela entidade forem
    `unmatched`, a **contabilidade é incompleta** e a entidade não é elegível.
@@ -184,8 +190,9 @@ execução, mas não prova que o sistema executa. Isso é a onda 5.
   0 mostrar que isso ocorre nas pools apostadas, o pouso exige o estado da conta (`getAccountInfo` no slot não existe
   historicamente) ou a aposta fica **censurada**.
 - **Migração (curva completa):** a cotação da curva deixa de ser executável. A posição segue no pool **decodificado**.
-  Sem evento decodificável do pool, a aposta é **censurada** e entra no primário com **R = −1** (limite inferior), com
-  sensibilidade no primeiro preço do pool.
+  Sem evento decodificável do pool, a aposta é **censurada** e entra no primário com **R = −1**. Isso é uma
+  **imputação pré-registrada, não um limite inferior**: a perda total da ficha é R = −2. Sensibilidades: o primeiro
+  preço do pool, e as censuradas a **R = −2** (o CONFIRMA também tem de se manter assim).
 - `quote_buy`/`quote_sell` (`hunter_indicators.meme.curve`) só são reutilizados com **o teto de SOL real sempre
   passado** (`curve.py:292` permite omiti-lo). A PumpSwap ganha cotação própria. O `net_proceeds` do `SellEvent`
   (`sell_event.py:94`) já é líquido de taxa, então **não** se desconta de novo. Fixtures reais provam semântica,

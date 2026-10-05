@@ -97,3 +97,30 @@ passed**.
 
 [[carteiras-lucro-design]] · [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]] ·
 [[2026-10-05-seguir-carteiras-lucrativas-aprovado]] · [[EXP-M15-carteiras-vencedoras]] · [[Revisoes-Astra/Index|índice]]
+
+## Revisão de código (code-reviewer, 05/10): REQUEST_CHANGES, todos os itens aplicados
+
+Os testes passaram de 81 para 98. Os testes novos que passaram de primeira cobrem comportamento que já estava certo. Para
+provar que têm dentes, rodei uma verificação de mutação: quebrei o código num ponto de cada vez e conferi que o teste
+falhava, e depois o arquivo voltou ao original. **15 de 15 mutantes foram mortos.**
+
+| # | Achado | O que mudou |
+|---|---|---|
+| 1 (HIGH) | `build_snapshot` não filtrava `opening_lots` por tempo. Um lote aberto depois do corte vazava (o próprio `ranker_leaks` acusava), e um lote aberto dentro da janela entrava duas vezes: o E-PnL ia de 6,299 para 7,069 SOL | Só entram lotes com `opened_at` < início da janela. `strip_future` segue o mesmo corte, e `_future()` ganhou um lote futuro e um lote dentro da janela |
+| 2 | Lote preservado sem estado válido no início valia 0 em V(início): a venda de um mint morto por 2 SOL contava +2 SOL sem custo | O episódio fica **incompleto** (`pricing.liquidation_or_none`). A errata do desenho e do PREREG diz isso |
+| 3 | Faltavam testes com dentes | Cobertos: financiador conhecido depois do corte; `trades_previous_day` só do último dia; horizonte `settle_seconds`; mediana ponderada com 3 peças; sinal de `pre_trade_real_sol`. Também: `positive_days` estrito, `h2_supported` com ≥, neutro estrito, piso entrada + 1 do pouso, stop com ≤, stop fora do slot de entrada, lotes por `ents.of`, `causal_view` checando `block_time` |
+| 4 | Agrupamento quadrático | Uma passada por mint e por entidade. `TriggerLedger` registra no lugar, com visão só de leitura, sem cópia por decisão. Episódios excluídos indexados por mint. Liquidação memorizada por fronteira. Sintético (`week()` replicado, não é medição de mercado): **32 004 fills em 6,3 s e 64 008 em 11,5 s**, antes 8,4 s e 26,0 s nesta máquina. O crescimento ficou linear, mas a constante (cotações em `Decimal`) não chega à população de 3–4 M fills/dia sem trabalho na onda 3 |
+| 5 | Contaminação de episódio por lacuna (§2) não existia | `Episode.contaminated`: fechado = [abertura, fechamento]; aberto = até a última lacuna. `window_books(gaps=…)` e `EntityMetrics.contaminated_episodes`. Fica contado, não excluído (o §4 do desenho não manda excluir) |
+| 6 | PREREG e desenho desalinhados da errata | O §1 item 2 e o §3.1 do desenho e o bloco H-030 do PREREG agora trazem a errata do E-PnL e R = −1 como imputação (a perda total é R = −2). O CONFIRMA também exige que H1 se mantenha com as censuradas a R = −2 |
+| 7 | Criação duplicada | Fica o `CreateEvent` recebido mais cedo |
+
+### Para a onda 3 (itens LOW opcionais da revisão, não feitos aqui)
+
+- Motivos que consomem a "primeira compra": hoje `late_event`, `own_mint`, `create_block` e os tetos consomem, e
+  `below_min` não. Revisar se é a leitura desejada.
+- `mint_cooldown` é global no braço e por entidade no C-PnL. Decidir se o C-PnL também deve ser global.
+- As `FeatureDefinition` (`params.py`) ainda não têm consumidor.
+- `snapshot_id` = dia + hash dos parâmetros pode colidir se o código mudar sem mudar os parâmetros. Incluir o
+  `code_version`.
+- Falta validar UTC em `CreateEvent` e `Link`.
+- Falta um ajudante para `timedelta(seconds=float(decision_seconds))`, que se repete.
