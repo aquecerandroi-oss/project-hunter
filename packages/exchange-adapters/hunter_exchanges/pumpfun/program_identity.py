@@ -40,6 +40,16 @@ and ``TradeEvent`` were, for the third time, proven unchanged (18 / 16 accounts,
 program and against a mainnet simulation of our own bytes. Only
 :attr:`ProgramExpectation.last_deploy_slot` moves this time: the hash of T4.8c and
 of T4.8d are the same string on purpose.
+
+Lesson of 2026-10-02 (T4.8e/T4.8f, ``obsidian/06-DECISIONS/Revisoes-Astra/T4.8e-decoders.md``): a
+**fourth** deploy — PumpSwap (15:47:07Z), the pump program (slot 452654932, 15:47:21Z) and the
+fee program (15:47:39Z) within 32 s — and the IDL account was untouched **a third time** (same
+base64 as T4.8c's, read at slot 453633942). ``buy``/``sell`` of the pump program were again
+byte-identical to real post-upgrade trades, but the *events* grew (``TradeEvent`` +8 bytes,
+PumpSwap ``SellEvent`` +49) and PumpSwap's ``sell`` began to demand three remaining accounts
+(``pool_v2``, a buyback recipient and its WSOL ATA; ``6062`` without them) — found only by
+simulating our own bytes. Only :attr:`ProgramExpectation.last_deploy_slot` moves; PumpSwap and
+the fee program are watched by ``program_watch.WATCHED_PROGRAMS``.
 """
 
 from __future__ import annotations
@@ -84,7 +94,7 @@ _IDL_ACCOUNT_DISCRIMINATOR = bytes.fromhex("184662bf3a907b9e")
 the same 8 bytes head the pump program's IDL account on chain (``t48b_rpc_idl_account_raw``)."""
 _PROGRAMDATA_TAG = 3
 _PROGRAMDATA_HEADER_LEN = 45
-UPGRADE_MESSAGE = "programa mudou: regravar T4.8e"
+UPGRADE_MESSAGE = "programa mudou: regravar T4.8g"
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +119,7 @@ the IDL account still predated *that* upgrade) and ``t48b_rpc_programdata_raw.js
 (deploy slot 446462760 = 2026-09-12 15:24:04 UTC, ``t48b_rpc_deploy_block_time_raw``).
 Reachable through :data:`PUMP_PROGRAM_HISTORY`."""
 
-PREVIOUS_PUMP_PROGRAM = ProgramExpectation(
+_T48C_PUMP_PROGRAM = ProgramExpectation(
     idl_sha256="c7ca9566370b9351df9472adb7667dcc77695c49d0b1cc21b953f77567e2dc12",
     last_deploy_slot=447228373,
     captured_at="2026-09-15T19:53:52Z",
@@ -119,11 +129,10 @@ PREVIOUS_PUMP_PROGRAM = ProgramExpectation(
 the IDL account *was* republished that time, matching the count T4.14 read from
 GitHub's "main") and ``t48c_rpc_programdata_raw.json`` (deploy slot 447228373 =
 2026-09-15 10:34:32 UTC / 07:34:32 BRT, ``t48c_rpc_deploy_block_time_raw`` — also
-the value the plantão's run 19 read independently, KB-0096). Kept for history —
-:func:`program_divergence` only compares against the current
-:data:`EXPECTED_PUMP_PROGRAM`."""
+the value the plantão's run 19 read independently, KB-0096). Reachable through
+:data:`PUMP_PROGRAM_HISTORY`."""
 
-EXPECTED_PUMP_PROGRAM = ProgramExpectation(
+PREVIOUS_PUMP_PROGRAM = ProgramExpectation(
     idl_sha256="c7ca9566370b9351df9472adb7667dcc77695c49d0b1cc21b953f77567e2dc12",
     last_deploy_slot=449734335,
     captured_at="2026-09-23T17:37:58Z",
@@ -139,16 +148,41 @@ The upgrade authority (``6348fb82…``) did not change. What *was* re-proven, si
 unchanged IDL proves nothing about the bytecode: byte-for-byte parity of ``buy`` /
 ``sell`` / ``TradeEvent`` with third-party trades that landed on this program
 (``test_pumpfun_tx_parity_t48d.py``) and a mainnet simulation of our own bytes
-(``t48d_simulation_proof_mainnet_raw.json``)."""
+(``t48d_simulation_proof_mainnet_raw.json``). Kept for history —
+:func:`program_divergence` only compares against the current
+:data:`EXPECTED_PUMP_PROGRAM`."""
+
+EXPECTED_PUMP_PROGRAM = ProgramExpectation(
+    idl_sha256="c7ca9566370b9351df9472adb7667dcc77695c49d0b1cc21b953f77567e2dc12",
+    last_deploy_slot=452654932,
+    captured_at="2026-10-05T16:33:02Z",
+    task="T4.8f",
+)
+"""``t48f_rpc_programdata_pump_raw.json`` (deploy slot 452654932 = 2026-10-02 15:47:21 UTC,
+``t48f_rpc_deploy_block_times.json``) and the IDL account — whose bytes are, to the byte, T4.8c's
+for the **third** time (read at slot 453633942): the hash is the same string as T4.8c's and
+T4.8d's on purpose and the slot is the only field that moved. The upgrade authority
+(``6348fb82…``) did not change. Re-proven because an unchanged IDL proves nothing about the
+bytecode: byte parity of the pump ``buy``/``sell`` with real post-upgrade trades
+(``t48e_*``, executed by ``test_pumpfun_tx_parity_t48f.py``) and a mainnet simulation of our own bytes (never sent): curve buys and sells
+(classic, holder-reward and cashback coins) and our PumpSwap ``sell``, all ``err: null`` with
+events decoded. ``unexplained_lamports == 0`` on every one except the cashback **buy**, whose
+residual is exactly the 1 513 840-lamport ATA rent of a wallet that had none (a simulation has no
+inner instructions to name it). A PumpSwap **cashback** ``sell`` (``pool_v2`` plus the accumulator
+pair) is proven both ways: two real post-upgrade sells reproduced account for account
+(``test_pumpswap_tx_t48f.py``) and our own bytes simulated on a migrated cashback pool, ``err: null``;
+a wallet that never traded on PumpSwap pays the accumulator's 1 346 200-lamport rent on its first
+such sell, named ``cashback_init_lamports`` (``unexplained`` stays 0)."""
 
 PUMP_PROGRAM_HISTORY: tuple[ProgramExpectation, ...] = (
     _T48B_PUMP_PROGRAM,
+    _T48C_PUMP_PROGRAM,
     PREVIOUS_PUMP_PROGRAM,
     EXPECTED_PUMP_PROGRAM,
 )
 """Every deploy this package has been proven against, oldest first — for docs
-and tests that want to show the program has moved more than once. Three deploys
-in twelve days; two of them left the IDL account untouched."""
+and tests that want to show the program has moved more than once. Four deploys
+in three weeks; three of them left the IDL account untouched."""
 
 
 @dataclass(frozen=True, slots=True)

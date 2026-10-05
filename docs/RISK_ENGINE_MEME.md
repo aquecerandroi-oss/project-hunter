@@ -1128,7 +1128,7 @@ assume:
 > reconciliação → fechamento único e só então o pino — checklist em
 > `obsidian/06-DECISIONS/Revisoes-Astra/T4.8e-decoders.md`.
 >
-> **T4.8f (05/10/2026, o pino continua T4.8d):** a simulação mainnet dos nossos próprios bytes achou a venda
+> **T4.8f (05/10/2026; o pino foi movido para a T4.8f na mesma noite, depois do deploy só-saídas — entradas pump/launch seguem presas apenas pelo escopo esgotado `small_test_below_min` e pela `launch_lane` desligada; subir o escopo exige o teste Postgres de fechamento único verde, com variante PumpSwap, e a decisão do Everton sobre compras cashback; revisão `obsidian/06-DECISIONS/Revisoes-Astra/t48f-pin-move.md`):** a simulação mainnet dos nossos próprios bytes achou a venda
 > PumpSwap recusada (`Custom 6062 InvalidPoolV2`): desde o redeploy de 02/10 o `sell` exige *remaining accounts*
 > — `pool_v2` (PDA `["pool-v2", base_mint]`, só se o pool tem coin creator), um `buyback_fee_recipient` de
 > `GlobalConfig.buyback_fee_recipients` e o ATA dele; em pool cashback o acumulador de volume vai antes (layout provado

@@ -2,9 +2,9 @@
 in live mode and a logged, heartbeat-visible state in inert mode; at runtime the
 deploy slot alone flips the state. No signer is involved in any branch.
 
-Fixtures refreshed to T4.8d (2026-09-23, the program's third deploy, slot
-449734335) — ``EXPECTED_PUMP_PROGRAM`` moved from T4.8c's values. That deploy left
-the IDL account untouched, so only the deploy slot separates the two."""
+Fixtures refreshed to T4.8f (2026-10-02 deploy, slot 452654932, read 2026-10-05) —
+``EXPECTED_PUMP_PROGRAM`` moved from T4.8d's values. That deploy left the IDL account untouched
+(a third time), so only the deploy slot separates them."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ class FakeRpc:
         if params[0] == pump_idl_account_address():
             return _fixture("t48d_rpc_idl_account_raw.json")["result"]
         if params[0] == pump_programdata_address():
-            result = _fixture("t48d_rpc_programdata_raw.json")["result"]
+            result = _fixture("t48f_rpc_programdata_pump_raw.json")["result"]
             header = struct.pack("<IQ", 3, self.deploy_slot) + b"\x01" + b"\x00" * 32
             value = {**result["value"], "data": [base64.b64encode(header).decode(), "base64"]}
             return {**result, "value": value}
