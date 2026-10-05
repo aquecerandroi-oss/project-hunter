@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from hunter_meme_worker.lab_heartbeat import percentile
+from hunter_meme_worker.logs_trades import LostTrades
 
 __all__ = ["EventGateStats", "heartbeat_fields"]
 
@@ -93,6 +94,9 @@ class EventGateStats:
     (``ConnectionError``/``TimeoutError``/``OSError``) inside
     ``subscribe_at_create`` — counted and degraded to the periodic sync
     picking the mint up instead, never a crash of the discovery task."""
+    lost_trades: LostTrades = field(default_factory=LostTrades)
+    """T4.8e: ``TradeEvent`` log lines that could not be decoded — each marked a coverage gap
+    on its mint (``logs_trades``), counted here and published on the heartbeat."""
     _subscribe_at_create_failed_last_logged_at: datetime | None = field(
         default=None, repr=False, compare=False
     )
@@ -229,6 +233,7 @@ def heartbeat_fields(
         "create_to_subscribe_ms_p95": "" if subscribe_p95 is None else str(subscribe_p95),
         "early_retention_unknown_share_60s": unknown_share,
     }
+    fields.update(stats.lost_trades.heartbeat_fields(now))
     for key, value in (cache_sizes or {}).items():
         fields[f"cache_{key}"] = str(value)
     return {HEARTBEAT_PREFIX + key: value for key, value in fields.items()}

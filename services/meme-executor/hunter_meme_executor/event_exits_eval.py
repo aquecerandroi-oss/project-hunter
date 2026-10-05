@@ -25,7 +25,7 @@ from hunter_exchanges.pumpfun.curve import TOKEN_SUBUNITS_PER_TOKEN
 from hunter_exchanges.pumpfun.decode import NATIVE_SOL_QUOTE_MINT, decode_bonding_curve_account
 from hunter_exchanges.pumpfun.quote import CurveReserves
 from hunter_exchanges.pumpfun.rpc_ws_models import AccountNotification, LogsNotification
-from hunter_exchanges.pumpfun.trade_event import trade_events_from_logs
+from hunter_exchanges.pumpfun.trade_event import scan_trade_event_logs
 from hunter_meme_executor.build import reserves_of_account
 from hunter_meme_executor.event_exits_runtime import EventExitsRuntime, Watched
 from hunter_meme_executor.exit_common import LAMPORTS, exit_params, mark_sol
@@ -256,7 +256,20 @@ async def _on_logs(rt: EventExitsRuntime, notif: LogsNotification, now: datetime
     # Only this curve's own events: a bot's bundle can mention several curves in
     # one transaction, and another mint's ``TradeEvent`` is neither this
     # position's reserves nor its creator's sell.
-    events = [e for e in trade_events_from_logs(notif.logs) if e.mint == w.position.mint]
+    scan = scan_trade_event_logs(notif.logs)
+    if scan.lost:  # T4.8e: a TradeEvent we cannot read is lost data, not "no trade"
+        if rt.stats.record_undecodable(now, len(scan.undecodable), scan.undecodable[-1]):
+            logger.warning(
+                "meme_event_exit_trade_undecodable",
+                position_id=w.position.id,
+                mint=w.position.mint,
+                signature=notif.signature,
+                slot=notif.slot,
+                lost=len(scan.undecodable),
+                error=scan.undecodable[-1],
+                total=rt.stats.undecodable_trades_total,
+            )
+    events = [e for e in scan.events if e.mint == w.position.mint]
     if not events:
         return None
     rt.stats.record_update(now)

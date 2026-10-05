@@ -32,7 +32,6 @@ from hunter_exchanges.base import MalformedMessage
 from hunter_exchanges.pumpfun.curve import raw_lamports_to_sol, raw_subunits_to_tokens
 from hunter_exchanges.pumpfun.decode import decode_bonding_curve_account
 from hunter_exchanges.pumpfun.rpc_ws_models import AccountNotification, LogsNotification
-from hunter_exchanges.pumpfun.trade_event import normalized_curve_trade, trade_events_from_logs
 from hunter_meme_worker.event_gate_config import GATE_SHADOW
 from hunter_meme_worker.event_gate_rows import SERIES_EVENT, EventReserves, build_event_row
 from hunter_meme_worker.event_gate_trail import (
@@ -44,6 +43,7 @@ from hunter_meme_worker.event_gate_trail import (
     write_pending_trail,
 )
 from hunter_meme_worker.lab_fast import _trail_row  # pyright: ignore[reportPrivateUsage]
+from hunter_meme_worker.logs_trades import logs_trades
 from hunter_meme_worker.proposal_race import insert_proposals_reserved, reserve_all
 from hunter_meme_worker.proposals import evaluate_gate
 from hunter_meme_worker.repo import record_gap
@@ -98,10 +98,7 @@ def _handle_logs(rt: EventGateRuntime, notif: LogsNotification) -> str | None:
     state = rt.book.get(mint)
     if state is None or notif.err is not None:  # a failed instruction is not a fill
         return None
-    for event in trade_events_from_logs(notif.logs):
-        trade = normalized_curve_trade(
-            event, slot=notif.slot, signature=notif.signature, received_at=notif.received_at
-        )
+    for trade in logs_trades(rt.stats.lost_trades, state, notif, lane="event_gate", mint=mint):
         state.apply_trade(trade)
         rt.reserves[mint] = EventReserves(trade.virtual_sol_reserves, trade.virtual_token_reserves)
         rt.pullback.observe_trade(mint, trade)  # T4.91: O(1) unless this mint is armed

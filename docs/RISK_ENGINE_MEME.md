@@ -1106,6 +1106,27 @@ assume:
 > `real_sol_reserves = 1` — `Overflow`/6024, económico, idêntico com as duas PDAs e em três tamanhos).
 > Mitigação: `mayhem_policy_check` recusa toda entrada Mayhem hoje (`mayhem_policy_approved` nunca é
 > ligado em código de produção) e a simulação obrigatória da §9.2 continua a ser o guarda da saída.
+>
+> **T4.8e (05/10/2026, decodificadores; o pino NÃO se moveu):** em 02/10 (32 s, 15:47Z) a PumpSwap, o pump
+> (slot 452654932) e o programa de taxas foram reimplantados. Os builders continuam byte a byte iguais a
+> trades reais posteriores ao deploy, mas os **eventos** mudaram: o `TradeEvent` ganhou um `u64` sem nome
+> no fim (22 de 22 eventos reais; corpo de 382 B no `buy` e 383 B no `sell` — o tamanho varia com
+> `ix_name`/`shareholders`) e o `SellEvent` da PumpSwap ganhou 49 B (41 declarados na IDL do GitHub +
+> 8 sem nome; 4 de 4). Antes: `decode_fills` levantava exceção (uma compra ou venda real viraria
+> `fill_decode_failed`), `trade_events_from_logs` devolvia vazio **em silêncio** (as pistas `event_gate`,
+> `launch_lane` e `event_exits` ficaram cegas a trades desde 02/10 15:47Z) e `decode_pumpswap_fills`
+> levantava antes do fallback pelo delta do pagador que a docstring prometia. Agora:
+> `trade_event_codec.py` aceita só caudas de 0, 16 e 24 bytes **depois** dos campos variáveis (qualquer outro
+> comprimento continua recusado) e expõe a cauda em `TradeEvent.trailing_u64` — **reportada, nunca somada**
+> (semântica desconhecida; a verdade contábil continua o delta real do pagador, §9.6);
+> `sell_event.py` decodifica os 41 B declarados + a cauda de 8 e só aceita 0 ou 49; o fallback da PumpSwap
+> roda de verdade (`event_error` no fill); e `scan_trade_event_logs` separa "notificação sem `TradeEvent`"
+> de "`TradeEvent` indecodificável" — as pistas do meme-worker marcam `mark_gap` no mint, contam
+> (`*_undecodable_trades_*` no heartbeat) e logam; o `event_exits` do executor conta e loga. Fixtures
+> reais `t48e_*` (leitura só pública, 05/10, slot 453609715). **Aberto para a próxima rodada** (nada disto
+> reautoriza dinheiro): simulação mainnet dos nossos bytes, teste envio → falha de decode → reinício →
+> reconciliação → fechamento único e só então o pino — checklist em
+> `obsidian/06-DECISIONS/Revisoes-Astra/T4.8e-decoders.md`.
 
 > **T4.29c (16/09/2026):** as taxas deixaram de ser uma constante datada. `fee_config.py` decodifica
 > a conta `FeeConfig` do **programa de taxas** (`pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ`, PDA

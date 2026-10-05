@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 __all__ = ["EventExitsStats", "heartbeat_fields", "percentile"]
 
 UPDATES_WINDOW_S = 60
+UNDECODABLE_LOG_INTERVAL_S = 30
 _UPDATES_MAXLEN = 20_000
 _LATENCY_MAXLEN = 200
 
@@ -54,6 +55,11 @@ class EventExitsStats:
     """Sell tasks that raised (RPC, DB) — the tick retries; counted, never hidden."""
     third_party_sells_seen_total: int = 0
     """T4.67b: first third-party sells seen on watched launch curves."""
+    undecodable_trades_total: int = 0
+    """T4.8e: ``TradeEvent`` log lines of a watched curve that could not be decoded — a creator
+    sell or a third-party sell may have been among them; the account path keeps the mark."""
+    last_undecodable_error: str = ""
+    _undecodable_logged_at: datetime | None = field(default=None, repr=False)
 
     def record_update(self, now: datetime) -> None:
         self.updates.append(now)
@@ -86,6 +92,17 @@ class EventExitsStats:
     def record_third_party_sell(self) -> None:
         self.third_party_sells_seen_total += 1
 
+    def record_undecodable(self, now: datetime, count: int, error: str) -> bool:
+        """Counts every loss; returns whether *this one* should be logged — at most once
+        every ``UNDECODABLE_LOG_INTERVAL_S``, so a layout nobody knows never floods the logs."""
+        self.undecodable_trades_total += count
+        self.last_undecodable_error = error
+        last = self._undecodable_logged_at
+        if last is not None and (now - last).total_seconds() < UNDECODABLE_LOG_INTERVAL_S:
+            return False
+        self._undecodable_logged_at = now
+        return True
+
 
 def heartbeat_fields(stats: EventExitsStats, *, now: datetime, enabled: bool) -> dict[str, str]:
     """The ``event_exits_*`` fields of ``hb:meme:executor``. With the flag off
@@ -112,4 +129,6 @@ def heartbeat_fields(stats: EventExitsStats, *, now: datetime, enabled: bool) ->
         "event_exits_marks_written": str(stats.marks_written_total),
         "event_exits_sell_errors": str(stats.sell_errors_total),
         "event_exits_third_party_sells_seen": str(stats.third_party_sells_seen_total),
+        "event_exits_undecodable_trades": str(stats.undecodable_trades_total),
+        "event_exits_last_undecodable_error": stats.last_undecodable_error,
     }

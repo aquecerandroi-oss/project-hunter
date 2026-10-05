@@ -103,6 +103,7 @@ class FillRecord:
             "holder_rewards": e.holder_rewards,
             "holder_rewards_basis_points": e.holder_rewards_basis_points,
             "event_layout": e.layout,
+            "event_trailing_u64": e.trailing_u64,
             "network_fee_lamports": self.network_fee_lamports,
             "payer_delta_lamports": self.payer_delta_lamports,
             "unexplained_lamports": self.unexplained_lamports,

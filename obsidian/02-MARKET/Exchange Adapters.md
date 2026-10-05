@@ -72,6 +72,13 @@ Fixtures gravadas (JSON de REST e sequências WS) em `hunter_exchanges/testing/f
 
 Conexões privadas (chaves de usuário, trading real) são Fase 3+ e passam por `fetch_permissions()` antes de persistir — chave com `withdraw=true` é sempre rejeitada (ver [[Risk Engine]] e `docs/SECURITY.md`).
 
+### Eventos on-chain da pump.fun/PumpSwap (T4.8e, 05/10/2026)
+
+Os decodificadores de evento (`hunter_exchanges/pumpfun/trade_event_codec.py`, `pumpswap/sell_event.py`) validam a
+**cauda depois dos campos variáveis**, aceitam só os comprimentos vistos na cadeia e expõem a cauda sem nome
+(`trailing_u64`) sem somá-la; `scan_trade_event_logs` separa "sem `TradeEvent`" de "`TradeEvent` indecodificável".
+Contexto e checklist do pino em [[T4.8e-decoders]]; o incidente em [[Open Bugs]].
+
 ## Relacionadas
 
 [[Market Collector]] · [[WebSockets]] · [[System Overview]]

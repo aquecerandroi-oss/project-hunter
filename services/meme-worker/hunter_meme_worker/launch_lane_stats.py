@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from hunter_meme_worker.lab_heartbeat import percentile
+from hunter_meme_worker.logs_trades import LostTrades
 
 __all__ = ["LaunchLaneStats", "heartbeat_fields"]
 
@@ -39,6 +40,8 @@ class LaunchLaneStats:
     than opened at what is already the peak."""
     latency_ms: deque[int] = field(default_factory=lambda: deque(maxlen=LATENCY_SAMPLE))
     """``create_to_proposal_ms`` of every proposal this process wrote."""
+    lost_trades: LostTrades = field(default_factory=LostTrades)
+    """T4.8e: ``TradeEvent`` log lines that could not be decoded (a gap on the watch's tape)."""
 
     def record_create(self, now: datetime) -> None:
         self.creates_total += 1
@@ -75,5 +78,6 @@ def heartbeat_fields(stats: LaunchLaneStats, *, now: datetime, mode: str) -> dic
         "born_full_60s": str(stats.born_full_total),
         "create_to_proposal_ms_p50": "" if p50 is None else str(p50),
         "create_to_proposal_ms_p95": "" if p95 is None else str(p95),
+        **stats.lost_trades.heartbeat_fields(now),
     }
     return {HEARTBEAT_PREFIX + key: value for key, value in fields.items()}

@@ -1,38 +1,20 @@
-"""``TradeEvent`` — the fill, as the chain reports it (``docs/RISK_ENGINE_MEME.md`` §9.6).
+"""``TradeEvent`` — the fill, as the chain reports it (``docs/RISK_ENGINE_MEME.md`` §9.6): where
+it is read from a ``getTransaction`` result or a ``logsSubscribe`` notification.
 
-The pump program emits events through Anchor's ``#[event_cpi]``: a self-CPI
-whose instruction data is ``e445a52e51cb9a1d`` (the event-CPI tag) followed by
-the event's own 8-byte discriminator and its Borsh body. The same bytes also
-appear base64-encoded in ``meta.logMessages`` as ``Program data: …``. This
-module decodes the body field by field in the exact order of the official IDL
-(``docs/PUMPFUN-ONCHAIN.md`` §1.4; T4.8 checked the layout against a real
-mainnet sell, ``tests/fixtures/pumpfun/rpc_tx_probe_raw.json``: 359 bytes
-consumed of 359).
+The byte codec (``TradeEvent``, ``decode_trade_event``, the layouts of 2026-09-12 and
+2026-10-02) lives in ``trade_event_codec.py`` — split out in T4.8e for the file-size budget and
+re-exported here, which stays the import path.
 
-**Layout of 2026-09-12 (T4.8b).** The program deployed that afternoon (slot
-446462760) appends two ``u64`` — ``holder_rewards_bps``, ``holder_rewards`` — after
-``real_quote_reserves`` (375 bytes; real sell ``t48b_rpc_tx_sell_raw.json``, real
-router buy ``t48b_rpc_tx_buy_router_v2_raw.json``). They are fields of
-:class:`TradeEvent`; an event of the older 359-byte layout decodes with both at
-``0`` and ``layout`` naming it, so the pre-upgrade fixtures stay readable. Any
-other trailing length is refused: an unknown layout is not a fill.
-
-What a fill costs comes **from the event**, never from a constant:
-``fee`` (protocol, ``fee_basis_points``), ``creator_fee`` and — for cashback
-coins — ``cashback``, which the T4.8 balance reconciliation proved is also
-deducted from the trader's SOL (``user`` delta = ``sol_amount − fee − cashback
-− network fee − tip``, lamport-exact) even though ``creator_fee`` reads 0.
-``holder_rewards`` read ``0`` on every fill of 2026-09-12 (three sells, one buy);
-whether a non-zero value is a split of ``fee`` (as ``buyback_fee`` is) or one more
-deduction is **not** established, so it is reported and not summed — the
-executor's ledger uses the payer's real balance delta (``docs/RISK_ENGINE_MEME.md``
-§9.6) and names the gap to the event arithmetic.
+**Reading logs without going blind (T4.8e).** A ``Program data:`` line that starts with the
+``TradeEvent`` discriminator but cannot be decoded is *not* the same as a notification with no
+``TradeEvent`` at all (a non-trade instruction on the same PDA): the first is lost data, the
+second is normal. :func:`scan_trade_event_logs` reports both facts apart; the research lanes
+mark a coverage gap on the first. :func:`trade_events_from_logs` is the events-only view.
 """
 
 from __future__ import annotations
 
 import base64
-import struct
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -42,198 +24,33 @@ from typing import Any, cast
 from hunter_core.domain.types import utcnow
 from hunter_exchanges.pumpfun.curve import raw_lamports_to_sol, raw_subunits_to_tokens
 from hunter_exchanges.pumpfun.models import NormalizedCurveTrade
-from hunter_exchanges.pumpfun.solana_codec import b58decode, b58encode
+from hunter_exchanges.pumpfun.solana_codec import b58decode
+from hunter_exchanges.pumpfun.trade_event_codec import (
+    EVENT_CPI_TAG,
+    LAYOUT_HOLDER_REWARDS,
+    LAYOUT_PRE_HOLDER_REWARDS,
+    LAYOUT_TRAILING_U64,
+    TRADE_EVENT_DISCRIMINATOR,
+    TradeEvent,
+    decode_trade_event,
+)
 
 __all__ = [
     "EVENT_CPI_TAG",
     "LAYOUT_HOLDER_REWARDS",
     "LAYOUT_PRE_HOLDER_REWARDS",
+    "LAYOUT_TRAILING_U64",
     "TRADE_EVENT_DISCRIMINATOR",
     "TradeEvent",
+    "TradeLogScan",
     "decode_trade_event",
     "normalized_curve_trade",
+    "scan_trade_event_logs",
     "trade_events_from_logs",
     "trade_events_from_transaction",
 ]
 
-EVENT_CPI_TAG = bytes.fromhex("e445a52e51cb9a1d")
-TRADE_EVENT_DISCRIMINATOR = bytes.fromhex("bddb7fd34ee661ee")
 _LOG_PREFIX = "Program data: "
-LAYOUT_HOLDER_REWARDS = "2026-09-12/holder_rewards"
-"""34 fields, 375 bytes: the program deployed on 2026-09-12 (slot 446462760)."""
-LAYOUT_PRE_HOLDER_REWARDS = "pre-2026-09-12"
-"""32 fields, 359 bytes: the T4.8 fixtures (morning of 2026-09-12)."""
-_HOLDER_REWARDS_TAIL = 16
-
-
-@dataclass(frozen=True, slots=True)
-class TradeEvent:
-    mint: str
-    sol_amount: int
-    token_amount: int
-    is_buy: bool
-    user: str
-    timestamp: int
-    virtual_sol_reserves: int
-    virtual_token_reserves: int
-    real_sol_reserves: int
-    real_token_reserves: int
-    fee_recipient: str
-    fee_basis_points: int
-    fee: int
-    creator: str
-    creator_fee_basis_points: int
-    creator_fee: int
-    track_volume: bool
-    total_unclaimed_tokens: int
-    total_claimed_tokens: int
-    current_sol_volume: int
-    last_update_timestamp: int
-    ix_name: str
-    mayhem_mode: bool
-    cashback_fee_basis_points: int
-    cashback: int
-    buyback_fee_basis_points: int
-    buyback_fee: int
-    shareholders: tuple[tuple[str, int], ...]
-    quote_mint: str
-    quote_amount: int
-    virtual_quote_reserves: int
-    real_quote_reserves: int
-    holder_rewards_basis_points: int
-    """Appended by the program deployed on 2026-09-12 (``holder_rewards_bps``,
-    ``holder_rewards``: two ``u64``). ``0`` on every fill recorded that day and on
-    an event of the older layout (``layout`` says which). Not summed into the
-    trader's cost here: the wallet's real balance delta is the ledger's truth."""
-    holder_rewards: int
-    layout: str = LAYOUT_HOLDER_REWARDS
-
-    @property
-    def sol_deducted_from_user(self) -> int:
-        """Lamports the trader gives up beyond ``sol_amount``: protocol fee, creator fee
-        and cashback — all three leave the wallet (reconciled lamport-exact in T4.8)."""
-        return self.fee + self.creator_fee + self.cashback
-
-    @property
-    def buy_total_cost(self) -> int:
-        """A buy pays ``sol_amount`` into the curve plus every deduction."""
-        return self.sol_amount + self.sol_deducted_from_user
-
-    @property
-    def sell_net_proceeds(self) -> int:
-        """A sell receives ``sol_amount`` from the curve minus every deduction."""
-        return self.sol_amount - self.sol_deducted_from_user
-
-
-class _Reader:
-    def __init__(self, raw: bytes, offset: int) -> None:
-        self.raw = raw
-        self.off = offset
-
-    def take(self, n: int) -> bytes:
-        if self.off + n > len(self.raw):
-            raise ValueError("TradeEvent truncated")
-        chunk = self.raw[self.off : self.off + n]
-        self.off += n
-        return chunk
-
-    def pubkey(self) -> str:
-        return b58encode(self.take(32))
-
-    def u64(self) -> int:
-        return struct.unpack("<Q", self.take(8))[0]
-
-    def i64(self) -> int:
-        return struct.unpack("<q", self.take(8))[0]
-
-    def u32(self) -> int:
-        return struct.unpack("<I", self.take(4))[0]
-
-    def u16(self) -> int:
-        return struct.unpack("<H", self.take(2))[0]
-
-    def boolean(self) -> bool:
-        byte = self.take(1)[0]
-        if byte not in (0, 1):
-            raise ValueError("TradeEvent boolean is not 0/1")
-        return bool(byte)
-
-    def string(self) -> str:
-        return self.take(self.u32()).decode("utf-8")
-
-
-def decode_trade_event(raw: bytes) -> TradeEvent:
-    """Decode ``TradeEvent`` bytes. Accepts the body with or without the event-CPI tag."""
-    if raw[:8] == EVENT_CPI_TAG:
-        raw = raw[8:]
-    if raw[:8] != TRADE_EVENT_DISCRIMINATOR:
-        raise ValueError("not a TradeEvent (discriminator mismatch)")
-    r = _Reader(raw, 8)
-    mint = r.pubkey()
-    sol_amount = r.u64()
-    token_amount = r.u64()
-    is_buy = r.boolean()
-    user = r.pubkey()
-    timestamp = r.i64()
-    vsol, vtok, rsol, rtok = r.u64(), r.u64(), r.u64(), r.u64()
-    fee_recipient = r.pubkey()
-    fee_bps, fee = r.u64(), r.u64()
-    creator = r.pubkey()
-    creator_fee_bps, creator_fee = r.u64(), r.u64()
-    track_volume = r.boolean()
-    total_unclaimed, total_claimed, current_sol_volume = r.u64(), r.u64(), r.u64()
-    last_update = r.i64()
-    ix_name = r.string()
-    mayhem_mode = r.boolean()
-    cashback_bps, cashback, buyback_bps, buyback_fee = r.u64(), r.u64(), r.u64(), r.u64()
-    shareholders = tuple((r.pubkey(), r.u16()) for _ in range(r.u32()))
-    quote_mint = r.pubkey()
-    quote_amount, vquote, rquote = r.u64(), r.u64(), r.u64()
-    trailing = len(raw) - r.off
-    if trailing == _HOLDER_REWARDS_TAIL:
-        holder_rewards_bps, holder_rewards, layout = r.u64(), r.u64(), LAYOUT_HOLDER_REWARDS
-    elif trailing == 0:
-        # The layout the program emitted before its 2026-09-12 upgrade (T4.8 fixtures).
-        holder_rewards_bps, holder_rewards, layout = 0, 0, LAYOUT_PRE_HOLDER_REWARDS
-    else:
-        raise ValueError(f"TradeEvent has {trailing} trailing bytes")
-    return TradeEvent(
-        mint=mint,
-        sol_amount=sol_amount,
-        token_amount=token_amount,
-        is_buy=is_buy,
-        user=user,
-        timestamp=timestamp,
-        virtual_sol_reserves=vsol,
-        virtual_token_reserves=vtok,
-        real_sol_reserves=rsol,
-        real_token_reserves=rtok,
-        fee_recipient=fee_recipient,
-        fee_basis_points=fee_bps,
-        fee=fee,
-        creator=creator,
-        creator_fee_basis_points=creator_fee_bps,
-        creator_fee=creator_fee,
-        track_volume=track_volume,
-        total_unclaimed_tokens=total_unclaimed,
-        total_claimed_tokens=total_claimed,
-        current_sol_volume=current_sol_volume,
-        last_update_timestamp=last_update,
-        ix_name=ix_name,
-        mayhem_mode=mayhem_mode,
-        cashback_fee_basis_points=cashback_bps,
-        cashback=cashback,
-        buyback_fee_basis_points=buyback_bps,
-        buyback_fee=buyback_fee,
-        shareholders=shareholders,
-        quote_mint=quote_mint,
-        quote_amount=quote_amount,
-        virtual_quote_reserves=vquote,
-        real_quote_reserves=rquote,
-        holder_rewards_basis_points=holder_rewards_bps,
-        holder_rewards=holder_rewards,
-        layout=layout,
-    )
 
 
 def _obj(value: Any) -> dict[str, Any]:
@@ -287,19 +104,39 @@ def trade_events_from_transaction(
     return tuple(decode_trade_event(raw) for raw in _event_payloads(transaction, program_id))
 
 
-def trade_events_from_logs(lines: Sequence[str]) -> tuple[TradeEvent, ...]:
+@dataclass(frozen=True, slots=True)
+class TradeLogScan:
+    """What one sequence of log lines held: the decoded events and, apart, the reasons of the
+    ``TradeEvent``-shaped lines that could not be decoded (T4.8e)."""
+
+    events: tuple[TradeEvent, ...]
+    undecodable: tuple[str, ...] = ()
+    """One reason per line that carried the ``TradeEvent`` discriminator and failed to decode
+    (unknown trailing length, truncation, a boolean that is not 0/1...)."""
+
+    @property
+    def lost(self) -> bool:
+        """``True`` when at least one trade was on the wire and could not be read — the
+        caller's tape is incomplete and must say so (``mark_gap``), never carry on as if
+        the notification had simply held no trade."""
+        return bool(self.undecodable)
+
+
+def scan_trade_event_logs(lines: Sequence[str]) -> TradeLogScan:
     """Every ``TradeEvent`` in one sequence of log lines (T4.52b-1) — typically
-    a Solana RPC ``logsSubscribe`` notification's ``value.logs``.
+    a Solana RPC ``logsSubscribe`` notification's ``value.logs`` — with the lines that
+    looked like one and could not be decoded reported apart (T4.8e).
 
     Unlike :func:`trade_events_from_transaction`'s logs-only fallback, this
     does **not** filter by ``program_id``: the caller already scoped the
     subscription to one mint's bonding-curve PDA via ``mentions``, so any
-    ``TradeEvent``-shaped ``Program data:`` line here is that curve's. A line
-    that fails to decode (truncated, wrong discriminator, unknown trailing
-    length) is skipped, never raised — a notification with zero trade events
-    (a non-trade instruction on the same PDA) is a normal, empty result.
+    ``TradeEvent``-shaped ``Program data:`` line here is that curve's. A notification
+    with zero trade events (a non-trade instruction on the same PDA) is a normal, empty
+    scan; a line that is not valid base64 or does not start with the discriminator is
+    some other event and is not ours to count. Never raises.
     """
     events: list[TradeEvent] = []
+    undecodable: list[str] = []
     for line in lines:
         if not line.startswith(_LOG_PREFIX):
             continue
@@ -311,9 +148,15 @@ def trade_events_from_logs(lines: Sequence[str]) -> tuple[TradeEvent, ...]:
             continue
         try:
             events.append(decode_trade_event(data))
-        except ValueError:
-            continue
-    return tuple(events)
+        except ValueError as exc:
+            undecodable.append(str(exc))
+    return TradeLogScan(tuple(events), tuple(undecodable))
+
+
+def trade_events_from_logs(lines: Sequence[str]) -> tuple[TradeEvent, ...]:
+    """The events of :func:`scan_trade_event_logs`, nothing else: an undecodable line
+    is dropped here **silently** — callers that feed a tape or an exit must use the scan."""
+    return scan_trade_event_logs(lines).events
 
 
 def normalized_curve_trade(

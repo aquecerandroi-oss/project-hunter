@@ -16,7 +16,6 @@ from hunter_exchanges.base import ExchangeUnavailable, MalformedMessage
 from hunter_exchanges.pumpfun.decode import decode_bonding_curve_account
 from hunter_exchanges.pumpfun.pdas import bonding_curve_address
 from hunter_exchanges.pumpfun.rpc_ws_models import AccountNotification, LogsNotification
-from hunter_exchanges.pumpfun.trade_event import normalized_curve_trade, trade_events_from_logs
 from hunter_indicators.meme.launch_lane import reconstruct_initial_real_token_reserves
 from hunter_meme_worker.event_state import MintEventState
 from hunter_meme_worker.features_tape import TapeTrade
@@ -30,6 +29,7 @@ from hunter_meme_worker.launch_lane_config import (
 from hunter_meme_worker.launch_lane_entry import evaluate_create
 from hunter_meme_worker.launch_lane_pricing import born_full, entry_point, exit_trigger
 from hunter_meme_worker.launch_lane_runtime import LaunchWatch
+from hunter_meme_worker.logs_trades import logs_trades
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.rpc_ws_models import Notification
     from hunter_meme_worker.launch_lane_repo import LaunchRuleSpec
     from hunter_meme_worker.launch_lane_runtime import LaunchLaneRuntime
+    from hunter_meme_worker.logs_trades import LostTrades
     from hunter_meme_worker.proposals import ProposalDraft
 
 logger = get_logger(__name__)
@@ -62,14 +63,11 @@ def _tape_trade(trade: NormalizedCurveTrade) -> TapeTrade:
     )
 
 
-def _fold_logs(watch: LaunchWatch, notif: LogsNotification) -> TapeTrade | None:
+def _fold_logs(watch: LaunchWatch, notif: LogsNotification, lost: LostTrades) -> TapeTrade | None:
     if notif.err is not None:
         return None
     latest: TapeTrade | None = None
-    for event in trade_events_from_logs(notif.logs):
-        trade = normalized_curve_trade(
-            event, slot=notif.slot, signature=notif.signature, received_at=notif.received_at
-        )
+    for trade in logs_trades(lost, watch.state, notif, lane="launch_lane", mint=watch.mint):
         watch.state.apply_trade(trade)
         latest = _tape_trade(trade)
     return latest
@@ -185,7 +183,7 @@ async def apply_notification(rt: LaunchLaneRuntime, notif: Notification, now: da
         return
     latest_trade: TapeTrade | None = None
     if isinstance(notif, LogsNotification):
-        latest_trade = _fold_logs(rt.watches[mint], notif)
+        latest_trade = _fold_logs(rt.watches[mint], notif, rt.stats.lost_trades)
     elif isinstance(notif, AccountNotification):
         _fold_account(rt.watches[mint], notif)
     else:

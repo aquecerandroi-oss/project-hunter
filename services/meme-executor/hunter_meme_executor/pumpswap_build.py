@@ -52,6 +52,9 @@ class PumpSwapFillRecord:
     network_fee_lamports: int
     event: SellEvent | None = None
     payer_delta_lamports: int | None = None
+    event_error: str | None = None
+    """Why the ``SellEvent`` could not be decoded (T4.8e) — the record is then keyed on the
+    payer's delta alone and says so; ``None`` when the event decoded or there was none."""
 
     @property
     def sell_net_lamports(self) -> int:
@@ -74,6 +77,9 @@ class PumpSwapFillRecord:
             "protocol_fee": None if e is None else e.protocol_fee,
             "coin_creator_fee": None if e is None else e.coin_creator_fee,
             "user_quote_amount_out": None if e is None else e.user_quote_amount_out,
+            "event_layout": None if e is None else e.layout,
+            "event_trailing_u64": None if e is None else e.trailing_u64,
+            "event_error": self.event_error,
             "network_fee_lamports": self.network_fee_lamports,
             "payer_delta_lamports": self.payer_delta_lamports,
             "sell_net_lamports": self.sell_net_lamports,
@@ -95,14 +101,24 @@ def decode_pumpswap_fills(transaction: dict[str, Any]) -> list[PumpSwapFillRecor
     """``decode_fill`` for the submitter, PumpSwap edition. A landed
     transaction with no decodable ``SellEvent`` still yields one record keyed
     on the payer's balance delta — the WSOL unwrap makes that delta the
-    honest net proceeds even when the event itself cannot be parsed."""
+    honest net proceeds even when the event itself cannot be parsed. T4.8e: the
+    fallback really runs now — the decode error is caught and carried in
+    ``event_error`` (before, it escaped and a landed sell ended ``fill_decode_failed``).
+
+    Contract of the fallback: the caller hands over the transaction of **our own order**,
+    fetched by its recorded signature and routed by the order's venue (``exit_settle``) — a
+    landed transaction with balances is booked as a sale here, never an arbitrary one."""
     meta = cast(dict[str, Any], transaction.get("meta") or {})
     if meta.get("err") is not None:
         return []
     tx = cast(dict[str, Any], transaction.get("transaction") or {})
     signatures = cast(list[Any], tx.get("signatures") or [""])
     block_time = transaction.get("blockTime")
-    events = sell_events_from_transaction(transaction)
+    event_error: str | None = None
+    try:
+        events = sell_events_from_transaction(transaction)
+    except ValueError as exc:  # an unknown layout is not a fill — the payer's delta is
+        events, event_error = (), str(exc)
     delta = _payer_delta(meta)
     if not events and delta is None:
         return []
@@ -113,6 +129,7 @@ def decode_pumpswap_fills(transaction: dict[str, Any]) -> list[PumpSwapFillRecor
         network_fee_lamports=int(meta.get("fee") or 0),
         event=events[0] if events else None,
         payer_delta_lamports=delta,
+        event_error=event_error,
     )
     return [record]
 

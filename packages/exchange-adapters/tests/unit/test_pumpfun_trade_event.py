@@ -112,8 +112,8 @@ def test_the_2026_09_12_layout_appends_holder_rewards_and_nothing_else_is_tolera
     assert newer.sell_net_proceeds == older.sell_net_proceeds
     with pytest.raises(ValueError, match="8 trailing bytes"):
         decode_trade_event(raw + b"\x00" * 8)
-    with pytest.raises(ValueError, match="24 trailing bytes"):
-        decode_trade_event(raw + b"\x00" * 24)
+    with pytest.raises(ValueError, match="32 trailing bytes"):
+        decode_trade_event(raw + b"\x00" * 32)
 
 
 def test_a_real_sell_of_2026_09_12_decodes_the_holder_rewards_layout() -> None:

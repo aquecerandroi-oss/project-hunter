@@ -6,17 +6,26 @@ Anchor-wide constant, ``sha256("global:emit_cpi")[:8]`` — identical in every
 program using the feature, reused here rather than redefined). Discriminator
 and the 26-field layout are read from the same on-chain IDL ``decode.py``
 cites (all fixed-size fields — no strings or vectors, unlike the bonding
-curve's ``TradeEvent``). **Not yet checked against a real ``SellEvent``**: no
-wallet exists in this task to produce a real PumpSwap sell fill (see
-``.claude/state/notes-T4.29a.md`` "not proven"); the field order and sizes
-come only from the IDL.
+curve's ``TradeEvent``). T4.29a had **not** checked it against a real
+``SellEvent`` (``.claude/state/notes-T4.29a.md`` "not proven"); T4.8e did, with four real
+sells of 2026-10-05.
+
+**Layout of 2026-10-02 (T4.8e).** The PumpSwap program redeployed that day (slot 452654882,
+15:47:07Z) emits 49 bytes after those 26 fields: 41 declared by the GitHub IDL
+(``virtual_quote_reserves`` i128, ``can_boost`` bool, ``base_supply`` u64,
+``holder_rewards_bps`` u64, ``holder_rewards`` u64 — decoded as fields) and 8 named in no IDL
+(:attr:`SellEvent.trailing_u64`, reported, **never summed**: the money is
+``user_quote_amount_out`` and the payer's real balance delta). 4 of 4 real events (441-byte
+bodies) were refused before. The tail is validated after the last known field; the only
+trailing lengths accepted are 0 (the 26-field layout) and 49 — anything else, including the
+IDL's 41 without the unnamed 8, is refused (an unknown layout is not a fill).
 """
 
 from __future__ import annotations
 
 import struct
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, cast
 
 from hunter_exchanges.pumpfun.solana_codec import b58decode, b58encode
@@ -24,6 +33,8 @@ from hunter_exchanges.pumpfun.trade_event import EVENT_CPI_TAG
 from hunter_exchanges.pumpswap.decode import PUMPSWAP_PROGRAM_ID
 
 __all__ = [
+    "LAYOUT_IDL_26",
+    "LAYOUT_TRAILING_U64",
     "SELL_EVENT_DISCRIMINATOR",
     "SellEvent",
     "decode_sell_event",
@@ -31,6 +42,12 @@ __all__ = [
 ]
 
 SELL_EVENT_DISCRIMINATOR = bytes([62, 47, 55, 10, 165, 3, 220, 42])
+LAYOUT_IDL_26 = "idl-26-fields"
+"""The T4.29a layout: 26 fields, 392 bytes with the discriminator, nothing after."""
+LAYOUT_TRAILING_U64 = "2026-10-02/idl_extension_trailing_u64"
+"""26 fields + 41 declared bytes + one unnamed ``u64`` (441 bytes): the 2026-10-02 redeploy."""
+_IDL_EXTENSION = 41
+_UNNAMED_TAIL = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +79,17 @@ class SellEvent:
     cashback: int
     buyback_fee_basis_points: int
     buyback_fee: int
+    layout: str = LAYOUT_IDL_26
+    virtual_quote_reserves: int | None = None
+    """i128 (signed, beyond 64 bits). ``None`` — never ``0`` — on the 26-field layout."""
+    can_boost: bool | None = None
+    base_supply: int | None = None
+    holder_rewards_basis_points: int | None = None
+    holder_rewards: int | None = None
+    """``0`` on the four real fills of 2026-10-05. Reported, not summed."""
+    trailing_u64: int | None = None
+    """The unnamed ``u64`` after the IDL's extension (seen ``0 … 9 915 553``). Reported, **never**
+    summed or interpreted; ``None`` on the 26-field layout, so a real ``0`` is a reading."""
 
     @property
     def net_proceeds(self) -> int:
@@ -92,6 +120,15 @@ class _Reader:
     def i64(self) -> int:
         return struct.unpack("<q", self.take(8))[0]
 
+    def i128(self) -> int:
+        return int.from_bytes(self.take(16), "little", signed=True)
+
+    def boolean(self) -> bool:
+        byte = self.take(1)[0]
+        if byte not in (0, 1):
+            raise ValueError("SellEvent boolean is not 0/1")
+        return bool(byte)
+
 
 def decode_sell_event(raw: bytes) -> SellEvent:
     if raw[:8] == EVENT_CPI_TAG:
@@ -116,9 +153,9 @@ def decode_sell_event(raw: bytes) -> SellEvent:
     cashback_bps, cashback = r.u64(), r.u64()
     buyback_bps, buyback_fee = r.u64(), r.u64()
     trailing = len(raw) - r.off
-    if trailing != 0:
+    if trailing not in (0, _IDL_EXTENSION + _UNNAMED_TAIL):
         raise ValueError(f"SellEvent has {trailing} trailing bytes")
-    return SellEvent(
+    event = SellEvent(
         timestamp=timestamp,
         base_amount_in=base_amount_in,
         min_quote_amount_out=min_quote_amount_out,
@@ -146,6 +183,18 @@ def decode_sell_event(raw: bytes) -> SellEvent:
         cashback=cashback,
         buyback_fee_basis_points=buyback_bps,
         buyback_fee=buyback_fee,
+    )
+    if not trailing:
+        return event
+    return replace(
+        event,
+        layout=LAYOUT_TRAILING_U64,
+        virtual_quote_reserves=r.i128(),
+        can_boost=r.boolean(),
+        base_supply=r.u64(),
+        holder_rewards_basis_points=r.u64(),
+        holder_rewards=r.u64(),
+        trailing_u64=r.u64(),
     )
 
 
