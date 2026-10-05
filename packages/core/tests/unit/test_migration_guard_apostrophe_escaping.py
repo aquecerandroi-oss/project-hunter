@@ -39,7 +39,8 @@ def _ddl(monkeypatch: pytest.MonkeyPatch, name: str) -> ModuleType:
     undoes itself when the test ends, so this file leaves no path behind for
     whatever test happens to run next (Astra's review, 23/09/2026)."""
     if str(MIGRATIONS_DIR) not in sys.path:
-        monkeypatch.syspath_prepend(str(MIGRATIONS_DIR))
+        # pytest's stub types the parameter as Unknown; the call itself is typed `str`.
+        monkeypatch.syspath_prepend(str(MIGRATIONS_DIR))  # pyright: ignore[reportUnknownMemberType]
     return importlib.import_module(f"ddl.{name}")
 
 

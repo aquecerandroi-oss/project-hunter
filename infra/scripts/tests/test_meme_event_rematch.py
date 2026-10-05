@@ -63,7 +63,7 @@ class FakeConn:
     ) -> None:
         self.events = events
         self.tokens = tokens
-        self.already = already if already is not None else set()
+        self.already: set[tuple[str, str]] = already if already is not None else set()
         self.statements: list[tuple[str, Any]] = []
 
     async def execute(self, statement: Any, parameters: Any = None, /) -> _Rows:
@@ -142,11 +142,11 @@ async def test_apply_inserts_the_match_and_advances_the_cursor() -> None:
     conn = FakeConn(events=[event], tokens=[token])
     code, report = await script.rematch(conn, hours=72, now=NOW, apply=True)
     assert code == 0 and "applied: 1 new meme_event_matches rows" in report
-    insert_sql, insert_params = next(
+    _, insert_params = next(
         s for s in conn.statements if s[0].lstrip().startswith("INSERT INTO meme_event_matches")
     )
     assert insert_params == {"event_id": "E1", "mint": "MINT1", "match_kind": "buy"}
-    cursor_sql, cursor_params = next(
+    _, cursor_params = next(
         s for s in conn.statements if s[0].lstrip().startswith("UPDATE meme_events")
     )
     assert cursor_params == {"now": NOW, "ids": ["E1"]}
@@ -184,9 +184,9 @@ async def test_no_events_in_window_writes_nothing() -> None:
     conn = FakeConn(events=[], tokens=[])
     code, report = await script.rematch(conn, hours=72, now=NOW, apply=True)
     assert code == 0 and "0 events" in report
-    assert not any(
-        s.lstrip().startswith(("INSERT", "UPDATE")) for s in conn.writes()
-    ), "only the read of meme_events itself; nothing to write with no events in the window"
+    assert not any(s.lstrip().startswith(("INSERT", "UPDATE")) for s in conn.writes()), (
+        "only the read of meme_events itself; nothing to write with no events in the window"
+    )
 
 
 async def test_a_coin_created_before_this_events_own_cursor_is_not_its_candidate() -> None:
@@ -204,7 +204,7 @@ async def test_a_coin_created_before_this_events_own_cursor_is_not_its_candidate
     cold = _event("E_COLD", observed_at=NOW - timedelta(hours=5), symbol_hint="BUM")
     between = _token("MINT_BETWEEN", created_at=NOW - timedelta(hours=3), symbol="BUM")
     conn = FakeConn(events=[warm, cold], tokens=[between])
-    code, report = await script.rematch(conn, hours=72, now=NOW, apply=True)
+    code, _ = await script.rematch(conn, hours=72, now=NOW, apply=True)
     assert code == 0
     matches = [
         s for s in conn.statements if s[0].lstrip().startswith("INSERT INTO meme_event_matches")

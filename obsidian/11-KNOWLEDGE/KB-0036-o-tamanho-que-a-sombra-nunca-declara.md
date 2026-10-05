@@ -92,8 +92,12 @@ porta):
 ```python
 # para cada mkt:binance:*:book, anda o ask ate completar `size` em USDT
 for pr, q in asks:
-    take = min(pr * q, remaining); cost += take; filled += take / pr; remaining -= take
-    if remaining <= 0: break
+    take = min(pr * q, remaining)
+    cost += take
+    filled += take / pr
+    remaining -= take
+    if remaining <= 0:
+        break
 custo_bps = (cost / filled - mid) / mid * 10000 if remaining <= 0 else None
 ```
 

@@ -13,19 +13,26 @@ No database. Run: ``uv run pytest infra/scripts/tests/test_meme_rule_set_pullbac
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from .test_meme_rule_set_validate import (
+pytestmark = pytest.mark.unit
+
+# Same convention as the sibling tests: infra/scripts/tests has no __init__.py, so
+# a relative import cannot work and the folder must be on sys.path for the plain one.
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
+
+from test_meme_rule_set_validate import (  # noqa: E402
     FakeConn,
     _load,
     _obsidian_note,
     _set,
 )
-
-pytestmark = pytest.mark.unit
 
 REASON = "T4.91: EXP-M24, entrada no recuo"
 

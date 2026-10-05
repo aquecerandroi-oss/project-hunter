@@ -75,6 +75,7 @@ def test_the_delta_and_the_slope_are_taken_against_the_photo_at_least_60_s_older
         (x - mx) ** 2 for x in xs
     )
     assert row.mcap_slope_60s == Decimal(repr(slope)).quantize(Decimal("0.000001"))
+    assert row.mcap_slope_60s is not None
     assert row.mcap_slope_60s > 0
     # Progress: 1 - real/initial, newest minus the reference.
     now = (Decimal(1) - Decimal("773000000") / INITIAL).quantize(Decimal("0.000001"))

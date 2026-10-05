@@ -112,9 +112,9 @@ from decimal import Decimal
 from hunter_risk_meme import ExitParams
 
 ExitParams(
-    target_multiple=Decimal("2"),          # operator/x params: "target_x": "2"      (hoje "3")
+    target_multiple=Decimal("2"),  # operator/x params: "target_x": "2"      (hoje "3")
     trailing_from_peak_pct=Decimal("0.30"),  # operator/x params: "trailing_pct": "30"  (hoje "35")
-    time_stop_s=900,                        # operator/x params: "max_hold_s": 900      (hoje 1800)
+    time_stop_s=900,  # operator/x params: "max_hold_s": 900      (hoje 1800)
 )
 ```
 

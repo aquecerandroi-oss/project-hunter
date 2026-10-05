@@ -6,7 +6,7 @@ import threading
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -277,7 +277,7 @@ def test_stream_event_replay_is_idempotent_by_signature(signer: CountingSigner) 
     assert first is not None and first.state is SubmitState.CONFIRMED and not first.replayed
     assert second is not None and second.replayed and second.fill == first.fill
     assert submitter.on_stream_event("unknown-signature", {"fill": True}) is None
-    rows = submitter._journal.rows()  # type: ignore[attr-defined]  # pyright: ignore[reportPrivateUsage, reportAttributeAccessIssue]
+    rows = cast("list[Any]", submitter._journal.rows())  # type: ignore[attr-defined]  # pyright: ignore[reportPrivateUsage, reportAttributeAccessIssue]
     assert len(rows) == 1 and rows[0].signatures == [unconfirmed.signature]
 
 

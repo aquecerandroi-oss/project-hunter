@@ -141,8 +141,14 @@ async def test_metrics_endpoint_is_mounted() -> None:
     assert b"hunter_" in response.content or response.content == b""
 
 
-def test_role_registry_starts_empty_for_t03() -> None:
-    assert RoleRegistry == {}
+def test_role_registry_maps_role_names_to_callable_entrypoints() -> None:
+    """Was ``== {}`` at T03. ``hunter_core`` registers nothing itself, but every
+    ``services/*`` package registers its role on import and a full pytest run
+    imports them all during collection, so the registry is never empty there
+    (it failed every CI run). What stays true whatever was imported: keys are
+    role names and values are callables."""
+    assert all(isinstance(role, str) and role for role in RoleRegistry)
+    assert all(callable(entrypoint) for entrypoint in RoleRegistry.values())
 
 
 async def test_ready_returns_503_when_database_unhealthy() -> None:

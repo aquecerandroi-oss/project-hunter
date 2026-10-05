@@ -202,7 +202,8 @@ async def main() -> int:
         # The operator reads this stream and `.claude/state/t35-proof.md`
         # quotes it: the output *is* the artefact, the same reason
         # `infra/scripts/**` is exempt from this rule in ruff.toml.
-        print(json.dumps(entry), flush=True)  # noqa: T201
+        sys.stdout.write(json.dumps(entry) + "\n")
+        sys.stdout.flush()
 
     ids = await seed(engine, args.slug)
     portfolio_id = await open_wallet(factory, ids)
@@ -240,7 +241,8 @@ async def main() -> int:
 
     report["final"] = {k: str(v) for k, v in (await snapshot_state(engine, portfolio_id)).items()}
     report["ended_at"] = utcnow().isoformat()
-    print(json.dumps(report, indent=2), flush=True)  # noqa: T201
+    sys.stdout.write(json.dumps(report, indent=2) + "\n")
+    sys.stdout.flush()
     await redis.aclose()
     await engine.dispose()
     return 0

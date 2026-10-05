@@ -12,7 +12,6 @@ from infra.research.queue import (
     DEFAULT_PATH,
     QueueFormatError,
     load_queue,
-    open_hypotheses,
     parse_queue,
 )
 from infra.research.report import render

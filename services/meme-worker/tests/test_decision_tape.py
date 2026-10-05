@@ -386,6 +386,7 @@ def test_creation_bundle_counts_sol_and_wallets_excluding_the_creator() -> None:
     state.apply_trade(_trade("LATER", "buy", at=later, sol="5", real_sol="16"))
     as_of = later + timedelta(seconds=60)
     bundle = capture_decision_tape(state, as_of=as_of, series=SERIES).derived["creation_bundle"]
+    assert state.crowd.create_slot is not None
     assert bundle["creation_slot"] == state.crowd.create_slot
     assert bundle["sol"] == "3" and bundle["wallets"] == 3
     assert bundle["creator_buy_sol"] == "8"

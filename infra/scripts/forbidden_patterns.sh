@@ -117,7 +117,9 @@ scan_file() {
   case "$f" in
     infra/scripts/*) : ;;
     *.py)
-      report "$f" "print(" 'print\('
+      # Not preceded by an identifier character: `fingerprint(` / `pprint(` are
+      # not a call to the builtin (a bare `print(` or `x.print(` still hits).
+      report "$f" "print(" '(^|[^[:alnum:]_])print\('
       ;;
   esac
 
@@ -235,6 +237,11 @@ run_self_test() {
 
   printf 'def handler():\n    print("debug")\n' > handler.py
   assert_hit "handler.py" "print("
+
+  printf 'def handler():\n    fp = fingerprint("a", "b")\n    pprint(fp)\n' > fingerprint_user.py
+  assert_no_hit "fingerprint_user.py"            # `fingerprint(` / `pprint(` are not print(
+  printf 'def handler():\n    console.print("debug")\n' > rich_print.py
+  assert_hit "rich_print.py" "print("
 
   printf 'export function onClick() {\n  console.log("clicked");\n}\n' > button.ts
   assert_hit "button.ts" "console."

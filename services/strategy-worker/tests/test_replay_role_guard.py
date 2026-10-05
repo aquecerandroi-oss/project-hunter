@@ -9,6 +9,8 @@ on) survives a ``docker exec`` even though it bypasses the entrypoint, so it
 is the signal this guard reads.
 """
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 from typing import Any

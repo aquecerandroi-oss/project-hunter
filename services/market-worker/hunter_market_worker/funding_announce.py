@@ -31,9 +31,7 @@ if TYPE_CHECKING:
 __all__ = ["enqueue_funding_backfilled", "funding_backfilled_event_id"]
 
 
-def funding_backfilled_event_id(
-    exchange: str, symbol: str, start: datetime, end: datetime
-) -> UUID:
+def funding_backfilled_event_id(exchange: str, symbol: str, start: datetime, end: datetime) -> UUID:
     """Identity of one funding-backfill completion announcement.
 
     Hashed over the **requested** window, not the rows actually inserted:

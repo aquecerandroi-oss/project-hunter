@@ -11,19 +11,27 @@ Convencoes (KB-0099 r4-q05, reusadas sem mudanca):
   stop   = preenchido no mcap OBSERVADO da foto, nao no nivel
 E20 = a foto corrente esta <= 80 % do pico corrente (KB-0108 §3).
 """
-import sys, math, random
-from collections import defaultdict
 
-FEE = 0.9825 ** 2
+import math
+import random
+import sys
+from collections import defaultdict
+from typing import Any
+
+FEE = 0.9825**2
 random.seed(20260916)
 
+Entry = dict[str, Any]
+Result = tuple[float, str, int]  # (r, motivo, tempo_s)
 
-def load(entradas_path, serie_path):
-    ent = {}
+
+def load(entradas_path: str, serie_path: str) -> dict[str, Entry]:
+    ent: dict[str, Entry] = {}
     for ln in open(entradas_path, encoding="utf-8"):
         dia, mint, sym, snip, t_in, base = ln.rstrip("\n").split("|")
-        ent[mint] = dict(dia=dia, mint=mint, sym=sym, snipers=int(snip), t_in=t_in,
-                         base=float(base), serie=[])
+        ent[mint] = dict(
+            dia=dia, mint=mint, sym=sym, snipers=int(snip), t_in=t_in, base=float(base), serie=[]
+        )
     for ln in open(serie_path, encoding="utf-8"):
         dia, mint, base, dt, mcap, sells, buys = ln.rstrip("\n").split("|")
         if mint not in ent:
@@ -37,7 +45,7 @@ def load(entradas_path, serie_path):
     return ent
 
 
-def simulate(e, variant):
+def simulate(e: Entry, variant: str) -> Result | None:
     """Retorna (r, motivo, tempo_s). Pura: so le e['base'] e e['serie']."""
     base = e["base"]
     serie = e["serie"]
@@ -50,7 +58,7 @@ def simulate(e, variant):
             return ((3.0 * base / base) * FEE - 1) / 0.5, "alvo_3x", dt
         # 2) piso -50 % e trailing 35 % apos 1,5x (S0, presente em todas menos S4 acima de 1,5x)
         if variant == "S4" and peak >= 1.5 * base:
-            nivel = 0.5 * base            # o trailing 35 % sai; fica so o piso
+            nivel = 0.5 * base  # o trailing 35 % sai; fica so o piso
         elif peak >= 1.5 * base:
             nivel = max(0.65 * peak, 0.5 * base)
         else:
@@ -66,11 +74,15 @@ def simulate(e, variant):
             armado = peak >= 1.30 * base
         elif variant == "S3":
             armado = ratio is not None and ratio > 0.6
-        elif variant == "S4":
+        else:  # S4
             armado = peak >= 1.50 * base
         hit_e20 = e20 and armado
         if hit_s0 or hit_e20:
-            motivo = "e20" if (hit_e20 and not hit_s0) else ("stop" if hit_s0 and not hit_e20 else "stop+e20")
+            motivo = (
+                "e20"
+                if (hit_e20 and not hit_s0)
+                else ("stop" if hit_s0 and not hit_e20 else "stop+e20")
+            )
             return ((mcap / base) * FEE - 1) / 0.5, motivo, dt
         if mcap > peak:
             peak = mcap
@@ -78,8 +90,8 @@ def simulate(e, variant):
     return ((mcap / base) * FEE - 1) / 0.5, "tempo", dt
 
 
-def pct(xs, q):
-    xs = sorted(xs)
+def pct(values: list[float], q: float) -> float:
+    xs = sorted(values)
     if not xs:
         return float("nan")
     k = (len(xs) - 1) * q
@@ -87,9 +99,9 @@ def pct(xs, q):
     return xs[lo] if lo == hi else xs[lo] * (hi - k) + xs[hi] * (k - lo)
 
 
-def boot_ci(by_day, n=10000):
+def boot_ci(by_day: dict[str, list[float]], n: int = 10000) -> tuple[float, float]:
     dias = list(by_day)
-    out = []
+    out: list[float] = []
     for _ in range(n):
         amostra = [r for d in (random.choice(dias) for _ in dias) for r in by_day[d]]
         if amostra:
@@ -97,10 +109,10 @@ def boot_ci(by_day, n=10000):
     return pct(out, 0.025), pct(out, 0.975)
 
 
-def main(ent_p, ser_p):
+def main(ent_p: str, ser_p: str) -> None:
     ent = load(ent_p, ser_p)
     variants = ["S0", "S1", "S2", "S3", "S4"]
-    res = {v: {} for v in variants}
+    res: dict[str, dict[str, Result]] = {v: {} for v in variants}
     sem_serie = [m for m, e in ent.items() if not e["serie"]]
     for v in variants:
         for m, e in ent.items():
@@ -109,27 +121,34 @@ def main(ent_p, ser_p):
                 res[v][m] = r
     print(f"entradas={len(ent)}  sem serie de 15 s={len(sem_serie)}  com serie={len(res['S0'])}")
     print()
-    hdr = ("var", "n", "R medio", "R mediano", "R total", ">=+2R", "<=-0.5R",
-           "tempo med (s)", "saidas E20", "IC95 do R medio")
+    hdr = (
+        "var",
+        "n",
+        "R medio",
+        "R mediano",
+        "R total",
+        ">=+2R",
+        "<=-0.5R",
+        "tempo med (s)",
+        "saidas E20",
+        "IC95 do R medio",
+    )
     print("|" + "|".join(hdr) + "|")
     for v in variants:
         rs = [x[0] for x in res[v].values()]
-        by_day = defaultdict(list)
+        by_day: defaultdict[str, list[float]] = defaultdict(list)
         for m, x in res[v].items():
             by_day[ent[m]["dia"]].append(x[0])
         lo, hi = boot_ci(by_day)
         n = len(rs)
         ne20 = sum(1 for x in res[v].values() if "e20" in x[1])
-        print("|%s|%d|%+.3f|%+.3f|%+.1f|%.1f%%|%.1f%%|%.0f|%d (%.1f%%)|[%+.2f; %+.2f]|" % (
-            v, n, sum(rs) / n, pct(rs, 0.5), sum(rs),
-            100 * sum(1 for r in rs if r >= 2) / n,
-            100 * sum(1 for r in rs if r <= -0.5) / n,
-            sum(x[2] for x in res[v].values()) / n,
-            ne20, 100 * ne20 / n, lo, hi))
+        print(
+            f"|{v}|{n}|{sum(rs) / n:+.3f}|{pct(rs, 0.5):+.3f}|{sum(rs):+.1f}|{100 * sum(1 for r in rs if r >= 2) / n:.1f}%|{100 * sum(1 for r in rs if r <= -0.5) / n:.1f}%|{sum(x[2] for x in res[v].values()) / n:.0f}|{ne20} ({100 * ne20 / n:.1f}%)|[{lo:+.2f}; {hi:+.2f}]|"
+        )
     print()
     print("motivos de saida por variante")
     for v in variants:
-        c = defaultdict(int)
+        c: defaultdict[str, int] = defaultdict(int)
         for x in res[v].values():
             c[x[1]] += 1
         print(v, dict(sorted(c.items(), key=lambda kv: -kv[1])))
@@ -137,18 +156,27 @@ def main(ent_p, ser_p):
     print("cauda: 10 melhores de S0 sob cada variante")
     top = sorted(res["S0"].items(), key=lambda kv: -kv[1][0])[:10]
     print("|moeda|dia|" + "|".join(variants) + "|")
-    for m, x in top:
-        print("|%s|%s|" % (ent[m]["sym"], ent[m]["dia"][5:]) +
-              "|".join("%+.2f" % res[v][m][0] for v in variants) + "|")
-    print("|**soma top-10 de S0**||" + "|".join(
-        "%+.2f" % sum(res[v][m][0] for m, _ in top) for v in variants) + "|")
+    for m, _ in top:
+        print(
+            "|{}|{}|".format(ent[m]["sym"], ent[m]["dia"][5:])
+            + "|".join(f"{res[v][m][0]:+.2f}" for v in variants)
+            + "|"
+        )
+    print(
+        "|**soma top-10 de S0**||"
+        + "|".join(f"{sum(res[v][m][0] for m, _ in top):+.2f}" for v in variants)
+        + "|"
+    )
     print()
     print("R total por dia")
     print("|dia|n|" + "|".join(variants) + "|")
     for d in sorted({e["dia"] for e in ent.values()}):
         ms = [m for m in res["S0"] if ent[m]["dia"] == d]
-        print("|%s|%d|" % (d, len(ms)) + "|".join(
-            "%+.2f" % sum(res[v][m][0] for m in ms) for v in variants) + "|")
+        print(
+            f"|{d}|{len(ms)}|"
+            + "|".join(f"{sum(res[v][m][0] for m in ms):+.2f}" for v in variants)
+            + "|"
+        )
 
 
 if __name__ == "__main__":

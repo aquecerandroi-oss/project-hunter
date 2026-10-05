@@ -68,9 +68,7 @@ def test_database_url_migrations_defaults_to_empty(monkeypatch: pytest.MonkeyPat
 
 
 def test_database_url_migrations_reads_env_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(
-        "DATABASE_URL_MIGRATIONS", "postgresql://owner:pw@postgres:5432/hunter"
-    )
+    monkeypatch.setenv("DATABASE_URL_MIGRATIONS", "postgresql://owner:pw@postgres:5432/hunter")
     settings = Settings()
     assert (
         settings.database_url_migrations is not None

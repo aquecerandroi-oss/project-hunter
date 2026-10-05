@@ -6,6 +6,8 @@ and checked here, plus the malformed-input edges.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from hunter_exchanges.pumpswap.decode import GlobalConfig, Pool
@@ -23,8 +25,8 @@ VIRTUAL_QUOTE = 17_584_505_291
 EFFECTIVE_QUOTE = QUOTE_RAW + VIRTUAL_QUOTE
 
 
-def _global_config(**overrides: int) -> GlobalConfig:
-    defaults = dict(
+def _global_config(**overrides: Any) -> GlobalConfig:
+    defaults: dict[str, Any] = dict(
         lp_fee_basis_points=20, protocol_fee_basis_points=5, coin_creator_fee_basis_points=5
     )
     defaults.update(overrides)

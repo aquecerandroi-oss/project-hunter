@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import sys
 import urllib.request
+from typing import Any
 
 from hunter_exchanges.pumpfun.decode import decode_bonding_curve_account
 from hunter_exchanges.pumpfun.tx import bonding_curve_address
@@ -33,7 +34,7 @@ RPC_URL = "https://api.mainnet-beta.solana.com"
 LAMPORTS = 1_000_000_000
 
 
-def _rpc(method: str, params: list[object]) -> dict[str, object]:
+def _rpc(method: str, params: list[object]) -> dict[str, Any]:
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
     req = urllib.request.Request(RPC_URL, data=body, headers={"content-type": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -43,9 +44,10 @@ def _rpc(method: str, params: list[object]) -> dict[str, object]:
 def read_curve(mint: str) -> dict[str, object]:
     curve = bonding_curve_address(mint)
     out = _rpc("getAccountInfo", [curve, {"encoding": "base64", "commitment": "finalized"}])
-    result = out.get("result") or {}
-    slot = (result.get("context") or {}).get("slot")
-    value = result.get("value")
+    result: dict[str, Any] = out.get("result") or {}
+    context: dict[str, Any] = result.get("context") or {}
+    slot: int | None = context.get("slot")
+    value: dict[str, Any] | None = result.get("value")
     if value is None:
         return {"mint": mint, "curve": curve, "slot": slot, "reason": "curve_not_found"}
     account = decode_bonding_curve_account(value["data"][0], owner=value["owner"])

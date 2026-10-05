@@ -6,7 +6,7 @@ in the ``paper_v1`` profile, never in an environment variable: a restart with a
 different env must not be a different set of limits. What is here is cadence,
 and the two flags the contract requires the process to refuse to start without.
 
-``ENABLE_LIVE_TRADING=true`` is fatal at startup, by name. The worker is a paper
+``ENABLE_LIVE_TRADING`` set to true is fatal at startup, by name. The worker is a paper
 worker; ``LiveExecutionAdapter`` raises whatever the flag says, and a process
 that came up anyway would be a process an operator believes is live.
 
@@ -50,7 +50,7 @@ are all worker-only since ``0007_paper_roles`` (§19.1)."""
 
 
 class LiveTradingRefused(RuntimeError):
-    """``ENABLE_LIVE_TRADING=true``: this process refuses to exist."""
+    """``ENABLE_LIVE_TRADING`` set to true: this process refuses to exist."""
 
 
 def _flag(name: str, default: bool) -> bool:

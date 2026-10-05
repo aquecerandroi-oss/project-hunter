@@ -104,9 +104,11 @@ outro agente acabou de movê-lo para `repo_context.py` na árvore de trabalho, *
 ```python
 _FEATURES = text(
     "SELECT end_time, curve_volume_1m_sol, creator_sold, top10_share "
-    "FROM meme_features_1m WHERE mint = :mint ORDER BY end_time DESC LIMIT 1")
+    "FROM meme_features_1m WHERE mint = :mint ORDER BY end_time DESC LIMIT 1"
+)
 _RISK = text(  # so o bundled_share, e so dentro de RISK_SNAPSHOT_MAX_AGE_S = 600
-    "SELECT bundled_share, observed_at FROM meme_risk_snapshots ...")
+    "SELECT bundled_share, observed_at FROM meme_risk_snapshots ..."
+)
 ```
 
 **24 ordens de compra hoje (16/09 BRT), 23 com o check `top10_share` registrado.** Todos os 23 valores batem com a coluna

@@ -25,7 +25,7 @@ regexes = [
   # (commits 88c2dd7/4c107f7, packages/core/tests/unit/test_settings.py).
   # The working tree now uses "FAKEsupersecret"; this exact literal keeps
   # git-history scans clean without rewriting history.
-  '''postgresql\+asyncpg://u:supersecret@host/db''',
+  '''^supersecret$''',
 ]
 
 # packages/core/tests/** fixtures use synthetic values. A path-only allowlist
@@ -37,9 +37,9 @@ regexes = [
 # because of what it contains, wherever it happens to live.
 [[allowlists]]
 description = "Fixture values that self-declare as fake (must contain FAKE)"
-regexTarget = "line"
+regexTarget = "secret"
 regexes = [
-  '''(?i)FAKE''',
+  '''FAKE''',
 ]
 
 # .env.example never holds real values — see docs/SECURITY.md §4 and §8; only
@@ -61,7 +61,8 @@ paths = [
 [[rules]]
 id = "hunter-db-uri-embedded-password"
 description = "Database/cache URI with embedded password"
-regex = '''(?i)(postgres(ql)?(\+asyncpg)?|redis|rediss)://[^:\s/]+:[^@\s]{8,}@'''
+regex = '''(?i)(?:postgres(?:ql)?(?:\+asyncpg)?|rediss?)://[^:\s/@]*:([^@\s]{8,})@[^\s/:?]+'''
+secretGroup = 1
 tags = ["database", "credentials"]
 
 # Local/CI/dev-default hosts: docker-compose service names and localhost.
@@ -69,7 +70,53 @@ tags = ["database", "credentials"]
 # weaken unrelated default rules that happen to mention "localhost".
 [[rules.allowlists]]
 description = "Local/dev/CI default hosts (docker-compose services, localhost)"
-regexTarget = "line"
+regexTarget = "match"
 regexes = [
-  '''@(localhost|127\.0\.0\.1|postgres|redis)(:|/)''',
+  '''@(?:localhost|127\.0\.0\.1|postgres|redis)$''',
+]
+
+# --- proposal (security-reviewer 2026-10-05) ---------------------------------
+# Public on-chain addresses: provenance (path of raw public-API / RPC captures)
+# AND exact, anchored address shape under an address-typed key (AND, not OR).
+[[allowlists]]
+description = "Public Solana/EVM addresses in raw public-API and RPC captures"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''(?:^|/)\.claude/state/plantao-meme/raw-lane\d+/[^/]+\.jsonl?$''',
+  '''(?:^|/)packages/exchange-adapters/tests/fixtures/(?:pumpfun|pumpswap|jupiter)/[^/]+\.jsonl?$''',
+  '''(?:^|/)services/meme-executor/tests/fixtures/[^/]+\.json$''',
+]
+regexes = [
+  '''^(?:tokenAddress|accountKey|bondingCurveKey|ammKey)"\s*:\s*"(?:[1-9A-HJ-NP-Za-km-z]{32,44}|0x[0-9a-fA-F]{40})"$''',
+]
+
+# Zenodo record file names (files[].key) in the raw research captures only.
+[[allowlists]]
+description = "Zenodo files[].key file names in raw research captures"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+paths = ['''(?:^|/)\.claude/state/plantao-meme/raw-lane\d+/[^/]*zenodo[^/]*\.json$''']
+regexes = ['''^key"\s*:\s*"[A-Za-z0-9_.-]+\.(?:pdf|zip|html|csv)"$''']
+
+# Snake/kebab identifiers (exit keys, idempotency keys, feature keys): anchored,
+# lowercase words, first segment letters only (a UUID/hex key cannot start so).
+[[allowlists]]
+description = "Snake/kebab identifiers under identifier-named keys"
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+regexes = [
+  '''^(?:exit_key|idempotency_key|identity_key|FEATURE_KEY_[A-Z_]+|(?:definition|value|f)\.key|key)["']?\s*(?:={1,3}|:)\s*["'][a-z]{3,}(?:[_-][a-z0-9]{1,12})+["']$''',
+]
+
+# Exact test literals by value.
+[[allowlists]]
+description = "Exact test literals (public ATA, test client key, code reference)"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^oP37bN43zQGNp4Lx6ADrfvFfDtmkBYWs6AQGsS6fxTA$''',
+  '''^t369b-diverged$''',
+  '''^MOMENTUM_V1\.key$''',
 ]

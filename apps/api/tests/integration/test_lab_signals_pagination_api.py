@@ -22,6 +22,8 @@ from . import lab_fixtures as fx
 from .conftest import Actor
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     import httpx
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -33,8 +35,8 @@ NOW = datetime(2026, 9, 8, 12, 0, tzinfo=UTC)
 async def _seed_mixed_population(
     session_factory: async_sessionmaker[AsyncSession],
     *,
-    strategy_version_id,
-    market_id,
+    strategy_version_id: UUID,
+    market_id: UUID,
     closed: int,
     open_: int,
     pending_entry: int,
@@ -117,7 +119,7 @@ async def _seed_mixed_population(
         )
     ids = await fx.seed_shadow_population(session_factory, specs)
     cursor = 0
-    grouped = {"closed": [], "open": [], "pending": []}
+    grouped: dict[str, list[str]] = {"closed": [], "open": [], "pending": []}
     for _ in range(closed):
         grouped["closed"].append(str(ids[cursor]))
         cursor += 1

@@ -11,6 +11,7 @@ every one of its six producers (T4.47).
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -21,7 +22,7 @@ pytestmark = pytest.mark.unit
 _AT = datetime(2026, 9, 17, 0, 11, 48, tzinfo=UTC)
 
 
-def _row(**identity: str | None) -> TokenRow:
+def _row(**identity: Any) -> TokenRow:
     return TokenRow(
         mint="71CeThH29G5SuXy6BrRP2RAeTULJdV8VUshFit9vpump",
         first_seen_source="trenches_ws",

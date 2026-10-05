@@ -120,7 +120,9 @@ async def test_a_funding_request_lands_settlements_and_announces_completion(
     now = utcnow()
     window_start = now - 31 * 24 * 60 * MINUTE
     settlements = [
-        builders.funding("BTCUSDT", exchange=exchange_code, ts=window_start + timedelta(hours=8 * n))
+        builders.funding(
+            "BTCUSDT", exchange=exchange_code, ts=window_start + timedelta(hours=8 * n)
+        )
         for n in range(3)
     ]
     adapter = RealizedAdapter(exchange_code)
@@ -169,7 +171,9 @@ async def test_a_rerun_of_the_same_window_never_duplicates_rows(
     market_id = await seed_market(db_session_factory, exchange_code, "ETHUSDT")
     now = utcnow()
     window_start = now - 10 * 24 * 60 * MINUTE
-    settlement = builders.funding("ETHUSDT", exchange=exchange_code, ts=window_start + timedelta(hours=8))
+    settlement = builders.funding(
+        "ETHUSDT", exchange=exchange_code, ts=window_start + timedelta(hours=8)
+    )
     adapter = RealizedAdapter(exchange_code)
     adapter.realized["ETHUSDT"] = [settlement]
     payload = funding_request_payload(
@@ -204,13 +208,17 @@ async def test_a_backfilled_row_never_overwrites_one_the_live_poller_already_wro
     market_id = await seed_market(db_session_factory, exchange_code, "SOLUSDT")
     now = utcnow()
     settlement_time = now - 5 * 24 * 60 * MINUTE
-    live_rate = builders.funding("SOLUSDT", rate="0.0002", exchange=exchange_code, ts=settlement_time)
+    live_rate = builders.funding(
+        "SOLUSDT", rate="0.0002", exchange=exchange_code, ts=settlement_time
+    )
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
         from hunter_market_worker.persist_rows import upsert_funding
         from hunter_market_worker.queues import RealizedFunding
 
         await upsert_funding(
-            session, [RealizedFunding.model_validate(live_rate.model_dump())], {"SOLUSDT": market_id}
+            session,
+            [RealizedFunding.model_validate(live_rate.model_dump())],
+            {"SOLUSDT": market_id},
         )
 
     conflicting_rate = live_rate.model_copy(update={"funding_rate": live_rate.funding_rate * 5})

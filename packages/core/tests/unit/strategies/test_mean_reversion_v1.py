@@ -27,7 +27,7 @@ import pytest
 
 from hunter_core.domain.enums import Timeframe, TradeDirection
 from hunter_core.domain.market import NormalizedCandle
-from hunter_core.strategies.base import StrategyContext, build_context
+from hunter_core.strategies.base import Decision, StrategyContext, build_context
 from hunter_core.strategies.constraints import check_ranges
 from hunter_core.strategies.envelope import AssumedCosts
 from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
@@ -414,7 +414,7 @@ def test_bootstrap_equals_continuous_execution() -> None:
     bootstrap = MEAN_REVERSION_V1.evaluate(context(candles=candles), PARAMS)
 
     grown: list[NormalizedCandle] = []
-    decisions = []
+    decisions: list[Decision | None] = []
     for index in range(TOTAL_BARS):
         grown.extend(candles[index * 15 : (index + 1) * 15])
         cut = ORIGIN + timedelta(minutes=15 * (index + 1))

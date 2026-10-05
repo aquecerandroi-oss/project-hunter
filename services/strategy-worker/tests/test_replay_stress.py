@@ -19,6 +19,8 @@ de 4 bps fora do preço), não copiados da saída do código:
             = 1,357767...
 """
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import uuid

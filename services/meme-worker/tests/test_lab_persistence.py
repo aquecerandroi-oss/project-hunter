@@ -766,7 +766,9 @@ class _FakeChainOneRead:
     async def get_mayhem_flows(self, mints: Any) -> Any:
         raise AssertionError("not the Mayhem loop")
 
-    async def get_curve_states(self, mints: Any, *, with_block_time: bool = True) -> CurveBatch:
+    async def get_curve_states(
+        self, mints: Any, *, with_block_time: bool = True, commitment: str = "finalized"
+    ) -> CurveBatch:
         self.calls.append(list(mints))
         assert len(mints) == 1, "T4.16b's own rule: one point read, one mint"
         mint = mints[0]
@@ -840,7 +842,9 @@ class _FakeChainRefuses:
     async def get_mayhem_flows(self, mints: Any) -> Any:
         raise AssertionError("not the Mayhem loop")
 
-    async def get_curve_states(self, mints: Any, *, with_block_time: bool = True) -> CurveBatch:
+    async def get_curve_states(
+        self, mints: Any, *, with_block_time: bool = True, commitment: str = "finalized"
+    ) -> CurveBatch:
         return CurveBatch(states={}, refused={mints[0]: "curve_not_found"}, slots=(1,), calls=2)
 
 

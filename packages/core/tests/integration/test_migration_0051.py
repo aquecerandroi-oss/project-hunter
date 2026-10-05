@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Mapping
 
 import pytest
 import pytest_asyncio
@@ -78,7 +78,7 @@ async def engine(upgraded: str) -> AsyncIterator[AsyncEngine]:
         await created.dispose()
 
 
-async def _write(engine: AsyncEngine, statement: str, params: dict[str, object]) -> None:
+async def _write(engine: AsyncEngine, statement: str, params: Mapping[str, object]) -> None:
     async with engine.begin() as connection:
         await connection.execute(text(statement), params)
 
@@ -216,7 +216,7 @@ async def test_grants_are_read_only_for_the_app_and_no_delete_to_anyone(
     assert ("hunter_worker", "DELETE") not in grants
 
 
-async def _write_url(url: str, statement: str, params: dict[str, object]) -> None:
+async def _write_url(url: str, statement: str, params: Mapping[str, object]) -> None:
     created = async_engine(url)
     try:
         await _write(created, statement, params)

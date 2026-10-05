@@ -16,6 +16,8 @@ called, which is exactly the "pop, then discover it should not have run" bug
 this closes.
 """
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import argparse

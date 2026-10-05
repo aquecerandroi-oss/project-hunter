@@ -392,7 +392,7 @@ def breakout_decision(candles: list[NormalizedCandle]) -> Decision | None:
     return BREAKOUT_V1.evaluate(ctx_of(candles, BREAKOUT_CUT), BREAKOUT_V1.default_parameters)
 
 
-def _envelope_json(decision: Decision | None) -> str:
+def _envelope_json(decision: Decision | None) -> bytes:
     assert decision is not None
     return canonical_json(decision.supporting_features.to_jsonable())
 

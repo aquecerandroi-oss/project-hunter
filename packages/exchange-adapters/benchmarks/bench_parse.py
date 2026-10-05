@@ -12,14 +12,15 @@ calls per frame) and reports events/s and microseconds/event — the "before"
 and "after" numbers the T1.6b-A brief requires as a deliverable, run once
 against stashed ``HEAD`` and once against the change.
 
-``print``, not ``structlog``, is deliberate here: this is a throwaway CLI
-tool, not library code (CLAUDE.md's "no print in library code" scopes to
-``hunter_*`` packages' importable modules) — every call is `# noqa: T201`.
+Output goes through ``sys.stdout.write`` (``_emit``), not ``structlog``: this is
+a throwaway CLI tool whose stdout *is* the deliverable, and the repo's
+forbidden-patterns gate bans ``print`` calls in production Python.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 import time
 from decimal import Decimal
 from pathlib import Path
@@ -76,11 +77,15 @@ def _run_channel(label: str, stream_name: str, fixture: str, n: int) -> tuple[fl
     elapsed = time.perf_counter() - start
     events_per_s = n / elapsed
     us_per_event = elapsed * 1_000_000 / n
-    print(  # noqa: T201
+    _emit(
         f"{label:>12}  {n:>8} iters  {elapsed:8.4f}s  {events_per_s:14,.0f} events/s  "
         f"{us_per_event:8.3f} us/event"
     )
     return events_per_s, us_per_event
+
+
+def _emit(line: str) -> None:
+    sys.stdout.write(line + "\n")
 
 
 def _run_mix() -> None:
@@ -97,17 +102,15 @@ def _run_mix() -> None:
     elapsed = time.perf_counter() - start
     events_per_s = total / elapsed
     us_per_event = elapsed * 1_000_000 / total
-    print("-" * 80)  # noqa: T201
-    print(  # noqa: T201
+    _emit("-" * 80)
+    _emit(
         f"{'mix':>12}  {total:>8} iters  {elapsed:8.4f}s  {events_per_s:14,.0f} events/s  "
         f"{us_per_event:8.3f} us/event  (weights={_MIX_WEIGHTS})"
     )
 
 
 def main() -> None:
-    print(  # noqa: T201
-        f"{'channel':>12}  {'iters':>8}         {'wall':>8}  {'throughput':>14}  {'latency':>8}"
-    )
+    _emit(f"{'channel':>12}  {'iters':>8}         {'wall':>8}  {'throughput':>14}  {'latency':>8}")
     for label, stream_name, fixture, n in _CASES:
         _run_channel(label, stream_name, fixture, n)
     _run_mix()

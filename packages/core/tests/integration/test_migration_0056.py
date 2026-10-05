@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Mapping
 
 import pytest
 import pytest_asyncio
@@ -76,7 +76,7 @@ async def engine(upgraded: str) -> AsyncIterator[AsyncEngine]:
         await created.dispose()
 
 
-async def _write(engine: AsyncEngine, statement: str, params: dict[str, object]) -> None:
+async def _write(engine: AsyncEngine, statement: str, params: Mapping[str, object]) -> None:
     async with engine.begin() as connection:
         await connection.execute(text(statement), params)
 
@@ -86,7 +86,7 @@ async def _clean(engine: AsyncEngine) -> None:
         await connection.execute(text("DELETE FROM meme_treasury_swaps"))
 
 
-async def _write_once(url: str, statement: str, params: dict[str, object]) -> None:
+async def _write_once(url: str, statement: str, params: Mapping[str, object]) -> None:
     created = async_engine(url)
     try:
         await _write(created, statement, params)

@@ -26,7 +26,7 @@ from hunter_risk.limits import PAPER_V1
 from .conftest import Actor, create_org
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
     import httpx
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -183,7 +183,7 @@ async def test_a_wallet_from_another_organization_is_404(
 
 
 async def _link_profile(
-    session_factory: async_sessionmaker[AsyncSession], wallet: Wallet, limits: dict[str, object]
+    session_factory: async_sessionmaker[AsyncSession], wallet: Wallet, limits: Mapping[str, object]
 ) -> None:
     """Give the wallet a ``risk_profiles`` row of its own and point it there.
 
@@ -194,6 +194,7 @@ async def _link_profile(
     from sqlalchemy import text
 
     profile_id = uuid7()
+    assert wallet.actor.org_id is not None
     async with tenant_session(
         session_factory, wallet.actor.org_id, wallet.actor.user_id, db_role="hunter_app"
     ) as session:

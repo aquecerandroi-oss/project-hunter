@@ -7,6 +7,7 @@ Every case uses ``httpx.MockTransport``; nothing here reaches the network
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 
@@ -29,8 +30,8 @@ def _load(name: str) -> dict[str, object]:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
-def _client(handler: object) -> JupiterClient:
-    transport = httpx.MockTransport(handler)  # type: ignore[arg-type]
+def _client(handler: Callable[[httpx.Request], httpx.Response]) -> JupiterClient:
+    transport = httpx.MockTransport(handler)
     return JupiterClient(http_client=httpx.Client(transport=transport, timeout=5.0))
 
 

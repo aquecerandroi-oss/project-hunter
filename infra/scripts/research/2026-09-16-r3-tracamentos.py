@@ -21,7 +21,7 @@ from statistics import mean, median
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from meme_render_bets_model import Bet, load_bets, rule_set_slug  # noqa: E402
+from meme_render_bets_model import Bet, load_bets, rule_set_slug
 
 
 def _png(bet: Bet) -> str:
@@ -107,7 +107,9 @@ def main(path: Path) -> int:
     for reason, n in reasons.most_common():
         rows = [b for b in measured if b.exit_reason == reason]
         rs = [float(b.r_multiple) for b in rows]
-        out.append(f"| `{reason}` | {n} | {_sum(rows):+.2f} | {mean(rs):+.3f} | {median(rs):+.3f} |")
+        out.append(
+            f"| `{reason}` | {n} | {_sum(rows):+.2f} | {mean(rs):+.3f} | {median(rs):+.3f} |"
+        )
     out.append("")
     broken = [b for b in measured if b.exit_reason == "line_broken"]
     rest = [b for b in measured if b.exit_reason != "line_broken"]
@@ -118,27 +120,38 @@ def main(path: Path) -> int:
         f"{len(rest)} (mediana {median(float(b.r_multiple) for b in rest):+.3f}, "
         f"{sum(b.r_multiple > 0 for b in rest)} positivas)."
     )
-    hw = [b for b in broken if b.high_water_x is not None]
+    hw = [b.high_water_x for b in broken if b.high_water_x is not None]
     if hw:
-        above = [b for b in hw if b.high_water_x >= Decimal("1.5")]
+        above = [x for x in hw if x >= Decimal("1.5")]
         out.append(
             f"Das `line_broken`, {len(above)} chegaram a ≥ 1,5× (arme do trailing) antes de sair; "
-            f"high-water mediano {median(float(b.high_water_x) for b in hw):.2f}×."
+            f"high-water mediano {median(float(x) for x in hw):.2f}×."
         )
     out.append("")
     buckets = Counter(
-        "≤ -0.50" if b.r_multiple <= Decimal("-0.5") else
-        "-0.50 … -0.10" if b.r_multiple <= Decimal("-0.1") else
-        "-0.10 … +0.10" if b.r_multiple < Decimal("0.1") else
-        "+0.10 … +0.50" if b.r_multiple < Decimal("0.5") else "≥ +0.50"
+        "≤ -0.50"
+        if b.r_multiple <= Decimal("-0.5")
+        else "-0.50 … -0.10"
+        if b.r_multiple <= Decimal("-0.1")
+        else "-0.10 … +0.10"
+        if b.r_multiple < Decimal("0.1")
+        else "+0.10 … +0.50"
+        if b.r_multiple < Decimal("0.5")
+        else "≥ +0.50"
         for b in broken
     )
     order = ["≤ -0.50", "-0.50 … -0.10", "-0.10 … +0.10", "+0.10 … +0.50", "≥ +0.50"]
-    out.append("Faixas de R das `line_broken`: " + "; ".join(f"{k}: {buckets.get(k, 0)}" for k in order) + ".")
+    out.append(
+        "Faixas de R das `line_broken`: "
+        + "; ".join(f"{k}: {buckets.get(k, 0)}" for k in order)
+        + "."
+    )
     out.append("")
     # Uma moeda por linha: a mesma aposta cai em vários conjuntos (mesma entrada, R quase igual).
     ranked = sorted(measured, key=lambda b: b.r_multiple)
-    out.append("**3 melhores** (uma moeda por linha; os outros conjuntos que a levaram entre parênteses)")
+    out.append(
+        "**3 melhores** (uma moeda por linha; os outros conjuntos que a levaram entre parênteses)"
+    )
     out.append("")
     out += _distinct(list(reversed(ranked)), measured)
     out.append("**3 piores**")

@@ -3,6 +3,8 @@
 Run: ``uv run pytest infra/scripts/tests/test_meme_daily_ficha_queries.py -q``
 """
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import sys

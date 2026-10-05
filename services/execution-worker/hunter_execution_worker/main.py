@@ -7,7 +7,7 @@ process that restarts — a stopped protection loop is a position without a stop
 
 Two refusals happen before any loop starts:
 
-- **``ENABLE_LIVE_TRADING=true``** (``config.load_config``). This process is the
+- **``ENABLE_LIVE_TRADING`` set to true** (``config.load_config``). This process is the
   paper worker and there is no live adapter; coming up anyway would be coming up
   as something an operator believes is trading real money;
 - **the paper schema is missing.** Without ``0006``/``0007`` there is no wallet

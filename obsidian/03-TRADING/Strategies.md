@@ -15,7 +15,10 @@ owner: sexta-feira
 
 ```python
 class Strategy(Protocol):
-    key: str; version: str; parameters_schema: type[BaseModel]
+    key: str
+    version: str
+    parameters_schema: type[BaseModel]
+
     def evaluate(self, ctx, opp, regime, params) -> Signal | None: ...
 ```
 

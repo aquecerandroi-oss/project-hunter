@@ -83,7 +83,7 @@ class DeskConn:
     async def execute(self, statement: Any, parameters: Any = None, /) -> _Result:
         sql = str(statement)
         self.statements.append((sql, parameters))
-        params = parameters or {}
+        params: dict[str, Any] = parameters or {}
         if (
             "spot_desk_markets" in sql
             and "WHERE binance_symbol" in sql
@@ -165,7 +165,7 @@ async def test_enable_apply_writes_and_leaves_an_audit_row(tmp_path: Path) -> No
     )
     assert code == 0 and "applied" in report
     assert conn.markets["WIFUSDT"]["enabled"] is True
-    update, params = next(s for s in conn.statements if s[0].startswith("UPDATE spot_desk_markets"))
+    _, params = next(s for s in conn.statements if s[0].startswith("UPDATE spot_desk_markets"))
     assert params == {"symbol": "WIFUSDT", "enabled": True, "actor": "Everton"}
     _, audit_params = next(s for s in conn.statements if "system_events" in s[0])
     assert audit_params["component"] == "spot_desk" and audit_params["event"] == "enabled"
@@ -376,13 +376,13 @@ class FichaConn:
         self, position: dict[str, Any] | None, orders: dict[str, dict[str, Any]] | None = None
     ) -> None:
         self.position = position
-        self.orders = orders or {}
+        self.orders: dict[str, dict[str, Any]] = orders or {}
         self.statements: list[tuple[str, Any]] = []
 
     async def execute(self, statement: Any, parameters: Any = None, /) -> _Result:
         sql = str(statement)
         self.statements.append((sql, parameters))
-        params = parameters or {}
+        params: dict[str, Any] = parameters or {}
         if "FROM spot_positions p JOIN" in sql:
             if self.position is None or self.position["id"] != params["id"]:
                 return _Result([])

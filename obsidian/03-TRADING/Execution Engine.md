@@ -48,7 +48,8 @@ qualquer jeito.
 
 ```python
 class ExecutionAdapter(Protocol):
-    mode: ExecutionMode                # PAPER | SHADOW | LIVE
+    mode: ExecutionMode  # PAPER | SHADOW | LIVE
+
     async def submit(self, order: OrderIntent, market: MarketState) -> ExecutionResult: ...
     async def cancel(self, order_id) -> None: ...
     async def mark_to_market(self, positions, prices) -> list[PositionUpdate]: ...
