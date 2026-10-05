@@ -32,6 +32,12 @@ from typing import TYPE_CHECKING, Any
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from hunter_core.domain.types import utcnow
+from hunter_core.events.consume_decode import (
+    deadline,
+    decode_id,
+    envelope_from_fields,
+    unprocessed,
+)
 from hunter_core.events.envelope import EventEnvelope
 from hunter_core.events.processed import (
     PROCESSED_DAYS,
@@ -41,7 +47,7 @@ from hunter_core.events.processed import (
     is_processed,
     processed_many,
 )
-from hunter_core.events.produce import FIELD_NAME, ensure_group
+from hunter_core.events.produce import ensure_group
 from hunter_core.logging import get_logger
 from hunter_core.redis import (
     # Deliberate coupling: the block budget must be derived from the client's
@@ -58,6 +64,7 @@ logger = get_logger(__name__)
 
 __all__ = [
     "DEFAULT_BLOCK_MS",
+    "MAX_CLAIM_PAGES_PER_ROUND",
     "MAX_CONSECUTIVE_TIMEOUTS",
     "PROCESSED_DAYS",
     "PROCESSED_TTL_S",
@@ -96,67 +103,15 @@ healthy."""
 
 TIMEOUT_BACKOFF_S = 0.2
 
+MAX_CLAIM_PAGES_PER_ROUND = 5
+"""Pages of ``XAUTOCLAIM`` paid before each read; the cursor survives the round.
 
-def _decode_id(message_id: bytes | str) -> str:
-    return message_id.decode() if isinstance(message_id, bytes) else message_id
-
-
-def _deadline(stream: str, group: str, op: str, count: int) -> None:
-    """One log line for any read-path timeout, ``op``-labelled (T3.83): shared
-    by ``_read_loop``'s two calls and ``consume()``'s own guard so a shared
-    counter is never required across operations that fail independently."""
-    logger.warning("consume_read_deadline", stream=stream, group=group, op=op, consecutive=count)
-
-
-def _envelope_from_fields(fields: dict[Any, Any]) -> EventEnvelope:
-    raw: Any = fields.get(FIELD_NAME) if FIELD_NAME in fields else fields.get(FIELD_NAME.decode())
-    if raw is None:
-        raise ValueError(f"stream message is missing the {FIELD_NAME!r} field")
-    return EventEnvelope.from_bytes(raw)
-
-
-async def _unprocessed(
-    client: redis_asyncio.Redis,
-    stream: str,
-    group: str,
-    entries: list[tuple[Any, dict[Any, Any]]],
-    *,
-    now: datetime,
-    track: bool = True,
-) -> list[tuple[str, EventEnvelope]]:
-    """Decode a raw batch and drop what this group already applied.
-
-    An entry whose envelope does not decode is left **pending**: acking it would
-    hide it, and raising would cost the rest of the batch its progress. It comes
-    back on the next ``XAUTOCLAIM``, is skipped again in microseconds, and is
-    visible in the log every time (Astra, T2.5d design review, must-fix 5).
-    ``track=False`` (T3.85) skips the guard: no durable effect, nothing to remember.
-    """
-    decoded: list[tuple[str, EventEnvelope]] = []
-    for message_id, fields in entries:
-        try:
-            envelope = _envelope_from_fields(fields)
-        except Exception as error:
-            logger.warning(
-                "consume_message_unreadable",
-                stream=stream,
-                group=group,
-                message_id=_decode_id(message_id),
-                error=str(error),
-            )
-            continue
-        decoded.append((_decode_id(message_id), envelope))
-    if not decoded or not track:
-        return decoded
-    seen = await processed_many(
-        client, group, [str(envelope.event_id) for _id, envelope in decoded], now=now
-    )
-    if not seen:
-        return decoded
-    stale = [message_id for message_id, envelope in decoded if str(envelope.event_id) in seen]
-    if stale:
-        await client.xack(stream, group, *stale)
-    return [(item, envelope) for item, envelope in decoded if str(envelope.event_id) not in seen]
+Reclaiming the whole pending list before every ``XREADGROUP`` starved the reads:
+01/10/2026, a scanner holding 17 000 pending entries read new messages only at the
+rate they were produced while redelivering its own list ~88 times over. A small list
+(a dead instance's last few messages) still fits in one round and is recovered as
+fast as before; a large one is walked across rounds, with reads in between and a
+non-blocking read while a backlog remains."""
 
 
 async def _read_loop(
@@ -170,7 +125,11 @@ async def _read_loop(
     claim_idle_ms: int,
     timeout_backoff_s: float,
 ) -> AsyncGenerator[list[tuple[Any, dict[Any, Any]]], None]:
-    """Yield raw entry lists forever: reclaimed first, then newly read.
+    """Yield raw entry lists forever, one budgeted round at a time.
+
+    Each round claims at most :data:`MAX_CLAIM_PAGES_PER_ROUND` pages of idle pending
+    entries -- resuming from where the previous round stopped -- and then reads new
+    messages, without blocking while a claim backlog remains.
 
     The reading itself — and only the reading — lives here, so the per-message
     and the batched consumers below cannot drift apart on reclaiming, on the
@@ -186,9 +145,10 @@ async def _read_loop(
     # one op's success must not erase the other's timeout streak.
     claim_timeouts = 0
     read_timeouts = 0
+    cursor: Any = "0-0"
     while True:
-        cursor: Any = "0-0"
-        while True:
+        pages = 0
+        while pages < MAX_CLAIM_PAGES_PER_ROUND:
             try:
                 claimed: list[Any] = await client.xautoclaim(
                     stream,
@@ -200,28 +160,36 @@ async def _read_loop(
                 )
             except RedisTimeoutError:
                 claim_timeouts += 1
-                _deadline(stream, group, "xautoclaim", claim_timeouts)
+                deadline(stream, group, "xautoclaim", claim_timeouts)
                 if claim_timeouts > MAX_CONSECUTIVE_TIMEOUTS:
                     raise
                 if timeout_backoff_s > 0:
                     await asyncio.sleep(timeout_backoff_s)
                 continue
             claim_timeouts = 0
+            pages += 1
             next_cursor: Any = claimed[0]
             entries: list[tuple[Any, dict[Any, Any]]] = claimed[1]
             if entries:
                 yield entries
             cursor = next_cursor
-            if _decode_id(cursor) == "0-0" or not entries:
+            if decode_id(cursor) == "0-0" or not entries:
+                cursor = "0-0"
                 break
 
+        # More to claim next round: read what is new without waiting for it.
+        backlog = decode_id(cursor) != "0-0"
         try:
             response: Any = await client.xreadgroup(
-                group, consumer, streams={stream: ">"}, count=batch, block=block_ms
+                group,
+                consumer,
+                streams={stream: ">"},
+                count=batch,
+                block=None if backlog else block_ms,
             )
         except RedisTimeoutError:
             read_timeouts += 1
-            _deadline(stream, group, "xreadgroup", read_timeouts)
+            deadline(stream, group, "xreadgroup", read_timeouts)
             if read_timeouts > MAX_CONSECUTIVE_TIMEOUTS:
                 raise
             if timeout_backoff_s > 0:
@@ -249,10 +217,11 @@ async def consume(
 ) -> AsyncGenerator[tuple[str, EventEnvelope], None]:
     """Yield ``(message_id, envelope)`` for every new or reclaimed message.
 
-    Each loop iteration first reclaims messages idle for longer than
-    ``claim_idle_ms`` (``XAUTOCLAIM`` — recovers work stuck on a dead
-    consumer instance), then reads up to ``batch`` new messages, blocking for
-    ``block_ms`` if the stream is empty.
+    Each loop iteration reclaims messages idle for longer than ``claim_idle_ms``
+    (``XAUTOCLAIM`` — recovers work stuck on a dead consumer instance), at most
+    :data:`MAX_CLAIM_PAGES_PER_ROUND` pages per round and resuming from the previous
+    round's cursor, then reads up to ``batch`` new messages: blocking for
+    ``block_ms`` if the stream is empty, not blocking while claim backlog remains.
 
     A read deadline (``redis.exceptions.TimeoutError``) is retried after a short
     backoff up to :data:`MAX_CONSECUTIVE_TIMEOUTS` times and then re-raised;
@@ -279,7 +248,7 @@ async def consume(
         timeout_backoff_s=timeout_backoff_s,
     ):
         for message_id, fields in entries:
-            envelope = _envelope_from_fields(fields)
+            envelope = envelope_from_fields(fields)
             # T3.83: the guard's SISMEMBER had zero timeout tolerance, unlike
             # ``_read_loop``'s calls — own budget, since "have we seen this?"
             # is a different failure than a stall reading the stream.
@@ -288,7 +257,7 @@ async def consume(
                     seen = await is_processed(client, group, str(envelope.event_id), now=now())
                 except RedisTimeoutError:
                     guard_timeouts += 1
-                    _deadline(stream, group, "is_processed", guard_timeouts)
+                    deadline(stream, group, "is_processed", guard_timeouts)
                     if guard_timeouts > MAX_CONSECUTIVE_TIMEOUTS:
                         raise
                     if timeout_backoff_s > 0:
@@ -299,7 +268,7 @@ async def consume(
             if seen:
                 await client.xack(stream, group, message_id)
                 continue
-            yield _decode_id(message_id), envelope
+            yield decode_id(message_id), envelope
 
 
 async def consume_batches(
@@ -347,4 +316,4 @@ async def consume_batches(
         claim_idle_ms=claim_idle_ms,
         timeout_backoff_s=timeout_backoff_s,
     ):
-        yield await _unprocessed(client, stream, group, entries, now=now(), track=track)
+        yield await unprocessed(client, stream, group, entries, now=now(), track=track)

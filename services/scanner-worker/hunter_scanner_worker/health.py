@@ -14,6 +14,15 @@ anonymous ``false``:
 - **``scanner_evaluation``** -- the evaluation cycle is running. This is the one
   that matters: consumers that mark work nobody performs would otherwise report
   a perfectly healthy worker producing nothing;
+- **``scanner_persistence``** -- the cycle's writes are reaching the database.
+  ``scanner_evaluation`` only proves the loop turns: on 30/09 and again on 02/10
+  every flush failed for hours (14 h, then 2.5 days) while the loop turned, the
+  heartbeat refreshed and ``/ready`` answered 200. This one goes red when cycles
+  have been failing for longer than :data:`MAX_FAILING_S` with no real commit in
+  between, **or at once** when the retained batch hit its bound (``FlushLane``:
+  evaluation paused, nothing dropped). Watchdog flushes count too. "Real" means a flush that wrote rows: an empty flush after a lost
+  batch proves nothing (Astra, 05/10), so it neither clears nor starts the clock.
+  A quiet scanner that never fails is not an alarm;
 - **``scanner_outbox``** -- nothing queued and unpublished for too long. An
   event stuck in Postgres means the streams no longer reflect the database;
 - **``scanner_baselines``** -- the archive was loaded **and** every market's
@@ -40,6 +49,7 @@ from typing import TYPE_CHECKING, Any, cast
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_core.redis import keys
+from hunter_scanner_worker.cycle_health import MAX_CYCLE_IDLE_S, MAX_FAILING_S, CycleHealth
 from hunter_scanner_worker.metrics import (
     scanner_anomalies_open,
     scanner_baselines,
@@ -68,7 +78,6 @@ logger = get_logger(__name__)
 
 HB_TTL_S = 30
 MAX_CONSUMER_IDLE_S = 60.0
-MAX_CYCLE_IDLE_S = 30.0
 OUTBOX_MAX_PENDING = 5_000
 OUTBOX_MAX_LAG_S = 60.0
 
@@ -80,27 +89,14 @@ counter, so what is published is the delta, never the running total."""
 """Label pairs this process has published, so a rearmed detector can be
 set back to zero instead of keeping its last value forever."""
 
-__all__ = ["CycleHealth", "newest_stream_entry_at", "readiness_checks", "write_heartbeat"]
-
-
-class CycleHealth:
-    """Liveness and the last cycle's shape, shared with ``/ready``."""
-
-    __slots__ = ("baselines_loaded", "evaluated", "last_cycle_at", "started_at")
-
-    def __init__(self) -> None:
-        self.started_at = utcnow()
-        self.last_cycle_at = None
-        self.evaluated = 0
-        self.baselines_loaded = False
-
-    def touch(self, evaluated: int) -> None:
-        self.last_cycle_at = utcnow()
-        self.evaluated += evaluated
-
-    def alive(self, *, max_idle_s: float = MAX_CYCLE_IDLE_S) -> bool:
-        reference = self.last_cycle_at or self.started_at
-        return (utcnow() - reference).total_seconds() <= max_idle_s
+__all__ = [
+    "MAX_CYCLE_IDLE_S",
+    "MAX_FAILING_S",
+    "CycleHealth",
+    "newest_stream_entry_at",
+    "readiness_checks",
+    "write_heartbeat",
+]
 
 
 async def newest_stream_entry_at(redis: redis_asyncio.Redis, stream: str) -> datetime | None:
@@ -153,6 +149,9 @@ def readiness_checks(
     async def scanner_evaluation() -> bool:
         return cycle.alive()
 
+    async def scanner_persistence() -> bool:
+        return not cycle.persistence_stalled()
+
     async def scanner_outbox() -> bool:
         return outbox.ready(max_pending=OUTBOX_MAX_PENDING, max_lag_s=OUTBOX_MAX_LAG_S)
 
@@ -168,7 +167,13 @@ def readiness_checks(
         # scanner that will never have baselines cannot score anything.
         return progress.active()
 
-    return [scanner_consumers, scanner_evaluation, scanner_outbox, scanner_baselines]
+    return [
+        scanner_consumers,
+        scanner_evaluation,
+        scanner_persistence,
+        scanner_outbox,
+        scanner_baselines,
+    ]
 
 
 async def write_heartbeat(
@@ -237,6 +242,17 @@ async def write_heartbeat(
         "markets": str(len(markets)),
         "dirty": str(scanner.state.dirty),
         "evaluations": str(cycle.evaluated),
+        # Persistence, in the numbers missing on 30/09 and 02/10: when a flush
+        # last wrote rows (empty = never in this process), how long cycles have
+        # been failing with no commit between (0 = not failing), the streak, and
+        # the failed attempts since the process started (the batch is retained and
+        # retried, not dropped -- ``flush_blocked`` says when the bound was hit).
+        "last_commit_at": cycle.last_commit_at.isoformat() if cycle.last_commit_at else "",
+        "failing_for_s": str(int(cycle.failing_for_s())),
+        "commit_failures": str(cycle.failures),
+        "commit_failures_total": str(cycle.failures_total),
+        "flush_blocked": str(cycle.blocked).lower(),
+        "checkpoint_failures_total": str(cycle.checkpoint_failures_total),
         "anomalies_open": str(open_anomalies),
         "baselines_usable": str(maturity.usable if maturity else 0),
         "baselines_under_construction": str(maturity.under_construction if maturity else 0),

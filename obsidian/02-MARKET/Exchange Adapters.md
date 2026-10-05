@@ -79,6 +79,12 @@ Os decodificadores de evento (`hunter_exchanges/pumpfun/trade_event_codec.py`, `
 (`trailing_u64`) sem somá-la; `scan_trade_event_logs` separa "sem `TradeEvent`" de "`TradeEvent` indecodificável".
 Contexto e checklist do pino em [[T4.8e-decoders]]; o incidente em [[Open Bugs]].
 
+**T4.8f (05/10):** o `sell` da PumpSwap passou a exigir remaining accounts (`pool_v2` quando o pool tem coin
+creator; recipient de buyback e o ATA dele; em pool cashback, o acumulador antes) — achado pela simulação dos nossos
+bytes, não pelas fixtures. O builder (`pumpswap/tx.py`) e o `GlobalConfig` decodificado (`buyback_fee_recipients`)
+seguem isso; `program_watch.py` vigia o slot de deploy da PumpSwap e do programa de taxas ao lado do pump. Detalhe,
+simulações e limites em [[T4.8f-pumpswap-guard]].
+
 ## Relacionadas
 
 [[Market Collector]] · [[WebSockets]] · [[System Overview]]

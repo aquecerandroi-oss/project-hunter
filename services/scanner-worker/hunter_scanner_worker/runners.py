@@ -21,10 +21,10 @@ other loops only feed it or maintain what it reads.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
-from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow, uuid7
 from hunter_core.events.outbox import build_envelope, event_id_for
 from hunter_core.events.streams import Streams
@@ -33,17 +33,22 @@ from hunter_scanner_worker import publish as projections
 from hunter_scanner_worker import rows
 from hunter_scanner_worker.checkpoint import load_checkpoint, save_checkpoint
 from hunter_scanner_worker.coverage import read_coverage
-from hunter_scanner_worker.metrics import scanner_tick_to_opportunity_seconds
-from hunter_scanner_worker.persist import DB_ROLE, WriteBatch, flush_batch
+from hunter_scanner_worker.cycle_health import CycleHealth
+from hunter_scanner_worker.evaluation_cycle import evaluate_due_markets
+from hunter_scanner_worker.failure_summary import summarize_exception
+from hunter_scanner_worker.flush_lane import BLOCKED_BACKOFF_S, FlushLane
+from hunter_scanner_worker.persist import WriteBatch, flush_batch
 from hunter_scanner_worker.regime import BTC_SYMBOL, breadth_observation
+from hunter_scanner_worker.rehydrate import rehydrate_markets, resync_invalidated
 from hunter_scanner_worker.watchdog import sweep_silent_markets
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
     import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from hunter_core.runtime import WorkerRuntime
-    from hunter_scanner_worker.health import CycleHealth
     from hunter_scanner_worker.scanner import Scanner
 
 logger = get_logger(__name__)
@@ -53,6 +58,7 @@ __all__ = [
     "regime_loop",
     "registry_loop",
     "watchdog_loop",
+    "writer_tasks",
 ]
 
 
@@ -62,68 +68,73 @@ async def evaluation_loop(
     redis: redis_asyncio.Redis,
     runtime: WorkerRuntime,
     cycle: CycleHealth,
+    lane: FlushLane | None = None,
 ) -> None:
-    """Evaluate the dirty markets and commit one batch. Forever."""
+    """Evaluate the dirty markets and commit one batch. Forever.
+
+    The whole cycle -- from the first mutation to the end of the flush -- runs under
+    ``lane.lock`` and appends to ``lane.batch``, which survives any exception: a
+    failed flush or a Redis error mid-cycle keeps what was already collected, because
+    the collectors have already forgotten it (``flush_lane``).
+    """
     config = scanner.config
+    lane = lane or FlushLane(factory, redis, cycle)
     last_flush = utcnow()
-    batch = WriteBatch()
     while True:
         now = utcnow()
+        pause = config.cycle_s
         try:
-            scanner.coverage = await read_coverage(redis, config.exchange, now=now)
-            due = scanner.state.due(now, config.feature_throttle_s)
-            evaluated = 0
-            for market in due[: config.max_markets]:
-                # Captured before the advance clears the dirt: the measurement
-                # starts at the market's own timestamp, not at ours.
-                waiting_since = market.last_input_ts
-                evaluation = await scanner.advance(redis, market, batch, now=now)
-                if evaluation is None:
-                    continue
-                evaluated += 1
-                await projections.publish_features(redis, scanner.producer, market.ref, evaluation)
-                radar = projections.RADAR_NOTHING
-                if evaluation.score is not None:
-                    radar = await projections.publish_radar(redis, market.ref, evaluation)
-                delivered = radar != projections.RADAR_FAILED
-                if evaluation.scored and delivered and waiting_since is not None:
-                    # After the publish, never before it: the budget is "tick to
-                    # opportunity", and an observation taken inside ``advance``
-                    # would leave the two projections outside the number that is
-                    # supposed to bound them (Astra, T2.5c design review).
-                    #
-                    # ``delivered`` is the second half of that: an observation whose
-                    # Radar row was refused by Redis was *not* delivered, and
-                    # counting it would report a latency for something nobody
-                    # can see (Astra, diff review, must-fix 2). An observation
-                    # with no usable score published nothing on purpose and is
-                    # still a finished cycle, which is what the histogram's help
-                    # text now says it measures.
-                    scanner_tick_to_opportunity_seconds.observe(
-                        max(0.0, (utcnow() - waiting_since).total_seconds())
-                    )
-            cycle.touch(evaluated)
-            if (now - last_flush).total_seconds() >= config.persist_s or batch.acks:
-                batch.acks.extend(scanner.state.pending_acks)
-                scanner.state.pending_acks = []
-                invalidated = await flush_batch(factory, redis, batch, now=now)
-                for market_id in invalidated:
-                    ref = scanner.registry.ref_by_id(market_id)
-                    state = None if ref is None else scanner.state.get(ref.symbol)
-                    if state is not None:
-                        state.touch("baseline_vanished")
-                await _save_checkpoints(redis, scanner, evaluated_only=True)
-                batch = WriteBatch()
-                last_flush = now
-            runtime.mark_success()
+            async with lane.lock:
+                if lane.invalidated:
+                    # Before any new mutation: a market whose rows were dropped at
+                    # flush time must be back in line with the table first, or the
+                    # next episode opens beside one the table still holds open.
+                    await resync_invalidated(scanner, factory, lane)
+                if lane.blocked:
+                    # Fail loud, do not drop and do not grow: the retained batch is
+                    # retried, nothing new is collected on top of it.
+                    cycle.touch(0)
+                    pause = BLOCKED_BACKOFF_S
+                else:
+                    cycle.touch(await evaluate_due_markets(scanner, redis, lane.batch, now=now))
+                due_flush = (now - last_flush).total_seconds() >= config.persist_s
+                if lane.blocked or due_flush or lane.batch.acks:
+                    if not lane.blocked:  # an ACK never outruns the evaluation it announces
+                        lane.batch.add_acks(scanner.state.take_acks())
+                    if await lane.flush(now=now):
+                        last_flush = now
+                        try:  # after a good commit: its failure is not a persistence failure
+                            await _save_checkpoints(redis, scanner, evaluated_only=True)
+                        except Exception as error:
+                            cycle.checkpoint_failed(error)
+                    else:
+                        pause = max(pause, 1.0)  # the failure is already in ``cycle``
+            if cycle.failures:
+                runtime.mark_error()
+            else:
+                runtime.mark_success()
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as error:
             runtime.mark_error()
-            logger.exception("scanner_cycle_failed")
-            batch = WriteBatch()
-            await asyncio.sleep(1.0)
-        await asyncio.sleep(config.cycle_s)
+            lane.failed(error)
+            pause = 1.0 + config.cycle_s
+        await asyncio.sleep(pause)
+
+
+def writer_tasks(
+    scanner: Scanner,
+    factory: async_sessionmaker[AsyncSession],
+    redis: redis_asyncio.Redis,
+    runtime: WorkerRuntime,
+    cycle: CycleHealth,
+) -> dict[str, Coroutine[Any, Any, None]]:
+    """The two loops that mutate scanner memory, sharing one batch and one lock."""
+    lane = FlushLane(factory, redis, cycle)
+    return {
+        "evaluation": evaluation_loop(scanner, factory, redis, runtime, cycle, lane),
+        "watchdog": watchdog_loop(scanner, factory, redis, runtime, lane),
+    }
 
 
 async def _save_checkpoints(
@@ -160,9 +171,9 @@ async def regime_loop(
             runtime.mark_success()
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as error:
             runtime.mark_error()
-            logger.exception("scanner_regime_failed")
+            logger.error("scanner_regime_failed", **summarize_exception(error))
 
 
 async def run_regime_once(
@@ -198,6 +209,7 @@ async def run_regime_once(
         universe_size=scanner.registry.size,
     )
     batch = WriteBatch()
+    regime_id: UUID | None = None
     if decision.changed or scanner.regime_id is None:
         regime_id = uuid7()
         if scanner.regime_id is not None:
@@ -215,8 +227,6 @@ async def run_regime_once(
                 ts=moment,
             )
         )
-        scanner.regime_id = regime_id
-        engine.row_id = regime_id
     else:
         # The pair did not change, but the hysteresis and the evidence did: the
         # checkpoint has to move on every accepted observation or a restart
@@ -232,6 +242,12 @@ async def run_regime_once(
             ),
         )
     await flush_batch(factory, redis, batch, now=moment)
+    if regime_id is not None:
+        # After the commit, never before: an opportunity that names a regime row the
+        # table never got is refused by its foreign key, and with a retained batch
+        # that refusal would hold the whole lane (Astra, 05/10).
+        scanner.regime_id = regime_id
+        engine.row_id = regime_id
     await projections.publish_regime_current(redis, decision, regime_id=str(scanner.regime_id))
 
 
@@ -240,20 +256,35 @@ async def watchdog_loop(
     factory: async_sessionmaker[AsyncSession],
     redis: redis_asyncio.Redis,
     runtime: WorkerRuntime,
+    lane: FlushLane | None = None,
 ) -> None:
-    """Report the minutes nobody saw, so the two expiries are provable."""
+    """Report the minutes nobody saw, so the two expiries are provable.
+
+    Shares the evaluation cycle's ``lane``: it mutates memory too, so it takes the
+    same lock and appends to the same batch, and a failed flush of its rows feeds
+    ``scanner_persistence`` like any other. A private lane, when none is given, feeds
+    nobody -- the worker always passes the shared one.
+    """
+    lane = lane or FlushLane(factory, redis, CycleHealth())
     while True:
         await asyncio.sleep(scanner.config.watchdog_s)
         try:
-            batch = WriteBatch()
-            sweep_silent_markets(scanner, batch)
-            await flush_batch(factory, redis, batch)
-            runtime.mark_success()
+            async with lane.lock:
+                if lane.invalidated:
+                    await resync_invalidated(scanner, factory, lane)
+                if lane.blocked:
+                    continue  # nothing new on top of a batch that cannot be committed
+                sweep_silent_markets(scanner, lane.batch)
+                flushed = await lane.flush()
+            if flushed:
+                runtime.mark_success()
+            else:
+                runtime.mark_error()
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as error:
             runtime.mark_error()
-            logger.exception("scanner_watchdog_failed")
+            lane.failed(error)  # a failed sweep feeds scanner_persistence too
 
 
 async def registry_loop(
@@ -298,47 +329,4 @@ async def refresh_universe(
         scanner.deriv.drop(ref.market_id)
         await projections.drop_from_radar(redis, ref)
     if diff.changed:
-        await _rehydrate(scanner, factory, [ref for ref in diff.added])
-
-
-async def _rehydrate(
-    scanner: Scanner, factory: async_sessionmaker[AsyncSession], refs: list[object]
-) -> None:
-    """Load the durable state of the markets that just joined."""
-    from hunter_scanner_worker.checkpoint import history_mark_from_wire
-    from hunter_scanner_worker.registry import MarketRef
-    from hunter_scanner_worker.repo import load_open_anomalies, load_open_episodes
-
-    typed = [ref for ref in refs if isinstance(ref, MarketRef)]
-    if not typed:
-        return
-    ids = [ref.market_id for ref in typed]
-    since = utcnow() - timedelta(hours=6)
-    async with role_session(factory, db_role=DB_ROLE) as session:
-        anomalies = await load_open_anomalies(session, ids, since=since)
-        episodes = await load_open_episodes(session, ids)
-    for ref in typed:
-        state = scanner.state.get(ref.symbol)
-        if state is None:
-            continue
-        loaded = anomalies.get(ref.market_id, {})
-        state.anomalies = {kind: entry[1] for kind, entry in loaded.items()}
-        state.anomaly_ids = {kind: entry[0] for kind, entry in loaded.items() if entry[1].is_open}
-        state.closed_anomaly_at = {
-            kind: entry[1].observation_ts for kind, entry in loaded.items() if not entry[1].is_open
-        }
-        episode = episodes.get(ref.market_id)
-        if episode is None:
-            continue
-        state.episode = episode.episode
-        state.opportunity_id = episode.opportunity_id
-        if episode.history_wire:
-            try:
-                state.checkpoint = state.checkpoint.__class__(
-                    features=state.checkpoint.features,
-                    stage=state.checkpoint.stage,
-                    history=history_mark_from_wire(episode.history_wire),
-                    recovered=True,
-                )
-            except Exception:
-                logger.warning("scanner_history_mark_unreadable", symbol=ref.symbol)
+        await rehydrate_markets(scanner, factory, [ref for ref in diff.added])

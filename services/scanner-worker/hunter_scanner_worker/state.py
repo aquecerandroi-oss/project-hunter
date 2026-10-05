@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from hunter_indicators.opportunity import EpisodeState
     from hunter_scanner_worker.registry import MarketRef
 
-__all__ = ["MarketState", "PendingAck", "ScannerState"]
+__all__ = ["MarketState", "PendingAck", "ScannerState", "ack_key"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +48,10 @@ class PendingAck:
     group: str
     message_id: str
     event_id: str
+
+
+def ack_key(ack: PendingAck) -> tuple[str, str, str]:
+    return ack.stream, ack.group, ack.message_id
 
 
 @dataclass
@@ -158,7 +162,22 @@ class ScannerState:
     """The scanner's whole working set: one state per monitored market."""
 
     markets: dict[str, MarketState] = field(default_factory=dict[str, "MarketState"])
-    pending_acks: list[PendingAck] = field(default_factory=list[PendingAck])
+    pending_acks: dict[tuple[str, str, str], PendingAck] = field(
+        default_factory=dict[tuple[str, str, str], PendingAck]
+    )
+    """Keyed by ``(stream, group, message_id)``. While a flush keeps failing the Redis
+    pending list grows and the consumer reclaims its own idle entries, redelivering
+    each message again and again (~88x measured on 01/10): a list would take one
+    entry per delivery, the book holds one per message and so cannot outgrow the
+    pending list it mirrors."""
+
+    def hold_ack(self, ack: PendingAck) -> None:
+        self.pending_acks.setdefault(ack_key(ack), ack)
+
+    def take_acks(self) -> list[PendingAck]:
+        taken = list(self.pending_acks.values())
+        self.pending_acks.clear()
+        return taken
 
     def get(self, symbol: str) -> MarketState | None:
         return self.markets.get(symbol)

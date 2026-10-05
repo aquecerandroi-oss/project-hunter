@@ -41,6 +41,10 @@ Pedido: revisar o diff da cura (`FlushLane`, lock único para avaliação e watc
 
 **Concordâncias absorvidas:** lock amplo em vez de `take()/restore()`; **pausar é melhor que descartar depois de N tentativas** (descartar perde o fechamento que evita a próxima violação; bissecção pode separar fechamento, abertura, histórico e evento do mesmo mercado) — para veneno determinístico será preciso intervenção humana; idempotência da repetição conferida (`(market_id, ts)`, `id`, `(opportunity_id, ts)`, `event_id`), valendo só para o **mesmo** conteúdo; falha de ACK individual não provoca retry do lote. **Divergência:** nenhuma de fundo; não pedi uma terceira rodada depois das correções.
 
+## Revisão de código da cura (sem Astra): amplificação dos ACKs com a lane bloqueada
+
+Uma revisão de código separada (`REQUEST_CHANGES`, 1 HIGH) achou o que as duas rodadas da Astra não viram: com a lane bloqueada a PEL cresce, o consumidor reclama as próprias entradas e `handle` anexava outro `PendingAck` por reentrega, a espiral de ~88× de 01/10 **na memória e sem teto**, pior que o código antigo (que descartava o lote). **Aceito e corrigido** (detalhes e testes em [[Scanner-lag-2026-10-01]] §8.3 e §8.4): livro de ACKs deduplicado por `(stream, group, message_id)`; reclaim limitado a 5 páginas por rodada com cursor persistente em `consume.py` (contrato compartilhado, testado em `packages/core/tests`); falhas de avaliação contam para o limite de 60 s; lane vazia limpa o bloqueio. **Não adotado:** impedir que o consumidor reclame as próprias entradas, porque o `XAUTOCLAIM` não filtra pelo dono. A Astra olhou a retenção do lote e os ACKs dentro da lane, mas não o laço de reentrega do `consume` que alimenta o livro; o ponto cego foi a fronteira entre o contrato compartilhado e o worker.
+
 ## Relacionado
 [[Scanner-lag-2026-10-01]] · [[2026-10-01-scanner-lag]] · [[Anomalies]] · [[Workers]]
 

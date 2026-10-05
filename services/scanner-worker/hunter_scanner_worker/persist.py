@@ -81,6 +81,11 @@ class WriteBatch:
     baseline_ids: set[UUID] = field(default_factory=set[UUID])
     """The union of every ``baseline_id`` the envelopes in this batch name."""
 
+    invalidated: set[UUID] = field(default_factory=set[UUID])
+    """Markets whose rows ``_drop_invalidated`` removed from this batch. Kept on the
+    batch, not only returned: when the transaction then fails, the retry may find the
+    batch empty and would otherwise forget that their memory is ahead of the table."""
+
     referenced_by: dict[UUID, set[UUID]] = field(default_factory=dict[UUID, set[UUID]])
     """``market_id -> baseline ids it referenced``, so one vanished baseline
     invalidates exactly the markets that used it."""
@@ -113,6 +118,16 @@ class WriteBatch:
             or self.events
         )
 
+    def add_acks(self, acks: Sequence[PendingAck]) -> None:
+        """Hold ``acks`` once each: a redelivery of a message already here is the same ACK."""
+        from hunter_scanner_worker.state import ack_key
+
+        known = {ack_key(ack) for ack in self.acks}
+        for ack in acks:
+            if ack_key(ack) not in known:
+                known.add(ack_key(ack))
+                self.acks.append(ack)
+
     def reference(self, market_id: UUID, ids: Sequence[UUID]) -> None:
         if not ids:
             return
@@ -133,6 +148,7 @@ def _drop_invalidated(batch: WriteBatch, missing: set[UUID]) -> set[UUID]:
     affected = {market_id for market_id, used in batch.referenced_by.items() if used & missing}
     if not affected:
         return affected
+    batch.invalidated |= affected
     dropped_ids = {row["id"] for row in batch.opportunities if row["market_id"] in affected}
     batch.opportunities = [row for row in batch.opportunities if row["market_id"] not in affected]
     batch.history = [row for row in batch.history if row["opportunity_id"] not in dropped_ids]

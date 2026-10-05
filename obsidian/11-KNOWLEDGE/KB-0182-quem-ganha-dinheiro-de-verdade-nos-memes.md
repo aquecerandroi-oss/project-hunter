@@ -111,6 +111,13 @@ H-030 (rascunho, **não** está na Fila). A previsão registrada é **NÃO CONFI
 [[06-DECISIONS/Revisoes-Astra/carteiras-lucro-design|carteiras-lucro-design]] — REQUEST_CHANGES no desenho, concorda
 com a pesquisa. Os 9 itens obrigatórios foram absorvidos no desenho e no rascunho.
 
+**Onda 1c (05/10): o motor puro existe, e a definição do E-PnL ganhou uma errata.** Ao pé da letra, "realizado FIFO +
+Δ liquidação" pontuaria com +0,2 um saco comprado por 1 que hoje vale 0,2. O motor calcula **caixa casado da janela +
+V(fim) − V(início)**, com a mesma avaliação em toda fronteira e 0 sem estado válido. A censura a R = −1 do PREREG é
+uma **imputação** pré-registrada, não um limite inferior: a perda total é R = −2. Ver
+[[06-DECISIONS/Revisoes-Astra/wallets-engine|wallets-engine]]. Nada foi medido em dado real: o motor só tem testes
+sintéticos.
+
 ## Relacionados
 
 [[EXP-M15-carteiras-vencedoras]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0142-kol-e-call-antecipam-ou-confirmam]] ·

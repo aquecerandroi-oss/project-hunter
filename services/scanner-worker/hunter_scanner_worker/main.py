@@ -54,11 +54,10 @@ from hunter_scanner_worker.regime_hourly import regime_hourly_loop
 from hunter_scanner_worker.regime_job import RegimeHealth
 from hunter_scanner_worker.registry import MarketRegistry
 from hunter_scanner_worker.runners import (
-    evaluation_loop,
     refresh_universe,
     regime_loop,
     registry_loop,
-    watchdog_loop,
+    writer_tasks,
 )
 from hunter_scanner_worker.scanner import Scanner
 from hunter_scanner_worker.supervision import forever
@@ -137,9 +136,8 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
 
         async with asyncio.TaskGroup() as group:
             tasks: dict[str, Any] = {
-                "evaluation": evaluation_loop(scanner, factory, runtime.redis, runtime, cycle),
+                **writer_tasks(scanner, factory, runtime.redis, runtime, cycle),
                 "regime": regime_loop(scanner, factory, runtime.redis, runtime),
-                "watchdog": watchdog_loop(scanner, factory, runtime.redis, runtime),
                 "registry": registry_loop(scanner, factory, runtime.redis, runtime, universe_wake),
                 "baselines": baseline_loop(
                     scanner,
@@ -273,7 +271,7 @@ def _candle_handler(scanner: Scanner) -> Any:
         ):
             return None
         ack = pending_ack(Streams.MARKET_CANDLES_CLOSED, message_id, envelope)
-        scanner.state.pending_acks.append(ack)
+        scanner.state.hold_ack(ack)
         return ack
 
     return handle

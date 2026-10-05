@@ -281,11 +281,21 @@ async def write_opportunities(session: AsyncSession, rows: list[dict[str, Any]])
 
 
 async def touch_episodes(session: AsyncSession, rows_: list[dict[str, Any]]) -> None:
-    """Move only the durable counters of an open episode, by identity."""
+    """Move only the durable counters of an open episode, by identity.
+
+    Never backwards in time: ``flush_batch`` applies the touches after the
+    opportunities, and a retained batch can hold a touch the watchdog collected
+    before an evaluation that has since changed the episode (``HOT`` then, or
+    ``EXPIRED``). The touch carries its own ``last_updated_at``; it only applies to a
+    row that is not newer (Astra, 05/10).
+    """
     for row in rows_:
         await session.execute(
             update(Opportunity)
-            .where(Opportunity.id == row["id"])
+            .where(
+                Opportunity.id == row["id"],
+                Opportunity.last_updated_at <= row["last_updated_at"],
+            )
             .values(
                 below_40_since=row["below_40_since"],
                 status=row["status"],

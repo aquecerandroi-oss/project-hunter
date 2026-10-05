@@ -64,3 +64,4 @@ reabrir a pergunta com população maior em vez de reanalisar a fita da R57; con
 dinheiro real fora do escopo, com a onda 5 obrigatória depois de um eventual CONFIRMA.
 
 - **Decisão do Everton (05/10):** projeto aprovado por inteiro, Helius paga se precisar — [[2026-10-05-seguir-carteiras-lucrativas-aprovado]].
+- **Onda 1c (motor puro, 05/10):** [[wallets-engine]] — o motor `hunter_indicators.meme.wallets` implementado com 81 testes sintéticos; errata do E-PnL (caixa casado + V(fim) − V(início), mesma avaliação em toda fronteira); 7 must-fix da rodada 1 e 2 casos da rodada 2 consertados com teste que falhou antes; rodada 3 APPROVE.

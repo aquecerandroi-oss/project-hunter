@@ -1,6 +1,6 @@
 ---
 tags: [performance, scanner, radar, redis-streams, diagnostico, persistencia, incidente]
-updated: 2026-10-01
+updated: 2026-10-05
 status: parcial
 owner: backend-specialist
 ---
@@ -126,10 +126,105 @@ Sem reiniciar: a margem é de 78 min e estável; o scanner continua sem persisti
 
 > **`scanner-worker` não persiste nada desde 30/09 ~13:36Z e vira 2 h de lag no stream (achado em 01/10).** `flush_batch` falha em ~100 % dos ciclos com `uq_anomalies_active_per_market_type` (`writers.write_anomalies` só trata conflito em `id`). A memória esquece o id da anomalia antes do commit (`collect.py:85`, `watchdog.py:115`) e o lote que falha é descartado (`runners.py:121`); o par `(mercado, tipo)` fica com a linha X ativa no banco e o scanner tenta abrir Y — veto permanente do lote inteiro e dos ACKs. O PEL (17 mil) é reclaimado pelo próprio consumidor antes de cada leitura nova (`hunter_core/events/consume.py`), reentregando ~88× o volume e saturando um núcleo. `/ready` e o heartbeat continuam verdes. Gatilho do primeiro erro não identificado (logs rotacionados). Mitigação: `supersede_orphan_anomalies` em `writers.py` (aguarda deploy). Aberto: reter o lote em falha e serializar watchdog × avaliação; limitar o reclaim; alarme de `last_commit_at`. Dono: `services/scanner-worker`, `packages/core`. Nota: [[Scanner-lag-2026-10-01]].
 
+## 7. Segunda parada: 02/10/2026 10:12Z (diagnosticada em 05/10, só leitura)
+
+> **Veredito em quatro linhas.** (1) O `scanner-worker` parou de persistir em **02/10 ~10:12Z** (~21,5 h depois do deploy `9622f087` que levou o `supersede_orphan_anomalies`) e só voltou com o reboot da VPS em 05/10 14:35Z. (2) **Foi o mesmo mecanismo da primeira parada, agora no outro índice único:** 726 das 728 falhas do log retido são `UniqueViolationError` em `uq_opportunities_open_per_market` (`writers.py:256`, `write_opportunities`). (3) A mitigação das anomalias **disparou em todo ciclo** (726 `scanner_anomalies_superseded`) mas dentro da transação que depois falhava nas oportunidades — rollback, **zero** linha com `superseded_by` no banco; o veto das oportunidades nunca esteve no desenho do conserto. (4) **O primeiro erro de 02/10 10:12Z não é recuperável** (logs rotacionados, nenhuma série de heartbeat); o gatilho mais plausível é uma exceção qualquer no ciclo (falha de flush ou `TimeoutError` do Redis dentro de `advance`) que faz o laço descartar um lote cujas transições a memória já aplicou — **hipótese, não prova**.
+
+### 7.1 Evidência durável (comandos de leitura; `BEGIN READ ONLY` no Postgres)
+
+```text
+feature_snapshots_2026_10 por hora   02/10 09h 12.005 · 10h 2.587 (último ts 10:12:00Z) · nada até 05/10 14h 1.252 (reboot 14:35Z) · 15h 600 (200/min)
+última escrita de oportunidades      10 linhas com last_updated_at = 10:12:00.958588Z (mesmo `now` do ciclo)
+última anomalia fechada              expired 10:12:11.701Z · resolved até 10:06 · detected 10h: 204 linhas (até 10:12)
+anomalies com metadata.superseded_by 0 em toda a vida do banco  (a mitigação nunca persistiu nada)
+anomalies active hoje                313 (min detected_at 11/09); opportunities abertas hoje 185 (121 NORMAL + 64 ANOMALY)
+pós-reboot                           44 oportunidades-zumbi (first_seen 02/10 07:26–10:04, last_updated 10:12) expiradas às 14:53–14:56Z; 409 anomalias expiradas às 14:54Z
+```
+
+- **O log do contêiner `scanner` sobreviveu ao reboot** (contêiner criado 01/10 12:37:33Z, não recriado; `RestartCount=1`, `OOMKilled=false`): retido de **04/10 07:05:38Z a 09:15:13Z** (a VPS congelou ~09:15Z; último registro do journal do boot anterior 11:15:08 CEST). Nesse trecho: **728 `scanner_cycle_failed`** — **726** `asyncpg.exceptions.UniqueViolationError` com frames `runners.py:109 evaluation_loop` → `persist.py:174 flush_batch` → `writers.py:256 write_opportunities`, `DETAIL: Key (market_id)=(…) already exists.`; **2** `redis.exceptions.TimeoutError` dentro de `scanner.advance` → `context.py:160 build_market_context` (04/10 08:02:15Z e 09:00:54Z — o tipo de falha que descarta um lote **sem** nenhum erro de banco) — e **726 `scanner_anomalies_superseded`** (`closed` 136 no primeiro).
+- **Postgres** (log retido só desde 04/10 06:15:45Z): 1.004 `duplicate key … uq_opportunities_open_per_market` e 332 `canceling statement due to statement timeout` (a amostra que li era uma consulta de `meme_tokens`; **não** investiguei as demais).
+- **Sem OOM, disco ou IO:** `journalctl -b -1` com 0 ocorrências de `out of memory`/`oom-kill`/`Killed process`; no kernel de 12:05–12:20 CEST (10:05–10:20Z) só eventos de bridge/veth de um contêiner reiniciado às 12:06:17 CEST (não identificado pelo nome) e ruído de firewall. O `dmesg` atual é só do boot novo.
+- **Mercado:** o `market-worker` registrou `ws_state_changed connected -> reconnecting` às 10:08:38Z (reconectou em 11 s) — pouco antes da parada, **sem** lacuna nos snapshots (200 por minuto até 10:11). Não estabeleci relação.
+- **Retenção de baselines descartada como gatilho:** `feature_baselines` ainda guarda do dia 06/09 em diante (2,6 M linhas; não achei executor de retenção no código, só o protocolo em `docs/DATABASE.md` §17.2) — então `_drop_invalidated` (`persist.py:123`) não pode ter sido o primeiro gatilho de 02/10.
+- **Redis agora:** `scanner-worker.market.candles.closed consumers 111 pending 1586 lag 0` (15:07Z de 05/10).
+- **Sem série histórica de saúde:** `worker_heartbeats` guarda uma linha por worker (o scanner não tem linha hoje), `hb:scanner:*` expira em 30 s e `system_events` não tem evento do scanner. É a lacuna que o alarme de §7.3 fecha.
+
+### 7.2 O mecanismo (igual ao de §2, em `opportunities`)
+
+`collect_opportunity` (`collect.py:166-170`) esquece `opportunity_id` no `EXPIRE` antes do commit; qualquer exceção no ciclo faz `evaluation_loop` executar `batch = WriteBatch()` e a linha `EXPIRE` do episódio X se perde; o episódio Y seguinte do mesmo mercado viola `UNIQUE (market_id) WHERE expired_at IS NULL` **para sempre**, e cada lote perdido envenena mais mercados. A Astra confirmou o mecanismo e **não achou caminho normal** que gere Y antes do fechamento de X no mesmo lote (`dedupe` preserva a posição; `collect.py:136`).
+
+**Latente, achado pela Astra (sem falha prévia):** `_drop_invalidated` remove a linha `EXPIRE` de X e seu evento depois de a memória esquecer X e a transação **termina bem**; uma avaliação posterior abre Y com X ainda aberto. Hoje não tem produtor (nada deleta baselines), mas reter o lote só no `except` **não basta** — a invalidação precisa restaurar o estado especulativo do mercado.
+
+### 7.3 O alarme implementado (05/10, sem commit)
+
+- **`/ready` ganha `scanner_persistence`** (`health.py`): vermelho quando os ciclos **falham há mais de 120 s (`MAX_FAILING_S`) sem um commit real no meio**. Commit real = `flush_batch` que **escreveu linhas** (`not batch.empty`); flush vazio ou só de ACKs **não** limpa nem inicia o relógio. A primeira versão (relógio "idade da avaliação mais antiga não commitada", limpo por qualquer flush) tinha esse furo e a Astra o apontou com cenário concreto: o lote com dados falha e é descartado; o ciclo seguinte não tem mercado devido, `flush_batch` retorna sem transação e zerava o alarme a cada ciclo quieto. Teste: `test_commit_alarm.py::test_an_empty_flush_after_a_lost_batch_does_not_clear_the_alarm` (**falha** se o commit voltar a ser incondicional — verificado por mutação).
+- **Por que não "dirty > 0 e sem commit":** `dirty` oscila entre 0 e ~200 de instante a instante; um alarme sobre ele pisca verde entre as sondas do Docker. O relógio de falhas só depende de o ciclo ter falhado.
+- **N = 120 s:** a falha se repete a cada ~1,25 s (1 s de espera + `cycle_s`), então 120 s são ~100 falhas seguidas — mais que um reinício/failover do Postgres, que o laço sobrevive; com o healthcheck (`interval 15 s`, `retries 5`) o contêiner vira `unhealthy` ~3 min depois da primeira falha. A Astra lembra que 120 s é ponto de partida, não distribuição medida: calibrar pela série `failing_for_s`.
+- **Heartbeat `hb:scanner:*`** ganha `last_commit_at` (vazio = nenhum neste processo, nunca um horário inventado), `failing_for_s`, `commit_failures` (sequência) e `commit_failures_total` (lotes descartados desde o início — o contador de perda, que continua subindo mesmo com commits no meio).
+- **`scanner_cycle_failed` agora é uma linha curta** (`failure_summary.py`): `error_type`, `root_type`, `message`, `constraint`, `detail` (só a chave `Key (cols)=(uuids)` de violação única) e os 3 últimos frames do projeto — nunca o SQL nem um parâmetro. Lista de permissão (Astra): mensagem do servidor só para as classes SQLSTATE `08/23/40/53/55/57`; a classe `22` e as demais viram frase fixa; `Failing row contains (…)` nunca sai. Os laços do watchdog e do regime usam o mesmo resumo.
+
+### 7.4 O que **não** foi feito e o teste que falha hoje
+
+> **Atualização (05/10, noite): a cura entrou em código — ver §8.** O texto abaixo é o registro do que se sabia antes dela; o `xfail` virou teste que passa.
+
+A cura é a **retenção do lote com um único dono da sequência mutação → persistência** (avaliação e watchdog), mais o tratamento explícito da invalidação de baseline (Astra: "um lock só ao redor do SQL chega tarde — a identidade já foi esquecida"; `take()/restore()` só serve se preservar linhas, eventos com os mesmos ids, ACKs, callbacks, a precedência do lote antigo e o estado para desfazer avaliações invalidadas). `runners.py` está em **348** linhas: extrair o laço de flush para outro módulo faz parte do trabalho. Reidratar a memória do banco depois de falha é **complementar**, não rollback completo (o `_rehydrate` apenas dá `continue` quando não acha episódio). Supersede de oportunidades no writer: **não** como conserto principal — a expiração teria de gerar também o evento `opportunities.updated`, que nasce na coleta.
+
+**Teste que falha hoje** (xfail estrito, `services/scanner-worker/tests/test_batch_retention.py`): o mercado A coleta o `EXPIRE` do episódio X e esquece o episódio; o mercado B levanta `TimeoutError` (Redis); depois da recuperação do laço a linha de X **nunca chega ao flush**. Visto falhar pela razão certa com `--runxfail` (`assert UUID(...0a) in []`); no dia em que a retenção entrar, o teste "falha por passar". Regressões que a Astra pede junto: baseline some durante `EXPIRE(X)` (nenhuma memória livre para Y com X aberto) e, com Postgres real, rollback → retry (`test_flush_retry.py`).
+
+**Acompanhamento sem custo de código, até a cura:** alertar externamente em `commit_failures_total` crescendo e em `last_commit_at` mais velho que 3 min com `dirty > 0` (o alarme de `/ready` cobre só a sequência de **falhas**, não "nada para gravar por muito tempo").
+
+Revisão da Astra: [[2026-10-05-scanner-parada-0210]].
+
+## 8. A cura: reter o lote com um único dono (05/10/2026, sem commit, não implantada)
+
+> **Em quatro linhas.** (1) `FlushLane` (`flush_lane.py`) é o lote único e o `asyncio.Lock` que avaliação e watchdog seguram **do primeiro mutar até o fim do flush**; um flush que falha **mantém o lote inteiro** (linhas, eventos com os mesmos `event_id`, ACKs, callbacks, na ordem de coleta) e o repete. (2) Limite de retenção: **60 s** de falha ininterrupta → a lane **bloqueia**: `/ready` vermelho na hora, uma linha CRITICAL `scanner_flush_blocked`, a avaliação e o watchdog **param de coletar** e a lane segue tentando a cada 5 s. **Nada é descartado em silêncio.** (3) Falhas do watchdog (flush e varredura) agora alimentam `scanner_persistence`. (4) A revisão da Astra (`REQUEST_CHANGES`, 5 bloqueadores) foi absorvida e cada correção foi **vista falhar por mutação**.
+
+### 8.1 Desenho
+
+- **Por que lock no ciclo todo e não `take()/restore()`:** `Scanner.advance` recebe o lote antes dos `await` de leitura do Redis e só coleta depois; trocar o lote no meio faria a coleta cair num lote já em voo (perda silenciosa). Com o lock, ninguém apenda durante um flush e não há o que fundir; o custo é o watchdog esperar até um ciclo (a varredura é de 60 em 60 s). A Astra concordou ("manteria o lock amplo").
+- **Por que pausar em vez de descartar depois de N tentativas (escolha):** descartar perde exatamente o `EXPIRE`/`RESOLVE` que evita a próxima violação única — reabriria o veto de 30/09 e 02/10. Isolar o mercado venenoso por bissecção pode separar fechamento, abertura, histórico e evento do mesmo mercado. Pausar é o único limite que **não cria divergência**; o preço é que um lote determinísticamente envenenado também para o Radar ao vivo e o `features.updated` (publicado no laço) até alguém reiniciar, e **reiniciar abandona o lote em memória** (o novo processo reidrata do banco): é recuperação com possível perda de trabalho, e a linha CRITICAL diz isso. Antes: perda silenciosa e veto eterno; agora: parada barulhenta com o lote preservado enquanto a falha for transitória.
+- **O limite (60 s):** um lote retido cresce até ~200 linhas de snapshot por segundo (o mesmo minuto é refeito até commitar), então 60 s são ~12 mil linhas, dezenas de MB. É verificado **na próxima falha**, não por temporizador independente (tentativas a cada ≤ 5 s).
+- **`_drop_invalidated` (baseline sumida sem exceção):** o lote agora lembra os mercados que esvaziou (`WriteBatch.invalidated`), e a lane guarda a obrigação de recarregar a memória do banco (`rehydrate.resync_invalidated`) **antes de qualquer nova mutação** — no começo do ciclo de avaliação e da varredura do watchdog — e só solta os ids depois de o reload dar certo. Sem isso, um `EXPIRE(X)` descartado deixava a memória livre para abrir Y com X aberto no banco.
+- **Regime:** `run_regime_once` só expõe o id do novo `market_regimes` depois do commit dele (uma oportunidade que cita regime inexistente é recusada pela FK e, com lote retido, seguraria a lane inteira).
+- **Toque velho do watchdog:** `touch_episodes` só atualiza uma linha que **não seja mais nova** (`last_updated_at <=` o do toque). Os toques são aplicados depois das oportunidades e um lote retido pode carregar um toque coletado antes de uma avaliação que já mudou o episódio (`HOT`, `EXPIRED`).
+- **ACKs:** com a lane bloqueada, ACKs novos não entram no lote (não passam à frente da avaliação que anunciam). **E o livro de ACKs é deduplicado** (revisão de código, 05/10, HIGH): ver §8.3, a amplificação.
+- **Reidratação do universo (mercado que entra):** continua não destrutiva (`authoritative=False`): o reload de um mercado novo roda fora do lock, e apagar o episódio ausente apagaria um `OPEN(Y)` já coletado. Só o resync (sob o lock) é autoritativo.
+- **Extração para o limite de 350 linhas:** `cycle_health.py` (CycleHealth, de `health.py`), `evaluation_cycle.py` (o laço de avaliar, de `runners.py`, sem mudar comportamento), `rehydrate.py`; `runners.writer_tasks` cria a lane compartilhada (`main.py` fica em 348).
+
+### 8.2 Evidência de teste (todos locais, sem Docker)
+
+`test_flush_lane.py` (9) e `test_flush_lane_recovery.py` (7), `test_batch_retention.py` (o `xfail` estrito de §7.4, agora passa) e `test_commit_alarm.py`. **Mutações que falham** (executadas): descartar o lote na falha (5 testes caem); não fazer resync / resync depois da avaliação (3); watchdog sem lock; não pausar bloqueado; esquecer a invalidação na falha; remover a guarda do toque; ACKs com a lane bloqueada.
+
+**Não verificado:** `test_flush_retry.py` (rollback → retry com o índice único real, e o toque velho contra Postgres) está escrito e **não rodou** — o Docker não existe nesta máquina e a VPS é só leitura. A suíte do scanner: ver o relatório.
+
+### 8.3 A amplificação que a cura reabria, e o que a limita (revisão de código de 05/10)
+
+**O achado.** Com a lane bloqueada (ou com o flush falhando), os ACKs deixam de sair, a lista pendente (PEL) do Redis cresce, o consumidor faz `XAUTOCLAIM` das **próprias** entradas ociosas (≥ 30 s) antes de cada leitura nova e `handle` (`main.py`) anexava **mais um** `PendingAck` por reentrega: a espiral de ~88× medida em 01/10 (15,9 M entregas para ~170 mil mensagens), agora **na memória** e sem teto. A versão antiga, que descartava o lote, tinha teto. Cada mensagem reentregue só volta a cada ≥ 30 s (a reclamação zera o tempo ocioso), mas o livro crescia uma entrada por entrega.
+
+**O que limita agora (três camadas):**
+1. **Livro deduplicado.** `ScannerState.pending_acks` é um dicionário por `(stream, group, message_id)` (`hold_ack`/`take_acks`) e `WriteBatch.add_acks` não guarda a mesma mensagem duas vezes: o tamanho acompanha a PEL (≤ ~50 mil, o `MAXLEN` do stream), não o número de entregas. Teste: 50 reentregas da mesma `message_id` ⇒ 1 entrada; e, com o flush falhando por ~2 s e a mesma mensagem reentregue a cada ciclo, o lote termina com 1 ACK.
+2. **Reclaim em páginas por rodada** (`packages/core/hunter_core/events/consume.py`, contrato compartilhado): no máximo `MAX_CLAIM_PAGES_PER_ROUND = 5` páginas de `XAUTOCLAIM` antes de cada leitura, **cursor persistente entre rodadas**, e leitura **sem bloqueio** enquanto sobra backlog (recuperar a lista de uma instância morta não fica lento num stream ocioso). Uma lista pequena cabe numa rodada e é recuperada como antes (todos os 1.423 testes unitários do core e os testes de consumidores do market/strategy-worker seguem verdes). As funções de decodificação foram extraídas para `consume_decode.py` (o arquivo estava em 350 linhas).
+3. **Teto de retenção que também conta falhas de avaliação** (ver §8.4).
+
+**O que não foi feito (pedido "de preferência"):** *não reclamar mensagens que o próprio consumidor já segura*. O `XAUTOCLAIM` do Redis não filtra pelo dono: toma e zera o ocioso de qualquer entrada ≥ `min-idle`, inclusive as do mesmo consumidor; excluir as próprias exigiria `XPENDING` por consumidor, outro desenho. Com o livro deduplicado a reentrega é idempotente e, com o orçamento por rodada, deixou de monopolizar o laço.
+
+### 8.4 Dois furos do mesmo review, fechados
+
+- **Falhas de avaliação contam para o limite de 60 s** (`FlushLane.failed`): uma avaliação que levanta a cada ciclo depois de coletar linhas nunca chegava ao flush, e o lote retido crescia sem bloquear. Agora `evaluation_loop` e `watchdog_loop` registram a falha pela lane (o resync que falha também). Teste: avaliação que levanta com o relógio de retenção vencido ⇒ lane bloqueada, `/ready` vermelho, linhas coletadas preservadas.
+- **Lane vazia encerra a falha:** o retorno antecipado de `flush()` com lote e ACKs vazios agora limpa `blocked`, `retained_since` e a sequência de falhas (`CycleHealth.recovered`). Com a retenção, "vazio" quer dizer "nada retido, nada em risco" (antes, com o descarte, vazio podia esconder perda). Teste incluído. O comentário velho de `health.py` ("batches discarded") foi corrigido.
+
+### 8.5 O que continua aberto (escrito, não resolvido)
+
+- **Transição de regime perdida:** se o flush da abertura de um regime falha, o id deixa de vazar, mas o classificador já avançou: o próximo minuto não vê `changed` e a linha do novo regime só nasce na próxima troca (dado de pesquisa incompleto; sem veto).
+- **Reidratação do universo fora do lock:** um mercado que entra pode ser avaliado antes de seu reload terminar (pré-existente, mercado novo é raro).
+- **ACKs pendentes em memória** crescem sem limite enquanto bloqueado (dezenas de bytes por mensagem; reiniciar resolve).
+- **Falha pós-commit** (callbacks) repete um lote já commitado: seguro para snapshots, anomalias, oportunidades, histórico e outbox (chaves únicas / `event_id`), mas a Astra lembra que isso vale para o **mesmo** conteúdo — por isso nada é apendado entre tentativas.
+- Segunda rodada da Astra **não** foi pedida depois das correções; cada uma tem teste que falha sem ela.
+
 ## Fontes
 
 `.claude/state/astra-review-scanner-lag.md` · `services/scanner-worker/hunter_scanner_worker/{runners,persist,writers,collect,watchdog,consumers,main}.py` · `packages/core/hunter_core/events/consume.py` · `docs/design/retencao-e-disco-2026-09-27.md` §history_v2 (descartado como causa) · [[2026-09-27-retencao-de-dados-e-backup]]
 
 ## Relacionadas
 
-[[Performance Overview]] · [[Late-delay-do-Lab-diagnostico-2026-10-01]] · [[KB-0087-o-atraso-de-decisao-e-as-tres-correcoes]] · [[KB-0089-o-teto-de-cpu-de-um-processo-so]] · [[2026-10-01-scanner-lag]] · [[07-BUGS/Open Bugs|Open Bugs]] · [[Workers]] · [[Features]] · [[Anomalies]]
+[[Performance Overview]] · [[Late-delay-do-Lab-diagnostico-2026-10-01]] · [[KB-0087-o-atraso-de-decisao-e-as-tres-correcoes]] · [[KB-0089-o-teto-de-cpu-de-um-processo-so]] · [[2026-10-01-scanner-lag]] · [[2026-10-05-scanner-parada-0210]] · [[07-BUGS/Open Bugs|Open Bugs]] · [[Workers]] · [[Features]] · [[Anomalies]]

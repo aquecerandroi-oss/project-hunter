@@ -367,10 +367,12 @@ services:
       market-worker:
         condition: service_started
     restart: unless-stopped
-    # Four readiness checks (hunter_scanner_worker/health.py): `scanner_consumers`
+    # Five readiness checks (hunter_scanner_worker/health.py): `scanner_consumers`
     # (every stream loop iterated recently -- a quiet stream is not a stuck
     # consumer), `scanner_evaluation` (the cycle is running: consumers that mark
     # work nobody performs would otherwise look perfectly healthy),
+    # `scanner_persistence` (the writes reach the database: cycles failing for
+    # more than 120 s with no commit, or a retained batch that hit its bound),
     # `scanner_outbox` (nothing queued and unpublished for too long) and
     # `scanner_baselines` (the archive was *loaded* -- deliberately not "is
     # mature", because a fresh install has no seven-day history and saying so is
