@@ -114,3 +114,23 @@ Síntese: [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]]. Revisão: [[06-D
 ## Avaliação de 05/10/2026 — onda 0 (infraestrutura, não resultado de estratégia)
 
 Sondagem de leitura do programa inteiro (pump + PumpSwap) por RPC público, 144 min válidos em três janelas (19:03Z 90 min com feed degradado, 22:01Z 39 min e 22:46Z 15 min limpos). **Nada sobre carteiras foi medido e nenhum desfecho foi olhado.** Resultado de infraestrutura: 330–353 swaps/s (28,5–30,5 M/dia, 5–10× a hipótese do desenho), 217–254 GB/dia de WS sem compressão, RPC público **reprovado** para 24/7 (uma janela em três degradou: 79 quedas, atraso até ~30 s), Helius ≈ US$ 650–760/mês (estimativa de preço de tabela), linha estimada em 529 B → 136–149 GB em 9 dias. Decodificadores da T4.8e: 0 falhas em ~1,2 milhão de eventos; `BuyEvent` da PumpSwap (36 % dos swaps) sem decodificador. Decisão: **go** para um piloto de WS pago e para as ondas 1a e 1c; **segura** a 1b e a 2 até rever retenção/formato. Auditoria do exemplo "sadcrissy": não feita (endereço completo ausente). A previsão de H-030 (**NÃO CONFIRMA**) não muda. Detalhe: seção 8 de `docs/design/seguir-carteiras-lucrativas.md`, [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar|KB-0183]], revisão [[wallet-tape-probe]].
+
+## Avaliação de 05/10/2026 (noite) — armazenamento da fita do H-030 (infraestrutura, não resultado de estratégia)
+
+**Nenhum desfecho foi olhado; nada foi implementado nem migrado.** O diálogo [[wallet-tape-storage]] (DECISÃO CONJUNTA com a Astra, 3 rodadas) decidiu o armazenamento depois da onda 0. O detalhe está na §9 de `docs/design/seguir-carteiras-lucrativas.md`.
+
+- **Os 10–20 GB aprovados não comportam o H-030 como está escrito.** Só as assinaturas de 7 dias somam 13,44 GB. A faixa de planejamento da opção escolhida é de 80–175 GB.
+- **Escolha (e):** fita bruta enxuta no Postgres (248 B/linha, poda por dependência, pico normal 50,7–55,1 GB), lotes FIFO intactos durante uma campanha finita, sem horizonte contábil, e coleta que para com lacuna ao atingir o teto.
+- **Opções rejeitadas:**
+  - agregar no ingresso, porque muda a especificação (a liquidação da entidade não é a soma das carteiras);
+  - filtrar swaps < 0,01 SOL, porque apaga as saídas dos sacos;
+  - só a curva, porque é outra população.
+- **Parquet** fica como alternativa e depende de exceção do Everton.
+- **Pedido ao Everton:** teto de 100 GiB (pode interromper a campanha) e +100 GiB de disco.
+- **Portão antes das ondas 1b definitiva e 2:**
+  - crons de partição e de outbox provados pelo efeito (hoje não estão instalados);
+  - backup de 05/10 explicado (ausente no log);
+  - piloto com tabela de ensaio;
+  - motor 1c-bis com prova de equivalência (o `build_snapshot` atual não cabe em memória na janela real).
+- **Seguidores** entram como pergunta secundária ([[2026-10-05-carteiras-seguidores-como-pergunta-secundaria]]), com foto datada por `known_at`.
+- **A previsão do H-030 (NÃO CONFIRMA) não muda.**

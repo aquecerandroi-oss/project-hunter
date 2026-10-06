@@ -81,3 +81,14 @@ Nenhuma: é infraestrutura. O piloto pago deve repetir a mesma auditoria de bloc
 
 [[EXP-M15-carteiras-vencedoras]] · [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] ·
 [[KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos|KB-0124]] · [[T4.8e-decoders]] · [[Exchange Adapters]] · [[carteiras-lucro-design]]
+
+## Armazenamento depois da medição (acrescentado em 05/10/2026, database-architect)
+
+O diálogo [[wallet-tape-storage]] (3 rodadas com a Astra, DECISÃO CONJUNTA) fechou como guardar esta fita. O desenho é a §9 de `docs/design/seguir-carteiras-lucrativas.md`. O que esta nota passa a saber:
+
+- **A linha da onda 0 (529 B) era otimista.** A tabela real parecida, `meme_trades` com 2 índices, mede **599–616 B/linha** na VPS. A linha enxuta da fita (assinatura bytea 64, carteira/mint bytea 32, sem btree) tem **248 B** pela aritmética de tupla (`pg_column_size`), ou 7,1–7,7 GB/dia. Isso é cálculo, ainda não tabela medida.
+- **Só a assinatura** (64 B incompressíveis, ~1 evento por tx) custa 1,92 GB/dia, ou 13,44 GB em 7 dias. Nenhuma opção completa apresentada demonstrou caber nos 10–20 GB aprovados.
+- **Lotes abertos crescem sem teto num mercado de sacos mortos.** A fita parcial de 01/10 deu 0,216 posição aberta nova por trade, o que sugere 2–6,5 M posições/dia (cenário, não medida de lotes).
+- **Decisão:** fita enxuta no Postgres com poda por dependência (pico normal ~7,17 d = 50,7–55,1 GB), contabilidade intacta numa campanha finita e faixa de planejamento de 80–175 GB. Pedido ao Everton: teto de 100 GiB e +100 GiB de disco. Ondas 1b definitiva e 2 seguradas até o piloto físico.
+- **O motor puro não escala para a janela real** (~210 M fills, ~95 GB de RAM estimados). Nasce a onda 1c-bis, com prova de equivalência.
+- **Seguidores** (pergunta secundária, [[2026-10-05-carteiras-seguidores-como-pergunta-secundaria]]) ganham uma tabela pequena de fotos de perfil com `known_at`, de ~0,5 MB/noite.

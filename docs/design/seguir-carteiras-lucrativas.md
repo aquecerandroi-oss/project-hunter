@@ -387,3 +387,215 @@ Um regime, um dia, dois horários; RPC público sem garantia de entrega (a cober
 o que o servidor entregou); WAL, escrita real no Postgres, RSS, cache de resolução de pool, recuperação de lacunas e períodos de reserva de pool inválida (**não medidos**); identidade do payload do evento (só contagem);
 a linha de 529 B é uma fórmula por tipo de coluna, não uma tabela medida. Limitações do instrumento reconhecidas na revisão: a deduplicação de 60 s da run 1 e 2 pode ter contado de novo uma entrega muito atrasada
 (janela depois subida para 300 s; nas corridas limpas nenhuma tx esperada nas duas assinaturas chegou só em uma, então não há cópia tardia a duplicar); na run 2 o fechamento julgou cedo ~5 blocos (conservador: só podia somar perdas, e não somou).
+
+## 9. Armazenamento depois da medição (05/10/2026)
+
+> Acrescentada em 05/10/2026 pelo `database-architect`. **Substitui, para armazenamento, a linha de §2.2 "9 dias" e o
+> custo de §2/§7**; não muda a contabilidade, a política nem o pré-registro. Diálogo com a Astra em três rodadas, com
+> DECISÃO CONJUNTA: [[wallet-tape-storage]] (`obsidian/06-DECISIONS/Dialogos/wallet-tape-storage.md`; transcrição
+> `.claude/state/dialogue-wallet-tape-storage.md`). Conhecimento: [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]].
+> Avaliação datada: [[EXP-M15-carteiras-vencedoras]]. Nada foi implementado, migrado ou contratado.
+
+### 9.1 Resposta curta
+
+**Nenhuma opção completa apresentada demonstrou caber em ~20 GB com o H-030 como está escrito.** As opções que cabem
+mudam a pesquisa: guardar só agregados, só a curva ou podar lotes antigos. A decisão conjunta é **(e): fita bruta
+enxuta no Postgres, contabilidade intacta, campanha finita com teto físico, e mais disco**. O pedido ao Everton passa de
+10–20 GB para um **teto de 100 GiB** para o H-030, com **+100 GiB de disco** recomendados. As ondas 1b (definitiva) e 2
+continuam seguradas até o portão de §9.7.
+
+### 9.2 O que foi medido agora (VPS, só leitura, 05/10 23:29Z)
+
+| Item | Valor |
+|---|---|
+| Disco | 348 G; 161 G usados; **187 G livres**. Em 30/09 eram 207 G livres, logo a tendência é de **−3,3 G/dia** sem o H-030 |
+| Banco | 90 GB. `outbox_events` tem 33 GB e 15,9 M linhas despachadas, a mais velha de 26/09: **nenhuma poda desde 28/09** |
+| Crons em `/etc/cron.d` | só `hunter-backup` e `hunter-meme-close`. **Não há** `hunter-outbox`, `hunter-partitions` nem poda de partições (os arquivos existem em `infra/vps/cron/`, mas não estão instalados) |
+| Séries meme | as partições `2026_10` somam 8,50 GB em 5,98 d = **1,42 GB/dia**. Com 30 d de retenção e partição mensal, o pico é ~61 d ≈ 87 GB (hoje ~35 GB), **e só cai se a poda rodar** |
+| Backup | 3 dumps de 6,7–7,4 GB (zstd, sem `opportunity_history`). **Não há linha de 05/10 no `backup.log`** (o último é de 04/10 01:35Z). A VPS reiniciou às 14:35Z de 05/10 (`uptime -s`), mas isso não explica, sozinho, um backup que deveria ter rodado às 01:17Z |
+| WAL | 32 GB desde 14:35Z (`pg_stat_wal`), ≈ **86 GB/dia hoje**. `max_wal_size` 1 GB, `wal_compression` off, checkpoint de 5 min (104 por tempo, 9 pedidos), `shared_buffers` 128 MB. Ajuste a estudar em separado |
+| E/S e CPU | SSD; `sar` mostra ~14 MB/s de escrita, com %util de 4–8 %. 12 núcleos, ~41 % ocupados. 47 GB de RAM, 41 disponíveis |
+
+### 9.3 Tamanho de linha
+
+Calculado com `pg_column_size(ROW(...))` na VPS (`BEGIN READ ONLY`), varlena curta, alinhamento e 4 B de *line pointer*:
+
+| Linha | B/linha | GB/dia (28,5–31 M) |
+|---|---|---|
+| Desenho (base58 em texto, 3 btree). A onda 0 estimou 529 B. A tabela real parecida, `meme_trades` com 2 índices, **mede 599–616 B**, e a conta com 3 btree dá ~623 B | 529–623 | **15,1–19,3** |
+| **L0 enxuta**: `signature` bytea 64, `wallet`/`mint` bytea 32, sem btree, BRIN em `slot`, 33 tuplas/página | **248** | **7,1–7,7** |
+| Só a assinatura (64 B aleatórios, incompressíveis, ~1 evento por tx) | 64 | 1,92 → **13,44 GB em 7 dias** |
+| Parquet zstd-3, sintético (a assinatura é exata, o resto é sintético) | 102 | 2,9–3,2 |
+
+O prefixo de 8 B da assinatura foi **rejeitado**: a identidade do motor é `(signature, program, event_ordinal)`
+(`tape.py:107`), e um prefixo perde a auditoria e permite colisão silenciosa.
+
+### 9.4 Achado do motor: o `build_snapshot` não roda na janela real
+
+`build_snapshot` (`ranking.py`) recebe **todas** as fills causais e monta `MintTape`, livros e `simulate_copy` de
+todas as entidades. Sete dias × 30 M dão ~210 M objetos `Fill`, ≈ 95 GB de RAM (estimativa parcial, não RSS medido).
+Isso não roda nesta VPS em **nenhuma** opção de armazenamento. Nasce a **onda 1c-bis**: refatorar o *acesso*
+(memória limitada, processamento por mint/entidade, filtros só por condições necessárias provadas e aplicados depois
+da fusão) **sem trocar as regras**. Ela exige prova diferencial contra o motor atual nestes casos: virada de dia,
+janela móvel, fronteira anterior ao L0, partição expirada, fusão tardia, duplicata/conflito de payload, evento tardio,
+restart e perda de estado. A CPU também não está demonstrada: para 1,5–5 M gatilhos/dia numa janela de 2 h, um
+núcleo teria de simular cada um em 4,8–1,44 ms.
+
+### 9.5 Opções, com a conta
+
+Pico residente = dias de partição diária presentes, incluindo a parcial. "Exato" significa que o motor calcula o retrato
+como está escrito, no ponto do tempo, sem look-ahead.
+
+| Opção | GB/dia | Regime | WAL a mais | O que o motor ainda calcula | H-030 (7 d de aquecimento, 14–28 d de coorte) | Backup |
+|---|---|---|---|---|---|---|
+| (a) linha do desenho, 2–3 d de bruto + agregados | 15,1–19,3 | 2,1 d: 31,7–40,6 GB; 3,1 d: 46,7–59,9 GB; mais os derivados de (b) | 2 btree aleatórios geram FPI depois de cada checkpoint. A fórmula 2 × 104 mil × 8 KB × 288 dá ~490 GB/dia; é cenário, **não** limite | O mesmo que (b), pagando índices. **Dominada** | Igual a (b) | Bruto fora |
+| (b) agregar no ingresso: fatos carteira-dia, gatilhos pré-simulados por carteira, L0 de ~1,2 d | L0 7,1–7,7; derivados a medir | ~16–25 GB (até ~33 se forem ~5 M carteiras/dia) | ~9 GB/dia | **Não é o H-030**. A liquidação da entidade não é a soma das carteiras (exemplo: 90 + 90 contra 166). A mediana de posse não é uma contagem. A exclusão por financiador conhecido depois precisa de proveniência por episódio. O C-PnL por carteira não compõe por entidade (`follow.py:107/147`, `policy.py:84`). Evento tardio deixa de entrar no corte seguinte | Exigiria reescrever o PREREG (outra especificação). **Retirada** | Derivados fora |
+| (c) filtrar no ingresso | tx falha: **0** (as linhas de swap já são só de tx com sucesso; corta ~47 % dos bytes da Helius, não linhas). < 0,01 SOL: −29 % (5,0–5,5 GB/dia). Carteira de 1 swap: desconhecível no ingresso | — | — | Cortar < 0,01 SOL apaga as saídas pequenas de sacos derretidos e enviesa FIFO, episódios e unmatched | Muda a população. **Rejeitada** | — |
+| (d) Parquet fora do Postgres, assinatura inteira | 2,9–3,2 (sintético) | 7,2–9,2 d de L0: 21–29 GB; mais lotes e o resto: ~35–60 GB | só o staging | Exato | Preservado | Fora do `pg_dump` |
+| (e) **L0 enxuta no Postgres, campanha finita** | 7,1–7,7 | §9.6: 80–175 GB de faixa de planejamento | ≈ N × ~300 B ≈ 8,6–9,3 GB/dia (+10 %; hipótese a medir com `wal_bytes`/`wal_fpi`) | **Exato** | Preservado | L0 e lotes fora; evidência dentro |
+| (f) só a curva (pump) | 1,3–1,4 (o `TradeEvent` é 61 de ~329 swaps/s) | 9–13 GB de L0 | pequeno | Exato **numa população nova**: some a perna PumpSwap das mesmas carteiras, e toda aposta que migra cai na censura | **Não testa o H-030** | — |
+
+A opção (d) mantém a semântica, mas viola a regra dura "No local state … Postgres + Redis only" do `CLAUDE.md`. Fica
+como alternativa a medir, que **depende de exceção arquitetural do Everton** (ADR). A decisão conjunta usa o Postgres.
+
+### 9.6 A decisão: (e), contabilidade intacta numa campanha finita
+
+1. **L0** (`meme_wallet_fills`): linha enxuta de 248 B, identidade inteira, **partição diária**, sem btree de consulta
+   nem chave única, BRIN em `slot` (a medir), e nenhum filtro econômico ou de atividade no ingresso.
+2. **Lotes sem horizonte H.** Lotes FIFO abertos (quantidade, custo, origem, ordem) ficam inteiros **durante toda a
+   campanha** e enquanto forem necessários ao fechamento e à evidência. Um horizonte H foi proposto e retirado, por três
+   cenários:
+   - a perda de um saco de 10 → 1 SOL some do E-PnL sem venda nenhuma;
+   - uma venda velha casa com uma compra nova pela cabeça da fila (`lots.py:153`);
+   - um lote expira dentro da janela móvel.
+   Se o Everton quiser H, ele vem como **nova definição contábil completa** antes do congelamento. A campanha tem
+   **duração máxima a fixar antes do congelamento**: piloto + 7 d + até 28 d. O fim do ingresso e o fim da retenção são
+   datas separadas.
+3. **Poda por dependência, não por idade.** A partição do dia *p* só sai depois de publicado e verificado tudo o que
+   depende dela: retratos até *p*+7, apostas, pares, sensibilidades, kept e o estado de continuação (fronteiras
+   consultáveis, reserva válida anterior ao L0 em `episodes.py:131`, creates/exclusões, evidência parcial das ligações
+   fracas em `entities.py:74`, inventário e pendências). *p*+7 é a primeira liberação **possível**: uma dependência sem
+   substituto suficiente segura a partição. O pico normal é **7 + (hora UTC da liberação)/24** dias; liberando às 04:00,
+   dá 7,1667 d = **50,7–55,1 GB**. Cada dia retido a mais soma um dia de ingresso. O coletor **para, com lacuna
+   explícita**, no que vier primeiro:
+   - 2 noites de atraso (horário-limite e definição a fixar);
+   - o teto do H-030;
+   - o espaço livre verificado chegando à reserva da operação, com margem para a escrita em voo, o WAL e o
+     fechamento.
+   O podador diário é **contrato novo**: o atual só entende mês (`partition_retention.py:36/106`).
+4. **Reexecução idempotente por efeito.** Resultado e checkpoint versionados por dia/corte/código/parâmetros,
+   publicação atômica e imutável, e exclusão mútua entre o job e a poda. A canonicalização da identidade usa memória
+   limitada e preserva a recepção original; conflito de payload é tratado explicitamente, e uma reentrega tardia nunca
+   vira swap de outro dia. Os dois relógios de `causal_view` continuam estritos. O `dedupe` atual é referência
+   semântica, não solução de escala.
+5. **Retratos.** Grava uma linha por entidade que passa a atividade, depois da fusão e das exclusões e por cenário, com
+   métricas, motivos e o universo de candidatos dos controles 1 e 2 (com o mecanismo de sorteio). As demais entram só
+   como contagem total e por motivo no manifesto, e fica declarado que elas não têm explicação individual permanente. O
+   kept guarda a execução, a evidência de ranking e as dependências de controles e sensibilidades, sem encurtar §2.2 em
+   silêncio.
+6. **Backup degradado.** L0 e lotes de continuação ficam **fora** do `pg_dump`
+   (`--exclude-table-data-and-children`, conferido nas filhas e numa restauração de ensaio). Retratos, apostas/pares,
+   episódios e evidências exigidas, links/proveniência, kept, manifestos e lacunas ficam **dentro**. A restauração marca
+   a cobertura contábil como desconhecida e nunca a apresenta como completa: sete dias novos não reconstroem lotes
+   perdidos.
+7. **Foto de perfil por carteira (pergunta secundária de seguidores).** Decisão do Everton de 05/10:
+   [[2026-10-05-carteiras-seguidores-como-pergunta-secundaria]]. Fica numa tabela pequena, global e sem RLS (dado
+   público), só de acréscimo, chamada `meme_wallet_profile_snapshots`, com estas colunas:
+   - `wallet` (bytea 32);
+   - `known_at` (instante da resposta);
+   - `snapshot_day`;
+   - `http_status`;
+   - `followers` e `following` (NULL quando a leitura falha);
+   - `is_pump_user`;
+   - `username`.
+
+   A PK é `(wallet, known_at)`. A tabela é lida no mesmo job noturno do retrato, para as carteiras das entidades
+   ranqueadas e do universo de controle 1/2, e **nunca** se usa o valor atual. Uma aposta só usa a foto com
+   `known_at` < o instante da decisão. Carteira sem foto anterior fica "seguidores desconhecidos", não 0.
+
+   A fonte é `GET /users/{address}` (`docs/PUMPFUN.md` endpoint 11). Ela devolve `x-ratelimit-limit` 30 por 60 s, e
+   esse limite é por IP, dividido com as outras leituras da pump.fun do meme-worker. Por isso há teto de **3 000
+   carteiras/noite** (~100 min a 30/min), com a ordem de leitura pré-declarada: seguidas e controles primeiro. A leitura
+   corre em paralelo e **não atrasa** a publicação do retrato. Linha ≈ 110 B de heap + ~60 B de PK ≈ 170 B: 3 000 ×
+   170 B ≈ 0,5 MB/noite, ≈ 23 MB em 45 noites. Mesmo 30 mil/noite dariam 0,23 GB. Fica **dentro** do backup e sem poda
+   até o veredito + 90 dias (é evidência).
+
+   Revisão da Astra (`.claude/state/astra-review-wallet-profile-snapshots.md`): a regra não tem look-ahead, mas três
+   pontos precisam ser congelados no PREREG antes do aquecimento:
+   - **Qual foto usar.** Proposta: a mais recente com sucesso, `known_at` < decisão e no máximo 48 h de idade. Falha,
+     429 ou timeout também viram linha (`http_status` NULL + código do erro), e a aposta guarda a referência da foto
+     usada.
+   - **Ordem completa da fila.** Posto, depois controles, com desempate pelo hash da carteira e uma nova tentativa.
+     A cobertura e as ausências são publicadas, e a conclusão fica restrita à população observada.
+   - **Carteira contra entidade.** Proposta: a carteira-gatilho da aposta, com o máximo da entidade como sensibilidade.
+     A regra para fotos parcialmente ausentes também é congelada antes de ver resultado.
+
+   A conta de tamanho foi conferida (0,51 MB/noite; 22,95 MB em 45 noites). Ela é estimativa por tipo, e as linhas de
+   novas tentativas somam.
+
+**Orçamento de (e)** (cenários de planejamento, não medidas):
+
+| Parcela | Conta | GB |
+|---|---|---|
+| L0, regime normal | 7,1667 d × 28,5–31 M × 248 B | 50,7–55,1 |
+| L0 com 2 noites de atraso | 9,17 d × idem | 64,8–70,5 |
+| Lotes da campanha | **Não medido.** A fita parcial de 01/10 (`meme_trades` `swap_api`: 450 039 trades, 97 433 pares carteira/mint com saldo no fim do dia, 0,216 por trade) sugere 2–6,5 M **posições** abertas novas por dia. Lotes são ≥ posições (um lote por compra). 45 d × 263 B | 24–77, ou mais |
+| Retratos, apostas, kept, links, episódios (60 d), lacunas | a medir até o veredito + 90 d | 1–5, faixa aberta |
+| Fotos de perfil (seguidores) | ≤ 3 000 carteiras/noite × ~170 B × 45 noites | ~0,02 |
+| Temporários do job | pico simultâneo, a medir | ? |
+| **Faixa de planejamento** | | **80–175 GB = 74,5–163 GiB** |
+
+A previsão grosseira, **sem** o H-030 e **com** os crons funcionando, deixa 94–109 G livres no pior ponto (fim de
+novembro): 187 − 51 (meme até o pico) − 12 (perpétuos) − 15 a 30 (dumps maiores). Os 20 GiB de reserva da operação não
+financiam o H-030. Sem a poda de partições e da outbox, a VPS enche sozinha: as séries meme crescem 1,42 G/dia sem
+queda, e a outbox cresce ~1,8 G/dia quando acabar o espaço interno.
+
+### 9.7 O que precisa do Everton, e o portão
+
+**Duas decisões separadas** (Astra): quanto disco adicionar, e que risco de interrupção aceitar com o teto do experimento.
+
+1. **Teto físico do H-030: proposta de 100 GiB (107,4 GB)** no lugar dos 10–20 GB aprovados. A faixa de planejamento
+   vai até 163 GiB, então **o teto pode interromper a campanha antes do fim**. Ao atingi-lo, a coleta para e a coorte
+   segue o protocolo de lacuna/aborto do PREREG, que já proíbe consertar e reaproveitar a mesma coorte depois de ver
+   desfechos.
+2. **Disco: +100 GiB úteis (recomendado).** +50 GiB só servem se a projeção **medida** da campanha inteira, com margem e
+   com a reserva de 20 GiB separada, couber. Mais disco não amplia o teto sozinho. O preço do provedor (Contabo) não foi
+   consultado.
+3. **Exceção à regra "Postgres + Redis only"** só se ele preferir (d). Não é recomendada aqui.
+
+**Portão. Nada da onda 1b definitiva nem da onda 2 antes de:**
+
+1. os crons de partição e de outbox estarem instalados e **provados pelo efeito**: último sucesso, idade/backlog,
+   partições futuras e *skips* por dump/lock;
+2. o backup de 05/10 ter a linha do tempo reconstruída e um backup restaurável comprovado;
+3. um piloto de pelo menos um ciclo diário no provedor pago, com **tabela de ensaio isolada** (escopo próprio, antes
+   da migração definitiva), medindo:
+   - cobertura, atraso e custo faturado;
+   - bytes físicos por evento único e por evento recebido (tabela, índices e TOAST);
+   - `wal_bytes`/`wal_fpi`;
+   - lotes criados, consumidos, parciais e remanescentes, e posições por dia;
+   - linhas de retrato e evidência completa por aposta e cenário;
+   - CPU, RSS, temporários e duração do motor 1c-bis, com a prova de equivalência.
+
+   Um dia calibra taxas; não mede sozinho 45 dias de estoque. A projeção tem de cobrir a campanha inteira até o veredito
+   + 90 dias, incluindo o backup;
+4. a decisão do Everton sobre teto e disco **com esses números**.
+
+**Ondas revistas:**
+
+| Onda | O que é | Arquivos |
+|---|---|---|
+| 1b-ensaio | tabela de ensaio isolada | — |
+| 1c-bis | motor com memória limitada e prova diferencial | `packages/indicators/hunter_indicators/meme/wallets/*` |
+| piloto | medições do item 3 do portão | — |
+| decisão | teto e disco, com os números do piloto | — |
+| 1b-definitiva | migração, podador diário por dependência, exclusões do dump | `docs/DATABASE.md` (§1.3: partição **diária** e poda por dependência, convenção nova; L0 **sem chave primária**, desvio declarado de §15.2) |
+| 2 | coletor `wallet-tape` | — |
+
+### 9.8 Achados laterais (registrados, fora do escopo)
+
+- **Crons de manutenção não instalados.** A outbox não é podada desde 28/09; nenhuma partição meme cai sem
+  `prune_partitions`. A **primeira queda devida é a de 2026_09, em 31/10**.
+- **Backup de 05/10 ausente** no log.
+- **WAL de ~86 GB/dia** com `shared_buffers` padrão (128 MB), `max_wal_size` 1 GB e `wal_compression` off. É um candidato
+  a ajuste (devops/DBA), a medir em separado.

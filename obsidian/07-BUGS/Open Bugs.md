@@ -1614,3 +1614,11 @@ HIGH (controle de segurança; repo público). Auditoria do security-reviewer em 
 ## `maxSupportedTransactionVersion: 0` recusa blocos com transação versão 1 (05/10) — MÉDIA
 
 MÉDIA (latente; nenhuma perda observada). A sondagem da onda 0 ([[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]]) viu o RPC público responder `-32015` ("Transaction version (1) is not supported") a `getBlock`/`getTransaction` com `maxSupportedTransactionVersion: 0` quando a transação é de **versão 1** (147 de 1 104 num bloco amostrado, 13 %; evidência em `.claude/state/carteiras-lucro/probe/side-findings-v1-tx-and-slot-time.json`). `packages/exchange-adapters/hunter_exchanges/pumpfun/tx_rpc.py:191` e `rpc_wallet.py:82` usam `0`. As nossas transações são legacy/v0, então o risco hoje é de leituras de terceiros (financiadores e carteiras do H-030) e de reconciliação de assinatura alheia; a correção é trocar para `1` e provar com fixture real. Não corrigido aqui (arquivos de outra tarefa em curso). Aberto também: o desenho fala em "5 slots ≈ 2 s", mas o slot hoje dura ≈ 268 ms (3,73 slots/s).
+
+## Manutenção da VPS sem rodar: crons ausentes, backup de 05/10 faltando, WAL ~86 GB/dia (05/10) — HIGH
+
+HIGH (operação; disco). Achados do database-architect em leituras só de leitura na VPS (05/10), durante o desenho do armazenamento do H-030 ([[wallet-tape-storage]]):
+- `/etc/cron.d` só tem `hunter-backup` e `hunter-meme-close`. Faltam `hunter-partitions` e `hunter-outbox`. A outbox não é podada desde 28/09: 15,9 M linhas despachadas, a mais velha de 26/09. Nenhuma partição meme vai cair; a primeira, 2026_09, vence em 31/10. A instalação está com o Everton.
+- `backup.log` não tem linha de 05/10; a última é de 04/10 01:35Z. O reboot de 05/10 foi às 14:35Z, depois da hora do backup (01:17Z). Na madrugada de 05/10 a VPS estava travada (incidente de 04/10 ~09:15Z, [[2026-10-05]]), o que provavelmente explica a falta. Falta confirmar que o backup de 06/10 rodou.
+- WAL ~86 GB/dia com `shared_buffers` 128 MB, `max_wal_size` 1 GB e `wal_compression` off. Ajuste à parte, com o database-architect.
+- Disco: 187 G livres, caindo 3,3 G/dia desde 30/09.
