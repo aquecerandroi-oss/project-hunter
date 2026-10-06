@@ -118,18 +118,17 @@ async def wallet(
 
 
 class TestBrlUnavailable:
-    """Runs **first** in this module, deliberately.
+    """The newest rate is stale -> BRL degrades with a reason.
 
-    ``fx_observations`` is global (DATABASE.md §18.2) and the live summary
-    read picks the newest one available for the pair/source
-    (``FxObservationRepository.latest_available``) — exactly right in
-    production, where there is one true USDTBRL rate for every wallet. In this
-    suite it means a fresh observation any *other* test's ``wallet`` fixture
-    inserts would outrank the deliberately-stale one this test needs the
-    summary to actually pick. Collection order in a module is definition
-    order (no randomisation plugin is configured), so this class is declared
-    before ``TestSummary`` precisely so nothing has inserted a fresher
-    ``USDTBRL``/``binance.spot.ticker`` row yet.
+    ``fx_observations`` is global (DATABASE.md §18.2) and the live summary read picks the newest
+    one available for the pair/source (``FxObservationRepository.latest_available``) -- exactly
+    right in production, where there is one true USDTBRL rate for every wallet. In this suite
+    every other test of the session (``test_manual_orders``, ``test_risk_api``, this module's own
+    ``wallet`` fixture...) leaves a *fresher* observation behind, and the deliberately stale one
+    this test plants is never the newest. This class used to rely on running first in its module,
+    which holds only when the whole session is this one file (the CI job runs everything in one
+    session). It now makes *every* observation stale instead: the summary's clock is moved two
+    hours ahead, so whichever observation is the newest is old by then.
     """
 
     async def test_a_stale_rate_makes_brl_unavailable_with_a_reason(
@@ -137,12 +136,16 @@ class TestBrlUnavailable:
         client: httpx.AsyncClient,
         make_actor: Callable[[str], Actor],
         session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """The rate that opened the wallet is fresh *at the opening instant* and
         stale *now* — BRL degrades without touching the USDT side (M3 joint
         decision, item 1)."""
         unique = uuid.uuid4().hex[:8]
         actor = await create_org(client, make_actor(f"pf-stale-{unique}"), f"Stale {unique}")
+        monkeypatch.setattr(
+            "hunter_api.routers.portfolio.utcnow", lambda: utcnow() + timedelta(hours=2)
+        )
         observed_at = utcnow() - timedelta(seconds=700)
         fx_id = await _observe_fx(session_factory, observed_at=observed_at)
         portfolio_id = await _open(
