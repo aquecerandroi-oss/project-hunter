@@ -91,7 +91,7 @@ Contraste mínimo AA (4.5:1) para texto em todos os pares acima; verificar com o
 
 ## 4. Página de pré-visualização (desenvolvimento)
 
-`apps/web/app/_design/page.tsx` renderiza tokens e componentes-âncora nos dois temas para revisão visual. Retorna 404 em produção (`HUNTER_ENV`/`NODE_ENV`) e não aparece na navegação. É ferramenta de design, não feature.
+`apps/web/app/%5Fdesign/page.tsx` (a pasta **precisa** se chamar `%5Fdesign`: `_design` é pasta privada do App Router e nunca roteia; guarda em `tests/design-route-folder.test.ts`) renderiza tokens e componentes-âncora nos dois temas para revisão visual. Retorna 404 em produção (`HUNTER_ENV`/`NODE_ENV`) e não aparece na navegação. É ferramenta de design, não feature.
 
 ## 5. Histórico
 

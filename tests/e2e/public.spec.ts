@@ -14,13 +14,40 @@ function usingFakeClerkKey(): boolean {
   return !key || key === FAKE_CLERK_PUBLISHABLE_KEY;
 }
 
+/**
+ * What the web app under test is: `production` (`next start` / the Docker
+ * image, which is what CI's e2e job runs -- NODE_ENV=production baked into
+ * infra/docker/Dockerfile.web) or `development` (`pnpm --filter @hunter/web
+ * dev`, the documented local flow in playwright.config.ts). Explicit
+ * `E2E_WEB_MODE` wins; otherwise CI means production and a bare local run
+ * means a dev server.
+ */
+function resolveWebMode(): "production" | "development" {
+  const explicit = process.env.E2E_WEB_MODE;
+  if (explicit === "production" || explicit === "development") return explicit;
+  if (explicit) throw new Error(`E2E_WEB_MODE must be "production" or "development", got "${explicit}"`);
+  return process.env.CI ? "production" : "development";
+}
+const webMode = resolveWebMode();
+
 test.describe("public surfaces (no auth required)", () => {
-  test("/_design renders the design tokens page", async ({ page }) => {
+  // docs/DESIGN.md §4: /_design is a design-review tool -- it renders in
+  // development and 404s in production (app/%5Fdesign/page.tsx calls notFound()
+  // when NODE_ENV === "production"). The two branches below assert each half
+  // of that one contract; neither is weakened, the environment picks which
+  // half applies.
+  test("/_design follows its dev-only contract (renders in development, 404s in production)", async ({ page }) => {
     const response = await page.goto("/_design");
-    expect(response?.ok()).toBe(true);
-    // docs/DESIGN.md §4 -- app/globals.css's shared <title> ("Project
-    // Hunter") doesn't change per route, so the honest check is the page's
-    // own h1 (components/design/design-preview.tsx: "HUNTER -- Design Tokens"),
+    if (webMode === "production") {
+      expect(response?.status()).toBe(404);
+      await expect(page.getByText("This page could not be found")).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: /design/i })).toHaveCount(0);
+      return;
+    }
+    expect(response?.status()).toBe(200);
+    // app/globals.css's shared <title> ("Project Hunter") doesn't change per
+    // route, so the honest check is the page's own h1
+    // (components/design/design-preview.tsx: "HUNTER -- Design Tokens"),
     // not document.title.
     await expect(page.getByRole("heading", { level: 1 })).toContainText(/design/i);
   });
