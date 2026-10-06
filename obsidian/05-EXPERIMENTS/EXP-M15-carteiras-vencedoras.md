@@ -144,3 +144,6 @@ Sondagem de leitura do programa inteiro (pump + PumpSwap) por RPC público, 144 
 
 ### Fonte REA (06/10/2026)
 - Perfil e competições da pump.fun: oito rotas de perfil observadas (`portfolio-summary`, `user-portfolio`, `callout/list`, `balance/tokens`, `wallet-overview` e outras), nenhuma com carimbo próprio demonstrado; não há página de competições navegável. Só serve para observar daqui para a frente. [[2026-10-06-perfil-e-competicoes]]
+
+### Decisão (06/10/2026)
+- NATS da pump.fun entra para acompanhar as carteiras escolhidas na fase de seguir/papel, com fallback on-chain e lacuna explícita; o ranking continua vindo da fita do programa inteiro. [[2026-10-06-nats-da-pumpfun-no-projeto-das-carteiras]]

@@ -1,6 +1,6 @@
 ---
 tags: [inbox, pendencia, pumpfun, nats, termos, rea, escopo]
-status: aberto
+status: resolvido
 owner: sexta-feira
 updated: 2026-10-06
 ---
@@ -31,6 +31,8 @@ updated: 2026-10-06
 ## Sai daqui quando
 
 O Everton escolher uma opção (anotar a data, a opção e o motivo aqui), ou quando a medição for descartada.
+
+**Resolvido em 06/10/2026:** Everton escolheu a opção 3 (usar no projeto das carteiras), com limites: [[2026-10-06-nats-da-pumpfun-no-projeto-das-carteiras]].
 
 ## Relacionado
 
