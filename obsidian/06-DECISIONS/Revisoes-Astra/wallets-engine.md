@@ -124,3 +124,49 @@ falhava, e depois o arquivo voltou ao original. **15 de 15 mutantes foram mortos
   `code_version`.
 - Falta validar UTC em `CreateEvent` e `Link`.
 - Falta um ajudante para `timedelta(seconds=float(decision_seconds))`, que se repete.
+
+## Conserto da precificação de pool e ponte `SwapRecord → Fill` (05/10, noite)
+
+Fecha o defeito "cota a pool sem a reserva virtual e desfaz o trade sem a taxa LP", achado em [[wallets-1a]] e agora em [[Resolved Bugs]].
+A revisão da Astra deu APPROVE sem must-fix: [[wallets-1c-pricing]]. O conserto mudou só o contrato, para que o 1c-bis
+(§9.4 do desenho) o reaproveite como está.
+
+**O que mudou no motor**
+
+- **Pool cotada em `Q_real + V`.** `Reserves.virtual_quote_lamports` tem sinal e pode ser negativa. Um estado com quote efetiva ≤ 0 não existe (`ValueError`), e a ponte o recusa por nome (`non_positive_effective_quote`).
+- **Teto da venda de pool.** O bruto fica limitado ao `Q_real` do cofre e a taxa sai depois. É convenção de liquidação, não o limite exato do cofre.
+- **`pre_trade_state` (público) desfaz o trade pelo fluxo exato do cofre.** Na compra, `Q_pós − (sol + LP)` e `B_pós + átomos`. Na venda, `Q_pós + (sol − LP)` e `B_pós − átomos`. A `V` não muda, e um pré-estado com quote efetiva ≤ 0 é impossível (`None`).
+- **`pre_trade_real_sol`** (tercil do pareamento H2) usa o mesmo pré-estado.
+- **`bridge.fill_from_swap`.** O `hunter_indicators` não depende do `hunter_exchanges`, então a entrada é estrutural (`SwapLike`) e o `SwapRecord` real serve sem cópia. Recusas por nome:
+  - `pool_quote_unresolved`;
+  - `non_sol_quote` e `sol_is_base`;
+  - `virtual_quote_missing`;
+  - `non_positive_effective_quote`;
+  - `curve_completion_unknown`;
+  - `invalid_values`.
+
+**Prova nas fixtures reais `t1a_*`**
+
+| Prova | Resultado |
+|---|---|
+| Pré-estado de pool reconstruído contra as reservas que o próprio evento reporta antes do trade | Igual em 9 de 9 swaps de pool com quote WSOL (8 fixtures) |
+| Compra de 38 387 041 lamports | Pelo `ceil` do programa sobre o pré-estado, o custo exato dos átomos do líder é 38 387 041 |
+| Mesma compra, só com a quote real | 32 468 690 pelo `ceil` (o 32 468 689 da [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro]] é o piso), −15 % |
+| `buy_atoms` com o total pago pelo líder | 52 542 046 711 átomos contra 52 542 044 672 (+2 039, cerca de 1,5 lamport de quote). Sem a `V` daria 62 116 740 872 (+18,2 %) |
+| Vendas (2 com cashback e 1 v1) | Bruto igual ao lamport. Líquido +1, 0 e +2 lamports acima da cadeia (um teto sobre a taxa total contra quatro tetos) |
+| Pares fixados (compra→compra na pool `BTKS…` e as duas vendas com cashback) | O pós-estado do primeiro é o pré-estado do segundo |
+
+**Comandos**
+
+- `uv run pytest packages/indicators/tests/meme/`: 144 passed.
+- `uv run pytest packages/indicators`: 1 595 passed (rodado de novo depois dos nice-to-have da Astra).
+- 12 mutantes manuais mortos (fluxo sem LP, compra e venda sem `V`, sem teto, sem a guarda de quote efetiva, `V` perdida no pré-estado e seis na ponte). Rodados à mão; o script não está no repositório.
+
+**Achados que ficam**
+
+- **Pools com WSOL na base.** O `SwapRecord` chama de `sol_lamports` a perna de quote, que nessas pools é outro token. São 3 de 13 swaps das fixtures.
+- **O `SwapRecord` não carrega a flag `complete` da curva.** A ponte exige `curve_complete` do chamador, **daquele evento**.
+
+Os dois estão em [[Open Bugs]] para a onda 2.
+
+**Rodada de revisão de código (05/10, noite).** Um pré-estado impossível não é mais descartado em silêncio. O slot de pouso fica `CENSORED`, a ponte recusa o registro (`pre_state_impossible`) e a liquidez antes do gatilho fica desconhecida (`None`), sem par no H2. A compra de pool passou a ser em inteiros e nunca custa mais que o orçamento. Detalhe e divergência de severidade em [[wallets-1c-pricing]].

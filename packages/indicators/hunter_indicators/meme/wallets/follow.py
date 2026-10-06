@@ -32,6 +32,7 @@ from typing import Literal
 
 from hunter_indicators.meme.wallets.clock import NominalClock
 from hunter_indicators.meme.wallets.params import FollowPolicy
+from hunter_indicators.meme.wallets.pricing import pre_trade_state
 from hunter_indicators.meme.wallets.snapshot import Snapshot, current_snapshot
 from hunter_indicators.meme.wallets.tape import CreateEvent, Fill, event_order
 
@@ -221,16 +222,23 @@ def _age_bucket(f: Fill, creates: Mapping[str, CreateEvent]) -> str:
     return "<5m" if minutes < 5 else "5-60m" if minutes <= 60 else ">60m"
 
 
-def pre_trade_real_sol(f: Fill) -> int:
-    """Real SOL in the curve/pool just before ``f`` (a buy added it, a sell removed it)."""
-    real = f.reserves.real_sol_lamports if f.reserves.venue == "curve" else f.reserves.sol_lamports
-    return (real or 0) - (f.sol_lamports if f.side == "buy" else -f.sol_lamports)
+def pre_trade_real_sol(f: Fill) -> int | None:
+    """Real SOL in the curve/pool just before ``f`` (:func:`~.pricing.pre_trade_state`: the
+    exact vault flow, LP fee included); ``None`` (unknown, never 0) when that state is
+    impossible."""
+    pre = pre_trade_state(f)
+    if pre is None:
+        return None
+    return (pre.real_sol_lamports if pre.venue == "curve" else pre.sol_lamports) or 0
 
 
 def _stratum(
     f: Fill, creates: Mapping[str, CreateEvent], edges: tuple[int, int]
-) -> tuple[str, str, int]:
+) -> tuple[str, str, int] | None:
+    """The pairing cell; ``None`` when the liquidity before the trigger is unknown."""
     real = pre_trade_real_sol(f)
+    if real is None:
+        return None
     tercile = 0 if real < edges[0] else 1 if real < edges[1] else 2
     return (f.venue, _age_bucket(f, creates), tercile)
 
@@ -252,11 +260,16 @@ def pair_controls(
     venue, age bucket and real-SOL tercile before the trigger; seeded hash draw,
     without replacement. Outcome-blind: only trigger fields are read, so
     incomplete or censored controls stay in the pool (Astra). The tercile edges
-    are frozen inputs computed outside, blind to outcomes."""
+    are frozen inputs computed outside, blind to outcomes. A trigger whose liquidity
+    before the trade is unknown (impossible pre-state) is never paired, and such a
+    control is never drawn: its pair is ``None``, counted like any unpaired bet."""
     used: set[str] = set()
     pairs: dict[str, str | None] = {}
     for f in sorted(follows, key=lambda x: (x.received_at, _draw(seed, x.signature, ""))):
         key = _stratum(f, creates, tercile_edges)
+        if key is None:
+            pairs[f.signature] = None
+            continue
         pool = [
             c
             for c in controls

@@ -82,3 +82,7 @@ O `code-reviewer` rodou a Astra sobre o conjunto (`.claude/state/astra-review-re
 
 Também aceitos: o valor da cauda sem nome (`trailing_u64`) agora é conferido contra os 8 últimos bytes do corpo e fixado (169 685 numa fixture), porque zerar o campo passava; o aluguel da compra v1 é fixado em **1 513 840 lamports** (antes o teste aceitava tudo `None`); `0.9 * int` virou comparação inteira; contagens das docstrings alinhadas (4 `buy_exact_quote_in` + 3 `buy` nas fixtures; "61 de 61" qualificado como varredura avulsa com 3 pares fixados); docstring de `rpc.py` corrigida; o arquivo de teste de 531 linhas foi dividido (`test_swap_record.py` para a normalização). Guardas que não tinham teste ganharam: compra que tira mais base do que a pool tem, venda que paga mais quote do que a pool tem, timestamp não positivo, e cashback dentro de `fee_total` da compra (corpo sintético rotulado, que reprova na conservação). Mutantes: 6 novos, todos mortos.
 
+
+## Item 2 da rodada 2: consertado no motor (05/10, noite)
+
+O item de integração (o motor 1c perdia a reserva virtual e a LP) foi consertado em `packages/indicators/hunter_indicators/meme/wallets/`. A pool passa a ser cotada em `Q_real + V` com sinal, o pré-estado sai do fluxo exato do cofre e há uma ponte `SwapRecord → Fill`. A prova usa estas fixtures, e a Astra aprovou sem must-fix: [[wallets-1c-pricing]].

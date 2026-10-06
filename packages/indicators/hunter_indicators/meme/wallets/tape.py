@@ -13,6 +13,7 @@ the fees the event declares** and ``fee_lamports`` is those fees, so a buy costs
 ``sol + fee`` and a sell nets ``sol − fee``. An adapter that maps a PumpSwap
 ``SellEvent`` must therefore put ``quote_amount_out`` (gross) here, never
 ``net_proceeds`` (already net) — otherwise the fee is taken twice (§3.1).
+:mod:`.bridge` maps the adapter's ``SwapRecord`` (same semantics) into a ``Fill``.
 """
 
 from __future__ import annotations
@@ -56,8 +57,10 @@ class Reserves:
 
     Curve: ``sol_lamports``/``token_atoms`` are the *virtual* reserves and
     ``real_sol_lamports`` is the vault (the ceiling of any sale, ``curve.py``
-    T4.27) — mandatory on the curve. Pool: quote (SOL) and base (token)
-    reserves; the quote reserve is already real, so no ceiling field.
+    T4.27) — mandatory on the curve. Pool: ``sol_lamports`` is the REAL quote
+    (WSOL vault, the ceiling of any sale) and ``virtual_quote_lamports`` the
+    pool's signed virtual quote: the pool is priced on their sum
+    (:attr:`effective_quote_lamports`, KB-0184 item 3), which must be positive.
     """
 
     venue: Venue
@@ -66,12 +69,23 @@ class Reserves:
     real_sol_lamports: int | None
     complete: bool = False
     """The curve program's own completion flag (migration); never derived here."""
+    virtual_quote_lamports: int = 0
+    """PumpSwap ``virtual_quote_reserves`` (i128, may be negative); ``0`` on the curve."""
 
     def __post_init__(self) -> None:
         if self.sol_lamports <= 0 or self.token_atoms <= 0:
             raise ValueError("reserves must be positive")
         if self.venue == "curve" and self.real_sol_lamports is None:
             raise ValueError("a curve state needs its real SOL (the sale ceiling)")
+        if self.venue == "curve" and self.virtual_quote_lamports != 0:
+            raise ValueError("a curve state has no separate virtual quote")
+        if self.effective_quote_lamports <= 0:
+            raise ValueError("the pool's effective quote (real + virtual) must be positive")
+
+    @property
+    def effective_quote_lamports(self) -> int:
+        """The quote side of the constant product: real + virtual (the curve's is virtual already)."""
+        return self.sol_lamports + self.virtual_quote_lamports
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +108,9 @@ class Fill:
     fee_bps: int
     """Total fee of the event in basis points — the rate our simulated trade pays."""
     reserves: Reserves
+    lp_fee_lamports: int = 0
+    """The part of ``fee_lamports`` that stays in a pool (PumpSwap LP fee): the vault moves by
+    ``sol + lp`` on a buy and ``sol − lp`` on a sale. ``0`` on the curve."""
 
     def __post_init__(self) -> None:
         _utc(self.block_time, "block_time")
@@ -102,6 +119,10 @@ class Fill:
             raise ValueError("a fill moves a positive token amount and non-negative SOL")
         if not 0 <= self.fee_bps < 10_000:
             raise ValueError("fee_bps out of range")
+        if not 0 <= self.lp_fee_lamports <= self.fee_lamports or (
+            self.reserves.venue == "curve" and self.lp_fee_lamports
+        ):
+            raise ValueError("the lp fee is part of the declared fees, and only in a pool")
 
     @property
     def identity(self) -> tuple[str, str, int]:

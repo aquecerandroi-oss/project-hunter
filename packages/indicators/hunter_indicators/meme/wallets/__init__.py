@@ -6,6 +6,8 @@ the package: every instant comes from an event or from the caller.
 
 - :mod:`.tape` — the decoded event (:class:`~.tape.Fill`), identity/dedupe and
   :func:`~.tape.causal_view` (mined **and** received before an instant);
+- :mod:`.bridge` — the adapter's ``SwapRecord`` → :class:`~.tape.Fill`, every refusal
+  named (pool quote not resolved to WSOL, curve completion unknown, ...);
 - :mod:`.lots` — FIFO lots, realized PnL net of fees (W-PnL), unmatched sales;
 - :mod:`.pricing` — the §3.1 price contract (last state ≤ slot, worst of the
   landing slot, real-SOL ceiling always on, migration without pool → censored);

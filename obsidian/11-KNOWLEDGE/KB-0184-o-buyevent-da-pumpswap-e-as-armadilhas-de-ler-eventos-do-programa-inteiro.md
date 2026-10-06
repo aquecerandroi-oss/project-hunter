@@ -18,7 +18,7 @@ populacao: PumpSwap e pump.fun, 100 transações com swap da PumpSwap (48 BuyEve
 efeito: —
 ic: —
 veredito: —
-proximo_passo: o motor 1c (pricing.py) passa a cotar pool com a reserva virtual e a desfazer o trade com a taxa LP; o coletor (onda 2) consome SwapRecord
+proximo_passo: feito no motor 1c em 05/10 (wallets-1c-pricing); o coletor (onda 2) consome SwapRecord pela ponte e precisa resolver as mints da pool e a flag complete da curva
 classe_de_perda: —
 mercado: meme
 ---
@@ -78,10 +78,17 @@ Nenhuma: é instrumento. Serve à onda 1c e à onda 2 do H-030.
 ## O que muda na operação
 
 - **Nada liga.** O leitor e o decodificador não estão ligados a nenhum worker.
-- **O motor 1c precisa mudar antes do coletor:** `packages/indicators/hunter_indicators/meme/wallets/pricing.py` cota a pool com `state.sol_lamports * atoms // (token_atoms + atoms)` (sem a reserva virtual) e `_pre_state`
-  desfaz só `sol_lamports` (sem a taxa LP). O `SwapRecord` já entrega `virtual_quote_reserves`, `lp_fee_lamports` e reservas pós-trade exatas ([[Open Bugs]]).
+- **O motor 1c já mudou (05/10, noite):** a pool é cotada em `quote + virtual_quote_reserves` (com sinal) e o pré-estado é desfeito com a taxa LP. Há uma ponte pura `SwapRecord → Fill` (`hunter_indicators.meme.wallets.bridge`) com recusas nomeadas. Provado nestas fixtures ([[wallets-1c-pricing]], [[Resolved Bugs]]).
 - `maxSupportedTransactionVersion` passou a `1` em `tx_rpc.py` e `rpc_wallet.py` ([[Resolved Bugs]]).
 - Achado lateral: `infra/scripts/wallet_tape_probe_core.py` (`_from_sell`) soma a taxa da venda **sem** o cashback (2 de 54 vendas): a sondagem da onda 0 subestima a taxa nessas vendas. Não alterado aqui.
+
+## Depois do conserto do motor 1c (05/10, noite)
+
+O motor foi testado contra estas fixtures ([[wallets-1c-pricing]], [[wallets-engine]]). Três coisas que a primeira leitura não dizia:
+
+- **Nem toda pool tem WSOL na quote.** Em 3 de 13 swaps destas fixtures (`4jyi…`, `551G…` e `4xuv…`) as contas 3/4 da instrução mostram **WSOL na base** e outro token na quote. Ali o que o `SwapRecord` chama de `sol_lamports` é átomo de outro token. As "vendas que batem exato" do item 3 incluem uma dessas pools (`551G…`): a fórmula bate, mas a moeda não é SOL. A ponte recusa (`sol_is_base`) e a onda 2 precisa resolver as mints por pool ([[Open Bugs]]).
+- **O 32 468 689 do item 3 é o piso.** O custo exato pelo `ceil` do programa, só com a quote real, é 32 468 690. Com a reserva virtual o custo é 38 387 041, igual ao da cadeia.
+- **A `V` não muda dentro do trade.** Nos dois pares fixados no motor (compra→compra na pool `BTKS…` e as duas vendas com cashback), o pós-estado com a mesma `V` é o pré-estado do trade seguinte. Isso dá suporte nesses casos, não prova universal.
 
 ## Por que pode falhar
 
@@ -98,4 +105,4 @@ Nenhuma: é instrumento. Serve à onda 1c e à onda 2 do H-030.
 
 ## Relacionados
 
-[[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]] · [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]] · [[T4.8e-decoders]] · [[wallets-engine]] · [[EXP-M15-carteiras-vencedoras]] · [[Exchange Adapters]]
+[[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]] · [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]] · [[T4.8e-decoders]] · [[wallets-engine]] · [[wallets-1c-pricing]] · [[EXP-M15-carteiras-vencedoras]] · [[Exchange Adapters]]

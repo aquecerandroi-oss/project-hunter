@@ -12,6 +12,28 @@ closed: 2026-09-08
 
 Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
 
+## Fechado em 05/10/2026, noite (conserto do motor 1c do H-030; na árvore, aguarda o commit do orquestrador)
+
+- **Motor 1c cotava a pool sem a reserva virtual e desfazia o trade sem a taxa LP (ALTA latente, aberto em 05/10) — fechado.** Achado na rodada 2 de [[wallets-1a]] ([[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro]]).
+  - **Antes:** `packages/indicators/hunter_indicators/meme/wallets/pricing.py` cotava compra e venda de pool com a quote real e `_pre_state` subtraía só `sol_lamports`.
+  - **Agora:**
+    - `Reserves.virtual_quote_lamports` tem sinal e a cotação usa `Q_real + V`;
+    - quote efetiva ≤ 0 não é estado e a ponte a recusa por nome;
+    - `pre_trade_state` desfaz o trade pelo fluxo exato do cofre (compra `Q_pós − (sol + LP)`, venda `Q_pós + (sol − LP)`);
+    - `Fill.lp_fee_lamports`;
+    - ponte pura `bridge.fill_from_swap` com recusas nomeadas.
+  - **Prova nas fixtures reais:**
+    - pré-estado igual ao reportado pelo evento em 9 de 9 swaps de pool com quote WSOL;
+    - a compra de 38 387 041 lamports custa exatamente isso sobre o pré-estado (só com a quote real, 32 468 690, −15 %);
+    - vendas com bruto exato;
+    - dois pares consecutivos encadeados.
+  - **Testes que falharam antes:** `test_wallets_pricing_pool.py`, `test_wallets_bridge.py` e `test_wallets_chain.py`; 12 mutantes manuais mortos.
+  - **Revisão:** [[wallets-1c-pricing]]. A Astra deu APPROVE na rodada 1. Na revisão de código, o code-reviewer deu APPROVE_WITH_NITS e ela apontou dois HIGH, ambos fechados aqui:
+    - um pré-estado impossível agora censura o pouso e é recusado pela ponte (`pre_state_impossible`);
+    - liquidez desconhecida (`None`) nunca entra no pareamento.
+    A compra de pool também deixou de custar mais que o orçamento. Detalhe em [[wallets-engine]].
+  - **O que ficou aberto:** a flag `complete` da curva e as pools com WSOL na base, em [[Open Bugs]].
+
 ## Fechados em 05/10/2026 (onda 1a do H-030; na árvore, aguardam o commit do orquestrador)
 
 - **`maxSupportedTransactionVersion: 0` recusava transações versão 1 (MÉDIA, aberto em 05/10) — fechado.** `getTransaction` com `0` recebia `-32015` para toda transação v1

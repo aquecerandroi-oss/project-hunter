@@ -47,8 +47,15 @@ def curve(
     )
 
 
-def pool(sol: int, tokens: int) -> Reserves:
-    return Reserves(venue="pool", sol_lamports=sol, token_atoms=tokens, real_sol_lamports=None)
+def pool(sol: int, tokens: int, *, virtual: int = 0) -> Reserves:
+    """A pool state: real quote ``sol``, base ``tokens`` and the signed virtual quote."""
+    return Reserves(
+        venue="pool",
+        sol_lamports=sol,
+        token_atoms=tokens,
+        real_sol_lamports=None,
+        virtual_quote_lamports=virtual,
+    )
 
 
 _SEQ = [0]
@@ -66,6 +73,7 @@ def fill(
     received_delay: float = 0.5,
     fee: int = 0,
     fee_bps: int = 125,
+    lp_fee: int = 0,
     reserves: Reserves | None = None,
     signature: str | None = None,
     ordinal: int = 0,
@@ -90,6 +98,7 @@ def fill(
         token_atoms=atoms,
         fee_lamports=fee,
         fee_bps=fee_bps,
+        lp_fee_lamports=lp_fee,
         reserves=state,
     )
 

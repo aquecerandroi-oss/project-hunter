@@ -10,7 +10,10 @@
   order-free. Used only to resolve a fill, never to decide.
 - **Curve:** ``hunter_indicators.meme.curve`` quotes, with the real-SOL ceiling
   **always** passed (``curve.py`` lets it be omitted; here it cannot be).
-- **Pool:** its own constant product on (quote, base); the fee is the event's.
+- **Pool:** its own constant product on (real + virtual quote, base) — the signed
+  ``virtual_quote_reserves`` of PumpSwap, KB-0184 item 3 — with a sale never paying
+  more than the real quote in the vault; the fee is the event's. The state before a
+  trade is rebuilt from the exact vault flow, LP fee included (:func:`pre_trade_state`).
 - **Migration:** a completed curve is not executable. A position then follows
   in the pool **only** if a decoded pool event exists at or before the landing;
   otherwise the landing is :data:`CENSORED`.
@@ -43,6 +46,7 @@ __all__ = [
     "buy_atoms",
     "liquidation_lamports",
     "liquidation_or_none",
+    "pre_trade_state",
     "sell_lamports",
 ]
 
@@ -82,18 +86,21 @@ def _curve(state: Reserves) -> CurveReserves:
 
 
 def buy_atoms(state: Reserves, budget_lamports: int, *, fee_bps: int) -> int | None:
-    """Atoms a total spend of ``budget_lamports`` buys (fee on top); ``None`` if not executable."""
+    """Atoms a total spend of ``budget_lamports`` buys (fee on top); ``None`` if not executable.
+
+    Pool: in integers. The net quote is floored to whole lamports so that net plus the
+    ceiled fee never exceeds the budget, and the atoms are floored so that the program's
+    ceiled exact-out cost of them never exceeds that net.
+    """
     if not _executable(state) or budget_lamports <= 0:
         return None
-    with localcontext(CONTEXT):
-        if state.venue == "curve":
+    if state.venue == "curve":
+        with localcontext(CONTEXT):
             fee_pct = Decimal(fee_bps) / 100
             tokens = quote_buy(_curve(state), Decimal(budget_lamports) / _SOL, fee_pct).tokens
             return _floor(tokens * _TOK)
-        quote_in = Decimal(budget_lamports) / (1 + Decimal(fee_bps) / _BPS)
-        return _floor(
-            Decimal(state.token_atoms) * quote_in / (Decimal(state.sol_lamports) + quote_in)
-        )
+    quote_in = budget_lamports * 10_000 // (10_000 + fee_bps)
+    return state.token_atoms * quote_in // (state.effective_quote_lamports + quote_in)
 
 
 def _ceil_bps(amount: int, bps: int) -> int:
@@ -105,7 +112,13 @@ def sell_lamports(state: Reserves, atoms: int, *, fee_bps: int) -> int | None:
 
     Gross is floored and the fee is ceiled separately (``pumpswap/quote.py``);
     with only the event's *total* bps the three program-side ceilings become
-    one, so this can be at most 2 lamports more generous than the program.
+    one, so this can be at most 2 lamports more generous than the program (3 with
+    the PumpSwap cashback as a fourth fee). A pool sale is quoted on the effective
+    quote and its GROSS capped at the real quote of the vault, then the fee is taken.
+    That cap is a research liquidation convention, like the curve's real-SOL ceiling:
+    it neither shows the whole sale would execute on chain nor models the vault's exact
+    limit (``gross − LP ≤ real quote``); it only binds when the virtual quote is
+    positive and the sale is huge.
     """
     if not _executable(state):
         return None
@@ -123,22 +136,32 @@ def sell_lamports(state: Reserves, atoms: int, *, fee_bps: int) -> int | None:
             )
             gross = _floor(quote.curve_proceeds_sol * _SOL)
     else:
-        gross = state.sol_lamports * atoms // (state.token_atoms + atoms)
+        gross = min(
+            state.effective_quote_lamports * atoms // (state.token_atoms + atoms),
+            state.sol_lamports,
+        )
     return gross - _ceil_bps(gross, fee_bps)
 
 
-def _pre_state(f: Fill) -> Reserves | None:
-    """The reserves just before ``f`` (its own trade undone); ``None`` if impossible."""
+def pre_trade_state(f: Fill) -> Reserves | None:
+    """The reserves just before ``f`` (its own trade undone); ``None`` if impossible.
+
+    Curve: the gross SOL leg moved the virtual and the real SOL. Pool: the vault moved
+    by the exact flow — a buy added ``sol + lp`` (net quote plus the LP fee), a sale
+    paid ``sol − lp`` (gross minus the LP fee, which stays in the pool); the virtual
+    quote is a pool parameter the trade does not move. A pre-state whose effective
+    quote would not be positive is impossible, never priced.
+    """
     sign = 1 if f.side == "buy" else -1
     post = f.reserves
-    sol = post.sol_lamports - sign * f.sol_lamports
+    flow = f.sol_lamports + sign * f.lp_fee_lamports
+    sol = post.sol_lamports - sign * flow
     tokens = post.token_atoms + sign * f.token_atoms
-    real = (
-        None if post.real_sol_lamports is None else post.real_sol_lamports - sign * f.sol_lamports
-    )
-    if sol <= 0 or tokens <= 0 or (real is not None and real < 0):
+    real = None if post.real_sol_lamports is None else post.real_sol_lamports - sign * flow
+    virtual = post.virtual_quote_lamports
+    if sol <= 0 or tokens <= 0 or (real is not None and real < 0) or sol + virtual <= 0:
         return None
-    return Reserves(post.venue, sol, tokens, real, complete=False)
+    return Reserves(post.venue, sol, tokens, real, complete=False, virtual_quote_lamports=virtual)
 
 
 class MintTape:
@@ -161,20 +184,25 @@ class MintTape:
         i = bisect_left(self._slots, slot)
         return self._slots[i - 1] if i else None
 
-    def landing_states(self, slot: int) -> tuple[tuple[Reserves, int], ...]:
+    def landing_states(self, slot: int) -> tuple[tuple[Reserves, int], ...] | Censored:
         """``(state, fee_bps)`` a landing at ``slot`` may meet (§3.1).
 
         With trades in the slot: the previous slot's post-states, every post-state
         of the slot **and** every pre-state of the slot (the state before its first
-        trade is one of them, whatever the unknown intra-slot order). Without
+        trade is one of them, whatever the unknown intra-slot order). A trade of the
+        slot whose pre-state is impossible makes the worst state unknowable: the
+        landing is :data:`CENSORED`, never priced on the states that remain. Without
         trades: the post-states of the last slot ≤ ``slot``.
         """
         if slot in self._by_slot:
             before = self._slot_before(slot)
             prior = self._by_slot[before] if before is not None else []
             here = self._by_slot[slot]
-            pre = [(p, f.fee_bps) for f in here if (p := _pre_state(f)) is not None]
-            return (*((f.reserves, f.fee_bps) for f in (*prior, *here)), *pre)
+            pre = [(pre_trade_state(f), f.fee_bps) for f in here]
+            if any(p is None for p, _ in pre):
+                return CENSORED
+            undone = [(p, b) for p, b in pre if p is not None]
+            return (*((f.reserves, f.fee_bps) for f in (*prior, *here)), *undone)
         last = self._slot_at_or_before(slot)
         if last is None:
             return ()
@@ -186,8 +214,10 @@ class MintTape:
 
     @staticmethod
     def _priceable(
-        states: Sequence[tuple[Reserves, int]],
+        states: Sequence[tuple[Reserves, int]] | Censored,
     ) -> tuple[tuple[Reserves, int], ...] | Censored | None:
+        if isinstance(states, Censored):
+            return states
         if not states:
             return None
         if any(r.venue == "pool" for r, _ in states):
