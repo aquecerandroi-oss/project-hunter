@@ -118,10 +118,12 @@ uma **imputação** pré-registrada, não um limite inferior: a perda total é R
 [[06-DECISIONS/Revisoes-Astra/wallets-engine|wallets-engine]]. Nada foi medido em dado real: o motor só tem testes
 sintéticos.
 
+**Releitura da pump.fun (06/10): o que o site publica sobre carteiras, e por que não é ponto no tempo.** O quadro de PnL tem seis visões de 100 linhas (300 carteiras distintas na união da rodada), é vivo, curado e, no daily, 77 % marcação com 59–84 % de selos KOL; seguidores e quadro não têm histórico; `/user-trades/{wallet}` devolveu ~10 dias (800 trades) de uma carteira. Ver [[KB-0185-o-que-a-pumpfun-publica-sobre-carteiras-lucrativas]].
+
 ## Relacionados
 
 [[EXP-M15-carteiras-vencedoras]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0142-kol-e-call-antecipam-ou-confirmam]] ·
 [[KB-0138-explosao-de-compradores-nao-tem-vantagem]] · [[KB-0141-sniper-de-lancamento]] ·
 [[KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos|KB-0124]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] ·
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[KB-0156-o-despejo-em-bloco-nao-e-uma-rede-de-financiamento]] ·
-[[KB-0171-custo-real-da-spot-1]] · [[Fila de Hipoteses]] · [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar|KB-0183]] (a medição da onda 0: volume, RPC e disco)
+[[KB-0171-custo-real-da-spot-1]] · [[Fila de Hipoteses]] · [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar|KB-0183]] (a medição da onda 0: volume, RPC e disco) · [[KB-0185-o-que-a-pumpfun-publica-sobre-carteiras-lucrativas|KB-0185]] (o que o site publica sobre carteiras)

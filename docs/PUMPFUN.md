@@ -32,7 +32,7 @@ de 120 endpoints) e as páginas oficiais `pump.fun/docs/fees`, `/docs/bonding-cu
 | `fun-block.pump.fun` | `getBlockchainClientUrl` — doações/caridade (`/donate/*`) | cookie | — | vivo (400 de validação) |
 | `advanced-api-v2.pump.fun` | `getAdvancedClientServerUrl` — ainda referenciado no bundle | — | — | **HTTP 530, Cloudflare 1016** (origem morta). A lista comunitária rotula todas as capturas com este host — artefato da ferramenta HAR, não use |
 | `solana-mainnet.pump.fun/<uuid>` | RPC Solana do próprio site (HTTPS e WSS), chave embutida no bundle | chave do site | não medido | `getHealth` → `ok`. **Não é para uso de terceiros**: é a cota do site |
-| `wss://multichain-prod.nats.realtime.pump.fun` | NATS — eventos de trade multichain (EVM) | `auth_required: true` no `INFO` | — | vivo, fechado |
+| `wss://multichain-prod.nats.realtime.pump.fun` | NATS — eventos de trade multichain (EVM) | `auth_required: true` no `INFO` | — | vivo, fechado (ver §10: hoje também `prod-v2` e `unified-prod`) |
 | `socket.io` (`livechatUrl`, vindo da config do servidor, não do bundle estático) | chat da livestream | token de auth no payload | — | não conectado (não é feed de trades) |
 | `frontend-api.pump.fun` (v1) / `frontend-api-v2` | domínios antigos dos tutoriais | — | — | 530/1016 (T4.0); v2 "deprecated" na lista comunitária |
 
@@ -46,23 +46,23 @@ em `notes-T4.0c.md` §4; aqui vai o resumo.
 
 | # | Método e path | Query observada (bundle) | Auth | HTTP | RL | Forma (resumo) |
 |---|---|---|---|---|---|---|
-| 1 | `GET /coins` | `offset, limit, sort, order, includeNsfw[, complete=true][, searchTerm][, creator][, tokenizedAgent=true][, isCharity=true][, deviceId, sessionId]` | não | 200 | 60 | `[Coin]` — 54 campos (§1.3). **Cap de 70 itens por página**: `limit=100` e `limit=1000` devolvem 70. `offset` funciona (paginei até 630). `sort=created_timestamp` e `sort=market_cap` confirmados; `complete=true` filtra graduadas; `searchTerm=pepe` busca por nome |
-| 2 | `GET /coins/{mint}` | — | não | 200 | — | `Coin` + `security_verdict{verdict,scope,reasons[],decided_by,provider,version,updated_at,source}` |
+| 1 | `GET /coins` | `offset, limit, sort, order, includeNsfw[, complete=true][, searchTerm][, creator][, tokenizedAgent=true][, isCharity=true][, deviceId, sessionId]` | não | 200 | 60 | `[Coin]` — 54 campos (§1.3). **Cap de 70 itens por página**: `limit=100` e `limit=1000` devolvem 70. `offset` funciona (paginei até 630). `sort=created_timestamp` e `sort=market_cap` confirmados; `complete=true` filtra graduadas; `searchTerm=pepe` busca por nome (ver §10: +5 campos no `Coin`, `chain_id` CAIP-2) |
+| 2 | `GET /coins/{mint}` | — | não | 200 | — | `Coin` + `security_verdict{verdict,scope,reasons[],decided_by,provider,version,updated_at,source}` (ver §10: **404 em 06/10**; `/coins-v3/{mint}` responde 200) |
 | 3 | `GET /coins-v3/{mint}` | `includeLiveStreamInfo=bool` | não | 200 | 60 | `Coin` (mesmos campos; sem `security_verdict` nesta amostra) |
 | 4 | `GET /sol-price` | — | não | 200 | 50 | `{solPrice: float, asOfTimestamp: int(ms), stale: bool}` |
 | 5 | `GET /coins/great-coins` | (`?…` opcional) | não | 200 | 20 | `[Coin]` (5) — "trending"; inclui coins EVM (`mint` 0x…), `canonical_pool_liquidity_usd`, `pump_swap_pool`, `inverted` |
 | 6 | `GET /coins/top-tokens/mints` | — | não | 200 | 60 | `[str]` (502 mints; começa em wSOL; inclui tokens fora do pump) |
 | 7 | `GET /coins/similar` | `mint, limit=5, offset=0, includeNsfw` | não | 200 | 20 | `[Coin]` |
 | 8 | `GET /mayhem/top-coins` | `window=24h` | não | 200 | 60 | `{window, items[50]{rank, mint, netUsdDeployed}, updatedAt}` |
-| 9 | `GET /mayhem/top-traders` | `window=24h` | não | 200 | 60 | `{window, items[50]{rank, address, realisedPnlUsd, winRate, volumeUsd, tradeCount}, updatedAt}` |
-| 10 | `GET /pnl-leaderboard` | `period ∈ {daily, weekly, monthly}, sort?, limit?` | não | 200 (400 com `period=24h`) | 60 | `{entries[]{rank, walletAddress, pnlSol, pnlUsd, pnlPercent, buySpendSol, realizedPnl*, unrealizedPnl*, positionsCount, topPositions[]{mint, chainId, symbol, name, imageUri}, username, userId…}, periodType, periodLabel, windowStartSec}` |
-| 11 | `GET /users/{address}` | — | não | 200 | 30 | `{address, userId, is_pump_user, username, profile_image, kind, member_count, following, followers, bio, x_username, canonical_svm_wallet, group_badges[]}` |
+| 9 | `GET /mayhem/top-traders` | `window=24h` | não | 200 | 60 | `{window, items[50]{rank, address, realisedPnlUsd, winRate, volumeUsd, tradeCount}, updatedAt}` (ver §10: também `window=7d`) |
+| 10 | `GET /pnl-leaderboard` | `period ∈ {daily, weekly, monthly}, sort?, limit?` | não | 200 (400 com `period=24h`) | 60 | `{entries[]{rank, walletAddress, pnlSol, pnlUsd, pnlPercent, buySpendSol, realizedPnl*, unrealizedPnl*, positionsCount, topPositions[]{mint, chainId, symbol, name, imageUri}, username, userId…}, periodType, periodLabel, windowStartSec}` (ver §10: `sort` realized/unrealized/combined, `limit` ≤ 100, sem `offset`) |
+| 11 | `GET /users/{address}` | — | não | 200 | 30 | `{address, userId, is_pump_user, username, profile_image, kind, member_count, following, followers, bio, x_username, canonical_svm_wallet, group_badges[]}` (ver §10: +5 campos) |
 | 12 | `GET /coins-v2/user-created-coins/{address}` | `limit=10, offset=0` | não | 200 | 60 | `{limit, offset, count, coins[Coin]}` |
-| 13 | `GET /coins/top-holders/{mint}` | `shape=web` | não | 200 | 60 | `{topHolders[50]{address, amount(float, unidades UI)}, totalHolders: int}` |
+| 13 | `GET /coins/top-holders/{mint}` | `shape=web` | não | 200 | 60 | `{topHolders[50]{address, amount(float, unidades UI)}, totalHolders: int}` (ver §10: superada por `top-holders-v2`) |
 | 14 | `GET /token-holders/{mint}/count` | — | não | 200 | 60 | `{mint, chain, networkId, holderCount}` |
 | 15 | `GET /coins-v2/{mint}/mayhem-state` | — | não | 200 | 60 | `{mint, state ∈ active/paused/completed, mode ∈ auto/manual, pause_reason}` (ex.: `below_initial_buy_floor`) |
 | 16 | `POST /coins-v2/mints` | corpo `{mints[], includeNsfw, include_nsfw}` | não | 201 | 30 | `[Coin]` (lote de metadados; o site usa `credentials:"include"`, mas anônimo funcionou) |
-| 17 | `GET /user-positions/{wallet}` | `mints=<mint>[,…]` obrigatório (≤ 200; 400 sem ele) | não | 200 | **600** | `{positions[]{coinMint, chainId, isExited, walletAddress, amountHeld, pnlUsd, pnlPercentage, costBasisAmount, costBasisUsd, amountBoughtUsd, amountBought, callout, hasTransfers, likelyLost, valueUsd, tokenPriceUsd, realizedPnlUsd, updatedAt}}` |
+| 17 | `GET /user-positions/{wallet}` | `mints=<mint>[,…]` obrigatório (≤ 200; 400 sem ele) | não | 200 | **600** | `{positions[]{coinMint, chainId, isExited, walletAddress, amountHeld, pnlUsd, pnlPercentage, costBasisAmount, costBasisUsd, amountBoughtUsd, amountBought, callout, hasTransfers, likelyLost, valueUsd, tokenPriceUsd, realizedPnlUsd, updatedAt}}` (ver §10: +`openedAt`, `tradeCount`) |
 | 18 | `GET /coins/search-unrestricted` | `offset, limit, sort, order, includeNsfw, currentlyLive=true[, tokenizedAgent][, isCharity]`; `sort` também aceita `featured`, `livestream_num_participants` (bundle) | não | 200 | — | `[Coin]` + campos de live: `num_participants, playlist_url(_high/_low), playlist_status, thumbnail, vod_playlist_url, volume_1h_usd, recommendation_id/rank, last_reply, inverted, pump_swap_pool, banner_uri` |
 | 19 | `GET /global-params/{created_timestamp_ms}` | path = timestamp da criação da coin | não | 200 | 50 | `{slot, signature, initial_virtual_token_reserves, initial_virtual_sol_reserves, initial_virtual_quote_reserves, initial_real_token_reserves, token_total_supply, fee_basis_points, timestamp}` — **parâmetros iniciais da curva vigentes naquele instante** (§4.2) |
 | 20 | `GET /coins/mayhem-mode` | `limit=60, mayhemState?` | não | 200 (A4.1b) | — | `[Coin]` com `mayhem_state` |
@@ -70,7 +70,7 @@ em `notes-T4.0c.md` §4; aqui vai o resumo.
 | 22 | `GET /coins/king-of-the-hill` | `includeNsfw` | — | **404** `Coin not found for mint: king-of-the-hill` | — | rota v1 morta: o router v3 trata como `/coins/{mint}` |
 | 23 | `GET /coins/latest`, `GET /candlesticks/{mint}`, `GET /replies/{mint}`, `GET /trades/latest`, `GET /metas/current` | (v1) | — | **404** | — | rotas v1/v2 documentadas pela comunidade **não existem** em v3 |
 
-### 1.2 Vistos no bundle, não chamados (precisam de cookie de sessão, são escrita, ou não cabem no orçamento)
+### 1.2 Vistos no bundle, não chamados (precisam de cookie de sessão, são escrita, ou não cabem no orçamento) (ver §10: várias foram lidas na releitura de 06/10)
 
 `POST /profiles/verified {ids[]}`, `POST /users/batch`, `GET /users/search-v2?…`, `GET /users/mention-candidates`,
 `GET /users/{id}/mutual-followers`, `GET|POST|DELETE /following/*`, `/following/v3/{following|followers}/count/{id}`,
@@ -84,7 +84,7 @@ em `notes-T4.0c.md` §4; aqui vai o resumo.
 `POST /wallet-overview`, `POST /x/public-handles`, `GET /kols`, `GET /livestream[/history|/is-approved-creator]`.
 Nenhum deles é necessário para radar ou execução.
 
-### 1.3 O objeto `Coin` (54 campos observados em `/coins`, `/coins/{mint}`, `/coins-v3`, `/coins-v2/mints`)
+### 1.3 O objeto `Coin` (54 campos observados em `/coins`, `/coins/{mint}`, `/coins-v3`, `/coins-v2/mints`) (ver §10: 59 chaves, +5)
 
 ```
 mint, initialized, name, symbol, description, image_uri, metadata_uri, twitter?, website?, telegram?,
@@ -174,7 +174,7 @@ e `SwapApiClient.market_activity_batch`; worker: `services/meme-worker/hunter_me
 
 ## 3. Superfícies em tempo real
 
-### 3.1 WS do site: `wss://advanced-indexer.pump.fun/ws/trenches` (boards do screener)
+### 3.1 WS do site: `wss://advanced-indexer.pump.fun/ws/trenches` (boards do screener) (ver §10)
 
 - URL: `/ws/trenches?subscription=<JSON url-encoded {board, tier:"web", filterKey}>`; depois de abrir,
   o cliente envia `{"event":"subscribe","data":{"board":"movers","tier":"web","platform":"WEB","surface":"WEB"[, filters, userId, sessionId, deviceId]}}`.
@@ -226,7 +226,7 @@ e `SwapApiClient.market_activity_batch`; worker: `services/meme-worker/hunter_me
   cotação SOL exata em lamports; `commitment`, `outer_ix_index`, `inner_ix_index` e `is_mayhem_agent`
   ficam `NULL` (a resposta não os traz); `event_index` = ordinal do trade dentro da mesma tx no lote.
 
-### 3.2 NATS multichain: `wss://multichain-prod.nats.realtime.pump.fun`
+### 3.2 NATS multichain: `wss://multichain-prod.nats.realtime.pump.fun` (ver §10: hoje há 3 hosts NATS)
 
 Handshake lido (só `INFO`, sem `CONNECT`): servidor NATS 2.12.11, `auth_required: true`,
 `max_payload: 524288`. O bundle usa para `useMultichainTradeEventSubscription` (trades de coins
@@ -304,7 +304,7 @@ vêm de `/global-params/{ts}` (§4.2) e do estado da `bonding_curve` on-chain.
 
 ## 4. Taxas, ciclo de vida e estatísticas ao vivo
 
-### 4.1 Taxas — `https://pump.fun/docs/fees`, **"Last Updated: 20 May 2026"**
+### 4.1 Taxas — `https://pump.fun/docs/fees`, **"Last Updated: 20 May 2026"** (ver §10: relida em 06/10, igual)
 
 | Ação | Taxa |
 |---|---|
@@ -432,7 +432,7 @@ Listagem `complete=true` (70 graduadas mais novas por criação): todas criadas 
 
 | Necessidade | Situação medida | Alternativa |
 |---|---|---|
-| Holders por coin | **Parcial**: top 50 por quantidade + `totalHolders` (`/coins/top-holders`), `holderCount`, `top10HoldersPercent`/`devHoldingsPercent`/`bundlerOwnedPercentageV2` (indexer, sem definição). Lista completa e PnL por holder (`profile-api POST /pnl/coin/{mint}/holders`) não testados/rota de sessão | RPC `getTokenLargestAccounts` (20) / `getProgramAccounts` por mint, ou Helius DAS / Bitquery (chave) |
+| Holders por coin | **Parcial**: top 50 por quantidade + `totalHolders` (`/coins/top-holders`; ver §10: `top-holders-v2`, `holder-stats`), `holderCount`, `top10HoldersPercent`/`devHoldingsPercent`/`bundlerOwnedPercentageV2` (indexer, sem definição). Lista completa e PnL por holder (`profile-api POST /pnl/coin/{mint}/holders`) não testados/rota de sessão | RPC `getTokenLargestAccounts` (20) / `getProgramAccounts` por mint, ou Helius DAS / Bitquery (chave) |
 | Histórico de trades | Paginado por cursor de 100 (`swap-api`), `first-trade` de abril/2025 existe → profundidade parece completa, mas **sem garantia de retenção documentada**; sem filtro por intervalo de tempo além de `createdTs`/cursor | Backfill próprio por `getSignaturesForAddress` da bonding curve + decodificação com a IDL |
 | Candles | 12 intervalos, ≤ 1 000 por chamada, **só os N mais recentes** (nenhum parâmetro `to/before` no bundle); 1 m × 1 000 cobriu 45 h numa coin antiga (esparso), 1 h × 1 000 cobriu julho→setembro; retenção real desconhecida | Reconstruir de trades ou provedor OHLCV (Bitquery até 1 s) |
 | Trades em tempo real por coin (Solana) | **Não há WS público** do site: `trenches` é agregado por board; NATS exige auth (e é EVM); socket.io é chat | PumpPortal `subscribeTokenTrade` (0,01 SOL/10 k eventos, chave + ≥ 0,02 SOL) ou Geyser/`logsSubscribe` próprio |
@@ -631,3 +631,173 @@ mint (nunca o endereço fixo do sol-vault), `--apply` exige `--reason` e deixa u
 `system_events` com a contagem por `mayhem_enabled`. Ver `docs/DATABASE.md` §55 para o esquema, o
 gatilho de escrita única estendido e o downgrade recusado enquanto alguma linha carregar um valor em
 `bonding_curve_raw`.
+
+## 10. Releitura de 06/10/2026
+
+**Status:** releitura da superfície pública depois do upgrade dos programas de 02/10 (pedido do Everton: "leia o
+pump.fun por inteiro"). Medido entre **02:22 e 02:56 UTC de 06/10/2026** (23:22–23:56 BRT de 05/10), no mesmo método
+da T4.0c e com a mesma disciplina: sem login, sem cookie, sem chave, `GET` anônimo (mais três `POST` de leitura: dois do
+lote da §2 #4 e um de PnL de holders, §10.3), ≥ 1 s entre chamadas, nenhum desafio contornado, nenhum cabeçalho
+falsificado. Notas cruas, o log de todas as chamadas e as formas completas:
+`.claude/state/notes-pumpfun-releitura-2026-10-06.md`. Síntese e leitura para o H-030:
+[[KB-0185-o-que-a-pumpfun-publica-sobre-carteiras-lucrativas]]; revisão da Astra:
+[[06-DECISIONS/Revisoes-Astra/pumpfun-releitura|pumpfun-releitura]].
+
+**Quatro tipos de evidência, nunca misturados nesta seção.** **HTTP** = chamei e li a resposta. **Bundle** = o registro tipado
+de rotas do site diz (não é uma chamada). **REA** = o navegador chamou (não prova que um cliente sem navegador receba a
+mesma resposta). **Não testado** = nada disso.
+
+**Dois métodos, créditos separados.**
+1. **Leitura do bundle + chamadas `curl`/`websockets`** (este agente): **53 chamadas de API** (`frontend-api-v3` 44, `profile-api` 4,
+   `swap-api` 3, `advanced-indexer` 2), 6 páginas HTML e 5 conexões WS de leitura = **64 unidades**, acima do "~60" pedido: 61 até a
+   segunda captura do REA (a 61.ª leu a forma de `POST /pnl/coin/{mint}/holders` a pedido do orquestrador) e 3 a mais para
+   desfazer uma afirmação "sumiu" que a revisão da Astra apontou (`GET /coins/{mint}`, §10.2); além de 101 chunks JS estáticos, fora da conta.
+   Códigos das 53: 200 × 44, 201 × 3, 400 × 1, 401 × 3, 404 × 2. **Nenhum 429, nenhum 403, nenhum desafio Cloudflare.** Limite do método:
+   só li os chunks que a home lista; chunks de rota carregados depois (`/leaderboard`, screener) ficaram de fora.
+2. **Observação passiva via REA** (Chrome headless sem login, duas capturas: home + `/leaderboard` — 744 requisições, 4 WebSockets — e
+   `/coin/{mint}`, feitas pelo orquestrador; `.claude/state/rea-pumpfun-capture-2026-10-06.md`). Não guarda corpos. Itens só dele levam "(REA)".
+
+### 10.1 O que mudou desde 12/09, em uma página
+
+- **O mapa tem um contrato escrito agora (bundle).** Um chunk do site (`02i6ywd4i-qb4.js`) traz o registro tipado de **312 rotas** do BFF
+  (178 GET, 102 POST, 21 DELETE, 6 PATCH, 5 PUT) com `summary`, `query` e `response` (zod), inclusive os tetos de `limit`. Em 12/09 só
+  tínhamos literais de URL. "Ausente do mapa de 12/09" abaixo quer dizer isso, **não** que a rota tenha nascido depois: não sei desde quando existe.
+- **`GET /coins/{mint}` saiu do ar (HTTP).** Respondeu **404 "Cannot GET"** em dois mints (a §1.1 #2 dava 200 em 12/09). `GET /coins-v3/{mint}` responde 200 (RL 60).
+  Confirma o que o código já registra ("a rota por mint que dá 404 desde ~25/09", T4.97b/R80, `services/meme-worker/hunter_meme_worker/collect.py`); `PumpFunRestClient.get_curve_state` ainda aponta para ela.
+- **O quadro de PnL tem `sort` e tetos medidos (HTTP + bundle).** `sort ∈ {realized, unrealized, combined}`; `limit` teto 100 e `offset` sem efeito. Há rotas públicas por carteira que o mapa
+  de 12/09 não tinha (`/user-trades/{wallet}`, `/users/{id}/overview`, `/pnl-leaderboard/top-trader-trades/{mint}`, profile-api `/v4/pnl/*`) e rotas que ele só listava no bundle e que agora foram **chamadas**
+  (`/following/v3/*/count`, `/mint-positions/{mint}`, `/pnl-leaderboard/positions`, `POST profile-api /pnl/coin/{mint}/holders`). Detalhe em 10.3.
+- **`Coin`: cinco campos antes não registrados foram observados** em 70 itens de `/coins` (`updated_at`, `is_holder_reward`, `transfer_fee_bps`, `transfer_hook_program`, `depth`) e `chain_id` veio em CAIP-2
+  (`solana:5eykt4…`). Seis chaves de 12/09 não apareceram nesta amostra (a referência antiga mistura quatro rotas): **não é um diff completo de schema**. O teto de 70 por página continua.
+  `is_holder_reward` casa com o `Pool.is_holder_reward` que o IDL do GitHub já mostrava (§8.1) e com a aba "Holder rewards" do site; ligar isso ao upgrade de 02/10 é **coincidência de data**, não prova.
+- **Em tempo real (HTTP + REA).** Os handshakes anônimos de `prod-v2.nats.realtime.pump.fun` (NATS 2.12.15, `max_payload` 8 192), `unified-prod.nats.realtime.pump.fun` (visto pelo REA; NATS 2.12.11, 524 288)
+  e `multichain-prod.nats.realtime.pump.fun` (igual a 12/09) exigem `auth` (`auth_required: true`, 3 de 3 medidos). O bundle descreve `POST /nats/token` ("JWT de usuário por 1 h", dependente de sessão, atrás de uma
+  flag escura); **não o chamei** e ele não é fonte para nós. O `wss://advanced-indexer.pump.fun/ws/trenches` **ainda responde anônimo** (15 s: 1 snapshot + 26 deltas); a entrada tem as chaves `hr` e `lp` a mais.
+  O REA não viu o trenches nas páginas que abriu (o screener não foi aberto); isso não prova que ele saiu.
+- **Taxas: as páginas conferem.** `/docs/fees` ainda diz **"Last Updated: 20 May 2026"** e a escada SOL/USDC confere linha a linha com a §4.1; PumpPortal `/fees/` também. As taxas **on-chain** de hoje não foram relidas aqui.
+- **Login da web (documentação do site):** a entrada por carteira de navegador foi aposentada em **25/09/2026 15:00 UTC** (e-mail, Google, Apple, GitHub via Privy). Endereço, posições, callouts e seguidores permanecem. Irrelevante para nós (não fazemos login).
+- **`/mayhem/overview`** tem `agentVolumeUsd`, `distinctTraders` e o modo `party` (355 moedas em 24 h) a mais; `coinsCreated` 24 h = 10 226 (12/09: 10 705; é conteúdo, não interface).
+
+### 10.2 Tabela de diferenças
+
+Colunas: **estado** (mudou / igual / ausente do mapa de 12/09 / no mapa só como bundle / saiu do ar / bloqueada / não testada), **evidência** (HTTP, bundle, REA), código e limite (`x-ratelimit-limit`, janela 60 s) quando houve chamada.
+
+| Estado | Rota | Evidência e código | RL | Nota |
+|---|---|---|---|---|
+| **saiu do ar** | `GET /coins/{mint}` (§1.1 #2) | HTTP **404** "Cannot GET" (2 mints) | — | substituta: `GET /coins-v3/{mint}` HTTP 200, RL 60; confirma R80 |
+| **mudou (campos novos observados)** | `GET /coins?limit=100` | HTTP 200, **70** itens | 60 | + `updated_at, is_holder_reward, transfer_fee_bps, transfer_hook_program, depth`; `chain_id` CAIP-2 |
+| **mudou** | `GET /pnl-leaderboard` | HTTP 200 | 60 | `sort` (valores caracterizados), `limit` ≤ 100, `offset` sem efeito; 3 períodos |
+| **mudou** | `GET /users/{address}` | HTTP 200 | 30 | + `is_banned, header_image_url, avatar_decoration, last_username_update_timestamp, canonical_evm_wallet`; ainda público |
+| **mudou** | `GET /user-positions/{wallet}?mints=` | HTTP 200 | 600 | + `openedAt`, `tradeCount`; `callout{…}` quando a carteira publicou um |
+| **mudou** | `advanced-indexer /in-memory-coin/{mint}` | HTTP 200, **67** campos (65) | — | + `isHolderReward`, `isMultiplayer`, `mayhemBotCoinSupplied`, `builderTip*`, `tradingAppFee*`, `txFeeSolV2` (a lista de 12/09 era parcial) |
+| **mudou** | `wss://…/ws/trenches` | HTTP/WS responde anônimo | — | entrada com `hr`, `lp` a mais |
+| **igual (forma)** | `GET /mayhem/overview`, `GET /mayhem/top-traders?window=24h\|7d`, `GET /sol-price` | HTTP 200 | 60 / 60 / 50 | `overview` ganhou 3 campos; o #1 de 24 h em `top-traders` tem PnL = volume e 5 999 trades (perfil de robô/agente) |
+| **igual** | `POST swap-api /v1/coins/market-activity/batch` | HTTP 201 | 1 000 (CF ~20) | duas moedas pump ativas voltaram preenchidas; **um mint sem sufixo `pump` voltou `null` em toda janela** (o sufixo não foi validado como classificador de programa) |
+| **ausente do mapa de 12/09** | `GET /user-trades/{wallet}` | HTTP 200 | **600** | trades **por carteira**, 200 por página, cursor; ver 10.3 |
+| **ausente do mapa de 12/09** | `GET /users/{id}/overview` | HTTP 200 | 60 | seguidores, seguindo, `verified`, `createdCoinsCount`; ver 10.3 |
+| **ausente do mapa de 12/09** | `GET /pnl-leaderboard/top-trader-trades/{mint}` | HTTP 200 | 120 | trades do top-50 de qualquer período naquela moeda |
+| **ausente do mapa de 12/09** | `GET /coins/top-holders-v2/{mint}` | HTTP 200 | 60 | holders com `isDev`, `isSniper`, `isBundler`, `enteredAt` |
+| **ausente do mapa de 12/09** | `GET /coins/holder-stats/{mint}` | HTTP 200 | 60 | % top-10, dev, snipers, bundlers, taxas totais (nulos num mint fora do programa pump) |
+| **ausente do mapa de 12/09** | `GET /trades/{chainId}/{address}` | HTTP 200 | 600 | fita **por moeda**, `blockId` = slot, `before/after`; sem filtro por carteira |
+| **ausente do mapa de 12/09** | `GET /competitions`, `/competitions/{slug}` | HTTP 200 | 60 | competições com prêmio; 100 linhas; ver 10.3 |
+| **ausente do mapa de 12/09** | `GET /fees/holder-rewards` | HTTP 200 | 600 | livro de holder rewards (123 429 moedas, 360 427 carteiras distintas pagas) |
+| **ausente do mapa de 12/09** | `profile-api /balance/summary/{w}`, `/v4/pnl/token/{w}/{m}`, `/v4/pnl/{w}/trades` | HTTP 200 | sem cabeçalho | PnL por carteira e por moeda (o `balance/summary` nu era 404 em 12/09, sem id) |
+| **ausente do mapa de 12/09** | `GET /coins/perps`, `GET /changelog` | HTTP 200 | 60 | perpétuos HyperCore (fora do nosso escopo); `changelog` vazio hoje |
+| **no mapa só como bundle, agora chamada** | `GET /following/v3/{followers,following}/count/{id}` | HTTP 200 `{count}` | 50 | contagem barata |
+| **no mapa só como bundle, agora chamada** | `GET /pnl-leaderboard/positions?period=`, `GET /mint-positions/{mint}` | HTTP 200 (e REA) | 60 / 60 | posições do topo; holders com PnL e `callout`, 50 por página; a página de moeda chama `/mint-positions/{mint}?sortBy&pageSize[&withThesis]` (REA) |
+| **no mapa como "não testada", agora chamada** | `POST profile-api /pnl/coin/{mint}/holders` | HTTP **201** anônimo (e REA 3×) | sem cabeçalho | corpo `{holders:[≤ 20 carteiras]}` (bundle); PnL de cada carteira **naquela moeda**; ver 10.3 |
+| **ausente do mapa (REA)** | `GET advanced-indexer /boards/trending` (`ranking`, `window`, `chains`), `GET /home-feed` (anônima), `GET /competitions/{id}/entries/{entry}/highlights?limit`, `POST pump.fun/api/relay/rpc/tokens/batch` | só REA | — | não chamadas por mim; forma não lida |
+| **ausente do mapa (REA)** | `livestream-api` (`/kols`, `/livestream`, `/livestream/history`, `/livestream/is-approved-creator`, `/clips/{mint}`, `/bounties/v2/tasks`), `blockchain-swap /supported/coin-create-mints` | só REA | — | chamadas pelo navegador em outro host; **resposta não verificada** (o `livestream-api` deu 404 no caminho nu em 12/09) |
+| **bloqueada** | `GET /users/{address}/trader-stats`, `/social-stats`, `GET /coin-activity/{mint}` | HTTP **401** | 30 / 30 / 20 | exigem sessão; registrado e deixado |
+| **bloqueada** | NATS (3 hosts) | HTTP/WS `auth_required: true` | — | só li o `INFO`; `POST /nats/token` só no bundle, **não chamado** |
+| **não testada (substituída no bundle)** | `/coins/top-holders/{mint}`, `/following/{id}`, `/following/v2/*` | só bundle ("superseded") | — | por `top-holders-v2` e `/following/v3/*` |
+| **não testada (fora do registro)** | `POST /wallet-overview`, `POST /x/public-handles`, `GET /kols`, `GET /livestream*`, `GET /coin-narrative/by-mints`, `GET /leaderboard` | ausentes do registro tipado; nenhuma chamada | — | podem viver em outro contrato; **não** é prova de que saíram |
+| **não testada** | `king-of-the-hill`, `/coins/latest`, `/candlesticks/*`, `/replies/*`, `/trades/latest`, `/metas/current` | 404 em 12/09; nada em 06/10 | — | não re-testadas |
+| **não testada** | `advanced-api-v2`, `livestream-api` (GET), `fun-block`, `blockchain-swap`, `solana-mainnet.pump.fun` | — | — | sem orçamento; o bundle ainda os cita |
+| **parcial** | `GET /candles/{chainId}/{address}` | HTTP **400** | 600 | o parâmetro é `res` ∈ {1s,15s,30s,1m,5m,15m,1h,4h,1d}; não explorado |
+
+### 10.3 O que é público sobre carteiras (para o H-030), com forma e limite medidos
+
+**Quadro de PnL — `GET /pnl-leaderboard?period=daily|weekly|monthly&sort=realized|unrealized|combined&limit≤100`** (HTTP; RL 60). Teto de 100
+linhas (bundle: "default and ceiling 100"; HTTP: `limit=200` → 100). `offset` não tem efeito (daily `limit=100&offset=100`: mesmo #1, 98 de 100
+carteiras iguais; a diferença é refresh). Campos: `rank, walletAddress, pnlSol, pnlUsd, pnlPercent, buySpendSol, realizedPnlSol/Usd, unrealizedPnlSol/Usd,
+positionsCount, topPositions[3], lastRefreshedAtMs, isVerified, verifiedBadgeVisible, userId` (+ nome e imagem, que não guardamos). Os três `windowStartSec` observados terminam
+em 02:00 UTC (daily 05/10, weekly 29/09, monthly 06/09, lidos às 02:25 UTC de 06/10); **uma leitura não distingue âncora fixa de janela móvel arredondada**. Cada linha foi atualizada a poucos minutos da leitura: o quadro é **vivo**, não um retrato diário.
+Seis quadros lidos nessa leitura (3 períodos × `combined` e `realized`) = 600 linhas = **300 carteiras distintas na união daquela rodada** (não é previsão de candidatas novas por dia: as mesmas carteiras reaparecem; o `sort=realized` não é o `combined`
+com outro nome: 49 de 100 em comum no daily). O que os números dizem:
+
+| quadro (100 linhas) | realizado Σ / não realizado Σ (SOL) | `isVerified` | `buySpendSol` ≈ 0 | `topPositions` de mint `…pump` | fora de Solana |
+|---|---|---|---|---|---|
+| daily combined | 3 597 / **11 760** | 59 | **14** | 80 / 254 | 61 |
+| weekly combined | 24 581 / 26 593 | 84 | 2 | 95 / 265 | 37 |
+| monthly combined | 106 170 / 76 769 | 80 | 1 | 86 / 252 | 34 |
+| daily realized | 6 107 / 378 | 60 | 0 | 109 / 247 | 25 |
+| weekly / monthly realized | — | 81 / 77 | 0 / 0 | 106 / 256; 90 / 252 | 19; 35 |
+
+- **A maior parte do PnL de "hoje" é marcação:** no daily combined, 77 % do PnL somado é não realizado (mediana por carteira 0,78), 38 das 100 linhas têm realizado ≤ 0 e 14 têm gasto de compra ≈ 0.
+  `buySpendSol ≈ 0` **não prova** "tokens recebidos": pode ser compra anterior à janela, custo ausente ou outra convenção contábil. No `sort=realized` essas linhas somem (0 sem compra, 0 com realizado ≤ 0), mas é um quadro de **sobreviventes de um
+  dia** (realizado/gasto mediano 0,29 no daily).
+- **O quadro não é só pump nem só Solana:** de 254 posições de topo no daily combined, só 80 têm mint `…pump` e 61 são de outras cadeias (EVM). É preciso filtrar para swaps do programa pump/PumpSwap.
+- **Metade ou mais é "verificado":** 59–84 de 100. O registro tipado descreve `POST /profiles/verified` como "Verified (KOL/influencer badge)"; **não está demonstrado que seja o mesmo conjunto que o R61 mediu** ([[KB-0142-kol-e-call-antecipam-ou-confirmam]]), e o
+  campo diverge entre rotas: o #1 semanal tinha `isVerified = true` no quadro (02:25 UTC) e `verified = false` no `/users/{id}/overview` (02:31 UTC).
+- **O quadro é curado (bundle):** rotas de moderação escondem carteiras banidas e moedas bloqueadas (`/pnl-leaderboard/ban`, `/blocklist/mints/*`).
+- Exemplo de leitura (não é recomendação): o #1 semanal (`9BMz..QdLU`) tem 27 709 seguidores, `following` 0, PnL +4 043 SOL dos quais **−62 realizado e +4 105 não realizado**, gasto de 3 228 SOL, 45 posições, e uma posição
+  com `callout` (uma "chamada" pública da moeda) em que custo = quantidade (nada vendido, realizado 0). Pela definição do KB-0182, isso é marcação.
+
+**Competições — `GET /competitions`, `GET /competitions/{slug}?limit≤100`** (HTTP; RL 60). Hoje 2 ao vivo (`solo-cuptober`, `squad-cuptober`, 03–10/10) e 2 passadas (`test-…`).
+`solo-cuptober`: **20 506 participantes**, prêmio de US$ 50 000 ao #1 (US$ 100 000 no total, `prizeCopy`), e o #1 tem **+US$ 682 mil, realizado 0, `buySpendSol` 0, 65 posições** (100 % marcação). Cada entrada
+traz `walletAddress`. É lista de candidatos **sob incentivo de prêmio** (viés provável; não medido).
+
+**Seguidores — público, sem data (HTTP).** `GET /users/{address}` (RL 30) devolve `followers` e `following`; `GET /following/v3/followers/count/{id}` e `/following/v3/following/count/{id}`
+(RL 50 observado) devolvem `{"count":n}` (15 e 11 B nessas duas respostas); `GET /users/{id}/overview` (RL 60) traz `counts{followers,following}`, `verified`, `banned`, `createdCoinsCount` e `degraded[]`. **Nenhuma tem carimbo de data nem histórico.** As fontes
+**não são equivalentes campo a campo**: a contagem não traz `following`, `is_pump_user`, verificação nem criação de moedas; e na mesma carteira o `/users` deu 27 709 (02:29 UTC) e o `/overview` 27 710 (02:31 UTC), por drift de leitura, e `verified` divergiu do quadro (acima). 50/min é o
+cabeçalho observado, não capacidade garantida. `/users/{address}/trader-stats` e `/social-stats` pedem sessão (**401**).
+
+**Trades por carteira — `GET /user-trades/{wallet}`** (HTTP; RL 600; só Solana). `limit` 1–200 (padrão 50), `cursor` (chave `micros:uuid`), `mint`, `types=trades|transfers`. Linha:
+`tx, isBuy, timestamp (ISO, segundos), amountUsd, amountSol, baseAmount, priceUsd, mint, chainId, walletAddress, userId, slotIndexId` (12 primeiros dígitos = slot; **slot sozinho não identifica um trade**: usar tx + evento/perna). Formulação sustentada: **800 trades recuperados de uma carteira
+em quatro páginas de 200, cobrindo ~10,05 dias (10 d 1 h 11 min: 06/10 00:47Z → 25/09 23:36Z), sem duplicata e com `nextCursor` ainda presente**. Não demonstra janela completa, retenção mínima nem cobertura uniforme de carteiras. Não traz programa/venue nem taxa.
+Alternativas por carteira: `profile-api GET /v4/pnl/{wallet}/trades?mint=` (uma moeda, `legCount`, `poolAddress`), `GET /v4/pnl/token/{wallet}/{mint}`, `GET /balance/summary/{wallet}` (sem cabeçalho de limite) e `swap-api /v2/coins/{mint}/trades?userAddress=` (por moeda; entra no limite de ~20/60 s do Cloudflare da §2).
+
+**PnL de holders por moeda — `POST profile-api /pnl/coin/{mint}/holders`** (HTTP 201 anônimo, sem cabeçalho de limite; achado da segunda captura do REA, forma lida por mim). Corpo, como o site o monta (bundle): `{"holders":["<carteira>", …]}`, em lotes de **20**. Chamei uma vez com 5 carteiras públicas do
+`top-holders-v2` da mesma moeda. Resposta: `{success, data[]{wallet, mint, unrealized{cost_basis{sol,usd}, pnl{sol,usd}, pnl_mark{sol,usd}, percentage{sol,usd}, amount_held}|null, realized{pnl, percentage, avg_buy_price, avg_sell_price, amount_sold, total_in, total_out}|null,
+total_buy_spend{sol,usd}, total_buy_amount, last_slot_index_id, has_transfers, has_untrusted_basis, fee{sol,usd}, fee_detail{base, priority, tip, ui, ata_rent, protocol, cashback}}, errors[]}`. Nas 5: 3 com realizado, 1 aberta (−99,6 % sobre 23,5 SOL), 1 linha sem dado; **`has_untrusted_basis = true` em 3 de 5**;
+`fee_detail` preenchido só em parte. É a única rota pública que devolve **realizado e custo por carteira e por moeda** para uma lista que *nós* escolhemos, mas o recorte é do site, `amount_held` divergiu da lista de holders lida 9 min antes (4,2 M tokens → 0) e a conta não é a nossa FIFO.
+
+**Sinal do próprio site — `GET /pnl-leaderboard/top-trader-trades/{mint}`** (HTTP; RL 120, `limit` ≤ 500, `to` em ms, cursor): trades, em todas as carteiras, de contas que estão no **top-50 de qualquer período**.
+Devolve `boardsBuiltAtMs` (a idade do quadro). Como o top-50 é o quadro vivo, uma operação antiga devolvida hoje **não era sinal disponível naquele instante**. É primo do sinal que o KB-0142 mediu (selo KOL: comprar 20 s depois deu R −0,071); **não** foi medido como tal.
+
+**Outras (HTTP).** `GET /mayhem/top-traders?window=24h|7d` (50 itens; só moedas Mayhem). `GET /coins/top-holders-v2/{mint}` marca cada holder com `isDev`/`isSniper`/`isBundler`. `GET /trades/{chainId}/{address}` é a fita por moeda com slot exato e `before/after`, **sem filtro por carteira**.
+`GET /user-portfolio/{wallet}` devolveu 200 posições com `limit=5` (195 KB). `GET /fees/holder-rewards?limit=3` devolveu 3 moedas e totais globais.
+
+### 10.4 O que o H-030 pode usar, o que não pode, e o aviso de olhar o futuro
+
+**Pode usar (com as condições da revisão da Astra):**
+- **Gerar candidatas observadas para frente, não escolher.** Cada resposta guarda fonte, período, ordenação e `received_at`; entradas e saídas posteriores do quadro **não apagam** candidatas já observadas. `known_at` anterior à aposta **não basta**: a candidata descoberta às 02:25 não existia
+  para o corte econômico de 00:00, então também precisa ser anterior ao corte do retrato que a selecionou. **Atenção ao universo:** o desenho diz que toda carteira vista na fita entra no ranking; se só as descobertas pelo site concorrerem ao top-30, o experimento passa a medir "C-PnL dentro da seleção da pump.fun", outra população,
+  mesmo sem olhar o futuro. A lista do site deve ser **observação adicional** (rotulada como tal), nunca substituir o universo da fita; os controles continuam vindo da fita inteira.
+- **Foto de seguidores.** A contagem barata (`followers/count`, 50/min observado) só cobre `followers`; `following`, `is_pump_user`, verificação e criação exigem `/users` (30/min) ou `/overview` (60/min), e as fontes não coincidem campo a campo. Antes de coletar, congelar fonte por campo, `known_at` **por resposta** (não o horário da primeira chamada
+  quando combinar fontes), tratamento de `degraded[]`/ausência (falha não vira `false` nem zero) e a divergência `verified` × `isVerified`. `is_verified` e `created_coins_count` entram **descritivos, sem alterar elegibilidade nem CONFIRMA**; `createdCoinsCount` não equivale à exclusão do criador de um mint. **Não guardar `username`.**
+- **Auditoria parcial por carteira.** `/user-trades/{wallet}` e `POST /pnl/coin/{mint}/holders` conferem **componentes** do PnL por entidade da nossa fita, não reproduzem o C-PnL, as reservas nem a execução. Antes de tratar como auditoria: intervalo fechado de comparação, paginação até a fronteira, detecção de cursor repetido, lacunas e eventos tardios;
+  casamento por tx + evento/perna, mint, carteira, lado e quantidade; inventário de abertura (dez dias não recuperam uma compra antiga vendida hoje); carteiras de cada entidade na versão do corte; `received_at` real no backfill, nunca o horário antigo do trade.
+- **Medir, sem decidir.** `top-trader-trades` pode ser registrado prospectivamente **como comparação descritiva pré-declarada** (universo de mints, cadência, deduplicação, composição do top, `boardsBuiltAtMs`, `generatedAtMs`, recepção local congelados antes), **sem poder confirmar o H-030**; se alguém quiser hipótese confirmatória sobre o site, precisa de protocolo
+  próprio e tratamento prévio da multiplicidade. Escolher os mints depois de ver sucesso é outra seleção.
+
+**Não pode usar:**
+- **Histórico de quadro.** Nenhum quadro, seguidor ou `top-trader-trades` tem versão passada: não há como reconstruir o quadro de 06/09 a 05/10. Só vale para frente, a partir da primeira foto arquivada.
+- **Ranking de hoje como critério ou como backtest.** O quadro de um dia ordena por resultado **até aquele dia** (inclui marcação, linhas sem custo e a curadoria da pump.fun). Uma carteira que aparece hoje apareceu *porque* ganhou; usar o quadro de hoje para escolher quem seguir e medir o ganho de ontem é olhar o futuro. O `sort=realized` também é viés de sobrevivência de uma janela.
+- **Seguidor com histórico.** Nem `/users` nem as contagens têm data: só a foto noturna nossa é ponto no tempo.
+- **`trader-stats`, `social-stats`, `coin-activity`, alertas de quem se segue, NATS:** exigem sessão ou autenticação.
+- **Descobrir o universo pelo site.** O quadro tem 100 linhas por período e nenhuma paginação; competição é população sob prêmio; Mayhem é um nicho. O universo completo só sai da nossa fita do programa inteiro.
+
+**Aviso de olhar o futuro, em uma frase:** um quadro lido **hoje** é o resultado de uma janela que já terminou (e `lastRefreshedAtMs` mostra que ainda se mexe), então só pode alimentar "quem observar a partir de agora", e cada uso precisa de um `known_at` anterior à aposta **e ao corte
+do retrato**, como já está escrito para os seguidores ([[2026-10-05-carteiras-seguidores-como-pergunta-secundaria]]).
+
+### 10.5 Limites desta releitura
+
+- Não li os chunks de rota que a home não lista (o `unified-prod.nats…` e `boards/trending` do REA não estão nos 101 que li). Não sei se o `trenches` ainda é usado pelo screener; sei que responde anônimo.
+- Cada rota nova foi chamada **uma vez** (às vezes duas); nada de teste de carga nem de 429 de propósito. Os limites são os cabeçalhos devolvidos; `remaining` leu 59 (ou 599, 119) em toda primeira chamada, mesmo 2–3 s depois de outra do mesmo caminho: **não concluí como os contadores se agrupam**.
+- Retenção de `/user-trades` e de `/trades/{chainId}/{address}` não foi encontrada. Os agregados (300 carteiras, 800 trades, 77 %) estão nas notas com o procedimento, mas as respostas brutas **não** foram preservadas (ver abaixo).
+- Não re-testei os hosts `advanced-api-v2`, `livestream-api`, `fun-block`, `blockchain-swap`, nem a regra de ~20 requisições por 60 s do Cloudflare no `swap-api` (T4.2f): o nosso tráfego a esse host foi 3 chamadas.
+- Os 5 campos novos do `Coin` e o upgrade de 02/10 são coincidência de data. Não houve diff completo de schema.
+- **Dados pessoais:** as respostas trouxeram nome de usuário, biografia e handle de X de pessoas. As respostas brutas ficaram numa pasta temporária **fora do repositório** durante a análise e **foram apagadas ao fim** (só restaram cabeçalhos e o log); no repositório há só endereços públicos truncados e agregados.
+  Na próxima leitura, sanitizar antes de qualquer persistência.

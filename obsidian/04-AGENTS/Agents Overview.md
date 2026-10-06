@@ -41,3 +41,4 @@ Um `agent` é uma instância de uma `strategy_version` dentro de um portfolio: `
 `docs/DATABASE.md` §6, `docs/PIPELINE.md` §6–7, `docs/ROADMAP.md` (Milestone 4), `CLAUDE.md`
 
 - 01/10/2026 — pesquisa ganhou dois papéis em par: [[Advogado de Jesus]] (derruba o resultado antes do dinheiro) e [[Defensor]] (impede que uma ideia boa morra por um teste ruim, sempre com pré-registro novo).
+- 06/10/2026 — ferramenta [[REA]] (engenharia reversa, MCP): observa sites como visitante anônimo; primeira leitura da pump.fun achou o PnL dos holders por moeda e as posições dos traders do topo.

@@ -134,3 +134,10 @@ Sondagem de leitura do programa inteiro (pump + PumpSwap) por RPC público, 144 
   - motor 1c-bis com prova de equivalência (o `build_snapshot` atual não cabe em memória na janela real).
 - **Seguidores** entram como pergunta secundária ([[2026-10-05-carteiras-seguidores-como-pergunta-secundaria]]), com foto datada por `known_at`.
 - **A previsão do H-030 (NÃO CONFIRMA) não muda.**
+
+## Avaliação de 06/10/2026 — releitura da superfície pública da pump.fun (infraestrutura, não resultado de estratégia)
+
+- **O que mudou para o H-030:** o site publica um quadro de PnL com seis visões de 100 linhas (3 períodos × `realized`/`combined`; 300 carteiras distintas na união da rodada de leitura), contagens de seguidores sem data (`/following/v3/followers/count`, RL 50/min), trades por carteira (`/user-trades/{wallet}`, RL 600; 800 trades recuperados de uma carteira, ~10 dias) e o PnL de holders por moeda (`POST profile-api /pnl/coin/{mint}/holders`). Nada tem histórico.
+- **Aviso de olhar o futuro:** o quadro de hoje é o resultado de uma janela já terminada e ainda se mexe por minuto; no daily combined 77 % do PnL é marcação, 14 de 100 linhas lucram sem ter comprado e 59–84 de 100 têm selo KOL. Só pode alimentar "quem observar daqui para a frente", com `known_at`; o critério primário segue sendo o C-PnL da nossa fita.
+- **A previsão do H-030 (NÃO CONFIRMA) não muda.** Nenhum número de PnL de carteira foi medido por nós nesta leitura.
+- Detalhe, formas e limites: `docs/PUMPFUN.md` §10 e [[KB-0185-o-que-a-pumpfun-publica-sobre-carteiras-lucrativas]]; revisão: [[06-DECISIONS/Revisoes-Astra/pumpfun-releitura|pumpfun-releitura]].
