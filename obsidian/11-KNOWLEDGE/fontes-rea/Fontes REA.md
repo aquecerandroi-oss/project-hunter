@@ -21,7 +21,7 @@ Nomes de usuário não entram; endereços entram truncados.
 Notas anteriores ao batedor que já valem como fonte: [[KB-0185-o-que-a-pumpfun-publica-sobre-carteiras-lucrativas]] e `.claude/state/rea-pumpfun-capture-2026-10-06.md`.
 
 ## Notas
-_(nenhuma ainda)_
+- 2026-10-06 · [[2026-10-06-perfil-e-competicoes]] — página de perfil de trader (oito rotas novas, observadas) e competições (sem página navegável achada); nada é ponto no tempo; serve ao H-030 / [[EXP-M15-carteiras-vencedoras]].
 
 ## Relacionado
 [[REA]] · [[2026-10-06-rea-na-pumpfun-apesar-dos-termos]]

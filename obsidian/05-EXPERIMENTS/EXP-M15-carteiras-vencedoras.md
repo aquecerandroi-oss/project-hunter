@@ -141,3 +141,6 @@ Sondagem de leitura do programa inteiro (pump + PumpSwap) por RPC público, 144 
 - **Aviso de olhar o futuro:** o quadro de hoje é o resultado de uma janela já terminada e ainda se mexe por minuto; no daily combined 77 % do PnL é marcação, 14 de 100 linhas lucram sem ter comprado e 59–84 de 100 têm selo KOL. Só pode alimentar "quem observar daqui para a frente", com `known_at`; o critério primário segue sendo o C-PnL da nossa fita.
 - **A previsão do H-030 (NÃO CONFIRMA) não muda.** Nenhum número de PnL de carteira foi medido por nós nesta leitura.
 - Detalhe, formas e limites: `docs/PUMPFUN.md` §10 e [[KB-0185-o-que-a-pumpfun-publica-sobre-carteiras-lucrativas]]; revisão: [[06-DECISIONS/Revisoes-Astra/pumpfun-releitura|pumpfun-releitura]].
+
+### Fonte REA (06/10/2026)
+- Perfil e competições da pump.fun: oito rotas de perfil observadas (`portfolio-summary`, `user-portfolio`, `callout/list`, `balance/tokens`, `wallet-overview` e outras), nenhuma com carimbo próprio demonstrado; não há página de competições navegável. Só serve para observar daqui para a frente. [[2026-10-06-perfil-e-competicoes]]
