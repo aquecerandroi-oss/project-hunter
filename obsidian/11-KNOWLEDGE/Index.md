@@ -215,6 +215,7 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0180-carry-de-funding]] | carry de funding protegido / mecânica da Binance (0,01 %/8 h, 4 h em 467 de 801 contratos, tetos), rentabilidade publicada, encolhimento e cauda (base da H-029) | He, Manela, Ross & von Wachter 2024 (lido); Schmeling, Schrimpf & Todorov (BIS 1087, resumo); `fapi/v1/fundingInfo` | backtest do autor | H-029 |
 | [[KB-0181-carry-de-funding-no-dado]] | H-029: carry protegido no top-20 da Binance 2020–2026 — A1 +5,3 % a.a. mas Holm 0,15–0,175 e +0,6 % desde 2023; A0 −4,4 % desde 2023; NÃO CONFIRMA | R87 (05/10/2026) | backtest do autor | H-029 |
 | [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]] | coleta do programa inteiro (pump + PumpSwap): 330–353 swaps/s = 28–31 M/dia, 217–254 GB/dia de WS, RPC público degradou em 1 de 3 janelas, Helius ≈ US$ 650–760/mês (estimativa), linha ≈ 529 B → 136–149 GB em 9 dias | onda 0 (05/10/2026) | backtest do autor | H-030 |
+| [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro]] | `BuyEvent` da PumpSwap decodificado; cinco armadilhas medidas ao ler swaps do programa inteiro: `buy_exact_quote_in` troca dois campos (36 de 48 compras), reservas de pool são de antes do trade (61/61 pares), preço exige a reserva virtual (−15 % sem ela), cashback é dedução na venda, 18 % das transações são versão 1 | onda 1a (05/10/2026) | backtest do autor | H-030 |
 
 ## O que a primeira rodada mudou de fato
 

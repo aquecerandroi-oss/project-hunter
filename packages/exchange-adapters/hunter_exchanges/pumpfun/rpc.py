@@ -6,7 +6,7 @@ Mayhem flow read derives its four accounts from the mint by the IDL's seeds
 the curve batch (``rpc_curves.py``, T4.2f) derives the curve PDA of every mint
 and reads 100 per call, stamped with the slot's block time. **T4.12** adds the
 two reads a watched wallet needs — ``getSignaturesForAddress`` (newest first,
-``until`` a cursor) and ``getTransaction`` (``encoding: json``, version 0) —
+``until`` a cursor) and ``getTransaction`` (``encoding: json``, versions up to 1 since wave 1a of H-030) —
 still reads only: nothing here sends. HTTP/RPC errors never include the
 injected URL (it may carry a key).
 

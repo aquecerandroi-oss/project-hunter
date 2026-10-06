@@ -1,6 +1,6 @@
 ---
 tags: [bugs, resolvidos]
-updated: 2026-10-01
+updated: 2026-10-05
 status: registro
 owner: sexta-feira
 severity: misto
@@ -11,6 +11,15 @@ closed: 2026-09-08
 # Resolved Bugs
 
 Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
+
+## Fechados em 05/10/2026 (onda 1a do H-030; na árvore, aguardam o commit do orquestrador)
+
+- **`maxSupportedTransactionVersion: 0` recusava transações versão 1 (MÉDIA, aberto em 05/10) — fechado.** `getTransaction` com `0` recebia `-32015` para toda transação v1
+  (21 das 115 transações com sucesso do programa pump e 18 das 100 da PumpSwap com swap, lidas em 05/10; um bloco amostrado: 13 %). `tx_rpc.py` (`SolanaTxRpcClient.get_transaction`,
+  leituras de reconciliação do meme-executor) e `rpc_wallet.py` (`WalletRpc.get_transaction`, laço de carteiras observadas) passaram a `1`. Prova: teste offline com a resposta
+  `-32015` real e transações v1 reais, que **falhava antes** com `ExchangeError code=-32015` e passa depois (`tests/unit/test_rpc_v1_transactions.py`); legacy e v0 respondem **idêntico** a `0` e a `1`
+  contra o nó público (`tests/live/test_live_tx_version.py`, 3 passed, opt-in); os parsers a jusante (`rent.py`, `wallet_fills.py`, `trade_event.py`, `sell_event.py`, `pumpswap_build.py`, `spot_send_rules.py`) leem só
+  `accountKeys`/`loadedAddresses`/`innerInstructions` e responderam sem erro a fixtures v1 (os dois do meme-executor foram rodados à mão, fora do repositório; os do pacote têm teste). Conhecimento: [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro]]; revisão da Astra: [[wallets-1a]]. O guardião de risco revisa por tocar `tx_rpc.py`.
 
 ## Encerramentos reconciliados na curadoria de 2026-10-01
 

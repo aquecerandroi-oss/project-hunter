@@ -184,11 +184,15 @@ class SolanaTxRpcClient:
     def get_transaction(
         self, signature: str, *, commitment: str = "confirmed"
     ) -> dict[str, Any] | None:
+        # ``maxSupportedTransactionVersion: 1`` (wave 1a of H-030): with ``0`` the node answers
+        # ``-32015`` to every version-1 transaction (21 of 115 successful pump transactions read on 2026-10-05).
+        # Legacy and v0 replies are byte-identical either way; a v1 reply has the same
+        # ``accountKeys``/``innerInstructions`` shape and an empty ``loadedAddresses``.
         result = self._call(
             "getTransaction",
             [
                 signature,
-                {"encoding": "json", "commitment": commitment, "maxSupportedTransactionVersion": 0},
+                {"encoding": "json", "commitment": commitment, "maxSupportedTransactionVersion": 1},
             ],
         )
         return None if result is None else cast(dict[str, Any], result)

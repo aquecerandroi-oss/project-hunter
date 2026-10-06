@@ -43,7 +43,7 @@ O desenho completo dos números é a seção 8 de `docs/design/seguir-carteiras-
 | run 3, 22:46, 15 min | 0 quedas; 353 swaps/s; 73 235 carteiras; 58 % com 1 swap; 29 % dos swaps < 0,01 SOL |
 
 Decodificação: **0 falhas** em ~480 mil `TradeEvent` e ~730 mil `SellEvent` (layout de 02/10, T4.8e). O `BuyEvent` da PumpSwap é **36 %**
-dos swaps e não tem decodificador. Em três compras reais a carteira e a pool dele, lidas por deslocamento, batem com as contas 0 e 1 da instrução `buy`.
+dos swaps e **ganhou decodificador na onda 1a** (KB-0184). Em três compras reais a carteira e a pool dele, lidas por deslocamento, batem com as contas 0 e 1 da instrução `buy`.
 
 ## O que a literatura/documentação diz
 
@@ -64,7 +64,7 @@ Nenhuma: é infraestrutura. O piloto pago deve repetir a mesma auditoria de bloc
 
 - **Nada liga.** Não há coletor 24/7; a onda 2 espera o piloto e a decisão de armazenamento.
 - A medição do atraso em **slots** segue; as frases em **segundos** ("5 slots ≈ 2 s") precisam de nova conversão: o slot dura hoje **≈ 268 ms** (3,73 slots/s, `getRecentPerformanceSamples`), logo 5 slots ≈ 1,34 s.
-- `getTransaction`/`getBlock` com `maxSupportedTransactionVersion = 0` falham quando há transação **versão 1** (13 % de um bloco amostrado); `tx_rpc.py:191` e `rpc_wallet.py:82` usam `0` ([[Open Bugs]]).
+- `getTransaction`/`getBlock` com `maxSupportedTransactionVersion = 0` falhavam quando há transação **versão 1** (13 % de um bloco amostrado): **corrigido** na onda 1a (`tx_rpc.py` e `rpc_wallet.py` passaram a `1`, [[Resolved Bugs]]; prova ao vivo e armadilhas do `BuyEvent` em [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro|KB-0184]]).
 
 ## Por que pode falhar
 
@@ -79,7 +79,7 @@ Nenhuma: é infraestrutura. O piloto pago deve repetir a mesma auditoria de bloc
 
 ## Relacionados
 
-[[EXP-M15-carteiras-vencedoras]] · [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] ·
+[[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro|KB-0184]] (o `BuyEvent` decodificado) · [[EXP-M15-carteiras-vencedoras]] · [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] ·
 [[KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos|KB-0124]] · [[T4.8e-decoders]] · [[Exchange Adapters]] · [[carteiras-lucro-design]]
 
 ## Armazenamento depois da medição (acrescentado em 05/10/2026, database-architect)

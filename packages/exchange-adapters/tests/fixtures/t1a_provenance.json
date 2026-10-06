@@ -1,0 +1,120 @@
+{
+  "captured_at_utc": "2026-10-05, between about 23:15Z and 23:50Z (finalized commitment; each fixture carries its own block_time_utc)",
+  "rpc": "https://api.mainnet-beta.solana.com (public, read-only)",
+  "methods": "getSignaturesForAddress + getTransaction {encoding: json, commitment: finalized, maxSupportedTransactionVersion: 1}; the error file is the same getTransaction with maxSupportedTransactionVersion 0",
+  "note": "Wave 1a of H-030. Third-party on-chain transactions, nothing signed or sent. Each fixture file is the raw `result` of getTransaction (the error file is the whole JSON-RPC reply).",
+  "fixtures": [
+    {
+      "file": "pumpswap/t1a_rpc_amm_buy_5SmrD75SgxDd_raw.json",
+      "signature": "5SmrD75SgxDdqqcuGiBQA7CMUyfL71gm48aTbB5FWe6xxQPm3Y7ksTGExoVYd2VWNZ4Ae5FmKCLH3p3qGWU5bJo7",
+      "slot": 453727714,
+      "block_time_utc": "2026-10-05T23:33:04Z",
+      "version": 0,
+      "why": "BuyEvent via ix `buy`, tx version 0, AMM top-level; first of a consecutive pair in one pool (pre-trade reserves chain)"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_amm_buy_2EjiTbbdkX2L_raw.json",
+      "signature": "2EjiTbbdkX2Ln17BBoQmN5dutgecEkt2PBMUrjFkt9arP6Tc5hJUPZa68s5TzQMcxMs7YtVja43t9JKuqoSLSH3S",
+      "slot": 453727714,
+      "block_time_utc": "2026-10-05T23:33:04Z",
+      "version": 0,
+      "why": "BuyEvent via ix `buy`, version 0; the next trade of the same pool as 5SmrD75SgxDd"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_amm_buy_exact_3YxgSPJioUJp_raw.json",
+      "signature": "3YxgSPJioUJp2LvykKBYRMbwu88h4ZfjNw3bhNWJHF3nokCB4h3yEyiRALoWA4cLTwUp9N9J95hbEbiBAR8uEAaY",
+      "slot": 453727714,
+      "block_time_utc": "2026-10-05T23:33:04Z",
+      "version": "legacy",
+      "why": "BuyEvent via ix `buy_exact_quote_in`, tx version legacy, non-zero unnamed tail u64, creator fee 5 bps"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_amm_buy_exact_5tKuWqTWBw8y_raw.json",
+      "signature": "5tKuWqTWBw8yVquFsiKk6MyPiy6mMgysPH6QpEqM61Q4PbXGX3KCwikRSYRBAuVz2Aq4dDg55DLQtxcU3Qodbs8",
+      "slot": 453727714,
+      "block_time_utc": "2026-10-05T23:33:04Z",
+      "version": 0,
+      "why": "BuyEvent via ix `buy_exact_quote_in`, version 0 (the event swaps the meaning of quote_amount_in and user_quote_amount_in)"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_amm_buy_nocreator_4jyiFoCoVoWt_raw.json",
+      "signature": "4jyiFoCoVoWtCg7ei1omtE1qj1dMkPztAgE2fTa38expzznWHH1YV3EicKx2W85yWRtXDNmAnwC7GQ6jFaNSSc6V",
+      "slot": 453728338,
+      "block_time_utc": "2026-10-05T23:35:51Z",
+      "version": 0,
+      "why": "BuyEvent via ix `buy`, version 0, pool with no coin creator (default pubkey, creator fee 0)"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_amm_buy_routed_2HzxLVTqSFWq_raw.json",
+      "signature": "2HzxLVTqSFWqFCqzuU7SyoHEqBsHSWX4jmmRnUCWJkDpsjV9G3nPwCw1EJbDUQsfQuPqMHVzSsYyQCa1WiiAxVjJ",
+      "slot": 453728338,
+      "block_time_utc": "2026-10-05T23:35:51Z",
+      "version": 0,
+      "why": "BuyEvent reached through a router: the PumpSwap instruction is an inner instruction, version 0"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_v1_amm_buy_exact_holder_rewards_4JMsAJNT9otk_raw.json",
+      "signature": "4JMsAJNT9otkPDkVjVxys6u7ZBjtjvwGJwYHQKJQznQmyE1aMwLjZB64GX4fhJCjqE85kN3T8FJ36gJLKpWuoSdL",
+      "slot": 453728337,
+      "block_time_utc": "2026-10-05T23:35:50Z",
+      "version": 1,
+      "why": "version 1 transaction, routed BuyEvent via `buy_exact_quote_in`, holder_rewards non-zero (5 401 786)"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_v1_amm_sell_5Ls5TV77aYS3_raw.json",
+      "signature": "5Ls5TV77aYS36qbZGWtQcdmKegR2fucPrFnsERrotYJTZorw9RcVaT17oazoJvQkEVggk4dehzRXTQSrMiV5yWF1",
+      "slot": 453728338,
+      "block_time_utc": "2026-10-05T23:35:51Z",
+      "version": 1,
+      "why": "version 1 transaction carrying a PumpSwap SellEvent"
+    },
+    {
+      "file": "pumpfun/t1a_rpc_v1_pump_sell_37gcmBFxPWmF_raw.json",
+      "signature": "37gcmBFxPWmFETjMoTyCgwzVtohmcadxeW6e8iveCbU6wRALjgrRwoMHhtKYs6QgD8xiRxmnfYfgvHC7gNQXkXU2",
+      "slot": 453730743,
+      "block_time_utc": "2026-10-05T23:46:33Z",
+      "version": 1,
+      "why": "version 1 transaction carrying a pump.fun bonding-curve TradeEvent (sell)"
+    },
+    {
+      "file": "pumpfun/t1a_rpc_v1_pump_buy_4b5YwBKdr5_raw.json",
+      "signature": "4b5YwBKdr54i51X5zX2A8a7wNudJJyDThxeNDRsQaWuTk6TtmbgybefQC89H2GZapBMvNtXS9MgKwFECWmmuo9R5",
+      "slot": 453730743,
+      "block_time_utc": "2026-10-05T23:46:33Z",
+      "version": 1,
+      "why": "version 1 transaction carrying a pump.fun bonding-curve TradeEvent (buy)"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_amm_sell_551G1CF8C3Bx_raw.json",
+      "signature": "551G1CF8C3BxUJXSdFAq9qewvDezqUei3ScnBuEUPCU4Cr4Gi28byLPj9ZiagRhJWqWqTffELyNvjzpeZMqBN4HR",
+      "slot": 453728337,
+      "block_time_utc": "2026-10-05T23:35:50Z",
+      "version": 0,
+      "why": "SellEvent, version 0; first of a consecutive pair in one pool (pre-trade reserves chain for sells)"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_amm_sell_4xuvoJjc286y_raw.json",
+      "signature": "4xuvoJjc286ysoZTgmmKNZYcjoNhewumU2pjhxGWVf9b7z7pkKBegphERYwyxSmBcevyRbZSyC76ufXWBJtTdXBd",
+      "slot": 453728338,
+      "block_time_utc": "2026-10-05T23:35:51Z",
+      "version": 0,
+      "why": "SellEvent, version 0; the next trade of the same pool as 551G1CF8C3Bx"
+    },
+    {
+      "file": "pumpswap/t1a_rpc_amm_sell_cashback_two_events_3gYxvcFECiai_raw.json",
+      "signature": "3gYxvcFECiaiRcmngm71o7tn7r2n48FXp4j9zFmRwGgekBQ2M58xp7LhzSCQGRifBSb7gdRxEmN2YW76fSti7cGF",
+      "slot": 453728337,
+      "block_time_utc": "2026-10-05T23:35:50Z",
+      "version": "legacy",
+      "why": "legacy transaction with TWO SellEvents (event ordinals 0 and 1), both with non-zero cashback (21 and 166)"
+    },
+    {
+      "file": "pumpfun/t1a_rpc_get_transaction_v1_unsupported_error_raw.json",
+      "signature": "37gcmBFxPWmFETjMoTyCgwzVtohmcadxeW6e8iveCbU6wRALjgrRwoMHhtKYs6QgD8xiRxmnfYfgvHC7gNQXkXU2",
+      "slot": 453730743,
+      "block_time_utc": "2026-10-05T23:46:33Z",
+      "version": 1,
+      "why": "the public RPC's real reply to getTransaction(maxSupportedTransactionVersion=0) for the version-1 transaction t1a_rpc_v1_pump_sell_37gcmBFxPWmF (same signature)"
+    }
+  ]
+}

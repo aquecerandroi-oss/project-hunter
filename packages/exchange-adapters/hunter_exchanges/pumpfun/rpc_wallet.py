@@ -1,6 +1,6 @@
 """The two reads a watched wallet needs (T4.12), over :class:`SolanaRpcClient`:
 ``getSignaturesForAddress`` (newest first, ``until`` a cursor) and
-``getTransaction`` (``encoding: json``, version 0 accepted). Reads only —
+``getTransaction`` (``encoding: json``, versions up to 1 accepted). Reads only —
 nothing here sends — under the client's own buckets, so the wallet loop's
 budget is whatever bucket the client was built with.
 
@@ -70,8 +70,9 @@ class WalletRpc:
         return out
 
     async def get_transaction(self, signature: str) -> dict[str, Any] | None:
-        """One finalized transaction as ``encoding: json`` (version 0 accepted), or
-        ``None`` when the node does not have it. Read only."""
+        """One finalized transaction as ``encoding: json`` (legacy, v0 and v1 accepted — with
+        ``maxSupportedTransactionVersion: 0`` the node refuses every version-1 transaction with
+        ``-32015``), or ``None`` when the node does not have it. Read only."""
         result = await self._client.call(
             "getTransaction",
             [
@@ -79,7 +80,7 @@ class WalletRpc:
                 {
                     "encoding": "json",
                     "commitment": "finalized",
-                    "maxSupportedTransactionVersion": 0,
+                    "maxSupportedTransactionVersion": 1,
                 },
             ],
         )

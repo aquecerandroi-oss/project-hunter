@@ -219,6 +219,6 @@ async def test_the_wallet_rpc_reads_signatures_and_a_transaction_offline() -> No
         ]
         tx = await rpc.get_transaction(infos[1].signature)
         assert tx is not None and tx["slot"] == 446373814
-        assert requests[1]["params"][1]["maxSupportedTransactionVersion"] == 0
+        assert requests[1]["params"][1]["maxSupportedTransactionVersion"] == 1
         assert await rpc.get_transaction("missing") is None
     assert len(requests) == 3  # well under the brief's ten

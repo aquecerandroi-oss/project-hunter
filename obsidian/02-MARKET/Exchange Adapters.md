@@ -1,6 +1,6 @@
 ---
 tags: [mercado, exchanges, binance, bybit, m1]
-updated: 2026-09-05
+updated: 2026-10-05
 status: implementado
 owner: sexta-feira
 ---
@@ -88,6 +88,14 @@ seguem isso; `program_watch.py` vigia o slot de deploy da PumpSwap e do programa
 simulações e limites em [[T4.8f-pumpswap-guard]].
 
 **Programa inteiro, por `logsSubscribe` (onda 0 de H-030, 05/10):** um `logsSubscribe` com `mentions` no programa entrega a transação inteira, com os eventos como linhas `Program data:` (os dois programas as emitem antes do self-CPI), e **53 % das transações entregues só mencionam o programa**. A identidade correta do evento é `(assinatura, programa, ordinal)` e a atribuição vem da pilha de `invoke` do próprio log. Os decodificadores da T4.8e leram 100 % dos `TradeEvent` e `SellEvent` ao vivo (~1,2 milhão de eventos); o `BuyEvent` da PumpSwap (36 % dos swaps) ainda não tem decodificador. Números, custo do RPC pago e achados laterais (tx versão 1; slot de ≈ 268 ms) em [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar|KB-0183]].
+
+**Onda 1a do H-030 (05/10/2026) — `BuyEvent` e leitor de logs do programa inteiro.** Três módulos novos em `hunter_exchanges`, **sem ligar a nenhum worker**:
+`pumpswap/buy_event.py` (decodificador do `BuyEvent`, 36 % dos swaps: cauda de 49 B aceita, qualquer outra, inclusive nenhuma, recusada com `BuyEventError`; nunca soma a cauda sem nome),
+`pumpfun/swap_record.py` (um registro `SwapRecord` para o `TradeEvent` da curva, o `BuyEvent` e o `SellEvent`: SOL bruto de taxas + `fee_lamports` + `lp_fee_lamports`, tudo em `int`; reservas sempre **pós-trade**,
+na pool derivadas do fluxo exato do cofre e provadas contra o trade seguinte; `virtual_quote_reserves` para cotar a pool) e `pumpfun/program_logs.py` (leitor puro `logs → SwapRecord`:
+atribuição pela pilha de `invoke` — estrita, contexto quebrado vira lacuna —, identidade `(assinatura, programa, ordinal)` com o ordinal reservado antes de validar, contadores para tudo o que não é swap limpo e `gap` para o coletor).
+O `BuyEvent` tem armadilhas só vistas na cadeia (campos trocados no `buy_exact_quote_in`, reservas de antes do trade, quote virtual, cashback): [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro|KB-0184]]. Fixtures **reais** `t1a_*` com proveniência em `tests/fixtures/t1a_provenance.json`.
+`SolanaTxRpcClient.get_transaction` e `WalletRpc.get_transaction` pedem `maxSupportedTransactionVersion: 1` (com `0` o nó recusa toda transação versão 1 com `-32015`; [[Resolved Bugs]]). Revisão: [[wallets-1a]].
 
 ## Relacionadas
 

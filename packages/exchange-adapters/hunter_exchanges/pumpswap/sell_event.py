@@ -209,7 +209,7 @@ def _seq(value: Any) -> list[Any]:
 def _event_payloads(transaction: dict[str, Any]) -> Iterable[bytes]:
     meta = _obj(transaction.get("meta"))
     message = _obj(_obj(transaction.get("transaction")).get("message"))
-    keys: list[Any] = _seq(message.get("accountKeys"))
+    keys: list[Any] = [*_seq(message.get("accountKeys"))]  # a copy: never extend the caller's list
     loaded = _obj(meta.get("loadedAddresses"))
     keys += _seq(loaded.get("writable")) + _seq(loaded.get("readonly"))
     for inner in _seq(meta.get("innerInstructions")):
