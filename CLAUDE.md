@@ -84,6 +84,7 @@ Dispatch the specialist whose row matches; never a generic agent for delegable w
 | `documentation-writer` | `docs/*.md` (Portuguese), READMEs, runbooks, ADRs in `docs/decisions/`. | sonnet |
 | `advogado-de-jesus` | Red team of every research result before a verdict (Everton named it, 01/10/2026): look-ahead, period luck, concentration, overlap, real costs, forking paths, confounds. Read-only. Runs on every hypothesis that reaches a verdict, paired with `defensor`. | opus |
 | `defensor` | Steelman of every refuted / not-confirmed hypothesis: was the test able to see it, right control, right cost; proposals only as NEW pre-registrations on unused data (never re-slicing). Read-only. Paired with `advogado-de-jesus`. | opus |
+| `batedor-rea` | Source scout of the strategy team (Everton, 06/10/2026): given a hypothesis that needs outside data, observes public sites (pump.fun first) as an anonymous visitor through the REA MCP tools, maps routes/fields/feeds, writes a source note with provenance and point-in-time status in `obsidian/11-KNOWLEDGE/fontes-rea/`. Never logs in, never bypasses protections, never writes product code, never decides. | sonnet |
 
 ## Conventions
 

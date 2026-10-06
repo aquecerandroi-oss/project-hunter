@@ -36,7 +36,7 @@ A Astra apontou, e a Sexta-feira conferiu no texto oficial (`pump.fun/docs/terms
 - **§21(h):** proíbe bots, crawlers, scripts ou métodos automáticos para acessar, copiar ou monitorar a plataforma, exceto o que a pump.fun permitir expressamente (§6.1).
 - **§21(j):** proíbe desmontar, decompilar ou fazer engenharia reversa da plataforma, inclusive dos conceitos e algoritmos.
 
-**Consequência:** o uso do REA **na pump.fun** fica **pausado** até a decisão do Everton. O mesmo risco vale para a coleta que o meme-worker já faz no frontend da pump.fun desde 09/2026. A blockchain é pública e não é a plataforma deles, então o caminho seguro para o H-030 é a fita on-chain (onda 0/1a/1b) mais provedores com termos próprios (Helius, PumpPortal). Revisão: [[pumpfun-releitura]].
+**Decisão do Everton (06/10): continuar mesmo assim**, como visitante anônimo e em volume baixo ([[2026-10-06-rea-na-pumpfun-apesar-dos-termos]]). Quem usa é o [[Batedor REA]]. O mesmo risco vale para a coleta que o meme-worker já faz no frontend da pump.fun desde 09/2026. A blockchain é pública e não é a plataforma deles, então o caminho seguro para o H-030 é a fita on-chain (onda 0/1a/1b) mais provedores com termos próprios (Helius, PumpPortal). Revisão: [[pumpfun-releitura]].
 
 ## Ligações
 [[Agents Overview]] · [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]] · [[KB-0142-kol-e-call-antecipam-ou-confirmam]] · [[2026-10-05]]

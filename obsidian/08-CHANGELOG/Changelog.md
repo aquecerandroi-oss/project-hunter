@@ -1788,3 +1788,4 @@ carteira do Everton deixou de ser um número parado e passou a ter um processo q
 - `ac7fc32c` docs(conhecimento): KB-0165 — staking do SOL parado não compensa agora → [[KB-0165-staking-do-sol-parado|KB-0165]]
 - `ce4bcd34` feat(meme): EXP-M26 — histórico de estado das moedas (0067_meme_token_state_history) e a leitura J passa a usar 'o que se sabia em L' → [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]]
 - `78209589` docs(pesquisa): KB-0164 (momentum semanal em cripto) e H-024 pré-registrada → [[KB-0164-momentum-semanal-em-cripto-grande|KB-0164]] · [[Fila de Hipoteses#H-024 — Momentum semanal de série temporal em cripto grande (à vista, só compra)|H-024]]
+- 06/10/2026 — roster ganhou o [[Batedor REA]] (fontes de site para as hipóteses, via [[REA]]); decisão [[2026-10-06-rea-na-pumpfun-apesar-dos-termos]]

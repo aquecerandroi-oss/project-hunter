@@ -42,3 +42,4 @@ Um `agent` é uma instância de uma `strategy_version` dentro de um portfolio: `
 
 - 01/10/2026 — pesquisa ganhou dois papéis em par: [[Advogado de Jesus]] (derruba o resultado antes do dinheiro) e [[Defensor]] (impede que uma ideia boa morra por um teste ruim, sempre com pré-registro novo).
 - 06/10/2026 — ferramenta [[REA]] (engenharia reversa, MCP): observa sites como visitante anônimo; primeira leitura da pump.fun achou o PnL dos holders por moeda e as posições dos traders do topo.
+- 06/10/2026 — novo agente [[Batedor REA]]: usa o REA para pegar no site o que as hipóteses precisam, com nota de fonte e procedência; termos da pump.fun aceitos pelo Everton com limites.
