@@ -113,7 +113,7 @@ def trade_rows(trades: Sequence[NormalizedSwapTrade]) -> tuple[list[TradeRow], d
 
 _TRADE_COLUMNS = tuple(TradeRow.__dataclass_fields__)
 _INSERT_TRADE = text(
-    f"INSERT INTO meme_trades ({', '.join(_TRADE_COLUMNS)}) "  # noqa: S608
+    f"INSERT INTO meme_trades ({', '.join(_TRADE_COLUMNS)}) "  # noqa: S608  # nosec B608 -- column names come from the _TRADE_COLUMNS constant; every value is a bound parameter
     f"VALUES ({', '.join(':' + column for column in _TRADE_COLUMNS)}) "
     "ON CONFLICT (block_time, signature, event_index) DO NOTHING"
 )
@@ -228,7 +228,7 @@ def pending_mints_sql() -> str:
     way ``creator_watch.py`` silences it for its table names). The two timestamps
     are bound parameters, as they must be."""
     proposals = [
-        "SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets r ON r.id = p.rule_set_id "  # noqa: S608
+        "SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets r ON r.id = p.rule_set_id "  # noqa: S608  # nosec B608 -- only module-level literal constants are interpolated (see pending_mints_sql); timestamps are bound
         "WHERE r.kind = 'operator' AND r.status = 'active' "
         f"AND p.status = '{status}' AND p.proposed_at >= :since"
         # A ``proposed`` row past its deadline is dead to the desk and to the robot
@@ -238,7 +238,7 @@ def pending_mints_sql() -> str:
     ]
     states = ", ".join(f"'{status}'" for status in LIVE_ORDER_PENDING_STATUSES)
     orders = (
-        "SELECT p.mint FROM meme_live_orders o JOIN meme_proposals p ON p.id = o.proposal_id "  # noqa: S608
+        "SELECT p.mint FROM meme_live_orders o JOIN meme_proposals p ON p.id = o.proposal_id "  # noqa: S608  # nosec B608 -- only module-level literal constants are interpolated (see pending_mints_sql); timestamps are bound
         f"WHERE o.side = 'buy' AND o.status IN ({states}) AND o.received_at >= :since"
     )
     return " UNION ".join([*proposals, orders])

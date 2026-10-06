@@ -81,7 +81,7 @@ _COLUMNS = (
     "proposal_refusals, proposal_id, no_proposal_reason, fidelity, lane_since"
 )
 _INSERT = text(
-    f"INSERT INTO meme_mature_opportunities ({_COLUMNS}) VALUES ("  # noqa: S608 - frozen text
+    f"INSERT INTO meme_mature_opportunities ({_COLUMNS}) VALUES ("  # noqa: S608 - frozen text  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     "  :id, CAST(:rule_set_id AS uuid), :mint, :evaluated_at, :features_end_time, "
     "  :features_version, :features_computed_at, :code_ref, :age_s, :curve_progress_pct, "
     "  :mcap_sol, :curve_volume_1m_sol, :participation_pct, :creator_net_seller, :higher_lows, "

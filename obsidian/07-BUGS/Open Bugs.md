@@ -12,6 +12,19 @@ closed: ""
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+
+## `meme_close_day` cria `Diario-Meme/<dia>.md` ao lado de `Diario/<dia>.md` e deixa `[[<dia>]]` ambíguo — o lint volta vermelho (06/10) — MÉDIA
+
+Achado pela Astra na revisão de [[CI-verde-2026-10-05]]: o teste `test_meme_close_day_integration` falhava porque o diário real de 05/10 já existia; ele passou a usar um dia sem diário (2026-09-29), o que **contorna** a colisão. Cenário real: fechar o dia 2026-10-05 grava `Diario-Meme/2026-10-05.md`, o fechamento só checa o próprio destino, e todo `[[2026-10-05]]` (por exemplo em `04-AGENTS/REA.md`) passa a ter dois candidatos; `obsidian_lint.py` devolve erro. Defeito da ferramenta (`infra/scripts/meme_close_day.py`) e da convenção de links, não do motor. Correção proposta: o fechamento escrever links qualificados (`[[09-OPERATIONS/Diario-Meme/<dia>|<dia>]]`) e um teste de coexistência dos dois diários. Dono: quem mantém a mesa meme. Não corrigido aqui.
+
+## `forbidden-patterns` não reconhece `1`/`yes`/`on` como flag ligada (06/10) — BAIXA
+
+Preexistente, achado pelo security-reviewer na revisão de [[CI-verde-2026-10-05]] ([[sec-ci-green-2]]). `packages/core/hunter_core/execution/meme/gates.py:88` (`parse_flag`) aceita `1/true/yes/on` e os bools do pydantic aceitam `1/yes/on`; `infra/scripts/forbidden_patterns.sh` só procura `true`. Cenário: `ENABLE_MEME_LIVE_TRADING=yes` (ou `: "1"`) num arquivo rastreado liga a flag no runtime e passa pelo detector. Não há nenhum caso hoje no repositório. Correção proposta: o padrão aceitar `true|1|yes|on` e o `--self-test` ganhar um caso por valor. Dono: quem mantém o portão de padrões proibidos.
+
+## Exceção de comentário do `forbidden-patterns` escolhida por nome de arquivo (06/10) — BAIXA (fechado no mesmo dia)
+
+A primeira versão aplicava `^[^#]*` a `.env`, `.env.*` e `*.example`; um `compose.yml.example` ou `.env.compose.yml` com flow map YAML `{LABEL: "#desk", ENABLE_MEME_LIVE_TRADING: "true"}` não acertava. Fechado: a exceção vale só para `.env`, `.env.example` e `.env.<x>.example`, e nunca para nome com `.yml`/`.yaml`; o `--self-test` cobre os dois nomes e `.env.staging.example`. Fica registrado porque "nome de arquivo não prova o formato": um arquivo dotenv com nome fora do padrão volta a ser varrido como código (mais largo, mais ruído, nunca menos detecção).
+
 ## Upgrade de 02/10 (pump, PumpSwap, taxas) — executor em laço de reinício e decodificadores de evento quebrados (05/10)
 
 **ALTA (dinheiro real latente; dados de pesquisa já afetados).** Em 02/10, em 32 s, foram reimplantados a PumpSwap (15:47:07Z), o pump `6EF8…` (slot 452654932, 15:47:21Z) e o programa de taxas `pfeeUx…` (15:47:39Z). Quando a VPS voltou (05/10 14:35Z), o `meme-executor` passou a recusar o boot com `program_upgraded` (guarda da T4.8b, funcionando como devia).

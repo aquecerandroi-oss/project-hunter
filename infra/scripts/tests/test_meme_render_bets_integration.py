@@ -46,8 +46,8 @@ SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-DAY = "2026-10-05"
-ENTRY = datetime(2026, 10, 5, 12, 0, 35, tzinfo=UTC)
+DAY = "2026-09-29"  # no real diary for it (see test_meme_close_day_integration.DAY)
+ENTRY = datetime(2026, 9, 29, 12, 0, 35, tzinfo=UTC)
 """09:00:35 BRT de um dia dentro das partições iniciais de 2026-10."""
 EXIT = ENTRY + timedelta(minutes=6)
 MINUTE = ENTRY.replace(second=0)
@@ -193,7 +193,7 @@ async def _plant(url: str) -> str:
         await connection.execute(
             text(
                 "INSERT INTO meme_rule_sets (id, name, version, kind, params, code_ref, exp_ref) "
-                "VALUES (:id, 'flow_v2', '9', 'research_only', CAST(:params AS jsonb), "
+                "VALUES (:id, 'flow_v2', '901', 'research_only', CAST(:params AS jsonb), "
                 "  'hunter_indicators.meme.rules@sha256:test', 'EXP-M5')"
             ),
             {"id": RULE_SET_ID, "params": json.dumps(PARAMS)},
@@ -326,13 +326,13 @@ def test_the_export_reads_as_hunter_app_only_the_window_and_only_this_mint(
 
     assert len(records) == 1, "a indeterminada fica de fora por padrão"
     row = records[0]
-    assert row["rule_set"] == "flow_v2/9" and row["symbol"] == "WIF"
+    assert row["rule_set"] == "flow_v2/901" and row["symbol"] == "WIF"
     assert row["exp_ref"] == "EXP-M5" and row["manual_plan"] == PLAN
     assert row["entry_mcap_sol"] == "120.5" and row["exit_mcap_sol"] == "104.25"
     assert row["exit_reason"] == "line_broken"
     assert Decimal(row["r_multiple"]) == Decimal("-0.0403")
     assert Decimal(row["high_water_x"]) == Decimal("1.08")
-    assert row["creator_sold_seen_at"].startswith("2026-10-05T12:03:35")
+    assert row["creator_sold_seen_at"].startswith("2026-09-29T12:03:35")
     assert row["outcome_quality"] == "measured"
 
     minutes = row["features_1m"]
@@ -388,8 +388,8 @@ def test_the_notes_leave_a_copy_of_the_vault_clean_in_the_linter(
     monkeypatch.setattr(notes_mod, "MEME_README", vault / "03-TRADING" / "Meme" / "README.md")
 
     written = notes_mod.write_notes([parse_bet(r) for r in records])
-    assert (vault / "03-TRADING" / "Meme" / "Apostas-tracadas" / "flow_v2-9.md") in written
-    page = (vault / "03-TRADING" / "Meme" / "Apostas-tracadas" / "flow_v2-9.md").read_text(
+    assert (vault / "03-TRADING" / "Meme" / "Apostas-tracadas" / "flow_v2-901.md") in written
+    page = (vault / "03-TRADING" / "Meme" / "Apostas-tracadas" / "flow_v2-901.md").read_text(
         encoding="utf-8"
     )
     assert "[[EXP-M5-fluxo-e-holders]]" in page and f"## Dia {DAY}" in page

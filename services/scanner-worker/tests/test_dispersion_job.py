@@ -286,7 +286,7 @@ class TestOUniversoDaSerie:
     async def test_um_mercado_spot_nao_entra_no_universo(self, db_session_factory: Any) -> None:
         """O mesmo par em spot cairia -50 %; ele não é perpétuo, então não existe
         para esta série (a mesma cláusula de ``hunter_core.universe``)."""
-        exchange = "binance-spot"
+        exchange = "binance-disp-spot"
         await _member(db_session_factory, exchange, REFERENCE_SYMBOL, old="100", new="99")
         await _member(db_session_factory, exchange, "AUSDT", old="100", new="98")
         spot = await _seed_market(
@@ -359,7 +359,7 @@ class TestCoberturaInsuficiente:
     ) -> None:
         """Cinco de dez respondem (50 %, abaixo dos 80 %) — o BTC entre eles, para
         que a recusa seja a cobertura e não a referência."""
-        exchange = "binance-lowcov"
+        exchange = "binance-disp-lowcov"
         await _member(db_session_factory, exchange, REFERENCE_SYMBOL, old="100", new="99")
         for symbol in ("AUSDT", "BUSDT", "CUSDT", "DUSDT"):
             await _member(db_session_factory, exchange, symbol, old="100", new="98")
@@ -401,7 +401,7 @@ class TestIdempotencia:
     async def test_a_segunda_passagem_nao_insere_e_a_linha_fica_byte_a_byte_igual(
         self, db_session_factory: Any
     ) -> None:
-        exchange = "binance-idem"
+        exchange = "binance-disp-idem"
         await _member(db_session_factory, exchange, REFERENCE_SYMBOL, old="100", new="99")
         for symbol in ("AUSDT", "BUSDT", "CUSDT"):
             await _member(db_session_factory, exchange, symbol, old="100", new="98")
@@ -449,7 +449,7 @@ class TestNaoAntecipacaoNoCaminhoDoProdutor:
         deixaria de ser -0,030000. A quarta armadilha é ``UNFINAL``: um mercado cuja
         vela da ponta nova ainda está imprimindo não é contado — e ele cairia -90 %
         se fosse, levando a mediana das alts de -0,040000 para -0,050000."""
-        exchange = "binance-lookahead"
+        exchange = "binance-disp-lookahead"
         poisoned = [
             await _member(db_session_factory, exchange, REFERENCE_SYMBOL, old="100", new="99"),
             await _member(db_session_factory, exchange, "AUSDT", old="100", new="98"),
@@ -531,7 +531,7 @@ class TestATrancaDoRedis:
         """A forma de ``test_breadth_job.py``: o ganho de ``claim_minute`` é quem
         chega a chamar o fold; quem perde nunca chama e devolve o rótulo que
         ``dispersion_loop`` usaria para pular."""
-        exchange = "binance-lock"
+        exchange = "binance-disp-lock"
         await _member(db_session_factory, exchange, REFERENCE_SYMBOL, old="100", new="99")
         await _member(db_session_factory, exchange, "AUSDT", old="100", new="98")
 

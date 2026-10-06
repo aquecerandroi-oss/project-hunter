@@ -60,7 +60,7 @@ class MemeSourcesRepository:
         for source, (table, column) in SOURCE_TABLES.items():
             predicate = _SOURCE_FILTER.get(source, "")
             value = await self.session.scalar(
-                text(f"SELECT max({column}) FROM {table} {predicate}")  # noqa: S608 — constants above
+                text(f"SELECT max({column}) FROM {table} {predicate}")  # noqa: S608 — constants above  # nosec B608 -- table/column/predicate come from module constants; no value is interpolated
             )
             out[source] = LatestRow(
                 table=table, observed_at=None if value is None else ensure_utc(value)

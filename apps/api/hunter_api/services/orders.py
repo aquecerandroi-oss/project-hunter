@@ -141,7 +141,7 @@ async def list_manual_orders(
         conditions.append("(created_at, id) < (:after_ts, :after_id)")
         params["after_ts"], params["after_id"] = after
     statement = text(
-        "SELECT id AS proposal_id, market_id, direction::text AS direction, "  # noqa: S608
+        "SELECT id AS proposal_id, market_id, direction::text AS direction, "  # noqa: S608  # nosec B608 -- WHERE parts are fixed literals built above; every value is a bound parameter
         "status::text AS status, risk_decision, created_at FROM trade_proposals "
         f"WHERE {' AND '.join(conditions)} ORDER BY created_at DESC, id DESC LIMIT :limit"
     )

@@ -256,6 +256,16 @@ async def test_a_spot_candle_writes_no_shadow_row(db_session_factory: Any) -> No
             ),
             {"id": spot_id, "exchange_id": exchange_id, "symbol": builders.SYMBOL},
         )
+        # ``ON CONFLICT DO NOTHING``: when an earlier test of the session already planted this
+        # spot market, ours was never inserted and ``spot_id`` named a row that does not exist
+        # (the candle insert below then failed its foreign key). Read the id that is there.
+        spot_id = await session.scalar(
+            text(
+                "SELECT id FROM markets WHERE exchange_id = :exchange_id AND symbol = :symbol "
+                "AND market_type = 'spot'"
+            ),
+            {"exchange_id": exchange_id, "symbol": builders.SYMBOL},
+        )
         await builders.activate_version(session)
         await builders.isolate_catalogue(session)
         bars = builders.series(cut)

@@ -77,7 +77,7 @@ UPSERT_TOKEN = text(
     # INSERT omitted them, ``excluded.mayhem_state`` was always NULL, the column
     # never held a value and ``_LOAD_TRACKED``'s "a paused agent keeps the mint"
     # never fired). The CASE is the CHECK ``a_disabled_token_has_no_agent_state``.
-    f"INSERT INTO meme_tokens ({', '.join(_ALL_TOKEN_COLUMNS)}, mayhem_mode, mayhem_state) "  # noqa: S608
+    f"INSERT INTO meme_tokens ({', '.join(_ALL_TOKEN_COLUMNS)}, mayhem_mode, mayhem_state) "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"VALUES ({', '.join(':' + column for column in _ALL_TOKEN_COLUMNS)}, :mayhem_mode, "
     "CASE WHEN :mayhem_enabled IS FALSE THEN NULL ELSE :mayhem_state END) "
     "ON CONFLICT (mint) DO UPDATE SET "

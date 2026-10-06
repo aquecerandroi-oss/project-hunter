@@ -52,10 +52,14 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 MIGRATIONS_DIR = REPO_ROOT / "infra" / "migrations"
 SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 RESEARCH_ID = "01994d00-6c1a-7000-8000-000000000001"
-DAY = "2026-10-05"
-NOW = datetime(2026, 10, 5, 12, 10, 30, tzinfo=UTC)
-"""09:10:30 BRT of the planted day, inside the 2026-10 partitions."""
-FIRST_ENTRY = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
+DAY = "2026-09-29"
+"""A day the real vault has **no** diary for (``Diario/`` and ``Diario-Meme/``): the test writes
+``Diario-Meme/<DAY>.md`` into a copy of the vault and lints it, and a day that already has a
+``Diario/<DAY>.md`` makes every real ``[[<DAY>]]`` link ambiguous (it did for 2026-10-05 the
+day the real diary was written). 2026-09-29 is past and has neither."""
+NOW = datetime(2026, 9, 29, 12, 10, 30, tzinfo=UTC)
+"""09:10:30 BRT of the planted day, inside the 2026-09 partitions."""
+FIRST_ENTRY = datetime(2026, 9, 29, 12, 0, tzinfo=UTC)
 
 
 def _load_script(name: str) -> ModuleType:
@@ -424,7 +428,7 @@ def test_apply_closes_the_day_into_a_copy_of_the_vault_that_lints_clean_and_refu
     assert exp_after.startswith(exp_before.split("## Variantes tentadas")[0].rstrip("\n"))
     readme = (vault / "09-OPERATIONS" / "Diario-Meme" / "README.md").read_text(encoding="utf-8")
     assert f"[[09-OPERATIONS/Diario-Meme/{DAY}|{DAY}]] — 32 apostas fechadas" in readme
-    lote = (state / "lote-meme-2026-10-06.md").read_text(encoding="utf-8")
+    lote = (state / "lote-meme-2026-09-30.md").read_text(encoding="utf-8")
     assert "manter (n 32/100, dias 1/30)" in lote and "`same_slot`" in lote
 
     from obsidian_lint import lint

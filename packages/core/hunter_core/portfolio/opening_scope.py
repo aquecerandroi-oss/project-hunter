@@ -68,7 +68,7 @@ async def verify_scope(
         row = (
             await session.execute(
                 text(
-                    f"SELECT count(*) AS total, "  # noqa: S608
+                    f"SELECT count(*) AS total, "  # noqa: S608  # nosec B608 -- table/column pairs come from the _SCOPE_TABLES constant; values are bound
                     "count(*) FILTER (WHERE organization_id = :org) AS in_scope "
                     f"FROM {table} WHERE {key_column} = :portfolio_id"
                 ),

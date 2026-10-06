@@ -2,7 +2,7 @@
 the event lane. A copy of ``flow_v2/1`` with ``entry_pullback_pct "5"`` /
 ``entry_pullback_window_s 60`` arms at the gate pass instead of proposing;
 deterministic synthetic tapes (``TradeEvent`` decode stubbed at the lane's own
-seam, ``event_gate_eval.trade_events_from_logs``) then prove: the proposal is
+seam, ``logs_trades.scan_trade_event_logs`` / ``normalized_curve_trade``) then prove: the proposal is
 emitted at the right trade with the quote of that moment and the block; no
 pullback -> no proposal + a ``no_pullback`` trail row with its tape; a creator
 sale during the wait kills the entry; a feed gap or a changed set is censored,
@@ -24,11 +24,12 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 
-import hunter_meme_worker.event_gate_eval as event_gate_eval
 import hunter_meme_worker.event_gate_pullback as event_gate_pullback
+import hunter_meme_worker.logs_trades as logs_trades_module
 from hunter_core.db.session import role_session
 from hunter_exchanges.pumpfun.models import NormalizedCurveTrade
 from hunter_exchanges.pumpfun.rpc_ws_models import LogsNotification
+from hunter_exchanges.pumpfun.trade_event import TradeLogScan
 from hunter_meme_worker.entry_pullback import (
     ARMED,
     EVENT_LANE_ONLY,
@@ -114,14 +115,16 @@ def _stub_decode(monkeypatch: pytest.MonkeyPatch, trades: dict[str, NormalizedCu
     """The lane's own decode seam: a notification's single log line names the
     synthetic ``TradeEvent`` it carries."""
 
-    def events(logs: tuple[str, ...]) -> tuple[str, ...]:
-        return logs
+    def scan(logs: tuple[str, ...]) -> TradeLogScan:
+        # Every synthetic line decodes: the lane's loss accounting (T4.8e) sees nothing lost.
+        return TradeLogScan(events=logs)  # type: ignore[arg-type]
 
     def normalized(event: str, **_kw: object) -> NormalizedCurveTrade:
         return trades[event]
 
-    monkeypatch.setattr(event_gate_eval, "trade_events_from_logs", events)
-    monkeypatch.setattr(event_gate_eval, "normalized_curve_trade", normalized)
+    # T4.8e moved the decode from ``event_gate_eval`` to ``logs_trades``: that is the seam now.
+    monkeypatch.setattr(logs_trades_module, "scan_trade_event_logs", scan)
+    monkeypatch.setattr(logs_trades_module, "normalized_curve_trade", normalized)
 
 
 def _trade(

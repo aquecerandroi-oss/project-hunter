@@ -54,9 +54,12 @@ _RULE_SET = text(
     "VALUES (:id, :name, '1', 'research_only', 'test', 'EXP-M26')"
 )
 _PROPOSAL = text(
-    "INSERT INTO meme_proposals (id, mint, rule_set_id, origin, status, expires_at, "
+    # ``proposed_at`` is explicit: its default is the *real* clock, and the table's CHECK wants
+    # ``expires_at`` after it -- with NOW pinned to 2026-09-27 every run after that date failed.
+    "INSERT INTO meme_proposals (id, mint, rule_set_id, origin, status, proposed_at, expires_at, "
     "  decision, decided_by, decided_at) "
-    "VALUES (:id, :mint, :rs, 'operator', :status, :expires_at, '{}'::jsonb, 'rules', :decided_at)"
+    "VALUES (:id, :mint, :rs, 'operator', :status, :decided_at, :expires_at, '{}'::jsonb, "
+    "  'rules', :decided_at)"
 )
 _BET = text(
     "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, entry_at, entry, "
@@ -281,10 +284,12 @@ async def test_load_mature_candidates_excludes_already_pinned_mints(
             )
             await connection.execute(
                 text(
-                    "INSERT INTO meme_curve_snapshots (observed_at, mint, source, "
+                    # ``received_at`` explicit: the restart query keeps only photos received
+                    # by ``now``, and the default is the real clock (after the pinned NOW).
+                    "INSERT INTO meme_curve_snapshots (observed_at, received_at, mint, source, "
                     "  virtual_sol_reserves, virtual_token_reserves, real_sol_reserves, "
                     "  real_token_reserves, total_supply, complete) "
-                    "VALUES (:at, :mint, 'pumpfun_rest', :mcap, 1000000000, "
+                    "VALUES (:at, :at, :mint, 'pumpfun_rest', :mcap, 1000000000, "
                     "  :mcap, 720100000, 1000000000, false)"
                 ),
                 {"mint": mint, "at": NOW, "mcap": mcap},

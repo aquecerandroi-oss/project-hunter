@@ -24,6 +24,8 @@ owner: sexta-feira
 - **`forbidden-patterns`:** o padrão `print\(` casava `fingerprint(` (agora exige que não haja caractere de identificador antes; `--self-test` cobre os dois lados); docstrings escreviam `ENABLE_LIVE_TRADING=true` literalmente (reescritas); `services/execution-worker/proof/run_proof.py` usava `print`. O script varre ~3000 arquivos rastreados com um `grep` por padrão e arquivo: no Windows passou de 30 min sem terminar (a verificação local foi feita com `git grep` e o mesmo critério por arquivo); o tempo no runner Linux ainda não foi medido neste registro.
 - **`security`/gitleaks:** `actions/checkout` com `fetch-depth: 0` e `GITLEAKS_VERSION: 8.30.1` (versão fixada: a padrão da ação, 8.24.3, ignora `allowlists` globais); `.gitleaks.toml` revisado. Config e CI devem ser testados com a mesma versão.
 
+- **Segunda rodada (05–06/10), detalhe em [[CI-verde-2026-10-05]]:** o `security` escondia três passos atrás do gitleaks — `pip-audit` (24 vulnerabilidades; `uv lock` em pyjwt/urllib3/virtualenv, sem ignores), `pnpm audit` (13 high; `overrides` + 1 ignore sem versão corrigida, `braces` — e só saiu 0 depois de `source-map-js 1.2.1 -> 1.2.2`, que o security-reviewer achou) e `bandit` (120 B608; `nosec` revisados, testes fora do escopo; a última linha, do `meme-executor`, foi anotada pelo orquestrador); `forbidden-patterns` falhava em prosa de comentário do `.env.example` (exceção só para `.env`, `.env.example` e `.env.<x>.example`, nunca para nome com `.yml`/`.yaml`; `--self-test` agora no CI); `python-test` tinha 60+ falhas só de teste (data fixa vs relógio, banco compartilhado, deriva de contrato, ordem de sessão) que só apareceram rodando o CI em Linux com Docker.
+
 ## O que é planejado
 
 - **Ambientes reais** (preview/staging/produção): Vercel (web), Railway ou Fly.io (api/workers), Neon (Postgres), Redis Railway/Upstash. Documentado em [[Deployment]] mas ainda não configurado de fato além de dev local.
@@ -32,7 +34,7 @@ owner: sexta-feira
 
 ## Relacionadas
 
-[[System Overview]] · [[Workers]] · [[Deployment]] · [[Environment Variables]] · [[Gitleaks-CI-2026-10-05]]
+[[System Overview]] · [[Workers]] · [[Deployment]] · [[Environment Variables]] · [[Gitleaks-CI-2026-10-05]] · [[CI-verde-2026-10-05]]
 
 ## Fontes
 

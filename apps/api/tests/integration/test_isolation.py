@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 ANY_UUID = uuid.uuid4()
+MINT = "M" * 40
 
 
 def _tenant_routes(org_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUID) -> list[Any]:
@@ -89,6 +90,30 @@ def _tenant_routes(org_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUI
         ),
         ("GET", f"{base}/portfolios/{ANY_UUID}/order-requests", None),
         ("GET", f"{base}/portfolios/{ANY_UUID}/order-requests/{ANY_UUID}", None),
+        # The routes that were served but never listed here (CI found 27 listed against 48
+        # served): the confluence screen, the daily goal and the whole meme desk. Same rule
+        # for every one of them -- a member of A naming B's organization gets the 404.
+        ("GET", f"{base}/markets/binance/ISOUSDT/desk", None),
+        ("GET", f"{base}/markets/binance/ISOUSDT/events", None),
+        ("GET", f"{base}/lab/daily-goal?day=2026-01-01", None),
+        ("GET", f"{base}/meme/overview", None),
+        ("GET", f"{base}/meme/desk", None),
+        ("GET", f"{base}/meme/gaps", None),
+        ("GET", f"{base}/meme/lab", None),
+        ("GET", f"{base}/meme/live", None),
+        ("GET", f"{base}/meme/live/wallet-summary", None),
+        ("GET", f"{base}/meme/sources", None),
+        ("GET", f"{base}/meme/tests", None),
+        ("GET", f"{base}/meme/tests.csv", None),
+        ("GET", f"{base}/meme/tests/{ANY_UUID}", None),
+        ("GET", f"{base}/meme/tokens", None),
+        ("GET", f"{base}/meme/tokens/{MINT}", None),
+        ("POST", f"{base}/meme/bets/{ANY_UUID}/sell-now", None),
+        ("POST", f"{base}/meme/live/positions/{ANY_UUID}/sell-now", None),
+        ("POST", f"{base}/meme/proposals/manual", {"mint": MINT}),
+        ("POST", f"{base}/meme/proposals/{ANY_UUID}/approve", {}),
+        ("POST", f"{base}/meme/proposals/{ANY_UUID}/reject", {}),
+        ("POST", f"{base}/meme/proposals/{ANY_UUID}/cancel", None),
     ]
 
 

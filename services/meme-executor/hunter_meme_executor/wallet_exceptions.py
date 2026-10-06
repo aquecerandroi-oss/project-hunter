@@ -45,7 +45,7 @@ parser recognized — never an absent or unknown one."""
 
 _ACTIVE = text(
     "SELECT token_program, mint, max_atoms, decimals, require_frozen, id, created_at "  # noqa: S608
-    f"FROM {EXCEPTIONS_TABLE} "  # a constant table name
+    f"FROM {EXCEPTIONS_TABLE} "  # nosec B608 -- constant table name EXCEPTIONS_TABLE
     "WHERE wallet = :wallet AND revoked_at IS NULL"
 )
 

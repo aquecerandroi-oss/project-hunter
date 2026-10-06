@@ -54,11 +54,11 @@ _SNAPSHOT_COLUMNS = (
 """``mayhem_enabled`` (T4.27): the photo's own bit, so a mark against a chain
 photo of a Mayhem coin is capped even before the token row learned the flag."""
 _FIRST_SNAPSHOT_AFTER = text(
-    f"SELECT {_SNAPSHOT_COLUMNS} FROM meme_curve_snapshots "  # noqa: S608
+    f"SELECT {_SNAPSHOT_COLUMNS} FROM meme_curve_snapshots "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     "WHERE mint = :mint AND observed_at > :after ORDER BY observed_at, source LIMIT 1"
 )
 _SNAPSHOTS_AFTER = text(
-    f"SELECT {_SNAPSHOT_COLUMNS} FROM meme_curve_snapshots "  # noqa: S608
+    f"SELECT {_SNAPSHOT_COLUMNS} FROM meme_curve_snapshots "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     "WHERE mint = :mint AND observed_at > :after ORDER BY observed_at, source LIMIT :limit"
 )
 

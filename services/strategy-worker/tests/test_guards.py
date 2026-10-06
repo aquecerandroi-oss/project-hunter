@@ -28,7 +28,14 @@ from hunter_strategy_worker.decide import evaluate_slot
 from hunter_strategy_worker.eligibility import universe_changed_after
 from hunter_strategy_worker.repo import load_market
 
-from .builders import EXCHANGE, SYMBOL, activate_version, only_version, seed_market
+from .builders import (
+    EXCHANGE,
+    SYMBOL,
+    activate_version,
+    isolate_catalogue,
+    only_version,
+    seed_market,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -126,6 +133,10 @@ class TestFrozenCodeGuard:
             await activate_version(
                 session, key="volume_anomaly", code_ref=version_code_ref("volume_anomaly_v1")
             )
+            # The catalogue is shared by the session and an earlier gate test leaves
+            # ``volume_anomaly`` deprecated (``isolate_catalogue(keep=<its own key>)``): say which
+            # catalogue this scenario expects instead of inheriting it.
+            await isolate_catalogue(session)
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
             versions = await load_active_versions(session)
         assert "volume_anomaly" in {v.strategy_key for v in versions}
@@ -165,6 +176,10 @@ class TestEligibilityEvidence:
             await session.execute(text("DELETE FROM shadow_episodes"))
             await seed_market(session)
             await activate_version(session)
+            # The catalogue is shared by the session and an earlier gate test leaves
+            # ``volume_anomaly`` deprecated (``isolate_catalogue(keep=<its own key>)``): say which
+            # catalogue this scenario expects instead of inheriting it.
+            await isolate_catalogue(session)
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
             versions = await load_active_versions(session)
             market = await load_market(session, EXCHANGE, SYMBOL)

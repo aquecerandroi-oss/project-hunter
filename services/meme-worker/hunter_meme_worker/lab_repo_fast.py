@@ -49,7 +49,7 @@ _EVENT_MATCH_LATERAL = (
 imported, the existing convention between these two modules."""
 
 _FAST_ROWS = text(
-    "SELECT f.as_of, f.mint, f.snapshot_observed_at, f.snapshot_source, f.mcap_sol, "  # noqa: S608
+    "SELECT f.as_of, f.mint, f.snapshot_observed_at, f.snapshot_source, f.mcap_sol, "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     "       f.mcap_delta_60s, f.curve_progress_pct, f.progress_reason, f.progress_rising, "
     "       f.holders, f.holders_prev, f.holders_rising, f.holders_reason, "
     "       f.buys_60s, f.sells_60s, f.unique_buyers_60s, "

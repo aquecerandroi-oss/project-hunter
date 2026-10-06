@@ -51,7 +51,12 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
 WORKER_ROLE = "hunter_worker"
-NOW = datetime(2026, 9, 7, 12, 0, tzinfo=UTC)
+NOW = datetime(2026, 9, 14, 12, 0, tzinfo=UTC)
+"""Its own *day*, not just its own hour: ``proof_venue.seed`` reuses one market and its
+candles for every test in this database, so a ``NOW`` whose 24 h window overlaps another
+test's candles (``test_bridge_refusal_dedupe`` and ``test_manual_request_decided`` sit at
+2026-09-07 12:00) sums their volume into this one and the thin market stops being thin;
+and ``fx_observations`` is unique per ``(pair, source, observed_at)``."""
 STALLED_NOW = datetime(2026, 9, 7, 13, 0, tzinfo=UTC)
 """A second instant of its own: ``fx_observations`` is unique per
 ``(pair, source, observed_at)``, so two wallets opened at the same second

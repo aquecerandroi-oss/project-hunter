@@ -151,7 +151,7 @@ class LedgerRepository(TenantRepository):
         # S608: the only interpolated fragments are the module constants above
         # (column list and join). Every value is a bound parameter.
         statement = text(
-            "SELECT p.id AS position_id, p.market_id, p.direction::text AS direction, p.qty, "  # noqa: S608
+            "SELECT p.id AS position_id, p.market_id, p.direction::text AS direction, p.qty, "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
             "p.avg_entry_price, p.stop_price, p.status::text AS status, p.is_residual, "
             "p.mark_price AS durable_mark_price, "
             f"{_MARKET_COLUMNS} FROM positions p "
@@ -174,7 +174,7 @@ class LedgerRepository(TenantRepository):
         """
         # S608: same module constants; every value is a bound parameter.
         statement = text(
-            "SELECT tp.id AS proposal_id, tp.market_id, tp.reserved_notional, tp.reserved_cash, "  # noqa: S608
+            "SELECT tp.id AS proposal_id, tp.market_id, tp.reserved_notional, tp.reserved_cash, "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
             f"tp.reserved_risk, tp.reserved_slot, {_MARKET_COLUMNS} FROM trade_proposals tp "
             + _MARKET_JOIN.format(alias="tp")
             + " WHERE tp.organization_id = :org AND tp.portfolio_id = :pf "

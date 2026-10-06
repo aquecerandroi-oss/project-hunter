@@ -86,7 +86,9 @@ async def test_the_seed_hands_the_desk_to_operator_5_on_the_flow_gate_arm_2(
         specs = {s.label: s for s in await load_active_rule_sets(session)}
     # The desk is whichever ``kind = 'operator'`` set is active — never a hardcoded
     # version: it moved 2 -> 3 -> 4 -> 5 and will move again.
-    operator = next(s for s in specs.values() if s.kind == "operator" and s.name == "operator")
+    # ``0055`` seeds ``operator/6`` next to ``operator/5`` (both active): pick this test's by
+    # label, not by whichever the dict yields first.
+    operator = specs["operator/5"]
     flow = specs["flow_v2/2"]
     assert "operator/4" not in specs and operator.id == OPERATOR_5_ID
     assert "flow_v2/1" in specs, "arm 1 keeps being measured next to arm 2"
@@ -102,9 +104,12 @@ async def test_the_seed_hands_the_desk_to_operator_5_on_the_flow_gate_arm_2(
     assert operator.trailing_arm_x == flow.trailing_arm_x == Decimal("1.5")
     assert (operator.max_hold_s, operator.max_loss_pct) == (1800, Decimal(50))
     assert operator.exit_on_line_break and flow.ttl_s is None
-    assert [s.label for s in specs.values() if s.kind == "operator" and s.name == "operator"] == [
-        "operator/5"
-    ], "exactly one seeded operator set (test_lab_persistence plants throwaway operator-kind sets)"
+    assert sorted(
+        s.label for s in specs.values() if s.kind == "operator" and s.name == "operator"
+    ) == ["operator/5", "operator/6"], (
+        "exactly the two seeded desk sets (test_lab_persistence plants throwaway operator-kind "
+        "sets, but under their own random names)"
+    )
 
 
 async def test_operator_5_proposes_the_same_coin_as_flow_v2_2_waits_180_s_and_fills_once_approved(

@@ -229,7 +229,10 @@ async def test_the_loop_appends_real_fills_dedupes_by_signature_and_derives_the_
     assert verdict["accepted"] is False and "creator_net_seller_unknown" in verdict["refusals"]
     active = await _rows(
         db_session_factory,
-        "SELECT name || '/' || version AS label FROM meme_rule_sets WHERE status = 'active'",
+        # The Lab loads every active set except the launch lane's (``clock = 'event'``, 0053):
+        # those are the lane's own and never speak in a wallet trade's context.
+        "SELECT name || '/' || version AS label FROM meme_rule_sets WHERE status = 'active' "
+        "AND COALESCE(params ->> 'clock', '') <> 'event'",
     )
     assert set(context["rule_sets"]) == {str(r["label"]) for r in active}  # every active set spoke
     assert "meme_paper_v0/1" in context["rule_sets"]  # the 0022 seed is still active

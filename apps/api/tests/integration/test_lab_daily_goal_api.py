@@ -164,7 +164,10 @@ class TestDedupe:
                         "EXPLAIN SELECT s.id FROM agent_signals s "
                         "JOIN signal_outcomes o ON o.signal_id = s.id "
                         "WHERE s.strategy_version_id = '00000000-0000-0000-0000-000000000000' "
-                        "AND s.emitted_at >= '2026-01-01' AND s.emitted_at < '2026-01-02'"
+                        "AND s.emitted_at >= '2026-01-01' AND s.emitted_at < '2026-01-02' "
+                        # The repository's own predicate (``COHORT == PROSPECTIVE``): without
+                        # it the planner may legitimately prefer the plain version/emitted index.
+                        "AND (s.supporting_features ->> 'cohort') = 'prospective'"
                     )
                 )
             ).scalars()
@@ -173,9 +176,12 @@ class TestDedupe:
 
 
 class TestParticipationBinds:
-    DAY = date(2026, 9, 6)
-    ENTRY_TS = datetime(2026, 9, 6, 14, 5, tzinfo=UTC)
-    EXIT_TS = datetime(2026, 9, 6, 15, 0, tzinfo=UTC)
+    # A day no other API test plants bets on: the daily progress sums *every* version's outcomes
+    # of the day in the shared database, and 2026-09-06 (this class's first choice) is also used
+    # by the Lab and scoreboard tests -- progress read 2170 where this test priced 140.
+    DAY = date(2026, 9, 14)
+    ENTRY_TS = datetime(2026, 9, 14, 14, 5, tzinfo=UTC)
+    EXIT_TS = datetime(2026, 9, 14, 15, 0, tzinfo=UTC)
     RATE = Decimal("5.00")
 
     async def test_real_brl_is_priced_under_the_participation_ceiling(

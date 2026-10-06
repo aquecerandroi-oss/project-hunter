@@ -161,7 +161,7 @@ class ReplayRun:
 
 
 _INSERT_SLICE = text(
-    f"INSERT INTO {TABLE} (id, run_id, cohort, strategy_version_id, window_from, window_to, "  # noqa: S608
+    f"INSERT INTO {TABLE} (id, run_id, cohort, strategy_version_id, window_from, window_to, "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     "markets, markets_digest, started_at, finished_at, bars_evaluated, signals, "
     "outcomes_resolved, outcomes_open, seconds, decision_lag_s, workers, "
     "evaluations_by_state, errors) "

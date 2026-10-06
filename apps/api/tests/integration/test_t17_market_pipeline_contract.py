@@ -149,8 +149,10 @@ async def test_api_decodes_the_real_hot_state_writers_book_ticker_and_trades(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["last_price"] == "123.45"
-    assert body["book"]["bids"][0]["price"] == "123.40"
-    assert body["book"]["asks"][0]["price"] == "123.50"
+    # ``decimal_plain`` (b6f5c2c2) drops trailing zeros on every API decimal, so
+    # the writer's ``Decimal("123.40")`` reads back as ``123.4``: same number.
+    assert body["book"]["bids"][0]["price"] == "123.4"
+    assert body["book"]["asks"][0]["price"] == "123.5"
     assert body["book"]["kind"] == "snapshot"
     assert body["book"]["depth"] == 20
     assert len(body["recent_trades"]) == 1

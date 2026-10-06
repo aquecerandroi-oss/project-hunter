@@ -200,8 +200,15 @@ class TestHourlyIsStale:
         row = _hourly_row(end_time=utcnow() - HOURLY_STALE_AFTER - timedelta(minutes=1))
         assert _hourly_is_stale(row, regime_hourly_fresh=True) is True
 
-    def test_hour_exactly_at_the_two_hour_boundary_is_not_stale_by_age(self) -> None:
-        row = _hourly_row(end_time=utcnow() - HOURLY_STALE_AFTER)
+    def test_hour_exactly_at_the_two_hour_boundary_is_not_stale_by_age(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The clock is frozen: with two real ``utcnow()`` reads the second is always a few
+        # microseconds later than the first on a fine-grained clock (Linux), so the row was
+        # *older* than the boundary by the time the service looked at it.
+        now = utcnow()
+        monkeypatch.setattr("hunter_api.services.regime.utcnow", lambda: now)
+        row = _hourly_row(end_time=now - HOURLY_STALE_AFTER)
         assert _hourly_is_stale(row, regime_hourly_fresh=True) is False
 
 

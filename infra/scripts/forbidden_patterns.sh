@@ -145,11 +145,28 @@ scan_file() {
 
   # T4.4 finding: also the meme flag and the YAML form (`KEY: "true"`) that
   # docker-compose uses -- the shell form alone let both through.
-  report "$f" "ENABLE_LIVE_TRADING=true" 'ENABLE_(MEME_)?LIVE_TRADING[[:space:]]*[=:][[:space:]]*"?true' -i
+  #
+  # Env-format files (`.env`, `.env.example`, `.env.<x>.example`) hold one assignment per line
+  # and `#` there starts a comment, so prose such as "só liga com
+  # ENABLE_MEME_LIVE_TRADING=true" after the value is documentation, not an
+  # assignment (it failed CI for exactly that); only for them the match must
+  # sit before any `#` (`^[^#]*`). Everywhere else the pattern stays as wide as
+  # before: in YAML flow maps and source code a `#` can sit inside a string on
+  # the same line as a real flag (`{LABEL: "#desk", ENABLE_LIVE_TRADING: "true"}`),
+  # and a lead-in that skips past it would hide the flag.
+  # The exception is chosen by file name, so it is as narrow as the name allows: ``.env``,
+  # ``.env.example`` and ``.env.<x>.example`` -- and never a name that says YAML, where a
+  # ``compose.yml.example`` or an ``.env.compose.yml`` is a flow map, not a dotenv file.
+  lead=''
+  case "${f##*/}" in
+    *.yml*|*.yaml*) ;;
+    .env|.env.example|.env.*.example) lead='^[^#]*' ;;
+  esac
+  report "$f" "ENABLE_LIVE_TRADING=true" "${lead}ENABLE_(MEME_)?LIVE_TRADING[[:space:]]*[=:][[:space:]]*\"?true" -i
 
   # T4.28: the stage-1 "no click" flag of the meme executor is the owner's to
   # flip in the VPS .env, never a tracked file -- same shapes as the live flag.
-  report "$f" "MEME_LIVE_AUTO_APPROVE=true" 'MEME_LIVE_AUTO_APPROVE[[:space:]]*[=:][[:space:]]*"?true' -i
+  report "$f" "MEME_LIVE_AUTO_APPROVE=true" "${lead}MEME_LIVE_AUTO_APPROVE[[:space:]]*[=:][[:space:]]*\"?true" -i
 
   # T4.8 (docs/RISK_ENGINE_MEME.md section 3.3 / section 13 finding 3): a Solana
   # secret key has two export shapes, and neither may ever be *assigned* in a
@@ -261,6 +278,24 @@ run_self_test() {
   assert_hit "auto_compose.yml" "MEME_LIVE_AUTO_APPROVE=true"
   printf 'environment:\n  MEME_LIVE_AUTO_APPROVE: ${MEME_LIVE_AUTO_APPROVE:-false}\n' > auto_default.yml
   assert_no_hit "auto_default.yml"             # the substitution that defaults to false
+  printf 'SPOT1_ENABLED=false  # only turns on with ENABLE_MEME_LIVE_TRADING=true and a signer\n' > .env.example
+  assert_no_hit ".env.example"                 # prose in an env-file comment is not an assignment
+  printf 'ENABLE_LIVE_TRADING=true  # flipped on\n' > .env.example
+  assert_hit ".env.example" "ENABLE_LIVE_TRADING=true"      # a trailing comment must not hide it
+  printf '# ENABLE_LIVE_TRADING=true\nMEME_LIVE_AUTO_APPROVE=true # on\n' > .env.example
+  assert_hit ".env.example" "MEME_LIVE_AUTO_APPROVE=true"   # ...nor the next, real line
+  printf 'SPOT1_ENABLED=false  # only turns on with ENABLE_MEME_LIVE_TRADING=true and a signer\n' > env_comment.py
+  assert_hit "env_comment.py" "ENABLE_LIVE_TRADING=true"    # outside env files the wide pattern stays
+  printf 'environment: {LABEL: "#desk", ENABLE_MEME_LIVE_TRADING: "true"}\n' > flow_map.yml
+  assert_hit "flow_map.yml" "ENABLE_LIVE_TRADING=true"      # a `#` inside a string must not hide the flag
+  printf 'environment: {LABEL: "#desk", MEME_LIVE_AUTO_APPROVE: "true"}\n' > flow_map_auto.yml
+  assert_hit "flow_map_auto.yml" "MEME_LIVE_AUTO_APPROVE=true"
+  printf 'environment: {LABEL: "#desk", ENABLE_MEME_LIVE_TRADING: "true"}\n' > compose.yml.example
+  assert_hit "compose.yml.example" "ENABLE_LIVE_TRADING=true"   # a YAML name never gets the dotenv exception
+  printf 'environment: {LABEL: "#desk", ENABLE_MEME_LIVE_TRADING: "true"}\n' > .env.compose.yml
+  assert_hit ".env.compose.yml" "ENABLE_LIVE_TRADING=true"
+  printf 'SPOT1_ENABLED=false  # only turns on with ENABLE_MEME_LIVE_TRADING=true\n' > .env.staging.example
+  assert_no_hit ".env.staging.example"                         # .env.<x>.example is still a dotenv file
 
   # T4.8: Solana secret-key shapes. The fixtures are synthetic (a repeated
   # pattern, an ascending integer sequence) -- never a real key.

@@ -11,3 +11,21 @@ minimumReleaseAgeExclude:
   - '@clerk/react@6.15.1'
   - lucide-react@1.41.0
 virtualStoreDir: node_modules/.s
+# Transitive pins that their parents hold below the patched release (pnpm audit,
+# 05/10/2026). Each target is already in the lockfile for another dependent.
+# next@15 pins postcss 8.4.31 (GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849, patched
+# >= 8.5.18); @redocly/openapi-core@1 pins js-yaml 4.3.1 (GHSA-2883-xcg3-v3hh,
+# patched >= 4.3.2). Drop each line when the parent ships the fix.
+overrides:
+  "next>postcss": 8.5.28
+  "@redocly/openapi-core>js-yaml": 4.3.2
+# GHSA-vfj7-8cjw-p6xm (braces <= 3.0.3, stack exhaustion on deeply nested brace
+# patterns): NO patched release exists (3.0.3 is the latest on npm, 05/10/2026).
+# Not reachable: the only path is packages/config > @next/eslint-plugin-next >
+# fast-glob > micromatch > braces, a lint-time dev dependency that expands the
+# plugin's own constant globs; no request, user input or runtime image touches it.
+# Remove the entry when braces ships a fix. Documented in
+# obsidian/06-DECISIONS/Revisoes-Astra/CI-verde-2026-10-05.md.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-vfj7-8cjw-p6xm

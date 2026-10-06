@@ -202,7 +202,7 @@ _BOARD_COLUMNS = (
 )
 
 _INSERT_BOARD_MINUTE = text(
-    f"INSERT INTO meme_board_observations ({', '.join(_BOARD_COLUMNS)}, extra) "  # noqa: S608
+    f"INSERT INTO meme_board_observations ({', '.join(_BOARD_COLUMNS)}, extra) "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"VALUES ({', '.join(':' + column for column in _BOARD_COLUMNS)}, "
     "COALESCE(CAST(:extra AS jsonb), '{}'::jsonb)) "
     "ON CONFLICT (observed_at, board, mint) DO NOTHING"

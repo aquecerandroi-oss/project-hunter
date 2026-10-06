@@ -278,7 +278,7 @@ class MemeTestsRepository:
         if exists is None:
             return WalletPositionsRead(rows=[], source="não observada")
         query = text(
-            f"SELECT * FROM {WALLET_POSITIONS_TABLE} "  # noqa: S608 — constant identifier
+            f"SELECT * FROM {WALLET_POSITIONS_TABLE} "  # noqa: S608 — constant identifier  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
             "WHERE first_buy_at >= CAST(:start AS TIMESTAMPTZ) "
             "AND first_buy_at < CAST(:end AS TIMESTAMPTZ) "
             "ORDER BY first_buy_at DESC LIMIT :limit"

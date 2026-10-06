@@ -89,7 +89,7 @@ _SNAPSHOT_COLUMNS = (
 )
 
 _INSERT_SNAPSHOT = text(
-    f"INSERT INTO meme_curve_snapshots ({', '.join(_SNAPSHOT_COLUMNS)}) "  # noqa: S608
+    f"INSERT INTO meme_curve_snapshots ({', '.join(_SNAPSHOT_COLUMNS)}) "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"VALUES ({', '.join(':' + column for column in _SNAPSHOT_COLUMNS)}) "
     "ON CONFLICT (observed_at, mint, source) DO NOTHING"
 )
@@ -152,7 +152,7 @@ _FEATURE_COLUMNS = (
 )
 
 _INSERT_FEATURES = text(
-    f"INSERT INTO meme_features_1m ({', '.join(_FEATURE_COLUMNS)}) "  # noqa: S608
+    f"INSERT INTO meme_features_1m ({', '.join(_FEATURE_COLUMNS)}) "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"VALUES ({', '.join(':' + column for column in _FEATURE_COLUMNS)}) "
     "ON CONFLICT (end_time, mint, features_version) DO NOTHING"
 )

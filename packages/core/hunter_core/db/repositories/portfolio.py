@@ -67,7 +67,7 @@ class PortfolioRepository(TenantRepository):
         # S608: ``_PRINCIPAL_PAPER`` is a module constant copied from the index
         # definition; the organization is a bound parameter.
         statement = text(
-            "SELECT id FROM portfolios WHERE organization_id = :org "  # noqa: S608
+            "SELECT id FROM portfolios WHERE organization_id = :org "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
             f"AND {_PRINCIPAL_PAPER} LIMIT 1"
         )
         found = await self.session.scalar(statement, {"org": self.organization_id})

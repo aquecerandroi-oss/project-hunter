@@ -184,7 +184,7 @@ async def find_pending(
             # S608: the only variable fragment is the literal " FOR UPDATE" below,
             # chosen from a closed set of two constants — never caller input.
             text(
-                "SELECT id AS proposal_id, portfolio_id, market_id, "  # noqa: S608
+                "SELECT id AS proposal_id, portfolio_id, market_id, "  # noqa: S608  # nosec B608 -- constant text; FOR UPDATE toggled by a bool; values are bound
                 "direction::text AS direction, source::text AS source, request_digest, "
                 "request_payload FROM trade_proposals WHERE organization_id = :org "
                 "AND idempotency_key = :key AND status = 'pending' AND decided_at IS NULL"

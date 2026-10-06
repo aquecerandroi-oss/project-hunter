@@ -272,6 +272,22 @@ def _status_detail_keys() -> tuple[set[str], set[str]]:
     tree = ast.parse(inspect.getsource(scanner_main))
     registered: set[str] = set()
     cleared: set[str] = set()
+    # ``for detail in ("baselines", ...): runtime.status_details.pop(detail, None)`` -- the
+    # finally block clears the details in one loop over literal names, not one line each.
+    looped: dict[str, set[str]] = {}
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.For)
+            and isinstance(node.target, ast.Name)
+            and isinstance(node.iter, ast.Tuple | ast.List)
+            and all(
+                isinstance(item, ast.Constant) and isinstance(item.value, str)
+                for item in node.iter.elts
+            )
+        ):
+            looped[node.target.id] = {
+                str(item.value) for item in node.iter.elts if isinstance(item, ast.Constant)
+            }
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.Subscript)
@@ -288,9 +304,12 @@ def _status_detail_keys() -> tuple[set[str], set[str]]:
             and isinstance(node.func.value, ast.Attribute)
             and node.func.value.attr == "status_details"
             and node.args
-            and isinstance(node.args[0], ast.Constant)
         ):
-            cleared.add(str(node.args[0].value))
+            first = node.args[0]
+            if isinstance(first, ast.Constant):
+                cleared.add(str(first.value))
+            elif isinstance(first, ast.Name):
+                cleared |= looped.get(first.id, set())
     return registered, cleared
 
 
@@ -298,7 +317,7 @@ def test_every_status_detail_the_scanner_registers_is_removed_when_it_stops() ->
     """Symmetry, not a list: a fourth detail added tomorrow fails this too."""
     registered, cleared = _status_detail_keys()
 
-    assert registered == {"baselines", "beta", "regime_hourly", "breadth"}
+    assert registered == {"baselines", "beta", "regime_hourly", "breadth", "dispersion"}
     assert cleared == registered
 
 

@@ -53,8 +53,9 @@ PRODUCER = "market-worker@gateway-it:1"
 
 
 class _FakeRuntime:
-    def __init__(self, redis: object) -> None:
+    def __init__(self, redis: object, settings: Settings) -> None:
         self.redis = redis
+        self.settings = settings  # ``run_heartbeat`` reads the shard from it (T1.6b)
         self.instance = EXCHANGE
 
     def mark_success(self) -> None:
@@ -87,7 +88,9 @@ async def _publish_a_tick_and_one_heartbeat(database_url: str, redis_url: str) -
         universe.set([SYMBOL])
         state = HeartbeatState()
         hb_task = asyncio.create_task(
-            run_heartbeat(cast(Any, _FakeRuntime(redis)), adapter, universe, state, session_factory)
+            run_heartbeat(
+                cast(Any, _FakeRuntime(redis, settings)), adapter, universe, state, session_factory
+            )
         )
         await asyncio.sleep(
             0.3

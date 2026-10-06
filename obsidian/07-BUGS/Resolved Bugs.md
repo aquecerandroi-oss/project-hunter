@@ -356,3 +356,9 @@ CRITICAL e HIGH levantados pelo `database-architect` (duas passadas), pelo `code
 - `b2e48b5` **`setup_env.ps1` gravava o `.env` numa linha só** (precedência da vírgula sobre `+` no PowerShell).
 - `541ef78` **500 em toda rota `/[orgSlug]`**: menu passava função e componente do servidor para o cliente.
 - `744fdf8` **8 testes dependentes de ordem** por balde de rate limit compartilhado entre TestClients.
+
+## CI `python-test`, `security` e `forbidden-patterns` (06/10, ainda sem commit)
+
+Detalhe e tabela por causa em [[CI-verde-2026-10-05]]. **`pip-audit`:** `pyjwt 2.13.0 -> 2.15.1`, `urllib3 2.7.0 -> 2.8.0`, `virtualenv 21.7.8 -> 21.14.5` (24 vulnerabilidades -> "No known vulnerabilities found"). **`pnpm audit`:** `undici`/`brace-expansion` por `pnpm update`, `next>postcss` e `@redocly/openapi-core>js-yaml` por `overrides`, `braces` (GHSA-vfj7-8cjw-p6xm, sem versão corrigida, só dev) ignorado e documentado. **`bandit`:** 28 `nosec B608` revisados + testes fora do escopo (falta 1 linha no `meme-executor`, ver [[Open Bugs]]). **`forbidden-patterns`:** exceção por formato de arquivo env, `--self-test` no CI. **`python-test`:** 60+ testes de integração que nunca tinham rodado em CI com Docker (data fixa vs relógio, banco compartilhado, deriva de contrato, ordem de sessão) corrigidos nos testes; matrizes de isolamento e RBAC agora cobrem as 48 rotas do tenant.
+
+**`bandit` em `services/meme-executor/hunter_meme_executor/wallet_exceptions.py` (06/10):** o único B608 de produção que faltava recebeu `# nosec B608 -- constant table name EXCEPTIONS_TABLE` (acrescentado pelo orquestrador, linha 48); `bandit -r packages apps services -q -ll --exclude "*/tests/*"` sai 0. **`pnpm audit`:** `source-map-js 1.2.1 -> 1.2.2` (GHSA-68fv-2mgg-jv7q) — o audit só saiu 0 depois dele ([[sec-ci-green-2]]).

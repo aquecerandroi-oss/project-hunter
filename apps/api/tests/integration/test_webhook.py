@@ -537,7 +537,9 @@ async def test_a_completed_claim_is_never_re_run_however_old_it_is(
 
 
 async def test_the_pruner_drops_old_completed_rows_only_and_is_idempotent(
-    session_factory: async_sessionmaker[AsyncSession], api_database_url: str
+    session_factory: async_sessionmaker[AsyncSession],
+    api_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Retention for ``processed_events``, and the rule about what it may take.
 
@@ -568,6 +570,10 @@ async def test_the_pruner_drops_old_completed_rows_only_and_is_idempotent(
             },
         )
 
+    # The script reads ``DATABASE_URL_MIGRATIONS`` from the environment, and the fixtures that
+    # migrate a scratch database (``migrate_fresh_database``) overwrite it for the rest of the
+    # session: unpinned, the pruner connected to an empty scratch database and deleted nothing.
+    monkeypatch.setenv("DATABASE_URL_MIGRATIONS", api_database_url)
     pruner = load_script("prune_processed_events")
     first = await pruner.prune()
     second = await pruner.prune()

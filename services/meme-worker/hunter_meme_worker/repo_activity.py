@@ -183,7 +183,7 @@ def activity_rows(
 
 _COLUMNS = tuple(ActivityRow.__dataclass_fields__)
 _INSERT = text(
-    f"INSERT INTO meme_market_activity_1m ({', '.join(_COLUMNS)}) "  # noqa: S608
+    f"INSERT INTO meme_market_activity_1m ({', '.join(_COLUMNS)}) "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"VALUES ({', '.join(':' + column for column in _COLUMNS)}) "
     "ON CONFLICT (end_time, mint, window_name) DO NOTHING"
 )

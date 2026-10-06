@@ -86,7 +86,7 @@ RISK_COLUMNS: tuple[str, ...] = (
 )
 
 _INSERT_RISK = text(
-    f"INSERT INTO meme_risk_snapshots ({', '.join(RISK_COLUMNS)}, raw) "  # noqa: S608
+    f"INSERT INTO meme_risk_snapshots ({', '.join(RISK_COLUMNS)}, raw) "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"VALUES ({', '.join(':' + column for column in RISK_COLUMNS)}, CAST(:raw AS jsonb)) "
     "ON CONFLICT (observed_at, mint) DO NOTHING"
 )

@@ -14,7 +14,7 @@ import json
 import re
 import uuid
 from collections.abc import AsyncIterator, Iterator, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import cast
 
@@ -6180,7 +6180,10 @@ def _a_qualified_bet(
                 "proposal": proposal,
                 "rule_set": rule_set,
                 "status": status,
-                "exit_at": datetime(2026, 10, 5, 12, 5, tzinfo=UTC) if closed else None,
+                # Relative to the entry (``now() - 2 minutes`` in the INSERT above): the table
+                # CHECKs ``exit_at > entry_at``, and a fixed date turned into a failure the day
+                # the real clock passed it. The scoreboard reads ``day_brt = today`` the same way.
+                "exit_at": datetime.now(UTC) - timedelta(minutes=1) if closed else None,
                 "exit": json.dumps({"reason": exit_reason}) if closed else None,
                 "pnl": Decimal("-0.05") if closed else None,
                 "r": Decimal(-1) if closed else None,

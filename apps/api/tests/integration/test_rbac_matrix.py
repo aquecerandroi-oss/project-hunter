@@ -106,7 +106,57 @@ ROUTES: list[tuple[str, str, OrganizationRole]] = [
     # authorisation. They live under ``/orgs/{org_id}`` for no other reason.
     ("markets.desk", "GET", OrganizationRole.VIEWER),
     ("markets.events", "GET", OrganizationRole.VIEWER),
+    # The daily goal and the meme desk (`routers/lab_daily_goal.py`, `meme*.py`) were served
+    # without a line here (CI counted 29 declared against 48 served). The minimum is what each
+    # router declares: every read is VIEWER, every write of the desk -- a manual proposal,
+    # approve, reject, cancel, "sell now" on a paper bet or a live position -- is TRADER
+    # (`OperatorOrg`). The ids are random UUIDs, so the 404/422 they earn is not a role failure,
+    # which is exactly what property 2 allows.
+    ("lab.daily_goal", "GET", OrganizationRole.VIEWER),
+    ("meme.overview", "GET", OrganizationRole.VIEWER),
+    ("meme.desk", "GET", OrganizationRole.VIEWER),
+    ("meme.gaps", "GET", OrganizationRole.VIEWER),
+    ("meme.lab", "GET", OrganizationRole.VIEWER),
+    ("meme.live", "GET", OrganizationRole.VIEWER),
+    ("meme.live.wallet_summary", "GET", OrganizationRole.VIEWER),
+    ("meme.sources", "GET", OrganizationRole.VIEWER),
+    ("meme.tests", "GET", OrganizationRole.VIEWER),
+    ("meme.tests_csv", "GET", OrganizationRole.VIEWER),
+    ("meme.test_read", "GET", OrganizationRole.VIEWER),
+    ("meme.tokens", "GET", OrganizationRole.VIEWER),
+    ("meme.token_read", "GET", OrganizationRole.VIEWER),
+    ("meme.bet_sell_now", "POST", OrganizationRole.TRADER),
+    ("meme.live.position_sell_now", "POST", OrganizationRole.TRADER),
+    ("meme.proposal_manual", "POST", OrganizationRole.TRADER),
+    ("meme.proposal_approve", "POST", OrganizationRole.TRADER),
+    ("meme.proposal_reject", "POST", OrganizationRole.TRADER),
+    ("meme.proposal_cancel", "POST", OrganizationRole.TRADER),
 ]
+
+MINT = "M" * 40
+
+# kind -> (method, path under /orgs/{org_id}, body); ``{rid}`` is a fresh random UUID.
+_DESK_CALLS: dict[str, tuple[str, str, dict[str, Any] | None]] = {
+    "lab.daily_goal": ("GET", "/lab/daily-goal?day=2026-01-01", None),
+    "meme.overview": ("GET", "/meme/overview", None),
+    "meme.desk": ("GET", "/meme/desk", None),
+    "meme.gaps": ("GET", "/meme/gaps", None),
+    "meme.lab": ("GET", "/meme/lab", None),
+    "meme.live": ("GET", "/meme/live", None),
+    "meme.live.wallet_summary": ("GET", "/meme/live/wallet-summary", None),
+    "meme.sources": ("GET", "/meme/sources", None),
+    "meme.tests": ("GET", "/meme/tests", None),
+    "meme.tests_csv": ("GET", "/meme/tests.csv", None),
+    "meme.test_read": ("GET", "/meme/tests/{rid}", None),
+    "meme.tokens": ("GET", "/meme/tokens", None),
+    "meme.token_read": ("GET", "/meme/tokens/{mint}", None),
+    "meme.bet_sell_now": ("POST", "/meme/bets/{rid}/sell-now", None),
+    "meme.live.position_sell_now": ("POST", "/meme/live/positions/{rid}/sell-now", None),
+    "meme.proposal_manual": ("POST", "/meme/proposals/manual", {"mint": MINT}),
+    "meme.proposal_approve": ("POST", "/meme/proposals/{rid}/approve", {}),
+    "meme.proposal_reject": ("POST", "/meme/proposals/{rid}/reject", {}),
+    "meme.proposal_cancel": ("POST", "/meme/proposals/{rid}/cancel", None),
+}
 
 
 def _role_below(minimum: OrganizationRole) -> OrganizationRole | None:
@@ -311,6 +361,15 @@ async def _call(
     if kind == "markets.events":
         return await client.get(
             f"/api/v1/orgs/{org_id}/markets/binance/RBACUSDT/events", headers=caller.headers
+        )
+    desk_call = _DESK_CALLS.get(kind)
+    if desk_call is not None:
+        method, path, body = desk_call
+        return await client.request(
+            method,
+            f"/api/v1/orgs/{org_id}{path.format(rid=uuid.uuid4(), mint=MINT)}",
+            json=body,
+            headers=caller.headers,
         )
     raise AssertionError(f"unhandled route kind {kind!r}")  # pragma: no cover
 

@@ -39,4 +39,6 @@ Pedido: o job `security` do `ci.yml` falhava em todo push na `main`, no passo `g
 - **Zero achados depois de alargar allowlists exige controles negativos** — um achado que some por allowlist larga demais é indistinguível, no relatório, de um achado que nunca existiu.
 - Allowlist por linha (`regexTarget = "line"`) é a forma mais larga possível; preferir `secret`/`match` e, quando for por local, caminho **e** formato.
 
+Segunda rodada (pip-audit, bandit, pnpm audit, forbidden-patterns, que o gitleaks escondia): [[CI-verde-2026-10-05]].
+
 Relacionadas: [[Infrastructure]] · [[Open Bugs]] · [[Resolved Bugs]] · [[Revisoes-Astra/Index|índice das revisões da Astra]]

@@ -5,11 +5,11 @@ no IO, no Redis.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import redis.exceptions
-from structlog.testing import capture_logs
 
 from hunter_api.schemas.system import WorkerLivenessStatus
 from hunter_api.services.system_status import (
@@ -28,6 +28,10 @@ from hunter_api.services.system_status import (
 )
 from hunter_core.domain.types import utcnow
 from hunter_core.redis import keys
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from contextlib import AbstractContextManager
 
 pytestmark = pytest.mark.unit
 
@@ -306,7 +310,7 @@ class _RaisingScanRedis:
 
 
 async def test_scan_heartbeats_reraises_when_redis_is_unavailable(
-    caplog: pytest.LogCaptureFixture,
+    module_logs: Callable[[str], AbstractContextManager[list[dict[str, object]]]],
 ) -> None:
     """(G4) Redis being unavailable must not read the same as "no worker has
     ever reported in" -- both would otherwise render as an identical
@@ -315,8 +319,12 @@ async def test_scan_heartbeats_reraises_when_redis_is_unavailable(
     """
     fake_redis = _RaisingScanRedis(redis.exceptions.ConnectionError("connection refused"))
     # structlog renders to stdout, not the stdlib handlers, so caplog never
-    # sees it -- capture at the structlog layer (T2.5g moved this path to SCAN).
-    with capture_logs() as records, pytest.raises(redis.exceptions.ConnectionError):
+    # sees it -- capture at the structlog layer (T2.5g moved this path to SCAN), through
+    # ``module_logs`` so a logger frozen by an earlier ``configure_logging`` still reaches it.
+    with (
+        module_logs("hunter_api.services.system_status") as records,
+        pytest.raises(redis.exceptions.ConnectionError),
+    ):
         await scan_heartbeats(fake_redis)  # pyright: ignore[reportArgumentType]
     assert any(r.get("error_type") == "ConnectionError" for r in records)
     assert all("connection refused" not in str(r) for r in records)

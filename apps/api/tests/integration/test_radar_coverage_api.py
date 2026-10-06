@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import pytest
 import pytest_asyncio
 import redis.asyncio as redis_asyncio
+from sqlalchemy import text
 
 from hunter_core.db.models.analysis import OpportunityHistory, OpportunityWeights
 from hunter_core.db.models.analysis_baselines import FeatureBaseline
@@ -146,11 +147,19 @@ async def test_get_radar_coverage_max_score_ever_reads_opportunity_history(
         session_factory, market_id, score=Decimal("10.00"), status=OpportunityStatus.NORMAL
     )
     async with session_factory() as session:
+        # The API database is shared by the whole suite and the ceiling is read
+        # off *every* history row, so sit one cent above whatever other tests
+        # (``test_opportunities_api`` writes a 65.00) left there -- a fixed
+        # 38.33 only held when this file ran alone.
+        others = (
+            await session.execute(text("SELECT COALESCE(max(score), 0) FROM opportunity_history"))
+        ).scalar_one()
+        ceiling = max(Decimal(others), Decimal("10.00")) + Decimal("0.01")
         session.add(
             OpportunityHistory(
                 opportunity_id=opportunity_id,
                 ts=datetime.now(UTC),
-                score=Decimal("38.33"),
+                score=ceiling,
                 confidence=Decimal("0.4000"),
                 status=OpportunityStatus.NORMAL,
                 stage=OpportunityStage.NONE,
@@ -162,7 +171,7 @@ async def test_get_radar_coverage_max_score_ever_reads_opportunity_history(
     response = await client.get("/api/v1/radar/coverage", headers=actor.headers)
 
     assert response.status_code == 200, response.text
-    assert response.json()["max_score_ever"] == "38.33"
+    assert response.json()["max_score_ever"] == f"{ceiling:.2f}"
 
 
 async def test_get_radar_coverage_baseline_gate_v2_pct_against_the_active_weight_vector(
@@ -174,10 +183,26 @@ async def test_get_radar_coverage_baseline_gate_v2_pct_against_the_active_weight
     `opportunity_weights.baseline_gate` -- 50 %, not a fabricated ``None``."""
     _exchange, _symbol, market_id = await fx.seed_market(session_factory)
     now = datetime.now(UTC)
+    gate_version = f"gate-test-{uuid.uuid4().hex[:8]}"
     async with session_factory() as session:
+        # The seeded database already carries an active vector and the schema
+        # allows exactly one (``uq_opportunity_weights_active``): park it for the
+        # duration of this test and put it back in ``finally`` below.
+        parked = (
+            (
+                await session.execute(
+                    text(
+                        "UPDATE opportunity_weights SET is_active = false "
+                        "WHERE is_active RETURNING id"
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
         session.add(
             OpportunityWeights(
-                version=f"gate-test-{uuid.uuid4().hex[:8]}",
+                version=gate_version,
                 weights={
                     "baseline_gate": {
                         "min_distinct_days": 3,
@@ -223,7 +248,19 @@ async def test_get_radar_coverage_baseline_gate_v2_pct_against_the_active_weight
         await session.commit()
     actor: Actor = make_actor("radar-coverage-gate")
 
-    response = await client.get("/api/v1/radar/coverage", headers=actor.headers)
+    try:
+        response = await client.get("/api/v1/radar/coverage", headers=actor.headers)
+    finally:
+        async with session_factory() as session:
+            await session.execute(
+                text("UPDATE opportunity_weights SET is_active = false WHERE version = :version"),
+                {"version": gate_version},
+            )
+            await session.execute(
+                text("UPDATE opportunity_weights SET is_active = true WHERE id = ANY(:ids)"),
+                {"ids": parked},
+            )
+            await session.commit()
 
     assert response.status_code == 200, response.text
     assert response.json()["baseline_gate_v2_pct"] == "50.00"

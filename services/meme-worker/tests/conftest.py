@@ -137,3 +137,30 @@ async def db_session_factory(
     from hunter_core.db.session import create_session_factory
 
     yield create_session_factory(db_engine)
+
+
+@pytest.fixture(autouse=True)
+def snapshots_are_received_when_observed(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    """Stamp a planted curve photo as received at its own ``observed_at``.
+
+    The worker's insert leaves ``received_at`` to the database (``now()``), and the
+    folds under test keep only photos with ``received_at <= <the instant decided>``.
+    The fixtures decide at fixed instants (2026-09-27, 2026-10-05, ...), so they only held
+    while the real clock was *earlier* than those dates: the day it passed them every
+    photo looked like it had arrived after the decision and a dozen tests failed on CI
+    with a perfectly healthy fold. Tests that want a photo that arrives late insert it
+    with an explicit ``received_at`` of their own, which this does not touch.
+    """
+    if request.path.name == "test_persistence.py":
+        return  # that module proves the worker's own INSERT (idempotency included): untouched
+    from hunter_meme_worker import repo
+
+    columns = repo._SNAPSHOT_COLUMNS  # pyright: ignore[reportPrivateUsage]
+    statement = (
+        f"INSERT INTO meme_curve_snapshots ({', '.join(columns)}, received_at) "  # noqa: S608
+        f"VALUES ({', '.join(':' + column for column in columns)}, :observed_at) "
+        "ON CONFLICT (observed_at, mint, source) DO NOTHING"
+    )
+    monkeypatch.setattr(repo, "_INSERT_SNAPSHOT", text(statement))

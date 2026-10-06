@@ -62,7 +62,7 @@ with any ``avoid`` match shows that one first — the safe read for a gate that
 must refuse it regardless of what other events also named it."""
 
 _GATE_ROWS = text(
-    "SELECT f.mint, f.end_time, f.curve_progress_pct, f.progress_reason, f.mcap_sol, "  # noqa: S608
+    "SELECT f.mint, f.end_time, f.curve_progress_pct, f.progress_reason, f.mcap_sol, "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     "       f.creator_net_seller, f.curve_volume_1m_sol, "
     "       f.snapshot_observed_at, f.snapshot_source, "
     "       f.higher_lows, f.breakout_15m, f.distance_to_support_pct, f.line_reason, "

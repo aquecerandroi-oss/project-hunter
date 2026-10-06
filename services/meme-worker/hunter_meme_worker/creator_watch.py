@@ -78,7 +78,7 @@ _WATCHED = text(
 )
 _MARK_SOLD = tuple(
     text(
-        f"UPDATE {table} SET creator_sold_seen_at = :at, creator_sold_fraction = :fraction, "  # noqa: S608
+        f"UPDATE {table} SET creator_sold_seen_at = :at, creator_sold_fraction = :fraction, "  # noqa: S608  # nosec B608 -- table name comes from the WATCHED_TABLES constant; values are bound
         "  creator_balance_reason = NULL "
         "WHERE mint = :mint AND status = 'open' AND creator_sold_seen_at IS NULL"
     )
@@ -86,7 +86,7 @@ _MARK_SOLD = tuple(
 )
 _MARK_REASON = tuple(
     text(
-        f"UPDATE {table} SET creator_balance_reason = :reason "  # noqa: S608
+        f"UPDATE {table} SET creator_balance_reason = :reason "  # noqa: S608  # nosec B608 -- table name comes from the WATCHED_TABLES constant; values are bound
         "WHERE mint = :mint AND status = 'open' AND creator_sold_seen_at IS NULL "
         "  AND creator_balance_reason IS DISTINCT FROM :reason"
     )

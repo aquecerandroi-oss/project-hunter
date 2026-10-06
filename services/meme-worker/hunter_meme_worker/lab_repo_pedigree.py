@@ -69,7 +69,7 @@ _SYMBOL_24H = (
     "       ) END AS symbol_dup_24h"
 )
 _DUMP_COUNT = (
-    "CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("  # noqa: S608
+    "CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"        {_PRIOR_MINTS}"
     "           AND ("
     "             EXISTS (SELECT 1 FROM meme_features_1m pf WHERE pf.mint = o.mint "
@@ -92,7 +92,7 @@ _DUMP_COUNT = (
     "       ) END AS creator_prior_dump_count"
 )
 _DEAD_COUNT = (
-    "CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("  # noqa: S608
+    "CASE WHEN t.creator IS NULL OR t.created_at IS NULL THEN NULL ELSE ("  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"        {_PRIOR_MINTS}"
     "           AND EXISTS ("
     "             SELECT 1 FROM ("

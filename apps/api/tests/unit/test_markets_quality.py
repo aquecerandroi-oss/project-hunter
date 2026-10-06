@@ -6,11 +6,10 @@ Postgres.
 
 from __future__ import annotations
 
-import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import msgpack
 import pytest
@@ -28,6 +27,12 @@ from hunter_api.services.markets import (
 from hunter_api.services.markets_hot_state import pipeline_hot_state
 from hunter_core.domain.enums import MarketStatus, MarketType, Timeframe
 from hunter_core.domain.market import DataQuality
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from contextlib import AbstractContextManager
+
+    ModuleLogs = Callable[[str], AbstractContextManager[list[dict[str, object]]]]
 
 pytestmark = pytest.mark.unit
 
@@ -718,28 +723,25 @@ def test_parse_trades_drops_an_entry_that_is_not_a_decodable_map() -> None:
 
 
 async def test_pipeline_hot_state_degrades_to_absent_when_redis_is_unavailable(
-    caplog: pytest.LogCaptureFixture,
+    module_logs: ModuleLogs,
 ) -> None:
     """(F2) Redis down -> every market in the batch degrades to absent hot
     state rather than a 500; only the error's type is logged, never a key.
 
-    Uses pytest's stdlib-``logging``-backed ``caplog`` rather than
-    ``structlog.testing.capture_logs()`` -- once any earlier test in this
-    session has caused ``configure_logging`` to run (any integration test
-    that builds the app does), structlog's ``cache_logger_on_first_use``
-    freezes this module's bound logger onto the real processor chain, and
-    ``capture_logs()``'s later reconfiguration no longer reaches it.
+    Captured at the structlog layer through ``module_logs`` (``tests/unit/conftest.py``): the
+    stdlib ``caplog`` only sees these records once ``configure_logging`` has run in the
+    session, which made this test pass or fail with the order of the suite.
     """
     fake_redis = _RaisingRedis(redis.exceptions.ConnectionError("connection refused"))
-    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets_hot_state"):
+    with module_logs("hunter_api.services.markets_hot_state") as records:
         result = await pipeline_hot_state(fake_redis, [_row()])  # pyright: ignore[reportArgumentType]
     assert result == {}
-    assert "ConnectionError" in caplog.text
-    assert "mkt:" not in caplog.text
+    assert any(r.get("error_type") == "ConnectionError" for r in records)
+    assert "mkt:" not in str(records)
 
 
 async def test_pipeline_hot_state_wrongtype_error_never_logs_the_offending_key(
-    caplog: pytest.LogCaptureFixture,
+    module_logs: ModuleLogs,
 ) -> None:
     """(F2) redis-py appends the failing command *and its key* to a
     WRONGTYPE ``ResponseError`` message -- that must never reach a log line.
@@ -749,16 +751,16 @@ async def test_pipeline_hot_state_wrongtype_error_never_logs_the_offending_key(
         "mkt:binance:BTCUSDT:ticker"
     )
     fake_redis = _RaisingRedis(exc)
-    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets_hot_state"):
+    with module_logs("hunter_api.services.markets_hot_state") as records:
         result = await pipeline_hot_state(fake_redis, [_row()])  # pyright: ignore[reportArgumentType]
     assert result == {}
-    assert "mkt:binance:BTCUSDT:ticker" not in caplog.text
-    assert "ticker" not in caplog.text
-    assert "ResponseError" in caplog.text
+    assert "mkt:binance:BTCUSDT:ticker" not in str(records)
+    assert "ticker" not in str(records)
+    assert any(r.get("error_type") == "ResponseError" for r in records)
 
 
 async def test_pipeline_hot_state_isolates_a_single_market_command_failure(
-    caplog: pytest.LogCaptureFixture,
+    module_logs: ModuleLogs,
 ) -> None:
     """(G3) A single market's ticker command failing (verified against a real
     Redis server: a WRONGTYPE comes back as a ``ResponseError`` *in place* in
@@ -782,10 +784,10 @@ async def test_pipeline_hot_state_isolates_a_single_market_command_failure(
     ]
     fake_redis = _PartialFailureRedis(results)
     rows = [_row(symbol="AAA"), _row(symbol="BBB")]
-    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets_hot_state"):
+    with module_logs("hunter_api.services.markets_hot_state") as records:
         out = await pipeline_hot_state(fake_redis, rows)  # pyright: ignore[reportArgumentType]
     assert out[rows[0].id].ticker == {}
     assert out[rows[1].id].ticker["last"] == "1"
-    assert "ResponseError" in caplog.text
-    assert "AAA" not in caplog.text
-    assert "BBB" not in caplog.text
+    assert any(r.get("error_types") == ["ResponseError"] for r in records)
+    assert "AAA" not in str(records)
+    assert "BBB" not in str(records)

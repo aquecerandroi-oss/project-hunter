@@ -39,7 +39,7 @@ _POINTS = text(
 
 _ROW_COLUMNS = tuple(Fast15sRow.__dataclass_fields__)
 _INSERT_ROW = text(
-    f"INSERT INTO meme_features_15s ({', '.join(_ROW_COLUMNS)}) "  # noqa: S608
+    f"INSERT INTO meme_features_15s ({', '.join(_ROW_COLUMNS)}) "  # noqa: S608  # nosec B608 -- identifiers and fragments are module-level constants, never an argument or a row; values are bound parameters
     f"VALUES ({', '.join(':' + column for column in _ROW_COLUMNS)}) "
     "ON CONFLICT (as_of, mint, features_version) DO NOTHING"
 )

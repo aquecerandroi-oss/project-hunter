@@ -40,6 +40,7 @@ if TYPE_CHECKING:
 from hunter_core.domain.enums import Timeframe
 from hunter_core.domain.market import align_open_time
 from hunter_core.domain.types import utcnow
+from hunter_core.events.outbox import reconcile
 from hunter_core.events.streams import Streams
 from hunter_core.redis import keys
 from hunter_exchanges.testing.fake_adapter import FakeExchangeAdapter
@@ -98,6 +99,10 @@ async def test_full_pipeline_fake_adapter_to_redis_to_postgres_to_api(
     )
     universe.set(monitored)
     assert monitored == [SYMBOL]
+    # T2.9: ``market.universe.changed`` is queued in the outbox inside the transaction that
+    # writes ``is_monitored`` and published by the dispatcher, not by ``refresh_universe``.
+    # The worker runs the dispatcher (``run_outbox``); here one reconcile pass stands in.
+    assert await reconcile(worker_redis, worker_session_factory) >= 1
     universe_envelope = await _last_stream_entry(worker_redis, Streams.MARKET_UNIVERSE_CHANGED)
     assert universe_envelope["payload"]["added"] == [SYMBOL]
 
@@ -282,7 +287,8 @@ async def test_full_pipeline_fake_adapter_to_redis_to_postgres_to_api(
     body = list_resp.json()
     row = next(item for item in body["items"] if item["symbol"] == SYMBOL)
     assert row["data_quality"] == "ok"  # ticker+book+mark all fresh, no gap
-    assert row["last_price"] == "50000.50"
+    # API decimals drop trailing zeros (``decimal_plain``, b6f5c2c2): 50000.50 reads as 50000.5.
+    assert row["last_price"] == "50000.5"
     assert row["bid"] == str(ticker_event.bid)
 
     detail_resp = await pipeline_client.get(
@@ -293,7 +299,7 @@ async def test_full_pipeline_fake_adapter_to_redis_to_postgres_to_api(
     assert detail["book"]["depth"] == 20
     assert detail["book"]["kind"] == "snapshot"
     assert len(detail["recent_trades"]) == 1
-    assert detail["recent_trades"][0]["price"] == "50000.60"
+    assert detail["recent_trades"][0]["price"] == "50000.6"
 
     candles_resp = await pipeline_client.get(
         f"/api/v1/markets/{EXCHANGE}/{SYMBOL}/candles", headers=authed_actor
@@ -312,7 +318,7 @@ async def test_full_pipeline_fake_adapter_to_redis_to_postgres_to_api(
     await hb_pubsub.subscribe("rt:system")
     hb_task = asyncio.create_task(
         run_heartbeat(
-            cast("WorkerRuntime", _FakeRuntime(worker_redis)),
+            cast("WorkerRuntime", _FakeRuntime(worker_redis, worker_settings)),
             adapter,
             universe,
             state,
@@ -382,7 +388,7 @@ async def test_the_real_ingest_loop_consumes_adapter_stream_into_hot_state(
     heartbeat_state = HeartbeatState()
     health = IngestionHealth()
     watchdog = Watchdog(adapter, lambda _msg: _noop())
-    runtime = _FakeRuntime(worker_redis)
+    runtime = _FakeRuntime(worker_redis, worker_settings)
 
     task = asyncio.create_task(
         run_ingest(
@@ -429,8 +435,9 @@ class _FakeRuntime:
     a real ``WorkerRuntime`` would also open its own engine/health server,
     neither of which this test needs."""
 
-    def __init__(self, redis: Any) -> None:
+    def __init__(self, redis: Any, settings: Settings) -> None:
         self.redis = redis
+        self.settings = settings  # ``run_heartbeat`` reads the shard from it (T1.6b)
         self.instance = "pipeline-it"
 
     def mark_success(self) -> None:

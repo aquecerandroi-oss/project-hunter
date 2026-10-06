@@ -24,7 +24,7 @@ from hunter_strategy_worker.consumer import ConsumerHealth
 from hunter_strategy_worker.health import readiness_checks
 from hunter_strategy_worker.outbox import OutboxHealth
 
-from .builders import activate_version, only_version, seed_market
+from .builders import activate_version, isolate_catalogue, only_version, seed_market
 
 CONFIG = ShadowConfig()
 
@@ -68,6 +68,10 @@ class TestRosterCounts:
             await activate_version(
                 session, key="volume_anomaly", code_ref=version_code_ref("volume_anomaly_v1")
             )
+            # The catalogue is shared by the session and an earlier gate test leaves
+            # ``volume_anomaly`` deprecated (``isolate_catalogue(keep=<its own key>)``): say which
+            # catalogue this scenario expects instead of inheriting it.
+            await isolate_catalogue(session)
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
             roster = await load_version_roster(session)
         assert "volume_anomaly" in {v.strategy_key for v in roster.versions}

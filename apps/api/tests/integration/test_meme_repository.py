@@ -128,6 +128,20 @@ DDL_STATEMENTS = [
         snapshot_observed_at timestamptz,
         snapshot_source text,
         computed_at timestamptz NOT NULL,
+        -- 0026 (T4.10): the drawn lines and the hype; the repository selects them all.
+        mcap_slope_5m numeric(12, 6),
+        mcap_slope_15m numeric(12, 6),
+        high_15m_sol numeric(28, 10),
+        low_15m_sol numeric(28, 10),
+        breakout_15m boolean,
+        support_line_sol numeric(28, 10),
+        support_line_slope numeric(12, 6),
+        higher_lows boolean,
+        distance_to_support_pct numeric(9, 6),
+        line_points smallint,
+        line_reason text,
+        hype_score numeric(9, 6),
+        hype_reason text,
         PRIMARY KEY (end_time, mint, features_version)
     )
     """,

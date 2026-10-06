@@ -259,7 +259,14 @@ def bootstrapped(pipeline_db_url: str, pipeline_redis_url: str) -> Bootstrapped:
     pattern ``packages/core/tests/integration/test_schema_seed_and_partitions.py``
     already uses, so no async resource is ever shared across event loops.
     """
-    return asyncio.run(_prepare(pipeline_db_url, pipeline_redis_url))
+    # ``finish_job`` stamps ``available_at = max(now, utcnow())`` -- publication is never
+    # earlier than the wall clock, which is right in production. This module reasons at fixed
+    # instants in September, so once the real clock passed them every bootstrap revision
+    # was "published after" the cut and no baseline was admissible (VOLUME_SPIKE never fired).
+    # The clock of the bootstrap is the test's own reference instant.
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("hunter_scanner_worker.replay_io.utcnow", lambda: BOOTSTRAP_NOW)
+        return asyncio.run(_prepare(pipeline_db_url, pipeline_redis_url))
 
 
 async def _scanner(
