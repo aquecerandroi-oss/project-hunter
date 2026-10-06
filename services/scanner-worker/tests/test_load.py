@@ -88,7 +88,10 @@ class MultiMarketHotState(FakeHotState):
 
 
 @pytest.mark.xfail(
-    strict=True,
+    # Not strict since 06/10/2026: the budget is wall time, and the GitHub runner passed it
+    # (XPASS strict) with no code change while slower machines miss it by ~8 %. A timing
+    # threshold cannot be a strict alarm; the construction-path follow-up stays in the reason.
+    strict=False,
     reason=(
         "MEASURED, and 8% out: cycle p99 3.23 s against the 3.0 s budget, with "
         "every one of the 200 markets holding a FULL hot state (1500 candle rows "
