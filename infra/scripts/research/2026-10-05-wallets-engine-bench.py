@@ -15,16 +15,25 @@ last day, checks both snapshots are EQUAL (a differential at scale), and reports
 The extrapolation at the end is LINEAR on the per-unit costs measured here, applied to the
 volumes of the design (28.5–31 M swaps/day, KB-0183) and to SCENARIOS (not measures) of entities
 and lots. Run: ``uv run python infra/scripts/research/2026-10-05-wallets-engine-bench.py``.
+
+**Updated 06/10/2026 (CPU plan step 1):** ``--generator`` defaults to ``kb0183-shape-v2``
+(``2026-10-06-wallets-engine-gen.py``: 13 % of events by one-swap wallets, as KB-0183 measured,
+instead of this file's 54 %); ``v1`` is the 05/10 generator below, kept so that run reproduces.
+Times are CPU (``process_time``) next to wall (``perf_counter``); the per-pass profile lives in
+``2026-10-06-wallets-engine-profile.py``.
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import random
+import sys
 import time
 import tracemalloc
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from hunter_indicators.meme.wallets.carry import (
     MintCarry,
@@ -118,13 +127,28 @@ def _windows(by_mint: dict[str, list[Fill]], creates: dict[str, list[CreateEvent
     ]  # fmt: skip
 
 
+def _kb0183(per_day: int, days: int, seed: int) -> tuple[list[Fill], list[CreateEvent]]:
+    spec = importlib.util.spec_from_file_location(
+        "wgen", Path(__file__).with_name("2026-10-06-wallets-engine-gen.py")
+    )
+    assert spec is not None and spec.loader is not None
+    gen = importlib.util.module_from_spec(spec)
+    sys.modules["wgen"] = gen
+    spec.loader.exec_module(gen)
+    return gen.generate(gen.Config(per_day=per_day, days=days, seed=seed))
+
+
+GENERATORS = {"kb0183-shape-v2": _kb0183, "v1": generate}
+CPU: dict[str, float] = {}
+
+
 def _measure(fn: Callable[[], object], traced: bool) -> tuple[object, float, int]:
     if traced:
         tracemalloc.start()
         tracemalloc.reset_peak()
-    t = time.perf_counter()
+    t, c = time.perf_counter(), time.process_time()
     out = fn()
-    elapsed = time.perf_counter() - t
+    elapsed, CPU["last"] = time.perf_counter() - t, time.process_time() - c
     peak = tracemalloc.get_traced_memory()[1] if traced else 0
     if traced:
         tracemalloc.stop()
@@ -146,8 +170,9 @@ def _fill_bytes(sample: list[Fill]) -> float:
     return size / max(1, len(copies))
 
 
-def run(per_day: int, days: int, window: int, traced: bool) -> dict[str, float]:
-    fills, creates = generate(per_day, days, seed=per_day)
+def run(per_day: int, days: int, window: int, traced: bool, generator: str = "kb0183-shape-v2"
+        ) -> dict[str, float]:  # fmt: skip
+    fills, creates = GENERATORS[generator](per_day, days, per_day)
     params = RankingParams(window_days=window)
     canon = sorted(fills, key=canonical_order)
     by_mint: dict[str, list[Fill]] = {}
@@ -160,7 +185,7 @@ def run(per_day: int, days: int, window: int, traced: bool) -> dict[str, float]:
     carry, first = initial_carry(T0, window_days=window)
     carries = {m.mint: m for m in first}
     nights: list[date] = [(T0 + timedelta(days=k)).date() for k in range(window, days)]
-    times, peaks, result = list[float](), list[int](), None
+    times, peaks, result, stream_cpu = list[float](), list[int](), None, 0.0
     for day in nights:
         ws = _windows(by_mint, c_by_mint, carries, cut_of(day) - timedelta(days=window))
         inputs = StreamInputs(carry=carry, mints=lambda w=ws: iter(w), shared_signatures=shared)
@@ -168,7 +193,7 @@ def run(per_day: int, days: int, window: int, traced: bool) -> dict[str, float]:
             lambda i=inputs, d=day: stream_snapshot(i, d, params=params), traced
         )
         assert isinstance(out, StreamResult)
-        result, carry = out, out.carry
+        result, carry, stream_cpu = out, out.carry, CPU["last"]
         carries = {m.mint: m for m in out.mint_carries}
         times.append(elapsed)
         peaks.append(peak)
@@ -188,7 +213,8 @@ def run(per_day: int, days: int, window: int, traced: bool) -> dict[str, float]:
     return {
         "fills_per_day": per_day, "window_fills": len(window_fills),
         "largest_mint_fills": max(per_mint), "entities": len(result.snapshot.rows),
-        "stream_s": times[-1], "batch_s": b_time, "stream_peak_mb": peaks[-1] / 1e6,
+        "stream_s": times[-1], "stream_cpu_s": stream_cpu, "batch_s": b_time,
+        "batch_cpu_s": CPU["last"], "stream_peak_mb": peaks[-1] / 1e6,
         "batch_peak_mb": b_peak / 1e6, "fill_bytes": _fill_bytes(window_fills[:5_000]),
         "carry_mints": len(mints), "carry_lots": sum(len(m.lots) for m in mints),
         "carry_flows": sum(len(m.flows) for m in mints),
@@ -203,21 +229,24 @@ def main() -> None:
     parser.add_argument("--scales", default="4000,8000,16000")
     parser.add_argument("--days", type=int, default=4)
     parser.add_argument("--window", type=int, default=2)
+    parser.add_argument("--generator", default="kb0183-shape-v2", choices=sorted(GENERATORS))
     args = parser.parse_args()
-    print("SYNTHETIC benchmark (not market data); window", args.window, "d; days", args.days)
+    print("SYNTHETIC benchmark (not market data); window", args.window, "d; days", args.days,
+          "; generator", args.generator)  # fmt: skip
     rows: list[dict[str, float]] = []
     for scale in (int(s) for s in args.scales.split(",")):
-        timing = run(scale, args.days, args.window, traced=False)
-        memory = run(scale, args.days, args.window, traced=True)
-        row = {**memory, "stream_s": timing["stream_s"], "batch_s": timing["batch_s"]}
+        timing = run(scale, args.days, args.window, traced=False, generator=args.generator)
+        memory = run(scale, args.days, args.window, traced=True, generator=args.generator)
+        row = {**memory, **{k: timing[k] for k in ("stream_s", "stream_cpu_s", "batch_s",
+                                                   "batch_cpu_s")}}  # fmt: skip
         rows.append(row)
         print({k: round(v, 3) if isinstance(v, float) else v for k, v in row.items()})
     big = rows[-1]
-    s_per_fill = big["stream_s"] / big["window_fills"]
-    b_per_fill = big["batch_s"] / big["window_fills"]
+    s_per_fill = big["stream_cpu_s"] / big["window_fills"]
+    b_per_fill = big["batch_cpu_s"] / big["window_fills"]
     heap_per_fill = big["batch_peak_mb"] * 1e6 / big["window_fills"]
     print(
-        "\nEXTRAPOLATION (linear on the largest scale; volumes from KB-0183; SCENARIOS, not measures)"
+        "\nEXTRAPOLATION (linear on the largest scale, CPU time; volumes from KB-0183; SCENARIOS, not measures)"
     )
     for per_day in (28_500_000, 31_000_000):
         w = 7 * per_day

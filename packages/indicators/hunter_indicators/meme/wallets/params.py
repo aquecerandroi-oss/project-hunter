@@ -13,7 +13,7 @@ after a slot its events are considered all received) and
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from decimal import Decimal
 from typing import Final
 
@@ -27,11 +27,28 @@ __all__ = [
     "RANK_DEFINITION",
     "W_PNL_DEFINITION",
     "FollowPolicy",
+    "NonFiniteParameter",
     "RankingParams",
     "manifest_hash",
 ]
 
 SOL: Final = 1_000_000_000
+
+
+class NonFiniteParameter(ValueError):
+    """A Decimal parameter is NaN/sNaN/±Infinity: it prices nothing and makes comparisons raise
+    or go silently false by the ambient Decimal traps (Astra, step-2 review)."""
+
+    def __init__(self, owner: str, field: str, value: Decimal) -> None:
+        super().__init__(f"{owner}.{field} must be a finite Decimal, got {value!r}")
+        self.field = field
+
+
+def _finite(params: object) -> None:
+    for f in fields(params):  # type: ignore[arg-type]  # a dataclass instance
+        value = getattr(params, f.name)
+        if isinstance(value, Decimal) and not value.is_finite():
+            raise NonFiniteParameter(type(params).__name__, f.name, value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +74,9 @@ class FollowPolicy:
     censored_r: Decimal = Decimal(-1)
     max_bets_per_entity_day: int = 20
     mint_cooldown_seconds: int = 1800
+
+    def __post_init__(self) -> None:
+        _finite(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +109,9 @@ class RankingParams:
     settle_seconds: int = 2
     """Engine assumption: a slot is settled (all its events received) 2 s after the
     cut; the PREREG drops a day whose ``received_at − block_time`` p50 exceeds 2 s."""
+
+    def __post_init__(self) -> None:
+        _finite(self)
 
 
 def manifest_hash(policy: FollowPolicy, ranking: RankingParams) -> str:

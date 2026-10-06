@@ -23,7 +23,13 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from hunter_indicators.meme.wallets.carry import Flow, MintCarry, canonical_order, sort_lots
+from hunter_indicators.meme.wallets.carry import (
+    Flow,
+    MintCarry,
+    canonical_order,
+    flow_totals,
+    sort_lots,
+)
 from hunter_indicators.meme.wallets.entities import Entities
 from hunter_indicators.meme.wallets.episodes import Episode, window_books
 from hunter_indicators.meme.wallets.follow import decision_order
@@ -176,6 +182,7 @@ def replay_mint(
     for owner, book in books.items():
         tally = tallies.books.setdefault(owner, EntityTally(days=par.window_days))
         excluded[owner] = tally.fold(book, ents.wallets_of(owner), known, night.funded_by, par)
+    flows: dict[str, Flow] | None = None  # built once per mint at its first copy, not per copy
     for f in sorted(window, key=decision_order):
         if f.identity not in night.bets:
             continue
@@ -183,8 +190,10 @@ def replay_mint(
         if _excluded(f, excluded.get(owner, ())):
             continue
         wallets = ents.wallets_of(owner)
+        if flows is None:
+            flows = {row.wallet: row for row in carry.flows}
         out = simulate_copy(f, leader_wallets=wallets, tape=tape, policy=night.policy,
                             horizon_slot=night.horizon, gaps=night.gaps,
-                            leader_prior=carry.flow_of(wallets), leader_since=night.start)  # fmt: skip
+                            leader_prior=flow_totals(flows, wallets), leader_since=night.start)  # fmt: skip
         tallies.copies.setdefault(owner, CopyTally()).add(out)
     return _advance(carry, fills, creates, night)

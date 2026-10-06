@@ -1,0 +1,819 @@
+SYNTHETIC profile (not market data) — wallets engine 1c-bis, CPU plan step 1
+ENV {"revision": "84704fa1283077ce8d1b5d2e3f9a23040ceaaeab", "engine_dirty": "clean", "engine_sha256": "05735f3f0d82032a", "python": "3.12.14", "platform": "Windows-11-10.0.26200-SP0", "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel", "cpu_count": "22", "generator": "kb0183-shape-v2", "argv": "--matrix step1 --out .claude/state/carteiras-lucro/bench/profile-2026-10-06-step1-before.txt"}
+
+=== base ===
+ROW {"config": {"name": "base", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 18852, "window_mints": 532, "largest_mint_fills": 2000, "entities": 5631, "bets": 2257, "copies": 2256, "same_slot_pairs": 2368, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 7.578125, "wall_s": 7.872022100025788, "profiled_wall_s": 17.81758669996634, "us_per_window_fill": 401.97989603225125, "passes": {"_prepared[bets]": {"cpu_s": 0.0312, "wall_s": 0.0433, "calls": 532}, "_prepared[other]": {"cpu_s": 0.0156, "wall_s": 0.0389, "calls": 532}, "_prepared[survey]": {"cpu_s": 0.0625, "wall_s": 0.0549, "calls": 532}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0005, "calls": 1}, "bets": {"cpu_s": 0.125, "wall_s": 0.1118, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0078, "calls": 2}, "replay(total)": {"cpu_s": 7.1719, "wall_s": 7.4741, "calls": 532}, "replay.carry_advance": {"cpu_s": 0.0625, "wall_s": 0.0823, "calls": 532}, "replay.copies": {"cpu_s": 5.6406, "wall_s": 5.9623, "calls": 2256}, "replay.fifo(w_pnl)": {"cpu_s": 0.0938, "wall_s": 0.1164, "calls": 1064}, "replay.window_books": {"cpu_s": 1.1562, "wall_s": 1.13, "calls": 532}, "survey": {"cpu_s": 0.1094, "wall_s": 0.1128, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1596, "stream._cobuys": 1064, "lots.fifo": 1064, "pricing.__init__": 18009, "lots.__init__": 1064, "carry.flow_of": 2256, "policy._leader_exit": 2256, "policy._find_exit": 2256, "stream_mint._advance": 532, "episodes.window_books": 532, "policy.simulate_copy": 2256, "policy._stopped": 297964, "pricing.liquidation_or_none": 33209, "episodes.__init__": 17477}, "census": {"wallets": 5655, "one_swap_wallets_pct": 63.784261715296196, "one_swap_events_pct": 13.206649091974224, "ge20_wallets_pct": 1.2908930150309461, "ge20_events_pct": 45.19991212653778, "lt_0_01_sol_pct": 40.209431751611014, "trigger_size_buys_pct": 35.65722889046882}, "top_mints": [["M1_116", 2000, 178, 1.318936499999836], ["M2_34", 2000, 176, 1.274068299913779], ["M1_125", 2000, 159, 1.2707579999696463], ["M2_101", 1226, 114, 0.6176606002263725], ["M1_41", 680, 78, 0.4700259000528604]], "peak_rss_mb": 0.0}
+  cpu 7.578 s  wall 7.872 s  window fills 18852  -> 402.0 us CPU/fill  copies 2256  stop quotes 297964
+  survey (+_prepared)                     0.113 s    1.4 %
+  links+entities                          0.008 s    0.1 %
+  bets (+_prepared)                       0.112 s    1.4 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            1.130 s   14.4 %
+  replay: fifo (W-PnL)                    0.116 s    1.5 %
+  replay: copies (simulate_copy)          5.962 s   75.7 %
+  replay: carry advance                   0.082 s    1.0 %
+  replay loop: _prepared (3rd pass)       0.039 s    0.5 %
+  replay: rest (tape, tallies, loop)      0.183 s    2.3 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.126 s    1.6 %
+         16905743 function calls (16905341 primitive calls) in 15.564 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   333979    1.758    0.000    7.855    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   340733    1.637    0.000   12.527    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   337539    1.142    0.000    2.487    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  2360435    1.094    0.000    1.094    0.000 {built-in method decimal.localcontext}
+  2360435    0.988    0.000    0.988    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   337539    0.900    0.000    1.938    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   297964    0.726    0.000   11.869    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   333979    0.628    0.000    1.012    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   337539    0.605    0.000    0.897    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   337539    0.459    0.000    0.736    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   337539    0.333    0.000    0.534    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   675078    0.313    0.000    0.313    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+   612874    0.281    0.000    0.447    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+  1012672    0.231    0.000    0.231    0.000 {built-in method builtins.getattr}
+     2256    0.225    0.000   12.258    0.005 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+   341118    0.203    0.000    0.203    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+   337556    0.190    0.000    0.268    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1296(_is_dataclass_instance)
+  1360857    0.188    0.000    0.188    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\tape.py:127(identity)
+
+
+
+
+=== seed2 ===
+ROW {"config": {"name": "seed2", "per_day": 8000, "days": 4, "window": 2, "seed": 2, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 15280, "window_mints": 532, "largest_mint_fills": 1992, "entities": 5227, "bets": 1899, "copies": 1898, "same_slot_pairs": 1944, "carry_lots": 11733, "carry_flows": 11548, "carry_pending": 1921, "cpu_s": 5.03125, "wall_s": 5.243168100016192, "profiled_wall_s": 12.075402300106362, "us_per_window_fill": 329.2702879581152, "passes": {"_prepared[bets]": {"cpu_s": 0.0312, "wall_s": 0.0285, "calls": 532}, "_prepared[other]": {"cpu_s": 0.0625, "wall_s": 0.0372, "calls": 532}, "_prepared[survey]": {"cpu_s": 0.0312, "wall_s": 0.0303, "calls": 532}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0006, "calls": 1}, "bets": {"cpu_s": 0.0781, "wall_s": 0.0701, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0048, "calls": 2}, "replay(total)": {"cpu_s": 4.7344, "wall_s": 4.9558, "calls": 532}, "replay.carry_advance": {"cpu_s": 0.1094, "wall_s": 0.1092, "calls": 532}, "replay.copies": {"cpu_s": 3.4375, "wall_s": 3.6046, "calls": 1898}, "replay.fifo(w_pnl)": {"cpu_s": 0.1094, "wall_s": 0.0919, "calls": 1064}, "replay.window_books": {"cpu_s": 0.9844, "wall_s": 0.9632, "calls": 532}, "survey": {"cpu_s": 0.0469, "wall_s": 0.0565, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1596, "stream._cobuys": 1064, "lots.fifo": 1064, "pricing.__init__": 17012, "lots.__init__": 1064, "carry.flow_of": 1898, "policy._leader_exit": 1898, "policy._find_exit": 1898, "stream_mint._advance": 532, "episodes.window_books": 532, "policy.simulate_copy": 1898, "policy._stopped": 176231, "pricing.liquidation_or_none": 31777, "episodes.__init__": 16480}, "census": {"wallets": 4861, "one_swap_wallets_pct": 60.35795103888089, "one_swap_events_pct": 13.593402520385471, "ge20_wallets_pct": 1.501748611396832, "ge20_events_pct": 45.760748702742774, "lt_0_01_sol_pct": 40.77557449962936, "trigger_size_buys_pct": 34.871584979023844}, "top_mints": [["M2_43", 1992, 155, 1.0093413998838514], ["M2_0", 859, 74, 0.46677629998885095], ["M2_5", 635, 82, 0.3471648001577705], ["M2_15", 474, 62, 0.25368899991735816], ["M1_96", 220, 28, 0.15209570014849305]], "peak_rss_mb": 0.0}
+  cpu 5.031 s  wall 5.243 s  window fills 15280  -> 329.3 us CPU/fill  copies 1898  stop quotes 176231
+  survey (+_prepared)                     0.057 s    1.1 %
+  links+entities                          0.005 s    0.1 %
+  bets (+_prepared)                       0.070 s    1.3 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            0.963 s   18.4 %
+  replay: fifo (W-PnL)                    0.092 s    1.8 %
+  replay: copies (simulate_copy)          3.605 s   68.7 %
+  replay: carry advance                   0.109 s    2.1 %
+  replay loop: _prepared (3rd pass)       0.037 s    0.7 %
+  replay: rest (tape, tallies, loop)      0.187 s    3.6 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.118 s    2.3 %
+         11111285 function calls (11110941 primitive calls) in 10.576 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   209454    1.102    0.000    4.972    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   215889    1.045    0.000    7.944    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   212472    0.735    0.000    1.599    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  1481670    0.685    0.000    0.685    0.000 {built-in method decimal.localcontext}
+  1481670    0.618    0.000    0.618    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   212472    0.576    0.000    1.245    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   176231    0.414    0.000    6.864    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   209454    0.403    0.000    0.647    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   212472    0.379    0.000    0.568    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   212472    0.292    0.000    0.463    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   212472    0.212    0.000    0.333    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   424944    0.198    0.000    0.198    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+   637471    0.149    0.000    0.149    0.000 {built-in method builtins.getattr}
+73069/73068    0.135    0.000    0.293    0.000 {built-in method builtins.sorted}
+   289361    0.128    0.000    0.206    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+     1898    0.125    0.000    7.094    0.004 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+   215090    0.123    0.000    0.123    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+      532    0.122    0.000   11.354    0.021 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\stream_mint.py:146(replay_mint)
+
+
+
+
+=== seed3 ===
+ROW {"config": {"name": "seed3", "per_day": 8000, "days": 4, "window": 2, "seed": 3, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 15126, "window_mints": 532, "largest_mint_fills": 2000, "entities": 4680, "bets": 2097, "copies": 2094, "same_slot_pairs": 1930, "carry_lots": 10521, "carry_flows": 10376, "carry_pending": 1633, "cpu_s": 5.671875, "wall_s": 6.000126899918541, "profiled_wall_s": 13.795571700204164, "us_per_window_fill": 374.97520825069415, "passes": {"_prepared[bets]": {"cpu_s": 0.0312, "wall_s": 0.0304, "calls": 532}, "_prepared[other]": {"cpu_s": 0.0312, "wall_s": 0.0397, "calls": 532}, "_prepared[survey]": {"cpu_s": 0.0156, "wall_s": 0.0321, "calls": 532}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0006, "calls": 1}, "bets": {"cpu_s": 0.0938, "wall_s": 0.0811, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0072, "calls": 2}, "replay(total)": {"cpu_s": 5.3438, "wall_s": 5.6954, "calls": 532}, "replay.carry_advance": {"cpu_s": 0.0, "wall_s": 0.0733, "calls": 532}, "replay.copies": {"cpu_s": 3.9062, "wall_s": 4.2156, "calls": 2094}, "replay.fifo(w_pnl)": {"cpu_s": 0.0781, "wall_s": 0.0976, "calls": 1064}, "replay.window_books": {"cpu_s": 1.0625, "wall_s": 1.1108, "calls": 532}, "survey": {"cpu_s": 0.0625, "wall_s": 0.0645, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1596, "stream._cobuys": 1064, "lots.fifo": 1064, "pricing.__init__": 15962, "lots.__init__": 1064, "carry.flow_of": 2094, "policy._leader_exit": 2094, "policy._find_exit": 2094, "stream_mint._advance": 532, "episodes.window_books": 532, "policy.simulate_copy": 2094, "policy._stopped": 195758, "pricing.liquidation_or_none": 28648, "episodes.__init__": 15430}, "census": {"wallets": 5005, "one_swap_wallets_pct": 60.25974025974026, "one_swap_events_pct": 13.341590728125276, "ge20_wallets_pct": 1.4585414585414584, "ge20_events_pct": 45.580819251526144, "lt_0_01_sol_pct": 40.020348580023004, "trigger_size_buys_pct": 35.65492102065613}, "top_mints": [["M2_25", 2000, 178, 1.2651792999822646], ["M1_20", 615, 69, 0.49021379998885095], ["M1_59", 610, 75, 0.42462609987705946], ["M1_47", 553, 66, 0.316593199968338], ["M1_63", 437, 58, 0.26158639998175204]], "peak_rss_mb": 0.0}
+  cpu 5.672 s  wall 6.000 s  window fills 15126  -> 375.0 us CPU/fill  copies 2094  stop quotes 195758
+  survey (+_prepared)                     0.065 s    1.1 %
+  links+entities                          0.007 s    0.1 %
+  bets (+_prepared)                       0.081 s    1.4 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            1.111 s   18.5 %
+  replay: fifo (W-PnL)                    0.098 s    1.6 %
+  replay: copies (simulate_copy)          4.216 s   70.3 %
+  replay: carry advance                   0.073 s    1.2 %
+  replay loop: _prepared (3rd pass)       0.040 s    0.7 %
+  replay: rest (tape, tallies, loop)      0.198 s    3.3 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.112 s    1.9 %
+         11719130 function calls (11718823 primitive calls) in 12.054 seconds
+
+   Ordered by: internal time
+   List reduced from 228 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   227579    1.307    0.000    5.849    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   232067    1.231    0.000    9.370    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   230911    0.868    0.000    1.893    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  1613495    0.824    0.000    0.824    0.000 {built-in method decimal.localcontext}
+  1613495    0.733    0.000    0.733    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   230911    0.690    0.000    1.471    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   195758    0.531    0.000    8.672    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   227579    0.474    0.000    0.759    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   230911    0.410    0.000    0.630    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   230911    0.350    0.000    0.553    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   230911    0.256    0.000    0.406    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   461822    0.234    0.000    0.234    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+   692788    0.172    0.000    0.172    0.000 {built-in method builtins.getattr}
+     2094    0.161    0.000    8.964    0.004 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+   313873    0.158    0.000    0.253    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+   233741    0.152    0.000    0.152    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+   230928    0.144    0.000    0.212    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1296(_is_dataclass_instance)
+   232067    0.140    0.000    0.140    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:106(_ceil_bps)
+
+
+
+
+=== fills_4k ===
+ROW {"config": {"name": "fills_4k", "per_day": 4000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 7090, "window_mints": 264, "largest_mint_fills": 462, "entities": 2752, "bets": 863, "copies": 860, "same_slot_pairs": 960, "carry_lots": 6566, "carry_flows": 6403, "carry_pending": 1195, "cpu_s": 1.875, "wall_s": 1.9362095999531448, "profiled_wall_s": 4.548908199882135, "us_per_window_fill": 264.45698166431595, "passes": {"_prepared[bets]": {"cpu_s": 0.0156, "wall_s": 0.0139, "calls": 264}, "_prepared[other]": {"cpu_s": 0.0156, "wall_s": 0.016, "calls": 264}, "_prepared[survey]": {"cpu_s": 0.0, "wall_s": 0.0123, "calls": 264}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0004, "calls": 1}, "bets": {"cpu_s": 0.0312, "wall_s": 0.0303, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0026, "calls": 2}, "replay(total)": {"cpu_s": 1.75, "wall_s": 1.8074, "calls": 264}, "replay.carry_advance": {"cpu_s": 0.0469, "wall_s": 0.0353, "calls": 264}, "replay.copies": {"cpu_s": 1.0938, "wall_s": 1.1533, "calls": 860}, "replay.fifo(w_pnl)": {"cpu_s": 0.0469, "wall_s": 0.0428, "calls": 528}, "replay.window_books": {"cpu_s": 0.3906, "wall_s": 0.4863, "calls": 264}, "survey": {"cpu_s": 0.0312, "wall_s": 0.0259, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 792, "stream._cobuys": 528, "lots.fifo": 528, "pricing.__init__": 8484, "lots.__init__": 528, "carry.flow_of": 860, "policy._leader_exit": 860, "policy._find_exit": 860, "stream_mint._advance": 264, "episodes.window_books": 264, "policy.simulate_copy": 860, "policy._stopped": 55108, "pricing.liquidation_or_none": 16784, "episodes.__init__": 8220}, "census": {"wallets": 2342, "one_swap_wallets_pct": 59.265584970111014, "one_swap_events_pct": 14.282774233381355, "ge20_wallets_pct": 1.5798462852263022, "ge20_events_pct": 45.307676476641284, "lt_0_01_sol_pct": 40.02881251286273, "trigger_size_buys_pct": 34.64872262773723}, "top_mints": [["M1_38", 462, 43, 0.2175289001315832], ["M2_8", 436, 42, 0.17268570000305772], ["M1_32", 265, 35, 0.11077279993332922], ["M1_9", 332, 31, 0.07958059990778565], ["M2_38", 242, 31, 0.0774795999750495]], "peak_rss_mb": 0.0}
+  cpu 1.875 s  wall 1.936 s  window fills 7090  -> 264.5 us CPU/fill  copies 860  stop quotes 55108
+  survey (+_prepared)                     0.026 s    1.3 %
+  links+entities                          0.003 s    0.1 %
+  bets (+_prepared)                       0.030 s    1.6 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            0.486 s   25.1 %
+  replay: fifo (W-PnL)                    0.043 s    2.2 %
+  replay: copies (simulate_copy)          1.153 s   59.6 %
+  replay: carry advance                   0.035 s    1.8 %
+  replay loop: _prepared (3rd pass)       0.016 s    0.8 %
+  replay: rest (tape, tallies, loop)      0.090 s    4.6 %
+  assembly (metrics, rank)                0.000 s    0.0 %
+  unattributed                            0.054 s    2.8 %
+         4155604 function calls (4155422 primitive calls) in 3.981 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    72228    0.396    0.000    1.738    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+    75957    0.373    0.000    2.800    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+    73651    0.262    0.000    0.567    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+   511605    0.244    0.000    0.244    0.000 {built-in method decimal.localcontext}
+   511605    0.221    0.000    0.221    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+    73651    0.205    0.000    0.442    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+    72228    0.144    0.000    0.228    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+    55108    0.141    0.000    2.318    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+    73651    0.107    0.000    0.174    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+    73651    0.106    0.000    0.168    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+    73651    0.078    0.000    0.123    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   147302    0.070    0.000    0.070    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+36741/36737    0.062    0.000    0.098    0.000 {built-in method builtins.sorted}
+      528    0.053    0.000    0.122    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+   221008    0.053    0.000    0.053    0.000 {built-in method builtins.getattr}
+      264    0.053    0.000    4.191    0.016 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\stream_mint.py:146(replay_mint)
+      264    0.049    0.000    1.119    0.004 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:200(window_books)
+    16784    0.048    0.000    0.753    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:261(liquidation_or_none)
+
+
+
+
+=== fills_16k ===
+ROW {"config": {"name": "fills_16k", "per_day": 16000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 31087, "window_mints": 1064, "largest_mint_fills": 4000, "entities": 9906, "bets": 4141, "copies": 4136, "same_slot_pairs": 4215, "carry_lots": 23794, "carry_flows": 23621, "carry_pending": 3977, "cpu_s": 17.40625, "wall_s": 28255.582494599978, "profiled_wall_s": 29.912093500141054, "us_per_window_fill": 559.9205455656705, "passes": {"_prepared[bets]": {"cpu_s": 0.0781, "wall_s": 0.0624, "calls": 1064}, "_prepared[other]": {"cpu_s": 0.0469, "wall_s": 0.1078, "calls": 1064}, "_prepared[survey]": {"cpu_s": 0.0625, "wall_s": 0.0579, "calls": 1064}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0011, "calls": 1}, "bets": {"cpu_s": 0.1562, "wall_s": 0.1576, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0127, "calls": 2}, "replay(total)": {"cpu_s": 16.6094, "wall_s": 28254.6907, "calls": 1064}, "replay.carry_advance": {"cpu_s": 0.0781, "wall_s": 0.1823, "calls": 1064}, "replay.copies": {"cpu_s": 12.8438, "wall_s": 28250.563, "calls": 4136}, "replay.fifo(w_pnl)": {"cpu_s": 0.2656, "wall_s": 0.2678, "calls": 2128}, "replay.window_books": {"cpu_s": 2.8906, "wall_s": 3.0533, "calls": 1064}, "survey": {"cpu_s": 0.1094, "wall_s": 0.1122, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 3192, "stream._cobuys": 2128, "lots.fifo": 2128, "pricing.__init__": 35407, "lots.__init__": 2128, "carry.flow_of": 4136, "policy._leader_exit": 4136, "policy._find_exit": 4136, "stream_mint._advance": 1064, "episodes.window_books": 1064, "policy.simulate_copy": 4136, "policy._stopped": 478108, "pricing.liquidation_or_none": 65779, "episodes.__init__": 34343}, "census": {"wallets": 9464, "one_swap_wallets_pct": 59.5414201183432, "one_swap_events_pct": 13.584532677611437, "ge20_wallets_pct": 1.5321217244294167, "ge20_events_pct": 46.03794508329115, "lt_0_01_sol_pct": 40.083411682457026, "trigger_size_buys_pct": 35.2760656419859}, "top_mints": [["M2_206", 904, 123, 28237.13859639992], ["M1_197", 4000, 310, 2.7646707999520004], ["M1_99", 1360, 172, 2.407670699991286], ["M2_78", 1623, 195, 2.018756899982691], ["M2_143", 685, 94, 0.9592514000833035]], "peak_rss_mb": 0.0}
+  cpu 17.406 s  wall 28255.582 s  window fills 31087  -> 559.9 us CPU/fill  copies 4136  stop quotes 478108
+  survey (+_prepared)                     0.112 s    0.0 %
+  links+entities                          0.013 s    0.0 %
+  bets (+_prepared)                       0.158 s    0.0 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            3.053 s    0.0 %
+  replay: fifo (W-PnL)                    0.268 s    0.0 %
+  replay: copies (simulate_copy)       28250.563 s  100.0 %
+  replay: carry advance                   0.182 s    0.0 %
+  replay loop: _prepared (3rd pass)       0.108 s    0.0 %
+  replay: rest (tape, tallies, loop)      0.624 s    0.0 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.500 s    0.0 %
+         28250472 function calls (28249933 primitive calls) in 26.147 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   545193    2.845    0.000   12.604    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   558312    2.655    0.000   20.300    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   551843    1.909    0.000    4.116    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  3852953    1.826    0.000    1.826    0.000 {built-in method decimal.localcontext}
+  3852953    1.549    0.000    1.549    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   551843    1.480    0.000    3.187    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   478108    1.141    0.000   18.870    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   545193    1.023    0.000    1.649    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   551843    0.745    0.000    1.233    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   551843    0.728    0.000    1.175    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   551843    0.561    0.000    0.904    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+  1103686    0.505    0.000    0.505    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+  1056925    0.467    0.000    0.752    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+     4136    0.395    0.000   19.556    0.005 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+  1655584    0.373    0.000    0.373    0.000 {built-in method builtins.getattr}
+   557163    0.347    0.000    0.347    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+   558312    0.331    0.000    0.331    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:106(_ceil_bps)
+     2128    0.331    0.000    0.598    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+
+
+
+
+=== entities_x0.5 ===
+ROW {"config": {"name": "entities_x0.5", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 0.5, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 14116, "window_mints": 532, "largest_mint_fills": 2000, "entities": 4298, "bets": 1419, "copies": 1417, "same_slot_pairs": 1691, "carry_lots": 10991, "carry_flows": 10814, "carry_pending": 1962, "cpu_s": 3.453125, "wall_s": 3.5076011000201106, "profiled_wall_s": 7.027292300015688, "us_per_window_fill": 244.62489373760272, "passes": {"_prepared[bets]": {"cpu_s": 0.0312, "wall_s": 0.0227, "calls": 532}, "_prepared[other]": {"cpu_s": 0.0625, "wall_s": 0.0299, "calls": 532}, "_prepared[survey]": {"cpu_s": 0.0, "wall_s": 0.025, "calls": 532}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0005, "calls": 1}, "bets": {"cpu_s": 0.0469, "wall_s": 0.0502, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0047, "calls": 2}, "replay(total)": {"cpu_s": 3.1875, "wall_s": 3.2761, "calls": 532}, "replay.carry_advance": {"cpu_s": 0.0469, "wall_s": 0.0524, "calls": 532}, "replay.copies": {"cpu_s": 2.2188, "wall_s": 2.2266, "calls": 1417}, "replay.fifo(w_pnl)": {"cpu_s": 0.1094, "wall_s": 0.0773, "calls": 1064}, "replay.window_books": {"cpu_s": 0.7344, "wall_s": 0.7845, "calls": 532}, "survey": {"cpu_s": 0.0469, "wall_s": 0.0472, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1596, "stream._cobuys": 1064, "lots.fifo": 1064, "pricing.__init__": 13163, "lots.__init__": 1064, "carry.flow_of": 1417, "policy._leader_exit": 1417, "policy._find_exit": 1417, "stream_mint._advance": 532, "episodes.window_books": 532, "policy.simulate_copy": 1417, "policy._stopped": 121947, "pricing.liquidation_or_none": 25297, "episodes.__init__": 12631}, "census": {"wallets": 3802, "one_swap_wallets_pct": 72.2251446607049, "one_swap_events_pct": 12.947333679098495, "ge20_wallets_pct": 0.97317201472909, "ge20_events_pct": 45.92861521052384, "lt_0_01_sol_pct": 40.24234994577773, "trigger_size_buys_pct": 35.220427528119835}, "top_mints": [["M2_39", 2000, 113, 0.7569206000771374], ["M2_69", 909, 73, 0.3786791998427361], ["M2_126", 550, 56, 0.22251729993149638], ["M2_123", 329, 32, 0.09616870013996959], ["M2_78", 196, 20, 0.08982790005393326]], "peak_rss_mb": 0.0}
+  cpu 3.453 s  wall 3.508 s  window fills 14116  -> 244.6 us CPU/fill  copies 1417  stop quotes 121947
+  survey (+_prepared)                     0.047 s    1.3 %
+  links+entities                          0.005 s    0.1 %
+  bets (+_prepared)                       0.050 s    1.4 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            0.784 s   22.4 %
+  replay: fifo (W-PnL)                    0.077 s    2.2 %
+  replay: copies (simulate_copy)          2.227 s   63.5 %
+  replay: carry advance                   0.052 s    1.5 %
+  replay loop: _prepared (3rd pass)       0.030 s    0.9 %
+  replay: rest (tape, tallies, loop)      0.135 s    3.9 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.099 s    2.8 %
+         8335238 function calls (8335055 primitive calls) in 6.089 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   149603    0.614    0.000    2.726    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   151753    0.582    0.000    4.381    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   151917    0.406    0.000    0.883    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  1056914    0.387    0.000    0.387    0.000 {built-in method decimal.localcontext}
+  1056914    0.347    0.000    0.347    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   151917    0.324    0.000    0.692    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   121947    0.234    0.000    3.843    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   149603    0.225    0.000    0.360    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   151917    0.170    0.000    0.276    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   151917    0.163    0.000    0.260    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   151917    0.119    0.000    0.188    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   303834    0.109    0.000    0.109    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+61829/61826    0.094    0.000    0.166    0.000 {built-in method builtins.sorted}
+   455806    0.082    0.000    0.082    0.000 {built-in method builtins.getattr}
+   219251    0.081    0.000    0.132    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+      532    0.078    0.000    6.481    0.012 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\stream_mint.py:146(replay_mint)
+     1064    0.076    0.000    0.173    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+     1417    0.074    0.000    3.981    0.003 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+
+
+
+
+=== entities_x2 ===
+ROW {"config": {"name": "entities_x2", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 2.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 14694, "window_mints": 532, "largest_mint_fills": 2000, "entities": 6566, "bets": 2127, "copies": 2126, "same_slot_pairs": 2045, "carry_lots": 11836, "carry_flows": 11763, "carry_pending": 1980, "cpu_s": 4.421875, "wall_s": 4.456165800103918, "profiled_wall_s": 9.718574600061402, "us_per_window_fill": 300.9306519667892, "passes": {"_prepared[bets]": {"cpu_s": 0.0312, "wall_s": 0.0411, "calls": 532}, "_prepared[other]": {"cpu_s": 0.0312, "wall_s": 0.0275, "calls": 532}, "_prepared[survey]": {"cpu_s": 0.0469, "wall_s": 0.0331, "calls": 532}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0005, "calls": 1}, "bets": {"cpu_s": 0.0781, "wall_s": 0.1041, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0047, "calls": 2}, "replay(total)": {"cpu_s": 4.0469, "wall_s": 4.0793, "calls": 532}, "replay.carry_advance": {"cpu_s": 0.1406, "wall_s": 0.0488, "calls": 532}, "replay.copies": {"cpu_s": 2.8281, "wall_s": 2.9421, "calls": 2126}, "replay.fifo(w_pnl)": {"cpu_s": 0.125, "wall_s": 0.0673, "calls": 1064}, "replay.window_books": {"cpu_s": 0.75, "wall_s": 0.8596, "calls": 532}, "survey": {"cpu_s": 0.0781, "wall_s": 0.0648, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1596, "stream._cobuys": 1064, "lots.fifo": 1064, "pricing.__init__": 18320, "lots.__init__": 1064, "carry.flow_of": 2126, "policy._leader_exit": 2125, "policy._find_exit": 2125, "stream_mint._advance": 532, "episodes.window_books": 532, "policy.simulate_copy": 2126, "policy._stopped": 177950, "pricing.liquidation_or_none": 34182, "episodes.__init__": 17788}, "census": {"wallets": 6916, "one_swap_wallets_pct": 57.634470792365526, "one_swap_events_pct": 16.89913935642515, "ge20_wallets_pct": 2.0965876229034124, "ge20_events_pct": 45.42756603213635, "lt_0_01_sol_pct": 40.412091406283125, "trigger_size_buys_pct": 34.95882298510225}, "top_mints": [["M2_99", 1360, 176, 1.0725000998936594], ["M2_121", 564, 79, 0.34229380008764565], ["M2_39", 519, 66, 0.25027470011264086], ["M2_81", 473, 52, 0.18980979989282787], ["M1_100", 288, 46, 0.11846400005742908]], "peak_rss_mb": 0.0}
+  cpu 4.422 s  wall 4.456 s  window fills 14694  -> 300.9 us CPU/fill  copies 2126  stop quotes 177950
+  survey (+_prepared)                     0.065 s    1.5 %
+  links+entities                          0.005 s    0.1 %
+  bets (+_prepared)                       0.104 s    2.3 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            0.860 s   19.3 %
+  replay: fifo (W-PnL)                    0.067 s    1.5 %
+  replay: copies (simulate_copy)          2.942 s   66.0 %
+  replay: carry advance                   0.049 s    1.1 %
+  replay loop: _prepared (3rd pass)       0.028 s    0.6 %
+  replay: rest (tape, tallies, loop)      0.162 s    3.6 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.175 s    3.9 %
+         11429660 function calls (11429060 primitive calls) in 8.506 seconds
+
+   Ordered by: internal time
+   List reduced from 228 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   207637    0.872    0.000    3.905    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   219944    0.844    0.000    6.299    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   210730    0.580    0.000    1.271    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  1475879    0.569    0.000    0.569    0.000 {built-in method decimal.localcontext}
+  1475879    0.500    0.000    0.500    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   210730    0.463    0.000    0.992    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   177950    0.354    0.000    5.693    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   207637    0.321    0.000    0.517    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   210730    0.237    0.000    0.391    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   210730    0.233    0.000    0.372    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   210730    0.172    0.000    0.270    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   421460    0.157    0.000    0.157    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+     1064    0.147    0.000    0.248    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+   358727    0.138    0.000    0.224    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+   632245    0.118    0.000    0.118    0.000 {built-in method builtins.getattr}
+     2125    0.114    0.000    5.911    0.003 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+   822871    0.102    0.000    0.102    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\tape.py:127(identity)
+   213818    0.100    0.000    0.100    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+
+
+
+
+=== hot_1k ===
+ROW {"config": {"name": "hot_1k", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 1000, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 19852, "window_mints": 533, "largest_mint_fills": 2000, "entities": 5775, "bets": 2358, "copies": 2357, "same_slot_pairs": 2402, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 8.8125, "wall_s": 9.00539859989658, "profiled_wall_s": 21.268594700144604, "us_per_window_fill": 443.9099335079589, "passes": {"_prepared[bets]": {"cpu_s": 0.0156, "wall_s": 0.0338, "calls": 533}, "_prepared[other]": {"cpu_s": 0.0312, "wall_s": 0.0464, "calls": 533}, "_prepared[survey]": {"cpu_s": 0.0156, "wall_s": 0.0301, "calls": 533}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0006, "calls": 1}, "bets": {"cpu_s": 0.0781, "wall_s": 0.0785, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0061, "calls": 2}, "replay(total)": {"cpu_s": 8.5156, "wall_s": 8.6761, "calls": 533}, "replay.carry_advance": {"cpu_s": 0.0938, "wall_s": 0.0767, "calls": 533}, "replay.copies": {"cpu_s": 7.0312, "wall_s": 7.1404, "calls": 2357}, "replay.fifo(w_pnl)": {"cpu_s": 0.1094, "wall_s": 0.1166, "calls": 1066}, "replay.window_books": {"cpu_s": 1.0156, "wall_s": 1.1131, "calls": 533}, "survey": {"cpu_s": 0.0625, "wall_s": 0.0601, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1599, "stream._cobuys": 1066, "lots.fifo": 1066, "pricing.__init__": 18453, "lots.__init__": 1066, "carry.flow_of": 2357, "policy._leader_exit": 2357, "policy._find_exit": 2357, "stream_mint._advance": 533, "episodes.window_books": 533, "policy.simulate_copy": 2357, "policy._stopped": 338755, "pricing.liquidation_or_none": 33508, "episodes.__init__": 17920}, "census": {"wallets": 5800, "one_swap_wallets_pct": 64.60344827586206, "one_swap_events_pct": 13.234670810963548, "ge20_wallets_pct": 1.2586206896551724, "ge20_events_pct": 45.13633794857304, "lt_0_01_sol_pct": 40.19143825939531, "trigger_size_buys_pct": 35.662299854439595}, "top_mints": [["M1_125", 2000, 159, 1.6169523999560624], ["M2_34", 2000, 176, 1.2332666998263448], ["M1_116", 2000, 177, 1.1937524999957532], ["HOT", 1000, 109, 0.799143600044772], ["M2_101", 1226, 114, 0.691643200116232]], "peak_rss_mb": 0.0}
+  cpu 8.812 s  wall 9.005 s  window fills 19852  -> 443.9 us CPU/fill  copies 2357  stop quotes 338755
+  survey (+_prepared)                     0.060 s    0.7 %
+  links+entities                          0.006 s    0.1 %
+  bets (+_prepared)                       0.079 s    0.9 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            1.113 s   12.4 %
+  replay: fifo (W-PnL)                    0.117 s    1.3 %
+  replay: copies (simulate_copy)          7.140 s   79.3 %
+  replay: carry advance                   0.077 s    0.9 %
+  replay loop: _prepared (3rd pass)       0.046 s    0.5 %
+  replay: rest (tape, tallies, loop)      0.229 s    2.5 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.137 s    1.5 %
+         18614592 function calls (18614190 primitive calls) in 18.544 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   375172    2.140    0.000    9.345    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   381896    1.965    0.000   15.057    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   378852    1.413    0.000    3.048    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  2650777    1.316    0.000    1.316    0.000 {built-in method decimal.localcontext}
+   378852    1.118    0.000    2.365    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+  2650777    1.116    0.000    1.116    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   338755    0.886    0.000   14.514    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   375172    0.768    0.000    1.224    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   378852    0.566    0.000    0.924    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   378852    0.538    0.000    0.856    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   378852    0.437    0.000    0.701    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   757704    0.401    0.000    0.401    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+   665642    0.300    0.000    0.496    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+     2357    0.292    0.000   15.018    0.006 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+  1136611    0.274    0.000    0.274    0.000 {built-in method builtins.getattr}
+   382676    0.269    0.000    0.269    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+   381896    0.242    0.000    0.242    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:106(_ceil_bps)
+   378869    0.230    0.000    0.330    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1296(_is_dataclass_instance)
+
+
+
+
+=== hot_2k ===
+ROW {"config": {"name": "hot_2k", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 2000, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 20852, "window_mints": 533, "largest_mint_fills": 2000, "entities": 5897, "bets": 2433, "copies": 2432, "same_slot_pairs": 2494, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 11.328125, "wall_s": 12.784603800158948, "profiled_wall_s": 26.0455656000413, "us_per_window_fill": 543.2632361404181, "passes": {"_prepared[bets]": {"cpu_s": 0.0312, "wall_s": 0.0514, "calls": 533}, "_prepared[other]": {"cpu_s": 0.0625, "wall_s": 0.0486, "calls": 533}, "_prepared[survey]": {"cpu_s": 0.0312, "wall_s": 0.0415, "calls": 533}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0006, "calls": 1}, "bets": {"cpu_s": 0.0938, "wall_s": 0.1346, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0312, "wall_s": 0.0095, "calls": 2}, "replay(total)": {"cpu_s": 10.9688, "wall_s": 12.373, "calls": 533}, "replay.carry_advance": {"cpu_s": 0.0781, "wall_s": 0.0803, "calls": 533}, "replay.copies": {"cpu_s": 9.2812, "wall_s": 10.6631, "calls": 2432}, "replay.fifo(w_pnl)": {"cpu_s": 0.2656, "wall_s": 0.188, "calls": 1066}, "replay.window_books": {"cpu_s": 0.9531, "wall_s": 1.1139, "calls": 533}, "survey": {"cpu_s": 0.0625, "wall_s": 0.0748, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1599, "stream._cobuys": 1066, "lots.fifo": 1066, "pricing.__init__": 18716, "lots.__init__": 1066, "carry.flow_of": 2432, "policy._leader_exit": 2432, "policy._find_exit": 2432, "stream_mint._advance": 533, "episodes.window_books": 533, "policy.simulate_copy": 2432, "policy._stopped": 445797, "pricing.liquidation_or_none": 33763, "episodes.__init__": 18183}, "census": {"wallets": 5921, "one_swap_wallets_pct": 65.2423577098463, "one_swap_events_pct": 13.178902838427948, "ge20_wallets_pct": 1.2328998479986488, "ge20_events_pct": 45.206741266375545, "lt_0_01_sol_pct": 40.126910480349345, "trigger_size_buys_pct": 35.723813260102}, "top_mints": [["HOT", 2000, 187, 3.534013800090179], ["M1_116", 2000, 177, 1.7480244999751449], ["M2_34", 2000, 174, 1.5093471000436693], ["M1_125", 2000, 159, 1.403042599791661], ["M2_101", 1226, 113, 0.8434995000716299]], "peak_rss_mb": 0.0}
+  cpu 11.328 s  wall 12.785 s  window fills 20852  -> 543.3 us CPU/fill  copies 2432  stop quotes 445797
+  survey (+_prepared)                     0.075 s    0.6 %
+  links+entities                          0.010 s    0.1 %
+  bets (+_prepared)                       0.135 s    1.1 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            1.114 s    8.7 %
+  replay: fifo (W-PnL)                    0.188 s    1.5 %
+  replay: copies (simulate_copy)         10.663 s   83.4 %
+  replay: carry advance                   0.080 s    0.6 %
+  replay loop: _prepared (3rd pass)       0.049 s    0.4 %
+  replay: rest (tape, tallies, loop)      0.328 s    2.6 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.143 s    1.1 %
+         22790182 function calls (22789779 primitive calls) in 22.659 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   482594    2.681    0.000   11.806    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   489321    2.507    0.000   19.022    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   486430    1.778    0.000    3.840    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  3405173    1.673    0.000    1.673    0.000 {built-in method decimal.localcontext}
+  3405173    1.466    0.000    1.466    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   486430    1.401    0.000    2.954    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   445797    1.168    0.000   18.907    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   482594    0.971    0.000    1.566    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   486430    0.689    0.000    1.140    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   486430    0.689    0.000    1.086    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   486430    0.548    0.000    0.867    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   972860    0.481    0.000    0.481    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+     2432    0.373    0.000   19.523    0.008 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+   769063    0.371    0.000    0.619    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+  1459345    0.345    0.000    0.345    0.000 {built-in method builtins.getattr}
+   490604    0.322    0.000    0.322    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+   489321    0.310    0.000    0.310    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:106(_ceil_bps)
+   486447    0.286    0.000    0.410    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1296(_is_dataclass_instance)
+
+
+
+
+=== hot_4k ===
+ROW {"config": {"name": "hot_4k", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 4000, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 22852, "window_mints": 533, "largest_mint_fills": 4000, "entities": 6150, "bets": 2495, "copies": 2494, "same_slot_pairs": 2874, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 20.484375, "wall_s": 23.180108400061727, "profiled_wall_s": 56.113792299991474, "us_per_window_fill": 896.3930946963067, "passes": {"_prepared[bets]": {"cpu_s": 0.0469, "wall_s": 0.0783, "calls": 533}, "_prepared[other]": {"cpu_s": 0.0625, "wall_s": 0.066, "calls": 533}, "_prepared[survey]": {"cpu_s": 0.0156, "wall_s": 0.0645, "calls": 533}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0005, "calls": 1}, "bets": {"cpu_s": 0.1562, "wall_s": 0.1763, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0119, "calls": 2}, "replay(total)": {"cpu_s": 19.9219, "wall_s": 22.6091, "calls": 533}, "replay.carry_advance": {"cpu_s": 0.1562, "wall_s": 0.1883, "calls": 533}, "replay.copies": {"cpu_s": 17.7812, "wall_s": 20.2868, "calls": 2494}, "replay.fifo(w_pnl)": {"cpu_s": 0.2656, "wall_s": 0.2635, "calls": 1066}, "replay.window_books": {"cpu_s": 1.5469, "wall_s": 1.6207, "calls": 533}, "survey": {"cpu_s": 0.125, "wall_s": 0.1175, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1599, "stream._cobuys": 1066, "lots.fifo": 1066, "pricing.__init__": 18899, "lots.__init__": 1066, "carry.flow_of": 2494, "policy._leader_exit": 2494, "policy._find_exit": 2494, "stream_mint._advance": 533, "episodes.window_books": 533, "policy.simulate_copy": 2494, "policy._stopped": 718076, "pricing.liquidation_or_none": 33692, "episodes.__init__": 18366}, "census": {"wallets": 6177, "one_swap_wallets_pct": 66.61809940100372, "one_swap_events_pct": 13.141926417986715, "ge20_wallets_pct": 1.1818034644649507, "ge20_events_pct": 45.32128257537047, "lt_0_01_sol_pct": 40.19864588656106, "trigger_size_buys_pct": 35.56025683851093}, "top_mints": [["HOT", 4000, 280, 11.04910930013284], ["M1_116", 2000, 175, 2.232972800033167], ["M2_34", 2000, 173, 2.1194676000159234], ["M1_125", 2000, 157, 1.7791864001192153], ["M2_101", 1226, 112, 0.9770420000422746]], "peak_rss_mb": 0.0}
+  cpu 20.484 s  wall 23.180 s  window fills 22852  -> 896.4 us CPU/fill  copies 2494  stop quotes 718076
+  survey (+_prepared)                     0.117 s    0.5 %
+  links+entities                          0.012 s    0.1 %
+  bets (+_prepared)                       0.176 s    0.8 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            1.621 s    7.0 %
+  replay: fifo (W-PnL)                    0.264 s    1.1 %
+  replay: copies (simulate_copy)         20.287 s   87.5 %
+  replay: carry advance                   0.188 s    0.8 %
+  replay loop: _prepared (3rd pass)       0.066 s    0.3 %
+  replay: rest (tape, tallies, loop)      0.250 s    1.1 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.199 s    0.9 %
+         33298608 function calls (33298213 primitive calls) in 48.849 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   754952    6.133    0.000   27.026    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   761569    5.705    0.000   43.534    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   759077    4.013    0.000    8.764    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  5316664    3.856    0.000    3.856    0.000 {built-in method decimal.localcontext}
+  5316664    3.248    0.000    3.248    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   759077    3.167    0.000    6.763    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   718076    2.742    0.000   44.624    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   754952    2.171    0.000    3.484    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   759077    1.768    0.000    2.816    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   759077    1.554    0.000    2.462    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   759077    1.255    0.000    1.990    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+  1518154    1.140    0.000    1.140    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+     2494    0.843    0.000   45.920    0.018 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+  2277286    0.769    0.000    0.769    0.000 {built-in method builtins.getattr}
+   763953    0.742    0.000    0.742    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+   761569    0.708    0.000    0.708    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:106(_ceil_bps)
+  1033168    0.670    0.000    1.129    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+   759094    0.669    0.000    1.031    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1296(_is_dataclass_instance)
+
+
+
+
+=== triggers_0.1 ===
+ROW {"config": {"name": "triggers_0.1", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.1, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 18852, "window_mints": 532, "largest_mint_fills": 2000, "entities": 5631, "bets": 726, "copies": 725, "same_slot_pairs": 2368, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 4.921875, "wall_s": 5.851873700041324, "profiled_wall_s": 17.84485900006257, "us_per_window_fill": 261.0797262889879, "passes": {"_prepared[bets]": {"cpu_s": 0.0469, "wall_s": 0.0886, "calls": 532}, "_prepared[other]": {"cpu_s": 0.0781, "wall_s": 0.0642, "calls": 532}, "_prepared[survey]": {"cpu_s": 0.0625, "wall_s": 0.0689, "calls": 532}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0006, "calls": 1}, "bets": {"cpu_s": 0.125, "wall_s": 0.181, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0156, "wall_s": 0.0143, "calls": 2}, "replay(total)": {"cpu_s": 4.4062, "wall_s": 5.2917, "calls": 532}, "replay.carry_advance": {"cpu_s": 0.2031, "wall_s": 0.1196, "calls": 532}, "replay.copies": {"cpu_s": 2.4219, "wall_s": 2.9405, "calls": 725}, "replay.fifo(w_pnl)": {"cpu_s": 0.2031, "wall_s": 0.1817, "calls": 1064}, "replay.window_books": {"cpu_s": 1.4531, "wall_s": 1.7883, "calls": 532}, "survey": {"cpu_s": 0.125, "wall_s": 0.1294, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1596, "stream._cobuys": 1064, "lots.fifo": 1064, "pricing.__init__": 18009, "lots.__init__": 1064, "carry.flow_of": 725, "policy._leader_exit": 725, "policy._find_exit": 725, "stream_mint._advance": 532, "episodes.window_books": 532, "policy.simulate_copy": 725, "policy._stopped": 94910, "pricing.liquidation_or_none": 33209, "episodes.__init__": 17477}, "census": {"wallets": 5655, "one_swap_wallets_pct": 63.784261715296196, "one_swap_events_pct": 13.206649091974224, "ge20_wallets_pct": 1.2908930150309461, "ge20_events_pct": 45.19991212653778, "lt_0_01_sol_pct": 56.088898652606915, "trigger_size_buys_pct": 10.028857011417339}, "top_mints": [["M1_116", 2000, 55, 0.808314299909398], ["M2_34", 2000, 75, 0.6510099000297487], ["M1_125", 2000, 46, 0.5798762999475002], ["M1_41", 680, 31, 0.369658499956131], ["M2_101", 1226, 37, 0.3673805999569595]], "peak_rss_mb": 0.0}
+  cpu 4.922 s  wall 5.852 s  window fills 18852  -> 261.1 us CPU/fill  copies 725  stop quotes 94910
+  survey (+_prepared)                     0.129 s    2.2 %
+  links+entities                          0.014 s    0.2 %
+  bets (+_prepared)                       0.181 s    3.1 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            1.788 s   30.6 %
+  replay: fifo (W-PnL)                    0.182 s    3.1 %
+  replay: copies (simulate_copy)          2.941 s   50.2 %
+  replay: carry advance                   0.120 s    2.0 %
+  replay loop: _prepared (3rd pass)       0.064 s    1.1 %
+  replay: rest (tape, tallies, loop)      0.262 s    4.5 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.171 s    2.9 %
+         8330836 function calls (8330654 primitive calls) in 15.687 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   130310    1.486    0.000    6.597    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   135725    1.376    0.000   10.595    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   131471    0.975    0.000    2.082    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+   902105    0.896    0.000    0.896    0.000 {built-in method decimal.localcontext}
+   131471    0.763    0.000    1.626    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   902105    0.737    0.000    0.737    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   131471    0.605    0.000    0.843    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   130310    0.524    0.000    0.841    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+    94910    0.496    0.000    7.832    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   131471    0.365    0.000    0.576    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   131471    0.297    0.000    0.482    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+81165/81163    0.285    0.000    0.486    0.000 {built-in method builtins.sorted}
+     1064    0.280    0.000    0.636    0.001 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+   262942    0.264    0.000    0.264    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+      532    0.244    0.000    5.672    0.011 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:200(window_books)
+    33209    0.230    0.000    3.891    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:261(liquidation_or_none)
+      532    0.217    0.000   16.465    0.031 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\stream_mint.py:146(replay_mint)
+   228140    0.195    0.000    0.317    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+
+
+
+
+=== triggers_0.7 ===
+ROW {"config": {"name": "triggers_0.7", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.7, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 18852, "window_mints": 532, "largest_mint_fills": 2000, "entities": 5631, "bets": 4199, "copies": 4198, "same_slot_pairs": 2368, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 27.078125, "wall_s": 30.003650800092146, "profiled_wall_s": 41.77260129991919, "us_per_window_fill": 1436.3529068533842, "passes": {"_prepared[bets]": {"cpu_s": 0.0938, "wall_s": 0.1128, "calls": 532}, "_prepared[other]": {"cpu_s": 0.0625, "wall_s": 0.0923, "calls": 532}, "_prepared[survey]": {"cpu_s": 0.1719, "wall_s": 0.196, "calls": 532}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.001, "calls": 1}, "bets": {"cpu_s": 0.2812, "wall_s": 0.3384, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0003, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0156, "wall_s": 0.0266, "calls": 2}, "replay(total)": {"cpu_s": 26.1875, "wall_s": 28.9669, "calls": 532}, "replay.carry_advance": {"cpu_s": 0.1406, "wall_s": 0.2047, "calls": 532}, "replay.copies": {"cpu_s": 22.5, "wall_s": 24.8842, "calls": 4198}, "replay.fifo(w_pnl)": {"cpu_s": 0.1562, "wall_s": 0.2736, "calls": 1064}, "replay.window_books": {"cpu_s": 2.8438, "wall_s": 3.002, "calls": 532}, "survey": {"cpu_s": 0.25, "wall_s": 0.2972, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1596, "stream._cobuys": 1064, "lots.fifo": 1064, "pricing.__init__": 18009, "lots.__init__": 1064, "carry.flow_of": 4198, "policy._leader_exit": 4198, "policy._find_exit": 4198, "stream_mint._advance": 532, "episodes.window_books": 532, "policy.simulate_copy": 4198, "policy._stopped": 545614, "pricing.liquidation_or_none": 33209, "episodes.__init__": 17477}, "census": {"wallets": 5655, "one_swap_wallets_pct": 63.784261715296196, "one_swap_events_pct": 13.206649091974224, "ge20_wallets_pct": 1.2908930150309461, "ge20_events_pct": 45.19991212653778, "lt_0_01_sol_pct": 18.746338605741066, "trigger_size_buys_pct": 70.04725858391535}, "top_mints": [["M1_116", 2000, 305, 5.846692299935967], ["M2_34", 2000, 273, 5.06445029983297], ["M1_125", 2000, 285, 4.93589899991639], ["M1_111", 463, 106, 1.8489400001708418], ["M2_101", 1226, 195, 1.7191961000207812]], "peak_rss_mb": 0.0}
+  cpu 27.078 s  wall 30.004 s  window fills 18852  -> 1436.4 us CPU/fill  copies 4198  stop quotes 545614
+  survey (+_prepared)                     0.297 s    1.0 %
+  links+entities                          0.027 s    0.1 %
+  bets (+_prepared)                       0.338 s    1.1 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            3.002 s   10.0 %
+  replay: fifo (W-PnL)                    0.274 s    0.9 %
+  replay: copies (simulate_copy)         24.884 s   82.9 %
+  replay: carry advance                   0.205 s    0.7 %
+  replay loop: _prepared (3rd pass)       0.092 s    0.3 %
+  replay: rest (tape, tallies, loop)      0.602 s    2.0 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.281 s    0.9 %
+         27179357 function calls (27178623 primitive calls) in 36.411 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   581626    4.293    0.000   19.020    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   590848    4.081    0.000   30.647    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   588223    2.847    0.000    6.183    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  4136414    2.770    0.000    2.770    0.000 {built-in method decimal.localcontext}
+  4136414    2.408    0.000    2.408    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   588223    2.213    0.000    4.784    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   545614    1.871    0.000   30.390    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   581626    1.558    0.000    2.503    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   588223    1.143    0.000    1.899    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   588223    1.129    0.000    1.794    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   588223    0.845    0.000    1.340    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+  1176446    0.778    0.000    0.778    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+  1022128    0.578    0.000    0.951    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+     4198    0.576    0.000   31.362    0.007 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+  1764724    0.560    0.000    0.560    0.000 {built-in method builtins.getattr}
+   594385    0.500    0.000    0.500    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+   590848    0.483    0.000    0.483    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:106(_ceil_bps)
+   588240    0.463    0.000    0.665    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1296(_is_dataclass_instance)
+
+
+
+
+=== history_3d ===
+ROW {"config": {"name": "history_3d", "per_day": 8000, "days": 6, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 15310, "window_mints": 798, "largest_mint_fills": 2000, "entities": 8925, "bets": 1815, "copies": 1811, "same_slot_pairs": 1966, "carry_lots": 24568, "carry_flows": 24101, "carry_pending": 4320, "cpu_s": 6.625, "wall_s": 7.112472099950537, "profiled_wall_s": 13.952795600052923, "us_per_window_fill": 432.72370999346833, "passes": {"_prepared[bets]": {"cpu_s": 0.0625, "wall_s": 0.0335, "calls": 798}, "_prepared[other]": {"cpu_s": 0.0469, "wall_s": 0.0423, "calls": 798}, "_prepared[survey]": {"cpu_s": 0.0156, "wall_s": 0.03, "calls": 798}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0007, "calls": 1}, "bets": {"cpu_s": 0.0781, "wall_s": 0.0846, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0073, "calls": 2}, "replay(total)": {"cpu_s": 6.2188, "wall_s": 6.6863, "calls": 798}, "replay.carry_advance": {"cpu_s": 0.0938, "wall_s": 0.1936, "calls": 798}, "replay.copies": {"cpu_s": 3.7188, "wall_s": 4.0457, "calls": 1811}, "replay.fifo(w_pnl)": {"cpu_s": 0.125, "wall_s": 0.1287, "calls": 1596}, "replay.window_books": {"cpu_s": 2.0156, "wall_s": 2.0211, "calls": 798}, "survey": {"cpu_s": 0.0625, "wall_s": 0.0617, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 2394, "stream._cobuys": 1596, "lots.fifo": 1596, "pricing.__init__": 25979, "lots.__init__": 1596, "carry.flow_of": 1811, "policy._leader_exit": 1811, "policy._find_exit": 1811, "stream_mint._advance": 798, "episodes.window_books": 798, "policy.simulate_copy": 1811, "policy._stopped": 187431, "pricing.liquidation_or_none": 59978, "episodes.__init__": 25181}, "census": {"wallets": 5047, "one_swap_wallets_pct": 60.84802853180107, "one_swap_events_pct": 14.519408065812492, "ge20_wallets_pct": 1.4464038042401426, "ge20_events_pct": 46.338234598836934, "lt_0_01_sol_pct": 39.70025057916883, "trigger_size_buys_pct": 35.38116825595331}, "top_mints": [["M3_125", 2000, 177, 1.3682737001217902], ["M4_15", 844, 73, 0.5407885999884456], ["M3_105", 568, 72, 0.3626556000672281], ["M2_101", 774, 66, 0.3548596000764519], ["M3_100", 497, 47, 0.22391800000332296]], "peak_rss_mb": 0.0}
+  cpu 6.625 s  wall 7.112 s  window fills 15310  -> 432.7 us CPU/fill  copies 1811  stop quotes 187431
+  survey (+_prepared)                     0.062 s    0.9 %
+  links+entities                          0.007 s    0.1 %
+  bets (+_prepared)                       0.085 s    1.2 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            2.021 s   28.4 %
+  replay: fifo (W-PnL)                    0.129 s    1.8 %
+  replay: copies (simulate_copy)          4.046 s   56.9 %
+  replay: carry advance                   0.194 s    2.7 %
+  replay loop: _prepared (3rd pass)       0.042 s    0.6 %
+  replay: rest (tape, tallies, loop)      0.297 s    4.2 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.229 s    3.2 %
+         13864479 function calls (13864274 primitive calls) in 12.226 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   254286    1.225    0.000    5.548    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   262049    1.166    0.000    8.922    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   257313    0.807    0.000    1.765    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  1764669    0.759    0.000    0.759    0.000 {built-in method decimal.localcontext}
+  1764669    0.702    0.000    0.702    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   257313    0.635    0.000    1.379    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   254286    0.448    0.000    0.719    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   257313    0.445    0.000    0.663    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   187431    0.405    0.000    6.859    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   257313    0.324    0.000    0.512    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   257313    0.292    0.000    0.423    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   514626    0.217    0.000    0.217    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+    59978    0.175    0.000    2.973    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:261(liquidation_or_none)
+107513/107511    0.164    0.000    0.266    0.000 {built-in method builtins.sorted}
+    15308    0.162    0.000    0.208    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:149(apply)
+   771994    0.162    0.000    0.162    0.000 {built-in method builtins.getattr}
+      798    0.155    0.000   13.097    0.016 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\stream_mint.py:146(replay_mint)
+      798    0.142    0.000    4.227    0.005 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:200(window_books)
+
+
+
+
+=== history_5d ===
+ROW {"config": {"name": "history_5d", "per_day": 8000, "days": 8, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 12079, "window_mints": 1064, "largest_mint_fills": 1512, "entities": 11789, "bets": 1281, "copies": 1278, "same_slot_pairs": 1594, "carry_lots": 35182, "carry_flows": 34597, "carry_pending": 5874, "cpu_s": 4.875, "wall_s": 5.262290399987251, "profiled_wall_s": 11.140686200000346, "us_per_window_fill": 403.59301266661146, "passes": {"_prepared[bets]": {"cpu_s": 0.0156, "wall_s": 0.0262, "calls": 1064}, "_prepared[other]": {"cpu_s": 0.0469, "wall_s": 0.0397, "calls": 1064}, "_prepared[survey]": {"cpu_s": 0.0469, "wall_s": 0.0298, "calls": 1064}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0011, "calls": 1}, "bets": {"cpu_s": 0.0625, "wall_s": 0.0562, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0002, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0062, "calls": 2}, "replay(total)": {"cpu_s": 4.3281, "wall_s": 4.7128, "calls": 1064}, "replay.carry_advance": {"cpu_s": 0.0469, "wall_s": 0.1245, "calls": 1064}, "replay.copies": {"cpu_s": 1.4062, "wall_s": 1.5186, "calls": 1278}, "replay.fifo(w_pnl)": {"cpu_s": 0.1406, "wall_s": 0.1237, "calls": 2128}, "replay.window_books": {"cpu_s": 2.4062, "wall_s": 2.5255, "calls": 1064}, "survey": {"cpu_s": 0.0625, "wall_s": 0.0546, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 3192, "stream._cobuys": 2128, "lots.fifo": 2128, "pricing.__init__": 30849, "lots.__init__": 2128, "carry.flow_of": 1278, "policy._leader_exit": 1278, "policy._find_exit": 1278, "stream_mint._advance": 1064, "episodes.window_books": 1064, "policy.simulate_copy": 1278, "policy._stopped": 73107, "pricing.liquidation_or_none": 77571, "episodes.__init__": 29785}, "census": {"wallets": 4704, "one_swap_wallets_pct": 58.99234693877551, "one_swap_events_pct": 13.645751376868608, "ge20_wallets_pct": 1.5518707482993197, "ge20_events_pct": 45.7956333595594, "lt_0_01_sol_pct": 40.30291109362707, "trigger_size_buys_pct": 34.5964461571398}, "top_mints": [["M5_69", 524, 51, 0.24840840022079647], ["M6_115", 450, 46, 0.22241299995221198], ["M6_45", 350, 41, 0.18092089984565973], ["M5_9", 429, 40, 0.17821040004491806], ["M0_123", 0, 0, 0.15732330013997853]], "peak_rss_mb": 0.0}
+  cpu 4.875 s  wall 5.262 s  window fills 12079  -> 403.6 us CPU/fill  copies 1278  stop quotes 73107
+  survey (+_prepared)                     0.055 s    1.0 %
+  links+entities                          0.006 s    0.1 %
+  bets (+_prepared)                       0.056 s    1.1 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            2.526 s   48.0 %
+  replay: fifo (W-PnL)                    0.124 s    2.4 %
+  replay: copies (simulate_copy)          1.519 s   28.9 %
+  replay: carry advance                   0.124 s    2.4 %
+  replay loop: _prepared (3rd pass)       0.040 s    0.8 %
+  replay: rest (tape, tallies, loop)      0.420 s    8.0 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.391 s    7.4 %
+         10235841 function calls (10235458 primitive calls) in 9.798 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   156391    0.856    0.000    3.912    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   168401    0.803    0.000    6.232    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   158255    0.566    0.000    1.216    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  1050299    0.527    0.000    0.527    0.000 {built-in method decimal.localcontext}
+  1050299    0.465    0.000    0.465    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   158255    0.435    0.000    0.938    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   158255    0.402    0.000    0.551    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   156391    0.308    0.000    0.490    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+    77571    0.244    0.000    4.041    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:261(liquidation_or_none)
+   158255    0.224    0.000    0.353    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+    73107    0.202    0.000    2.976    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+123530/123529    0.183    0.000    0.265    0.000 {built-in method builtins.sorted}
+     1064    0.181    0.000   10.268    0.010 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\stream_mint.py:146(replay_mint)
+     1064    0.177    0.000    5.495    0.005 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:200(window_books)
+   158255    0.165    0.000    0.258    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   316510    0.151    0.000    0.151    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+     2128    0.146    0.000    0.310    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+   147165    0.140    0.000    0.216    0.000 {built-in method builtins.any}
+
+
+
+
+=== burst_10 ===
+ROW {"config": {"name": "burst_10", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 20, "burst_size": 10, "quiet": false}, "window_fills": 19452, "window_mints": 552, "largest_mint_fills": 2000, "entities": 5668, "bets": 2075, "copies": 2071, "same_slot_pairs": 3090, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 6.1875, "wall_s": 7.089250599965453, "profiled_wall_s": 14.599768799962476, "us_per_window_fill": 318.0906847624923, "passes": {"_prepared[bets]": {"cpu_s": 0.0312, "wall_s": 0.0394, "calls": 552}, "_prepared[other]": {"cpu_s": 0.0469, "wall_s": 0.0425, "calls": 552}, "_prepared[survey]": {"cpu_s": 0.0, "wall_s": 0.0327, "calls": 552}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0007, "calls": 1}, "bets": {"cpu_s": 0.0781, "wall_s": 0.0878, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0086, "calls": 2}, "replay(total)": {"cpu_s": 5.9062, "wall_s": 6.7394, "calls": 552}, "replay.carry_advance": {"cpu_s": 0.0625, "wall_s": 0.075, "calls": 552}, "replay.copies": {"cpu_s": 4.4688, "wall_s": 5.2811, "calls": 2071}, "replay.fifo(w_pnl)": {"cpu_s": 0.1094, "wall_s": 0.114, "calls": 1104}, "replay.window_books": {"cpu_s": 1.0625, "wall_s": 1.0705, "calls": 552}, "survey": {"cpu_s": 0.0625, "wall_s": 0.0675, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1656, "stream._cobuys": 1104, "lots.fifo": 1104, "pricing.__init__": 16803, "lots.__init__": 1104, "carry.flow_of": 2071, "policy._leader_exit": 2071, "policy._find_exit": 2071, "stream_mint._advance": 552, "episodes.window_books": 552, "policy.simulate_copy": 2071, "policy._stopped": 283132, "pricing.liquidation_or_none": 30719, "episodes.__init__": 16251}, "census": {"wallets": 5719, "one_swap_wallets_pct": 64.13708690330478, "one_swap_events_pct": 13.141301232444826, "ge20_wallets_pct": 1.2764469312816926, "ge20_events_pct": 45.54671825738034, "lt_0_01_sol_pct": 40.23359128690169, "trigger_size_buys_pct": 35.64752459083303}, "top_mints": [["M1_116", 2000, 163, 1.399496000027284], ["M2_34", 2000, 161, 1.160458699800074], ["M1_125", 2000, 150, 1.041270400164649], ["M2_101", 1226, 105, 0.49948050011880696], ["M1_41", 680, 68, 0.3907908999826759]], "peak_rss_mb": 0.0}
+  cpu 6.188 s  wall 7.089 s  window fills 19452  -> 318.1 us CPU/fill  copies 2071  stop quotes 283132
+  survey (+_prepared)                     0.068 s    1.0 %
+  links+entities                          0.009 s    0.1 %
+  bets (+_prepared)                       0.088 s    1.2 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            1.071 s   15.1 %
+  replay: fifo (W-PnL)                    0.114 s    1.6 %
+  replay: copies (simulate_copy)          5.281 s   74.5 %
+  replay: carry advance                   0.075 s    1.1 %
+  replay loop: _prepared (3rd pass)       0.043 s    0.6 %
+  replay: rest (tape, tallies, loop)      0.199 s    2.8 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.143 s    2.0 %
+         16101425 function calls (16101058 primitive calls) in 12.771 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   316613    1.424    0.000    6.250    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   322574    1.315    0.000    9.994    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   319884    0.913    0.000    2.014    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  2236734    0.871    0.000    0.871    0.000 {built-in method decimal.localcontext}
+  2236734    0.832    0.000    0.832    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   319884    0.722    0.000    1.569    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   283132    0.584    0.000    9.569    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   316613    0.513    0.000    0.824    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   319884    0.371    0.000    0.609    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   319884    0.367    0.000    0.593    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   319884    0.267    0.000    0.416    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   639768    0.264    0.000    0.264    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+   574870    0.216    0.000    0.354    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+   959707    0.186    0.000    0.186    0.000 {built-in method builtins.getattr}
+    16803    0.186    0.000    0.216    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:170(__init__)
+     2071    0.179    0.000    9.879    0.005 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+  1288696    0.161    0.000    0.161    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\tape.py:127(identity)
+   323037    0.151    0.000    0.151    0.000 {method 'to_integral_value' of 'decimal.Decimal' objects}
+
+
+
+
+=== burst_40 ===
+ROW {"config": {"name": "burst_40", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 20, "burst_size": 40, "quiet": false}, "window_fills": 20052, "window_mints": 552, "largest_mint_fills": 2000, "entities": 5627, "bets": 1650, "copies": 1647, "same_slot_pairs": 8242, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 6.0625, "wall_s": 6.691105400212109, "profiled_wall_s": 13.450365500058979, "us_per_window_fill": 302.33891881109116, "passes": {"_prepared[bets]": {"cpu_s": 0.0312, "wall_s": 0.0384, "calls": 552}, "_prepared[other]": {"cpu_s": 0.0625, "wall_s": 0.0423, "calls": 552}, "_prepared[survey]": {"cpu_s": 0.0, "wall_s": 0.0377, "calls": 552}, "assemble_snapshot": {"cpu_s": 0.0156, "wall_s": 0.0006, "calls": 1}, "bets": {"cpu_s": 0.0625, "wall_s": 0.0847, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0014, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0312, "wall_s": 0.0273, "calls": 2}, "replay(total)": {"cpu_s": 5.6406, "wall_s": 6.2429, "calls": 552}, "replay.carry_advance": {"cpu_s": 0.0156, "wall_s": 0.0702, "calls": 552}, "replay.copies": {"cpu_s": 4.4688, "wall_s": 4.971, "calls": 1647}, "replay.fifo(w_pnl)": {"cpu_s": 0.1094, "wall_s": 0.1138, "calls": 1104}, "replay.window_books": {"cpu_s": 0.8594, "wall_s": 0.8505, "calls": 552}, "survey": {"cpu_s": 0.0938, "wall_s": 0.1478, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1656, "stream._cobuys": 1104, "lots.fifo": 1104, "pricing.__init__": 13699, "lots.__init__": 1104, "carry.flow_of": 1647, "policy._leader_exit": 1647, "policy._find_exit": 1647, "stream_mint._advance": 552, "episodes.window_books": 552, "policy.simulate_copy": 1647, "policy._stopped": 257337, "pricing.liquidation_or_none": 25059, "episodes.__init__": 13147}, "census": {"wallets": 5723, "one_swap_wallets_pct": 64.17962607024288, "one_swap_events_pct": 12.882295173961841, "ge20_wallets_pct": 1.275554778962083, "ge20_events_pct": 46.29278900112234, "lt_0_01_sol_pct": 40.24270482603816, "trigger_size_buys_pct": 35.65681510395921}, "top_mints": [["M2_34", 2000, 150, 1.3400600999593735], ["M1_116", 2000, 146, 1.1576779999304563], ["M1_125", 2000, 137, 1.0060104001313448], ["M2_101", 1226, 87, 0.4974571999628097], ["M1_41", 680, 58, 0.2906923000700772]], "peak_rss_mb": 0.0}
+  cpu 6.062 s  wall 6.691 s  window fills 20052  -> 302.3 us CPU/fill  copies 1647  stop quotes 257337
+  survey (+_prepared)                     0.148 s    2.2 %
+  links+entities                          0.029 s    0.4 %
+  bets (+_prepared)                       0.085 s    1.3 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            0.851 s   12.7 %
+  replay: fifo (W-PnL)                    0.114 s    1.7 %
+  replay: copies (simulate_copy)          4.971 s   74.3 %
+  replay: carry advance                   0.070 s    1.0 %
+  replay loop: _prepared (3rd pass)       0.042 s    0.6 %
+  replay: rest (tape, tallies, loop)      0.237 s    3.5 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.144 s    2.2 %
+         14747840 function calls (14747555 primitive calls) in 11.720 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   284886    1.246    0.000    5.671    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   289498    1.205    0.000    9.175    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   287503    0.856    0.000    1.846    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  2009728    0.834    0.000    0.834    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+  2009728    0.805    0.000    0.805    0.000 {built-in method decimal.localcontext}
+   287503    0.671    0.000    1.423    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   257337    0.539    0.000    8.947    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   284886    0.459    0.000    0.747    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   287503    0.343    0.000    0.567    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   287503    0.342    0.000    0.548    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   287503    0.240    0.000    0.377    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   575006    0.222    0.000    0.222    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+   532675    0.211    0.000    0.341    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+     1104    0.211    0.000    0.368    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+   862564    0.175    0.000    0.175    0.000 {built-in method builtins.getattr}
+     1647    0.160    0.000    9.210    0.006 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+  1207787    0.153    0.000    0.153    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\tape.py:127(identity)
+77435/77434    0.141    0.000    0.266    0.000 {built-in method builtins.sorted}
+
+
+
+
+=== burst_120 ===
+ROW {"config": {"name": "burst_120", "per_day": 8000, "days": 4, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 20, "burst_size": 120, "quiet": false}, "window_fills": 21652, "window_mints": 552, "largest_mint_fills": 2000, "entities": 5408, "bets": 1471, "copies": 1469, "same_slot_pairs": 52637, "carry_lots": 13098, "carry_flows": 12825, "carry_pending": 2388, "cpu_s": 6.015625, "wall_s": 6.306262899888679, "profiled_wall_s": 14.016522299963981, "us_per_window_fill": 277.83230186587843, "passes": {"_prepared[bets]": {"cpu_s": 0.0625, "wall_s": 0.0401, "calls": 552}, "_prepared[other]": {"cpu_s": 0.0312, "wall_s": 0.045, "calls": 552}, "_prepared[survey]": {"cpu_s": 0.0312, "wall_s": 0.0408, "calls": 552}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0005, "calls": 1}, "bets": {"cpu_s": 0.0781, "wall_s": 0.0806, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0095, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.1406, "wall_s": 0.1627, "calls": 2}, "replay(total)": {"cpu_s": 5.3906, "wall_s": 5.6532, "calls": 552}, "replay.carry_advance": {"cpu_s": 0.1875, "wall_s": 0.193, "calls": 552}, "replay.copies": {"cpu_s": 4.1719, "wall_s": 4.4405, "calls": 1469}, "replay.fifo(w_pnl)": {"cpu_s": 0.1719, "wall_s": 0.1776, "calls": 1104}, "replay.window_books": {"cpu_s": 0.7344, "wall_s": 0.7498, "calls": 552}, "survey": {"cpu_s": 0.2344, "wall_s": 0.2267, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 1656, "stream._cobuys": 1104, "lots.fifo": 1104, "pricing.__init__": 12810, "lots.__init__": 1104, "carry.flow_of": 1469, "policy._leader_exit": 1469, "policy._find_exit": 1469, "stream_mint._advance": 552, "episodes.window_books": 552, "policy.simulate_copy": 1469, "policy._stopped": 232906, "pricing.liquidation_or_none": 24229, "episodes.__init__": 12258}, "census": {"wallets": 5724, "one_swap_wallets_pct": 64.06359189378057, "one_swap_events_pct": 12.177869287991498, "ge20_wallets_pct": 1.2753319357092943, "ge20_events_pct": 45.845510095642936, "lt_0_01_sol_pct": 40.113575982996814, "trigger_size_buys_pct": 35.558052434456926}, "top_mints": [["M1_116", 2000, 146, 1.1329702001530677], ["M1_125", 2000, 137, 0.9479988999664783], ["M2_34", 2000, 110, 0.8798184997867793], ["M2_101", 1226, 62, 0.41026809997856617], ["M1_41", 680, 58, 0.3160457001067698]], "peak_rss_mb": 0.0}
+  cpu 6.016 s  wall 6.306 s  window fills 21652  -> 277.8 us CPU/fill  copies 1469  stop quotes 232906
+  survey (+_prepared)                     0.227 s    3.6 %
+  links+entities                          0.172 s    2.7 %
+  bets (+_prepared)                       0.081 s    1.3 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            0.750 s   11.9 %
+  replay: fifo (W-PnL)                    0.178 s    2.8 %
+  replay: copies (simulate_copy)          4.441 s   70.4 %
+  replay: carry advance                   0.193 s    3.1 %
+  replay loop: _prepared (3rd pass)       0.045 s    0.7 %
+  replay: rest (tape, tallies, loop)      0.092 s    1.5 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.128 s    2.0 %
+         14877619 function calls (14877329 primitive calls) in 12.317 seconds
+
+   Ordered by: internal time
+   List reduced from 229 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   259135    1.294    0.000    5.594    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   263772    1.191    0.000    8.957    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+   261444    0.811    0.000    1.818    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+  1826496    0.761    0.000    0.761    0.000 {built-in method decimal.localcontext}
+  1826496    0.707    0.000    0.707    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+   261444    0.650    0.000    1.408    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+   232906    0.529    0.000    8.694    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+   259135    0.456    0.000    0.722    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+   261444    0.344    0.000    0.548    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+   261444    0.324    0.000    0.525    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   261444    0.249    0.000    0.379    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+     1104    0.228    0.000    0.419    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+   522888    0.225    0.000    0.225    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+   473620    0.206    0.000    0.339    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:178(<genexpr>)
+119702/119701    0.195    0.000    0.430    0.000 {built-in method builtins.sorted}
+   784387    0.164    0.000    0.164    0.000 {built-in method builtins.getattr}
+   261461    0.163    0.000    0.219    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1296(_is_dataclass_instance)
+     1469    0.163    0.000    8.962    0.006 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:133(_find_exit)
+
+
+
+
+=== empty_window_big_carry ===
+ROW {"config": {"name": "empty_window_big_carry", "per_day": 8000, "days": 8, "window": 2, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": true}, "window_fills": 0, "window_mints": 665, "largest_mint_fills": 2, "entities": 8919, "bets": 0, "copies": 0, "same_slot_pairs": 0, "carry_lots": 30229, "carry_flows": 29702, "carry_pending": 5192, "cpu_s": 3.796875, "wall_s": 4.132047199876979, "profiled_wall_s": 7.497326400130987, "us_per_window_fill": 3796875.0, "passes": {"_prepared[bets]": {"cpu_s": 0.0, "wall_s": 0.0047, "calls": 665}, "_prepared[other]": {"cpu_s": 0.0156, "wall_s": 0.0136, "calls": 665}, "_prepared[survey]": {"cpu_s": 0.0156, "wall_s": 0.0057, "calls": 665}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0017, "calls": 1}, "bets": {"cpu_s": 0.0156, "wall_s": 0.0076, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0002, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 2}, "replay(total)": {"cpu_s": 3.4375, "wall_s": 3.7752, "calls": 665}, "replay.carry_advance": {"cpu_s": 0.0781, "wall_s": 0.1169, "calls": 665}, "replay.fifo(w_pnl)": {"cpu_s": 0.0938, "wall_s": 0.0815, "calls": 1330}, "replay.window_books": {"cpu_s": 2.875, "wall_s": 3.139, "calls": 665}, "survey": {"cpu_s": 0.0156, "wall_s": 0.0096, "calls": 1}}, "calls": {"encoder.__init__": 1, "<string>.__init__": 1, "stream._prepared": 1995, "stream._cobuys": 1330, "lots.fifo": 1330, "pricing.__init__": 25335, "lots.__init__": 1330, "stream_mint._advance": 665, "episodes.window_books": 665, "pricing.liquidation_or_none": 74010, "episodes.__init__": 24670}, "census": {"wallets": 2, "one_swap_wallets_pct": 100.0, "one_swap_events_pct": 100.0, "ge20_wallets_pct": 0.0, "ge20_events_pct": 0.0, "lt_0_01_sol_pct": 50.0, "trigger_size_buys_pct": 0.0}, "top_mints": [["M4_97", 0, 0, 0.21849499992094934], ["M2_101", 0, 0, 0.1809896999038756], ["M1_125", 0, 0, 0.14433529996313155], ["M2_34", 0, 0, 0.12699340004473925], ["M3_125", 0, 0, 0.08763690013438463]], "peak_rss_mb": 0.0}
+  cpu 3.797 s  wall 4.132 s  window fills 0  -> 3796875.0 us CPU/fill  copies 0  stop quotes 0
+  survey (+_prepared)                     0.010 s    0.2 %
+  links+entities                          0.000 s    0.0 %
+  bets (+_prepared)                       0.008 s    0.2 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            3.139 s   76.0 %
+  replay: fifo (W-PnL)                    0.082 s    2.0 %
+  replay: copies (simulate_copy)          0.000 s    0.0 %
+  replay: carry advance                   0.117 s    2.8 %
+  replay loop: _prepared (3rd pass)       0.014 s    0.3 %
+  replay: rest (tape, tallies, loop)      0.438 s   10.6 %
+  assembly (metrics, rank)                0.002 s    0.0 %
+  unattributed                            0.324 s    7.8 %
+         5783767 function calls (5783683 primitive calls) in 6.593 seconds
+
+   Ordered by: internal time
+   List reduced from 165 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    80646    0.509    0.000    2.336    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+    88590    0.493    0.000    3.750    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+    80646    0.334    0.000    0.715    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+    80646    0.264    0.000    0.349    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+    80646    0.263    0.000    0.565    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+    74010    0.261    0.000    4.329    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:261(liquidation_or_none)
+   492795    0.260    0.000    0.260    0.000 {built-in method decimal.localcontext}
+     8919    0.260    0.000    0.296    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\metrics.py:174(failing_reasons)
+   492795    0.241    0.000    0.241    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+    80646    0.180    0.000    0.287    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+    24670    0.153    0.000    1.874    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:125(open_with)
+      665    0.153    0.000    6.754    0.010 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\stream_mint.py:146(replay_mint)
+      665    0.147    0.000    5.739    0.009 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:200(window_books)
+   125347    0.144    0.000    0.201    0.000 {built-in method builtins.sum}
+    80646    0.128    0.000    0.203    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+   129335    0.126    0.000    0.186    0.000 {built-in method builtins.any}
+88645/88643    0.121    0.000    0.152    0.000 {built-in method builtins.sorted}
+    24670    0.119    0.000    3.258    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:138(pass_bounds)
+
+
+
+
+=== window7 ===
+ROW {"config": {"name": "window7", "per_day": 2000, "days": 9, "window": 7, "seed": 1, "trigger_share": 0.35, "wallet_scale": 1.0, "hot_fills": 0, "hot_minutes": 60, "bursts": 0, "burst_size": 0, "quiet": false}, "window_fills": 11624, "window_mints": 297, "largest_mint_fills": 500, "entities": 3017, "bets": 1137, "copies": 1135, "same_slot_pairs": 1339, "carry_lots": 2262, "carry_flows": 2242, "carry_pending": 381, "cpu_s": 2.78125, "wall_s": 3.06000870000571, "profiled_wall_s": 5.913346099900082, "us_per_window_fill": 239.26789401238815, "passes": {"_prepared[bets]": {"cpu_s": 0.0156, "wall_s": 0.0223, "calls": 297}, "_prepared[other]": {"cpu_s": 0.0312, "wall_s": 0.0299, "calls": 297}, "_prepared[survey]": {"cpu_s": 0.0156, "wall_s": 0.0224, "calls": 297}, "assemble_snapshot": {"cpu_s": 0.0, "wall_s": 0.0006, "calls": 1}, "bets": {"cpu_s": 0.0469, "wall_s": 0.0495, "calls": 1}, "entities_as_of": {"cpu_s": 0.0, "wall_s": 0.0001, "calls": 1}, "fee_seeds": {"cpu_s": 0.0, "wall_s": 0.0, "calls": 2}, "links(_weak)": {"cpu_s": 0.0, "wall_s": 0.0033, "calls": 2}, "replay(total)": {"cpu_s": 2.5156, "wall_s": 2.799, "calls": 297}, "replay.carry_advance": {"cpu_s": 0.0, "wall_s": 0.0257, "calls": 297}, "replay.copies": {"cpu_s": 1.5938, "wall_s": 1.7069, "calls": 1135}, "replay.fifo(w_pnl)": {"cpu_s": 0.0312, "wall_s": 0.0598, "calls": 594}, "replay.window_books": {"cpu_s": 0.7344, "wall_s": 0.8909, "calls": 297}, "survey": {"cpu_s": 0.0469, "wall_s": 0.0444, "calls": 1}}, "calls": {"<string>.__init__": 1, "encoder.__init__": 1, "stream._prepared": 891, "stream._cobuys": 594, "lots.fifo": 594, "pricing.__init__": 6942, "lots.__init__": 594, "carry.flow_of": 1135, "policy._leader_exit": 1135, "policy._find_exit": 1135, "stream_mint._advance": 297, "episodes.window_books": 297, "policy.simulate_copy": 1135, "policy._stopped": 69536, "pricing.liquidation_or_none": 28297, "episodes.__init__": 6645}, "census": {"wallets": 3112, "one_swap_wallets_pct": 59.57583547557841, "one_swap_events_pct": 13.777216318644571, "ge20_wallets_pct": 0.6105398457583547, "ge20_events_pct": 44.9505833395259, "lt_0_01_sol_pct": 40.26157390205841, "trigger_size_buys_pct": 35.10720082002221}, "top_mints": [["M1_0", 500, 35, 0.26487940014339983], ["M7_28", 500, 43, 0.2381170999724418], ["M6_22", 500, 36, 0.21794870006851852], ["M1_21", 309, 20, 0.10641089989803731], ["M5_29", 290, 24, 0.09695559996180236]], "peak_rss_mb": 0.0}
+  cpu 2.781 s  wall 3.060 s  window fills 11624  -> 239.3 us CPU/fill  copies 1135  stop quotes 69536
+  survey (+_prepared)                     0.044 s    1.5 %
+  links+entities                          0.003 s    0.1 %
+  bets (+_prepared)                       0.050 s    1.6 %
+  fee seeds                               0.000 s    0.0 %
+  replay: window_books (E-PnL)            0.891 s   29.1 %
+  replay: fifo (W-PnL)                    0.060 s    2.0 %
+  replay: copies (simulate_copy)          1.707 s   55.8 %
+  replay: carry advance                   0.026 s    0.8 %
+  replay loop: _prepared (3rd pass)       0.030 s    1.0 %
+  replay: rest (tape, tallies, loop)      0.116 s    3.8 %
+  assembly (metrics, rank)                0.001 s    0.0 %
+  unattributed                            0.133 s    4.4 %
+         5537977 function calls (5537718 primitive calls) in 5.206 seconds
+
+   Ordered by: internal time
+   List reduced from 230 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    97585    0.507    0.000    2.248    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:292(quote_sell)
+   102815    0.493    0.000    3.630    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:110(sell_lamports)
+    99288    0.338    0.000    0.742    0.000 C:\Users\evert\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\dataclasses.py:1540(replace)
+   685071    0.307    0.000    0.307    0.000 {built-in method decimal.localcontext}
+   685071    0.292    0.000    0.292    0.000 {method '__exit__' of 'decimal.ContextManager' objects}
+    99288    0.262    0.000    0.570    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:83(_curve)
+    97585    0.182    0.000    0.296    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:179(sell_proceeds)
+    69536    0.171    0.000    2.668    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\policy.py:60(_stopped)
+    99288    0.136    0.000    0.221    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:129(marginal_price_sol)
+    99288    0.134    0.000    0.214    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:219(fee_amount)
+    99288    0.097    0.000    0.151    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:75(_floor)
+   198576    0.095    0.000    0.095    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\curve.py:112(__post_init__)
+    28297    0.085    0.000    1.376    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\pricing.py:261(liquidation_or_none)
+34095/34094    0.083    0.000    0.142    0.000 {built-in method builtins.sorted}
+   297919    0.071    0.000    0.071    0.000 {built-in method builtins.getattr}
+    18269    0.070    0.000    1.536    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\episodes.py:138(pass_bounds)
+      297    0.070    0.000    5.401    0.018 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\stream_mint.py:146(replay_mint)
+      594    0.065    0.000    0.156    0.000 C:\dev\project-hunter\packages\indicators\hunter_indicators\meme\wallets\lots.py:131(fifo)
+
+
+

@@ -57,12 +57,18 @@ def _r(net: int, policy: FollowPolicy) -> Decimal:
         return Decimal(net) / (policy.r_unit * policy.budget_lamports)
 
 
-def _stopped(event: Fill, atoms: int, policy: FollowPolicy) -> bool:
+def _stop_floor(policy: FollowPolicy) -> Decimal:
+    """``stop_fraction × budget``, once per copy (it was recomputed per scanned event)."""
+    with localcontext(CONTEXT):
+        return policy.stop_fraction * policy.budget_lamports
+
+
+def _stopped(event: Fill, atoms: int, floor: Decimal) -> bool:
     quote = sell_lamports(event.reserves, atoms, fee_bps=event.fee_bps)
     if quote is None:  # a completed curve cannot be quoted; the timer/censor decide
         return False
-    with localcontext(CONTEXT):
-        return Decimal(quote) <= policy.stop_fraction * policy.budget_lamports
+    with localcontext(CONTEXT):  # same context as before step 2, whatever the caller's traps
+        return Decimal(quote) <= floor
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,11 +109,7 @@ def _leader_exit(
     arrived before the window, and the whole-history count comes from the carried totals).
     """
     leader = sorted(
-        (
-            e
-            for e in tape.fills
-            if e.wallet in leader_wallets and (since is None or e.received_at >= since)
-        ),
+        (e for e in tape.of_wallets(leader_wallets) if since is None or e.received_at >= since),
         key=lambda e: (e.received_at, *event_order(e)),
     )
     bought, sold = prior
@@ -149,10 +151,16 @@ def _find_exit(
     leader = _leader_exit(trigger, leader_wallets, tape, policy, clock, entry_slot, prior, since)
     if leader is not None and leader.landing_slot < best.landing_slot:
         best = leader
-    for event in tape.fills:
+    # Slot order. The stop is only checked after the entry slot, so the scan starts there: an
+    # earlier event never fired it, and one that ended the scan means the first later event
+    # ends it too, before any check (step 2; Astra corrected the first wording).
+    events, floor = tape.fills, None
+    for k in range(tape.first_after(entry_slot), len(events)):
+        event = events[k]
         if event.slot > best.landing_slot:
             break
-        if event.slot > entry_slot and _stopped(event, atoms, policy):
+        floor = _stop_floor(policy) if floor is None else floor  # at the first scanned event
+        if _stopped(event, atoms, floor):
             landing = _landing(event, policy, clock, entry_slot)
             if landing < best.landing_slot:
                 best = _Exit("stop", event.slot, landing)
@@ -175,7 +183,7 @@ def simulate_copy(
 
     ``leader_prior``/``leader_since``: see :func:`_leader_exit` (the default reads the whole tape).
     """
-    if all(f.identity != trigger.identity for f in tape.fills):
+    if not tape.has(trigger.identity):
         raise ValueError("the tape must contain the trigger (the leader state is armed on it)")
     clk = clock or NominalClock.anchored_on(trigger.slot, trigger.block_time, policy.slot_seconds)
     entry_slot = trigger.slot + policy.delay_slots

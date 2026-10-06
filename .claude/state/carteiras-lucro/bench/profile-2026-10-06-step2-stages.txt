@@ -1,0 +1,105 @@
+SYNTHETIC (not market data) — CPU plan step 2: stage-by-stage measurement of the wallets engine
+Protocol: each stage = a frozen copy of packages/indicators/hunter_indicators, imported through
+PYTHONPATH by infra/scripts/research/2026-10-06-wallets-engine-profile.py (ENV engine_path and
+engine_sha256_lf identify it). The machine is shared with other agents (20-40 % swings): times
+are minima; function-call counts under cProfile are deterministic and load-independent.
+
+Stages:
+  head 84704fa1 as committed (engine identical at 80e50cbc / 5b30bdd9)
+  B    + curve sale: gross leg only (no full SellQuote)
+  C    + MintTape.has: identity set once per tape (not a tape walk per copy)
+  D    + MintTape.of_wallets: leader events by index (not a whole-tape filter per copy)
+  A    + stop scan starts after the entry slot (bisect)
+  E    + carried flow index once per mint (not a dict per copy)
+  F    + _curve memo on (sol, tokens), lru 16 384 (not a Decimal conversion per copy and event)
+  G    + stop floor once per copy (not per scanned event); eager
+  G2   G + Astra review fixes: of_wallets dedups wallets, floor computed at the first scanned event
+
+====================================================================================================
+Pass 3: 8 stages x 8 configs, two interleaved rounds in opposite order, CPU s min/max (no cProfile)
+====================================================================================================
+engine sha256 (LF) per stage: {'head': '44255c0d29d62a2e', 'B': '1da36b1556c75437', 'C': 'cf9ad32f31cb23e0', 'D': '7800f464043531eb', 'A': 'c8e511e2763908ed', 'E': 'dd8424d45c851b5d', 'F': '4b2c7ef51a272cf3', 'G2': '7adcf56bc348ec5e'}
+config                    fills         head            B            C            D            A            E            F           G2  head/G2  same snapshot
+base                      18852  10.05/21.78   7.05/12.56   6.47/12.39   6.23/11.92   5.77/14.41   6.94/12.27   4.08/ 6.48   3.62/ 8.56   2.77x  True  (G2: 192 us/fill)
+hot_2k                    20852  13.33/26.03   7.89/17.36   7.83/16.75   7.55/15.48   6.64/15.69   5.70/15.88   5.78/12.25   4.23/12.31   3.15x  True  (G2: 203 us/fill)
+hot_4k                    22852  15.42/41.22   9.34/15.56   9.02/23.22   9.31/24.27   8.66/26.77   8.88/22.61   6.27/17.89   5.39/15.36   2.86x  True  (G2: 236 us/fill)
+triggers_0.7              18852  12.61/34.02   8.20/17.75   6.88/17.70   7.83/18.97   7.23/19.14   7.36/19.61   6.56/12.66   4.41/11.08   2.86x  True  (G2: 234 us/fill)
+fills_16k                 31087  13.34/33.58   7.39/19.72   8.28/19.36   8.39/20.17   8.48/20.84   7.70/18.78   5.81/14.62   5.97/15.09   2.24x  True  (G2: 192 us/fill)
+window7                   11624   2.83/ 5.16   1.33/ 3.64   1.44/ 4.64   1.64/ 3.02   1.52/ 4.27   1.83/ 3.69   0.97/ 3.41   1.50/ 3.30   1.89x  True  (G2: 129 us/fill)
+empty_window_big_carry        0   3.30/ 4.83   1.58/ 3.45   1.45/ 3.41   1.58/ 3.05   2.23/ 3.23   1.95/ 4.03   1.59/ 5.08   2.09/ 4.98   1.57x  True  (G2: 2093750 us/fill)
+burst_120                 21652   5.91/13.44   4.95/ 8.58   3.86/ 5.78   4.05/ 7.50   5.12/ 6.48   4.86/ 7.12   2.69/ 7.47   5.73/ 8.05   1.03x  True  (G2: 265 us/fill)
+
+====================================================================================================
+Pass 4: 8 stages x 5 configs, bare CPU min of 3 back-to-back runs + cProfile call counts
+====================================================================================================
+bare CPU s (min of 3 back-to-back runs, memo emptied each time)
+config                      head       B       C       D       A       E       F      G2  head/G2  same-snapshot
+base                       11.80    8.08    7.17    8.00    7.94    7.16    7.03    5.14    2.29x  True
+hot_4k                     31.91   13.92   15.39   11.70   10.41   12.20    6.86    6.27    5.09x  True
+triggers_0.7               12.70    7.19    7.11    7.11    6.56    6.61    5.05    4.83    2.63x  True
+fills_16k                  12.56    7.41    7.14    7.14    6.83    7.45    4.81    5.64    2.23x  True
+empty_window_big_carry      2.41    1.48    1.53    1.59    1.80    1.53    1.45    1.44    1.67x  True
+
+all function calls under cProfile (millions; deterministic, load-independent)
+config                      head       B       C       D       A       E       F      G2  head/G2
+base                       16.91   11.57    9.78    9.83    9.83    9.83    8.82    8.23    2.05x
+hot_4k                     33.31   21.23   18.18   18.24   18.24   18.28   15.98   14.55    2.29x
+triggers_0.7               27.18   17.88   14.87   14.93   14.93   14.94   13.18   12.10    2.25x
+fills_16k                  28.28   19.54   16.44   16.53   16.54   16.54   14.89   13.95    2.03x
+empty_window_big_carry      5.79    4.50    4.50    4.50    4.50    4.50    4.26    4.26    1.36x
+
+stop quotes (policy._stopped calls) per stage � must not change (same rule, same scan)
+base                      297964  297964  297964  297964  297964  297964  297964  297964
+hot_4k                    718076  718076  718076  718076  718076  718076  718076  718076
+triggers_0.7              545614  545614  545614  545614  545614  545614  545614  545614
+fills_16k                 478108  478108  478108  478108  478108  478108  478108  478108
+empty_window_big_carry         0       0       0       0       0       0       0       0
+
+us CPU per window fill (bare), head -> G2
+base                     fills  18852  head     626  G2     273  peak RSS G2 117.41184 MB (whole process)
+hot_4k                   fills  22852  head    1396  G2     274  peak RSS G2 124.399616 MB (whole process)
+triggers_0.7             fills  18852  head     674  G2     256  peak RSS G2 119.279616 MB (whole process)
+fills_16k                fills  31087  head     404  G2     181  peak RSS G2 153.870336 MB (whole process)
+empty_window_big_carry   fills      0  head 2406250  G2 1437500  peak RSS G2 136.6016 MB (whole process)
+
+Per run (pass 4): stage config bare_cpu_runs_s all_calls stop_quotes snapshot_digest | costliest mint in the wrapped (pass-timing) run: (mint, window events, copies, wall s)
+  head base                     [11.797, 14.828, 14.703] 16905743 297964 18bfc8b541d14878 | [('M1_125', 2000, 159, 3.35)]
+  B    base                     [8.906, 8.078, 10.0] 11569965 297964 18bfc8b541d14878 | [('M1_116', 2000, 178, 1.68)]
+  C    base                     [8.031, 8.266, 7.172] 9775873 297964 18bfc8b541d14878 | [('M1_125', 2000, 159, 1.37)]
+  D    base                     [9.125, 8.141, 8.0] 9826910 297964 18bfc8b541d14878 | [('M1_125', 2000, 159, 1.66)]
+  A    base                     [8.875, 8.125, 7.938] 9833678 297964 18bfc8b541d14878 | [('M1_116', 2000, 178, 1.29)]
+  E    base                     [7.531, 7.156, 8.484] 9833678 297964 18bfc8b541d14878 | [('M1_116', 2000, 178, 1.25)]
+  F    base                     [7.031, 9.516, 8.156] 8823473 297964 18bfc8b541d14878 | [('M2_34', 2000, 176, 1.26)]
+  G2   base                     [5.141, 7.031, 6.016] 8233878 297964 18bfc8b541d14878 | [('M2_34', 2000, 176, 0.9)]
+  head hot_4k                   [32.828, 31.906, 32.156] 33307251 718076 b0f124f97b4a2fe9 | [('HOT', 4000, 280, 14.68)]
+  B    hot_4k                   [14.562, 14.047, 13.922] 21228019 718076 b0f124f97b4a2fe9 | [('HOT', 4000, 280, 7.86)]
+  C    hot_4k                   [16.297, 16.219, 15.391] 18181760 718076 b0f124f97b4a2fe9 | [('HOT', 4000, 280, 8.59)]
+  D    hot_4k                   [11.703, 14.578, 15.266] 18243569 718076 b0f124f97b4a2fe9 | [('HOT', 4000, 280, 7.05)]
+  A    hot_4k                   [11.078, 10.406, 10.406] 18242408 718076 b0f124f97b4a2fe9 | [('HOT', 4000, 280, 4.81)]
+  E    hot_4k                   [12.688, 12.641, 12.203] 18277731 718076 b0f124f97b4a2fe9 | [('HOT', 4000, 280, 6.77)]
+  F    hot_4k                   [7.094, 7.844, 6.859] 15976756 718076 b0f124f97b4a2fe9 | [('HOT', 4000, 280, 4.11)]
+  G2   hot_4k                   [7.281, 6.422, 6.266] 14547633 718076 b0f124f97b4a2fe9 | [('HOT', 4000, 280, 2.72)]
+  head triggers_0.7             [12.703, 13.594, 13.859] 27179357 545614 20e6b4338e90c949 | [('M2_34', 2000, 273, 2.67)]
+  B    triggers_0.7             [7.188, 8.203, 8.391] 17883169 545614 20e6b4338e90c949 | [('M1_116', 2000, 305, 1.54)]
+  C    triggers_0.7             [7.531, 7.734, 7.109] 14867308 545614 20e6b4338e90c949 | [('M2_34', 2000, 273, 1.35)]
+  D    triggers_0.7             [7.109, 8.906, 7.266] 14928672 545614 20e6b4338e90c949 | [('M2_34', 2000, 273, 1.27)]
+  A    triggers_0.7             [7.281, 6.562, 7.219] 14931438 545614 20e6b4338e90c949 | [('M1_125', 2000, 285, 1.17)]
+  E    triggers_0.7             [7.219, 7.797, 6.609] 14941266 545614 20e6b4338e90c949 | [('M1_125', 2000, 285, 1.53)]
+  F    triggers_0.7             [5.047, 5.734, 6.219] 13180449 545614 20e6b4338e90c949 | [('M1_116', 2000, 305, 0.97)]
+  G2   triggers_0.7             [4.828, 5.031, 5.172] 12101191 545614 20e6b4338e90c949 | [('M1_116', 2000, 305, 0.87)]
+  head fills_16k                [12.562, 13.062, 13.781] 28284814 478108 2bd527aec6340880 | [('M1_197', 4000, 310, 2.34)]
+  B    fills_16k                [7.547, 7.406, 7.875] 19537289 478108 2bd527aec6340880 | [('M1_197', 4000, 310, 1.48)]
+  C    fills_16k                [7.141, 7.562, 8.156] 16444848 478108 2bd527aec6340880 | [('M1_197', 4000, 310, 1.18)]
+  D    fills_16k                [7.734, 7.609, 7.141] 16529315 478108 2bd527aec6340880 | [('M1_197', 4000, 310, 1.37)]
+  A    fills_16k                [7.266, 7.922, 6.828] 16541723 478108 2bd527aec6340880 | [('M1_197', 4000, 310, 1.48)]
+  E    fills_16k                [8.219, 7.516, 7.453] 16541723 478108 2bd527aec6340880 | [('M1_197', 4000, 310, 1.52)]
+  F    fills_16k                [4.812, 6.812, 5.094] 14889958 478108 2bd527aec6340880 | [('M1_197', 4000, 310, 1.07)]
+  G2   fills_16k                [6.062, 5.781, 5.641] 13945427 478108 2bd527aec6340880 | [('M1_197', 4000, 310, 0.7)]
+  head empty_window_big_carry   [2.75, 2.406, 2.531] 5792685 0 cd4c90fbbea4be4d | [('M3_125', 0, 0, 0.23)]
+  B    empty_window_big_carry   [1.484, 1.781, 2.281] 4502349 0 cd4c90fbbea4be4d | [('M2_34', 0, 0, 0.19)]
+  C    empty_window_big_carry   [1.625, 1.531, 1.688] 4502349 0 cd4c90fbbea4be4d | [('M3_125', 0, 0, 0.18)]
+  D    empty_window_big_carry   [1.594, 1.781, 2.375] 4502349 0 cd4c90fbbea4be4d | [('M4_20', 0, 0, 0.14)]
+  A    empty_window_big_carry   [1.797, 1.875, 2.406] 4502349 0 cd4c90fbbea4be4d | [('M4_20', 0, 0, 0.15)]
+  E    empty_window_big_carry   [1.531, 1.812, 1.969] 4502349 0 cd4c90fbbea4be4d | [('M4_20', 0, 0, 0.13)]
+  F    empty_window_big_carry   [2.188, 1.922, 1.453] 4260799 0 cd4c90fbbea4be4d | [('M0_82', 0, 0, 0.15)]
+  G2   empty_window_big_carry   [1.531, 1.438, 1.625] 4260799 0 cd4c90fbbea4be4d | [('M3_125', 0, 0, 0.17)]

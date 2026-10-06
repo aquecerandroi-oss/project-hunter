@@ -60,6 +60,7 @@ __all__ = [
     "MintCarry",
     "Violation",
     "canonical_order",
+    "flow_totals",
     "initial_carry",
     "lot_order",
     "merge_evidence",
@@ -132,9 +133,14 @@ class MintCarry:
         return not (self.frontier or self.lots or self.flows or self.create)
 
     def flow_of(self, wallets: Iterable[str]) -> tuple[int, int]:
-        rows = {f.wallet: f for f in self.flows}
-        hits = [rows[w] for w in wallets if w in rows]
-        return sum(f.bought_atoms for f in hits), sum(f.sold_atoms for f in hits)
+        return flow_totals({f.wallet: f for f in self.flows}, wallets)
+
+
+def flow_totals(rows: Mapping[str, Flow], wallets: Iterable[str]) -> tuple[int, int]:
+    """(bought, sold) atoms of ``wallets`` from a wallet → flow index. A replay builds the index
+    once per mint, not once per copy (CPU plan step 2)."""
+    hits = [rows[w] for w in wallets if w in rows]
+    return sum(f.bought_atoms for f in hits), sum(f.sold_atoms for f in hits)
 
 
 def _no_pairs() -> Mapping[tuple[str, str], Evidence]:

@@ -157,3 +157,18 @@ Os achados são **entradas fora do contrato que passavam em silêncio**. O harne
 - **Mint omitido:** é *nice-to-have* dela, não fechado aqui. A interface não traz o inventário esperado de mints, então a omissão não se vê de dentro. Fica como garantia externa, ao lado do manifesto de completude que ela sugere para a integração com o armazenamento.
 
 **Verificação depois do conserto.** `uv run pytest packages/indicators/tests/meme` deu 204 passed e `uv run pytest packages/indicators` deu 1 655 passed. Pyright strict, ruff, o portão de 350 linhas e o lint da base estão limpos. A mutação deu **20 de 20 mutantes mortos**: os 18 anteriores e as duas guardas novas.
+
+## CPU, passos 1–2 (06/10/2026, acréscimo do quant-engineer)
+
+O plano de [[wallets-cpu]] foi executado nos passos 1 (perfil) e 2 (tirar trabalho repetido). O motor desta nota **não mudou de regra**: sete remoções, uma por vez, cada uma com teste que falhou antes. A prova tem três partes:
+
+- os diferenciais desta nota, intocados e verdes;
+- uma referência congelada **deste** código (`packages/indicators/tests/meme/wallets_golden.json`, digests do commit `84704fa1`), para que uma mudança num helper compartilhado com o `build_snapshot` não engane os dois lados;
+- 11 de 11 mutantes mortos.
+
+O que mudou de leitura:
+
+- **A CPU não estava no acesso por mint.** Estava no stop de cada cópia: uma cotação Decimal da venda em cada estado observado depois da entrada. Ela cresce mais que linearmente num mint denso.
+- **A conta de 31–34 h desta nota usava o gerador antigo** (54 % dos eventos por carteiras de um swap só). O gerador novo segue o KB-0183 e muda a mistura.
+
+Números, extrapolação e o que sobra para o passo 3 estão em [[wallets-cpu]]; a revisão da Astra está em [[wallets-cpu-step2]].

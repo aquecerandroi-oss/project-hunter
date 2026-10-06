@@ -1,0 +1,11 @@
+SYNTHETIC benchmark (not market data); window 2 d; days 4 ; generator kb0183-shape-v2
+{'fills_per_day': 4000, 'window_fills': 7066, 'largest_mint_fills': 1000, 'entities': 2448, 'stream_s': 1.256, 'stream_cpu_s': 1.172, 'batch_s': 1.166, 'batch_cpu_s': 1.062, 'stream_peak_mb': 4.676, 'batch_peak_mb': 14.979, 'fill_bytes': 395.548, 'carry_mints': 132, 'carry_lots': 4759, 'carry_flows': 4733, 'carry_frontier': 156, 'carry_pending_pairs': 797, 'carry_weak_links': 1, 'carry_json_mb': 0.626}
+{'fills_per_day': 8000, 'window_fills': 17441, 'largest_mint_fills': 2000, 'entities': 5372, 'stream_s': 3.76, 'stream_cpu_s': 3.5, 'batch_s': 3.112, 'batch_cpu_s': 2.859, 'stream_peak_mb': 11.383, 'batch_peak_mb': 35.265, 'fill_bytes': 396.795, 'carry_mints': 266, 'carry_lots': 12690, 'carry_flows': 12382, 'carry_frontier': 312, 'carry_pending_pairs': 2219, 'carry_weak_links': 4, 'carry_json_mb': 1.627}
+{'fills_per_day': 16000, 'window_fills': 38456, 'largest_mint_fills': 4000, 'entities': 11423, 'stream_s': 6.331, 'stream_cpu_s': 5.391, 'batch_s': 8.262, 'batch_cpu_s': 7.5, 'stream_peak_mb': 24.552, 'batch_peak_mb': 79.231, 'fill_bytes': 397.584, 'carry_mints': 532, 'carry_lots': 28190, 'carry_flows': 27698, 'carry_frontier': 635, 'carry_pending_pairs': 4954, 'carry_weak_links': 12, 'carry_json_mb': 3.616}
+
+EXTRAPOLATION (linear on the largest scale, CPU time; volumes from KB-0183; SCENARIOS, not measures)
+  28.5 M/day x 7 d = 200 M window fills: batch heap ~ 490 GB (Fill objects + engine); CPU one core: batch ~ 10.8 h, bounded ~ 7.8 h/night
+  31.0 M/day x 7 d = 217 M window fills: batch heap ~ 533 GB (Fill objects + engine); CPU one core: batch ~ 11.8 h, bounded ~ 8.4 h/night
+  bounded heap with 1 M entities in the window ~ 2.1 GB (tallies; ~ 2149 B/entity measured)
+  bounded heap with 5 M entities in the window ~ 10.7 GB (tallies; ~ 2149 B/entity measured)
+  bounded heap with 20 M entities in the window ~ 43.0 GB (tallies; ~ 2149 B/entity measured)

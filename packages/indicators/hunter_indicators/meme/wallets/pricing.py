@@ -27,10 +27,11 @@ from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Sequence
 from datetime import datetime
 from decimal import ROUND_FLOOR, Decimal, localcontext
+from functools import lru_cache
 from typing import Final
 
 from hunter_core.strategies.numeric import CONTEXT
-from hunter_indicators.meme.curve import CurveReserves, quote_buy, quote_sell
+from hunter_indicators.meme.curve import CurveReserves, quote_buy, sell_proceeds
 from hunter_indicators.meme.wallets.tape import (
     LAMPORTS_PER_SOL,
     TOKEN_ATOMS_PER_TOKEN,
@@ -80,9 +81,17 @@ def _executable(state: Reserves) -> bool:
     return not (state.venue == "curve" and state.complete)
 
 
-def _curve(state: Reserves) -> CurveReserves:
+@lru_cache(maxsize=1 << 14)
+def _curve_of(sol_lamports: int, token_atoms: int) -> CurveReserves:
     with localcontext(CONTEXT):
-        return CurveReserves(Decimal(state.sol_lamports) / _SOL, Decimal(state.token_atoms) / _TOK)
+        return CurveReserves(Decimal(sol_lamports) / _SOL, Decimal(token_atoms) / _TOK)
+
+
+def _curve(state: Reserves) -> CurveReserves:
+    """The state in curve units. Memoized on its two integers (an immutable result, fixed
+    context): every copy whose stop scan crosses an event converted it again (CPU plan step 2);
+    16 384 entries hold 8.1 MB (measured) and cover a mint's hour of events."""
+    return _curve_of(state.sol_lamports, state.token_atoms)
 
 
 def buy_atoms(state: Reserves, budget_lamports: int, *, fee_bps: int) -> int | None:
@@ -128,13 +137,16 @@ def sell_lamports(state: Reserves, atoms: int, *, fee_bps: int) -> int | None:
         real = state.real_sol_lamports
         assert real is not None  # enforced by Reserves
         with localcontext(CONTEXT):
-            quote = quote_sell(
-                _curve(state),
-                Decimal(atoms) / _TOK,
-                Decimal(0),
-                real_sol_reserves=Decimal(real) / _SOL,
-            )
-            gross = _floor(quote.curve_proceeds_sol * _SOL)
+            # ``curve.quote_sell``'s gross leg only (its fee, after-state and marginal price were
+            # built and discarded on every stop check — CPU plan step 2); same operations, same
+            # context, same refusals, so the same lamport (test_wallets_cpu, wallets_golden).
+            reserves, ceiling = _curve(state), Decimal(real) / _SOL
+            if ceiling < 0:
+                raise ValueError("real_sol_reserves cannot be negative")
+            proceeds = min(sell_proceeds(reserves, Decimal(atoms) / _TOK), ceiling)
+            if reserves.virtual_sol_reserves - proceeds <= 0:
+                raise ValueError("virtual_sol_reserves must be positive")
+            gross = _floor(proceeds * _SOL)
     else:
         gross = min(
             state.effective_quote_lamports * atoms // (state.token_atoms + atoms),
@@ -175,6 +187,25 @@ class MintTape:
             self._by_slot.setdefault(f.slot, []).append(f)
         self._fill_slots = [f.slot for f in self.fills]
         self._valid: dict[datetime, tuple[Fill, ...]] = {}
+        self._ids: frozenset[tuple[str, str, int]] | None = None
+        self._by_wallet: dict[str, list[int]] | None = None
+
+    def of_wallets(self, wallets: Iterable[str]) -> list[Fill]:
+        """The events of ``wallets`` in tape order — the same subsequence a filter of
+        :attr:`fills` yields (the position index is built once, on first use, CPU plan step 2)."""
+        if self._by_wallet is None:
+            self._by_wallet = {}
+            for i, f in enumerate(self.fills):
+                self._by_wallet.setdefault(f.wallet, []).append(i)
+        at = sorted(i for w in set(wallets) for i in self._by_wallet.get(w, ()))
+        return [self.fills[i] for i in at]
+
+    def has(self, identity: tuple[str, str, int]) -> bool:
+        """Whether an event of this identity is on the tape (the set is built once, on first
+        use: every copy of the mint asks, CPU plan step 2)."""
+        if self._ids is None:
+            self._ids = frozenset(f.identity for f in self.fills)
+        return identity in self._ids
 
     def _slot_at_or_before(self, slot: int) -> int | None:
         i = bisect_right(self._slots, slot)
@@ -207,6 +238,10 @@ class MintTape:
         if last is None:
             return ()
         return tuple((f.reserves, f.fee_bps) for f in self._by_slot[last])
+
+    def first_after(self, slot: int) -> int:
+        """Position in :attr:`fills` of the first event with a slot above ``slot``."""
+        return bisect_right(self._fill_slots, slot)
 
     def observed_through(self, slot: int) -> tuple[Fill, ...]:
         """Every event with slot ≤ ``slot`` (what a watcher had seen by then)."""

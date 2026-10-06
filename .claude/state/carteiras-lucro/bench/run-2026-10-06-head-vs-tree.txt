@@ -1,0 +1,28 @@
+Back-to-back pair of the updated bench (generator kb0183-shape-v2), same machine, minutes apart.
+HEAD ENGINE = scratch copy of 84704fa1 via PYTHONPATH; TREE = working tree after step 2 (A-G + review fixes).
+
+===== HEAD ENGINE =====
+SYNTHETIC benchmark (not market data); window 2 d; days 4 ; generator kb0183-shape-v2
+{'fills_per_day': 4000, 'window_fills': 7066, 'largest_mint_fills': 1000, 'entities': 2448, 'stream_s': 2.805, 'stream_cpu_s': 2.578, 'batch_s': 1.93, 'batch_cpu_s': 1.734, 'stream_peak_mb': 4.948, 'batch_peak_mb': 14.996, 'fill_bytes': 394.478, 'carry_mints': 132, 'carry_lots': 4759, 'carry_flows': 4733, 'carry_frontier': 156, 'carry_pending_pairs': 797, 'carry_weak_links': 1, 'carry_json_mb': 0.626}
+{'fills_per_day': 8000, 'window_fills': 17441, 'largest_mint_fills': 2000, 'entities': 5372, 'stream_s': 7.006, 'stream_cpu_s': 6.25, 'batch_s': 8.292, 'batch_cpu_s': 7.281, 'stream_peak_mb': 11.239, 'batch_peak_mb': 35.285, 'fill_bytes': 392.435, 'carry_mints': 266, 'carry_lots': 12690, 'carry_flows': 12382, 'carry_frontier': 312, 'carry_pending_pairs': 2219, 'carry_weak_links': 4, 'carry_json_mb': 1.627}
+{'fills_per_day': 16000, 'window_fills': 38456, 'largest_mint_fills': 4000, 'entities': 11423, 'stream_s': 16.481, 'stream_cpu_s': 14.922, 'batch_s': 17.37, 'batch_cpu_s': 15.75, 'stream_peak_mb': 24.552, 'batch_peak_mb': 79.25, 'fill_bytes': 394.666, 'carry_mints': 532, 'carry_lots': 28190, 'carry_flows': 27698, 'carry_frontier': 635, 'carry_pending_pairs': 4954, 'carry_weak_links': 12, 'carry_json_mb': 3.616}
+
+EXTRAPOLATION (linear on the largest scale, CPU time; volumes from KB-0183; SCENARIOS, not measures)
+  28.5 M/day x 7 d = 200 M window fills: batch heap ~ 490 GB (Fill objects + engine); CPU one core: batch ~ 22.7 h, bounded ~ 21.5 h/night
+  31.0 M/day x 7 d = 217 M window fills: batch heap ~ 533 GB (Fill objects + engine); CPU one core: batch ~ 24.7 h, bounded ~ 23.4 h/night
+  bounded heap with 1 M entities in the window ~ 2.1 GB (tallies; ~ 2149 B/entity measured)
+  bounded heap with 5 M entities in the window ~ 10.7 GB (tallies; ~ 2149 B/entity measured)
+  bounded heap with 20 M entities in the window ~ 43.0 GB (tallies; ~ 2149 B/entity measured)
+
+===== TREE =====
+SYNTHETIC benchmark (not market data); window 2 d; days 4 ; generator kb0183-shape-v2
+{'fills_per_day': 4000, 'window_fills': 7066, 'largest_mint_fills': 1000, 'entities': 2448, 'stream_s': 1.899, 'stream_cpu_s': 1.672, 'batch_s': 2.021, 'batch_cpu_s': 1.844, 'stream_peak_mb': 4.676, 'batch_peak_mb': 14.979, 'fill_bytes': 395.548, 'carry_mints': 132, 'carry_lots': 4759, 'carry_flows': 4733, 'carry_frontier': 156, 'carry_pending_pairs': 797, 'carry_weak_links': 1, 'carry_json_mb': 0.626}
+{'fills_per_day': 8000, 'window_fills': 17441, 'largest_mint_fills': 2000, 'entities': 5372, 'stream_s': 5.203, 'stream_cpu_s': 4.703, 'batch_s': 4.623, 'batch_cpu_s': 4.25, 'stream_peak_mb': 11.383, 'batch_peak_mb': 35.265, 'fill_bytes': 396.795, 'carry_mints': 266, 'carry_lots': 12690, 'carry_flows': 12382, 'carry_frontier': 312, 'carry_pending_pairs': 2219, 'carry_weak_links': 4, 'carry_json_mb': 1.627}
+{'fills_per_day': 16000, 'window_fills': 38456, 'largest_mint_fills': 4000, 'entities': 11423, 'stream_s': 8.712, 'stream_cpu_s': 7.891, 'batch_s': 10.196, 'batch_cpu_s': 9.25, 'stream_peak_mb': 24.552, 'batch_peak_mb': 79.231, 'fill_bytes': 397.594, 'carry_mints': 532, 'carry_lots': 28190, 'carry_flows': 27698, 'carry_frontier': 635, 'carry_pending_pairs': 4954, 'carry_weak_links': 12, 'carry_json_mb': 3.616}
+
+EXTRAPOLATION (linear on the largest scale, CPU time; volumes from KB-0183; SCENARIOS, not measures)
+  28.5 M/day x 7 d = 200 M window fills: batch heap ~ 490 GB (Fill objects + engine); CPU one core: batch ~ 13.3 h, bounded ~ 11.4 h/night
+  31.0 M/day x 7 d = 217 M window fills: batch heap ~ 533 GB (Fill objects + engine); CPU one core: batch ~ 14.5 h, bounded ~ 12.4 h/night
+  bounded heap with 1 M entities in the window ~ 2.1 GB (tallies; ~ 2149 B/entity measured)
+  bounded heap with 5 M entities in the window ~ 10.7 GB (tallies; ~ 2149 B/entity measured)
+  bounded heap with 20 M entities in the window ~ 43.0 GB (tallies; ~ 2149 B/entity measured)
