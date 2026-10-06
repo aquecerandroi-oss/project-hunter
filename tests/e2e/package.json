@@ -13,6 +13,6 @@
     "@playwright/test": "^1.62.1",
     "@clerk/testing": "^2.2.33",
     "typescript": "^5.6",
-    "@types/node": "^24"
+    "@types/node": "^26"
   }
 }
