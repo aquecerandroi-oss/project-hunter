@@ -170,3 +170,24 @@ A revisão da Astra deu APPROVE sem must-fix: [[wallets-1c-pricing]]. O conserto
 Os dois estão em [[Open Bugs]] para a onda 2.
 
 **Rodada de revisão de código (05/10, noite).** Um pré-estado impossível não é mais descartado em silêncio. O slot de pouso fica `CENSORED`, a ponte recusa o registro (`pre_state_impossible`) e a liquidez antes do gatilho fica desconhecida (`None`), sem par no H2. A compra de pool passou a ser em inteiros e nunca custa mais que o orçamento. Detalhe e divergência de severidade em [[wallets-1c-pricing]].
+
+## Onda 1c-bis: o mesmo motor em memória limitada (06/10)
+
+O `build_snapshot` não roda na janela real: são ~210 M fills (§9.4 do desenho). A onda 1c-bis **não mudou nenhuma regra deste motor**. Ela acrescentou ao lado um motor que refaz a janela a cada noite, um mint de cada vez (`stream.py`, `stream_mint.py`, `stream_metrics.py`), sobre um estado carregado no início da janela (`carry.py`, `carry_codec.py`). A prova diferencial mostra o retrato igual a este motor, noite a noite. A síntese e a revisão da Astra estão em [[wallets-1c-bis]].
+
+**O que mudou aqui, sem trocar regra:**
+
+- `simulate_copy` ganhou `leader_prior` e `leader_since`. Os totais do líder recebidos antes do início da janela substituem esses eventos na contagem do "> metade vendida".
+- `fifo` e `window_books` ganharam `charged`. Com isso a taxa de tx de uma transação que toca vários mints é cobrada no evento vencedor, mesmo quando o replay vê um mint por vez.
+- A cauda do ranking virou `assemble_snapshot`, compartilhada pelos dois motores.
+- A `entity_metrics` ficou intocada, como oráculo.
+
+**O que este motor ensina sobre si:**
+
+- O `leader_sold` lê a **história inteira** do líder no mint, e isso é intencional: um teste existente exige. Por isso o carry guarda os totais por (carteira, mint) de toda posição já negociada na campanha. Essa dependência não estava na lista do §9.6.
+- Dentro da janela o motor é exato sob um contrato:
+  - um evento minerado antes do início da janela chega antes do selo;
+  - `received_at ≥ block_time`;
+  - um `block_time` por slot;
+  - `settled ≥ início da janela`.
+- A igualdade de entidades não implica igualdade do `known_at` de proveniência dos links fracos carregados. O retrato só depende dos grupos.

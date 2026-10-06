@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal, localcontext
 from typing import Literal
 
@@ -88,6 +88,8 @@ def _leader_exit(
     policy: FollowPolicy,
     clock: SlotClock,
     entry_slot: int,
+    prior: tuple[int, int] = (0, 0),
+    since: datetime | None = None,
 ) -> _Exit | None:
     """The leader's > half sold, counted in **arrival** order (Astra must-fix 2).
 
@@ -95,12 +97,20 @@ def _leader_exit(
     when we decided — and is then re-evaluated at every later arrival, whatever
     the slot it was mined in (a sale mined before the trigger but received after
     it can fire; a sale received before it is judged with the trigger counted).
+
+    ``prior`` = (bought, sold) atoms of the leader's events received before ``since``; those
+    events are then skipped in the tape (wave 1c-bis: the tape keeps only the frontier of what
+    arrived before the window, and the whole-history count comes from the carried totals).
     """
     leader = sorted(
-        (e for e in tape.fills if e.wallet in leader_wallets),
+        (
+            e
+            for e in tape.fills
+            if e.wallet in leader_wallets and (since is None or e.received_at >= since)
+        ),
         key=lambda e: (e.received_at, *event_order(e)),
     )
-    bought = sold = 0
+    bought, sold = prior
     armed = False
     best: _Exit | None = None
     for event in leader:
@@ -128,13 +138,15 @@ def _find_exit(
     clock: SlotClock,
     entry_slot: int,
     atoms: int,
+    prior: tuple[int, int],
+    since: datetime | None,
 ) -> _Exit:
     entry_instant = clock.instant(entry_slot)
     cap_fire = clock.first_slot_at_or_after(
         entry_instant + timedelta(seconds=policy.time_cap_seconds)
     )
     best = _Exit("time_cap", cap_fire, cap_fire + policy.delay_slots)
-    leader = _leader_exit(trigger, leader_wallets, tape, policy, clock, entry_slot)
+    leader = _leader_exit(trigger, leader_wallets, tape, policy, clock, entry_slot, prior, since)
     if leader is not None and leader.landing_slot < best.landing_slot:
         best = leader
     for event in tape.fills:
@@ -156,8 +168,13 @@ def simulate_copy(
     horizon_slot: int,
     gaps: Sequence[Gap] = (),
     clock: SlotClock | None = None,
+    leader_prior: tuple[int, int] = (0, 0),
+    leader_since: datetime | None = None,
 ) -> CopyOutcome:
-    """Follow ``trigger`` (a buy by the leader) on ``tape`` (the mint's events)."""
+    """Follow ``trigger`` (a buy by the leader) on ``tape`` (the mint's events).
+
+    ``leader_prior``/``leader_since``: see :func:`_leader_exit` (the default reads the whole tape).
+    """
     if all(f.identity != trigger.identity for f in tape.fills):
         raise ValueError("the tape must contain the trigger (the leader state is armed on it)")
     clk = clock or NominalClock.anchored_on(trigger.slot, trigger.block_time, policy.slot_seconds)
@@ -171,7 +188,9 @@ def simulate_copy(
     atoms = tape.landing_buy(entry_slot, policy.budget_lamports)
     if atoms is None or isinstance(atoms, Censored) or atoms <= 0:
         return CopyOutcome("no_fill", "entry_unpriceable", trigger.slot, entry_slot)
-    found = _find_exit(trigger, leader_wallets, tape, policy, clk, entry_slot, atoms)
+    found = _find_exit(
+        trigger, leader_wallets, tape, policy, clk, entry_slot, atoms, leader_prior, leader_since
+    )
     if found.landing_slot > horizon_slot:
         dirty = touches_gap(trigger.slot, horizon_slot, gaps)
         return CopyOutcome(

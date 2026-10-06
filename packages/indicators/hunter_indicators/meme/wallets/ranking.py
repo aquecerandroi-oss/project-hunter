@@ -41,7 +41,7 @@ from hunter_indicators.meme.wallets.pricing import MintTape
 from hunter_indicators.meme.wallets.snapshot import RankRow, Snapshot
 from hunter_indicators.meme.wallets.tape import CreateEvent, Fill, Gap, causal_view, dedupe
 
-__all__ = ["RankInputs", "build_snapshot", "cut_of"]
+__all__ = ["RankInputs", "assemble_snapshot", "build_snapshot", "cut_of"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,31 +215,50 @@ def build_snapshot(
             entity, failing_reasons(metrics, par), rank=None, followed=False,
             c_pnl_lamports=c_pnl, metrics=metrics,
         )  # fmt: skip
+    return assemble_snapshot(
+        rows, day=day, entities=ents, policy=pol, params=par, code_version=code_version,
+        window_fills=len(window), horizon=horizon,
+    )  # fmt: skip
+
+
+def assemble_snapshot(
+    rows: dict[str, RankRow],
+    *,
+    day: date,
+    entities: Entities,
+    policy: FollowPolicy,
+    params: RankingParams,
+    code_version: str,
+    window_fills: int,
+    horizon: int,
+) -> Snapshot:
+    """Rank the eligible rows by C-PnL, mark the top N and write the manifest (shared by the
+    batch :func:`build_snapshot` and the bounded :func:`.stream.stream_snapshot`)."""
     eligible = sorted(
         (r for r in rows.values() if r.eligible), key=lambda r: (-r.c_pnl_lamports, _hash(r.entity))
     )
     for rank, row in enumerate(eligible, start=1):
         rows[row.entity] = RankRow(
-            row.entity, row.reasons, rank, rank <= par.top_n, row.c_pnl_lamports, row.metrics
+            row.entity, row.reasons, rank, rank <= params.top_n, row.c_pnl_lamports, row.metrics
         )
     comparable = sum(1 for r in eligible if r.entity in rows and not rows[r.entity].followed)
-    digest = manifest_hash(pol, par)
+    digest = manifest_hash(policy, params)
     manifest = {
         "code_version": code_version,
         "params_hash": digest,
-        "window_fills": str(len(window)),
-        "entities_version": ents.version,
+        "window_fills": str(window_fills),
+        "entities_version": entities.version,
         "horizon_slot": str(horizon),
         "eligible": str(len(eligible)),
         "h2_comparable_entities": str(comparable),
-        "h2_supported": str(comparable >= par.min_h2_entities).lower(),
+        "h2_supported": str(comparable >= params.min_h2_entities).lower(),
     }
     return Snapshot(
         f"{day.isoformat()}:{digest[:12]}",
         day,
-        cut,
+        cut_of(day),
         None,
-        ents,
+        entities,
         MappingProxyType(rows),
         MappingProxyType(manifest),
     )

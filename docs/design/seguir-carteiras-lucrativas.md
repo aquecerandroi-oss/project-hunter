@@ -441,6 +441,8 @@ janela móvel, fronteira anterior ao L0, partição expirada, fusão tardia, dup
 restart e perda de estado. A CPU também não está demonstrada: para 1,5–5 M gatilhos/dia numa janela de 2 h, um
 núcleo teria de simular cada um em 4,8–1,44 ms.
 
+> **Estado da 1c-bis (06/10/2026).** Implementada como replay noturno da janela, mint a mint, sobre um estado carregado no início da janela, com dois relógios: o da mineração e o da chegada. Sob o contrato P1–P3 e com entrada canônica, o resultado é igual ao do `build_snapshot`, noite a noite, no teste diferencial ([[wallets-1c-bis]]). A memória fica em um mint, mais as entidades, mais o carry. O avanço "só o dia novo" não é equivalente: o retrato depende da janela (contraexemplo das gêmeas). **A CPU segue aberta:** ≈ 31–34 h por núcleo para 7 dias de janela, numa extrapolação sintética. Plano em [[wallets-cpu]]: medir primeiro, depois tirar trabalho repetido, depois 2 núcleos; meta < 2 h.
+
 ### 9.5 Opções, com a conta
 
 Pico residente = dias de partição diária presentes, incluindo a parcial. "Exato" significa que o motor calcula o retrato
@@ -474,7 +476,7 @@ como alternativa a medir, que **depende de exceção arquitetural do Everton** (
 3. **Poda por dependência, não por idade.** A partição do dia *p* só sai depois de publicado e verificado tudo o que
    depende dela: retratos até *p*+7, apostas, pares, sensibilidades, kept e o estado de continuação (fronteiras
    consultáveis, reserva válida anterior ao L0 em `episodes.py:131`, creates/exclusões, evidência parcial das ligações
-   fracas em `entities.py:74`, inventário e pendências). *p*+7 é a primeira liberação **possível**: uma dependência sem
+   fracas em `entities.py:74`, inventário, pendências e os **totais comprado/vendido por (carteira, mint) já negociado na campanha, inclusive os fechados**, porque `policy._leader_exit` lê a história inteira do líder no mint; achado da 1c-bis). *p*+7 é a primeira liberação **possível**: uma dependência sem
    substituto suficiente segura a partição. O pico normal é **7 + (hora UTC da liberação)/24** dias; liberando às 04:00,
    dá 7,1667 d = **50,7–55,1 GB**. Cada dia retido a mais soma um dia de ingresso. O coletor **para, com lacuna
    explícita**, no que vier primeiro:

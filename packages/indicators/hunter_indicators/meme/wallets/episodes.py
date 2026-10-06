@@ -207,11 +207,13 @@ def window_books(
     days: int,
     tx_fee_lamports: int = TX_FEE_LAMPORTS,
     gaps: Iterable[Gap] = (),
+    charged: Iterable[tuple[str, str]] = (),
 ) -> dict[str, OwnerBook]:
     """Episodes and E-PnL per owner over ``[start, start + days)``.
 
     ``fills`` must already be the causal view of the window; ``opening`` are the
-    preserved lots at ``start`` (keyed by their ``owner``, already mapped).
+    preserved lots at ``start`` (keyed by their ``owner``, already mapped);
+    ``charged`` as in :func:`.lots.fifo`.
     """
     bounds = [start + k * _DAY for k in range(days + 1)]
     holes = tuple(gaps)
@@ -228,13 +230,13 @@ def window_books(
         by_key.setdefault((lot.owner, lot.mint), []).append(lot)
     for (owner, mint), lots in by_key.items():
         track(owner, mint).open_with(lots)
-    charged: set[tuple[str, str]] = set()
+    paid: set[tuple[str, str]] = set(charged)
     for f in sorted(fills, key=event_order):
         owner = owner_of(f.wallet)
         t = track(owner, f.mint)
         t.pass_bounds(f.block_time)
-        fee = 0 if (owner, f.signature) in charged else tx_fee_lamports
-        charged.add((owner, f.signature))
+        fee = 0 if (owner, f.signature) in paid else tx_fee_lamports
+        paid.add((owner, f.signature))
         t.apply(f, net_cash(f, fee))
     books: dict[str, OwnerBook] = {}
     for (owner, _mint), t in sorted(tracks.items()):

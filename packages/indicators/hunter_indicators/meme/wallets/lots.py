@@ -112,9 +112,9 @@ def net_cash(fill: Fill, tx_fee: int) -> int:
 class _TxFees:
     """Charges the tx fee once per (owner, signature)."""
 
-    def __init__(self, per_tx: int) -> None:
+    def __init__(self, per_tx: int, charged: Iterable[tuple[str, str]] = ()) -> None:
         self.per_tx = per_tx
-        self.seen: set[tuple[str, str]] = set()
+        self.seen: set[tuple[str, str]] = set(charged)
 
     def charge(self, owner: str, signature: str) -> int:
         key = (owner, signature)
@@ -134,12 +134,17 @@ def fifo(
     owner_of: Callable[[str], str],
     opening: Iterable[Lot] = (),
     tx_fee_lamports: int = TX_FEE_LAMPORTS,
+    charged: Iterable[tuple[str, str]] = (),
 ) -> FifoResult:
-    """Run ``fills`` (any order; sorted here) through FIFO books per (owner, mint)."""
+    """Run ``fills`` (any order; sorted here) through FIFO books per (owner, mint).
+
+    ``charged``: (owner, signature) pairs whose tx fee was already charged elsewhere (a fill of
+    the same transaction in another mint, wave 1c-bis); they pay no fee here.
+    """
     books: dict[tuple[str, str], deque[Lot]] = {}
     for lot in sorted(opening, key=lambda x: (x.opened_slot, x.opened_at)):
         books.setdefault((lot.owner, lot.mint), deque()).append(lot)
-    fees = _TxFees(tx_fee_lamports)
+    fees = _TxFees(tx_fee_lamports, charged)
     matches: list[Match] = []
     unmatched: list[Unmatched] = []
     for f in sorted(fills, key=event_order):
