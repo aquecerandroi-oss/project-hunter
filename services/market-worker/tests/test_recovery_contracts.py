@@ -60,14 +60,24 @@ async def test_bootstrap_1500_closed_uses_exchange_clock(db_session_factory: Any
 async def test_internal_hole_before_watermark_is_recovered(db_session_factory: Any) -> None:
     code = unique_code()
     market_id = await seed_market(db_session_factory, code, "BTCUSDT")
-    end = align_open_time(utcnow(), Timeframe.M1) - recovery.DETECTION_GRACE
+    now = align_open_time(utcnow(), Timeframe.M1)
+    end = now - recovery.DETECTION_GRACE
     candles = [
         builders.candle("BTCUSDT", end - timedelta(minutes=i), exchange=code) for i in range(1440)
     ]
     missing = candles.pop(17)
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
         await upsert_candles(session, candles, {"BTCUSDT": market_id}, source="ws")
-    adapter = FakeAdapter(code)
+
+    class Adapter(FakeAdapter):
+        # The exchange clock is pinned to the instant the fixture was built from. Without it
+        # ``check_gaps`` read ``utcnow()`` again, and when the minute turned in between (a slow
+        # database makes that likely) its window no longer contained the hole: the gap stayed
+        # ``open`` and the test failed on the minute boundary.
+        async def server_time(self) -> Any:
+            return now
+
+    adapter = Adapter(code)
     adapter.candles_response["BTCUSDT"] = [missing]
     await recovery.check_gaps(db_session_factory, adapter, ["BTCUSDT"], HeartbeatState())
     async with role_session(db_session_factory, db_role="hunter_worker") as session:

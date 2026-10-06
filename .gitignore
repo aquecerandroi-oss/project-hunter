@@ -51,3 +51,6 @@ vault/.obsidian/cache
 # Obsidian app workspace state (per machine)
 .obsidian/
 .coverage
+
+# CI junit report (python-test)
+pytest-junit.xml

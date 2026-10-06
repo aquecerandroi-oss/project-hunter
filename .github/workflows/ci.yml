@@ -92,7 +92,15 @@ jobs:
       # `-m "unit or integration"` excludes the `live` marker by construction
       # (it hits real exchanges and must never run in CI).
       - name: pytest (unit + integration)
-        run: uv run pytest -m "unit or integration" --cov --cov-report=xml
+        run: uv run pytest -m "unit or integration" --cov --cov-report=xml --junitxml=pytest-junit.xml
+      # The job log needs a login, the annotations of a check run do not
+      # (GET /repos/{owner}/{repo}/check-runs/{id}/annotations): on failure,
+      # one ::error per failed/errored test (file, line, test id, first line of
+      # the message), capped at 50. Stdlib only -- it must not depend on what
+      # just failed; a missing report only warns.
+      - name: annotate the failed tests
+        if: failure()
+        run: python3 infra/scripts/junit_annotations.py pytest-junit.xml --limit 50
       # docs/plans/M1.md T1.7: already collected by the run above (testpaths
       # includes "tests" and "apps"; both are marked `integration`) -- this
       # extra, explicitly-named step exists only so a T1.7 regression shows up

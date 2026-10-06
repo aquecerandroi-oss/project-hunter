@@ -26,6 +26,8 @@ owner: sexta-feira
 
 - **Segunda rodada (05–06/10), detalhe em [[CI-verde-2026-10-05]]:** o `security` escondia três passos atrás do gitleaks — `pip-audit` (24 vulnerabilidades; `uv lock` em pyjwt/urllib3/virtualenv, sem ignores), `pnpm audit` (13 high; `overrides` + 1 ignore sem versão corrigida, `braces` — e só saiu 0 depois de `source-map-js 1.2.1 -> 1.2.2`, que o security-reviewer achou) e `bandit` (120 B608; `nosec` revisados, testes fora do escopo; a última linha, do `meme-executor`, foi anotada pelo orquestrador); `forbidden-patterns` falhava em prosa de comentário do `.env.example` (exceção só para `.env`, `.env.example` e `.env.<x>.example`, nunca para nome com `.yml`/`.yaml`; `--self-test` agora no CI); `python-test` tinha 60+ falhas só de teste (data fixa vs relógio, banco compartilhado, deriva de contrato, ordem de sessão) que só apareceram rodando o CI em Linux com Docker.
 
+- **Diagnóstico do CI sem login (06/10):** o `python-test` grava `pytest-junit.xml` e, se falhar, `infra/scripts/junit_annotations.py` emite uma anotação `::error` por teste falho (arquivo, linha, id, primeira linha da mensagem), legível pela API pública de check-runs; detalhe e a reprodução em sessão única (3 h, 5 falhas, 2 reais) em [[CI-verde-2026-10-05]].
+
 ## O que é planejado
 
 - **Ambientes reais** (preview/staging/produção): Vercel (web), Railway ou Fly.io (api/workers), Neon (Postgres), Redis Railway/Upstash. Documentado em [[Deployment]] mas ainda não configurado de fato além de dev local.
