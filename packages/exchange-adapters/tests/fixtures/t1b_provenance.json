@@ -1,0 +1,32 @@
+{
+  "captured_at_utc": "2026-10-06, between about 01:50Z and 02:15Z, that is the evening of 05/10 in Brasilia (finalized commitment; each fixture carries its own block_time_utc)",
+  "rpc": "https://api.mainnet-beta.solana.com (public, read-only)",
+  "methods": "getSignaturesForAddress (authority 39azUYFW..., then the mint, to find the completing buys) + getTransaction {encoding: json, commitment: finalized, maxSupportedTransactionVersion: 1}",
+  "note": "Wave 1b of H-030 (curve completion at the event). Third-party on-chain transactions, nothing signed or sent. Each fixture file is the raw `result` of getTransaction. The pool-leg tests of the same wave reuse the t1a/t48e/t48f PumpSwap fixtures (provenance of those: t1a_provenance.json and their own task notes).",
+  "fixtures": [
+    {
+      "file": "pumpfun/t1b_rpc_pump_buy_completes_curve_fnG6AdqJEF_raw.json",
+      "signature": "fnG6AdqJEFYuSw1v9h2CZBw8bXCAn5U8sFBepeGSvFt7T8iCuWXgiu1AJhyNycVjYubxRurJncM7rR5DYnvrjnW",
+      "slot": 453758355,
+      "block_time_utc": "2026-10-06T01:50:03Z",
+      "version": "legacy",
+      "why": "pump buy that drains the curve (real_token_reserves 0) and emits CompleteEvent; legacy; trade is ordinal 0; consecutive after 4j1Hpws2fH on the same mint"
+    },
+    {
+      "file": "pumpfun/t1b_rpc_pump_buy_before_complete_4j1Hpws2fH_raw.json",
+      "signature": "4j1Hpws2fHGJxrGp674pbwcVFFth9ST3EZxLzkydsbywvpcYmZ6ENMCVcUFnsUgwjqXhFs5FYN5TEBd9QfpvSTSU",
+      "slot": 453758355,
+      "block_time_utc": "2026-10-06T01:50:03Z",
+      "version": "legacy",
+      "why": "the last pump buy of BKddwL4e before the completing one: curve NOT complete after it (real_token_reserves 536 214 573 650 > 0), no CompleteEvent"
+    },
+    {
+      "file": "pumpfun/t1b_rpc_pump_create_buy_completes_curve_43xbmthGPT_raw.json",
+      "signature": "43xbmthGPTdVFGdzd8mdZdAnEEaZSJSbsSJ6N5QPPi9DnBh3dd22ow7VHS5gNmXK96LjaWM4f3vYcmKCpbvijUgc",
+      "slot": 453759490,
+      "block_time_utc": "2026-10-06T01:55:07Z",
+      "version": 0,
+      "why": "version 0 tx with an extra pump event before the trade (trade is ordinal 1): buy that drains the curve + CompleteEvent, same slot as the migrate tx kxQNcoN5b6"
+    }
+  ]
+}

@@ -53,6 +53,7 @@ def snapshot_of(self: ProbeStats, now: float) -> dict[str, Any]:
         "age_of_last_log_s_at_poll": {s: h.summary() for s, h in self.age_last_log.items()},
         "observations": {n: h.summary() for n, h in self.obs.items()},
         "size_bins_sol": dict(self.size_bins),
+        "size_unverified_quote": self.size_unverified_quote,
         "suspensions": list(self.suspensions),
         "swap_events_per_minute": {p: per_sec_summary(c) for p, c in self.per_min.items()},
         "lag_slots_vs_http_tip_by_10min": {

@@ -234,8 +234,11 @@ def test_size_bins_and_wallet_concentration_describe_what_an_ingest_filter_would
     logs = _logs("pumpswap/t48f_rpc_amm_tx_nocreator_2bYPbC8hziYA_raw.json")  # one Sell + one Buy
     for i in range(3):
         s.on_logs("amm", 10, f"S{i}", None, logs, 100, T0 + i)  # the same wallets, three txs
-    bins = s.snapshot(T0 + 5)["size_bins_sol"]
-    assert sum(bins.values()) == 3  # only the decoded Sell carries an amount
+    snap = s.snapshot(T0 + 5)
+    # The decoded Sell carries an amount, but a log line has no accounts: the pool's quote mint is
+    # unknown, so it is NOT binned as SOL (wave 1b: WSOL-base pools make it atoms of another token).
+    assert sum(snap["size_bins_sol"].values()) == 0
+    assert snap["size_unverified_quote"] == 3  # counted apart: the denominator stays honest
     conc = s.wallet_concentration()
     assert (
         sum(b["wallets"] for b in conc.values()) == 2

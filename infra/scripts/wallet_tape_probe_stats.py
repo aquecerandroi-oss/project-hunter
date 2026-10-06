@@ -64,6 +64,7 @@ class ProbeStats:
         self.first_slot: dict[str, int] = {}
         self.suspensions: list[dict[str, float]] = []
         self.size_bins: Counter[str] = Counter()
+        self.size_unverified_quote = 0  # swaps with an amount whose quote mint the logs cannot tell
         self.wallet_trades: Counter[str] = Counter()
         self._last_tick: float | None = None
         self.age_last_log: dict[str, Hist] = {}
@@ -249,7 +250,10 @@ class ProbeStats:
         if wallet:
             self.wallet_trades[wallet] += 1
         if d.ok and d.sol_lamports is not None:
-            self.size_bins[_size_bin(d.sol_lamports)] += 1
+            if d.quote_unverified:  # atoms of the quote token, SOL only if it is WSOL: not binned
+                self.size_unverified_quote += 1
+            else:
+                self.size_bins[_size_bin(d.sol_lamports)] += 1
         if d.wallet:
             self.wallets["pump" if event.program == PUMP else "amm"].add(d.wallet)
         if d.inferred_wallet:

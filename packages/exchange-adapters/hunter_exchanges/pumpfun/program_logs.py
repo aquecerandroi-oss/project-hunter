@@ -39,19 +39,33 @@ into a record: it is counted and described in :attr:`ProgramLogsRead.problems`, 
 notification is still read. :attr:`ProgramLogsRead.gap` says when the collector must record an
 ingestion gap (``Log truncated``, an undecodable or unconserved event, a line that is not base64, an
 unattributable data line or an incoherent invoke stack, logs the node did not return).
+
+**Wave 1b.** The pump ``CompleteEvent`` is read too (it is not a swap): it corroborates each curve
+reading of "complete at the event" and turns a contradiction into ``unknown``
+(:mod:`hunter_exchanges.pumpfun.curve_completion`; counted, not a gap). Pool legs (mints of the
+pool) need the swap instruction, which only a ``getTransaction`` result has: :func:`read_transaction_logs`
+attaches them (:mod:`hunter_exchanges.pumpswap.pool_legs`), :func:`read_program_logs` cannot and leaves
+them ``None`` without counting that as a failure.
 """
 
 from __future__ import annotations
 
 import base64
 import re
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from datetime import datetime, timedelta
 from typing import Any, Final, Literal, cast
 
+from hunter_exchanges.pumpfun.completion_reconcile import reconcile_completion, refused_trade_mint
+from hunter_exchanges.pumpfun.curve_completion import (
+    COMPLETE_EVENT_DISCRIMINATOR,
+    decode_complete_event,
+)
 from hunter_exchanges.pumpfun.decode import PUMP_PROGRAM_ID
 from hunter_exchanges.pumpfun.swap_record import Refused, SwapRecord, swap_record_from_event
+from hunter_exchanges.pumpfun.trade_event_codec import TRADE_EVENT_DISCRIMINATOR
 from hunter_exchanges.pumpswap.decode import PUMPSWAP_PROGRAM_ID
+from hunter_exchanges.pumpswap.pool_legs import attach_pool_legs
 
 __all__ = [
     "LogCounters",
@@ -84,6 +98,23 @@ class LogCounters:
     open_frames_at_end: int = 0
     """The logs ended with a program frame still open and no ``Log truncated`` marker: a successful
     transaction closes every frame, so the suffix (and its events) was lost."""
+    orphan_complete_events: int = 0
+    """A pump ``CompleteEvent`` with no trade of its mint before it in what was read: the draining
+    trade is missing. A gap (the collector recovers the transaction); no swap is invented."""
+    curve_completion_unknown: int = 0
+    """Curve swaps whose completion at the event is ``unknown`` (a sell reading 0 real tokens, or the
+    event and the transaction's ``CompleteEvent`` contradicting each other). Counted, NOT a gap: the
+    swap itself is in the records."""
+    pool_mints_unresolved: int = 0
+    """Pool swaps (transaction path only) with no swap instruction matching the event: their mints
+    stay unknown. Counted, not a gap."""
+    pool_mints_via_sibling: int = 0
+    """Pool swaps whose mints are resolved but share the pool and user with an instruction this reader
+    does not understand (e.g. ``SellV2``): right by construction, not proven per invocation. Counted,
+    not a gap."""
+    pool_mints_conflict: int = 0
+    """Pool swaps whose instruction(s) and the transaction's token-balance rows name different mints
+    (or two matching instructions disagree): mints stay unknown. Counted, not a gap."""
     bad_base64: int = 0
     """Not valid base64, or shorter than an event discriminator: counted, a gap, never skipped."""
     malformed_lines: int = 0
@@ -111,6 +142,7 @@ class LogCounters:
             or self.unattributed_data_lines
             or self.stack_inconsistencies
             or self.open_frames_at_end
+            or self.orphan_complete_events
         )
 
 
@@ -151,6 +183,11 @@ class _Scan:
         self.swaps: list[SwapRecord] = []
         self.problems: list[LogProblem] = []
         self.others: list[tuple[str, str]] = []
+        self.completes: list[tuple[int, str]] = []
+        """``(ordinal, mint)`` of every pump ``CompleteEvent``, to corroborate the curve readings."""
+        self.refused_trades: list[tuple[int, str | None]] = []
+        """Pump trade events that did not become a record (``mint`` ``None`` when not even decodable):
+        they keep their place, so a ``CompleteEvent`` is never attributed to an earlier trade."""
 
     def line(self, line: Any) -> None:
         if not isinstance(line, str):
@@ -207,12 +244,16 @@ class _Scan:
             payload = b""
         if len(payload) < 8:
             self.c["bad_base64"] += 1  # not an Anchor event at all: counted, and a gap
+            if program == PUMP_PROGRAM_ID:
+                self.refused_trades.append((ordinal, None))  # it may have been a trade
             return
         try:
             record = swap_record_from_event(
                 program, payload, {**self.envelope, "program": program, "event_ordinal": ordinal}
             )
         except Refused as refusal:
+            if program == PUMP_PROGRAM_ID and payload[:8] == TRADE_EVENT_DISCRIMINATOR:
+                self.refused_trades.append((ordinal, refused_trade_mint(payload)))
             if refusal.kind == "non_sol_quote":
                 self.c["non_sol_quote"] += 1
             else:
@@ -224,9 +265,19 @@ class _Scan:
         if record is None:
             self.c["non_swap_events"] += 1
             self.others.append((program, payload[:8].hex()))
+            if program == PUMP_PROGRAM_ID and payload[:8] == COMPLETE_EVENT_DISCRIMINATOR:
+                self._complete(payload, ordinal)
         else:
             self.c["swaps"] += 1
             self.swaps.append(record)
+
+    def _complete(self, payload: bytes, ordinal: int) -> None:
+        try:
+            self.completes.append((ordinal, decode_complete_event(payload).mint))
+        except ValueError as exc:
+            self.c["undecodable"] += 1
+            detail = str(exc)[:_DETAIL_MAX]
+            self.problems.append(LogProblem(PUMP_PROGRAM_ID, ordinal, "undecodable", detail))
 
 
 def read_program_logs(
@@ -249,8 +300,12 @@ def read_program_logs(
         scan.line(line)
     if scan.stack and not scan.blind:
         scan.c["open_frames_at_end"] = 1
+    swaps, scan.c["orphan_complete_events"] = reconcile_completion(
+        scan.swaps, scan.refused_trades, scan.completes
+    )
+    scan.c["curve_completion_unknown"] = sum(1 for s in swaps if s.curve_completion == "unknown")
     return ProgramLogsRead(
-        tuple(scan.swaps), LogCounters(**scan.c), tuple(scan.problems), tuple(scan.others)
+        tuple(swaps), LogCounters(**scan.c), tuple(scan.problems), tuple(scan.others)
     )
 
 
@@ -273,10 +328,18 @@ def read_transaction_logs(transaction: dict[str, Any], *, received_at: datetime)
     logs = meta.get("logMessages")
     if err is None and not isinstance(logs, list):
         return ProgramLogsRead((), LogCounters(logs_missing=1))
-    return read_program_logs(
+    read = read_program_logs(
         signature=signature,
         slot=slot,
         logs=cast(list[Any], logs) if isinstance(logs, list) else [],
         received_at=received_at,
         err=err,
     )
+    swaps, unresolved, conflicts, sibling = attach_pool_legs(transaction, read.swaps)
+    counters = replace(
+        read.counters,
+        pool_mints_unresolved=unresolved,
+        pool_mints_conflict=conflicts,
+        pool_mints_via_sibling=sibling,
+    )
+    return replace(read, swaps=swaps, counters=counters)

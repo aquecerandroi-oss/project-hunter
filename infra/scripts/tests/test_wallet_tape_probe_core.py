@@ -32,6 +32,8 @@ from wallet_tape_probe_core import (  # noqa: E402  (path surgery must come firs
     parse_logs,
 )
 
+from hunter_exchanges.pumpswap.sell_event import decode_sell_event  # noqa: E402
+
 FIX = Path(__file__).resolve().parents[3] / "packages/exchange-adapters/tests/fixtures"
 
 
@@ -287,3 +289,34 @@ def test_late_delivery_is_not_a_loss_coverage_is_evaluated_against_a_later_recei
     late = coverage(mentions, {PUMP: {"A", "B"}, AMM: {"C"}})
     assert early[PUMP]["missed"] == 1 and early[AMM]["missed_failed"] == 1
     assert late[PUMP]["missed"] == 0 and late[AMM]["missed"] == 0
+
+
+def test_a_sell_fee_includes_the_cashback_the_event_declares() -> None:
+    """Wave 1b erratum: the probe left the cashback out of a PumpSwap sell's fee (2 of 54 real sells
+    carry one; both are in this transaction, 21 and 166 lamports)."""
+    path = "pumpswap/t1a_rpc_amm_sell_cashback_two_events_3gYxvcFECiai_raw.json"
+    facts = parse_logs(_logs(path))
+    sells = [e for e in facts.events if event_name(e.program, e.disc) == "SellEvent"]
+    assert len(sells) == 2
+    for event in sells:
+        raw = decode_sell_event(event.payload)
+        assert raw.cashback > 0
+        got = decode_event(event)
+        assert (
+            got.fee_lamports == raw.lp_fee + raw.protocol_fee + raw.coin_creator_fee + raw.cashback
+        )
+
+
+def test_a_pool_sell_decoded_from_logs_alone_is_marked_quote_unverified() -> None:
+    """A ``logsSubscribe`` line carries no accounts, so the pool's quote mint is unknown: the amount in
+    ``sol_lamports`` is atoms of the QUOTE token, SOL only when that is WSOL. The WSOL-base sell of
+    this fixture (551G...) is a quote leg of another token read as lamports unless the flag is honoured
+    (wave 1b: 802 of 1 551 pool sells, 51.7 %, of 40 sampled blocks were in WSOL-base pools)."""
+    wsol_base = "pumpswap/t1a_rpc_amm_sell_551G1CF8C3Bx_raw.json"
+    facts = parse_logs(_logs(wsol_base))
+    (sell,) = [e for e in facts.events if event_name(e.program, e.disc) == "SellEvent"]
+    got = decode_event(sell)
+    assert got.ok and got.quote_unverified is True
+    trade = parse_logs(_logs("pumpfun/t48e_rpc_tx_buy_2qnMHiEaNfxX_raw.json"))
+    (curve,) = [e for e in trade.events if event_name(e.program, e.disc) == "TradeEvent"]
+    assert decode_event(curve).quote_unverified is False

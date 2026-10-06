@@ -88,6 +88,10 @@ class Decoded:
     reserves: tuple[int, ...] = ()
     inferred_wallet: str | None = None  # BuyEvent only: offset inference, not a decoder
     inferred_pool: str | None = None
+    quote_unverified: bool = False
+    """PumpSwap sells: the log line has no accounts, so the pool's quote mint is unknown and
+    ``sol_lamports`` is atoms of the QUOTE token (lamports only when it is WSOL). Wave 1b found WSOL-base
+    pools, whose quote leg is another token, to be a large share of the sells."""
 
 
 def event_name(program: str, disc: bytes) -> str:
@@ -150,9 +154,10 @@ def _from_sell(s: SellEvent) -> Decoded:
         "SellEvent", "swap", True,
         side="sell", wallet=s.user, key=s.pool, sol_lamports=s.net_proceeds,
         token_amount=s.base_amount_in,
-        fee_lamports=s.lp_fee + s.protocol_fee + s.coin_creator_fee,
+        fee_lamports=s.lp_fee + s.protocol_fee + s.coin_creator_fee + s.cashback,
         event_ts=s.timestamp, layout=s.layout,
         reserves=(s.pool_base_token_reserves, s.pool_quote_token_reserves),
+        quote_unverified=True,
     )  # fmt: skip
 
 

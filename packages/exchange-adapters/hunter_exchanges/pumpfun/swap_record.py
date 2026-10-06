@@ -26,6 +26,13 @@ quote, found no exception; three pairs are pinned by fixtures in the tests).
 
 An event whose own money does not close, or that is quoted in something other than SOL, raises
 :class:`Refused` instead of becoming a record.
+
+**Wave 1b: what the record says about the market it traded in.** A curve record carries
+``real_token_reserves`` after the trade and ``curve_completion`` (was the curve complete AT the event:
+``complete`` / ``not_complete`` / ``unknown``; rule in :mod:`hunter_exchanges.pumpfun.curve_completion`).
+A pool record carries ``base_mint`` / ``quote_mint`` once the transaction reader attached them
+(:mod:`hunter_exchanges.pumpswap.pool_legs`); ``quote_is_sol`` is then decided by the quote mint, and a
+pool whose BASE is WSOL (``wsol_is_base``) is marked, because its "quote leg" is atoms of another token.
 """
 
 from __future__ import annotations
@@ -35,6 +42,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, NoReturn
 
+from hunter_exchanges.pumpfun.curve_completion import CurveCompletion, completion_from_reserves
 from hunter_exchanges.pumpfun.decode import NATIVE_SOL_QUOTE_MINT, PUMP_PROGRAM_ID
 from hunter_exchanges.pumpfun.trade_event_codec import (
     TRADE_EVENT_DISCRIMINATOR,
@@ -46,7 +54,7 @@ from hunter_exchanges.pumpswap.buy_event import (
     BuyEvent,
     decode_buy_event,
 )
-from hunter_exchanges.pumpswap.decode import PUMPSWAP_PROGRAM_ID
+from hunter_exchanges.pumpswap.decode import PUMPSWAP_PROGRAM_ID, WSOL_MINT
 from hunter_exchanges.pumpswap.sell_event import (
     SELL_EVENT_DISCRIMINATOR,
     SellEvent,
@@ -94,8 +102,11 @@ class SwapRecord:
     layout: str
     ix_name: str | None
     quote_is_sol: bool | None
-    """``True`` for a curve trade checked against its ``quote_mint``; ``None`` for a pool event,
-    which carries no quote mint (the pool account does: resolve it with the pool)."""
+    """Decided by the QUOTE mint, never by an amount. Curve: ``True`` (checked against the event's
+    ``quote_mint``). Pool: ``None`` straight from the logs (the event has no mints); the transaction
+    reader (``read_transaction_logs``) sets it from the swap instruction's quote mint: ``True`` for a
+    WSOL quote, ``False`` for any other quote token (then ``sol_lamports`` is atoms of THAT token),
+    and leaves ``None`` when the instruction cannot be found or conflicts (``pool_mints_*`` counters)."""
     virtual_quote_reserves: int | None = None
     """PumpSwap only: the pool's virtual quote reserve at the event (``can_boost`` pools). A pool trade
     is priced against ``sol_reserves + virtual_quote_reserves``, not ``sol_reserves`` alone (the real
@@ -103,6 +114,36 @@ class SwapRecord:
     the sum reproduces the chain to the lamport on ``buy`` and within one lamport on
     ``buy_exact_quote_in``).
     ``None`` on a curve record (its reserves are already virtual)."""
+    real_token_reserves: int | None = None
+    """Curve only: the curve's real token reserve AFTER the trade (the event reports it so). ``0`` means
+    the trade drained the curve. ``None`` on a pool record."""
+    curve_completion: CurveCompletion | None = None
+    """Curve only: was the curve complete AT this event (the state the trade left): ``complete`` /
+    ``not_complete`` / ``unknown``, point-in-time from the event and the transaction's own
+    ``CompleteEvent``, never from a later read (rule and evidence in
+    :mod:`hunter_exchanges.pumpfun.curve_completion`). ``None`` on a pool record."""
+    base_mint: str | None = None
+    quote_mint: str | None = None
+    """Pool only, from the swap instruction's accounts 3 and 4 in the same transaction (cross-checked
+    against the token-balance rows of the pool's vaults and the user's accounts). ``None`` when
+    unknown, never guessed."""
+    user_base_token_account: str | None = None
+    user_quote_token_account: str | None = None
+    """Pool only: the event's own token accounts of the user, the keys the instruction is matched on."""
+
+    @property
+    def curve_complete(self) -> bool | None:
+        """``curve_completion`` as the ``bool | None`` a consumer passes on (``None`` = unknown, or
+        not a curve record)."""
+        if self.curve_completion is None or self.curve_completion == "unknown":
+            return None
+        return self.curve_completion == "complete"
+
+    @property
+    def wsol_is_base(self) -> bool | None:
+        """Pool only: ``True`` when the pool's BASE is WSOL (the quote leg is then atoms of another
+        token and the pool is not a SOL-quoted market); ``None`` while the mints are unknown."""
+        return None if self.base_mint is None else self.base_mint == WSOL_MINT
 
     @property
     def identity(self) -> tuple[str, str, int]:
@@ -160,6 +201,8 @@ def _curve(e: TradeEvent, common: dict[str, Any]) -> SwapRecord:
         layout=e.layout,
         ix_name=e.ix_name,
         quote_is_sol=True,
+        real_token_reserves=e.real_token_reserves,
+        curve_completion=completion_from_reserves(e.is_buy, e.real_token_reserves),
     )
 
 
@@ -203,6 +246,8 @@ def _pool_buy(e: BuyEvent, common: dict[str, Any]) -> SwapRecord:
         layout=e.layout,
         ix_name=e.ix_name,
         quote_is_sol=None,
+        user_base_token_account=e.user_base_token_account,
+        user_quote_token_account=e.user_quote_token_account,
     )
 
 
@@ -246,13 +291,20 @@ def _pool_sell(e: SellEvent, common: dict[str, Any]) -> SwapRecord:
         layout=e.layout,
         ix_name=None,
         quote_is_sol=None,
+        user_base_token_account=e.user_base_token_account,
+        user_quote_token_account=e.user_quote_token_account,
     )
 
 
 def swap_record_from_event(
     program: str, payload: bytes, common: dict[str, Any]
 ) -> SwapRecord | None:
-    """The record of a swap event; ``None`` for an event this reader does not turn into one."""
+    """The record of a swap event; ``None`` for an event this reader does not turn into one.
+
+    Called alone, a curve record's ``curve_completion`` is PROVISIONAL (the event's reserves only); it
+    is confirmed or turned ``unknown`` against the transaction's ``CompleteEvent`` by
+    ``read_program_logs`` / ``read_transaction_logs``, the callers a consumer should use. Likewise a
+    pool record's mints are attached only by ``read_transaction_logs``."""
     disc = payload[:8]
     try:
         if program == PUMP_PROGRAM_ID and disc == TRADE_EVENT_DISCRIMINATOR:

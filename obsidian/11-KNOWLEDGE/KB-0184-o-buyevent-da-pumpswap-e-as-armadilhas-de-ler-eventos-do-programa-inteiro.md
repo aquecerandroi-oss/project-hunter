@@ -6,7 +6,7 @@ fonte_url: https://solana.com/docs/rpc/http/gettransaction
 lido_em: 2026-10-05
 evidencia: medição própria (100 transações da PumpSwap com swap, 115 do programa pump, 61 pares consecutivos de pool, 3 provas ao vivo na RPC) + duas rodadas da Astra
 hipotese_testavel: não (é leitura de instrumento; serve ao H-030, onda 1c e onda 2)
-astra: duas rodadas; 4 pontos obrigatórios da primeira tratados com teste, ver Revisoes-Astra/wallets-1a
+astra: duas rodadas na onda 1a (wallets-1a) e uma na onda 1b (wallets-1b-record)
 status: vivo
 owner: exchange-integration-specialist
 updated: 2026-10-05
@@ -18,7 +18,7 @@ populacao: PumpSwap e pump.fun, 100 transações com swap da PumpSwap (48 BuyEve
 efeito: —
 ic: —
 veredito: —
-proximo_passo: feito no motor 1c em 05/10 (wallets-1c-pricing); o coletor (onda 2) consome SwapRecord pela ponte e precisa resolver as mints da pool e a flag complete da curva
+proximo_passo: feito: motor 1c (wallets-1c-pricing) e registro da onda 1b (wallets-1b-record, completude da curva e mints da pool). Antes da onda 2, ler as instruções V2 da PumpSwap e decidir as pools com WSOL na base (Open Bugs)
 classe_de_perda: —
 mercado: meme
 ---
@@ -80,15 +80,48 @@ Nenhuma: é instrumento. Serve à onda 1c e à onda 2 do H-030.
 - **Nada liga.** O leitor e o decodificador não estão ligados a nenhum worker.
 - **O motor 1c já mudou (05/10, noite):** a pool é cotada em `quote + virtual_quote_reserves` (com sinal) e o pré-estado é desfeito com a taxa LP. Há uma ponte pura `SwapRecord → Fill` (`hunter_indicators.meme.wallets.bridge`) com recusas nomeadas. Provado nestas fixtures ([[wallets-1c-pricing]], [[Resolved Bugs]]).
 - `maxSupportedTransactionVersion` passou a `1` em `tx_rpc.py` e `rpc_wallet.py` ([[Resolved Bugs]]).
-- Achado lateral: `infra/scripts/wallet_tape_probe_core.py` (`_from_sell`) soma a taxa da venda **sem** o cashback (2 de 54 vendas): a sondagem da onda 0 subestima a taxa nessas vendas. Não alterado aqui.
+- Achado lateral: `infra/scripts/wallet_tape_probe_core.py` (`_from_sell`) soma a taxa da venda **sem** o cashback (2 de 54 vendas). **Corrigido na onda 1b**, junto com um erro maior da mesma função (a quote de pool lida como SOL; ver a seção abaixo e o erratum em [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]]).
 
 ## Depois do conserto do motor 1c (05/10, noite)
 
 O motor foi testado contra estas fixtures ([[wallets-1c-pricing]], [[wallets-engine]]). Três coisas que a primeira leitura não dizia:
 
-- **Nem toda pool tem WSOL na quote.** Em 3 de 13 swaps destas fixtures (`4jyi…`, `551G…` e `4xuv…`) as contas 3/4 da instrução mostram **WSOL na base** e outro token na quote. Ali o que o `SwapRecord` chama de `sol_lamports` é átomo de outro token. As "vendas que batem exato" do item 3 incluem uma dessas pools (`551G…`): a fórmula bate, mas a moeda não é SOL. A ponte recusa (`sol_is_base`) e a onda 2 precisa resolver as mints por pool ([[Open Bugs]]).
+- **Nem toda pool tem WSOL na quote.** Em 3 de 13 swaps destas fixtures (`4jyi…`, `551G…` e `4xuv…`) as contas 3/4 da instrução mostram **WSOL na base** e outro token na quote. Ali o que o `SwapRecord` chama de `sol_lamports` é átomo de outro token. As "vendas que batem exato" do item 3 incluem uma dessas pools (`551G…`): a fórmula bate, mas a moeda não é SOL. A ponte recusa (`sol_is_base`); as mints por pool passaram a vir no registro na onda 1b (seção abaixo).
 - **O 32 468 689 do item 3 é o piso.** O custo exato pelo `ceil` do programa, só com a quote real, é 32 468 690. Com a reserva virtual o custo é 38 387 041, igual ao da cadeia.
 - **A `V` não muda dentro do trade.** Nos dois pares fixados no motor (compra→compra na pool `BTKS…` e as duas vendas com cashback), o pós-estado com a mesma `V` é o pré-estado do trade seguinte. Isso dá suporte nesses casos, não prova universal.
+
+## Onda 1b: a completude da curva e as mints da pool (05/10, fim da noite)
+
+Duas coisas que o registro de swap não dizia e a ponte só podia recusar ([[wallets-1b-record]]).
+
+**1. A curva estava completa naquele evento?** A `TradeEvent` pós-upgrade **não** tem a flag `complete`: na IDL on-chain (`idl_pump_onchain_raw.json`) ela só existe na conta `BondingCurve`, que só se lê depois (look-ahead se aplicada a um trade antigo). Mas o evento traz `real_token_reserves` **depois** do trade, e a compra que o zera é seguida, na mesma transação, do `CompleteEvent` do próprio programa (`bonding_curve` é o PDA do mint, `quote_mint` é a nativa). Regra pontual, tri-estado nomeado em `SwapRecord.curve_completion`:
+
+| Leitura | Quando |
+|---|---|
+| `complete` | compra com `real_token_reserves == 0` **e** `CompleteEvent` do mesmo mint logo depois (o último trade desse mint antes dele) |
+| `not_complete` | `real_token_reserves > 0` e nenhum `CompleteEvent` que feche esse trade |
+| `unknown` | qualquer contradição: venda lendo 0 (venda **soma** tokens), compra zerando sem `CompleteEvent`, `CompleteEvent` fechando trade que ainda tem tokens |
+
+Prova (fixtures `t1b_*`, proveniência em `t1b_provenance.json`): **2 conclusões reais guardadas** (`t1b_*`, re-executáveis) têm a compra com 0 e o `CompleteEvent` seguinte, e a compra que zera tem uma predecessora real não completa também guardada; numa varredura avulsa **não guardada** vi mais 3 conclusões iguais; a compra que zera leva **exatamente** o que o trade anterior do mesmo mint deixou (536 214 573 650 − 536 214 573 650 = 0); todos os demais trades de curva lidos tinham tokens reais e nenhum `CompleteEvent` (498 numa varredura avulsa de 40 blocos, não guardada e não reexecutável; 0 `unknown`). Depois da conclusão nenhum trade de curva do mint passa (reverte), então o trade que completa é também o último evento de curva do mint. **Observado, não garantido pelo protocolo:** um programa que completasse a curva de outro jeito apareceria como `unknown` (o `CompleteEvent` sem o zero), não como um `not_complete` silencioso. As cinco conclusões que achei eram de **mints criados e esgotados no mesmo slot**; uma curva que vive horas segue a mesma regra pelos mesmos campos, mas não tenho um exemplo guardado.
+
+**2. De que moeda é a perna de pool?** O evento da PumpSwap nomeia a pool, não as mints. A instrução que o emitiu (direta ou por CPI de roteador, ambas visíveis num `getTransaction`) traz `base_mint` e `quote_mint` nas contas 3 e 4 (IDL: `buy`, `buy_exact_quote_in` e `sell`, conferido). O casamento é pelos campos do próprio evento (contas 0, 1, 5 e 6 da instrução = `pool`, `user`, conta-base e conta-quote do usuário), não por ordem, e as mints são conferidas contra o campo `mint` dos saldos de token dos **cofres** da pool (contas 7 e 8) e das contas do usuário: **24 de 24** swaps de pool das 20 transações guardadas e **0 conflitos em 2 773** de uma varredura avulsa de 40 blocos (não guardada, não reexecutável). A conta WSOL do usuário muitas vezes **não** aparece nos saldos (embrulhada e fechada na mesma transação); os cofres sempre.
+
+O que isso mostrou (varredura avulsa de **40 blocos finalizados**, slots 453758284–453764134, 3 256 transações com sucesso que citam a pump ou a PumpSwap nos logs, 0 não decodificadas, 0 sem conservação):
+
+| Pools de swap | Vendas (1 551) | Compras (1 222) |
+|---|---|---|
+| WSOL na **quote** (o caso "normal") | 730 (47,1 %) | 824 (67,4 %) |
+| WSOL na **base** | **802 (51,7 %)** | **351 (28,7 %)** |
+| outra quote (ex.: o token PUMP) | 17 | 31 |
+| sem instrução conhecida | 2 | 16 |
+
+As 18 sem instrução conhecida são `SellV2`, `BuyExactQuoteInV2` e `BoostBuyAndBurn`, instruções novas (discriminadores e contas em [[Open Bugs]]): o evento delas fica sem pernas e contado (`pool_mints_unresolved`) quando nenhuma instrução conhecida da mesma pool, usuário e contas o cobre; se uma conhecida cobre (duas instruções, uma `SellV2`), as mints saem certas por construção (um par por pool) mas a invocação desconhecida só empresta a evidência da conhecida: conta em `pool_mints_via_sibling` e não conta como provado. Nunca adivinhadas, mas nem sempre provadas por invocação. A escolha foi **fechar contando** em vez de resolver só pelos saldos de token (que dariam a resposta, mas sem prova de que a instrução desconhecida usa a mesma ordem de contas). O registro só tem as mints no caminho por `getTransaction`; o `logsSubscribe` não traz contas, então ali `base_mint` e `quote_mint` ficam `None` sem contar como falha.
+
+**O que a revisão da Astra acrescentou à regra da curva** ([[wallets-1b-record]]): (a) um `CompleteEvent` **sem** trade de curva antes dele na transação é lacuna (`orphan_complete_events`), não leitura limpa: o trade que esgotou a curva é justamente o que faltou; (b) um trade de pump **recusado** (não decodifica, sem conservação, quote que não é SOL, linha que não é base64) mantém seu lugar na ordem, porque pode ser o que o `CompleteEvent` fecha; sem isso o trade aceito anterior do mesmo mint virava `unknown` por engano; (c) um `CompleteEvent` cujo trade fechador ainda tinha tokens (o trade que drena sumiu do que se leu) também é órfão, além de deixar o trade lido como `unknown`; (d) `swap_record_from_event` chamada sozinha devolve `curve_completion` **provisório** (só as reservas); o valor confirmado vem de `read_program_logs` / `read_transaction_logs`.
+
+**Consequência para os números da onda 0.** Numa venda de pool com WSOL na base, o "valor da venda" que a sonda lia como lamports são **átomos do outro token**. A distribuição de tamanho publicada ([[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]]: 29 % < 0,01 SOL, 14 % ≥ 10 SOL) estava errada nesse ponto; erratum lá.
+
+**Consequência para o H-030.** Cerca de **41,6 %** dos eventos de pool dessa amostra são em pools com WSOL na base, hoje recusados pela ponte (`sol_is_base`). Se esses eventos importam à contabilidade das carteiras é decisão aberta ([[Open Bugs]]).
 
 ## Por que pode falhar
 
@@ -101,7 +134,7 @@ O motor foi testado contra estas fixtures ([[wallets-1c-pricing]], [[wallets-eng
 
 ## Segunda opinião (Astra)
 
-[[wallets-1a]] — duas rodadas: 4 pontos obrigatórios na primeira (reservas e quote virtual, ordinal deslocado, pilha incoerente, quote por igualdade de quantidades), todos tratados com teste que falhou antes.
+[[wallets-1a]] — duas rodadas: 4 pontos obrigatórios na primeira (reservas e quote virtual, ordinal deslocado, pilha incoerente, quote por igualdade de quantidades), todos tratados com teste que falhou antes. [[wallets-1b-record]] — onda 1b (completude da curva e mints da pool).
 
 ## Relacionados
 

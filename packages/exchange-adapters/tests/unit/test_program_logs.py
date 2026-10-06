@@ -11,6 +11,7 @@ public RPC, 2026-10-05); anything built by hand from their logs is labelled SYNT
 from __future__ import annotations
 
 import base64
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -312,7 +313,12 @@ def test_a_get_transaction_result_reads_like_its_logs_of_any_version(
     tx = tx_fixture(directory, name)
     from_tx = read_transaction_logs(tx, received_at=RECEIVED)
     from_logs = _read(tx)
-    assert from_tx.swaps == from_logs.swaps and len(from_tx.swaps) >= 1
+    # Only a pool record gains something from the transaction: its mints (wave 1b, test_pool_legs).
+    unlegged = tuple(
+        replace(s, base_mint=None, quote_mint=None, quote_is_sol=None) if s.venue == "pool" else s
+        for s in from_tx.swaps
+    )
+    assert unlegged == from_logs.swaps and len(from_tx.swaps) >= 1
     assert from_tx.counters == from_logs.counters
 
 
