@@ -21,6 +21,8 @@ by: Everton
 
 **Decisão do Everton: aprovar tudo** — inclusive o uso do plano pago da Helius se for preciso para rodar 24 h. **Dinheiro real fica fora do escopo:** um CONFIRMA só libera a onda 5 (papel ao vivo pelo Risk Engine); qualquer passo com dinheiro volta ao Everton.
 
+**Complemento (05/10, noite):** seguidores entram como pergunta secundária, não como critério ([[2026-10-05-carteiras-seguidores-como-pergunta-secundaria]]).
+
 ## Relacionado
 
 [[EXP-M15-carteiras-vencedoras]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0142-kol-e-call-antecipam-ou-confirmam]] · [[2026-10-05]]
