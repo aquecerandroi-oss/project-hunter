@@ -42,5 +42,6 @@ bem abaixo do orçamento de 0,5–1,5 s previsto no plano original, sustentando 
 alimentam os testes das tarefas seguintes (T4.52b-2/3).
 
 ## Relacionados
+Atualização de 06/10/2026: o mesmo `logsSubscribe` público (`processed`) foi medido **contra** a NATS do site e o PumpPortal em [[KB-0186-o-tempo-real-da-pumpfun-chega-uns-0-1-s-antes-das-outras-fontes|KB-0186]] — por par e não contra o segundo do bloco: a NATS chegou 0,14–0,16 s antes dele (mediana) e o HTTP do RPC público passou a responder 413 (cota de dados). Os 0,42 s daqui e os números "contra o bloco" de lá usam métodos diferentes e não se comparam.
 `.claude/state/plan-T4.52b.md` · `.claude/state/notes-T4.52b-1.md` ·
 [[11-KNOWLEDGE/KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos|KB-0124]]

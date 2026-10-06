@@ -1,0 +1,19 @@
+curl -w "tcp=%{time_connect} tls=%{time_appconnect} ip=%{remote_ip}" https://<host>/   (3 requests per host, 1 s apart, 06/10/2026 ~09:15 BRT, this machine; the public Solana RPC host was NOT measured: its HTTP side was already answering 413)
+
+advanced-indexer.pump.fun        tcp=0.037115 tls=0.077087 ip=172.64.153.234
+advanced-indexer.pump.fun        tcp=0.059986 tls=0.117161 ip=172.64.153.234
+advanced-indexer.pump.fun        tcp=0.071760 tls=0.125011 ip=172.64.153.234
+prod-v2.nats.realtime.pump.fun   tcp=0.147335 tls=0.443781 ip=3.209.14.228
+prod-v2.nats.realtime.pump.fun   tcp=0.165174 tls=0.456869 ip=3.209.14.228
+prod-v2.nats.realtime.pump.fun   tcp=0.168970 tls=0.800151 ip=3.209.14.228
+pump.fun                         tcp=0.029941 tls=0.086713 ip=104.18.34.22
+pump.fun                         tcp=0.054229 tls=0.109303 ip=104.18.34.22
+pump.fun                         tcp=0.060907 tls=0.126473 ip=104.18.34.22
+pumpportal.fun                   tcp=0.162490 tls=0.336008 ip=216.155.134.164
+pumpportal.fun                   tcp=0.170287 tls=0.350948 ip=216.155.134.164
+pumpportal.fun                   tcp=0.321069 tls=0.505991 ip=216.155.134.164
+unified-prod.nats.realtime.pump.fun  tcp=0.157066 tls=0.444474 ip=52.2.180.247
+unified-prod.nats.realtime.pump.fun  tcp=0.164917 tls=0.621097 ip=52.2.180.247
+unified-prod.nats.realtime.pump.fun  tcp=0.254907 tls=0.537386 ip=52.2.180.247
+
+Reading: the NATS servers answer from 52.2.x / 3.209.x (AWS us-east range, by the address; the region itself was not confirmed), 150-255 ms of TCP connect from this machine; PumpPortal 162-321 ms; the Cloudflare-fronted hosts 30-72 ms.

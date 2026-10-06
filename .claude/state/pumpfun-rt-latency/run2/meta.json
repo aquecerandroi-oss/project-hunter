@@ -1,0 +1,62 @@
+{
+ "started": 1791286746.4058852,
+ "ended": 1791288848.678881,
+ "args": {
+  "seconds": 2100.0,
+  "max_mints": 30,
+  "hold": 360.0,
+  "lite_max": 10,
+  "max_wallets": 20,
+  "blocktime_slots": 60,
+  "keep_awake": true,
+  "out": ".claude/state/pumpfun-rt-latency/run2"
+ },
+ "counts": {
+  "clock.sample": 18,
+  "nats_u.sys": 2,
+  "nats_c.sys": 2,
+  "tr_new.sys": 1,
+  "rpc.sys": 1,
+  "pp.sys": 6,
+  "nats_u.sub": 241,
+  "tr_grad.sys": 1,
+  "rpc.logs": 171344,
+  "rpc.logs_err": 350623,
+  "nats_u.create": 1359,
+  "tr_new.patches": 22974,
+  "tr_new.snapshot": 1,
+  "pp.create": 1035,
+  "tr_new.add": 2580,
+  "tr_new.remove": 2580,
+  "nats_u.trade": 16328,
+  "nats_u.lite": 4551,
+  "nats_c.sub": 20,
+  "tr_new.kol": 406,
+  "tr_grad.patches": 26064,
+  "tr_grad.snapshot": 1,
+  "nats_c.balance": 22081,
+  "tr_grad.add": 95,
+  "tr_grad.remove": 95,
+  "pp.migration": 29,
+  "nats_u.unsub": 200,
+  "tr_grad.kol": 7
+ },
+ "refused": {},
+ "stalls": [],
+ "mints_opened": {
+  "processed": 180,
+  "lite": 60
+ },
+ "mints_skipped_cap": 991,
+ "wallets_followed": 20,
+ "loop_lag_s": {
+  "n": 20393,
+  "p50": 0.008999999938532705,
+  "p99": 0.024999999999999994,
+  "max": 0.5720000000204891
+ },
+ "blocktime": {
+  "requested": 60,
+  "answered": 0
+ }
+}

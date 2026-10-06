@@ -1,0 +1,52 @@
+nats instances in the page: ['ADVANCED', 'CORE', 'MULTICHAIN', 'UNIFIED']
+blocktime: [Errno 11001] getaddrinfo failed
+{
+ "counts": {
+  "clock.sample": 10,
+  "pp.sys": 2,
+  "rpc.sys": 2,
+  "tr_new.sys": 2,
+  "nats_c.sys": 3,
+  "nats_u.sys": 3,
+  "tr_grad.sys": 2,
+  "nats_u.sub": 146,
+  "rpc.logs_err": 200899,
+  "rpc.logs": 81974,
+  "nats_u.create": 717,
+  "pp.create": 582,
+  "nats_u.lite": 807,
+  "tr_new.patches": 11930,
+  "tr_new.snapshot": 1,
+  "tr_new.add": 1316,
+  "tr_new.remove": 1316,
+  "nats_u.trade": 5195,
+  "tr_grad.patches": 19344,
+  "tr_grad.snapshot": 1,
+  "nats_c.sub": 20,
+  "tr_new.kol": 126,
+  "nats_c.balance": 12313,
+  "tr_grad.add": 64,
+  "tr_grad.remove": 64,
+  "pp.migration": 13,
+  "nats_u.unsub": 111,
+  "sys.stall": 1,
+  "clock.sys": 1
+ },
+ "refused": {},
+ "stalls": [
+  [
+   1791258388.138267,
+   1791286618.035019
+  ]
+ ],
+ "loop_lag_s": {
+  "n": 11348,
+  "p50": 0.008999999938532705,
+  "p99": 0.024999999999999994,
+  "max": 28229.79099999983
+ },
+ "blocktime": {
+  "requested": 60,
+  "answered": 0
+ }
+}

@@ -1,0 +1,58 @@
+{
+ "started": 1791257067.3959854,
+ "ended": 1791257169.4426732,
+ "args": {
+  "seconds": 100.0,
+  "max_mints": 30,
+  "hold": 360.0,
+  "lite_max": 10,
+  "max_wallets": 20,
+  "blocktime_slots": 6,
+  "keep_awake": true,
+  "out": ".claude/state/pumpfun-rt-latency/smoke"
+ },
+ "counts": {
+  "clock.sample": 1,
+  "nats_c.sys": 2,
+  "rpc.sys": 1,
+  "nats_u.sys": 2,
+  "tr_grad.sys": 1,
+  "tr_new.sys": 1,
+  "pp.sys": 1,
+  "nats_u.sub": 41,
+  "rpc.logs": 32110,
+  "nats_u.create": 55,
+  "tr_new.patches": 1282,
+  "tr_new.snapshot": 1,
+  "tr_new.add": 80,
+  "tr_new.remove": 80,
+  "pp.create": 41,
+  "nats_u.lite": 201,
+  "nats_u.trade": 747,
+  "nats_c.sub": 20,
+  "nats_c.balance": 887,
+  "tr_grad.patches": 1278,
+  "tr_grad.snapshot": 1,
+  "tr_new.kol": 12,
+  "tr_grad.add": 5,
+  "tr_grad.remove": 5
+ },
+ "refused": {},
+ "stalls": [],
+ "mints_opened": {
+  "processed": 30,
+  "lite": 10
+ },
+ "mints_skipped_cap": 17,
+ "wallets_followed": 20,
+ "loop_lag_s": {
+  "n": 986,
+  "p50": 0.008999999938532705,
+  "p99": 0.024999999999999994,
+  "max": 0.024999999999999994
+ },
+ "blocktime": {
+  "requested": 6,
+  "answered": 6
+ }
+}

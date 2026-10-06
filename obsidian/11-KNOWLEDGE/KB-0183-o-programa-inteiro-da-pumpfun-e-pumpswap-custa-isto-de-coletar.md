@@ -79,7 +79,7 @@ Nenhuma: é infraestrutura. O piloto pago deve repetir a mesma auditoria de bloc
 
 ## Relacionados
 
-[[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro|KB-0184]] (o `BuyEvent` decodificado) · [[EXP-M15-carteiras-vencedoras]] · [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] ·
+[[KB-0186-o-tempo-real-da-pumpfun-chega-uns-0-1-s-antes-das-outras-fontes|KB-0186]] (06/10: o tempo real da própria pump.fun antecipa o RPC público em ~0,15 s, e o canal `account_balance_change.<carteira>` segue carteiras escolhidas sem coletar o programa inteiro, com a decisão de escopo pendente na INBOX; o HTTP do RPC público passou a responder 413, cota de dados, depois do `logsSubscribe` de todo o programa pump) · [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro|KB-0184]] (o `BuyEvent` decodificado) · [[EXP-M15-carteiras-vencedoras]] · [[KB-0182-quem-ganha-dinheiro-de-verdade-nos-memes]] · [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo]] ·
 [[KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos|KB-0124]] · [[T4.8e-decoders]] · [[Exchange Adapters]] · [[carteiras-lucro-design]]
 
 ## Armazenamento depois da medição (acrescentado em 05/10/2026, database-architect)

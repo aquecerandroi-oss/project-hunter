@@ -1,0 +1,41 @@
+nats instances in the page: ['ADVANCED', 'CORE', 'MULTICHAIN', 'UNIFIED']
+{
+ "counts": {
+  "clock.sample": 1,
+  "nats_c.sys": 2,
+  "rpc.sys": 1,
+  "nats_u.sys": 2,
+  "tr_grad.sys": 1,
+  "tr_new.sys": 1,
+  "pp.sys": 1,
+  "nats_u.sub": 41,
+  "rpc.logs": 32110,
+  "nats_u.create": 55,
+  "tr_new.patches": 1282,
+  "tr_new.snapshot": 1,
+  "tr_new.add": 80,
+  "tr_new.remove": 80,
+  "pp.create": 41,
+  "nats_u.lite": 201,
+  "nats_u.trade": 747,
+  "nats_c.sub": 20,
+  "nats_c.balance": 887,
+  "tr_grad.patches": 1278,
+  "tr_grad.snapshot": 1,
+  "tr_new.kol": 12,
+  "tr_grad.add": 5,
+  "tr_grad.remove": 5
+ },
+ "refused": {},
+ "stalls": [],
+ "loop_lag_s": {
+  "n": 986,
+  "p50": 0.008999999938532705,
+  "p99": 0.024999999999999994,
+  "max": 0.024999999999999994
+ },
+ "blocktime": {
+  "requested": 6,
+  "answered": 6
+ }
+}

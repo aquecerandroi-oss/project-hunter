@@ -1,0 +1,533 @@
+{
+ "report": {
+  "segment": {
+   "start": 1791286746.4058852,
+   "end": 1791288848.678881,
+   "segments": 1
+  },
+  "window_s": 1997.272995710373,
+  "stalls_dropped": 0,
+  "clock": {
+   "samples": 18,
+   "offset_s": 0.05603790283203125,
+   "offset_min_s": 0.03425335884094238,
+   "offset_max_s": 0.15192770957946777,
+   "rtt_median_s": 0.2702915668487549
+  },
+  "create": {
+   "coverage": {
+    "union": 1100,
+    "in_all": 962,
+    "by_source": {
+     "nats_u": {
+      "seen": 1100,
+      "share": 1.0
+     },
+     "pp": {
+      "seen": 962,
+      "share": 0.8745454545454545
+     },
+     "rpc": {
+      "seen": 1100,
+      "share": 1.0
+     }
+    }
+   },
+   "pairs": {
+    "pp_vs_nats": {
+     "common": 962,
+     "only_a": 0,
+     "only_b": 138,
+     "delta_s": {
+      "n": 962,
+      "p10": 0.021893525123596193,
+      "p50": 0.03186917304992676,
+      "p90": 0.12332229614257813
+     },
+     "a_first_share": 0.002079002079002079,
+     "b_first_share": 0.9792099792099792,
+     "tie_share": 0.018711018711018712
+    },
+    "rpc_vs_nats": {
+     "common": 1100,
+     "only_a": 0,
+     "only_b": 0,
+     "delta_s": {
+      "n": 1100,
+      "p10": 0.05528500080108643,
+      "p50": 0.15385067462921143,
+      "p90": 0.24059083461761474
+     },
+     "a_first_share": 0.0036363636363636364,
+     "b_first_share": 0.9927272727272727,
+     "tie_share": 0.0036363636363636364
+    },
+    "rpc_vs_pp": {
+     "common": 962,
+     "only_a": 138,
+     "only_b": 0,
+     "delta_s": {
+      "n": 962,
+      "p10": -0.003717660903930657,
+      "p50": 0.10380864143371582,
+      "p90": 0.20690855979919434
+     },
+     "a_first_share": 0.08523908523908524,
+     "b_first_share": 0.8648648648648649,
+     "tie_share": 0.0498960498960499
+    },
+    "tr_new_vs_nats": {
+     "common": 1093,
+     "only_a": 0,
+     "only_b": 7,
+     "delta_s": {
+      "n": 1093,
+      "p10": 0.2235398769378662,
+      "p50": 0.44643259048461914,
+      "p90": 0.6847468852996826
+     },
+     "a_first_share": 0.0,
+     "b_first_share": 1.0,
+     "tie_share": 0.0
+    }
+   },
+   "tr_new_seen_of_nats_mints": 0.9936363636363637,
+   "nats_mints": 1100
+  },
+  "trade": {
+   "nats_programs": {
+    "pump": 11410,
+    "pump_amm": 4275
+   },
+   "watched_mints": 180,
+   "followed_wallets": 20,
+   "replay_like_share": 0.0,
+   "replay_sensitivity": [
+    {
+     "slack_s": 0.0,
+     "common": 10787,
+     "p50": 0.15622377395629883,
+     "replay_like_share": 0.011922218680267771
+    },
+    {
+     "slack_s": 2.0,
+     "common": 10787,
+     "p50": 0.15622377395629883,
+     "replay_like_share": 0.0
+    },
+    {
+     "slack_s": 4.0,
+     "common": 10787,
+     "p50": 0.15622377395629883,
+     "replay_like_share": 0.0
+    }
+   ],
+   "cohort": 10787,
+   "coverage": {
+    "union": 10787,
+    "in_all": 10787,
+    "by_source": {
+     "nats_u": {
+      "seen": 10787,
+      "share": 1.0
+     },
+     "rpc": {
+      "seen": 10787,
+      "share": 1.0
+     }
+    }
+   },
+   "pairs": {
+    "rpc_vs_nats": {
+     "common": 10787,
+     "only_a": 0,
+     "only_b": 0,
+     "delta_s": {
+      "n": 10787,
+      "p10": 0.05812582969665528,
+      "p50": 0.15622377395629883,
+      "p90": 0.24083061218261714
+     },
+     "a_first_share": 0.0015759710762955409,
+     "b_first_share": 0.9942523407805692,
+     "tie_share": 0.004171688143135255
+    },
+    "lite_vs_nats": {
+     "common": 4033,
+     "only_a": 0,
+     "only_b": 6754,
+     "delta_s": {
+      "n": 4033,
+      "p10": 0.18711695671081544,
+      "p50": 0.2960810661315918,
+      "p90": 0.4248418807983399
+     },
+     "a_first_share": 0.0,
+     "b_first_share": 1.0,
+     "tie_share": 0.0
+    },
+    "balance_vs_nats": {
+     "common": 1315,
+     "only_a": 0,
+     "only_b": 2,
+     "delta_s": {
+      "n": 1315,
+      "p10": 0.34677672386169434,
+      "p50": 0.4686245918273926,
+      "p90": 0.6220501422882081
+     },
+     "a_first_share": 0.0,
+     "b_first_share": 1.0,
+     "tie_share": 0.0
+    },
+    "balance_vs_rpc": {
+     "common": 1315,
+     "only_a": 0,
+     "only_b": 2,
+     "delta_s": {
+      "n": 1315,
+      "p10": 0.25107240676879883,
+      "p50": 0.31912803649902344,
+      "p90": 0.43056879043579105
+     },
+     "a_first_share": 0.0007604562737642585,
+     "b_first_share": 0.9992395437262357,
+     "tie_share": 0.0
+    }
+   },
+   "balance_coverage": {
+    "expected": 1317,
+    "delivered": 1315,
+    "share": 0.9984813971146546
+   },
+   "wire_lower_bound_s": {
+    "n": 20819,
+    "p10": 0.15172533988952636,
+    "p50": 0.1841108798980713,
+    "p90": 0.25669069290161134
+   },
+   "delay_vs_block_time_s": {
+    "nats_u": {
+     "n": 10787,
+     "p10": 0.6261581420898438,
+     "p50": 1.0446429252624512,
+     "p90": 1.4443585395812988
+    },
+    "rpc": {
+     "n": 10787,
+     "p10": 0.7800815582275391,
+     "p50": 1.2038543224334717,
+     "p90": 1.5913477420806885
+    },
+    "lite": {
+     "n": 4033,
+     "p10": 0.9125814437866211,
+     "p50": 1.3321449756622314,
+     "p90": 1.7456836223602294
+    },
+    "balance": {
+     "n": 1315,
+     "p10": 1.104633092880249,
+     "p50": 1.5521531105041504,
+     "p90": 1.9249794960021978
+    }
+   },
+   "delay_note": "Block time is an estimate (the chain's getBlockTime is built from validator timestamps) published with one-second resolution; its total error was not measured (the check against getBlockTime was not obtained). The local clock's skew is corrected with the server-time offset (uncertainty about half the sample round trip). Compare sources with each other (the pair deltas), not with zero."
+  },
+  "migration": {
+   "pp_migrations": 28,
+   "tr_grad_adds": 75,
+   "tr_grad_vs_pp": {
+    "common": 12,
+    "only_a": 63,
+    "only_b": 16,
+    "delta_s": {
+     "n": 12,
+     "p10": 0.2191291332244873,
+     "p50": 0.49945366382598877,
+     "p90": 0.9818547010421753
+    },
+    "a_first_share": 0.0,
+    "b_first_share": 1.0,
+    "tie_share": 0.0
+   }
+  },
+  "kol": {
+   "add_events_pump": 1134,
+   "adds_pump": 1111,
+   "kol_gt0_at_add": 12,
+   "kol_updates": 406,
+   "kol_update_delay_s": {
+    "n": 376,
+    "p10": 0.4051389694213867,
+    "p50": 1.0628150701522827,
+    "p90": 9.14525318145752
+   }
+  },
+  "block_time_check": {
+   "n": 0,
+   "nats_minus_chain_s": {
+    "n": 0,
+    "p10": null,
+    "p50": null,
+    "p90": null
+   }
+  },
+  "health": {
+   "pp": {
+    "disconnect": 1,
+    "backoff": 2,
+    "error": 1
+   }
+  }
+ },
+ "fields": {
+  "rpc:ack": [
+   "id",
+   "jsonrpc",
+   "result"
+  ],
+  "pp": [
+   "message"
+  ],
+  "nats_u:unifiedCoinCreationEvent": [
+   "base_decimals",
+   "bonding_curve",
+   "complete",
+   "created_timestamp",
+   "creator",
+   "depth",
+   "derived_pool",
+   "description",
+   "game_mode",
+   "initialized",
+   "is_banned",
+   "is_cashback_enabled",
+   "is_holder_reward",
+   "market_cap",
+   "market_cap_usd",
+   "mayhem_state",
+   "metadata_uri",
+   "mint",
+   "name",
+   "platform",
+   "program",
+   "quote_decimals",
+   "quote_mint",
+   "quote_token_program",
+   "real_quote_reserves",
+   "real_sol_reserves",
+   "real_token_reserves",
+   "show_name",
+   "signer",
+   "slot_index_id",
+   "supply",
+   "symbol",
+   "token_program",
+   "transfer_fee_bps",
+   "transfer_hook_program",
+   "tx",
+   "virtual_quote_reserves",
+   "virtual_sol_reserves",
+   "virtual_token_reserves"
+  ],
+  "tr_new": [
+   "baseVersion",
+   "board",
+   "patches",
+   "serverTs",
+   "type",
+   "version"
+  ],
+  "nats_u:unifiedTradeEvent.processed": [
+   "amountSol",
+   "amountUsd",
+   "app",
+   "appFee",
+   "appFeeUsd",
+   "baseAmount",
+   "baseReserves",
+   "baseTransferFee",
+   "baseTransferFeeUsd",
+   "buybackFee",
+   "buybackFeeBasisPoints",
+   "cashback",
+   "cashbackFeeBasisPoints",
+   "cashbackUsd",
+   "coinMeta",
+   "creatorAddress",
+   "creatorFee",
+   "creatorFeeUsd",
+   "isBondingCurve",
+   "lpFee",
+   "lpFeeUsd",
+   "marketCap",
+   "marketCapNative",
+   "marketCapUsd",
+   "mintAddress",
+   "platform",
+   "platformFee",
+   "platformFeeUsd",
+   "poolAddress",
+   "priceBasePerQuote",
+   "priceQuotePerBase",
+   "priceSol",
+   "priceUsd",
+   "priorityFee",
+   "priorityFeeUsd",
+   "program",
+   "protocolFee",
+   "protocolFeeUsd",
+   "quoteAmount",
+   "quoteMintAddress",
+   "quoteReserves",
+   "quoteTokenProgram",
+   "quoteTransferFee",
+   "quoteTransferFeeUsd",
+   "relayer",
+   "relayerFee",
+   "relayerFeeUsd",
+   "slotIndexId",
+   "solPriceUsd",
+   "supply",
+   "surface",
+   "surfaceAttribution",
+   "timestamp",
+   "tx",
+   "txFee",
+   "txFeeUsd",
+   "type",
+   "userAddress",
+   "virtualQuoteReserves",
+   "virtualSolReserves",
+   "virtualTokenReserves"
+  ],
+  "nats_u:unifiedTradeEvent.lite": [
+   "amountSol",
+   "amountUsd",
+   "baseAmount",
+   "marketCap",
+   "mint",
+   "priceSol",
+   "priceUsd",
+   "slotIndexId",
+   "timestamp",
+   "tx",
+   "type",
+   "userAddress"
+  ],
+  "nats_c:account_balance_change": [
+   "balance",
+   "slot",
+   "timestamp",
+   "tokenMint",
+   "txIndex",
+   "txSignature",
+   "walletAddress"
+  ],
+  "tr_new entry (union of adds)": [
+   "age",
+   "ath",
+   "bc",
+   "bo",
+   "c",
+   "cb",
+   "desc",
+   "dh",
+   "dw",
+   "gd",
+   "hr",
+   "hs",
+   "i",
+   "ic",
+   "kol",
+   "lp",
+   "lv",
+   "m",
+   "mc",
+   "mh",
+   "mm",
+   "ms",
+   "n",
+   "nh",
+   "np",
+   "p",
+   "pa",
+   "pg",
+   "pl",
+   "sc",
+   "sn",
+   "so",
+   "t",
+   "t10",
+   "tf",
+   "tfUsd",
+   "tg",
+   "tw",
+   "tx5",
+   "txc",
+   "v",
+   "v15",
+   "v1h",
+   "v24h",
+   "v5",
+   "vUsd",
+   "vUsd15",
+   "vUsd1h",
+   "vUsd24h",
+   "vUsd5",
+   "ws"
+  ],
+  "tr_grad entry (union of adds)": [
+   "age",
+   "ath",
+   "bc",
+   "bo",
+   "c",
+   "cb",
+   "desc",
+   "dh",
+   "dw",
+   "gd",
+   "hr",
+   "hs",
+   "i",
+   "ic",
+   "kol",
+   "lp",
+   "lv",
+   "m",
+   "mc",
+   "mh",
+   "n",
+   "nh",
+   "np",
+   "p",
+   "pa",
+   "pg",
+   "pl",
+   "sc",
+   "sn",
+   "so",
+   "t",
+   "t10",
+   "tf",
+   "tfUsd",
+   "tg",
+   "tw",
+   "tx5",
+   "txc",
+   "v",
+   "v15",
+   "v1h",
+   "v24h",
+   "v5",
+   "vUsd",
+   "vUsd15",
+   "vUsd1h",
+   "vUsd24h",
+   "vUsd5",
+   "ws"
+  ]
+ }
+}

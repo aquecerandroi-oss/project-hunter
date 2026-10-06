@@ -1,0 +1,464 @@
+{
+ "report": {
+  "segment": {
+   "start": 1791257222.8842738,
+   "end": 1791258388.138267,
+   "segments": 2
+  },
+  "window_s": 1060.2539932727814,
+  "stalls_dropped": 10,
+  "clock": {
+   "samples": 10,
+   "offset_s": 0.05677676200866699,
+   "offset_min_s": 0.018718957901000977,
+   "offset_max_s": 0.11052632331848145,
+   "rtt_median_s": 0.2574946880340576
+  },
+  "create": {
+   "coverage": {
+    "union": 580,
+    "in_all": 520,
+    "by_source": {
+     "nats_u": {
+      "seen": 580,
+      "share": 1.0
+     },
+     "pp": {
+      "seen": 520,
+      "share": 0.896551724137931
+     },
+     "rpc": {
+      "seen": 580,
+      "share": 1.0
+     }
+    }
+   },
+   "pairs": {
+    "pp_vs_nats": {
+     "common": 520,
+     "only_a": 0,
+     "only_b": 60,
+     "delta_s": {
+      "n": 520,
+      "p10": 0.08020987510681152,
+      "p50": 0.09305369853973389,
+      "p90": 0.2276140928268433
+     },
+     "a_first_share": 0.0,
+     "b_first_share": 0.9942307692307693,
+     "tie_share": 0.0057692307692307696
+    },
+    "rpc_vs_nats": {
+     "common": 580,
+     "only_a": 0,
+     "only_b": 0,
+     "delta_s": {
+      "n": 580,
+      "p10": 0.034520220756530766,
+      "p50": 0.1361095905303955,
+      "p90": 0.23561878204345704
+     },
+     "a_first_share": 0.0034482758620689655,
+     "b_first_share": 0.9741379310344828,
+     "tie_share": 0.022413793103448276
+    },
+    "rpc_vs_pp": {
+     "common": 520,
+     "only_a": 60,
+     "only_b": 0,
+     "delta_s": {
+      "n": 520,
+      "p10": -0.11410312652587887,
+      "p50": 0.02223789691925049,
+      "p90": 0.13337364196777352
+     },
+     "a_first_share": 0.35384615384615387,
+     "b_first_share": 0.5442307692307692,
+     "tie_share": 0.10192307692307692
+    },
+    "tr_new_vs_nats": {
+     "common": 573,
+     "only_a": 0,
+     "only_b": 7,
+     "delta_s": {
+      "n": 573,
+      "p10": 0.21328463554382324,
+      "p50": 0.4542255401611328,
+      "p90": 0.6797688007354737
+     },
+     "a_first_share": 0.0,
+     "b_first_share": 0.9982547993019197,
+     "tie_share": 0.0017452006980802793
+    }
+   },
+   "tr_new_seen_of_nats_mints": 0.9879310344827587,
+   "nats_mints": 580
+  },
+  "trade": {
+   "nats_programs": {
+    "pump": 3204,
+    "pump_amm": 747
+   },
+   "watched_mints": 105,
+   "followed_wallets": 20,
+   "replay_like_share": 0.0,
+   "replay_sensitivity": [
+    {
+     "slack_s": 0.0,
+     "common": 2893,
+     "p50": 0.14211034774780273,
+     "replay_like_share": 0.022779043280182234
+    },
+    {
+     "slack_s": 2.0,
+     "common": 2893,
+     "p50": 0.14211034774780273,
+     "replay_like_share": 0.0
+    },
+    {
+     "slack_s": 4.0,
+     "common": 2893,
+     "p50": 0.14211034774780273,
+     "replay_like_share": 0.0
+    }
+   ],
+   "cohort": 2893,
+   "coverage": {
+    "union": 2893,
+    "in_all": 2893,
+    "by_source": {
+     "nats_u": {
+      "seen": 2893,
+      "share": 1.0
+     },
+     "rpc": {
+      "seen": 2893,
+      "share": 1.0
+     }
+    }
+   },
+   "pairs": {
+    "rpc_vs_nats": {
+     "common": 2893,
+     "only_a": 0,
+     "only_b": 0,
+     "delta_s": {
+      "n": 2893,
+      "p10": 0.04168944358825684,
+      "p50": 0.14211034774780273,
+      "p90": 0.23179206848144532
+     },
+     "a_first_share": 0.005184929139301763,
+     "b_first_share": 0.9751123401313515,
+     "tie_share": 0.0197027307293467
+    },
+    "lite_vs_nats": {
+     "common": 436,
+     "only_a": 0,
+     "only_b": 2457,
+     "delta_s": {
+      "n": 436,
+      "p10": 0.18068194389343262,
+      "p50": 0.29277050495147705,
+      "p90": 0.4469728469848633
+     },
+     "a_first_share": 0.0,
+     "b_first_share": 1.0,
+     "tie_share": 0.0
+    },
+    "balance_vs_nats": {
+     "common": 415,
+     "only_a": 0,
+     "only_b": 0,
+     "delta_s": {
+      "n": 415,
+      "p10": 0.34801268577575684,
+      "p50": 0.49074721336364746,
+      "p90": 0.6349670410156251
+     },
+     "a_first_share": 0.0,
+     "b_first_share": 1.0,
+     "tie_share": 0.0
+    },
+    "balance_vs_rpc": {
+     "common": 415,
+     "only_a": 0,
+     "only_b": 0,
+     "delta_s": {
+      "n": 415,
+      "p10": 0.26664047241210936,
+      "p50": 0.3392212390899658,
+      "p90": 0.468147897720337
+     },
+     "a_first_share": 0.0024096385542168677,
+     "b_first_share": 0.9975903614457832,
+     "tie_share": 0.0
+    }
+   },
+   "balance_coverage": {
+    "expected": 415,
+    "delivered": 415,
+    "share": 1.0
+   },
+   "wire_lower_bound_s": {
+    "n": 11313,
+    "p10": 0.156472110748291,
+    "p50": 0.19189977645874023,
+    "p90": 0.26657309532165535
+   },
+   "delay_vs_block_time_s": {
+    "nats_u": {
+     "n": 2893,
+     "p10": 0.6472348213195801,
+     "p50": 1.083885669708252,
+     "p90": 1.4832430362701416
+    },
+    "rpc": {
+     "n": 2893,
+     "p10": 0.7936874389648437,
+     "p50": 1.2239348888397217,
+     "p90": 1.612642765045166
+    },
+    "lite": {
+     "n": 436,
+     "p10": 0.9518640041351318,
+     "p50": 1.3782143592834473,
+     "p90": 1.762683391571045
+    },
+    "balance": {
+     "n": 415,
+     "p10": 1.1361196517944336,
+     "p50": 1.5419163703918457,
+     "p90": 1.9473076343536377
+    }
+   },
+   "delay_note": "Block time is an estimate (the chain's getBlockTime is built from validator timestamps) published with one-second resolution; its total error was not measured (the check against getBlockTime was not obtained). The local clock's skew is corrected with the server-time offset (uncertainty about half the sample round trip). Compare sources with each other (the pair deltas), not with zero."
+  },
+  "migration": {
+   "pp_migrations": 12,
+   "tr_grad_adds": 51,
+   "tr_grad_vs_pp": {
+    "common": 10,
+    "only_a": 41,
+    "only_b": 2,
+    "delta_s": {
+     "n": 10,
+     "p10": 0.08641204833984384,
+     "p50": 0.42151856422424316,
+     "p90": 0.6155647754669189
+    },
+    "a_first_share": 0.1,
+    "b_first_share": 0.9,
+    "tie_share": 0.0
+   }
+  },
+  "kol": {
+   "add_events_pump": 676,
+   "adds_pump": 587,
+   "kol_gt0_at_add": 2,
+   "kol_updates": 126,
+   "kol_update_delay_s": {
+    "n": 112,
+    "p10": 0.3880549192428589,
+    "p50": 0.9986259937286377,
+    "p90": 9.509158778190614
+   }
+  },
+  "block_time_check": {
+   "n": 0,
+   "nats_minus_chain_s": {
+    "n": 0,
+    "p10": null,
+    "p50": null,
+    "p90": null
+   }
+  },
+  "health": {}
+ },
+ "fields": {
+  "pp": [
+   "message"
+  ],
+  "rpc:ack": [
+   "id",
+   "jsonrpc",
+   "result"
+  ],
+  "nats_u:unifiedCoinCreationEvent": [
+   "base_decimals",
+   "bonding_curve",
+   "complete",
+   "created_timestamp",
+   "creator",
+   "depth",
+   "derived_pool",
+   "description",
+   "game_mode",
+   "initialized",
+   "is_banned",
+   "is_cashback_enabled",
+   "is_holder_reward",
+   "market_cap",
+   "market_cap_usd",
+   "mayhem_state",
+   "metadata_uri",
+   "mint",
+   "name",
+   "platform",
+   "program",
+   "quote_decimals",
+   "quote_mint",
+   "quote_token_program",
+   "real_quote_reserves",
+   "real_sol_reserves",
+   "real_token_reserves",
+   "show_name",
+   "signer",
+   "slot_index_id",
+   "supply",
+   "symbol",
+   "token_program",
+   "transfer_fee_bps",
+   "transfer_hook_program",
+   "tx",
+   "virtual_quote_reserves",
+   "virtual_sol_reserves",
+   "virtual_token_reserves"
+  ],
+  "nats_u:unifiedTradeEvent": [
+   "amountSol",
+   "amountUsd",
+   "baseAmount",
+   "marketCap",
+   "mint",
+   "priceSol",
+   "priceUsd",
+   "slotIndexId",
+   "timestamp",
+   "tx",
+   "type",
+   "userAddress"
+  ],
+  "tr_new": [
+   "baseVersion",
+   "board",
+   "patches",
+   "serverTs",
+   "type",
+   "version"
+  ],
+  "nats_c:account_balance_change": [
+   "balance",
+   "slot",
+   "timestamp",
+   "tokenMint",
+   "txIndex",
+   "txSignature",
+   "walletAddress"
+  ],
+  "tr_new entry (union of adds)": [
+   "age",
+   "ath",
+   "bc",
+   "bo",
+   "c",
+   "cb",
+   "desc",
+   "dh",
+   "dw",
+   "gd",
+   "hr",
+   "hs",
+   "i",
+   "ic",
+   "kol",
+   "lp",
+   "lv",
+   "m",
+   "mc",
+   "mh",
+   "mm",
+   "ms",
+   "n",
+   "nh",
+   "np",
+   "p",
+   "pa",
+   "pg",
+   "pl",
+   "sc",
+   "sn",
+   "so",
+   "t",
+   "t10",
+   "tf",
+   "tfUsd",
+   "tg",
+   "tw",
+   "tx5",
+   "txc",
+   "v",
+   "v15",
+   "v1h",
+   "v24h",
+   "v5",
+   "vUsd",
+   "vUsd15",
+   "vUsd1h",
+   "vUsd24h",
+   "vUsd5",
+   "ws"
+  ],
+  "tr_grad entry (union of adds)": [
+   "age",
+   "ath",
+   "bc",
+   "bo",
+   "c",
+   "cb",
+   "desc",
+   "dh",
+   "dw",
+   "gd",
+   "hr",
+   "hs",
+   "i",
+   "ic",
+   "kol",
+   "lp",
+   "lv",
+   "m",
+   "mc",
+   "mh",
+   "n",
+   "nh",
+   "np",
+   "p",
+   "pa",
+   "pg",
+   "pl",
+   "sc",
+   "sn",
+   "so",
+   "t",
+   "t10",
+   "tf",
+   "tfUsd",
+   "tg",
+   "tw",
+   "tx5",
+   "txc",
+   "v",
+   "v15",
+   "v1h",
+   "v24h",
+   "v5",
+   "vUsd",
+   "vUsd15",
+   "vUsd1h",
+   "vUsd24h",
+   "vUsd5",
+   "ws"
+  ]
+ }
+}
