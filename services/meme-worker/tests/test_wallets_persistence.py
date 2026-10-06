@@ -34,6 +34,7 @@ from hunter_indicators.meme.curve import CurveReserves, quote_sell
 from hunter_meme_worker.config import MemeConfig
 from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.features import FEATURES_VERSION
+from hunter_meme_worker.lab_repo import load_active_rule_sets
 from hunter_meme_worker.repo import insert_snapshot, upsert_token
 from hunter_meme_worker.repo_rows import SnapshotRow, TokenRow
 from hunter_meme_worker.sources import SourcesState
@@ -227,14 +228,13 @@ async def test_the_loop_appends_real_fills_dedupes_by_signature_and_derives_the_
     assert context["minute"] == MINUTE.isoformat() and context["reason"] is None
     verdict = context["rule_sets"]["meme_paper_v0/1"]
     assert verdict["accepted"] is False and "creator_net_seller_unknown" in verdict["refusals"]
-    active = await _rows(
-        db_session_factory,
-        # The Lab loads every active set except the launch lane's (``clock = 'event'``, 0053):
-        # those are the lane's own and never speak in a wallet trade's context.
-        "SELECT name || '/' || version AS label FROM meme_rule_sets WHERE status = 'active' "
-        "AND COALESCE(params ->> 'clock', '') <> 'event'",
-    )
-    assert set(context["rule_sets"]) == {str(r["label"]) for r in active}  # every active set spoke
+    # Every set the *Lab loads* spoke. The loader (not a bare ``status = 'active'`` query) is the
+    # reference: the shared database also holds throwaway sets planted by other tests, and the
+    # loader skips -- by name, with ``meme_rule_set_load_failed`` -- the ones it cannot parse,
+    # as it skips the launch lane's (``clock = 'event'``, 0053).
+    async with role_session(db_session_factory, db_role=WORKER) as session:
+        loaded = {spec.label for spec in await load_active_rule_sets(session)}
+    assert set(context["rule_sets"]) == loaded
     assert "meme_paper_v0/1" in context["rule_sets"]  # the 0022 seed is still active
     assert sell["side"] == "sell" and sell["lab_context"] is None
     assert sell["sol_lamports"] == 724_716_993 and sell["fee_lamports"] == 9_158_963

@@ -172,7 +172,15 @@ class TestDedupe:
                 )
             ).scalars()
             rows = "\n".join(str(line) for line in plan)
-        assert "ix_agent_signals_version_cohort_emitted" in rows, rows
+        # On an empty table the planner sees two equally cheap cohort indexes -- the
+        # version-first one this repository was built for, or the cohort-first one that also
+        # serves it with a filter on the version -- and picks either. What this guards is
+        # "an index, never a scan of ``agent_signals``", and that it is a *cohort* index.
+        assert "Seq Scan on agent_signals" not in rows, rows
+        assert (
+            "ix_agent_signals_version_cohort_emitted" in rows
+            or "ix_agent_signals_cohort_emitted" in rows
+        ), rows
 
 
 class TestParticipationBinds:

@@ -371,10 +371,13 @@ async def test_without_a_later_snapshot_the_proposal_waits_and_then_is_unfilled_
         db_session_factory, mint=mint, rule_set_id=rule_set, decided_at=decided
     )
     first = await lab_tick(ctx, now=NOW)
-    assert first.fills.waiting == 1
+    # ``>=``: the report counts *every* approved proposal in the shared database, and the
+    # tests before this one in the module leave theirs waiting (16 in CI). This proposal's own
+    # row, asserted next, is what proves the wait.
+    assert first.fills.waiting >= 1
     assert (await _bet_of(db_session_factory, proposal))["proposal_status"] == "approved"
     late = await lab_tick(ctx, now=decided + timedelta(seconds=181))
-    assert late.fills.unfilled == 1
+    assert late.fills.unfilled >= 1
     row = await _bet_of(db_session_factory, proposal)
     assert row["proposal_status"] == "unfilled" and row["refusal"] == "no_later_snapshot"
 

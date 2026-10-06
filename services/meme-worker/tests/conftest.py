@@ -139,6 +139,11 @@ async def db_session_factory(
     yield create_session_factory(db_engine)
 
 
+REAL_INSERT_MODULES = frozenset({"test_persistence.py", "test_chain_curves_persistence.py"})
+"""Modules that assert on what the database does with ``received_at`` (the block time is not
+the arrival: ``received_at`` must come out *after* ``observed_at``)."""
+
+
 @pytest.fixture(autouse=True)
 def snapshots_are_received_when_observed(
     monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
@@ -153,8 +158,8 @@ def snapshots_are_received_when_observed(
     with a perfectly healthy fold. Tests that want a photo that arrives late insert it
     with an explicit ``received_at`` of their own, which this does not touch.
     """
-    if request.path.name == "test_persistence.py":
-        return  # that module proves the worker's own INSERT (idempotency included): untouched
+    if request.path.name in REAL_INSERT_MODULES:
+        return  # these modules prove the worker's own INSERT and its stamps: untouched
     from hunter_meme_worker import repo
 
     columns = repo._SNAPSHOT_COLUMNS  # pyright: ignore[reportPrivateUsage]
