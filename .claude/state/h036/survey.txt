@@ -1,0 +1,91 @@
+             agora             
+-------------------------------
+ 2026-10-07 06:46:51.946597+00
+(1 row)
+
+         relname          |    tam     
+--------------------------+------------
+ market_snapshots_2026_08 | 8192 bytes
+ market_snapshots_2026_09 | 1321 MB
+ market_snapshots_2026_10 | 268 MB
+ market_snapshots_2026_11 | 8192 bytes
+ market_snapshots_2026_12 | 8192 bytes
+(5 rows)
+
+          min           |          max           | linhas  | com_spread | mercados 
+------------------------+------------------------+---------+------------+----------
+ 2026-09-05 22:42:00+00 | 2026-10-07 06:46:00+00 | 8632635 |    8541225 |      481
+(1 row)
+
+        table_name        |      column_name      |        data_type         
+--------------------------+-----------------------+--------------------------
+ fills                    | book_snapshot         | jsonb
+ market_snapshots         | market_id             | uuid
+ market_snapshots         | ts                    | timestamp with time zone
+ market_snapshots         | price                 | numeric
+ market_snapshots         | bid                   | numeric
+ market_snapshots         | ask                   | numeric
+ market_snapshots         | spread_pct            | numeric
+ market_snapshots         | volume_24h            | numeric
+ market_snapshots         | quote_volume_24h      | numeric
+ market_snapshots         | open_interest         | numeric
+ market_snapshots         | open_interest_value   | numeric
+ market_snapshots         | funding_rate          | numeric
+ market_snapshots         | next_funding_time     | timestamp with time zone
+ market_snapshots         | mark_price            | numeric
+ market_snapshots         | index_price           | numeric
+ market_snapshots         | liq_long_notional_1h  | numeric
+ market_snapshots         | liq_short_notional_1h | numeric
+ market_snapshots_2026_08 | bid                   | numeric
+ market_snapshots_2026_08 | spread_pct            | numeric
+ market_snapshots_2026_09 | bid                   | numeric
+ market_snapshots_2026_09 | spread_pct            | numeric
+ market_snapshots_2026_10 | bid                   | numeric
+ market_snapshots_2026_10 | spread_pct            | numeric
+ market_snapshots_2026_11 | bid                   | numeric
+ market_snapshots_2026_11 | spread_pct            | numeric
+ market_snapshots_2026_12 | bid                   | numeric
+ market_snapshots_2026_12 | spread_pct            | numeric
+ strategy_versions        | strategy_id           | uuid
+ strategy_versions        | version               | text
+ strategy_versions        | status                | USER-DEFINED
+ strategy_versions        | parameters_schema     | jsonb
+ strategy_versions        | default_parameters    | jsonb
+ strategy_versions        | code_ref              | text
+ strategy_versions        | changelog             | text
+ strategy_versions        | created_at            | timestamp with time zone
+ strategy_versions        | activated_at          | timestamp with time zone
+ strategy_versions        | deprecated_at         | timestamp with time zone
+ strategy_versions        | id                    | uuid
+ strategy_versions        | params_format         | integer
+ strategy_versions        | purpose               | text
+ strategy_versions        | promising_at          | timestamp with time zone
+ strategy_versions        | promising_by          | text
+ strategy_versions        | replication_parent_id | uuid
+ strategy_versions        | replication_index     | smallint
+ strategy_versions        | eligibility_policy    | jsonb
+(45 rows)
+
+      key       | version |   status   |    purpose    |         activated_at          |          created_at           
+----------------+---------+------------+---------------+-------------------------------+-------------------------------
+ mean_reversion | v1      | active     | research_only | 2026-09-08 16:32:33.947955+00 | 2026-09-06 03:31:39.415799+00
+ mean_reversion | v2      | active     | research_only | 2026-09-08 21:24:26.306302+00 | 2026-09-08 21:23:45.449938+00
+ mean_reversion | v3      | active     | research_only | 2026-09-08 21:34:01.491564+00 | 2026-09-08 21:23:57.510664+00
+ mean_reversion | v4      | deprecated | research_only | 2026-09-08 22:38:37.842745+00 | 2026-09-08 22:38:15.279787+00
+ mean_reversion | v5      | deprecated | research_only | 2026-09-08 22:38:41.887854+00 | 2026-09-08 22:38:17.241534+00
+ mean_reversion | v6      | active     | research_only | 2026-09-08 22:38:46.022557+00 | 2026-09-08 22:38:19.644613+00
+ mean_reversion | v7      | active     | research_only | 2026-09-08 22:38:49.950926+00 | 2026-09-08 22:38:21.6033+00
+ mean_reversion | v8      | active     | research_only | 2026-09-08 23:37:33.252307+00 | 2026-09-08 23:37:05.523288+00
+ mean_reversion | v9      | deprecated | research_only | 2026-09-09 03:16:43.388295+00 | 2026-09-09 03:15:23.860204+00
+ mean_reversion | v10     | active     | research_only | 2026-09-09 03:22:10.768913+00 | 2026-09-09 03:21:47.628501+00
+ mean_reversion | v11     | deprecated | research_only | 2026-09-09 15:28:02.129582+00 | 2026-09-09 15:27:00.165825+00
+ mean_reversion | v12     | deprecated | research_only | 2026-09-09 18:24:43.334572+00 | 2026-09-09 18:23:42.165522+00
+ mean_reversion | v13     | deprecated | research_only | 2026-09-09 18:24:50.590653+00 | 2026-09-09 18:23:53.639986+00
+ mean_reversion | v14     | active     | paper         | 2026-09-09 19:37:36.324502+00 | 2026-09-09 19:37:10.240484+00
+ mean_reversion | v15     | deprecated | research_only | 2026-09-10 15:26:45.566523+00 | 2026-09-10 15:25:33.783561+00
+ mean_reversion | v16     | deprecated | research_only | 2026-09-10 15:26:52.603483+00 | 2026-09-10 15:25:47.797905+00
+ mean_reversion | v17     | deprecated | research_only | 2026-09-10 15:26:59.553062+00 | 2026-09-10 15:25:54.765151+00
+ mean_reversion | v18     | deprecated | research_only | 2026-09-11 12:45:49.918585+00 | 2026-09-11 12:44:56.250305+00
+ mean_reversion | v19     | deprecated | research_only | 2026-09-11 12:46:02.98419+00  | 2026-09-11 12:45:10.20261+00
+(19 rows)
+

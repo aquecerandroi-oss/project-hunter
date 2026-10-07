@@ -1,0 +1,8 @@
+estados: {'no_entry': 33, 'terminal': 213}
+trades sem linha no export cego (o export complementar da consulta deveria zerar isto): 0
+consulta L3: elegíveis 213, trades 213, excluídos 0.0%, custo medido nas duas pernas 100.0%, substitutos 0, dias 25, semanas 5
+R médio primário (todo a mercado, custo medido) +0.0234 · EP semanal 0.1332 · t 0.18 · estresse +0.0023 → LIMITE
+sem o maior mercado (UNIUSDT): -0.0038 · IC mercado (0.023397755343210595, -0.11728534699275417, 0.13332427389721507)
+  expired: n 66, R -0.018
+  stop: n 81, R -1.030
+  target: n 66, R +1.357

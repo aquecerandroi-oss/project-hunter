@@ -1,0 +1,17 @@
+ direction | market_type |  code   |   cohort    |  estado  | count 
+-----------+-------------+---------+-------------+----------+-------
+ long      | perpetual   | binance | prospective | no_entry |    33
+ long      | perpetual   | binance | prospective | terminal |   213
+ long      | spot        | binance | prospective | no_entry |     6
+ long      | spot        | binance | prospective | terminal |     1
+(4 rows)
+
+   semana   | sinais | dias_com_sinal 
+------------+--------+----------------
+ 2026-09-07 |    105 |              4
+ 2026-09-14 |     42 |              7
+ 2026-09-21 |     76 |              7
+ 2026-09-28 |     27 |              6
+ 2026-10-05 |      3 |              1
+(5 rows)
+

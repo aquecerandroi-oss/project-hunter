@@ -1,0 +1,9 @@
+   semana   | sinais | elegiveis | dias_com_sinal | semana_tipo 
+------------+--------+-----------+----------------+-------------
+ 2026-09-07 |     98 |        65 |              4 | parcial
+ 2026-09-14 |     42 |        42 |              7 | completa
+ 2026-09-21 |     76 |        76 |              7 | completa
+ 2026-09-28 |     27 |        27 |              6 | completa
+ 2026-10-05 |      3 |         3 |              1 | parcial
+(5 rows)
+

@@ -225,6 +225,8 @@ para sinais emitidos depois do registro.
    vem de comparar versões já vistas (caminho bifurcado): rank baixo, só com geometria nova e coorte futura. Mata:
    bruto ≤ 0, ou k* abaixo do custo efetivo medido no item 1.
 
+*(07/10/2026: direções 1 e 2 executadas — instrumento medido em [[KB-0193-o-custo-binance-medido-nos-instantes-do-lab]] (custo efetivo da v14 exposta 11,6 bp todo a mercado, abaixo do k* de 16,1 bp, margem dentro do ruído) e coorte futura pré-registrada em [[Fila de Hipoteses#H-036 — `mean_reversion v14` em coorte futura, ao custo Binance medido (a v14 tem vantagem fora da amostra?)|H-036]].)*
+
 **O que esta nota tira da mesa:** baratear não demonstra uma estratégia rentável — a `momentum` permanece negativa
 em todos os cenários examinados (com IC do bruto por dia tocando zero) e a `volume_anomaly` tem vantagem bruta
 pequena e incerta, consumida pelos custos positivos examinados. A H-033r e a H-035 propostas pelo Defensor seguem
@@ -269,5 +271,5 @@ Ranking trocado por sugestão dela (instrumento antes da v14). Nada rejeitado. *
 [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] (o modelo de custo do Lab e o diagnóstico em duas etapas que ela
 pedia) · [[EXP-0005-momentum-paper]] · [[KB-0170-tendencia-diaria-nao-separa-os-sinais-do-lab]] ·
 [[KB-0191-oi-acima-da-semana-nao-separa-os-sinais-do-lab]] (o Defensor que pediu esta varredura) ·
-[[KB-0171-custo-real-da-spot-1]] · [[Fila de Hipoteses]] · [[Mapa de Estrategias]] · [[Proximas Hipoteses]] ·
+[[KB-0171-custo-real-da-spot-1]] · [[KB-0193-o-custo-binance-medido-nos-instantes-do-lab]] · [[Fila de Hipoteses]] · [[Mapa de Estrategias]] · [[Proximas Hipoteses]] ·
 [[06-DECISIONS/Revisoes-Astra/lab-cost-sweep|revisão da Astra]] · [[11-KNOWLEDGE/Index|Conhecimento]]

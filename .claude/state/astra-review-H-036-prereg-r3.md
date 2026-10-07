@@ -1,0 +1,20 @@
+**Sim: os seis pontos estão fechados**, considerando a Emenda 2 como contrato vigente.
+
+| Ponto da rodada 2 | Estado | Verificação |
+|---|---|---|
+| 1. Fronteira t permissiva | **Fechado** | Quantil por inversão da CDF, usado nas duas fronteiras: [design.py:110](/C:/dev/project-hunter/.claude/state/h036/design.py:110), [decision.py:89](/C:/dev/project-hunter/.claude/state/h036/decision.py:89). |
+| 2. Metades com dias ímpares | **Fechado** | Piso aplicado; dia mediano fica na segunda metade: [decision.py:71](/C:/dev/project-hunter/.claude/state/h036/decision.py:71). |
+| 3. População vazia e alcance do ensaio | **Fechado** | Sem avaliáveis retorna continua/LIMITE; ensaio preserva `no_entry`: [look.py:107](/C:/dev/project-hunter/.claude/state/h036/look.py:107), [gen_look.py:21](/C:/dev/project-hunter/.claude/state/h036/gen_look.py:21). A emenda reconhece que o ensaio não valida exclusões. |
+| 4. Calibração e parada | **Fechado** | REFUTA instável encerra como NÃO CONFIRMA: [look.py:62](/C:/dev/project-hunter/.claude/state/h036/look.py:62). A calibração foi corretamente delimitada como condicional, sem alegação de teto demonstrado. |
+| 5. Custo ausente | **Fechado** | Percentis incluem vizinhos; estresse usa +1 → +2 → p90: [look.py:117](/C:/dev/project-hunter/.claude/state/h036/look.py:117), [look.py:67](/C:/dev/project-hunter/.claude/state/h036/look.py:67). |
+| 6. Export complementar | **Fechado** | Obrigação anterior à leitura dos desfechos registrada na [Emenda 2:428](</C:/dev/project-hunter/obsidian/11-KNOWLEDGE/Fila de Hipoteses.md:428>); ausência de export publicada em [look.py:115](/C:/dev/project-hunter/.claude/state/h036/look.py:115). |
+
+Executei `uv run --no-sync pytest .claude/state/h036 -q -p no:cacheprovider`, com bytecode desabilitado: **35 passed in 6.55s**. Conferi **49 hashes, zero divergências**, e a cópia da Emenda 2 consta na Fila. Não rerodei a calibração completa. Nenhum arquivo alterado.
+
+**MUST-FIX NOVO:** nenhum identificado que exija outra emenda antes de T0.
+
+**OBSIDIAN**
+
+- **Fila de Hipóteses — H-036:** registrar o fechamento dos seis pontos.
+- **Revisões Astra — H-036-prereg:** acrescentar a rodada 3 e as verificações.
+- **KB-0193 — O custo Binance medido nos instantes do Lab:** incorporar os fallbacks e o export complementar da Emenda 2.

@@ -33,6 +33,7 @@ SORT mercado ASC, hipotese ASC
 |---|---|---|---|
 | [[Fila de Hipoteses#H-001 — Absorção de uma venda grande (EXP-M22)\|H-001]] — absorção de venda | meme | braços `absorb_v0/1` e `absorb_v0/2` em papel | **em_curso** — 14 apostas medidas em 23/09 (mínimo 20/lado); ficha de 25/09 mostra 72+84 entradas acumuladas nos dois braços, ainda sem novo julgamento ([[Ficha-2026-09-25]]) |
 | [[Fila de Hipoteses#H-002 — Retenção dos primeiros compradores (EXP-M19)\|H-002]] — retenção dos primeiros 20 | meme | braço `flow_v2/10` | **em_curso** — 0 apostas no corte de 23/09; sem sinal de ter começado a produzir |
+| [[Fila de Hipoteses#H-036 — `mean_reversion v14` em coorte futura, ao custo Binance medido (a v14 tem vantagem fora da amostra?)|H-036]] — `mean_reversion v14` em coorte futura ao custo medido | cripto (Lab/Shadow) | teste de nível pré-registrado, sinais emitidos desde T0 = 2026-10-07 12:00Z, custo todo a mercado medido no `market_snapshots` ([[KB-0193-o-custo-binance-medido-nos-instantes-do-lab]]) | **coletando** — consultas fixas em 06/01, 07/04 e 07/07/2027; nada a ler antes; export cego semanal |
 | `spot/1` (Jupiter/Binance, `mean_reversion v14`) | cripto | primeira mesa de cripto normal em dinheiro real (23/09) | viva — primeira posição real 25/09 11:30 BRT, `TAOUSDT`, alvo/stop declarados ([[09-OPERATIONS/Diario/2026-09-25|Diário 25/09]]) |
 | mesa real de memes (`operator/5`, `operator/6`) | meme | operadores em produção | vivos — 148 operações acumuladas até 25/09, acumulado **−0,4707 SOL**, primeiro dia verde em 25/09 (+0,0356 até 12:00 BRT) |
 | `mean_reversion v1/v2/v3/v6/v7/v8/v10` + `momentum v3` (paper) + `momentum v8` | cripto (Lab/Shadow) | roster do Shadow Lab depois da poda T3.56 (2026-09-09) | vivos na última leitura registrada (2026-09-09); **esta página não confirmou estado mais recente** — conferir [[Estratégias.base]] antes de citar como atual |
@@ -138,5 +139,5 @@ O que alimenta as consultas Dataview é o frontmatter de cada nota — `tipo`, `
 [[Dicionario de Variaveis]] · [[Fila de Hipoteses]] · [[Proximas Hipoteses]] · [[Strategy Backlog]] ·
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] ·
 [[KB-0168-fibonacci-elliott-e-lta-diaria]] · [[KB-0169-fibonacci-e-lta-diaria-no-dado]] ·
-[[KB-0170-tendencia-diaria-nao-separa-os-sinais-do-lab]] · [[KB-0191-oi-acima-da-semana-nao-separa-os-sinais-do-lab]] · [[KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal]] · [[Perdas/Index|Perdas]] · [[Estratégias.base]] ·
+[[KB-0170-tendencia-diaria-nao-separa-os-sinais-do-lab]] · [[KB-0191-oi-acima-da-semana-nao-separa-os-sinais-do-lab]] · [[KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal]] · [[KB-0193-o-custo-binance-medido-nos-instantes-do-lab]] · [[Perdas/Index|Perdas]] · [[Estratégias.base]] ·
 [[Experimentos.base]] · `docs/RESEARCH.md`

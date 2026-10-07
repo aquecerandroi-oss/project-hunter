@@ -87,7 +87,7 @@ mercado: meme
 - Como separar, **antes** da compra, a moeda que drena 70 % num bloco da que faz +139 %.
 - Se a `operator/6` (entrada do Lab) é pior que a `operator/5` ou é ruído: 22 contra 50 operações, diferença dentro do erro.
 - Se existe vantagem em qualquer horizonte maior que 5 minutos (nunca medimos; a mesa nasceu com 300 s).
-- Se o sinal do Lab (`mean_reversion v14`) tem vantagem fora da amostra: 23 sinais, agora em teste com dinheiro real na `spot/1`.
+- Se o sinal do Lab (`mean_reversion v14`) tem vantagem fora da amostra: 23 sinais, agora em teste com dinheiro real na `spot/1`. *(07/10/2026: pré-registrada em coorte futura, ao custo Binance medido — [[Fila de Hipoteses#H-036 — `mean_reversion v14` em coorte futura, ao custo Binance medido (a v14 tem vantagem fora da amostra?)|H-036]]; instrumento em [[KB-0193-o-custo-binance-medido-nos-instantes-do-lab]]; sem resposta antes da primeira consulta, 06/01/2027.)*
 
 ## Relacionado
 
