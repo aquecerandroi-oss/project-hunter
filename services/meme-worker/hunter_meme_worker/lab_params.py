@@ -38,6 +38,7 @@ __all__ = [
     "effective_params",
     "optional_count",
     "positive_count_or",
+    "switch_of",
 ]
 
 REFUSAL_EXCEEDS_MAX_SOL_PER_BET = "exceeds_max_sol_per_bet"
@@ -120,6 +121,18 @@ def bool_or(value: Any, default: bool) -> bool:
     return default if value is None else bool(value)
 
 
+def switch_of(params: Mapping[str, Any], name: str, default: bool) -> bool:
+    """H-031b: ``default`` only when the key is **absent**; present, it must be a bare
+    JSON boolean — ``bool("false")`` is ``True`` and a ``null`` would silently mean
+    the default, so both are refused, never read."""
+    if name not in params:
+        return default
+    value = params[name]
+    if not isinstance(value, bool):
+        raise TypeError(f"{name} is a switch: a bare JSON boolean (false), never {value!r}")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class EffectiveParams:
     """The numbers a bet actually runs on, plus the rule set's own floor."""
@@ -144,6 +157,9 @@ class EffectiveParams:
     line_support_max_age_s: int = SUPPORT_MAX_AGE_S
     """T4.98 (EXP-M26 L1): the support ``line_broken`` reads — only a minute
     folded by the photo, closed at most this long before it (``lines_exit``)."""
+    exit_on_creator_dump: bool = True
+    """H-031b (EXP-M27): the rule set's word only — ``False`` is the twin
+    ``absorb_semdump_v0/1``; written on **every** bet, so none is ambiguous."""
 
     def exit_rules(self, key: str = "lab_exit") -> ExitRules:
         return ExitRules(
@@ -156,6 +172,7 @@ class EffectiveParams:
             max_loss_pct=self.max_loss_pct,
             exit_on_curve_complete=self.exit_on_migration,
             exit_on_migration=self.exit_on_migration,
+            exit_on_creator_dump=self.exit_on_creator_dump,
             exit_on_line_break=self.exit_on_line_break,
             line_break_snapshots=self.line_break_snapshots,
             trailing_arm_multiple=self.trailing_arm_x,
@@ -175,6 +192,7 @@ class EffectiveParams:
             "max_loss_pct": money_str(self.max_loss_pct),
             "exit_on_line_break": self.exit_on_line_break,
             "line_break_snapshots": self.line_break_snapshots,
+            "exit_on_creator_dump": self.exit_on_creator_dump,
         }
         if not self.exit_on_migration:
             params["exit_on_migration"] = False
@@ -210,6 +228,7 @@ class EffectiveParams:
             line_support_max_age_s=positive_count_or(
                 "line_support_max_age_s", params.get("line_support_max_age_s"), SUPPORT_MAX_AGE_S
             ),
+            exit_on_creator_dump=switch_of(params, "exit_on_creator_dump", True),
         )
 
 
@@ -250,6 +269,7 @@ def effective_params(spec: RuleSetSpec, decision: Mapping[str, Any]) -> Effectiv
         dead_mark_pct=decimal_or(decision.get("dead_mark_pct"), spec.dead_mark_pct),
         line_support_causal=spec.line_support_causal,
         line_support_max_age_s=spec.line_support_max_age_s,
+        exit_on_creator_dump=spec.exit_on_creator_dump,
     )
 
 

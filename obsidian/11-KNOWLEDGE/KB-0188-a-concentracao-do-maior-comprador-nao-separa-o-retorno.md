@@ -93,6 +93,7 @@ cenário S1 não a atinge. O moinho agrupado (descritivo) diz REFUTA — não é
 
 - **Advogado de Jesus (07/10):** a fatia de B sobe quando o criador vende (o denominador `real_sol` cai), então concentração e venda prévia do criador estão misturadas. Entre os criadores que ainda não tinham vendido, o excesso de `creator_dump` é 1,58×, não 2×. O papel sai na primeira venda do criador; a mesa real perdeu −0,67 e −0,77 em duas dessas moedas.
 - **Defensor (07/10):** o braço baixo em −0,055 torna o CONFIRMA inalcançável abaixo de D ≈ 0,2. A direção do viés papel × real no `creator_dump` é desconhecida, e o `exit_on_creator_dump` está nulo nas 1 889 apostas. Próximo passo útil: o conjunto gêmeo sem `creator_dump`, em coorte nova.
+- **Desdobramento (07/10):** o Everton aprovou o gêmeo; pré-registrado como **H-031b** na [[Fila de Hipoteses]] ([[EXP-M27-gemeo-sem-creator-dump]]), e a chave `exit_on_creator_dump` passa a ser gravada em toda aposta de papel nova. Nada do R88 entra na conta da H-031b.
 
 ## Segunda opinião (Astra)
 
@@ -109,4 +110,4 @@ cenário S1 não a atinge. O moinho agrupado (descritivo) diz REFUTA — não é
 [[KB-0153-o-maior-comprador-nao-estava-no-arquivo]] (H-010) ·
 [[KB-0156-o-despejo-em-bloco-nao-e-uma-rede-de-financiamento]] (H-014) ·
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[EXP-M9-pedigree-e2b]] · [[golpe_do_criador]] ·
-[[Mapa de Estrategias]]
+[[Mapa de Estrategias]] · [[EXP-M27-gemeo-sem-creator-dump]] (H-031b, o gêmeo sem `creator_dump`, 07/10)

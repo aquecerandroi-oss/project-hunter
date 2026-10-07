@@ -20,7 +20,7 @@ at 8 s returns ``{}`` and every row of the minute becomes ``pedigree_unknown``.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
@@ -35,9 +35,13 @@ from hunter_meme_worker.refused_probe import PROBE_RULE_SET_ID
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["PRIOR_WINDOW_S", "pedigree_for", "pedigree_params"]
+__all__ = ["ABSORB_SEMDUMP_RULE_SET_ID", "PRIOR_WINDOW_S", "pedigree_for", "pedigree_params"]
 
 _logger = get_logger(__name__)
+
+ABSORB_SEMDUMP_RULE_SET_ID: Final = "01994d00-6c1a-7000-8000-000000000022"
+"""H-031b (EXP-M27): the twin ``absorb_semdump_v0/1`` (``absorb_v0/2`` without the
+``creator_dump`` exit) — ``ddl/meme_absorb_semdump_arm``'s own id."""
 
 PRIOR_WINDOW_S = 7 * 86_400
 """T4.24b (hotfix, 15/09/2026 19:3x BRT): the prior-coin counts look back **7 days**, not
@@ -154,7 +158,9 @@ def pedigree_params(mints: Sequence[str], gate: PedigreeGate, *, full: bool) -> 
             # T4.91 (EXP-M24): the same for recuo_v1/1 — its bets could witness a creator sale.
             "pullback_rule_set_id": PULLBACK_ARM_RULE_SET_ID,
             "pullback_control_rule_set_id": PULLBACK_CONTROL_RULE_SET_ID,  # T4.95: and its control
-            "mature_rule_set_ids": list(MATURE_CHART_RULE_SET_IDS),  # EXP-M26 (0068): the 3 arms
+            # EXP-M26 (0068): the 3 arms; H-031b: and the twin, through the same list so the
+            # statement's text (pinned by test_pedigree_light) does not change.
+            "mature_rule_set_ids": [*MATURE_CHART_RULE_SET_IDS, ABSORB_SEMDUMP_RULE_SET_ID],
         }
     return params
 

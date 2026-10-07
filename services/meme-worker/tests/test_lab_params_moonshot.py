@@ -110,7 +110,8 @@ def test_the_frozen_set_suggests_exactly_the_four_keys_it_always_had() -> None:
         "max_loss_pct": "50",
         "exit_on_line_break": False,
         "line_break_snapshots": 2,
-    }, "a bet of a frozen set writes the params it always wrote"
+        "exit_on_creator_dump": True,  # H-031b: every bet says it, the value it always ran on
+    }, "a bet of a frozen set writes the params it always wrote, plus the switch it ran on"
     rules = params.exit_rules()
     assert rules.exit_on_migration and rules.exit_on_curve_complete and not rules.exit_on_dead
 
@@ -127,6 +128,7 @@ def test_the_effective_params_carry_the_switches_and_round_trip() -> None:
         "max_loss_pct": "100",
         "exit_on_line_break": False,
         "line_break_snapshots": 2,
+        "exit_on_creator_dump": True,
         "exit_on_migration": False,
         "trailing_arm_x": "3",
         "exit_on_dead": True,

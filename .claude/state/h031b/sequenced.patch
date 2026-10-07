@@ -1,0 +1,251 @@
+diff --git a/services/meme-worker/hunter_meme_worker/lab_models.py b/services/meme-worker/hunter_meme_worker/lab_models.py
+index d1c609b1..14b2871e 100644
+--- a/services/meme-worker/hunter_meme_worker/lab_models.py
++++ b/services/meme-worker/hunter_meme_worker/lab_models.py
+@@ -52,6 +52,7 @@ from hunter_meme_worker.lab_params import (
+     optional_decimal,
+     positive_count_or,
+     suggested_extras,
++    switch_of,
+ )
+ from hunter_meme_worker.lab_values import (
+     LEGS,
+@@ -188,6 +189,8 @@ class RuleSetSpec:
+     entry_pullback: EntryPullback | None = None
+     """T4.91 (H-016): wait for the pullback before proposing — event lane only
+     (``entry_pullback.py``); ``None`` (no ``entry_pullback_pct``) proposes at once."""
++    exit_on_creator_dump: bool = True
++    """H-031b (EXP-M27): ``false`` only in the twin ``absorb_semdump_v0/1`` (``0069``)."""
+ 
+     @property
+     def label(self) -> str:
+@@ -257,6 +260,7 @@ class RuleSetSpec:
+             require_absorb_confirmed=bool_or(params.get("require_absorb_confirmed"), False),
+             require_absorb_sell_seen=bool_or(params.get("require_absorb_sell_seen"), False),
+             entry_pullback=entry_pullback_of(params, clock=_clock_of(params.get("clock"))),
++            exit_on_creator_dump=switch_of(params, "exit_on_creator_dump", True),
+         )
+ 
+     def suggested(self) -> dict[str, Any]:
+diff --git a/services/meme-worker/hunter_meme_worker/lab_params.py b/services/meme-worker/hunter_meme_worker/lab_params.py
+index beef188b..e2423630 100644
+--- a/services/meme-worker/hunter_meme_worker/lab_params.py
++++ b/services/meme-worker/hunter_meme_worker/lab_params.py
+@@ -269,6 +269,7 @@ def effective_params(spec: RuleSetSpec, decision: Mapping[str, Any]) -> Effectiv
+         dead_mark_pct=decimal_or(decision.get("dead_mark_pct"), spec.dead_mark_pct),
+         line_support_causal=spec.line_support_causal,
+         line_support_max_age_s=spec.line_support_max_age_s,
++        exit_on_creator_dump=spec.exit_on_creator_dump,
+     )
+ 
+ 
+diff --git a/services/meme-worker/tests/test_rule_set_creator_dump.py b/services/meme-worker/tests/test_rule_set_creator_dump.py
+new file mode 100644
+index 00000000..7d23eb19
+--- /dev/null
++++ b/services/meme-worker/tests/test_rule_set_creator_dump.py
+@@ -0,0 +1,88 @@
++"""H-031b (EXP-M27) — ``exit_on_creator_dump`` read from the rule set and carried
++to the bet: ``RuleSetSpec.from_params`` → ``effective_params`` → ``as_json`` /
++``exit_rules``. Until H-031b no rule set could turn the exit off (``from_params``
++never read the key); the twin ``absorb_semdump_v0/1`` is the first that does.
++The bet side (recorded on every bet, honoured by ``evaluate_exit``) is
++``test_lab_params_creator_dump.py``.
++"""
++
++from __future__ import annotations
++
++from typing import Any
++
++import pytest
++
++from hunter_indicators.meme.exits import ExitState, evaluate_exit
++from hunter_meme_worker.lab_models import EffectiveParams, RuleSetSpec, effective_params
++
++pytestmark = pytest.mark.unit
++
++BASE: dict[str, Any] = {
++    "gate_key": "comprar_cedo_na_curva", "gate_version": 1,
++    "exit_key": "alvo_2x_trailing_30_tempo_15m", "exit_version": 1,
++    "min_age_s": 30, "max_age_s": 600, "min_progress_pct": "2", "max_progress_pct": "50",
++    "max_participation_pct": "1", "require_creator_not_net_seller": True,
++    "size_sol": "0.05", "target_x": "2", "trailing_pct": "30", "max_hold_s": 900,
++    "max_loss_pct": "50", "wallet_max_sol": "2.0", "max_sol_per_bet": "0.05",
++    "daily_loss_cap_sol": "0.20", "max_open_positions": 3,
++    "max_exposure_per_mint_sol": "0.05", "fee_pct": "1.75", "priority_fee_sol": "0",
++}  # fmt: skip
++"""``test_paper_engine.PARAMS`` (the ``0022`` document), copied by hand."""
++TWIN: dict[str, Any] = {**BASE, "exit_on_creator_dump": False}
++
++
++def _spec(params: dict[str, Any]) -> RuleSetSpec:
++    return RuleSetSpec.from_params(
++        id="01994d00-6c1a-7000-8000-000000000097",
++        name="absorb_semdump_v0",
++        version="1",
++        kind="research_only",
++        exp_ref="EXP-M27",
++        status="active",
++        code_ref="hunter_indicators.meme.rules:evaluate_entry+evaluate_exit",
++        params=params,
++    )
++
++
++def _effective(params: dict[str, Any], decision: dict[str, Any] | None = None) -> EffectiveParams:
++    effective = effective_params(_spec(params), decision or {})
++    assert not isinstance(effective, str)
++    return effective
++
++
++def test_a_set_that_does_not_name_the_switch_keeps_the_exit() -> None:
++    assert _spec(BASE).exit_on_creator_dump is True
++    effective = _effective(BASE)
++    assert effective.exit_on_creator_dump is True
++    assert effective.as_json()["exit_on_creator_dump"] is True
++
++
++def test_the_twin_reaches_the_bet_and_the_exit() -> None:
++    assert _spec(TWIN).exit_on_creator_dump is False
++    effective = _effective(TWIN)
++    assert effective.as_json()["exit_on_creator_dump"] is False
++    assert EffectiveParams.from_json(effective.as_json()) == effective
++    state = ExitState(
++        mark_sol=effective.size_sol,
++        cost_basis_sol=effective.size_sol,
++        peak_mark_sol=effective.size_sol,
++        held_s=10,
++        rug_suspected=False,
++        creator_net_seller=True,
++    )
++    assert evaluate_exit(state, _effective(BASE).exit_rules()).reason == "creator_dump"
++    assert evaluate_exit(state, effective.exit_rules()).reason is None
++
++
++def test_the_decision_cannot_turn_the_rule_sets_switch() -> None:
++    """The set's word, like the loss floor — never the operator's per bet."""
++    assert _effective(BASE, {"exit_on_creator_dump": False}).exit_on_creator_dump is True
++    assert _effective(TWIN, {"exit_on_creator_dump": True}).exit_on_creator_dump is False
++
++
++@pytest.mark.parametrize("bad", ["false", "true", 0, 1, "0", None])
++def test_the_switch_is_a_bare_json_boolean(bad: Any) -> None:
++    """``bool("false")`` is ``True`` and ``null`` would silently mean the default: refused
++    at load (and by ``meme_rule_set.py --set-param``'s validator, which loads the same way)."""
++    with pytest.raises(TypeError):
++        _spec({**BASE, "exit_on_creator_dump": bad})
+diff --git a/services/meme-worker/tests/test_creator_watch_twin.py b/services/meme-worker/tests/test_creator_watch_twin.py
+new file mode 100644
+index 00000000..cc3f1a13
+--- /dev/null
++++ b/services/meme-worker/tests/test_creator_watch_twin.py
+@@ -0,0 +1,110 @@
++# pyright: reportPrivateUsage=false
++"""H-031b (EXP-M27) — the twin's bet through the real loop, against Postgres.
++
++``test_creator_watch_persistence`` proves a bet of an ordinary set closes
++``creator_dump`` one photo after the chain watch sees the creator sell. Here the
++same scene runs on a set whose params say ``"exit_on_creator_dump": false``:
++the fill records ``false`` on the bet, the watch still stamps the sale (the
++observation is measured on both arms — H-031b's latency reads it), and the next
++photo does **not** close the bet; reloaded from the row (a restart), the bet
++still runs without the exit. Astra, ``H-031b-diff`` nice-to-have 1.
++"""
++
++from __future__ import annotations
++
++from collections.abc import AsyncIterator
++from datetime import timedelta
++from typing import TYPE_CHECKING
++from uuid import uuid4
++
++import pytest
++import pytest_asyncio
++from sqlalchemy import text
++
++from hunter_core.db.session import role_session
++from hunter_meme_worker.config import MemeConfig
++from hunter_meme_worker.creator_watch import CreatorWatchState, creator_watch_once
++from hunter_meme_worker.lab import LabContext, LabState, lab_tick
++from hunter_meme_worker.lab_repo_bets import load_open_bets
++from hunter_meme_worker.repo import insert_snapshot
++
++from .test_creator_watch_persistence import NOW, FakeChain, _account, _mint, _radar, _set_creator
++from .test_lab_persistence import (
++    WORKER,
++    FakeQuotes,
++    Heartbeats,
++    _approve,
++    _bet_of,
++    _plant_curve,
++    _rule_set,
++    _snapshot,
++)
++
++if TYPE_CHECKING:
++    from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
++
++pytestmark = pytest.mark.integration
++
++
++@pytest_asyncio.fixture
++async def lab(
++    db_session_factory: async_sessionmaker[AsyncSession],
++) -> AsyncIterator[LabContext]:
++    yield LabContext(
++        config=MemeConfig(enabled=True, lab_enabled=True),
++        session_factory=db_session_factory,
++        state=LabState(),
++        quotes=FakeQuotes(),
++        heartbeat=Heartbeats(),
++    )
++
++
++async def test_the_twin_sees_the_sale_and_keeps_running(
++    lab: LabContext,
++    db_session_factory: async_sessionmaker[AsyncSession],
++    db_engine: AsyncEngine,
++) -> None:
++    rule_set = await _rule_set(db_engine, f"twin_{uuid4().hex[:6]}")
++    async with db_engine.begin() as connection:
++        await connection.execute(
++            text(
++                "UPDATE meme_rule_sets SET params = params || "
++                "'{\"exit_on_creator_dump\": false}'::jsonb WHERE id = :id"
++            ),
++            {"id": rule_set},
++        )
++    mint = _mint("twin")
++    decided = NOW - timedelta(seconds=60)
++    entry_at = decided + timedelta(seconds=30)
++    await _plant_curve(
++        db_session_factory,
++        mint,
++        [(entry_at, "32.4", "993000000")],
++        created_at=decided - timedelta(minutes=2),
++    )
++    await _set_creator(db_session_factory, mint)
++    proposal = await _approve(db_session_factory, mint=mint, rule_set_id=rule_set, decided_at=decided)
++    assert (await lab_tick(lab, now=NOW)).fills.filled >= 1
++    opened = await _bet_of(db_session_factory, proposal)
++    assert opened["params"]["exit_on_creator_dump"] is False, "the bet says what it runs on"
++
++    chain = FakeChain([[_account("1000"), None], [_account("400"), None]])
++    ctx, state = _radar(db_session_factory, chain), CreatorWatchState()
++    await creator_watch_once(ctx, state)
++    await creator_watch_once(ctx, state)
++    seen_at = (await _bet_of(db_session_factory, proposal))["creator_sold_seen_at"]
++    assert seen_at is not None, "the sale is still observed on the twin"
++
++    photo = seen_at + timedelta(seconds=15)
++    async with role_session(db_session_factory, db_role=WORKER) as session:
++        await insert_snapshot(session, _snapshot(mint, photo, "31", "1000000000"))
++    await lab_tick(lab, now=photo + timedelta(seconds=5))
++
++    after = await _bet_of(db_session_factory, proposal)
++    assert after["status"] == "open", "no creator_dump on the twin"
++    assert after["exit_intent"] is None
++    async with role_session(db_session_factory, db_role=WORKER) as session:
++        reloaded = {b.state.id: b for b in await load_open_bets(session)}
++    bet = reloaded[str(after["id"])]
++    assert bet.creator_sold_seen_at == seen_at
++    assert bet.state.params.exit_rules().exit_on_creator_dump is False, "a restart keeps it off"

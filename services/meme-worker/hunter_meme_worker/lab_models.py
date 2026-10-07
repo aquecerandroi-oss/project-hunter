@@ -52,6 +52,7 @@ from hunter_meme_worker.lab_params import (
     optional_decimal,
     positive_count_or,
     suggested_extras,
+    switch_of,
 )
 from hunter_meme_worker.lab_values import (
     LEGS,
@@ -188,6 +189,8 @@ class RuleSetSpec:
     entry_pullback: EntryPullback | None = None
     """T4.91 (H-016): wait for the pullback before proposing — event lane only
     (``entry_pullback.py``); ``None`` (no ``entry_pullback_pct``) proposes at once."""
+    exit_on_creator_dump: bool = True
+    """H-031b (EXP-M27): ``false`` only in the twin ``absorb_semdump_v0/1`` (``0069``)."""
 
     @property
     def label(self) -> str:
@@ -257,6 +260,7 @@ class RuleSetSpec:
             require_absorb_confirmed=bool_or(params.get("require_absorb_confirmed"), False),
             require_absorb_sell_seen=bool_or(params.get("require_absorb_sell_seen"), False),
             entry_pullback=entry_pullback_of(params, clock=_clock_of(params.get("clock"))),
+            exit_on_creator_dump=switch_of(params, "exit_on_creator_dump", True),
         )
 
     def suggested(self) -> dict[str, Any]:
