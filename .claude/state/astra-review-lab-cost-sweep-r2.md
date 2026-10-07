@@ -1,0 +1,26 @@
+**Quatro fechados; 2 e 3 ainda abertos.** Revisão somente por leitura, como `quant-engineer`; nenhum arquivo alterado ou teste executado.
+
+| Must-fix | Veredito e evidência |
+|---|---|
+| **1** | **FECHADO.** “Reprecificação condicionada”, admissão dependente do custo e preenchimento maker presumido estão explícitos em [sweep.py:18](C:/dev/project-hunter/.claude/state/lab-cost-sweep/sweep.py:18). O cenário O=S deixou de ser apresentado como execução válida sob qualquer custo. |
+| **2** | **ABERTO, parcialmente corrigido.** As duas populações estão separadas em [run.py:71](C:/dev/project-hunter/.claude/state/lab-cost-sweep/run.py:71), mas a nota ainda mistura **n financiado com mercados/atividade de todos**. Exemplo: v1 tem 377 financiados em **112** mercados; a nota apresenta **113**. Falha: atribuir cobertura de observações excluídas à estimativa financiada. Há também uma omissão: [run.py:141](C:/dev/project-hunter/.claude/state/lab-cost-sweep/run.py:141) suprime inclusive o cenário sem funding quando o subconjunto financiado não permite IC. Isso acontece no replay `7598d6c4`: **224/24 dias** no total, **23/3 dias** financiados ([results.txt:131](C:/dev/project-hunter/.claude/state/lab-cost-sweep/results.txt:131)). |
+| **3** | **ABERTO.** Ainda consta “**O custo do Lab em R cai com o horizonte**” em [KB-0192:180](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal.md:180), contrariando a correção posterior. Falha: aumentar somente o prazo esperando reduzir mecanicamente o custo. |
+| **4** | **FECHADO.** `Σh·k/Σh` implementado em [sweep.py:136](C:/dev/project-hunter/.claude/state/lab-cost-sweep/sweep.py:136); o [teste:152](C:/dev/project-hunter/.claude/state/lab-cost-sweep/test_sweep.py:152) cobre pesos iguais e diferentes. O exemplo mediana 10 versus custo efetivo 19,8 deixou de aprovar indevidamente a viabilidade. |
+| **5** | **FECHADO para esta nota de direções.** [extra.py:25](C:/dev/project-hunter/.claude/state/lab-cost-sweep/extra.py:25) qualifica estimando, dias elegíveis e ausência de paradas; [KB-0192:216](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal.md:216) exige calendário, futilidade e poder completos antes do pré-registro. Os 178 dias já não são promessa de comprovar média >0,10 R. |
+| **6** | **FECHADO para momentum v3 e volume_anomaly perp v1/v2.** [KB-0192:41](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal.md:41) distingue estimativa pontual, incerteza e custo; não confunde mais ausência de vantagem demonstrada com custo irrelevante. |
+
+**Divergências numéricas restantes na nota:**
+
+- **Mercados da Tabela 1**, usando a população financiada: momentum v1 **232→230**, v4 **108→107**, v8 **104→103**; mean_reversion v1 **113→112**, v2 **83→82**, v3 **70→69**, v6/v7 **80→79**, v8 **89→88**, v10 **89→87**; session_orb **33→31**. Compare [nota:103](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal.md:103) com [results.txt:6](C:/dev/project-hunter/.claude/state/lab-cost-sweep/results.txt:6). Atividade/duração precisam ser rotuladas como **todos**, ou recalculadas no subconjunto.
+- **Sobreposição 55–99%:** existem **48% e 100%** ([nota:59](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal.md:59); [results:351](C:/dev/project-hunter/.claude/state/lab-cost-sweep/results.txt:351), [results:360](C:/dev/project-hunter/.claude/state/lab-cost-sweep/results.txt:360)).
+- **Outubro “4 dias”:** varia de **1 a 5** na família tabelada ([nota:60](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal.md:60); [results:228](C:/dev/project-hunter/.claude/state/lab-cost-sweep/results.txt:228), [results:236](C:/dev/project-hunter/.claude/state/lab-cost-sweep/results.txt:236)).
+- **Replay momentum v11, 1.163 desfechos:** setembro tem **bruto +0,067**, não negativo; negativo é o líquido **−0,036**. A faixa geral “−0,13 a +0,21” também precisa explicitar população/filtro: o replay v2 financiado chega a **−0,282** ([nota:173](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal.md:173); [results:322](C:/dev/project-hunter/.claude/state/lab-cost-sweep/results.txt:322), [results:131](C:/dev/project-hunter/.claude/state/lab-cost-sweep/results.txt:131)).
+- **Fórmula documental de k*:** falta **×10⁴** para expressar bp em [nota:79](C:/dev/project-hunter/obsidian/11-KNOWLEDGE/KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal.md:79); a implementação está correta.
+- O frontmatter ainda diz **14 testes**; agora há **15 funções de teste**. Isso não afirma execução.
+
+Os valores citados de poder/pareamento em `extra.txt` e de fidelidade em `check.txt` conferem.
+
+**OBSIDIAN**
+
+- **KB-0192 — O custo do Lab explica a perda, mas não o sinal:** corrigir as divergências acima e retirar a declaração de fechamento integral.
+- **Revisões Astra / lab-cost-sweep:** registrar rodada 2, com itens 2 e 3 pendentes.

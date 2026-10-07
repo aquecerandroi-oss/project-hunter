@@ -1,0 +1,4 @@
+2a2c1e6c02f10d4e9ff958870ded1aff76ac97db3b6ad8054ea3404b59b1eee0 *out.csv
+a92e1038fe8f12047b6b18383132d886e9e992d798acce90da8039192098108c *spot.csv
+extraído 2026-10-07T06:07:35Z (relógio local, UTC)
+out.csv (5,7 MB) apagado depois da extração; o cache versionável é cache/out.csv.gz = gzip -9 do mesmo arquivo (gunzip devolve o sha256 acima).

@@ -1,0 +1,6 @@
+linhas 17979 sem insumos {}
+custos assumidos (spread, slip, fee) -> {('2', '5', '4'): 17979}
+motivo funding (mt, reason, r_multiple nulo) -> {('perpetual', '-', False): 16272, ('perpetual', 'funding_schedule_unknown', True): 1448, ('perpetual', 'funding_missing', True): 106, ('perpetual', 'funding_ambiguous_exit', True): 20, ('spot', 'funding_schedule_unknown', True): 133}
+r_multiple: n 16272 max|dif| 7.490630506978846e-06 n>1e-6 5
+r_ex_funding: n 17979 max|dif| 7.275247071447666e-11 n>1e-6 0
+abertura a < 10 % da unidade de risco do stop (O − S < 0,1·U; onde O − S como denominador explodiria): 15 {('volume_anomaly', 'v2'): 10, ('volume_anomaly', 'v1'): 5}

@@ -65,7 +65,7 @@ mercado: meme
 20. **RPC gratuito mata a mesa em silêncio**: com o Helius no limite, a pista rápida parou e a mesa ficou **2 dias e 1 hora sem operar** sem nenhum alarme (21/09 12:08 → 23/09 10:47). Plano pago: 0 erros/hora, 815 moedas avaliadas por tique (eram 385), 310 rastreadas (eram 126).
 21. **O `.env` não chega ao robô sem recriar o contêiner.** Quatro tentativas de 19 a 23/09 falharam por isso; `compose.sh update` recria porque o commit muda, mas mudança só de `.env` exige `up --force-recreate`.
 22. **A Binance lidera a Solana por menos de 15 s** e a Jupiter cota +9 bp acima do mid: em cripto normal a vantagem tem de vir do sinal, não da velocidade (R63/[[KB-0145-binance-como-sinal-solana-como-execucao|KB-0145]]).
-23. **Custo por praça, medido:** pump.fun 4,09 % (2,23 % sem aluguel) · pós-graduação 2,40 % · Solana à vista pela Jupiter **0,14 %** · Binance 0,02–0,10 %. Praça barata tem movimento pequeno — a vantagem não é de graça.
+23. **Custo por praça, medido:** pump.fun 4,09 % (2,23 % sem aluguel) · pós-graduação 2,40 % · Solana à vista pela Jupiter **0,14 %** · Binance 0,02–0,10 %. Praça barata tem movimento pequeno — a vantagem não é de graça. *(07/10/2026: no Lab de cripto, trocar os 20 bp assumidos por custo Binance não deixa a `momentum` positiva — o bruto já é −0,046 R — e só a `mean_reversion` fica bruto-positiva, dentro do ruído: [[KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal]].)*
 
 ## 5. Método: o que nos salvou de perder mais
 

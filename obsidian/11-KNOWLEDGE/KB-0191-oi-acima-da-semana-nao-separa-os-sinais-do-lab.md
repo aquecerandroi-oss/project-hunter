@@ -141,7 +141,8 @@ teste que falhou antes; saída numericamente idêntica depois.
 [[Dicionario de Variaveis]] · [[KB-0024-open-interest-como-posicionamento-evidencia-e-folclore]] ·
 [[KB-0020-funding-change-8h-nunca-calcula]] · [[KB-0025-o-nosso-detector-de-open-interest-so-olha-para-cima]] ·
 [[KB-0170-tendencia-diaria-nao-separa-os-sinais-do-lab]] · [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]] ·
-[[KB-0171-custo-real-da-spot-1]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[Market Collector]] · [[EXP-0005-momentum-paper]]
+[[KB-0171-custo-real-da-spot-1]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[Market Collector]] · [[EXP-0005-momentum-paper]] ·
+[[KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal]] (a varredura de custo que o Defensor pediu: o custo é ~78 % da perda da base, mas o bruto da `momentum v3` já é −0,046 R)
 
 ## Advogado de Jesus e Defensor (07/10/2026)
 

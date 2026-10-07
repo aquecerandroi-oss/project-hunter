@@ -1,0 +1,26 @@
+(a) spot/1 real × sombra do Lab no MESMO sinal (mean_reversion v14 perp):
+  TAOUSDT   2026-09-25 14:30 real -0.564 | sombra R_lab +0.086 G +0.165 | expired
+  NEARUSDT  2026-09-26 00:45 real -0.147 | sombra R_lab -0.341 G -0.247 | expired
+  TAOUSDT   2026-09-26 19:15 real -1.160 | sombra R_lab -1.095 G -0.960 | stop
+  NEARUSDT  2026-09-27 11:15 real +0.618 | sombra R_lab -1.071 G -0.969 | stop
+  NEARUSDT  2026-09-28 00:00 real -0.805 | sombra R_lab -1.058 G -0.975 | stop
+  LINKUSDT  2026-09-29 02:45 real -1.659 | sombra R_lab -1.068 G -0.971 | stop
+  UNIUSDT   2026-09-29 14:30 real -0.365 | sombra R_lab -1.092 G -0.960 | stop
+  NEARUSDT  2026-09-30 00:15 real +0.031 | sombra R_lab +1.174 G +1.263 | target
+  UNIUSDT   2026-09-30 14:45 real -0.011 | sombra R_lab +1.021 G +1.121 | target
+  NEARUSDT  2026-09-30 20:45 real -0.337 | sombra R_lab -0.436 G -0.356 | expired
+  médias (n=10): real -0.440 · sombra R_lab -0.388 · sombra G -0.289 · sombra taker5 -0.339 · real − sombra G -0.151 R
+
+(b) poder de REJEITAR média = 0 quando a média verdadeira é +efeito (não de provar média > efeito); aproximação normal, bilateral 5 %, 80 % (z 1,96 + 0,84); EP agrupado por dia desta coorte escalado por 1/√dias; 'dias' = dias COM trades elegíveis, mesma frequência/variância/dependência; SEM paradas intermediárias — referência condicional, potencialmente otimista (Astra, must-fix 5):
+  mean_reversion v10: n 338, 27 dias, média taker5 +0.020, EP dia 0.064, dp/trade 0.75 → efeito +0.03 R pede ≈ 956 dias (≈ 11974 trades)
+  mean_reversion v10: n 338, 27 dias, média taker5 +0.020, EP dia 0.064, dp/trade 0.75 → efeito +0.05 R pede ≈ 344 dias (≈ 4311 trades)
+  mean_reversion v10: n 338, 27 dias, média taker5 +0.020, EP dia 0.064, dp/trade 0.75 → efeito +0.10 R pede ≈ 86 dias (≈ 1078 trades)
+  mean_reversion v7: n 245, 26 dias, média taker5 +0.034, EP dia 0.078, dp/trade 0.90 → efeito +0.03 R pede ≈ 1363 dias (≈ 12844 trades)
+  mean_reversion v7: n 245, 26 dias, média taker5 +0.034, EP dia 0.078, dp/trade 0.90 → efeito +0.05 R pede ≈ 491 dias (≈ 4624 trades)
+  mean_reversion v7: n 245, 26 dias, média taker5 +0.034, EP dia 0.078, dp/trade 0.90 → efeito +0.10 R pede ≈ 123 dias (≈ 1156 trades)
+  mean_reversion v14: n 213, 25 dias, média taker5 +0.031, EP dia 0.095, dp/trade 1.04 → efeito +0.03 R pede ≈ 1974 dias (≈ 16820 trades)
+  mean_reversion v14: n 213, 25 dias, média taker5 +0.031, EP dia 0.095, dp/trade 1.04 → efeito +0.05 R pede ≈ 711 dias (≈ 6055 trades)
+  mean_reversion v14: n 213, 25 dias, média taker5 +0.031, EP dia 0.095, dp/trade 1.04 → efeito +0.10 R pede ≈ 178 dias (≈ 1514 trades)
+  momentum v3: n 1673, 30 dias, média taker5 -0.131, EP dia 0.022, dp/trade 0.81 → efeito +0.03 R pede ≈ 123 dias (≈ 6858 trades)
+  momentum v3: n 1673, 30 dias, média taker5 -0.131, EP dia 0.022, dp/trade 0.81 → efeito +0.05 R pede ≈ 44 dias (≈ 2469 trades)
+  momentum v3: n 1673, 30 dias, média taker5 -0.131, EP dia 0.022, dp/trade 0.81 → efeito +0.10 R pede ≈ 11 dias (≈ 617 trades)
