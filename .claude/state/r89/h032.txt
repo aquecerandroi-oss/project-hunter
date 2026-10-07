@@ -1,0 +1,63 @@
+linhas extraídas: 2469
+estrato × p: Counter({('B', '0.005'): 2468, ('A', '0.10'): 1})
+fora (estrato ≠ B): 1 | mayhem_unknown: 0
+
+== I1 concordância do bit (denominador: todas as apostas; nulo = discordância)
+registros sem concordância (inclui bit nulo e a proposta sem aposta) 239 de 2468 = 9.6840%; tok nulo 0, foto nula 239
+
+== ausentes por grupo (aberta, unfilled, pnl nulo, indeterminate, proposta sem aposta)
+Mayhem: n=732 resolvidas=731 ausentes=1 (0.14%)
+não-Mayhem: n=1736 resolvidas=1643 ausentes=93 (5.36%)
+
+== I2 teto de SOL real
+Mayhem: SOL real na foto de entrada p10/p50/p90 = [0.     0.0612 0.6799]; < 0,7 SOL: 90.3%; saídas com teto 463 de 731 = 63.34%
+não-Mayhem: SOL real na foto de entrada p10/p50/p90 = [0.     0.2413 7.3209]; < 0,7 SOL: 62.1%; saídas com teto 0 de 1643 = 0.00%
+
+== I3 ida e volta sem movimento externo (recomputada da foto de entrada)
+Mayhem: avaliáveis n=732 (só compra; não valida a venda Mayhem) |tokens/entry−1| ≤ 0,5 % em 100.00% (máx 0.00e+00); ida e volta sem teto mediana -0.0344; com teto no SOL real observado mediana -0.1409, < −10 % em 51.1%
+não-Mayhem: avaliáveis n=1735 (só compra; não valida a venda Mayhem) |tokens/entry−1| ≤ 0,5 % em 100.00% (máx 0.00e+00); ida e volta sem teto mediana -0.0344; com teto no SOL real observado mediana -0.0344, < −10 % em 0.0%
+
+I1 False · I2 False (teto Mayhem 63.34%) · I3 True · ausentes ≤ 20 % True → instrumento ok = False
+
+== dado: Mayhem resolvidas 731 (≥150), não-Mayhem 1643 (≥300), dias com os dois 14 (≥10) → True
+cortes n_outras_limpa (primário) c1=9.000 c2=10.000; sensibilidade c1=5.000 c2=6.000
+  tercis Mayhem: {0: 346, 1: 214, 2: 172}
+  tercis não-Mayhem: {0: 1178, 1: 352, 2: 206}
+suporte: estratos usados 137; descartados Mayhem 2.33%, não-Mayhem 1.34% → True
+
+== PRIMÁRIO D_adj = não-Mayhem − Mayhem (estratos dia × 6 h × tercil)
+D_adj = +0.5353  IC95 blocos 60 min [+0.4825, +0.5795] (não finitas 0.00%)  p centrado 0.0001
+IC95 blocos de dia [+0.4949, +0.5714] (não finitas 0.00%); blocos de 60 min: 290
+bruto (descritivo) D = +0.5477; média Mayhem -0.5971, não-Mayhem -0.0494
+medianas: Mayhem -0.8505, não-Mayhem -0.0388
+nível com custo da mesa real (+1,27 pp, descritivo): Mayhem -0.5844, não-Mayhem -0.0367
+
+== robustez (sinal de D_adj)
+  metade 1 (< 30/09): +0.4988
+  metade 2 (≥ 30/09): +0.5664
+  params com line_support_causal: +0.5520
+  params sem line_support_causal: +0.4885
+  famílias de volume/fluxo fora: +0.5355
+
+== censura (cenários de imputação)
+  favor da exclusão: D_adj +0.6355 [+0.5668, +0.6867]
+  contra da exclusão: D_adj +0.4776 [+0.4202, +0.5295]
+  grade de imputação (não é limiar; o rótulo não muda enquanto I1/I2 falharem): ausentes não-Mayhem = -1.0 → D_adj +0.4831
+  grade de imputação (não é limiar; o rótulo não muda enquanto I1/I2 falharem): ausentes não-Mayhem = -0.5 → D_adj +0.5111
+  grade de imputação (não é limiar; o rótulo não muda enquanto I1/I2 falharem): ausentes não-Mayhem = +0.0 → D_adj +0.5391
+  grade de imputação (não é limiar; o rótulo não muda enquanto I1/I2 falharem): ausentes não-Mayhem = +0.5 → D_adj +0.5671
+  grade de imputação (não é limiar; o rótulo não muda enquanto I1/I2 falharem): ausentes não-Mayhem = +1.0 → D_adj +0.5951
+  grade de imputação (não é limiar; o rótulo não muda enquanto I1/I2 falharem): ausentes não-Mayhem = +2.0 → D_adj +0.6511
+  grade de imputação (não é limiar; o rótulo não muda enquanto I1/I2 falharem): ausentes não-Mayhem = +5.0 → D_adj +0.8191
+
+RÓTULO: NÃO CONFIRMA — instrumento — portão de instrumento
+pista contrária (IC inteiro abaixo de zero, Mayhem melhor): False
+
+== secundárias (descritivas, não decidem)
+Mayhem: comprou_no_topo 80.44% (n 731); ret ≤ −0,5 70.86%; ret ≥ +0,10 10.26%; acerto (ret > 0) 11.90%
+   saídas: {'max_loss': 429, 'trailing': 164, 'target': 105, 'creator_dump': 30, 'time_stop': 3}
+não-Mayhem: comprou_no_topo 86.31% (n 1643); ret ≤ −0,5 1.16%; ret ≥ +0,10 6.94%; acerto (ret > 0) 9.25%
+   saídas: {'creator_dump': 756, 'time_stop': 502, 'trailing': 224, 'target': 124, 'line_broken': 24, 'max_loss': 13}
+comprou_no_topo Mayhem ÷ não-Mayhem = 0.93× (previsão secundária ≥ 1,5×)
+D_adj só com Mayhem sem teto e SOL real na entrada ≥ 0,7 (descritivo): +0.1397 (Mayhem n=54)
+permutação dentro do dia (bruto, descritiva): p = 0.0001

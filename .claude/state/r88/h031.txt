@@ -1,0 +1,70 @@
+R88 — H-031 · lista congelada sha256 18dcd185… (00:39:40Z) · desfechos lidos 00:40:00Z
+[A] classes: {'measured': 192, 'indeterminate': 17} · fee_pct: {'1.75': 209}
+[A] censura por braço — alto: {'measured': 66, 'indeterminate': 2} · baixo: {'measured': 126, 'indeterminate': 15}
+[B] classes: {'measured': 1647, 'indeterminate': 33} · fee_pct: {'1.25': 868, '1.75': 812}
+[B] censura por braço — alto: {'measured': 390, 'indeterminate': 14} · baixo: {'measured': 1257, 'indeterminate': 19}
+
+--- A · primário (measured) ---
+unidades 192 (baixo 126, alto 66) · mints 132 · dias 18 · limite: None
+conjuntos suportados (pesos ∝ unidades): {'flow_v2/6': 35, 'flow_v2/7': 28, 'flow_v2/8': 50, 'flow_v2/9': 78}
+D_adj = +0.0857 · nível ajustado do braço baixo -0.0183 · D agrupado +0.0891
+IC mint [-0.0746; +0.2479] p 0.1417 inválidas 0.07% · IC dia [-0.0343; +0.2409] p 0.1412 inválidas 11.96%
+p decisório (maior) 0.1417 · Holm 0.2834
+metades D_adj +0.1534 / -0.1562 · ≥ 8 dias em cada braço: True
+curva: 0.1013: D +0.0493 [-0.1046; +0.2171] ok (97/95) | 0.1152: D +0.0301 [-0.1386; +0.2013] ok (116/76) | 0.1222: D +0.0857 [-0.0746; +0.2479] ok (126/66) | 0.1306: D +0.0488 [-0.1417; +0.2325] ok (142/50) | 0.1479: D +0.0563 [-0.1403; +0.2421] ok (151/41) → pico
+por conjunto (n baixo, n alto, média baixo, média alto, suportado): flow_v2/10 0/1 +nan/-0.558 (fora); flow_v2/6 26/9 +0.055/-0.175; flow_v2/7 21/7 +0.039/-0.249; flow_v2/8 36/14 +0.037/-0.060; flow_v2/9 43/35 -0.107/-0.049
+RÓTULO (primário (measured)): NÃO CONFIRMA
+
+--- B · primário (measured) ---
+unidades 1647 (baixo 1257, alto 390) · mints 1300 · dias 11 · limite: None
+conjuntos suportados (pesos ∝ unidades): {'absorb_v0/1': 390, 'absorb_v0/2': 470, 'flow_v2/1': 333, 'operator/5': 42, 'recuo_ctrl_v1/1': 150, 'recuo_v1/1': 262}
+D_adj = -0.0023 · nível ajustado do braço baixo -0.0547 · D agrupado -0.0039
+IC mint [-0.0427; +0.0369] p 0.5529 inválidas 0.62% · IC dia [-0.0249; +0.0248] p 0.6018 inválidas 20.84%
+p decisório (maior) 0.6018 · Holm 0.6018
+metades D_adj -0.0084 / +0.0303 · ≥ 8 dias em cada braço: True
+curva: 0.2000: D -0.0170 [-0.0537; +0.0198] ok (826/821) | 0.2500: D -0.0404 [-0.0792; -0.0017] ok (1027/620) | 0.3000: D -0.0284 [-0.0710; +0.0123] ok (1163/484) | 0.3500: D -0.0023 [-0.0427; +0.0369] ok (1257/390) | 0.4000: D -0.0098 [-0.0602; +0.0368] ok (1329/318) | 0.4500: D -0.0207 [-0.0777; +0.0323] ok (1371/276) → ausente
+por conjunto (n baixo, n alto, média baixo, média alto, suportado): absorb_v0/1 315/75 -0.059/-0.058; absorb_v0/2 267/203 -0.054/-0.041; flow_v2/1 260/73 -0.083/-0.070; operator/5 37/5 -0.050/-0.016; recuo_ctrl_v1/1 132/18 -0.056/-0.019; recuo_v1/1 246/16 -0.014/-0.067
+RÓTULO (primário (measured)): NÃO CONFIRMA
+
+--- A · S1 (indeterminate = −1) ---
+unidades 209 (baixo 141, alto 68) · mints 143 · dias 18 · limite: None
+conjuntos suportados (pesos ∝ unidades): {'flow_v2/6': 39, 'flow_v2/7': 30, 'flow_v2/8': 56, 'flow_v2/9': 83}
+D_adj = +0.0150 · nível ajustado do braço baixo -0.1215 · D agrupado +0.0101
+IC mint [-0.1579; +0.1873] p 0.4317 inválidas 0.07% · IC dia [-0.0804; +0.1432] p 0.4172 inválidas 11.96%
+p decisório (maior) 0.4317 · Holm 0.4317
+metades D_adj +0.0753 / -0.2180 · ≥ 8 dias em cada braço: True
+curva: 0.1013: D +0.0630 [-0.1172; +0.2499] ok (105/104) | 0.1152: D +0.0259 [-0.1679; +0.2195] ok (127/82) | 0.1222: D +0.0150 [-0.1579; +0.1873] ok (141/68) | 0.1306: D +0.0082 [-0.1950; +0.2026] ok (157/52) | 0.1479: D -0.0086 [-0.2130; +0.1861] ok (167/42) → pico
+por conjunto (n baixo, n alto, média baixo, média alto, suportado): flow_v2/10 0/1 +nan/-0.558 (fora); flow_v2/6 29/10 -0.054/-0.257; flow_v2/7 23/7 -0.051/-0.249; flow_v2/8 41/15 -0.089/-0.122; flow_v2/9 48/35 -0.200/-0.049
+RÓTULO (S1 (indeterminate = −1)): NÃO CONFIRMA
+
+--- B · S1 (indeterminate = −1) ---
+unidades 1680 (baixo 1276, alto 404) · mints 1323 · dias 11 · limite: None
+conjuntos suportados (pesos ∝ unidades): {'absorb_v0/1': 393, 'absorb_v0/2': 475, 'flow_v2/1': 354, 'operator/5': 42, 'recuo_ctrl_v1/1': 152, 'recuo_v1/1': 264}
+D_adj = +0.0292 · nível ajustado do braço baixo -0.0686 · D agrupado +0.0149
+IC mint [-0.0218; +0.0824] p 0.1351 inválidas 0.63% · IC dia [+0.0013; +0.0599] p 0.0307 inválidas 20.84%
+p decisório (maior) 0.1351 · Holm 0.2701
+metades D_adj +0.0296 / +0.0422 · ≥ 8 dias em cada braço: True
+curva: 0.2000: D -0.0119 [-0.0504; +0.0262] ok (840/840) | 0.2500: D -0.0221 [-0.0648; +0.0208] ok (1041/639) | 0.3000: D -0.0052 [-0.0527; +0.0434] ok (1180/500) | 0.3500: D +0.0292 [-0.0218; +0.0824] ok (1276/404) | 0.4000: D +0.0421 [-0.0277; +0.1169] ok (1349/331) | 0.4500: D +0.0441 [-0.0384; +0.1330] ok (1392/288) → pico
+por conjunto (n baixo, n alto, média baixo, média alto, suportado): absorb_v0/1 318/75 -0.068/-0.058; absorb_v0/2 268/207 -0.057/-0.060; flow_v2/1 275/79 -0.133/-0.141; operator/5 37/5 -0.050/-0.016; recuo_ctrl_v1/1 132/20 -0.056/-0.117; recuo_v1/1 246/18 -0.014/-0.171
+RÓTULO (S1 (indeterminate = −1)): NÃO CONFIRMA
+
+RÓTULO POR MEDIDA (primário e S1 têm de concordar): {'A': 'NÃO CONFIRMA', 'B': 'NÃO CONFIRMA'}
+RÓTULO H-031 (família, emenda item 5): NÃO CONFIRMA
+
+=== secundária (não decide): taxas por braço, todas as apostas fechadas (measured + indeterminate) ===
+[A] limiar 0.1222
+  golpe (saída creator_dump), fechadas: alto 23/68 = 33.8% · baixo 43/141 = 30.5% · razão 1.11× · alto − baixo +3.3 pp IC mint [-14.5; +22.0]
+  perda ≥ 50 %, só measured (correção Astra: denominador = measured): alto 8/66 = 12.1% · baixo 6/126 = 4.8% · razão 2.55× · alto − baixo +7.4 pp IC mint [-3.1; +19.7]
+  indeterminate, fechadas: alto 2/68 = 2.9% · baixo 15/141 = 10.6% · razão 0.28× · alto − baixo -7.7 pp IC mint [-17.0; +0.2]
+[B] limiar 0.3500
+  golpe (saída creator_dump), fechadas: alto 185/404 = 45.8% · baixo 277/1276 = 21.7% · razão 2.11× · alto − baixo +24.1 pp IC mint [+18.3; +30.0]
+  perda ≥ 50 %, só measured (correção Astra: denominador = measured): alto 7/390 = 1.8% · baixo 70/1257 = 5.6% · razão 0.32× · alto − baixo -3.8 pp IC mint [-5.7; -1.8]
+  indeterminate, fechadas: alto 14/404 = 3.5% · baixo 19/1276 = 1.5% · razão 2.33× · alto − baixo +2.0 pp IC mint [-0.0; +4.1]
+
+=== descritivo ===
+[A] Σ pnl_sol (measured, Decimal) -0.3723522190 SOL · média r baixo -0.0082 alto -0.0972 · nível ajustado com ATA -0.0369
+[A] uma por mint: n 132 · D_adj +0.0065 · D agrupado +0.0088
+[A] sem criador como maior comprador: não avaliável (o pedigree_e2b não grava is_creator)
+[B] Σ pnl_sol (measured, Decimal) -5.5209788151 SOL · média r baixo -0.0535 alto -0.0495 · nível ajustado com ATA -0.0733
+[B] uma por mint: n 1300 · D_adj -0.0138 · D agrupado -0.0031
+[B] sem criador como maior comprador: n 1397 · D_adj +0.0080

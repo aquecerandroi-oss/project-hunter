@@ -121,6 +121,10 @@ falta de fita, não por mérito).
 ## Avaliação
 _(append-only; o fechamento diário acrescenta uma seção datada por dia com aposta fechada)_
 
+### 2026-10-07 — R88 / H-031 (pesquisa retrospectiva, não é o fechamento da régua)
+
+A H-031 ([[Fila de Hipoteses]]) mediu a fatia do maior comprador **dentro** das apostas que esta E2-b deixou passar: 212 apostas `flow_v2/6`–`/10` com o bloco `pedigree_e2b`, todas com `top_buyer_share` **< 0,35** (o critério recusa ≥ 0,35 antes de a proposta nascer) e `fill_seconds` **nulo nas 228 propostas** (P2 confirmada no extremo: a perna do tempo nunca falou numa proposta). No tercil superior (> 0,1222) contra o resto, D ajustado por conjunto **+0,086**, IC [−0,075; +0,248], pico, metades de sinal oposto — NÃO CONFIRMA, e a estimativa depende de uma mint no limiar. Medida no instrumento da decisão (`decision_tape`, onde existe fatia ≥ 0,35), excluir ≥ 0,35 **não** melhora o retorno do papel (D −0,0023, IC [−0,043; +0,037]). Isto não avalia P1/P3/P5 nem a régua desta página (≥ 100 apostas e 30 dias com contraste marcadas × não marcadas). KB: [[KB-0188-a-concentracao-do-maior-comprador-nao-separa-o-retorno]].
+
 ## Fontes
 
 `packages/indicators/hunter_indicators/meme/pedigree_e2b.py` ·

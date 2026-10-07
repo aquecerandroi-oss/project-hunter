@@ -1,0 +1,143 @@
+# H-031 A — fatia do maior comprador (D agrupado, descritivo) — NÃO CONFIRMA
+
+> Origem: Fila H-031; R88  ·  impressão digital do pré-registo: `1033bc8d4bb1`
+> Limiar congelado: **0.122168**  ·  efeito mínimo relevante (MRE): **+0.0500**
+
+## Pré-registo (escrito antes de correr)
+
+- **Previsão:**  em cada medida, D = média de r com fatia ≤ limiar − média de r com fatia > limiar ≥ **+0,05 por SOL** (MRE da casa — H-010/H-014; escolha, não derivação); IC 95 % por bootstrap de cluster de mint (10 000 réplicas, semente 20261007) com limite inferior > 0 **e** IC de blocos de dia com limite inferior > 0; p de permutação estratificada por conjunto, ajustado por **Holm** em {A, B}, < 0,05; braço selecionado **lucrativo em nível** (regra da casa: perder menos não conta); **planalto** no diagnóstico do moinho (≥ 4 limiares consecutivos com D > 0, ≥ 2 com IC > 0); **corte de período**: D > 0 nas 
+- **Refutação:**  por medida, na ordem: **limite de dado** se < 100 unidades elegíveis, < 30 unidades no braço excluído, < 8 dias UTC ou < 8 mints num dos braços; **REFUTA** (o tamanho previsto, não qualquer efeito) se o maior limite superior entre o IC de cluster e o de blocos for < +0,05; **CONFIRMA** só com todas as cláusulas da previsão; qualquer outro caso → **NÃO CONFIRMA** (errata do R76: imprecisão nunca vira refutação). H-031 = CONFIRMA se alguma medida confirmar; REFUTA se todas as medidas fora do limite refutarem; LIMITE DE DADO se as duas estiverem no limite; NÃO CONFIRMA no resto. **Poder declarad
+- **Regra de decisão:** emenda 00:36Z: D ajustado por conjunto decide (run88.py); este relatório é descritivo
+- **Política de limiar:** B: 0,35 da E2-b (16/09); A: quantil 2/3 da lista elegível congelada às 00:39:40Z
+- **Congelado em:** 2026-10-07
+
+## Os números
+
+| # | o quê | valor |
+|---|---|---|
+| 1 | população usada (de 192 linhas lidas) | **192** em 132 clusters |
+| 2 | selecionados / resto no limiar congelado | 126 / 66 |
+| 3 | média do desfecho: selecionados / resto | -0.0082 / -0.0972 |
+| 4 | **D = média(selecionados) − média(resto)** | **+0.0891** |
+| 5 | IC 95 % de D (bootstrap de cluster por `mint`) | [-0.0740, +0.2449]  P(D≤0) = 0.136 |
+| 6 | IC 95 % de D (bootstrap de blocos) | [-0.1176, +0.2332] em 18 blocos |
+| 7 | p de permutação (estratificada por `rs`) | 0.1995 |
+| 8 | dinheiro somado na população (Decimal) | `-0.3723522190` |
+
+Censura: 0 linhas sem desfecho, 0 sem a variável, 0 recusadas pela guarda anti-antecipação. Ausente nunca virou zero.
+
+## VEREDITO: NÃO CONFIRMA
+
+- IC 95 % inferior -0.0740 não está acima de zero
+- p de permutação 0.1995 não é < 0,05
+- o braço selecionado perde em nível (-0.0082); perder menos que o resto não é vantagem
+- a curva de limiares é pico, não planalto (5 limiares avaliáveis; maior corrida positiva 5 (0 com IC acima de zero))
+- há dependência temporal declarada e o IC 95 % por blocos [-0.1176, +0.2332] cobre zero
+
+## Curva de limiares — planalto ou pico?
+
+Diagnóstico: **pico** (5 limiares avaliáveis; maior corrida positiva 5 (0 com IC acima de zero)).
+
+| limiar | n sel/resto | D | IC 95 % |
+|---|---|---|---|
+| 0.10129 | 97/95 | +0.0677 | [-0.0865, +0.2330] |
+| 0.115234 | 116/76 | +0.0456 | [-0.1171, +0.2131] |
+| 0.122168 | 126/66 | +0.0891 | [-0.0750, +0.2456] |
+| 0.130643 | 142/50 | +0.0870 | [-0.0731, +0.2486] |
+| 0.147878 | 151/41 | +0.0973 | [-0.0798, +0.2658] |
+
+## Baldes por tercis (descritivo, não decide nada)
+
+| balde | n | média | mediana |
+|---|---|---|---|
+| -0.0823335 | 66 | +0.0521 | -0.0576 |
+| 0.0823335-0.123486 | 63 | -0.0898 | -0.0772 |
+| 0.123486-inf | 63 | -0.0829 | -0.0782 |
+
+## A ressalva que mais importa
+
+a guarda não correu (dispensa declarada: valor do pedigree_e2b gravado em reasons na transação da proposta (o que o portão leu)) — causalidade é afirmação do operador, não do moinho
+
+Outras ressalvas:
+
+- sem fatia de teste reservada: o resultado é dentro da amostra
+
+## Suposições numéricas declaradas
+
+- r = pnl_sol / entry.sol_spent como persistido; fee_pct 1,25–1,75 %/perna no simulador
+
+Estatística em `float` (contrastes de retorno); dinheiro publicado em `Decimal`. Tempo em UTC.
+
+> Nada aqui autoriza dinheiro real. Um CONFIRMA é candidato a **braço de papel pré-registado**, nunca parâmetro de mesa.
+
+
+================================================================================
+
+# H-031 B — fatia do maior comprador (D agrupado, descritivo) — REFUTA
+
+> Origem: Fila H-031; R88  ·  impressão digital do pré-registo: `06126468af3b`
+> Limiar congelado: **0.35**  ·  efeito mínimo relevante (MRE): **+0.0500**
+
+## Pré-registo (escrito antes de correr)
+
+- **Previsão:**  em cada medida, D = média de r com fatia ≤ limiar − média de r com fatia > limiar ≥ **+0,05 por SOL** (MRE da casa — H-010/H-014; escolha, não derivação); IC 95 % por bootstrap de cluster de mint (10 000 réplicas, semente 20261007) com limite inferior > 0 **e** IC de blocos de dia com limite inferior > 0; p de permutação estratificada por conjunto, ajustado por **Holm** em {A, B}, < 0,05; braço selecionado **lucrativo em nível** (regra da casa: perder menos não conta); **planalto** no diagnóstico do moinho (≥ 4 limiares consecutivos com D > 0, ≥ 2 com IC > 0); **corte de período**: D > 0 nas 
+- **Refutação:**  por medida, na ordem: **limite de dado** se < 100 unidades elegíveis, < 30 unidades no braço excluído, < 8 dias UTC ou < 8 mints num dos braços; **REFUTA** (o tamanho previsto, não qualquer efeito) se o maior limite superior entre o IC de cluster e o de blocos for < +0,05; **CONFIRMA** só com todas as cláusulas da previsão; qualquer outro caso → **NÃO CONFIRMA** (errata do R76: imprecisão nunca vira refutação). H-031 = CONFIRMA se alguma medida confirmar; REFUTA se todas as medidas fora do limite refutarem; LIMITE DE DADO se as duas estiverem no limite; NÃO CONFIRMA no resto. **Poder declarad
+- **Regra de decisão:** emenda 00:36Z: D ajustado por conjunto decide (run88.py); este relatório é descritivo
+- **Política de limiar:** B: 0,35 da E2-b (16/09); A: quantil 2/3 da lista elegível congelada às 00:39:40Z
+- **Congelado em:** 2026-10-07
+
+## Os números
+
+| # | o quê | valor |
+|---|---|---|
+| 1 | população usada (de 1647 linhas lidas) | **1647** em 1300 clusters |
+| 2 | selecionados / resto no limiar congelado | 1257 / 390 |
+| 3 | média do desfecho: selecionados / resto | -0.0535 / -0.0495 |
+| 4 | **D = média(selecionados) − média(resto)** | **-0.0039** |
+| 5 | IC 95 % de D (bootstrap de cluster por `mint`) | [-0.0391, +0.0311]  P(D≤0) = 0.585 |
+| 6 | IC 95 % de D (bootstrap de blocos) | [-0.0318, +0.0227] em 11 blocos |
+| 7 | p de permutação (estratificada por `rs`) | 0.8355 |
+| 8 | dinheiro somado na população (Decimal) | `-5.5209788151` |
+
+Censura: 0 linhas sem desfecho, 0 sem a variável, 0 recusadas pela guarda anti-antecipação. Ausente nunca virou zero.
+
+## VEREDITO: REFUTA
+
+- IC 95 % superior +0.0311 abaixo do MRE +0.0500: evidência CONTRA uma vantagem útil desse tamanho — não é refutação de qualquer efeito, é refutação de um efeito que pague a mesa.
+
+## Curva de limiares — planalto ou pico?
+
+Diagnóstico: **ausente** (6 limiares avaliáveis; maior corrida positiva 0 (0 com IC acima de zero)).
+
+| limiar | n sel/resto | D | IC 95 % |
+|---|---|---|---|
+| 0.2 | 826/821 | -0.0133 | [-0.0490, +0.0211] |
+| 0.25 | 1027/620 | -0.0335 | [-0.0718, +0.0040] |
+| 0.3 | 1163/484 | -0.0213 | [-0.0629, +0.0158] |
+| 0.35 | 1257/390 | -0.0039 | [-0.0398, +0.0307] |
+| 0.4 | 1329/318 | -0.0083 | [-0.0478, +0.0281] |
+| 0.45 | 1371/276 | -0.0073 | [-0.0496, +0.0320] |
+
+## Baldes por tercis (descritivo, não decide nada)
+
+| balde | n | média | mediana |
+|---|---|---|---|
+| -0.1597 | 550 | -0.0548 | -0.0920 |
+| 0.1597-0.274911 | 549 | -0.0676 | -0.1171 |
+| 0.274911-inf | 548 | -0.0352 | -0.0545 |
+
+## A ressalva que mais importa
+
+sem fatia de teste reservada: o resultado é dentro da amostra
+
+## Suposições numéricas declaradas
+
+- r = pnl_sol / entry.sol_spent como persistido; fee_pct 1,25–1,75 %/perna no simulador
+
+Estatística em `float` (contrastes de retorno); dinheiro publicado em `Decimal`. Tempo em UTC.
+
+> Nada aqui autoriza dinheiro real. Um CONFIRMA é candidato a **braço de papel pré-registado**, nunca parâmetro de mesa.
+
+
+================================================================================
+

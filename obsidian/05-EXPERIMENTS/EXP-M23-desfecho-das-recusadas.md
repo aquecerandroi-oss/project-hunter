@@ -112,3 +112,18 @@ Escrevo o que espero, para poder estar errado por escrito:
 **O que muda na análise:** o contraste global usa **A + B ponderados pelo inverso da probabilidade** (estimador não enviesado da população recusada inteira) e é reportado **também por estrato**; os 11 contrastes por critério usam **só o estrato A**. Se B render menos de 30 mints na janela, fica declarado **não testável** — não é substituído nem fundido em A.
 
 **Por que não a opção "população estreita + 10 % literal":** naquela tabela há exatamente um motivo por linha, então o requisito "gravar todos os motivos" ficaria vazio e a pergunta global ("seleciona ou aposta menos?") ficaria sem resposta. **Por que não "larga + taxa baixa uniforme":** diluiria o estrato A, que é o único onde o teste por critério tem sentido, para pagar amostra de um estrato onde a resposta é quase certa.
+
+## Avaliação — 07/10/2026 (R89, H-032): os dados desta sonda foram lidos por outra hipótese, e o lado recusado tem um artefato
+
+*Seção acrescentada, não reescrita. A família de 12 hipóteses, a parada e a interpretação acima não mudam.*
+
+- **Compartilhamento de dados.** A [[Fila de Hipoteses]] § H-032 (moeda Mayhem depois da entrada) usou as apostas do estrato B deste braço, decididas de 23/09 a 06/10 (2 468), pré-registrada antes de abrir desfechos. Quem rodar o contraste global daqui **não está mais cego** para o nível das recusadas Mayhem e não-Mayhem desse estrato (−0,597 e −0,049 por SOL). Nenhum contraste do estrato A foi olhado.
+- **Artefato do simulador no lado recusado.** O teto de SOL real do papel (T4.27) foi aplicado em **463 de 731 saídas das recusadas Mayhem (63 %)**. O SOL real mediano na foto de entrada é 0,061 SOL, menor que a ficha de 0,07.
+  - O papel corta a venda no SOL real observado, que **omite o SOL que a nossa compra hipotética teria posto na curva**. Uma ida e volta sem movimento de preço perde −14 % na mediana.
+  - Na mesma foto de saída, as 463 saídas cortadas valem −0,854 com o teto e −0,027 sem ele. Esse diagnóstico é pós-hoc e não refaz os gatilhos.
+  - Defeito registrado em [[Open Bugs]]; detalhe em [[KB-0189-o-papel-nao-sabe-medir-a-moeda-mayhem]].
+- **Consequência para este experimento.** O contraste global (A + B ponderados pelo inverso da probabilidade) está **comprometido por erro de instrumento na parcela Mayhem das recusadas**. As Mayhem são ~30 % das apostas da sonda em contagem; o peso no estimador não foi medido.
+  - Essa perda artificial pode aparecer como "o portão seleciona". Usar o mesmo simulador nos dois braços não cancela um erro que só atinge a composição de um deles.
+  - Os 11 contrastes por critério (estrato A) não são invalidados automaticamente: só 1 aposta do A existe no período, não-Mayhem.
+  - Tirar Mayhem ou o estrato B depois de ver também não é saída, porque mudaria a população do alvo confirmatório. A decisão sobre o EXP-M23 (consertar o teto e recoletar, ou declarar o global inválido por instrumento) é do orquestrador.
+- **Fato de amostragem medido no caminho** (só contagem): no período, o estrato A rendeu **1** aposta (p 0,10) e o B 2 468, todas com p 0,005 (motivo raro presente). O desenho esperava ~60/dia do A. Duas causas aparecem no código e nas contagens, sem medição separada de cada uma. A sonda sorteia a moeda na **primeira** recusa elegível, que quase sempre é a moeda recém-nascida: `age_below_min` aparece em 2 461 das 2 468, ao lado de vários `*_unknown`. E ela funde as recusas de `operator/5` e `operator/6` do mesmo instante. Resultado: o instante de critério único quase nunca é o primeiro.

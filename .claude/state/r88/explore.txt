@@ -1,0 +1,6 @@
+braço alto?, criador é o maior comprador? -> n, golpe %, r médio (measured), perda>=50 %
+(False, False) 1121 20.5% -0.0572 5.5%
+(False, True) 155 30.3% -0.0269 5.2%
+(True, False) 307 46.6% -0.0588 1.0%
+(True, True) 97 43.3% -0.0210 4.1%
+saídas por braço: {(False, 'trailing'): 456, (False, 'creator_dump'): 277, (False, 'target'): 253, (False, 'line_broken'): 222, (False, 'max_loss'): 42, (False, 'time_stop'): 21, (False, 'rug_no_snapshot'): 5, (True, 'creator_dump'): 185, (True, 'trailing'): 78, (True, 'line_broken'): 66, (True, 'target'): 39, (True, 'time_stop'): 31, (True, 'rug_no_snapshot'): 4, (True, 'max_loss'): 1}

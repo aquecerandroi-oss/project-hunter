@@ -1,0 +1,26 @@
+R88 congelamento — 2026-10-06T21:39:40-03:00
+units.csv: 2503 linhas, sha256 017819d40cc0e91a13c39f23c36d8e6c14ad1a216d8cee805e948aa079e7089f
+censura pela variável/guarda: {'A: guarda < 10': 1, 'B: conjunto com < 30 unidades (flow_v2/10)': 1, 'B: conjunto com < 30 unidades (flow_v2/9)': 11, 'B: conjunto com < 30 unidades (operator/6)': 14, 'B: guarda < 10': 88, 'B: livro não provado desde o nascimento': 497, 'B: sem fatia': 2}
+instantes depois da proposta (deve ser vazio): {}
+[A] unidades 209 · mints 143 · dias 18 · por conjunto {'flow_v2/10': 1, 'flow_v2/6': 39, 'flow_v2/7': 30, 'flow_v2/8': 56, 'flow_v2/9': 83}
+[A] limiar congelado 0.122168 · grade [0.10129, 0.115234, 0.122168, 0.130643, 0.147878]
+[A] criador como maior comprador: 0
+[A] suporte (só a variável):
+  limiar 0.1013: baixo 105 un/69 mints/17 dias · alto 104 un/74 mints/17 dias · conjuntos suportados {'flow_v2/6': 39, 'flow_v2/7': 30, 'flow_v2/8': 56, 'flow_v2/9': 83}
+  limiar 0.1152: baixo 127 un/82 mints/17 dias · alto 82 un/61 mints/17 dias · conjuntos suportados {'flow_v2/6': 39, 'flow_v2/7': 30, 'flow_v2/8': 56, 'flow_v2/9': 83}
+  limiar 0.1222: baixo 141 un/90 mints/17 dias · alto 68 un/53 mints/15 dias · conjuntos suportados {'flow_v2/6': 39, 'flow_v2/7': 30, 'flow_v2/8': 56, 'flow_v2/9': 83}
+  limiar 0.1306: baixo 157 un/100 mints/17 dias · alto 52 un/43 mints/15 dias · conjuntos suportados {'flow_v2/6': 39, 'flow_v2/8': 56, 'flow_v2/9': 83}
+  limiar 0.1479: baixo 167 un/110 mints/17 dias · alto 42 un/33 mints/14 dias · conjuntos suportados {'flow_v2/6': 39, 'flow_v2/8': 56, 'flow_v2/9': 83}
+[B] unidades 1680 · mints 1323 · dias 11 · por conjunto {'absorb_v0/1': 393, 'absorb_v0/2': 475, 'flow_v2/1': 354, 'operator/5': 42, 'recuo_ctrl_v1/1': 152, 'recuo_v1/1': 264}
+[B] limiar congelado 0.350000 · grade [0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+[B] criador como maior comprador: 252
+[B] suporte (só a variável):
+  limiar 0.2000: baixo 840 un/663 mints/11 dias · alto 840 un/706 mints/11 dias · conjuntos suportados {'absorb_v0/1': 393, 'absorb_v0/2': 475, 'flow_v2/1': 354, 'operator/5': 42, 'recuo_ctrl_v1/1': 152, 'recuo_v1/1': 264}
+  limiar 0.2500: baixo 1041 un/806 mints/11 dias · alto 639 un/547 mints/11 dias · conjuntos suportados {'absorb_v0/1': 393, 'absorb_v0/2': 475, 'flow_v2/1': 354, 'operator/5': 42, 'recuo_ctrl_v1/1': 152, 'recuo_v1/1': 264}
+  limiar 0.3000: baixo 1180 un/920 mints/11 dias · alto 500 un/433 mints/11 dias · conjuntos suportados {'absorb_v0/1': 393, 'absorb_v0/2': 475, 'flow_v2/1': 354, 'operator/5': 42, 'recuo_ctrl_v1/1': 152, 'recuo_v1/1': 264}
+  limiar 0.3500: baixo 1276 un/993 mints/11 dias · alto 404 un/363 mints/11 dias · conjuntos suportados {'absorb_v0/1': 393, 'absorb_v0/2': 475, 'flow_v2/1': 354, 'operator/5': 42, 'recuo_ctrl_v1/1': 152, 'recuo_v1/1': 264}
+  limiar 0.4000: baixo 1349 un/1041 mints/11 dias · alto 331 un/302 mints/11 dias · conjuntos suportados {'absorb_v0/1': 393, 'absorb_v0/2': 475, 'flow_v2/1': 354, 'recuo_ctrl_v1/1': 152, 'recuo_v1/1': 264}
+  limiar 0.4500: baixo 1392 un/1076 mints/11 dias · alto 288 un/265 mints/11 dias · conjuntos suportados {'absorb_v0/1': 393, 'absorb_v0/2': 475, 'flow_v2/1': 354, 'recuo_ctrl_v1/1': 152, 'recuo_v1/1': 264}
+eligible.csv: 1889 unidades, sha256 18dcd185127a76d408f722ae432ada6b0c9f39f13d8c9a985a58d4506d4d313f
+THR {'A': 0.12216842020537061, 'B': 0.35}
+GRIDS {'A': (0.10128969511707292, 0.11523434542508668, 0.12216842020537061, 0.13064277622410203, 0.1478777578808908), 'B': (0.2, 0.25, 0.3, 0.35, 0.4, 0.45)}

@@ -13,6 +13,28 @@ closed: ""
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
 
+## Papel em moeda Mayhem: marcas e saídas cortadas no SOL real observado omitem o SOL da compra hipotética (07/10) — ALTA para pesquisa, nula para a mesa real
+
+Achado pela Astra na revisão do pré-registro da H-032 ([[H-032-mayhem-prereg]]) e medido no R89 ([[KB-0189-o-papel-nao-sabe-medir-a-moeda-mayhem]]).
+
+**Onde está.** A primeira marca da aposta de papel vende contra as reservas **depois** da compra hipotética, sem teto (`services/meme-worker/hunter_meme_worker/paper_fill.py:171`). As marcas seguintes e a saída usam a foto observada da curva com o teto `Snapshot.sell_cap_sol` = SOL real **observado** (`lab_values.py:84`, `paper_engine.py:123/216`, `curve.quote_sell`). As fotos nunca contêm o SOL que a compra hipotética teria posto na curva.
+
+**Cenário.** SOL real observado 0, compra de 0,07 SOL, foto seguinte idêntica. O recebimento fica cortado em 0, a prioridade é descontada e dispara `max_loss`, sem nenhum movimento econômico.
+
+**Medido** (sonda `refused_probe_v0/1`, 23/09–06/10):
+- Teto aplicado em **463 de 731** saídas Mayhem (63 %).
+- SOL real mediano na foto de entrada Mayhem: 0,061 SOL, menor que a ficha.
+- Ida e volta sem movimento: −14 % na mediana Mayhem, contra −3,4 % de taxas.
+- Na mesma foto de saída: −0,854 com teto, −0,027 sem teto (pós-hoc).
+
+**Efeito.** Todo número de papel em Mayhem mede o teto, não o mercado. O contraste global do [[EXP-M23-desfecho-das-recusadas]] fica comprometido (as recusadas Mayhem parecem piores por artefato). Um braço de papel com `exclude_mayhem: false` herdaria o defeito.
+
+**O que não afeta.** A mesa real: ela exclui Mayhem por padrão (0 de 161 posições), e o executor deriva a conta certa da curva (`docs/PUMPFUN.md` §9).
+
+**O que falta saber.** O que a venda Mayhem on-chain faz quando a curva tem menos SOL real que o valor dos tokens: de onde sai o SOL (cofre do agente `sol-vault`?), e se a venda é recusada, parcial ou integral com recebimento cortado. Somar `curve_cost` ao teto é palpite, **não** correção validada (a Astra recusa tratá-la como tal).
+
+**Correção proposta.** Modelar as reservas reais com o aporte da compra hipotética ao longo da trajetória e validar a venda Mayhem contra execução de referência (simulação on-chain) antes de qualquer pesquisa de papel com Mayhem. Mudança em `services/meme-worker` e `packages/indicators`, fora do escopo do quant-engineer nesta tarefa. Dono: a decidir pelo orquestrador.
+
 ## `meme_close_day` cria `Diario-Meme/<dia>.md` ao lado de `Diario/<dia>.md` e deixa `[[<dia>]]` ambíguo — o lint volta vermelho (06/10) — MÉDIA
 
 Achado pela Astra na revisão de [[CI-verde-2026-10-05]]: o teste `test_meme_close_day_integration` falhava porque o diário real de 05/10 já existia; ele passou a usar um dia sem diário (2026-09-29), o que **contorna** a colisão. Cenário real: fechar o dia 2026-10-05 grava `Diario-Meme/2026-10-05.md`, o fechamento só checa o próprio destino, e todo `[[2026-10-05]]` (por exemplo em `04-AGENTS/REA.md`) passa a ter dois candidatos; `obsidian_lint.py` devolve erro. Defeito da ferramenta (`infra/scripts/meme_close_day.py`) e da convenção de links, não do motor. Correção proposta: o fechamento escrever links qualificados (`[[09-OPERATIONS/Diario-Meme/<dia>|<dia>]]`) e um teste de coexistência dos dois diários. Dono: quem mantém a mesa meme. Não corrigido aqui.

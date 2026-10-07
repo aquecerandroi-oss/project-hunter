@@ -1,0 +1,20 @@
+== por conjunto: status da proposta, aposta fechada single (nulidade), posição real (existência), mints e dias elegíveis
+       rs        | props |      status_vistos      | aposta_fechada | mints_ap | mints_ap_nasc | dias_ap | pos_real_fechada | mints_real 
+-----------------+-------+-------------------------+----------------+----------+---------------+---------+------------------+------------
+ absorb_v0/1     |  6611 | filled,unfilled         |            505 |      505 |           395 |       9 |                0 |          0
+ absorb_v0/2     |  1402 | filled,unfilled         |            762 |      762 |           544 |      11 |                0 |          0
+ operator/5      |  1091 | expired,filled,rejected |             48 |       47 |            42 |       2 |               46 |         45
+ flow_v2/1       |   631 | filled,unfilled         |            430 |      409 |           354 |      11 |                0 |          0
+ operator/6      |   506 | expired,filled,rejected |             16 |       16 |            14 |       3 |               16 |         16
+ recuo_v1/1      |   351 | filled                  |            351 |      351 |           264 |       5 |                0 |          0
+ recuo_ctrl_v1/1 |   208 | filled                  |            208 |      188 |           152 |       3 |                0 |          0
+ flow_v2/9       |    15 | filled                  |             15 |       14 |            11 |       8 |                0 |          0
+ flow_v2/10      |     1 | filled                  |              1 |        1 |             1 |       1 |                0 |          0
+(9 rows)
+
+== variável (sem desfecho) na população operator/5+6 com aposta fechada e ledger desde o nascimento: quantis de share_of_real_sol (maior comprador líquido) e share_of_supply (maior saldo)
+ mints |                                                   lnb_q                                                   | lnb_ge35 | lnb_is_creator |                                           holder_q                                            
+-------+-----------------------------------------------------------------------------------------------------------+----------+----------------+-----------------------------------------------------------------------------------------------
+    52 | {0.1115445,0.13064125000000001,0.140832789,0.17399799999999999,0.214378538,0.22952075,0.3817189999999999} |        6 |             13 | {0.0316521,0.03623025,0.039898639,0.050494,0.06036539100000002,0.0712265,0.10765369999999999}
+(1 row)
+

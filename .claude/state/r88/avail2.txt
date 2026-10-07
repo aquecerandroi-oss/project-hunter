@@ -1,0 +1,20 @@
+== uma amostra da FORMA do bloco (chaves apenas)
+                                                                      top_keys                                                                      |                                               lnb_keys                                                |                                                                ledger_keys                                                                 
+----------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------
+ kind,as_of,curve,slice,ledger,reason,series,creator,feature,version,windows,coverage,used_by_gate,largest_holder,creation_bundle,largest_net_buyer | buys,sells,wallet,net_sol,sold_sol,bought_sol,is_creator,net_tokens,share_of_supply,share_of_real_sol | since,gapped,reason,wallets,known_at,overflow,net_sol_total,tokens_missing,reconcile_gap_sol,reconcile_real_sol,creator_initial_buy_seeded
+(1 row)
+
+== propostas com decision_tape, por conjunto (contagens e nulidade)
+       rs        |     kind      |  n   | mints | dias |  primeiro  |   ultimo   | recusada_captura | com_lnb_share | ledger_desde_nascimento | com_holder_share 
+-----------------+---------------+------+-------+------+------------+------------+------------------+---------------+-------------------------+------------------
+ absorb_v0/1     | research_only | 6611 |  6597 |   12 | 2026-09-24 | 2026-10-07 |                0 |          6611 |                    4943 |             6611
+ absorb_v0/2     | research_only | 1402 |  1402 |   12 | 2026-09-24 | 2026-10-07 |                0 |          1395 |                     967 |             1362
+ operator/5      | operator      | 1091 |  1012 |   12 | 2026-09-24 | 2026-10-07 |                0 |          1091 |                     851 |             1091
+ flow_v2/1       | research_only |  631 |   589 |   12 | 2026-09-24 | 2026-10-07 |                0 |           631 |                     544 |              631
+ operator/6      | operator      |  506 |   479 |   12 | 2026-09-24 | 2026-10-07 |                0 |           506 |                     438 |              506
+ recuo_v1/1      | research_only |  351 |   351 |    5 | 2026-09-24 | 2026-09-28 |                0 |           351 |                     264 |              351
+ recuo_ctrl_v1/1 | research_only |  208 |   188 |    3 | 2026-09-26 | 2026-09-28 |                0 |           208 |                     167 |              208
+ flow_v2/9       | research_only |   15 |    14 |    8 | 2026-09-24 | 2026-10-06 |                0 |            15 |                      12 |               15
+ flow_v2/10      | research_only |    1 |     1 |    1 | 2026-09-26 | 2026-09-26 |                0 |             1 |                       1 |                1
+(9 rows)
+

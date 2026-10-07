@@ -77,3 +77,6 @@ evita perdas.**
   apontou na direção da tese pela cauda.
 
 Ver: [[Fila de Hipoteses]] (H-010) · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[KB-0143-o-que-antecede-o-dump]]
+
+**Reabertura parcial (07/10/2026):** a [[Fila de Hipoteses#H-031 — Concentração do maior comprador no preenchimento (`top_buyer_share`) como aviso de golpe|H-031]] usou o maior comprador gravado em `reasons` pela fita da decisão (`0062`), em **fluxo líquido de SOL** — não a variável de **estoque** de tokens pedida acima, que continua não testada. Resultado: NÃO CONFIRMA ([[KB-0188-a-concentracao-do-maior-comprador-nao-separa-o-retorno]]).
+
