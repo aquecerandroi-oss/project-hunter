@@ -81,3 +81,7 @@ executor (T4.62) e o `meme-worker` (T4.65). Detalhe completo em `obsidian/07-BUG
 4. Pendências antigas que continuam de pé: Groenlândia como `meme_event`, backup fora da VPS (serviço
    pago), e a stack local — postgres/redis/api/web pararam há 2 semanas e 3 workers ficam reiniciando
    sem banco na sua máquina.
+
+## Dever fixo do plantão: exportação semanal cega da H-036 (desde 07/10/2026)
+
+Toda **segunda-feira depois das 06:00Z**, rodar só leitura `.claude/state/h036/gen_export2.py` + `q.sh` (spread apenas, sem preços), conferir o sha256 e commitar o arquivo da semana com `git add` exato. Primeira: **2026-10-12**. Semana perdida dá para recuperar em até ~3 semanas; depois disso a medição de custo se perde (partições de `market_snapshots` caem 30–60 dias depois). Também a exportação complementar obrigatória em cada olhada (L1 2027-01-06, L2 2027-04-07, L3 2027-07-07, 12:00Z). **Não mexer na `mean_reversion v14`** (deprecar, substituir ou mudar parâmetro) até 2027-07-07: isso encerra a H-036 como LIMITE. Ver [[KB-0193]] e o bloco H-036 da Fila.
