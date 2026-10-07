@@ -1,0 +1,1 @@
+sinais 869 | max |SQL − réplica| = 7.105e-15 | > 1e-9: 0

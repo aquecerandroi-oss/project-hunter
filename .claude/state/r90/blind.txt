@@ -1,0 +1,24 @@
+## mean_reversion: terminais 2253 | com R (nulidade) 2227
+   motivos de fora (não exclusivos): {'oi_janela_curta': 906, 'oi_ausente': 4, 'oi_velho': 8}
+   completas: sinais 1331 | unidades 264 | dias 22 | mercados 15
+   1.º/último dia 2026-09-12 → 2026-10-03 | versões {'v1': 207, 'v8': 191, 'v10': 221, 'v2': 161, 'v3': 114, 'v6': 148, 'v14': 148, 'v7': 141}
+   oi_rel7d: p10 -0.061 p50 +0.002 p90 +0.087 | >0 134 ≤0 130
+   leitura corrente com chegada verificada no outbox: 75 unidades
+   maior mercado 29 unidades | maior dia 22
+## mean_reversion_h1: terminais 104 | com R (nulidade) 104
+   motivos de fora (não exclusivos): {'oi_janela_curta': 13}
+   completas: sinais 91 | unidades 91 | dias 17 | mercados 15
+   1.º/último dia 2026-09-13 → 2026-10-02 | versões {'v1': 91}
+   oi_rel7d: p10 -0.074 p50 +0.011 p90 +0.106 | >0 51 ≤0 40
+   leitura corrente com chegada verificada no outbox: 23 unidades
+   maior mercado 10 unidades | maior dia 15
+## momentum: terminais 3731 | com R (nulidade) 3684
+   motivos de fora (não exclusivos): {'oi_janela_curta': 2824, 'velas_chegaram_depois': 19, 'oi_ausente': 27, 'oi_velho': 18}
+   completas: sinais 869 | unidades 869 | dias 23 | mercados 15
+   1.º/último dia 2026-09-12 → 2026-10-04 | versões {'v3': 869}
+   oi_rel7d: p10 -0.059 p50 +0.003 p90 +0.083 | >0 470 ≤0 399
+   leitura corrente com chegada verificada no outbox: 252 unidades
+   maior mercado 71 unidades | maior dia 81
+## volume_anomaly: terminais 3323 | com R (nulidade) 3295
+   motivos de fora (não exclusivos): {'oi_janela_curta': 3302, 'velas_chegaram_depois': 60, 'oi_velho': 18, 'oi_ausente': 21}
+   completas: sinais 0 | unidades 0 | dias 0 | mercados 0

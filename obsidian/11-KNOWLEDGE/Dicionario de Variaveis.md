@@ -114,7 +114,7 @@ antes de qualquer teste (`orderbook_imbalance`). As dez mais prontas para virar 
 pré-registrada (dado já existe, ninguém mediu):
 
 1. ~~`distance_from_24h_high`/`_low` (cripto) — bloqueada só por uma medição de redundância nunca feita.~~ Virou a H-023 (R83, 28/09): redundância medida (não é redundante) e **NÃO CONFIRMA** na continuação; `_low` ficou como pista, só em coorte nova e com a feature gravada no envelope ([[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]]).
-2. `open_interest` **em nível** (não a variação) como profundidade — item 14 do [[Strategy Backlog]], nunca rodado.
+2. `open_interest` **em nível** (não a variação) como profundidade — item 14 do [[Strategy Backlog]] → **testada na H-033 (R90, 07/10) como OI relativo à mediana semanal: NÃO CONFIRMA** nos sinais da momentum do Lab ([[KB-0191-oi-acima-da-semana-nao-separa-os-sinais-do-lab]]). Reconstruível de `open_interest_history` com folga de 15 min: o `ts` é o bucket do início da rodada de leitura, não o instante.
 3. `{buy,sell}_pressure_{Nm}` e `trade_velocity_{Nm}` (cripto) — disponibilidade operacional nunca medida desde que o bloqueio de `covered_until` caiu.
 4. ~~`higher_lows`/`breakout_15m`/`distance_to_support_pct` (meme, bloco `line`) — nunca isolado de um conjunto que já os usa.~~ Virou a H-021 (R81, 26/09): **limite de dado** — a porta compra moedas de 1–4 min, não há gráfico de 5 min; volta só com a estrutura do preço marginal gravada na fita da decisão ([[KB-0161-o-grafico-de-5-minutos-nao-existe-na-porta]]).
 5. ~~`has_twitter`/`twitter_kind`/`twitter_reuse_count` (meme, `identity`) — coletado desde T4.26, nunca virou hipótese.~~ Virou a H-020 (R80, 26/09): **NÃO CONFIRMA** ([[KB-0160-o-link-reciclado-nao-avisa-o-golpe]]).

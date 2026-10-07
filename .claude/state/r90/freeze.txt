@@ -1,0 +1,7 @@
+motivos de fora (folga 15): {('volume_anomaly', 'oi_janela_curta'): 3224, ('volume_anomaly', 'velas_chegaram_depois'): 60, ('momentum', 'oi_janela_curta'): 2788, ('momentum', 'velas_chegaram_depois'): 19, ('volume_anomaly', 'oi_velho'): 18, ('volume_anomaly', 'oi_ausente'): 21, ('momentum', 'oi_ausente'): 26, ('momentum', 'oi_velho'): 18, ('mean_reversion', 'oi_janela_curta'): 898, ('mean_reversion', 'oi_ausente'): 4, ('mean_reversion_h1', 'oi_janela_curta'): 13, ('mean_reversion', 'oi_velho'): 8}
+congelado em 2026-10-07T05:18:27+00:00
+elegíveis por estratégia: {'mean_reversion': 1331, 'momentum': 869, 'mean_reversion_h1': 91} | decidem: ('momentum', 'volume_anomaly')
+janela inteira provada pós-commit: 37 | leitura corrente provada: 646 | com velas tardias: 52
+folga 30: elegíveis 2291 | interseção com 15: 2291
+folga 60: elegíveis 2290 | interseção com 15: 2290
+sha256 eligible.csv: e597cabf49f9a8e7beee21535dd218e2c3d9065b34264f70a4c086af658dd4dd

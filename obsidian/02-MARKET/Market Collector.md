@@ -190,6 +190,7 @@ host. O `strategy-worker` ao lado, em modo sombra, usa 0,60% de CPU e
 - **`tracking_hold` do Shadow Lab** — contratado na decisão SHADOW, implementado em S2.
 - **Follow-ups registrados em `docs/plans/M1.md`**: `command_timeout` de 30 s valendo para o engine da API; `market_snapshots.ts` como bucket do minuto e não instante da coleta; sufixo REST parcial no bootstrap; duplicidade de `ingestion_gaps` com duas instâncias por exchange (premissa do M1: uma instância por exchange); `spread_pct` ×100 nos helpers de domínio (T1.1c).
 - **Bybit** — M1b, mesmo contrato.
+- **Instante da leitura de OI não é durável** (medido no R90, 07/10/2026): `open_interest_history.ts` é o piso de 5 min do **início** da rodada (os mercados são lidos um a um por REST), e o número pode ter sido lido minutos depois — no outbox de 26/09 a 07/10 a maior distância bucket → inserção foi 325 s. O instante real (`payload.ts`) e a prova pós-commit (`dispatched_at` do relay; `created_at` é o `now()` da transação e não prova) só existem no `outbox_events`, retido ~11 dias. Gravar o instante da leitura na tabela fecharia isso para o ao vivo (`hunter_strategy_worker/derivatives.py`) e para a pesquisa ([[KB-0191-oi-acima-da-semana-nao-separa-os-sinais-do-lab]]).
 
 ## O que foi especificado no plano (referência)
 

@@ -1,0 +1,36 @@
+## momentum: unidades 869
+   Spearman(oi_rel7d, d_low) = +0.257
+   Spearman(oi_rel7d, ret4h) = +0.107
+   Spearman(oi_rel7d, atr_pct) = +0.090
+   Spearman(oi_rel7d, oi_vol) = -0.226 (sinais)
+   grupos: oi_rel7d<0 399 unidades em 23 datas | ≥0 470 em 22 datas
+   metades: 2026-09-12..2026-09-23 (511) × 2026-09-24..2026-10-04 (358)
+   sinais completos que estavam na lista elegível do R86: 773 de 869
+   pós-R86 (emitidas depois de 2026-10-01T03:06:15+00:00): 96 unidades, 4 dias, oi_rel7d<0 48
+   verificadas no outbox: 252
+   cortes (n com oi_rel7d < c): c=-0.04: 132 · c=-0.02: 226 · c=+0.00: 399 · c=+0.02: 559 · c=+0.04: 673
+   por mercado: {'NEARUSDT': 71, 'TAOUSDT': 71, 'ARBUSDT': 69, 'UNIUSDT': 67, 'ZECUSDT': 64, 'SOLUSDT': 64, 'XRPUSDT': 63, 'LINKUSDT': 60, 'SUIUSDT': 59, 'DOGEUSDT': 59, 'DASHUSDT': 53, 'ETHUSDT': 53, 'PROMUSDT': 52, 'BNBUSDT': 35, 'BTCUSDT': 29}
+## mean_reversion: unidades 264
+   Spearman(oi_rel7d, d_low) = +0.126
+   Spearman(oi_rel7d, ret4h) = +0.023
+   Spearman(oi_rel7d, atr_pct) = +0.086
+   Spearman(oi_rel7d, oi_vol) = -0.242 (sinais)
+   grupos: oi_rel7d<0 130 unidades em 22 datas | ≥0 134 em 18 datas
+   metades: 2026-09-12..2026-09-22 (132) × 2026-09-23..2026-10-03 (132)
+   sinais completos que estavam na lista elegível do R86: 140 de 1331
+   pós-R86 (emitidas depois de 2026-10-01T03:06:15+00:00): 28 unidades, 3 dias, oi_rel7d<0 15
+   verificadas no outbox: 75
+   cortes (n com oi_rel7d < c): c=-0.04: 43 · c=-0.02: 77 · c=+0.00: 130 · c=+0.02: 167 · c=+0.04: 196
+   por mercado: {'UNIUSDT': 188, 'ARBUSDT': 170, 'DASHUSDT': 168, 'NEARUSDT': 142, 'ZECUSDT': 142, 'SUIUSDT': 124, 'PROMUSDT': 114, 'TAOUSDT': 111, 'LINKUSDT': 49, 'DOGEUSDT': 46, 'XRPUSDT': 44, 'SOLUSDT': 21, 'ETHUSDT': 8, 'BNBUSDT': 3, 'BTCUSDT': 1}
+## mean_reversion_h1: unidades 91
+   Spearman(oi_rel7d, d_low) = +0.137
+   Spearman(oi_rel7d, ret4h) = -0.066
+   Spearman(oi_rel7d, atr_pct) = +0.096
+   Spearman(oi_rel7d, oi_vol) = -0.210 (sinais)
+   grupos: oi_rel7d<0 40 unidades em 17 datas | ≥0 51 em 14 datas
+   metades: 2026-09-13..2026-09-23 (63) × 2026-09-24..2026-10-02 (28)
+   sinais completos que estavam na lista elegível do R86: 0 de 91
+   pós-R86 (emitidas depois de 2026-10-01T03:06:15+00:00): 7 unidades, 2 dias, oi_rel7d<0 4
+   verificadas no outbox: 23
+   cortes (n com oi_rel7d < c): c=-0.04: 23 · c=-0.02: 30 · c=+0.00: 40 · c=+0.02: 54 · c=+0.04: 67
+   por mercado: {'NEARUSDT': 10, 'ZECUSDT': 9, 'UNIUSDT': 8, 'DOGEUSDT': 8, 'PROMUSDT': 7, 'TAOUSDT': 7, 'XRPUSDT': 6, 'DASHUSDT': 6, 'LINKUSDT': 6, 'SOLUSDT': 5, 'SUIUSDT': 5, 'ARBUSDT': 4, 'BNBUSDT': 4, 'ETHUSDT': 3, 'BTCUSDT': 3}

@@ -1,0 +1,4 @@
+# R90 réplica independente (oi_rel7d do OI cru; OLS por equações normais; bootstrap de dia próprio, semente 90)
+unidades 869 | dias 23 | mercados 15 | sinais sem variável na réplica 0
+β_x = +0.0026 R/desvio | IC dia [-0.0463, +0.0594] | nível oi_rel7d<0 -0.2501 (n 399) | ≥0 -0.1939 | todos -0.2197
+coeficientes [b0, x, d_low, ATR%, ret4h]: -0.2379 +0.0026 +0.0288 +0.0188 -0.0012

@@ -159,4 +159,4 @@ repetir este filtro.
 [[KB-0178-data-snooping-e-poucos-clusters-o-que-vale-para-a-h-027]] · [[KB-0175-estado-de-mercado-condiciona-momentum-mas-em-que-direcao]] ·
 [[KB-0174-o-filtro-de-tendencia-corta-queda-nao-acrescenta-alta]] · [[KB-0171-custo-real-da-spot-1]] ·
 [[KB-0169-fibonacci-e-lta-diaria-no-dado]] · [[KB-0166-evitar-as-moedas-em-queda-nao-bate-a-cesta]] ·
-[[KB-0149-o-que-a-mesa-real-ensinou]] · [[EXP-0005-momentum-paper]]
+[[KB-0149-o-que-a-mesa-real-ensinou]] · [[EXP-0005-momentum-paper]] · [[KB-0191-oi-acima-da-semana-nao-separa-os-sinais-do-lab]] (H-033 reusou este maquinário e a lição do FE de dia)

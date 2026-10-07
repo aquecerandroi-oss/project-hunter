@@ -1,0 +1,3 @@
+SINTÉTICO efeito +0,25: β_x +0.2167 IC dia [+0.1568, +0.2871] IC mercado [+0.1366, +0.3002] → CONFIRMA
+SINTÉTICO nulo A: β_x +0.0414 IC dia [-0.0251, +0.1056] IC mercado [-0.0479, +0.1139] → NÃO CONFIRMA
+SINTÉTICO nulo B: β_x +0.0321 IC dia [-0.0304, +0.1127] IC mercado [-0.0443, +0.0987] → NÃO CONFIRMA
