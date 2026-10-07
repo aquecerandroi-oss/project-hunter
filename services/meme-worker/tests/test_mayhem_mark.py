@@ -96,6 +96,7 @@ def _bet(is_mayhem: bool | None) -> BetState:
         exit_intent=None,
         fee_pct=FEE,
         priority_fee_sol=Decimal(0),
+        curve_cost_sol=Decimal(entry.entry["curve_cost_sol"]),
         is_mayhem=is_mayhem,
     )
 
@@ -104,17 +105,25 @@ PUSHED = _snapshot(180, "1977", "900000000", real_sol="0.9")
 """The agent's push: 1 977 SOL of virtual reserve over a vault of 0,9 SOL."""
 
 
-def test_the_mark_of_a_mayhem_bet_is_capped_at_the_photos_real_sol() -> None:
+OWN = Decimal("0.04914004914004914004914004914")
+"""The SOL our 0,05 SOL buy paid into the curve (``0.05 / 1.0175``): part of
+the vault the sale draws on, absent from the photo (bug of 07/10)."""
+VAULT = Decimal("0.9491400491400491400491400491")
+"""The photo's 0,9 SOL plus :data:`OWN`."""
+
+
+def test_the_mark_of_a_mayhem_bet_is_capped_at_the_photos_real_sol_plus_our_buy() -> None:
     bet = _bet(True)
+    assert bet.curve_cost_sol == OWN and Decimal("0.9") + OWN == VAULT
     formula = quote_sell(PUSHED.reserves, bet.tokens, FEE)
     assert formula.curve_proceeds_sol > Decimal(3), "the formula quotes what the vault cannot pay"
     mark = mark_bet(bet, PUSHED)
     assert mark.real_sol_cap_applied is True
-    assert mark.mark_sol == Decimal("0.9") * (1 - FEE / 100) == Decimal("0.88425")
+    assert mark.mark_sol == Decimal("0.9325300982800982800982800982")  # VAULT × (1 − 1,75 %)
     assert mark.high_water_x == mark.mark_sol / bet.sol_spent
     assert decide_exit(
         bet, PUSHED, mark, migrated=False, creator_net_seller=False, sell_now=False
-    ) == ("target"), "0,88 SOL for a 0,05 SOL stake is still the target — what the vault could pay"
+    ) == ("target"), "0,93 SOL for a 0,05 SOL stake is still the target — what the vault could pay"
 
 
 def test_a_standard_bet_and_a_completed_curve_keep_the_formula() -> None:
@@ -138,10 +147,12 @@ def test_the_close_prices_the_sale_by_the_vault_and_says_so_on_the_row() -> None
     closed = close_bet(bet, PUSHED, "target", None, intent_snapshot_at=None)
     assert closed.exit["real_sol_cap_applied"] is True
     assert closed.exit["mark_basis"] == MARK_BASIS_REAL_SOL
-    assert closed.exit["curve_proceeds_sol"] == "0.9"
-    assert closed.exit["sol_received"] == "0.88425"
+    assert closed.exit["curve_proceeds_sol"] == str(VAULT)
+    assert closed.exit["sell_cap_sol"] == str(VAULT)
+    assert closed.exit["own_curve_sol"] == str(OWN)
+    assert closed.exit["sol_received"] == "0.9325300982800982800982800982"
     assert closed.exit["snapshot"]["mayhem_enabled"] is None
-    assert closed.pnl_sol == Decimal("0.88425") - bet.sol_spent
+    assert closed.pnl_sol == Decimal("0.9325300982800982800982800982") - bet.sol_spent
     plain = close_bet(_bet(False), PUSHED, "target", None, intent_snapshot_at=None)
     assert plain.exit["real_sol_cap_applied"] is False
     assert plain.exit["mark_basis"] == MARK_BASIS_CURVE

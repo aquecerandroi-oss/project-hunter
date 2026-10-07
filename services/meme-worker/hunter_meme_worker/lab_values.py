@@ -14,9 +14,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from typing import Any
 
+from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.curve import CurveReserves
 from hunter_indicators.meme.executable import sell_cap_sol
 
@@ -28,6 +29,7 @@ __all__ = [
     "MARK_SOURCES",
     "MEASURED",
     "NO_SNAPSHOT_IN_WINDOW",
+    "SELL_CAP_MODEL",
     "BetExit",
     "Snapshot",
     "SolUsd",
@@ -40,6 +42,13 @@ LEGS: tuple[str, ...] = ("probe", "scale", "single")
 """``meme_paper_bets.leg`` (``0026``, T4.10): the brief's "semi-comprado (sonda)"
 (``probe``), "escalado (perna 2)" (``scale``, which names its ``parent_bet_id``)
 and the one-leg bet every other rule set opens (``single``)."""
+
+SELL_CAP_MODEL = "observed_real_plus_own_curve_cost/1"
+"""Bug of 07/10 (R89, H-032): the instrument version of a paper sale's cap,
+written on every new entry and on every exit priced against a curve photo
+(``close_bet``; a pool-tape exit or a close without a photo has no cap and
+no stamp) — a bet whose exit names it but whose entry does not crossed the
+deploy (its earlier marks used the old cap, observed real SOL alone)."""
 
 MARK_CURVE = "curve"
 MARK_POOL_TAPE = "pool_tape"
@@ -81,13 +90,25 @@ class Snapshot:
     """T4.27: the chain's ``is_mayhem_mode`` bit on this photo (``None`` on the
     REST mirror, which never says it)."""
 
-    def sell_cap_sol(self, is_mayhem: bool | None = None) -> Decimal | None:
-        """T4.27: the ceiling of a mark against this photo — its real SOL, unless
-        the coin is known standard (the photo's bit first, then the token's
-        ``is_mayhem``) or the curve is complete (its SOL is on the pool now)."""
+    def sell_cap_sol(self, is_mayhem: bool | None, *, own_curve_sol: Decimal) -> Decimal | None:
+        """T4.27: the ceiling of a paper sale against this photo — its real SOL
+        **plus** ``own_curve_sol``, the SOL our hypothetical buy paid into the
+        curve (bug of 07/10: the photo never holds it), unless the coin is known
+        standard (the photo's bit first, then the token's ``is_mayhem``) or the
+        curve is complete (its SOL is on the pool now).
+
+        Every bet sells everything at once, so nothing of ours has left the
+        vault yet. Assumes the observed outside flows stand as they were — an
+        accounting cap, not a replay of the curve with our buy in it; a probe
+        and its scale leg are capped each on its own contribution, never on a
+        shared vault (``SELL_CAP_MODEL``)."""
         mayhem = self.mayhem_enabled if self.mayhem_enabled is not None else is_mayhem
         complete = self.complete or self.reserves.complete
-        return sell_cap_sol(self.real_sol_reserves, mayhem=mayhem, complete=complete)
+        observed = sell_cap_sol(self.real_sol_reserves, mayhem=mayhem, complete=complete)
+        if observed is None:
+            return None
+        with localcontext(CONTEXT):
+            return observed + own_curve_sol
 
     def as_json(self) -> dict[str, Any]:
         return {

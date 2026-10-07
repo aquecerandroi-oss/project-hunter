@@ -31,6 +31,7 @@ from hunter_core.db.session import role_session
 from hunter_exchanges.pumpfun.models import NormalizedCurveTrade, NormalizedMemeTokenCreated
 from hunter_exchanges.pumpfun.solana_codec import b58encode
 from hunter_indicators.meme.curve import INITIAL_REAL_TOKEN_RESERVES, INITIAL_VIRTUAL_TOKEN_RESERVES
+from hunter_meme_worker.lab_values import SELL_CAP_MODEL
 from hunter_meme_worker.launch_lane_config import LAUNCH_LANE_PAPER, LaunchLaneConfig
 from hunter_meme_worker.launch_lane_eval import on_create, progress_mint
 from hunter_meme_worker.launch_lane_repo import LaunchRuleSpec
@@ -184,7 +185,8 @@ async def _bet_rows(factory: async_sessionmaker[AsyncSession], mint: str) -> lis
             (
                 await session.execute(
                     text(
-                        "SELECT status, exit, mark_source, pnl_sol FROM meme_paper_bets WHERE mint = :m"
+                        "SELECT status, entry, exit, mark_source, pnl_sol FROM meme_paper_bets "
+                        "WHERE mint = :m"
                     ),
                     {"m": mint},
                 )
@@ -277,4 +279,10 @@ async def test_a_replayed_exit_event_opens_and_closes_one_paper_bet(
     assert closed_rows[0]["status"] == "closed"
     assert closed_rows[0]["exit"]["reason"] == "first_third_party_sell"
     assert closed_rows[0]["mark_source"] == "solana_ws"
+    # bug of 07/10: the lane's entry and its curve close carry the sale-cap stamp;
+    # a known standard coin has no cap at all
+    assert closed_rows[0]["entry"]["sell_cap_model"] == SELL_CAP_MODEL
+    assert closed_rows[0]["exit"]["sell_cap_model"] == SELL_CAP_MODEL
+    assert closed_rows[0]["exit"]["sell_cap_sol"] is None
+    assert closed_rows[0]["exit"]["own_curve_sol"] == closed_rows[0]["entry"]["curve_cost_sol"]
     assert rt.wake.calls == 2  # type: ignore[union-attr]  # one on the proposal, one on the close

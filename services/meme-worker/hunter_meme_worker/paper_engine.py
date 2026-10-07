@@ -22,8 +22,13 @@ rather than a silent default:
    more than the SOL the curve holds** (T4.27): on a Mayhem coin the agent
    inflates the virtual reserve without paying SOL in, so the formula quotes a
    sale the vault could not pay; ``Snapshot.sell_cap_sol`` hands
-   ``quote_sell`` the photo's ``real_sol_reserves`` as the ceiling and the
-   row says when it bound (``exit.real_sol_cap_applied``, ``exit.mark_basis``).
+   ``quote_sell`` the photo's ``real_sol_reserves`` **plus the SOL our own
+   buy paid into the curve** (``BetState.curve_cost_sol`` — bug of 07/10,
+   R89: a later photo never holds it, and capping at the observed vault alone
+   cut a round trip with no price move to everyone else's SOL) and the row
+   says when it bound and against what (``exit.real_sol_cap_applied``,
+   ``exit.mark_basis``, ``exit.sell_cap_sol``, ``exit.own_curve_sol``,
+   ``exit.sell_cap_model``).
 
 The arithmetic is ``hunter_indicators.meme.curve`` and the exit precedence is
 ``hunter_indicators.meme.rules.evaluate_exit`` (rug signal, creator dump, the
@@ -44,7 +49,12 @@ from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.curve import quote_sell
 from hunter_indicators.meme.rules import ExitState, evaluate_exit
 from hunter_meme_worker.lab_models import BetExit, BetState, Snapshot, SolUsd, money_str
-from hunter_meme_worker.lab_values import INDETERMINATE, NO_SNAPSHOT_IN_WINDOW
+from hunter_meme_worker.lab_values import (
+    INDETERMINATE,
+    NO_SNAPSHOT_IN_WINDOW,
+    SELL_CAP_MODEL,
+    optional_money_str,
+)
 from hunter_meme_worker.paper_fill import (
     FILL_REFUSALS,
     FillVerdict,
@@ -120,13 +130,17 @@ class Mark:
     real_sol_cap_applied: bool = False
 
 
+def _cap(bet: BetState, snapshot: Snapshot) -> Decimal | None:
+    return snapshot.sell_cap_sol(bet.is_mayhem, own_curve_sol=bet.curve_cost_sol)
+
+
 def mark_bet(bet: BetState, snapshot: Snapshot) -> Mark:
     """The honest mark and the high water it may raise, never lower."""
     quote = quote_sell(
         snapshot.reserves,
         bet.tokens,
         bet.fee_pct,
-        real_sol_reserves=snapshot.sell_cap_sol(bet.is_mayhem),
+        real_sol_reserves=_cap(bet, snapshot),
     )
     with localcontext(CONTEXT):
         mark = quote.net_sol - bet.priority_fee_sol
@@ -213,12 +227,8 @@ def close_bet(
     intent_snapshot_at: datetime | None,
 ) -> BetExit:
     """Sell everything against ``snapshot`` — the one after the rule fired."""
-    quote = quote_sell(
-        snapshot.reserves,
-        bet.tokens,
-        bet.fee_pct,
-        real_sol_reserves=snapshot.sell_cap_sol(bet.is_mayhem),
-    )
+    cap = _cap(bet, snapshot)
+    quote = quote_sell(snapshot.reserves, bet.tokens, bet.fee_pct, real_sol_reserves=cap)
     with localcontext(CONTEXT):
         received = quote.net_sol - bet.priority_fee_sol
         pnl = received - bet.sol_spent
@@ -232,6 +242,9 @@ def close_bet(
         "curve_proceeds_sol": money_str(quote.curve_proceeds_sol),
         "real_sol_cap_applied": quote.real_sol_cap_applied,
         "mark_basis": MARK_BASIS_REAL_SOL if quote.real_sol_cap_applied else MARK_BASIS_CURVE,
+        "sell_cap_sol": optional_money_str(cap),
+        "own_curve_sol": money_str(bet.curve_cost_sol),
+        "sell_cap_model": SELL_CAP_MODEL,
         "fee_sol": money_str(quote.fee_sol),
         "priority_fee_sol": money_str(bet.priority_fee_sol),
         "sol_received": money_str(received),

@@ -1,6 +1,6 @@
 ---
 tags: [bugs, resolvidos]
-updated: 2026-10-05
+updated: 2026-10-07
 status: registro
 owner: sexta-feira
 severity: misto
@@ -11,6 +11,24 @@ closed: 2026-09-08
 # Resolved Bugs
 
 Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
+
+## Fechado em 07/10/2026 (teto da venda de papel em moeda Mayhem; na árvore, aguarda o commit do orquestrador)
+
+- **Papel em moeda Mayhem: marcas e saídas cortadas no SOL real observado omitiam o SOL da compra hipotética (ALTA para pesquisa, aberto em 07/10 pelo R89) — fechado em código.** Achado pela Astra no pré-registro da H-032 ([[H-032-mayhem-prereg]]), medido em [[KB-0189-o-papel-nao-sabe-medir-a-moeda-mayhem]]; desenho e revisão em [[paper-mayhem-cap]].
+  - **Antes:** `Snapshot.sell_cap_sol` devolvia o SOL real **observado** da foto como teto (`services/meme-worker/hunter_meme_worker/lab_values.py`). A foto nunca contém o SOL que a nossa compra hipotética pôs na curva, então uma ida e volta sem movimento era cortada no SOL dos outros.
+  - **Prova com foto real:** aposta `01a113bf…` (mint `EjsrG2…`, Mayhem), fotos de entrada e de saída idênticas, SOL real de 1 lamport. Fechou `max_loss` recebendo 1 lamport: −0,07 SOL sem nenhum movimento de preço.
+  - **Agora:** o teto é o SOL real observado **mais** o `curve_cost_sol` da própria aposta (o SOL que a compra pagou à curva, sem as taxas). `BetState.curve_cost_sol` é lido de `entry.curve_cost_sol`, que toda aposta grava desde 12/09. A marca e o fechamento usam o mesmo teto.
+  - A primeira marca não muda: ela já vendia contra as reservas depois da compra, onde o teto novo nunca morde.
+  - **Auditoria:** toda entrada nova e toda saída pela curva gravam `sell_cap_model = observed_real_plus_own_curve_cost/1`; a saída grava também `sell_cap_sol` (teto efetivo ou nulo) e `own_curve_sol`. Uma aposta cuja saída tem o carimbo e a entrada não atravessou o deploy: as marcas anteriores usaram o teto velho. Nenhuma aposta fechada foi reescrita.
+  - **Não-Mayhem também estava exposta:** com o bit Mayhem desconhecido, o teto velho valia também para moeda padrão. Em 1 390 das 5 613 saídas não-Mayhem a venda pela fórmula passava do SOL real observado; não mordeu só porque o bit era conhecido `false` em todas.
+  - Com o teto novo e `virtual − real = 30`, ele não morde em curva padrão. Os 23 casos que morderiam mesmo assim são fotos `pumpfun_rest` de curvas terminadas (virtual − real = 115,005), com o bit conhecido `false`.
+  - **Tamanho medido nas saídas fechadas** (somente leitura, todos os conjuntos): o teto velho mordeu em 469 de 739 saídas Mayhem. Com o teto novo, na mesma foto, morderia em 40.
+  - **Testes que falharam antes:** `services/meme-worker/tests/test_mayhem_own_buy_cap.py`, 5 de 6; o recebimento era cortado em `0.000000001`, o número da linha do R89. Os dois testes KAT de `test_mayhem_mark.py` passaram a esperar `0,9 + aporte`.
+  - **Errata (code-reviewer):** a primeira entrega citava "19 testes de integração" sem o `test_lab_mayhem.py`, que ainda fixava o teto velho (0,88425) e falhava.
+    - Esse teste foi corrigido para cofre + aporte e agora confere o carimbo na linha do banco.
+    - Entraram também `test_lab_cap_transition.py` (aposta de transição recarregada; `curve_cost_sol` ausente é recusado, nunca zero), a grade de 144 casos de curva padrão e o carimbo da pista de lançamento.
+    - As integrações rodaram com um diretório de migrações temporário (`HUNTER_MIGRATIONS_DIR`, cópia do HEAD), porque a árvore compartilhada tem dois `0069` não rastreados de outras tarefas.
+  - **Resto aberto:** a venda Mayhem on-chain sem SOL suficiente e a dupla cobrança de impacto nas reservas virtuais, em [[Open Bugs]].
 
 ## Fechado em 05/10/2026, fim da noite (onda 1b do H-030: o registro de swap diz a completude da curva e as mints da pool; na árvore, aguarda o commit do orquestrador)
 

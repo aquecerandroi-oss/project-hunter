@@ -112,10 +112,13 @@ def sell_cap_sol(
     on the curve unless it is **known** standard; ``None`` (no ceiling) for a
     standard coin and for a completed curve (its SOL is on the pool now).
 
-    An unknown flag keeps the ceiling: on a standard curve it cannot bind (the
-    vault is what the buyers paid), so the conservative reading costs a
-    standard coin nothing and protects the mark of a Mayhem coin the chain
-    has not yet been asked about.
+    An unknown flag keeps the ceiling, to protect the mark of a Mayhem coin
+    the chain has not yet been asked about. The vault is the **observed**
+    real SOL: for a paper position the caller adds the SOL its own
+    hypothetical buy paid in, which no photo holds (bug of 07/10, R89 —
+    without it the ceiling cut standard and Mayhem round trips alike to
+    everyone else's SOL; with it, a standard curve's ``virtual − real = 30``
+    keeps the ceiling from binding).
     """
     if mayhem is False or complete:
         return None

@@ -22,6 +22,7 @@ from hunter_indicators.meme.curve import CURVE_TRADE_FEE_PCT, quote_buy, quote_s
 from hunter_meme_worker.lab_models import BetEntry, BetState, EffectiveParams, Snapshot, money_str
 from hunter_meme_worker.lab_repo_bets import close_bet_row, mark_filled
 from hunter_meme_worker.lab_rows import ApprovedProposal
+from hunter_meme_worker.lab_values import SELL_CAP_MODEL
 from hunter_meme_worker.launch_lane_pricing import standard_reserves
 from hunter_meme_worker.paper_engine import close_bet
 
@@ -88,6 +89,7 @@ def _entry(spec: LaunchRuleSpec, snapshot: Snapshot) -> BetEntry:
         "curve_cost_sol": money_str(quote.curve_cost_sol),
         "fee_sol": money_str(quote.fee_sol),
         "fee_pct": money_str(CURVE_TRADE_FEE_PCT),
+        "sell_cap_model": SELL_CAP_MODEL,
         "priority_fee_sol": "0",
         "sol_spent": money_str(quote.total_sol),
         "tokens": money_str(quote.tokens),
@@ -167,6 +169,7 @@ async def close_launch_bet(
         exit_intent=None,
         fee_pct=CURVE_TRADE_FEE_PCT,
         priority_fee_sol=Decimal(0),
+        curve_cost_sol=Decimal(entry.entry["curve_cost_sol"]),
         leg="single",
         parent_bet_id=None,
         mark_source=MARK_SOURCE,

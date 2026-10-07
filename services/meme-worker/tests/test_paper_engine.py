@@ -272,6 +272,7 @@ def _bet(entry_snapshot: Snapshot = LATER, **kw: Any) -> BetState:
         exit_intent=kw.pop("exit_intent", None),
         fee_pct=Decimal("1.75"),
         priority_fee_sol=Decimal(0),
+        curve_cost_sol=Decimal(verdict.entry.entry["curve_cost_sol"]),
     )
 
 

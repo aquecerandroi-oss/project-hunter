@@ -13,27 +13,18 @@ closed: ""
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
 
-## Papel em moeda Mayhem: marcas e saídas cortadas no SOL real observado omitem o SOL da compra hipotética (07/10) — ALTA para pesquisa, nula para a mesa real
+## Papel em moeda Mayhem — dois residuais depois do conserto do teto (07/10) — MÉDIA para pesquisa, nula para a mesa real
 
-Achado pela Astra na revisão do pré-registro da H-032 ([[H-032-mayhem-prereg]]) e medido no R89 ([[KB-0189-o-papel-nao-sabe-medir-a-moeda-mayhem]]).
+A omissão principal (o teto da venda de papel ignorava o SOL da nossa compra hipotética) foi **consertada em código** em 07/10 e está em [[Resolved Bugs]] ([[paper-mayhem-cap]], [[KB-0189-o-papel-nao-sabe-medir-a-moeda-mayhem]]). Ficam abertos dois pontos que o conserto **não** cobre:
 
-**Onde está.** A primeira marca da aposta de papel vende contra as reservas **depois** da compra hipotética, sem teto (`services/meme-worker/hunter_meme_worker/paper_fill.py:171`). As marcas seguintes e a saída usam a foto observada da curva com o teto `Snapshot.sell_cap_sol` = SOL real **observado** (`lab_values.py:84`, `paper_engine.py:123/216`, `curve.quote_sell`). As fotos nunca contêm o SOL que a compra hipotética teria posto na curva.
+1. **A venda Mayhem on-chain sem SOL suficiente nunca foi validada.** O papel corta o recebimento no cofre e devolve todos os tokens (`curve.quote_sell`). Se o programa recusar a venda inteira, ou pagar do cofre do agente (`sol-vault`), o papel continua divergindo. Correção proposta: simulação on-chain de uma venda Mayhem com cofre curto, antes de qualquer pesquisa de papel que aceite Mayhem.
+2. **As fotos seguintes também não têm a nossa compra nas reservas virtuais**, em qualquer curva. Vender contra a foto observada `(x, y)` em vez de `(x + c, y − q)` cobra o impacto duas vezes; uma ida e volta sem movimento devolve `x·c/(x + 2c)`, não `c`.
+   - Medido em 07/10 (somente leitura, apostas de papel fechadas pela curva): mediana **0,34 %** da ficha nas não-Mayhem (p90 0,45 %, n 5 613) e **0,60 %** nas Mayhem (p90 2,7 %, n 739).
+   - É uma subavaliação local da cotação. Com gatilhos diferentes, **não** garante PnL final conservador.
+   - Não foi consertado agora porque mudaria a medição de todas as não-Mayhem no meio de experimentos em coleta. Além disso, o agente Mayhem reescreve as virtuais em valores absolutos (`set_mayhem_virtual_params`), então sobrepor a nossa compra a elas é palpite.
+   - Correção proposta: versão nova do modelo de venda, com corte de data. Dono: a decidir pelo orquestrador.
 
-**Cenário.** SOL real observado 0, compra de 0,07 SOL, foto seguinte idêntica. O recebimento fica cortado em 0, a prioridade é descontada e dispara `max_loss`, sem nenhum movimento econômico.
-
-**Medido** (sonda `refused_probe_v0/1`, 23/09–06/10):
-- Teto aplicado em **463 de 731** saídas Mayhem (63 %).
-- SOL real mediano na foto de entrada Mayhem: 0,061 SOL, menor que a ficha.
-- Ida e volta sem movimento: −14 % na mediana Mayhem, contra −3,4 % de taxas.
-- Na mesma foto de saída: −0,854 com teto, −0,027 sem teto (pós-hoc).
-
-**Efeito.** Todo número de papel em Mayhem mede o teto, não o mercado. O contraste global do [[EXP-M23-desfecho-das-recusadas]] fica comprometido (as recusadas Mayhem parecem piores por artefato). Um braço de papel com `exclude_mayhem: false` herdaria o defeito.
-
-**O que não afeta.** A mesa real: ela exclui Mayhem por padrão (0 de 161 posições), e o executor deriva a conta certa da curva (`docs/PUMPFUN.md` §9).
-
-**O que falta saber.** O que a venda Mayhem on-chain faz quando a curva tem menos SOL real que o valor dos tokens: de onde sai o SOL (cofre do agente `sol-vault`?), e se a venda é recusada, parcial ou integral com recebimento cortado. Somar `curve_cost` ao teto é palpite, **não** correção validada (a Astra recusa tratá-la como tal).
-
-**Correção proposta.** Modelar as reservas reais com o aporte da compra hipotética ao longo da trajetória e validar a venda Mayhem contra execução de referência (simulação on-chain) antes de qualquer pesquisa de papel com Mayhem. Mudança em `services/meme-worker` e `packages/indicators`, fora do escopo do quant-engineer nesta tarefa. Dono: a decidir pelo orquestrador.
+Também não coberto: a perna `probe` e a perna `scale` da mesma moeda têm cada uma o teto do próprio aporte, nunca um cofre compartilhado.
 
 ## `meme_close_day` cria `Diario-Meme/<dia>.md` ao lado de `Diario/<dia>.md` e deixa `[[<dia>]]` ambíguo — o lint volta vermelho (06/10) — MÉDIA
 

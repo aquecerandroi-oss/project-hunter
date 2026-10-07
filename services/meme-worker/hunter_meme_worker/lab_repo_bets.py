@@ -228,6 +228,7 @@ async def load_open_bets(session: AsyncSession) -> list[OpenBet]:
             exit_intent=r["exit_intent"],
             fee_pct=decimal_of(entry["fee_pct"]),
             priority_fee_sol=decimal_of(entry["priority_fee_sol"]),
+            curve_cost_sol=decimal_of(entry["curve_cost_sol"]),
             leg=str(r["leg"]),
             parent_bet_id=None if r["parent_bet_id"] is None else str(r["parent_bet_id"]),
             mark_source=str(r["mark_source"] or MARK_CURVE),

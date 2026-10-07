@@ -301,8 +301,8 @@ def quote_sell(
     ``real_sol_reserves`` (T4.27) is the ceiling on the **gross** proceeds — the
     SOL actually sitting in the curve, which is all a sale can take out; the fee
     is then charged on what leaves. ``None`` = no ceiling, the pre-T4.27 quote.
-    On a standard curve the ceiling never binds (the vault *is* what every buyer
-    paid in, and our tokens are a part of that); on a Mayhem coin it does.
+    A paper caller passes the observed vault **plus its own buy's SOL** (bug
+    of 07/10); so passed it cannot bind while ``virtual − real = 30`` holds.
     """
     proceeds = sell_proceeds(reserves, tokens)
     capped = False

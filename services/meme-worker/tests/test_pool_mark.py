@@ -51,6 +51,7 @@ BET = BetState(
     exit_intent=None,
     fee_pct=Decimal("1.75"),
     priority_fee_sol=Decimal(0),
+    curve_cost_sol=Decimal("0.0196560196560196560196560197"),
 )
 SOL_USD = SolUsd(
     price_usd=Decimal("101.4445"),

@@ -35,6 +35,7 @@ from hunter_meme_worker.lab_models import (
     effective_params,
     money_str,
 )
+from hunter_meme_worker.lab_values import SELL_CAP_MODEL
 
 __all__ = ["FILL_REFUSALS", "FillVerdict", "evaluate_fill", "pick_fill_snapshot"]
 
@@ -187,6 +188,7 @@ def _build_entry(
         "curve_cost_sol": money_str(quote.curve_cost_sol),
         "fee_sol": money_str(quote.fee_sol),
         "fee_pct": money_str(spec.fee_pct),
+        "sell_cap_model": SELL_CAP_MODEL,
         "priority_fee_sol": money_str(spec.priority_fee_sol),
         "sol_spent": money_str(spent),
         "tokens": money_str(quote.tokens),

@@ -108,9 +108,36 @@ valor imputado aos ausentes muda o rótulo enquanto I1/I2 falharem.
 - **Resultado** ([[H-032-mayhem-resultado]]): concorda com o rótulo e recomputou D_adj e as médias do CSV de forma independente.
   - 3 must-fix absorvidos: o bug em [[Open Bugs]], o aviso ao EXP-M23 e "grade de imputação" no lugar de "ponto de inversão".
 
+## Acréscimo — 07/10/2026: o teto do papel conserta a omissão do aporte (código, sem deploy)
+
+*Seção acrescentada, não reescrita. O rótulo da H-032 (`NÃO CONFIRMA — instrumento`) e os números acima não mudam: corrigir o código não refaz os gatilhos daquelas apostas.*
+
+- **O conserto.** O teto da venda de papel passou a ser o SOL real **observado** mais o `curve_cost_sol` da própria aposta: o SOL que a compra hipotética pagou à curva, sem as taxas, que vão aos recebedores.
+  - A marca e a saída usam o mesmo teto. A primeira marca não muda: ela já vendia contra as reservas depois da compra.
+  - Cada aposta vende tudo de uma vez, então "menos o que já tiramos" é zero.
+  - Detalhe em [[Resolved Bugs]], desenho e revisão em [[paper-mayhem-cap]].
+- **A hipótese escrita no código.** É um teto **contábil**, que supõe os fluxos externos observados mantidos como foram, e não uma reexecução da curva com a nossa compra dentro. Exemplo: uma venda de terceiro reprecificada depois da nossa compra tiraria mais SOL do que tirou na história. A Astra aceita a correção com essa ressalva.
+- **Prova com foto real.** A aposta `01a113bf…` (mint `EjsrG2…`) tinha fotos de entrada e de saída idênticas e 1 lamport de SOL real. Ela fechou `max_loss` recebendo 1 lamport.
+  - Com o teto novo, a mesma foto não dispara nada.
+  - A venda fica em −0,0025 SOL sobre 0,07: taxas mais o impacto cobrado duas vezes.
+- **Quanto muda, nas saídas fechadas** (somente leitura, todos os conjuntos, 07/10): o teto velho mordeu em **469 de 739** saídas Mayhem. Com o teto novo, na mesma foto de saída, morderia em **40**.
+  - Isto **não** é o retorno de um simulador corrigido, pelo mesmo motivo do item 5 acima.
+- **A não-Mayhem também estava exposta, sem ter sido atingida.** Com o bit Mayhem desconhecido o teto velho valia para moeda padrão. Em 1 390 de 5 613 saídas não-Mayhem a venda pela fórmula passava do SOL real observado.
+  - Só não mordeu porque o bit era conhecido `false` em todas.
+  - Em curva padrão (`virtual − real = 30`, `k` constante) o teto novo nunca morde: o máximo de `venda − real` fica no piso, abaixo do aporte.
+- **Carimbo de instrumento.** Entradas novas e saídas pela curva gravam `sell_cap_model = observed_real_plus_own_curve_cost/1`. Saída com o carimbo e entrada sem ele indica aposta de transição, cujas marcas anteriores usaram o teto velho.
+- **O que continua aberto** (em [[Open Bugs]]):
+  - A venda Mayhem on-chain sem SOL suficiente nunca foi validada.
+  - As reservas virtuais também não têm a nossa compra, em qualquer curva: mediana 0,34 % da ficha nas não-Mayhem e 0,60 % nas Mayhem.
+  - Pesquisa de papel com Mayhem continua exigindo dado coletado **depois** do deploy deste conserto e, de preferência, a validação on-chain.
+
 ## Relacionados
 
 [[Fila de Hipoteses]] (H-032) · [[Proximas Hipoteses]] · [[Dicionario de Variaveis]] ·
 [[EXP-M23-desfecho-das-recusadas]] · [[KB-0098-quantos-bums-reais-ha-por-dia-e-quanto-tempo-temos]] ·
 [[KB-0115-volta-ao-piso-e-real-ou-artefato]] · [[KB-0111-top10-share-maior-que-1-no-retrato-de-risco]] ·
-[[KB-0149-o-que-a-mesa-real-ensinou]] · [[comprou_no_topo]] · [[Mapa de Estrategias]] · [[Open Bugs]]
+[[KB-0149-o-que-a-mesa-real-ensinou]] · [[comprou_no_topo]] · [[Mapa de Estrategias]] · [[Open Bugs]] · [[Resolved Bugs]] · [[paper-mayhem-cap]]
+
+## Defensor (07/10/2026)
+
+A pergunta da mesa ("excluir Mayhem paga?") é limitada por **volume**, não só pelo instrumento: o quase-passou só por Mayhem é ~1 mint por semana. A prioridade da sonda é o estrato A do [[EXP-M23-desfecho-das-recusadas]]. Antes de qualquer papel Mayhem, falta validar on-chain a venda Mayhem (P1). Detalhe na [[Fila de Hipoteses]], H-032.

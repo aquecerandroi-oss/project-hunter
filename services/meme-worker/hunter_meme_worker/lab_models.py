@@ -302,6 +302,10 @@ class BetState:
     exit_intent: Mapping[str, Any] | None
     fee_pct: Decimal
     priority_fee_sol: Decimal
+    curve_cost_sol: Decimal
+    """``entry.curve_cost_sol``: the SOL our hypothetical buy paid **into the
+    curve** (fees excluded) — part of the vault a sale may draw on, and absent
+    from every later photo (07/10, ``Snapshot.sell_cap_sol``)."""
     leg: str = "single"
     parent_bet_id: str | None = None
     mark_source: str = MARK_CURVE

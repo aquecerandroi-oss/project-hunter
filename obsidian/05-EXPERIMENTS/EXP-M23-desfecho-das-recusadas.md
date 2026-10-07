@@ -127,3 +127,15 @@ Escrevo o que espero, para poder estar errado por escrito:
   - Os 11 contrastes por critério (estrato A) não são invalidados automaticamente: só 1 aposta do A existe no período, não-Mayhem.
   - Tirar Mayhem ou o estrato B depois de ver também não é saída, porque mudaria a população do alvo confirmatório. A decisão sobre o EXP-M23 (consertar o teto e recoletar, ou declarar o global inválido por instrumento) é do orquestrador.
 - **Fato de amostragem medido no caminho** (só contagem): no período, o estrato A rendeu **1** aposta (p 0,10) e o B 2 468, todas com p 0,005 (motivo raro presente). O desenho esperava ~60/dia do A. Duas causas aparecem no código e nas contagens, sem medição separada de cada uma. A sonda sorteia a moeda na **primeira** recusa elegível, que quase sempre é a moeda recém-nascida: `age_below_min` aparece em 2 461 das 2 468, ao lado de vários `*_unknown`. E ela funde as recusas de `operator/5` e `operator/6` do mesmo instante. Resultado: o instante de critério único quase nunca é o primeiro.
+
+## Nota — 07/10/2026: o teto do papel foi consertado em código; o contraste global segue comprometido
+
+*Nota acrescentada, não reescrita. Nada acima muda.*
+
+- O teto da venda de papel passou a somar o SOL que a compra hipotética pagou à curva ([[Resolved Bugs]], [[paper-mayhem-cap]], [[KB-0189-o-papel-nao-sabe-medir-a-moeda-mayhem]]). Até o deploy, **nada** muda nas apostas desta sonda, e nenhuma aposta fechada foi reescrita.
+- **Corte de instrumento.** Toda entrada nova e toda saída pela curva gravam `sell_cap_model = observed_real_plus_own_curve_cost/1`.
+  - Apostas sem o carimbo usam o teto velho.
+  - Uma aposta com o carimbo só na saída atravessou o deploy: as marcas que decidiram o gatilho usaram o teto velho. Ela deve ser tratada como transição, nem velha nem nova.
+- **Consequência.** O contraste global (A + B) das apostas decididas até 06/10 continua comprometido pelo teto velho. Misturar apostas de antes e de depois do corte seria trocar de instrumento no meio da coleta.
+  - A decisão entre recoletar só com o teto novo ou declarar o global inválido por instrumento continua do orquestrador.
+  - Dois residuais seguem abertos em [[Open Bugs]]: a venda Mayhem on-chain sem cofre suficiente e o impacto nas reservas virtuais.

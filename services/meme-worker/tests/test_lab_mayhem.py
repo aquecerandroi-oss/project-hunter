@@ -1,5 +1,6 @@
 """T4.27 against a real Postgres at ``head`` — a bet on a **Mayhem** coin is
-marked and sold by the vault (``real_sol_reserves``), never by the formula
+marked and sold by the vault (``real_sol_reserves`` plus the SOL our own buy
+paid in, bug of 07/10), never by the formula
 over the agent's virtual SOL; the row says so; the gate refuses a Mayhem coin
 by name on both clocks; the 15-second fold writes ``mcap_executable_sol``
 beside the theoretical cap; the minute clock's flag read is one bounded
@@ -27,6 +28,7 @@ from hunter_meme_worker.features import CurveObservation, MinuteInputs, build_ro
 from hunter_meme_worker.features_fast import FastInputs, build_fast_row
 from hunter_meme_worker.lab import LabContext, closed_minutes, lab_tick
 from hunter_meme_worker.lab_repo_mayhem import mayhem_flags_for
+from hunter_meme_worker.lab_values import SELL_CAP_MODEL
 from hunter_meme_worker.repo import insert_features, insert_snapshot, upsert_token
 from hunter_meme_worker.repo_fast import insert_fast_rows, load_fast_points
 
@@ -52,6 +54,12 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 WORKER = "hunter_worker"
+OWN = Decimal("0.04914004914004914004914004914")
+"""``0.05 / 1.0175``: the SOL the 0,05 SOL buy pays into the curve."""
+VAULT = Decimal("0.9491400491400491400491400491")
+"""The photo's 0,9 SOL plus :data:`OWN` — the cap since the bug of 07/10."""
+RECEIVED = "0.9325300982800982800982800982"
+""":data:`VAULT` minus the 1,75 % fee."""
 CREATED = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
 
 
@@ -105,7 +113,11 @@ async def test_a_mayhem_bet_is_marked_and_sold_by_the_vault_and_the_row_says_so(
     await lab_tick(ctx, now=trigger + timedelta(seconds=5))
     pending = await _bet_of(db_session_factory, proposal)
     assert pending["status"] == "open" and pending["exit_intent"]["reason"] == "target"
-    assert pending["mark_sol"] == Decimal("0.8842500000"), "0,9 SOL of vault minus the 1,75 % fee"
+    own = Decimal(opened["entry"]["curve_cost_sol"])
+    assert own == OWN, "the SOL our 0,05 SOL buy paid into the curve, read back from the row"
+    assert pending["mark_sol"] == Decimal("0.9325300983"), (
+        "0,9 SOL of vault plus our own 0,0491 SOL, minus the 1,75 % fee (bug of 07/10)"
+    )
     assert pending["mark_sol"] < Decimal(3), "the formula would have said ~3,3 SOL"
 
     sale_at = trigger + timedelta(seconds=30)
@@ -116,10 +128,16 @@ async def test_a_mayhem_bet_is_marked_and_sold_by_the_vault_and_the_row_says_so(
     assert closed["status"] == "closed" and closed["exit"]["reason"] == "target"
     assert closed["exit"]["real_sol_cap_applied"] is True
     assert closed["exit"]["mark_basis"] == "real_sol_reserves"
-    assert closed["exit"]["curve_proceeds_sol"] == "0.9"
-    assert closed["exit"]["sol_received"] == "0.88425"
+    assert closed["exit"]["curve_proceeds_sol"] == str(VAULT)
+    assert closed["exit"]["sell_cap_sol"] == str(VAULT)
+    assert closed["exit"]["own_curve_sol"] == str(OWN)
+    assert closed["exit"]["sell_cap_model"] == SELL_CAP_MODEL
+    assert closed["entry"]["sell_cap_model"] == SELL_CAP_MODEL, "a post-fix bet, not a transition"
+    assert closed["exit"]["sol_received"] == RECEIVED
     assert closed["exit"]["snapshot"]["mayhem_enabled"] is True
-    assert closed["pnl_sol"] == Decimal("0.88425") - closed["initial_risk_sol"]
+    assert closed["pnl_sol"] == (Decimal(RECEIVED) - closed["initial_risk_sol"]).quantize(
+        Decimal("1E-10")
+    )
     assert closed["outcome_quality"] == "measured", "a capped sale is a measured one"
 
 
