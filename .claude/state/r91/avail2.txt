@@ -1,0 +1,40 @@
+== histórico desses parâmetros
+     rs     |          changed_at           |           key           | old_value | new_value 
+------------+-------------------------------+-------------------------+-----------+-----------
+ operator/5 | 2026-09-16 19:14:49.908897+00 | require_holders_rising  | true      | false
+ operator/5 | 2026-09-16 19:14:53.488506+00 | holders_rising_or_flat  | true      | false
+ operator/5 | 2026-09-16 19:14:56.868116+00 | require_progress_rising | true      | false
+ operator/5 | 2026-09-16 19:15:00.510139+00 | progress_or_mcap_rising | true      | false
+ operator/5 | 2026-09-18 13:38:32.73237+00  | progress_or_mcap_rising | false     | true
+ operator/5 | 2026-09-18 13:38:36.222959+00 | require_progress_rising | false     | true
+ operator/5 | 2026-09-18 13:38:39.662244+00 | require_holders_rising  | false     | true
+ operator/5 | 2026-09-18 13:38:43.173767+00 | holders_rising_or_flat  | false     | true
+(8 rows)
+
+== unidades candidatas: (conjunto, mint) com bloco flow e aposta single; a proposta mais antiga que gerou aposta
+         rs         |                 series                  | unidades | dias |  primeiro  |   ultimo   | fechadas | nao_fechadas | h_t | h_f  | h_nulo | p_t | p_f | p_nulo | mayhem | may_nulo | com_sell_cap_model | fet_depois 
+--------------------+-----------------------------------------+----------+------+------------+------------+----------+--------------+-----+------+--------+-----+-----+--------+--------+----------+--------------------+------------
+ flow_v2/1          | meme_event_gate_v1,meme_features_15s_v1 |      575 |   23 | 2026-09-12 | 2026-10-07 |      575 |            0 | 575 |    0 |      0 | 575 |   0 |      0 |      0 |       12 |                  0 |          0
+ flow_v2/10         | meme_event_gate_v1                      |        1 |    1 | 2026-09-26 | 2026-09-26 |        1 |            0 |   0 |    1 |      0 |   1 |   0 |      0 |      0 |        0 |                  0 |          0
+ flow_v2/2          | meme_event_gate_v1,meme_features_15s_v1 |      317 |    8 | 2026-09-12 | 2026-09-19 |      317 |            0 | 129 |  188 |      0 | 317 |   0 |      0 |      0 |       91 |                  0 |          0
+ flow_v2/3          | meme_event_gate_v1,meme_features_15s_v1 |      204 |    6 | 2026-09-15 | 2026-09-20 |      204 |            0 |  85 |  119 |      0 | 204 |   0 |      0 |      0 |       24 |                  0 |          0
+ flow_v2/5          | meme_event_gate_v1,meme_features_15s_v1 |      213 |    4 | 2026-09-16 | 2026-09-19 |      213 |            0 |  97 |  116 |      0 | 213 |   0 |      0 |      0 |       18 |                  0 |          0
+ flow_v2/6          | meme_event_gate_v1,meme_features_15s_v1 |       39 |    4 | 2026-09-17 | 2026-09-20 |       39 |            0 |   7 |   32 |      0 |   9 |  17 |     13 |      0 |        0 |                  0 |          0
+ flow_v2/7          | meme_event_gate_v1,meme_features_15s_v1 |       30 |    4 | 2026-09-17 | 2026-09-20 |       30 |            0 |   5 |   25 |      0 |   2 |  15 |     13 |      0 |        0 |                  0 |          0
+ flow_v2/8          | meme_event_gate_v1,meme_features_15s_v1 |       56 |    4 | 2026-09-17 | 2026-09-20 |       56 |            0 |  13 |   43 |      0 |  11 |  30 |     15 |      0 |        1 |                  0 |          0
+ flow_v2/9          | meme_event_gate_v1,meme_features_15s_v1 |       85 |   17 | 2026-09-19 | 2026-10-07 |       85 |            0 |  23 |   62 |      0 |  36 |  41 |      8 |      0 |        0 |                  0 |          0
+ operator/5         | meme_event_gate_v1,meme_features_15s_v1 |      134 |    8 | 2026-09-17 | 2026-09-25 |      134 |            0 |  79 |   55 |      0 | 123 |   2 |      9 |      0 |        4 |                  0 |          0
+ operator/6         | meme_event_gate_v1                      |       39 |    6 | 2026-09-19 | 2026-09-26 |       39 |            0 |  39 |    0 |      0 |  39 |   0 |      0 |      0 |        2 |                  0 |          0
+ organic_v0/1       | 1m                                      |        2 |    2 | 2026-09-16 | 2026-09-18 |        2 |            0 |   2 |    0 |      0 |   2 |   0 |      0 |      0 |        0 |                  0 |          0
+ recuo_ctrl_v1/1    | meme_event_gate_v1,meme_features_15s_v1 |      302 |    3 | 2026-09-26 | 2026-09-28 |      302 |            0 | 176 |  126 |      0 | 302 |   0 |      0 |      0 |        0 |                  0 |          0
+ recuo_v1/1         | meme_event_gate_v1                      |      351 |    5 | 2026-09-24 | 2026-09-28 |      351 |            0 | 223 |  128 |      0 | 351 |   0 |      0 |      0 |        4 |                  0 |          0
+ refused_probe_v0/1 | 1m                                      |     2505 |   15 | 2026-09-23 | 2026-10-07 |     2505 |            0 | 614 | 1286 |    605 |   1 |   1 |   2503 |    672 |      247 |                  0 |          0
+(15 rows)
+
+== posições reais (só existência/status) por bloco flow
+     rs     | pos | fechadas | h_t | h_f | p_t | p_f | p_nulo 
+------------+-----+----------+-----+-----+-----+-----+--------
+ operator/5 | 123 |      123 |  68 |  55 | 114 |   2 |      7
+ operator/6 |  38 |       38 |  38 |   0 |  38 |   0 |      0
+(2 rows)
+

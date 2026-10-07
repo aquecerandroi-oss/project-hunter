@@ -101,8 +101,8 @@ mediana 43,6 s, p90 ≈ 129 s, e não serve para medir o instante da decisão �
 | `creator_sold` + `reason` | `meme_features_1m` | se o criador vendeu no minuto | M18 | `no_holders_reader` | alimenta pedigree (`creator_prior_dump_count`) | — |
 | `age_minutes` | `meme_features_1m` | idade em minutos | M18 | anulável sem coluna de motivo (só quando `created_at` é desconhecido) | esgotada (R65 "idade") | — |
 | `mcap_delta_60s`, `mcap_slope_60s` | `meme_features_15s` | variação/inclinação do mcap em 60 s | T4.16/`0030` | OLS de ln(mcap) entre referência de 60 s e a foto mais nova | não isolada (compõe `equilibrio`, H-013) | ver H-013 |
-| `progress_delta_60s`, `progress_rising` | `meme_features_15s` | variação/tendência do progresso em 60 s | T4.16 | — | compõe `equilibrio` | ver H-013 |
-| `holders_rising`, `holders_prev` | `meme_features_15s` | tendência de holders | T4.16 | — | esgotada (R65 "holders") | — |
+| `progress_delta_60s`, `progress_rising` | `meme_features_15s` | variação/tendência do progresso em 60 s | T4.16 | — | compõe `equilibrio`; `progress_rising` isolado na H-034 (**nao_confirma**) | H-034: +0,133 [−0,041; +0,315], 130 apostas, só varia nos `flow_v2/6`–`/9` ([[KB-0190-os-dois-subindo-nao-separam-o-retorno]]) |
+| `holders_rising`, `holders_prev` | `meme_features_15s` | tendência de holders | T4.16 | — | R65 testou o **nível** de holders; a tendência isolada é a H-034 (**nao_confirma**) | H-034: +0,027 [−0,030; +0,085], 1 680 apostas ([[KB-0190-os-dois-subindo-nao-separam-o-retorno]]) |
 | `buys_60s`, `sells_60s`, `unique_buyers_60s`, `net_sol_flow_60s`, `curve_volume_60s_sol` | `meme_features_15s` | fluxo do minuto corrente, na via de 15 s | T4.16 | via de 15 s (`meme_event_gate_v1`/`lab_fast`), atraso máximo 45 s | compõe `equilibrio`, `flow` | ver H-013 |
 
 ## O que nunca foi testado (semente da próxima leva de hipóteses)
@@ -121,7 +121,7 @@ pré-registrada (dado já existe, ninguém mediu):
 6. `is_mayhem` (meme) — excluído por padrão, nunca medido se a exclusão paga. **Testada em 07/10 (H-032, R89): NÃO CONFIRMA — instrumento**. A mesa nunca comprou Mayhem, e o papel não mede Mayhem enquanto o teto de SOL real omitir a compra hipotética ([[KB-0189-o-papel-nao-sabe-medir-a-moeda-mayhem]]).
 7. `top_buyer_share`/`fill_seconds` (meme, `pedigree_e2b`) — a família E2-b morreu como "seguir carteira", nunca como o **preenchimento** em si. **Testada em 07/10 (H-031, R88): NÃO CONFIRMA** ([[KB-0188-a-concentracao-do-maior-comprador-nao-separa-o-retorno]]).
 8. `market_betas` (cripto) — tabela existe, nunca populada o suficiente para medir.
-9. `holders_rising`/`progress_rising` (meme, `meme_features_15s`) isolados — só medidos hoje **dentro** de `equilibrio` (H-013, que morreu por 1 caso).
+9. `holders_rising`/`progress_rising` (meme, `meme_features_15s`) isolados — só medidos hoje **dentro** de `equilibrio` (H-013, que morreu por 1 caso). **Testadas em 07/10 (H-034, R91): NÃO CONFIRMA nas duas** — lidas do bloco `flow` gravado pela porta; holders subindo +0,027 por SOL [−0,030; +0,085], progresso subindo +0,133 [−0,041; +0,315] com só 130 apostas ([[KB-0190-os-dois-subindo-nao-separam-o-retorno]]).
 10. `liquidations` notional (cripto) — 8 421 linhas já coletadas, defeito de semântica nunca corrigido nem a série testada.
 
 Como transformar uma destas em hipótese pré-registrada, com onde os dados vivem e a classe de

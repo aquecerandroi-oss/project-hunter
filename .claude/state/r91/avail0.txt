@@ -1,0 +1,40 @@
+== conjuntos: kind, clock, ativo, parâmetros dos dois "subindo" (vivos hoje)
+         rs         |     kind      |  clock  | ativo | req_h | req_p | h_or_flat | p_or_mcap 
+--------------------+---------------+---------+-------+-------+-------+-----------+-----------
+ operator/1         | operator      |         | f     |       |       |           | 
+ operator/2         | operator      |         | f     |       |       |           | 
+ operator/3         | operator      | 15s     | f     | true  | true  |           | 
+ operator/4         | operator      | 15s     | f     | true  | true  | true      | true
+ operator/5         | operator      | 15s     | t     | true  | true  | true      | true
+ operator/6         | operator      | 15s     | t     | true  | true  |           | 
+ absorb_v0/1        | research_only | 15s     | t     |       |       |           | 
+ absorb_v0/2        | research_only | 15s     | t     |       |       |           | 
+ event_v0/1         | research_only | 1m      | f     |       |       |           | 
+ flow_v2/1          | research_only | 15s     | t     | true  | true  |           | 
+ flow_v2/10         | research_only | 15s     | t     | false | false | true      | true
+ flow_v2/2          | research_only | 15s     | f     | true  | true  | true      | true
+ flow_v2/3          | research_only | 15s     | f     | true  | true  | true      | true
+ flow_v2/4          | research_only | 15s     | f     | true  | true  | true      | true
+ flow_v2/5          | research_only | 15s     | f     | true  | true  | true      | true
+ flow_v2/6          | research_only | 15s     | f     | false | false | true      | true
+ flow_v2/7          | research_only | 15s     | f     | false | false | true      | true
+ flow_v2/8          | research_only | 15s     | f     | false | false | true      | true
+ flow_v2/9          | research_only | 15s     | t     | false | false | true      | true
+ hype_probe_v0/1    | research_only |         | f     |       |       |           | 
+ hype_probe_v0/2    | research_only |         | f     |       |       |           | 
+ launch_v0/1        | research_only | event   | f     |       |       |           | 
+ meme_paper_v0/1    | research_only |         | f     |       |       |           | 
+ moonshot_v0/1      | research_only |         | f     |       |       |           | 
+ moonshot_v0/2      | research_only |         | f     |       |       |           | 
+ organic_v0/1       | research_only | 1m      | f     | true  | true  | false     | false
+ recuo_ctrl_v1/1    | research_only | 15s     | f     | true  | true  | true      | true
+ recuo_v1/1         | research_only | 15s     | f     | true  | true  | true      | true
+ refused_probe_v0/1 | research_only | refused | t     | true  | true  |           | 
+ trendline_v0/1     | research_only |         | f     |       |       |           | 
+(30 rows)
+
+== histórico de mudança desses parâmetros
+ERROR:  column h.param does not exist
+LINE 1: SELECT rs.name||'/'||rs.version rs, h.changed_at, h.param, h...
+                                                          ^
+HINT:  Perhaps you meant to reference the column "rs.params".

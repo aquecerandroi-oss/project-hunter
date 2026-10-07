@@ -1,0 +1,29 @@
+R91 — H-034 · desfechos lidos em 2026-10-07 04:56:17.819351+00 · 1717 apostas
+I1 concordância bloco flow × meme_features_15s: 993 unidades, H 100.00%, P 100.00%
+
+== H (holders_rising) — 1717 unidades na lista
+  status × qualidade por braço: {('false', 'closed', 'indeterminate'): 24, ('false', 'closed', 'measured'): 859, ('true', 'closed', 'indeterminate'): 13, ('true', 'closed', 'measured'): 821}
+  braço true: teto aplicado 0/821 · ausentes (indeterminate/abertas) 13/834
+  braço false: teto aplicado 0/859 · ausentes (indeterminate/abertas) 24/883
+  primário: true: 821 un/530 mints/23 dias, média -0.0161, mediana -0.0702 · false: 859 un/533 mints/23 dias, média -0.0409, mediana -0.0601
+  instrumento: passa · limite de dado: passa
+  [primário] n=1680 D_adj +0.0274 · IC mint [-0.0297; +0.0849] (básico [-0.0302; +0.0844], inválidas 0.00%, p 0.1737) · IC dia [-0.0289; +0.0939] (básico [-0.0392; +0.0836], inválidas 0.00%, p 0.1935)
+  [primário] nível ajustado do braço true -0.0136 (com ATA -0.0322) · metades +0.0569 / -0.0158 · deixa-um-fora {flow_v2/2: +0.0135, flow_v2/3: +0.0188, flow_v2/5: +0.0194, flow_v2/6: +0.0277, flow_v2/7: +0.0272, flow_v2/8: +0.0292, flow_v2/9: +0.0360, operator/5: +0.0323, recuo_ctrl_v1/1: +0.0347, recuo_v1/1: +0.0335}
+  [S1] n=1717 D_adj +0.0286 · IC mint [-0.0305; +0.0870] (básico [-0.0298; +0.0877], inválidas 0.00%, p 0.1666) · IC dia [-0.0235; +0.0947] (básico [-0.0375; +0.0807], inválidas 0.00%, p 0.1762)
+  [S1] nível ajustado do braço true -0.0314 (com ATA -0.0500) · metades +0.0580 / -0.0168 · deixa-um-fora {flow_v2/2: +0.0141, flow_v2/3: +0.0197, flow_v2/5: +0.0228, flow_v2/6: +0.0297, flow_v2/7: +0.0276, flow_v2/8: +0.0295, flow_v2/9: +0.0363, operator/5: +0.0319, recuo_ctrl_v1/1: +0.0381, recuo_v1/1: +0.0353}
+
+== P (progress_rising) — 143 unidades na lista
+  status × qualidade por braço: {('false', 'closed', 'indeterminate'): 7, ('false', 'closed', 'measured'): 81, ('true', 'closed', 'indeterminate'): 6, ('true', 'closed', 'measured'): 49}
+  braço true: teto aplicado 0/49 · ausentes (indeterminate/abertas) 6/55
+  braço false: teto aplicado 0/81 · ausentes (indeterminate/abertas) 7/88
+  primário: true: 49 un/41 mints/16 dias, média -0.0041, mediana -0.0591 · false: 81 un/69 mints/17 dias, média -0.1200, mediana -0.1124
+  instrumento: passa · limite de dado: passa
+  [primário] n=130 D_adj +0.1334 · IC mint [-0.0412; +0.3150] (básico [-0.0482; +0.3080], inválidas 0.00%, p 0.0718) · IC dia [-0.0566; +0.3139] (básico [-0.0472; +0.3234], inválidas 0.00%, p 0.0745)
+  [primário] nível ajustado do braço true +0.0090 (com ATA -0.0096) · metades +0.1821 / +0.0403 · deixa-um-fora {flow_v2/6: +0.0988, flow_v2/8: +0.1099, flow_v2/9: +0.2480}
+  [S1] n=143 D_adj +0.0860 · IC mint [-0.1207; +0.2934] (básico [-0.1214; +0.2928], inválidas 0.00%, p 0.2095) · IC dia [-0.1475; +0.3280] (básico [-0.1560; +0.3196], inválidas 0.00%, p 0.2648)
+  [S1] nível ajustado do braço true -0.1035 (com ATA -0.1221) · metades +0.1231 / +0.0247 · deixa-um-fora {flow_v2/6: +0.0709, flow_v2/8: +0.0506, flow_v2/9: +0.1781}
+
+H: p bruto prim 0.1935 / S1 0.1762 · Holm prim 0.1935 / S1 0.3524 → NÃO CONFIRMA
+
+P: p bruto prim 0.0745 / S1 0.2648 · Holm prim 0.1490 / S1 0.3524 → NÃO CONFIRMA
+H-034 (família): NÃO CONFIRMA

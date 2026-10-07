@@ -1,0 +1,41 @@
+R91 congelamento — 2026-10-07T04:55:32+00:00
+units.csv: 2342 linhas, sha256 a515502f9b38b88aeb242cad1a9560b4a8c9cb94abcf53dd2d17c5a81cf332de
+features_end_time > proposed_at: 0 (deve ser 0)
+saídas antes da variável: {}
+concordância nas unidades com linha de 15 s ainda retida: {'linhas': 993, 'h_igual': 993, 'p_igual': 993}
+dias UTC com unidade (fronteira das metades): 23 2026-09-12…2026-10-06; 1.ª metade = 2026-09-24 e antes
+[H] nulos fora: {}
+[H]   flow_v2/10|or_flat,or_mcap: true 0 · false 1 — sem suporte
+[H]   flow_v2/1|req_h,req_p: true 572 · false 0 — sem suporte
+[H]   flow_v2/2|req_h,or_flat,req_p,or_mcap: true 129 · false 188 — SUPORTADO
+[H]   flow_v2/3|req_h,or_flat,req_p,or_mcap: true 85 · false 119 — SUPORTADO
+[H]   flow_v2/5|req_h,or_flat,req_p,or_mcap: true 97 · false 116 — SUPORTADO
+[H]   flow_v2/6|or_flat,or_mcap: true 7 · false 32 — SUPORTADO
+[H]   flow_v2/7|or_flat,or_mcap: true 5 · false 25 — SUPORTADO
+[H]   flow_v2/8|or_flat,or_mcap: true 13 · false 43 — SUPORTADO
+[H]   flow_v2/9|or_flat,or_mcap: true 23 · false 61 — SUPORTADO
+[H]   operator/5|nada: true 3 · false 10 — sem suporte
+[H]   operator/5|req_h,or_flat,req_p,or_mcap: true 76 · false 45 — SUPORTADO
+[H]   operator/6|req_h,req_p: true 39 · false 0 — sem suporte
+[H]   recuo_ctrl_v1/1|req_h,or_flat,req_p,or_mcap: true 176 · false 126 — SUPORTADO
+[H]   recuo_v1/1|req_h,or_flat,req_p,or_mcap: true 223 · false 128 — SUPORTADO
+[H] braço true (suportados): 834 un · 537 mints · 23 dias · pistas {'meme_features_15s_v1': 348, 'meme_event_gate_v1': 486}
+[H] braço false (suportados): 883 un · 550 mints · 23 dias · pistas {'meme_features_15s_v1': 582, 'meme_event_gate_v1': 301}
+[P] nulos fora: {'flow_v2/6': 13, 'flow_v2/7': 13, 'flow_v2/8': 15, 'flow_v2/9': 8, 'operator/5': 9}
+[P]   flow_v2/10|or_flat,or_mcap: true 1 · false 0 — sem suporte
+[P]   flow_v2/1|req_h,req_p: true 572 · false 0 — sem suporte
+[P]   flow_v2/2|req_h,or_flat,req_p,or_mcap: true 317 · false 0 — sem suporte
+[P]   flow_v2/3|req_h,or_flat,req_p,or_mcap: true 204 · false 0 — sem suporte
+[P]   flow_v2/5|req_h,or_flat,req_p,or_mcap: true 213 · false 0 — sem suporte
+[P]   flow_v2/6|or_flat,or_mcap: true 9 · false 17 — SUPORTADO
+[P]   flow_v2/7|or_flat,or_mcap: true 2 · false 15 — sem suporte
+[P]   flow_v2/8|or_flat,or_mcap: true 11 · false 30 — SUPORTADO
+[P]   flow_v2/9|or_flat,or_mcap: true 35 · false 41 — SUPORTADO
+[P]   operator/5|nada: true 2 · false 2 — sem suporte
+[P]   operator/5|req_h,or_flat,req_p,or_mcap: true 121 · false 0 — sem suporte
+[P]   operator/6|req_h,req_p: true 39 · false 0 — sem suporte
+[P]   recuo_ctrl_v1/1|req_h,or_flat,req_p,or_mcap: true 302 · false 0 — sem suporte
+[P]   recuo_v1/1|req_h,or_flat,req_p,or_mcap: true 351 · false 0 — sem suporte
+[P] braço true (suportados): 55 un · 45 mints · 16 dias · pistas {'meme_event_gate_v1': 29, 'meme_features_15s_v1': 26}
+[P] braço false (suportados): 88 un · 74 mints · 17 dias · pistas {'meme_features_15s_v1': 86, 'meme_event_gate_v1': 2}
+eligible.csv: 1860 linhas (H+P), sha256 78cfa32d394dbb65796918e75efe2196da68957001be0765d27240bfeb41e578

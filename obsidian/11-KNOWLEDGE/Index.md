@@ -649,3 +649,4 @@ produção. As limitações são de **janela** (16 h de sinais; 40 h de velas; u
 [[Strategy Backlog]] · [[Fila de Hipoteses]] · [[Registro de Tentativas]] · [[Experiments Index]] ·
 [[EXP-0001-momentum-v1]] · [[EXP-0002-volume-anomaly-v1]] · [[Strategy Performance]] ·
 [[Features]] · [[00-HOME]] · [[_TEMPLATE-NOTE|template de nota]]
+| [[KB-0190-os-dois-subindo-nao-separam-o-retorno]] | H-034: `holders_rising` e `progress_rising` isolados (bloco `flow` da porta) não separam o retorno do papel da porta `fluxo_e_holders` — holders D_adj +0,027 [−0,030; +0,085] em 1 680 apostas, braço verdadeiro perde em nível; progresso +0,133 [−0,041; +0,315] em 130; `comprou_no_topo` 1,19× (previa 1,5×); NÃO CONFIRMA | R91 (07/10/2026) | medição própria (papel) | H-034 |

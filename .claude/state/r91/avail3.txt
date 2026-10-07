@@ -1,0 +1,19 @@
+== suporte por variável e braço (unidade = proposta mais antiga do par conjunto×mint que gerou aposta single)
+       var       | braco |  un  | mints | dias | conjuntos | mayhem_alguma_fonte | tok_nulo 
+-----------------+-------+------+-------+------+-----------+---------------------+----------
+ holders_rising  | false |  895 |   557 |   24 |        11 |                   0 |        0
+ holders_rising  | true  | 1451 |  1015 |   24 |        12 |                   0 |        0
+ progress_rising | false |  105 |    74 |   17 |         5 |                   0 |        0
+ progress_rising | nulo  |   58 |    33 |    9 |         5 |                   0 |        0
+ progress_rising | true  | 2183 |  1424 |   24 |        13 |                   0 |        0
+(5 rows)
+
+== concordância: propostas da pista de 15 s com bloco flow e linha de meme_features_15s no features_end_time (retenção 7 d)
+     rs     | props | com_linha | h_igual | p_igual 
+------------+-------+-----------+---------+---------
+ flow_v2/1  |    16 |        16 |      16 |      16
+ flow_v2/9  |    18 |        18 |      18 |      18
+ operator/5 |   635 |       635 |     635 |     635
+ operator/6 |    13 |        13 |      13 |      13
+(4 rows)
+
