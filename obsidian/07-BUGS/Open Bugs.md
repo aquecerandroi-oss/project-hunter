@@ -22,6 +22,7 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 - **Aberto — condição para reabrir compras pump/launch (junto das da T4.8f):** (a) `buy_reserve_sol` (`scope.py`) não inclui o crescimento da curva (+76 200): numa curva antiga a compra pode custar acima da reserva do escopo (depois do fill vale o custo real); precisa de tratamento e teste de fronteira; (b) **venda numa curva antiga** não foi simulada (nenhum detentor achado) — não dá para declarar essa saída validada; (c) nenhum trade real cashback pós-deploy (curva ou PumpSwap): o layout cashback só tem as vendas reais da T4.8f (antes do redeploy) e a simulação de 08/10.
 - **Observação:** o tráfego real já usa instruções v2 (`buy_v2`/`sell_v2`, 27/28 contas) que o nosso construtor não usa; se um upgrade futuro aposentar as legadas, a simulação obrigatória recusa antes de assinar.
 Diário: [[2026-10-08]]. Revisão: [[T4.8g-upgrade-08-10]] · anteriores [[T4.8f-pumpswap-guard]] · [[t48f-pin-move]].
+- **Pino movido (08/10, noite)** — guardião APPROVE com condições ([[t48g-pin-move]]). O teste Postgres de fechamento único da curva rodou verde pela primeira vez. Faltam: a variante PumpSwap, a venda de curva SPL clássica simulada e a reserva de compra cobrindo o crescimento da curva (+76 200), todos antes de reabrir compras.
 
 ## Papel em moeda Mayhem — dois residuais depois do conserto do teto (07/10) — MÉDIA para pesquisa, nula para a mesa real
 

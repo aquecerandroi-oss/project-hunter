@@ -2,9 +2,9 @@
 in live mode and a logged, heartbeat-visible state in inert mode; at runtime the
 deploy slot alone flips the state. No signer is involved in any branch.
 
-Fixtures refreshed to T4.8f (2026-10-02 deploy, slot 452654932, read 2026-10-05) —
-``EXPECTED_PUMP_PROGRAM`` moved from T4.8d's values. That deploy left the IDL account untouched
-(a third time), so only the deploy slot separates them."""
+Fixtures refreshed to T4.8g (2026-10-08 deploy, slot 454596459, read 2026-10-08) —
+``EXPECTED_PUMP_PROGRAM`` moved from T4.8f's values. That deploy left the IDL account untouched
+(a fourth time), so only the deploy slot separates them."""
 
 from __future__ import annotations
 
@@ -37,8 +37,8 @@ def _fixture(name: str) -> dict[str, Any]:
 
 
 def _header_value(label: str, slot: int) -> dict[str, Any]:
-    """The recorded ``ProgramData`` header of ``label`` (t48f), with its deploy slot replaced."""
-    value = _fixture(f"t48f_rpc_programdata_{label}_raw.json")["result"]["value"]
+    """The recorded ``ProgramData`` header of ``label`` (t48g), with its deploy slot replaced."""
+    value = _fixture(f"t48g_rpc_programdata_{label}_raw.json")["result"]["value"]
     header = struct.pack("<IQ", 3, slot) + b"\x01" + b"\x00" * 32
     return {**value, "data": [base64.b64encode(header).decode(), "base64"]}
 
@@ -71,11 +71,11 @@ class FakeRpc:
                 programdata_address(WATCHED_PROGRAMS[1].program_id): ("pump_fees", self.fees_slot),
             }
             values = [_header_value(*slots[a]) for a in params[0]]
-            return {"context": {"slot": 453627199}, "value": values}
+            return {"context": {"slot": 454629051}, "value": values}
         if params[0] == pump_idl_account_address():
-            return _fixture("t48d_rpc_idl_account_raw.json")["result"]
+            return _fixture("t48g_rpc_idl_account_raw.json")["result"]
         if params[0] == pump_programdata_address():
-            result = _fixture("t48f_rpc_programdata_pump_raw.json")["result"]
+            result = _fixture("t48g_rpc_programdata_pump_raw.json")["result"]
             header = struct.pack("<IQ", 3, self.deploy_slot) + b"\x01" + b"\x00" * 32
             value = {**result["value"], "data": [base64.b64encode(header).decode(), "base64"]}
             return {**result, "value": value}

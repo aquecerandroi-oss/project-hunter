@@ -51,6 +51,7 @@ FIXTURES = Path(__file__).parents[1] / "fixtures/pumpfun"
 IDL_SLOT_T48D = 449773161
 PROGRAMDATA_SLOT_T48D = 449773156
 IDL_SLOT_T48F = 453633942
+IDL_SLOT_T48G = 454629141
 
 
 def _fixture(name: str) -> dict[str, Any]:
@@ -62,6 +63,26 @@ def test_the_captured_idl_hashes_to_the_expectation_or_the_program_changed() -> 
     assert sha == EXPECTED_PUMP_PROGRAM.idl_sha256, (
         f"{UPGRADE_MESSAGE}: IDL on-chain sha256 {sha} != {EXPECTED_PUMP_PROGRAM.idl_sha256}"
     )
+
+
+def test_the_t48g_deploy_did_not_republish_the_idl_account_a_fourth_time() -> None:
+    """The IDL account read on 2026-10-08 (slot 454629141, a real read, not a constant) is
+    T4.8c's to the byte — same base64, same decompressed IDL, same hash, same authority."""
+    old = _fixture("t48c_rpc_idl_account_raw.json")
+    new = _fixture("t48g_rpc_idl_account_raw.json")
+    assert new["address"] == old["address"] == pump_idl_account_address()
+    assert new["result"]["context"]["slot"] == IDL_SLOT_T48G > IDL_SLOT_T48F
+    assert new["result"]["value"]["data"][0] == old["result"]["value"]["data"][0]
+    value = new["result"]["value"]
+    decoded = decode_idl_account(value["data"][0], owner=value["owner"])
+    older = decode_idl_account(
+        old["result"]["value"]["data"][0], owner=old["result"]["value"]["owner"]
+    )
+    assert decoded.authority == older.authority
+    assert decoded.idl_bytes == (FIXTURES / "t48c_idl_pump_onchain_raw.json").read_bytes()
+    assert canonical_idl_sha256(decoded.idl_bytes) == EXPECTED_PUMP_PROGRAM.idl_sha256
+    assert EXPECTED_PUMP_PROGRAM.idl_sha256 == PREVIOUS_PUMP_PROGRAM.idl_sha256
+    assert EXPECTED_PUMP_PROGRAM.last_deploy_slot > PREVIOUS_PUMP_PROGRAM.last_deploy_slot
 
 
 def test_the_t48f_deploy_did_not_republish_the_idl_account_either() -> None:
@@ -106,21 +127,21 @@ def test_the_t48d_deploy_did_not_republish_the_idl_account() -> None:
 
 
 def test_the_programdata_header_gives_the_deploy_slot_and_its_block_time() -> None:
-    raw = _fixture("t48f_rpc_programdata_pump_raw.json")
+    raw = _fixture("t48g_rpc_programdata_pump_raw.json")
     assert raw["address"] == pump_programdata_address()
     value = raw["result"]["value"]
     assert value["owner"] == BPF_UPGRADEABLE_LOADER_ID
     slot = decode_programdata_header(value["data"][0], owner=value["owner"])
-    assert slot == EXPECTED_PUMP_PROGRAM.last_deploy_slot == 452654932
-    block_time = _fixture("t48f_rpc_deploy_block_times.json")["pump"]
+    assert slot == EXPECTED_PUMP_PROGRAM.last_deploy_slot == 454596459
+    block_time = _fixture("t48g_rpc_deploy_block_times.json")["pump"]
     assert block_time["programdata"] == pump_programdata_address()
     assert block_time["last_deploy_slot"] == slot
     assert datetime.fromtimestamp(block_time["block_time"], UTC) == datetime(
-        2026, 10, 2, 15, 47, 21, tzinfo=UTC
+        2026, 10, 8, 16, 20, 17, tzinfo=UTC
     )
-    # the upgrade authority did not change from T4.8c's capture
+    # the upgrade authority did not change from T4.8f's capture
     old_raw = base64.b64decode(
-        _fixture("t48d_rpc_programdata_raw.json")["result"]["value"]["data"][0]
+        _fixture("t48f_rpc_programdata_pump_raw.json")["result"]["value"]["data"][0]
     )
     new_raw = base64.b64decode(value["data"][0])
     assert old_raw[12] == new_raw[12] == 1, "Option<Pubkey> present (still upgradeable)"
@@ -132,23 +153,30 @@ def test_addresses_are_derived_not_typed() -> None:
     assert pump_programdata_address() == "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu"
 
 
-def test_history_keeps_the_previous_three_deploys_and_the_current_one_in_order() -> None:
-    assert len(PUMP_PROGRAM_HISTORY) == 4
+def test_history_keeps_the_previous_four_deploys_and_the_current_one_in_order() -> None:
+    assert len(PUMP_PROGRAM_HISTORY) == 5
     assert PUMP_PROGRAM_HISTORY[-1] is EXPECTED_PUMP_PROGRAM
     assert PUMP_PROGRAM_HISTORY[-2] is PREVIOUS_PUMP_PROGRAM
-    assert [entry.task for entry in PUMP_PROGRAM_HISTORY] == ["T4.8b", "T4.8c", "T4.8d", "T4.8f"]
+    assert [entry.task for entry in PUMP_PROGRAM_HISTORY] == [
+        "T4.8b",
+        "T4.8c",
+        "T4.8d",
+        "T4.8f",
+        "T4.8g",
+    ]
     assert [entry.last_deploy_slot for entry in PUMP_PROGRAM_HISTORY] == [
         446462760,
         447228373,
         449734335,
         452654932,
+        454596459,
     ]
     slots = [entry.last_deploy_slot for entry in PUMP_PROGRAM_HISTORY]
     assert slots == sorted(slots), "oldest first, strictly increasing"
-    assert len(set(slots)) == 4
-    assert EXPECTED_PUMP_PROGRAM.task == "T4.8f"
-    assert EXPECTED_PUMP_PROGRAM.captured_at == "2026-10-05T16:33:02Z"
-    assert UPGRADE_MESSAGE == "programa mudou: regravar T4.8g"
+    assert len(set(slots)) == 5
+    assert EXPECTED_PUMP_PROGRAM.task == "T4.8g"
+    assert EXPECTED_PUMP_PROGRAM.captured_at == "2026-10-08T18:47:22Z"
+    assert UPGRADE_MESSAGE == "programa mudou: regravar T4.8h"
 
 
 def test_the_previous_expectations_now_read_as_diverged() -> None:
@@ -159,10 +187,10 @@ def test_the_previous_expectations_now_read_as_diverged() -> None:
     assert program_divergence(identity, EXPECTED_PUMP_PROGRAM) is None
     for older in PUMP_PROGRAM_HISTORY[:-1]:
         reason = program_divergence(identity, older)
-        assert reason is not None and "last_deploy_slot 452654932" in reason
-    against_t48d = program_divergence(identity, PREVIOUS_PUMP_PROGRAM)
-    assert against_t48d is not None
-    assert "idl_sha256" not in against_t48d, "the T4.8f deploy left the IDL untouched"
+        assert reason is not None and "last_deploy_slot 454596459" in reason
+    against_t48f = program_divergence(identity, PREVIOUS_PUMP_PROGRAM)
+    assert against_t48f is not None
+    assert "idl_sha256" not in against_t48f, "the T4.8g deploy left the IDL untouched"
     against_t48b = program_divergence(identity, PUMP_PROGRAM_HISTORY[0])
     assert against_t48b is not None and "idl_sha256" in against_t48b
 
@@ -171,18 +199,18 @@ def _identity(**overrides: Any) -> ProgramIdentity:
     base = ProgramIdentity(
         idl_sha256=EXPECTED_PUMP_PROGRAM.idl_sha256,
         idl_authority="x",
-        idl_slot=IDL_SLOT_T48F,
+        idl_slot=IDL_SLOT_T48G,
         last_deploy_slot=EXPECTED_PUMP_PROGRAM.last_deploy_slot,
-        programdata_slot=453627199,
+        programdata_slot=454629029,
     )
     return replace(base, **overrides)
 
 
 def test_divergence_is_none_when_matching_and_named_otherwise() -> None:
     assert program_divergence(_identity()) is None
-    moved = program_divergence(_identity(last_deploy_slot=452654933))
-    assert moved is not None and "last_deploy_slot 452654933 != 452654932" in moved
-    assert UPGRADE_MESSAGE in moved and "T4.8f" in moved
+    moved = program_divergence(_identity(last_deploy_slot=454596460))
+    assert moved is not None and "last_deploy_slot 454596460 != 454596459" in moved
+    assert UPGRADE_MESSAGE in moved and "T4.8g" in moved
     rehashed = program_divergence(_identity(idl_sha256="ab" * 32))
     assert rehashed is not None and "idl_sha256" in rehashed and UPGRADE_MESSAGE in rehashed
     both = program_divergence(_identity(idl_sha256="ab" * 32, last_deploy_slot=1))
@@ -194,8 +222,8 @@ class _FakeRpc:
 
     def __init__(self, *, programdata_slot: int | None = None) -> None:
         self.calls: list[tuple[str, list[Any]]] = []
-        self.idl = _fixture("t48d_rpc_idl_account_raw.json")["result"]  # == T4.8c/T4.8f bytes
-        self.programdata = _fixture("t48f_rpc_programdata_pump_raw.json")["result"]
+        self.idl = _fixture("t48g_rpc_idl_account_raw.json")["result"]  # == T4.8c bytes
+        self.programdata = _fixture("t48g_rpc_programdata_pump_raw.json")["result"]
         if programdata_slot is not None:
             header = struct.pack("<IQ", 3, programdata_slot) + b"\x01" + b"\x00" * 32
             value = dict(self.programdata["value"])
@@ -218,9 +246,9 @@ def test_read_program_identity_is_two_reads_and_the_runtime_check_one() -> None:
     identity = read_program_identity(rpc)  # type: ignore[arg-type]
     assert [m for m, _ in rpc.calls] == ["getAccountInfo", "getAccountInfo"]
     assert program_divergence(identity) is None
-    assert identity.last_deploy_slot == 452654932
-    moved = _FakeRpc(programdata_slot=452654932 + 5)
-    assert read_last_deploy_slot(moved) == 452654937  # type: ignore[arg-type]
+    assert identity.last_deploy_slot == 454596459
+    moved = _FakeRpc(programdata_slot=454596459 + 5)
+    assert read_last_deploy_slot(moved) == 454596464  # type: ignore[arg-type]
     assert len(moved.calls) == 1
     assert program_divergence(read_program_identity(moved)) is not None  # type: ignore[arg-type]
 
@@ -233,7 +261,7 @@ def test_malformed_accounts_are_refused_not_guessed() -> None:
         decode_idl_account(base64.b64encode(b"\x00" * 64).decode(), owner=PUMP_PROGRAM_ID)
     with pytest.raises(MalformedMessage, match="base64"):
         decode_idl_account("not base64!", owner=PUMP_PROGRAM_ID)
-    pd = _fixture("t48f_rpc_programdata_pump_raw.json")["result"]["value"]
+    pd = _fixture("t48g_rpc_programdata_pump_raw.json")["result"]["value"]
     with pytest.raises(MalformedMessage, match="loader"):
         decode_programdata_header(pd["data"][0], owner=PUMP_PROGRAM_ID)
     wrong_tag = base64.b64encode(struct.pack("<IQ", 2, 1) + b"\x00" * 33).decode()

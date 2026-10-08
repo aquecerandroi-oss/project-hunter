@@ -56,21 +56,22 @@ WATCHED_PROGRAMS: tuple[WatchedProgram, ...] = (
     WatchedProgram(
         program_id=PUMPSWAP_PROGRAM_ID,
         label="pumpswap",
-        last_deploy_slot=452654882,  # 2026-10-02 15:47:07Z
-        captured_at="2026-10-05 (context slot 453627199)",
-        task="T4.8f",
+        last_deploy_slot=454596406,  # 2026-10-08 16:20:03Z
+        captured_at="2026-10-08 (context slot 454629040)",
+        task="T4.8g",
     ),
     WatchedProgram(
         program_id=PUMP_FEE_PROGRAM_ID,
         label="pump_fees",
-        last_deploy_slot=452655002,  # 2026-10-02 15:47:39Z
-        captured_at="2026-10-05 (context slot 453627199)",
-        task="T4.8f",
+        last_deploy_slot=454596501,  # 2026-10-08 16:20:30Z
+        captured_at="2026-10-08 (context slot 454629051)",
+        task="T4.8g",
     ),
 )
-"""Proven against: ``t48f_rpc_programdata_{pumpswap,pump_fees}_raw.json`` (read 2026-10-05), a
-mainnet simulation of our PumpSwap ``sell`` at slot 453626256 and the real post-upgrade sells
-of ``t48e_rpc_amm_tx_*``. Bump only by re-running that proof."""
+"""Proven against: ``t48g_rpc_programdata_{pumpswap,pump_fees}_raw.json`` (read 2026-10-08), a
+mainnet simulation of our PumpSwap ``sell`` at slot 454636840 and the real post-upgrade sells
+of ``t48g_rpc_amm_tx_sell_*`` (T4.8f's slots were 452654882 / 452655002). Bump only by re-running
+that proof."""
 
 
 @lru_cache(maxsize=8)

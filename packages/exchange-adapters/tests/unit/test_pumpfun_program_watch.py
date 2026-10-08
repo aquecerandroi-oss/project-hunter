@@ -1,10 +1,11 @@
-"""T4.8f: the runtime detector watches the programs our builders also depend on, not only the
-pump program — PumpSwap (``sell`` of a migrated position) and the pump **fee** program (both
-builders pass ``pfeeUx…``). Redeployed on 2026-10-02 within 32 s of the pump program
-(15:47:07Z, 15:47:21Z, 15:47:39Z): ``FeeConfig`` unchanged proves nothing about bytecode.
+"""T4.8f/T4.8g: the runtime detector watches the programs our builders also depend on, not only
+the pump program — PumpSwap (``sell`` of a migrated position) and the pump **fee** program (both
+builders pass ``pfeeUx…``). Redeployed together twice: 2026-10-02 within 32 s and 2026-10-08
+within 27 s of each other (16:20:03Z, 16:20:17Z, 16:20:30Z): ``FeeConfig`` unchanged proves nothing
+about bytecode.
 
-Fixtures ``t48f_rpc_programdata_*_raw.json``: the 45-byte ``ProgramData`` headers of the three
-programs, read-only, 2026-10-05 (context slot 453627199).
+Fixtures ``t48g_rpc_programdata_*_raw.json``: the 45-byte ``ProgramData`` headers of the three
+programs, read-only, 2026-10-08 (context slots 454629029..454629051).
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ def _fx(name: str) -> dict[str, Any]:
 
 
 def _header(label: str) -> dict[str, Any]:
-    return _fx(f"t48f_rpc_programdata_{label}_raw.json")["result"]["value"]
+    return _fx(f"t48g_rpc_programdata_{label}_raw.json")["result"]["value"]
 
 
 class FakeRpc:
@@ -46,7 +47,7 @@ class FakeRpc:
         self.missing = missing or set()
         by_address = {
             v["programdata"]: _header(label)
-            for label, v in _fx("t48f_rpc_deploy_block_times.json").items()
+            for label, v in _fx("t48g_rpc_deploy_block_times.json").items()
         }
         self.by_address = by_address
 
@@ -56,33 +57,33 @@ class FakeRpc:
         values = [
             None if address in self.missing else self.by_address[address] for address in params[0]
         ]
-        return {"context": {"slot": 453627199}, "value": values}
+        return {"context": {"slot": 454629051}, "value": values}
 
 
-def test_the_recorded_headers_carry_the_deploy_slots_of_2026_10_02() -> None:
+def test_the_recorded_headers_carry_the_deploy_slots_of_2026_10_08() -> None:
     slots = {
         label: decode_programdata_header(
             str(_header(label)["data"][0]), owner=_header(label)["owner"]
         )
         for label in ("pump", "pumpswap", "pump_fees")
     }
-    assert slots == {"pump": 452_654_932, "pumpswap": 452_654_882, "pump_fees": 452_655_002}
-    # 15:47:07Z, 15:47:21Z, 15:47:39Z — within 32 s
-    times = {label: v["block_time"] for label, v in _fx("t48f_rpc_deploy_block_times.json").items()}
-    assert max(times.values()) - min(times.values()) == 32
+    assert slots == {"pump": 454_596_459, "pumpswap": 454_596_406, "pump_fees": 454_596_501}
+    # 16:20:03Z, 16:20:17Z, 16:20:30Z — within 27 s
+    times = {label: v["block_time"] for label, v in _fx("t48g_rpc_deploy_block_times.json").items()}
+    assert max(times.values()) - min(times.values()) == 27
 
 
 def test_the_watch_list_covers_pumpswap_and_the_fee_program_at_these_slots() -> None:
     by_id = {w.program_id: w for w in WATCHED_PROGRAMS}
     assert set(by_id) == {PUMPSWAP_PROGRAM_ID, PUMP_FEE_PROGRAM_ID}
-    assert by_id[PUMPSWAP_PROGRAM_ID].last_deploy_slot == 452_654_882
-    assert by_id[PUMP_FEE_PROGRAM_ID].last_deploy_slot == 452_655_002
+    assert by_id[PUMPSWAP_PROGRAM_ID].last_deploy_slot == 454_596_406
+    assert by_id[PUMP_FEE_PROGRAM_ID].last_deploy_slot == 454_596_501
     for w in WATCHED_PROGRAMS:
         assert w.label and w.task and w.captured_at
 
 
 def test_programdata_addresses_match_the_chain() -> None:
-    for label, v in _fx("t48f_rpc_deploy_block_times.json").items():
+    for label, v in _fx("t48g_rpc_deploy_block_times.json").items():
         assert programdata_address(v["program"]) == v["programdata"], label
 
 
@@ -91,9 +92,9 @@ def test_one_multiple_accounts_call_reads_every_slot() -> None:
     ids = [PUMP_PROGRAM_ID, *(w.program_id for w in WATCHED_PROGRAMS)]
     slots = read_deploy_slots(rpc, ids)  # type: ignore[arg-type]
     assert slots == {
-        PUMP_PROGRAM_ID: 452_654_932,
-        PUMPSWAP_PROGRAM_ID: 452_654_882,
-        PUMP_FEE_PROGRAM_ID: 452_655_002,
+        PUMP_PROGRAM_ID: 454_596_459,
+        PUMPSWAP_PROGRAM_ID: 454_596_406,
+        PUMP_FEE_PROGRAM_ID: 454_596_501,
     }
     assert len(rpc.calls) == 1 and rpc.calls[0][0] == "getMultipleAccounts"
     assert rpc.calls[0][1][1]["dataSlice"] == {"offset": 0, "length": 45}
@@ -110,4 +111,4 @@ def test_divergence_names_the_program_and_both_slots() -> None:
     assert watched_divergence(watch, watch.last_deploy_slot) is None
     text = watched_divergence(watch, watch.last_deploy_slot + 1)
     assert text is not None
-    assert "pumpswap" in text and "452654883" in text and "452654882" in text
+    assert "pumpswap" in text and "454596407" in text and "454596406" in text
