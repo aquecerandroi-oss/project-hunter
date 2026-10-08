@@ -40,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0068_meme_wallet_exceptions"
+HEAD_REVISION = "0069_meme_absorb_semdump_arm"
 ABSORB_ARM_REVISION = "0058_meme_gate_absorb_arm"
 """``0059`` (T4.82) lands on ``0058`` (T4.79), which lands on ``0057`` (T4.74-1), which lands on ``0056`` (T4.73), which lands on ``0055`` (T4.71), which lands on ``0054`` (T4.66), which lands on ``0053`` (T4.67a), which lands on ``0052``
 (T4.61a), which lands on ``0051`` (T4.54), which lands on ``0050`` (T4.49),
@@ -71,8 +71,10 @@ pullback) and changes no schema, so it goes 24 → 25; ``0064`` adds one index
 arm's immediate-entry control) and changes no schema, so it goes 25 → 26;
 ``0066`` adds one table (``meme_mature_opportunities``, EXP-M26 R1) and seeds no
 rule set; ``0067`` adds one table (``meme_token_state_history``, EXP-M26 J) and seeds
-no rule set; ``0068`` adds one table (``meme_wallet_holding_exceptions``, F1) and
-seeds no rule set, so it stays at 26."""
+no rule set, so it stays at 26; ``0068`` adds one table
+(``meme_wallet_holding_exceptions``, F1) and seeds no rule set; ``0069`` seeds one
+research set (``absorb_semdump_v0/1``, EXP-M27, H-031b's twin of ``absorb_v0/2``) and
+changes no schema, so it goes 26 → 27."""
 EVENTS_SCAN_CURSOR_REVISION = "0043_meme_events_scan_cursor"
 E2B_ARM_REVISION = "0044_meme_gate_e2b_arm"
 """Where the ``0044`` tests stage now that ``0046``/``0047`` sit on top (T4.44):
@@ -4537,11 +4539,11 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     # retired (+1 = 25) — T4.91.
     # ``0065`` seeds recuo_ctrl_v1/1 (EXP-M25, the arm's immediate-entry control),
     # nothing retired (+1 = 26) — T4.95.
-    # ``0068`` seeds grafico_ctrl_v1/1, grafico_v1/1, grafico_v1/2 (EXP-M26, the minute
-    # clock), nothing retired (+3 = 29) — EXP-M26 S.
+    # ``0069`` seeds absorb_semdump_v0/1 (EXP-M27, absorb_v0/2 without the creator_dump
+    # exit), nothing retired (+1 = 27) — H-031b.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["26"]
+    ) == ["27"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",

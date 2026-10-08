@@ -8580,17 +8580,17 @@ diagnósticos tem de filtrar `pedigree ->> 'creator_prior_dump_count' IS NOT NUL
 `{"feature": "pedigree", …}` de `meme_proposals.reasons` dos conjuntos `1m` sem `pedigree_repeat_dumper`: os dois campos
 saem `null`. Sem migração: a coluna é `jsonb` livre e nenhuma restrição olha esses campos.
 
-## 69. Os três braços do gráfico maduro — `grafico_ctrl_v1/1`, `grafico_v1/1`, `grafico_v1/2` — M19 (`0068_meme_mature_chart_arms`)
+## 69. Os três braços do gráfico maduro — `grafico_ctrl_v1/1`, `grafico_v1/1`, `grafico_v1/2` — M19 (`0070_meme_mature_chart_arms`)
 
 **Por quê (EXP-M26 S, desenho §2, H-022).** A população nova (moedas de 15–120 min ainda na curva, retidas por I1)
 precisa de três conjuntos de papel no relógio `1m` — só a via de 1 min lê o bloco `line`.
 
-**O que a `0068` faz:** **três linhas** em `meme_rule_sets`, `research_only`, `exp_ref = 'EXP-M26'`, `status =
+**O que a `0070` faz:** **três linhas** em `meme_rule_sets`, `research_only`, `exp_ref = 'EXP-M26'`, `status =
 'active'`, `code_ref = 'hunter_indicators.meme.rules:evaluate_entry+evaluate_exit'`: `grafico_ctrl_v1/1` (C,
 `…001f`), `grafico_v1/1` (L, `…0020`), `grafico_v1/2` (H, `…0021`) — os ids livres depois de `…001e` (`…0099`,
 `…00aa` e `…00b6` são só de testes). Nenhuma tabela, coluna, índice, vista, enum, política, grant ou partição; nada é
 aposentado; a mesa não é tocada. DDL em `ddl/meme_mature_chart_arms.py`; o slug tem 27 caracteres. Encadeada em
-`0067_meme_token_state_history` (§70; era `0066` até a `0067` entrar na frente, 27/09). Contagem de conjuntos ativos: 26 → 29.
+`0069_meme_absorb_semdump_arm` (§72; escrita sobre a `0066`, depois sobre a `0067` em 27/09 e sobre a `0068_meme_wallet_exceptions` na §71; rebaseada sobre a gêmea da H-031b em 07/10/2026, que vai ao ar primeiro). Contagem de conjuntos ativos: 27 → 30.
 
 **Parâmetros: constantes do módulo, exatamente as tabelas §2.1/§2.2 do desenho** (decimais como string JSON) — não
 cópia de linha viva, ao contrário da `0063`/`0065`: nenhuma linha na VPS carrega estes conjuntos. Porta comum
@@ -8605,22 +8605,22 @@ em 2 fotos, migração); H pelo pacote do EXP-M2 (`alvo_2x_trailing_30_tempo_15m
 `"50"`, linha rompida em 2 fotos, migração). `day_timezone` e `ttl_s` não estão no desenho e ficam de fora (o laço
 usa o seu TTL; nenhum leitor do worker lê `day_timezone`).
 
-**A guarda recusa** (nada semeado, revisão fica em `0066`) quando um `name/version` do EXP-M26 já existe com outros
+**A guarda recusa** (nada semeado, revisão fica em `0069`) quando um `name/version` do EXP-M26 já existe com outros
 parâmetros — o `ON CONFLICT DO NOTHING` guardaria um estranho sob o nome congelado.
 
 **Papel por construção.** `research_only`: o executor só seleciona `rs.kind = 'operator'`
-(`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED`; `test_migration_0068` roda essa consulta contra uma proposta
+(`hunter_meme_executor.auto_approve._OPERATOR_PROPOSED`; `test_migration_0070` roda essa consulta contra uma proposta
 de cada braço e nenhuma volta). As apostas dos três são **subtraídas** da leitura de pedigree da mesa
 (`lab_repo_fast._PEDIGREE`, parâmetro `:mature_rule_set_ids` nas duas subconsultas de `creator_prior_dump_count`,
 `hunter_meme_worker.lab_opportunities.MATURE_CHART_RULE_SET_IDS`), como as do `refused_probe_v0/1` e dos braços do
 recuo. **Ao contrário** destes, as apostas do EXP-M26 **fixam** o mint no rastreador (I2 do desenho, outra tarefa):
 sem isso o fill e as marcas de 15 s de uma moeda madura se perdem.
 
-**Ordem de deploy — a `0068` É o seed (desenho §7: I1+I2+L1+R1 → C1 → 24 h → F → J congelado → S → P).** Ela não
-pode ir no mesmo deploy da `0066`/`0067`: `alembic upgrade head` aplicaria todas, e os braços começariam a apostar antes do
+**Ordem de deploy — a `0070` É o seed (desenho §7: I1+I2+L1+R1 → C1 → 24 h → F → J congelado → S → P).** Ela não
+pode ir no mesmo deploy da `0066`/`0067` nem da `0069` (a gêmea da H-031b, §72): `alembic upgrade head` aplicaria todas, e os braços começariam a apostar antes do
 funil F ("sem os três conjuntos") e antes de o J estar congelado — e a "1.ª por mint" conta desde o seed. Também
 depende de L1 no código: sem `RuleSetSpec.line_support_*`, o carregador **ignora** as duas chaves e a saída
-`line_broken` roda com o suporte velho que o desenho proíbe; `test_migration_0068` falha sem L1 (lê
+`line_broken` roda com o suporte velho que o desenho proíbe; `test_migration_0070` falha sem L1 (lê
 `spec.line_support_causal`/`line_support_max_age_s`).
 
 **Custo que volta com um conjunto `1m` ativo.** `lab_repo_e2b.lineage_for` só lê o pedigree do minuto quando algum
@@ -8665,7 +8665,7 @@ de 15 s também já estoura às vezes (`obsidian/07-BUGS/Open Bugs.md`, 01/10: 2
 **Downgrade (§17.7):** recusa enquanto uma linha de `meme_proposals`, `meme_paper_bets`,
 `meme_rule_set_param_history`, `meme_gate_refusals_by_mint` ou `meme_mature_opportunities` referencia um braço; senão
 apaga as três linhas. Trava e pooler: um `INSERT` e um bloco `DO` no upgrade; cinco `DO` e um `DELETE` no downgrade.
-Provado em `packages/core/tests/integration/test_migration_0068.py` (inclusive `alembic check`).
+Provado em `packages/core/tests/integration/test_migration_0070.py` (inclusive `alembic check`).
 
 ## 70. O que se sabia do token em cada instante — `meme_token_state_history` — M19 (`0067_meme_token_state_history`)
 
@@ -8896,7 +8896,9 @@ gatilhos e função.
 **Numeração.** A semente do EXP-M26 que estava parada como `0068_meme_mature_chart_arms` (§69, ainda não commitada)
 passou a **`0069_meme_mature_chart_arms`**, com `down_revision = 0068_meme_wallet_exceptions`; só os identificadores de
 revisão e o nome do arquivo mudaram (e as constantes de revisão em `test_migrations.py`/`test_migration_0068.py`). As
-menções a "`0068`" no texto da §69 descrevem essa semente.
+menções a "`0068`" no texto da §69 descrevem essa semente. **Depois (07/10/2026, §72):** a mesma semente passou a
+**`0070_meme_mature_chart_arms`**, sobre a `0069_meme_absorb_semdump_arm`; o teste virou `test_migration_0070.py` e o
+texto da §69 já diz `0070`.
 
 Provado em `packages/core/tests/integration/test_migration_wallet_exceptions.py` (global, só `SELECT` para os dois
 papéis e nada para `hunter_runtime`, o worker não escreve, nunca apagada nem truncada, só uma revogação inteira, uma
@@ -8904,3 +8906,68 @@ ativa por carteira+mint, checagens nomeadas, downgrade recusado com uma linha re
 `alembic check` em `head`); a ferramenta em `infra/scripts/tests/test_wallet_holding_exception.py` e
 `test_wallet_holding_exception_rules.py`; o executor em `services/meme-executor/tests/test_wallet_exceptions.py` e
 `test_wallet_exceptions_integration.py`.
+
+## 72. O gêmeo do `absorb_v0/2` sem a saída `creator_dump` — `absorb_semdump_v0/1` — H-031b (`0069_meme_absorb_semdump_arm`)
+
+**Por quê (H-031b, EXP-M27).** A H-031 (R88, KB-0188) achou que a fatia do maior comprador no instante da decisão não
+separa o retorno do papel, mas a saída `creator_dump` disparou 2,11× mais no braço de fatia alta. Se é a saída que
+esconde a diferença só se vê com a mesma aposta **sem** ela. Rota (2) do Defensor; aprovada pelo Everton em 07/10/2026.
+
+**O que a `0069` faz:** **uma linha** em `meme_rule_sets` (`01994d00-6c1a-7000-8000-000000000022`,
+`absorb_semdump_v0/1`, `kind = research_only`, `exp_ref = 'EXP-M27'`, `status = 'active'`, `code_ref` igual ao da
+`0058`). Nenhuma tabela, coluna, índice, vista, enum, política, grant ou partição; nada aposentado; a mesa e
+`absorb_v0/2` não são tocados. DDL em `ddl/meme_absorb_semdump_arm.py`; slug de 28 caracteres (§17.6). Encadeada em
+`0068_meme_wallet_exceptions`. O id é o seguinte livre depois dos `…001f`/`…0020`/`…0021` da semente do EXP-M26.
+`meme_rule_sets` é global (§34.1): sem `organization_id`, sem RLS. Contagem de conjuntos ativos: 26 → 27.
+
+**Linearização (07/10/2026).** A semente retida do EXP-M26 também descia da `0068` (duas cabeças fazem `upgrade head`
+falhar). A gêmea ficou como `0069` porque vai ao ar primeiro; a semente virou **`0070_meme_mature_chart_arms`**, com
+`down_revision = 0069_meme_absorb_semdump_arm` (§69, §71), e continua **fora de qualquer commit implantável até o J do
+EXP-M26 estar congelado**: o `compose.sh` roda `upgrade head`, e com o arquivo da `0070` na árvore implantada os três
+braços entrariam junto. Por isso o commit da gêmea leva `test_migrations.py` com `HEAD_REVISION =
+0069_meme_absorb_semdump_arm` e 27 conjuntos ativos; a árvore de trabalho com a `0070` presente diz `0070` e 30.
+
+**Copiado da linha VIVA de `absorb_v0/2`, mais uma chave** — o desvio declarado da §67: o seed é `absorb_v0/2.params
+|| '{"exit_on_creator_dump": false}'`, no mesmo `INSERT … SELECT` com o mesmo predicado das guardas (`id`, `name =
+'absorb_v0'`, `version = '2'`, `status = 'active'`). Porta, ficha, tetos (3 posições, perda diária 0,20 SOL, carteira
+2,0 SOL) e as demais saídas são as do original. `test_migration_0069` prova `gêmeo − exit_on_creator_dump = original`,
+chave a chave, e carrega a linha pelo caminho do robô (`RuleSetSpec.from_params` → `effective_params`): a saída sai
+desligada e a aposta grava `false`.
+
+- **A guarda recusa** (nada semeado, revisão fica em `0068`): `absorb_v0/2` ausente ou não ativo; `params ->> 'clock'`
+  diferente de `'15s'`; `exit_on_creator_dump` presente e diferente de `true` no original (o gêmeo seria cópia); e,
+  depois do `INSERT … ON CONFLICT DO NOTHING`, qualquer linha sob o nome congelado que não seja exatamente essa cópia
+  com esse id (um estranho). A linha de `absorb_v0/2` é travada (`SELECT … FOR NO KEY UPDATE`) antes das guardas e
+  até o fim da transação, e a cópia e a pós-checagem só aceitam a origem válida: um `--set-param` que chega primeiro faz a
+  migração esperar e o documento editado é o julgado (`test_migration_0069_guards`); um que chega depois espera a
+  migração terminar e só então grava — essa edição posterior não é julgada por ela e separa coortes (registrar o
+  `md5(params::text)` dos dois conjuntos no deploy, como na §67).
+- **`FOR NO KEY UPDATE`, não `FOR UPDATE` (revisão do database-architect, 07/10/2026).** Toda checagem de chave
+  estrangeira toma `FOR KEY SHARE` na linha referenciada, e `FOR UPDATE` conflita com ela: com `FOR UPDATE`, todo
+  `INSERT` do worker em `meme_proposals`/`meme_paper_bets`/`meme_gate_refusals_by_mint` de `absorb_v0/2` esperaria a
+  transação inteira da migração, e a migração esperaria qualquer transação do worker aberta com uma linha dessas.
+  `FOR NO KEY UPDATE` continua conflitando com o `UPDATE`/`DELETE` de `meme_rule_set.py` (`--set-param`,
+  `--deprecate`) e não com as inserções do worker. Medido num Postgres 16 descartável (inserção filha bloqueada com
+  `FOR UPDATE`, livre com `FOR NO KEY UPDATE`; `UPDATE` de `params` bloqueado nos dois) e provado em
+  `test_migration_0069_guards::test_the_lock_stops_an_edit_of_the_original_but_not_the_workers_inserts`. O teste da
+  corrida espera o bloqueio por `pg_blocking_pids`, não por um `sleep`.
+- **A chave tem de ser lida.** `RuleSetSpec.from_params` lê `exit_on_creator_dump` como booleano JSON estrito (string
+  recusada) e `EffectiveParams.as_json` grava a chave em **toda** aposta nova (`true` ou `false`); aposta anterior sem a
+  chave correu com `true`. Sem esse código o gêmeo seria uma cópia do original — o teste da migração falha nesse caso.
+  **Deploy em duas etapas:** o código vai antes; a `0069` só num deploy seguinte (o `compose.sh` migra antes de trocar
+  os serviços, e um worker antigo abriria apostas do gêmeo com a saída ligada).
+
+**Papel por construção.** `research_only`: o executor só seleciona `rs.kind = 'operator'` (`test_migration_0069` roda
+`auto_approve.operator_proposals` contra uma proposta do gêmeo e ela não volta). As apostas do gêmeo são **subtraídas**
+do `creator_prior_dump_count` da mesa pela lista de ids já existente (`lab_repo_pedigree`, parâmetro
+`:mature_rule_set_ids`, sem mudar o texto do SQL fixado por hash). Ao contrário do recuo (§65/§67), o gêmeo **fixa** o
+mint no rastreador: sem fotos, a cauda depois do `creator_dump` do original — o que o experimento mede — sumiria.
+Resíduo declarado (EXP-M27): a dobra do minuto pode gravar `meme_features_1m.creator_sold` de um mint que só o gêmeo
+mantém, e cada mint fixado estreita o teto do rastreador (no máximo 3 posições do gêmeo).
+
+**Downgrade (§17.7):** recusa enquanto `meme_proposals`, `meme_paper_bets`, `meme_rule_set_param_history`,
+`meme_gate_refusals_by_mint` ou `meme_mature_opportunities` referenciam o gêmeo — as cinco tabelas com chave
+estrangeira para `meme_rule_sets`, como na `0070` (§69); a quinta só é escrita para conjuntos do relógio `1m`, mas a
+guarda a nomeia em vez de deixar um erro cru de chave estrangeira. Trava e pooler: no upgrade, a trava de linha, dois
+blocos `DO` e um `INSERT … SELECT`; no downgrade, cinco `DO` e um `DELETE` — nada depende de estado de sessão; nenhuma
+janela de manutenção.

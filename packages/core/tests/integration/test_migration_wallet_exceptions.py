@@ -32,7 +32,7 @@ pytestmark = pytest.mark.integration
 
 REVISION = "0068_meme_wallet_exceptions"
 PREVIOUS = "0067_meme_token_state_history"
-SEED = "0069_meme_mature_chart_arms"
+SEED = "0069_meme_absorb_semdump_arm"
 TABLE = "meme_wallet_holding_exceptions"
 WALLET = "ARsuJEagSE2pLgjMfDvgNo1TdMRS2DDRYLmgu4fX6Dr4"
 MINT = "DgY9Z8xPG1346Ydrq98ASAZcVdyrurT4tCQ7TDapHcJg"

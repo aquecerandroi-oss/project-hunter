@@ -45,5 +45,8 @@ saída desligada) foi escrito — `test_creator_watch_twin.py`, no patch sequenc
 dividido (`test_migration_0069.py` + `_guards.py`). **Não feito:** expor a chave na API (`meme_desk_out`) — fora do
 escopo, sem leitor que precise hoje.
 
+**Revisão de banco depois desta:** [[H-031b-db-review]] — a trava virou `FOR NO KEY UPDATE` (a `FOR UPDATE` também
+travava as inserções do worker que referenciam `absorb_v0/2`), e o teste da trava deixou de depender de `sleep`.
+
 **Onde isto vive:** [[EXP-M27-gemeo-sem-creator-dump]] · [[Fila de Hipoteses]] (H-031b, emenda 2) · pré-registro:
 [[H-031b-prereg]] · [[Revisoes-Astra/Index|índice das revisões]]

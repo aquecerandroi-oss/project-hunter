@@ -18,7 +18,7 @@ populacao: primeira aposta do mint admitida por absorb_v0/2 e por absorb_semdump
 efeito: —
 ic: —
 veredito: —
-proximo_passo: database-architect revisa a 0069; aplicar o patch sequenciado de lab_models antes; deploy do Everton = T0
+proximo_passo: revisão de banco da 0069 feita (APPROVE, H-031b-db-review); aplicar o patch sequenciado de lab_models antes; deploy do código, depois a 0069 sem a 0070; deploy do Everton = T0
 classe_de_perda: golpe_do_criador
 mercado: meme
 ---
@@ -54,7 +54,9 @@ menos +0,05 por SOL. Texto decisório completo, emenda 1 incluída: [[Fila de Hi
   `created_at` do gêmeo (= T0) e o commit da imagem do `meme-worker`.**
 - **A migração recusa:** `absorb_v0/2` ausente ou aposentado; fora do relógio `15s`; com a chave presente e diferente
   de `true`; e qualquer outro conteúdo sob o nome congelado depois da cópia. A linha do original fica travada
-  (`FOR UPDATE`) durante a migração: um `--set-param` simultâneo espera e é julgado depois.
+  (`FOR NO KEY UPDATE`, [[H-031b-db-review]]) durante a migração: um `--set-param` que chega antes faz a migração
+  esperar e julgar o documento editado; um que chega depois espera e grava depois, e separa coortes (o `md5` do deploy
+  é o que mostra). As inserções do worker que referenciam `absorb_v0/2` não esperam pela trava.
 - **Papel por construção:** `research_only` — o executor só seleciona `kind = 'operator'` (o teste da `0069` roda a
   consulta do executor contra uma proposta do gêmeo e ela não volta).
 - **Toda aposta grava a chave.** Desde esta mudança, `meme_paper_bets.params` traz `exit_on_creator_dump` (`true` ou
@@ -84,8 +86,12 @@ menos +0,05 por SOL. Texto decisório completo, emenda 1 incluída: [[Fila de Hi
    migração falha se o código não ler a chave, mas não protege essa janela; por isso a emenda 2 da H-031b exclui da
    coorte toda aposta do gêmeo sem `"exit_on_creator_dump": false` no `params`.
 2. A `0069` é linearizada com a `0069_meme_mature_chart_arms` (não commitada, do EXP-M26) — hoje as duas descem da
-   `0068`.
+   `0068`. **Feito em 07/10** ([[H-031b-db-review]]): a gêmea fica `0069`; a semente do EXP-M26 virou
+   `0070_meme_mature_chart_arms`, sobre ela, e **não entra no commit implantável da gêmea** (o `compose.sh` roda
+   `upgrade head`; com o arquivo na árvore os três braços entrariam junto, antes do J congelar). O commit da gêmea leva
+   `test_migrations.py` com `HEAD = 0069` e 27 conjuntos ativos.
 3. Revisão do `database-architect` sobre a migração; deploy do Everton. **T0 = ativação** (o `created_at` da linha).
+   **Revisão feita em 07/10: APPROVE** depois de três ajustes ([[H-031b-db-review]]). Falta o deploy.
 
 ## Segunda opinião (Astra)
 
