@@ -1,0 +1,23 @@
+{
+ "address": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+ "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+ "jsonrpc": "2.0",
+ "result": {
+  "context": {
+   "apiVersion": "4.3.0",
+   "slot": 454629029
+  },
+  "value": {
+   "data": [
+    "AwAAAGuXGBsAAAAAAWNI+4ICMfurc9wwg+Hz8Un/EltxiCDzLrGhW/781hsJ",
+    "base64"
+   ],
+   "executable": false,
+   "lamports": 53268311040,
+   "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+   "rentEpoch": 18446744073709551615,
+   "space": 10485760
+  }
+ },
+ "id": 1
+}

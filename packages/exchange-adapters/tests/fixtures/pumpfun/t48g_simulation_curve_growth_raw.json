@@ -1,0 +1,39 @@
+{
+ "mint": "HDkoEKfP1Q3EAWEYfHwXogfgsFD9uMb9zbqYh6E6hYNa",
+ "user": "EnUR9YEybcgDj5fVSBa4eCnenrxFHKAvrwDwhLKPg4dM",
+ "curve": "2B533N7sZRaRDb6PpMiXqRaVDbUZo8eE87BqHYfMTZxy",
+ "budget_sol": "0.05",
+ "err": null,
+ "sim_slot": 454645917,
+ "pre_slot": 454645911,
+ "pre": {
+  "user": {
+   "lamports": 16884961324,
+   "data_len": 0,
+   "space": 0
+  },
+  "curve": {
+   "lamports": 1718102,
+   "data_len": 151,
+   "space": 151
+  }
+ },
+ "post": {
+  "user": {
+   "lamports": 16834880123,
+   "data_len": 0,
+   "space": 0
+  },
+  "curve": {
+   "lamports": 51177017,
+   "data_len": 166,
+   "space": 166
+  }
+ },
+ "event": {
+  "sol_amount": 49382715,
+  "fee": 469136,
+  "creator_fee": 148149,
+  "trailing_u64": 300701
+ }
+}

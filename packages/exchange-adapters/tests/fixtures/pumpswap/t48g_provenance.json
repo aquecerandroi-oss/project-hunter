@@ -1,0 +1,58 @@
+{
+ "captured_utc": "2026-10-08",
+ "rpc": "public mainnet-beta getSignaturesForAddress + getTransaction (maxSupportedTransactionVersion 1), read-only, no sendTransaction",
+ "after_deploy_slot": 454596406,
+ "scripts": [
+  ".claude/state/tmp/t48g_discover.py"
+ ],
+ "fixtures": {
+  "t48g_rpc_amm_tx_sell_2C8QHNSJtxoh_raw.json": {
+   "signature": "2C8QHNSJtxohhtwyNqEJRHyy8JWomrS5VJhjRtZyPXHtGvRfHn4dAHZTky5qFVeptwadNw8nAw5f8m1wrX6aCpCE",
+   "slot": 454630902,
+   "blockTime": 1791485743,
+   "why": "WSOL pool, 24 accounts (pool_v2 + buyback + its ATA): reproduced"
+  },
+  "t48g_rpc_amm_tx_sell_5cWuAY9xJtrp_raw.json": {
+   "signature": "5cWuAY9xJtrpzhywhu2poJiLNvhpZH249k9TNhFpJoN2W5tzEg2CzPwz95BZa6P7qHon5gGsQFdoVccZq96UxtBp",
+   "slot": 454630902,
+   "blockTime": 1791485743,
+   "why": "WSOL pool, 24 accounts: reproduced account for account"
+  },
+  "t48g_rpc_amm_tx_sell_AXNiK4CmYw5m_raw.json": {
+   "signature": "AXNiK4CmYw5mEy1fqTFH8zXDMPoHKMR8K8ovPi72HxKPa354GUxv4Gzt67EStgcJZNKkGAPw85p1NmanEchEPND",
+   "slot": 454630902,
+   "blockTime": 1791485743,
+   "why": "WSOL pool, 24 accounts: reproduced account for account"
+  },
+  "t48g_rpc_amm_tx_sell_YdnQWgW72poy_raw.json": {
+   "signature": "YdnQWgW72poy6GpKr97AcAmtQ5CbdCwveiugZSJj2gsPCpz8FAbMJqTSFRbvo3fiwFtaQeWQEa1qqWbSTHh268N",
+   "slot": 454630902,
+   "blockTime": 1791485743,
+   "why": "WSOL pool, 24 accounts: reproduced account for account"
+  },
+  "t48g_rpc_amm_tx_sell_5b3eUPbMhPAH_raw.json": {
+   "signature": "5b3eUPbMhPAH7mP3y3tLUCiJxUmzRJHhrSVquqQTjqro9dnayLXQP5gyirUFXEkpb3S3irPj8rQKXFas9eJJsfup",
+   "slot": 454630902,
+   "blockTime": 1791485743,
+   "why": "WSOL pool, 24 accounts; global_config ([2]) writable - a router's choice"
+  },
+  "t48g_rpc_amm_tx_buy_29Ew15xD3NfJ_raw.json": {
+   "signature": "29Ew15xD3NfJQQZ66mzJijLfr5GcLCHE7DrnBvUALPUioeKM5ee1TA6HsGFCRyHiVb38xgBBLcHoDfCi2BoU1GRG",
+   "slot": 454630902,
+   "blockTime": 1791485743,
+   "why": "BuyEvent 504 B (buy_exact_quote_in)"
+  },
+  "t48g_rpc_amm_tx_buy_3ocZBFd1F6hf_raw.json": {
+   "signature": "3ocZBFd1F6hfn86kFfFHXZhFcRD5wP9nJzfdncXhyeqv6SoRT3dZgyA24U76X1ud7hSbrtKAH9fw2esXLTieiNWe",
+   "slot": 454630902,
+   "blockTime": 1791485743,
+   "why": "BuyEvent 489 B (buy) plus a SellEvent in the same transaction"
+  },
+  "t48g_rpc_amm_tx_buy_2TtLDZYrHaXf_raw.json": {
+   "signature": "2TtLDZYrHaXfoHaandUAKXkxRa6Gsf77W85AmdfzFgPGvDsMzYHDRaNnkdQLGi3RE7KUkz7opBJi2us13fBPgWHZ",
+   "slot": 454632228,
+   "blockTime": 1791486106,
+   "why": "BuyEvent 507 B"
+  }
+ }
+}

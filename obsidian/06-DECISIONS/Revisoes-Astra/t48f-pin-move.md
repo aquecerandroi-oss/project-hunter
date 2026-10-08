@@ -36,3 +36,5 @@ veredito: APPROVE com condições — o pino pode subir; religar entradas pump/l
 Fonte: `.claude/state/astra-review-t48f-pin-move.md`.
 
 [[Open Bugs]] · [[T4.8e-decoders]] · [[T4.8f-pumpswap-guard]] · [[2026-10-05]]
+
+Seguido pelo redeploy de 08/10: [[T4.8g-upgrade-08-10]] (o pino de 05/10 vale até esse patch ser aplicado; as condições de religamento continuam e ganharam uma).

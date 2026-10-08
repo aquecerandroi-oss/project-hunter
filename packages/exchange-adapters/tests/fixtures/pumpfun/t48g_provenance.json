@@ -1,0 +1,150 @@
+{
+ "captured_utc": "2026-10-08",
+ "rpc": "public mainnet-beta getSignaturesForAddress + getTransaction (maxSupportedTransactionVersion 1), read-only, no sendTransaction",
+ "after_deploy_slot": 454596459,
+ "scripts": [
+  ".claude/state/tmp/t48g_discover.py",
+  ".claude/state/tmp/t48g_find_complete.py",
+  ".claude/state/tmp/t48g_curve_dump.py",
+  ".claude/state/tmp/t48g_capture_programdata.py",
+  ".claude/state/tmp/t48g_capture_idl_raw.py",
+  ".claude/state/tmp/t48g_capture_accounts.py"
+ ],
+ "fixtures": {
+  "t48g_rpc_tx_buy_Kz7Nk1YiVWWj_raw.json": {
+   "signature": "Kz7Nk1YiVWWjEZtRsTbjJoAuiBfnbeZXEDG2ewcb3B25rSeLTAjUzpTJCGbxznJqt6tEyMWssANGCd6adELod5Q",
+   "slot": 454631564,
+   "blockTime": 1791485924,
+   "why": "legacy buy, 24 B, holder-reward coin (hr 29630); reproduced byte for byte"
+  },
+  "t48g_rpc_tx_buy_3p8KxySa18L6_raw.json": {
+   "signature": "3p8KxySa18L6okPqsprYmuXsEPYBDszYwtcxTPxmQsde2QLNvKEjjiwTuenDZR7VAhwUFU56EN3ZBT4S6SYwbrBH",
+   "slot": 454631558,
+   "blockTime": 1791485922,
+   "why": "legacy buy, 24 B, classic coin; reproduced byte for byte"
+  },
+  "t48g_rpc_tx_buy_4yATaRdQNe2N_raw.json": {
+   "signature": "4yATaRdQNe2N2jB3Nbxivw28BGNPA7Vu7SoUnhmDcK65RduNWbVt63fxj3DpLauN57JzXbUYg6P1r9uaxRrKMG7p",
+   "slot": 454631564,
+   "blockTime": 1791485924,
+   "why": "legacy buy, 25 B (track_volume tail), classic; reproduced byte for byte"
+  },
+  "t48g_rpc_tx_buy_iJjSTjH8AoKT_raw.json": {
+   "signature": "iJjSTjH8AoKTZZ4bV2nNwLfp8VQ7jKEDvyZHdBuxsiBxCF9urcWfgQ7ftku7Cm87KRJGkkqFzWBWHZgXuWYgk8y",
+   "slot": 454631564,
+   "blockTime": 1791485924,
+   "why": "legacy buy, 25 B, classic; reproduced byte for byte"
+  },
+  "t48g_rpc_tx_sell_2zmu5NQsqrJ3_raw.json": {
+   "signature": "2zmu5NQsqrJ3Erq9JQ3GVWWzmbfVuFXUmmgvAH6fK3MUifgkrZf4JSEZQUCHnZMQLrY2ZFAcnEXP4W5DWQYv6ioV",
+   "slot": 454631563,
+   "blockTime": 1791485924,
+   "why": "legacy sell, classic; reproduced byte for byte"
+  },
+  "t48g_rpc_tx_sell_3SefGhSLx9f9_raw.json": {
+   "signature": "3SefGhSLx9f9BAxAEf937ruTzEF9iTetXU7fMPSL1V3WkX9JFJMCp2TcZ5qp3SKjMYSsZdjN3ygcUCXLWHY1SxoV",
+   "slot": 454630531,
+   "blockTime": 1791485641,
+   "why": "legacy sell, holder-reward coin; reproduced byte for byte"
+  },
+  "t48g_rpc_tx_sell_49Lfa4aoEdTw_raw.json": {
+   "signature": "49Lfa4aoEdTwLrBxcwLDwCzhWNDNQfT6riPJjafpcJzjB67wu2DucWZNZYc9p3zfzvVpKDRVzMBCsBKkzAo8NAM4",
+   "slot": 454631564,
+   "blockTime": 1791485924,
+   "why": "legacy sell, holder-reward coin; reproduced byte for byte"
+  },
+  "t48g_rpc_tx_sell_4Cuu6mMnzpvB_raw.json": {
+   "signature": "4Cuu6mMnzpvBWG5kTdSD5jgw93q8U78x2AfqwA5nHoGvhumAeZCUNN7DaB4qXDdN1tExLmp3wQi91wRLvkEX71XL",
+   "slot": 454630531,
+   "blockTime": 1791485641,
+   "why": "legacy sell, holder-reward coin; reproduced byte for byte"
+  },
+  "t48g_rpc_tx_sell_25uxGAn5kiFj_raw.json": {
+   "signature": "25uxGAn5kiFjeAxaRL1dRnFieQAnz6Njbyg7zZmS6hGHJHQ7zSnnXvYizmaPwtQ9u2sHfR8jbNSVTgBvqjsMQsZo",
+   "slot": 454631564,
+   "blockTime": 1791485924,
+   "why": "legacy sell via a bot router: user token account is not the ATA ([5]) and the mint is writable ([2]) - the caller's choices"
+  },
+  "t48g_rpc_tx_buy_5rtmX79KnNHo_raw.json": {
+   "signature": "5rtmX79KnNHoZSNvtFFMVALcjtKucFawJufZqdG4LU5QyKLYcXc8mv5rwafajdzwSC97Eoc63QfuaBMTSi23DVjt",
+   "slot": 454631563,
+   "blockTime": 1791485924,
+   "why": "legacy buy via a router: 26 B data and global_volume_accumulator, [15], [16] writable - the caller's choices"
+  },
+  "t48g_rpc_tx_buy_3xkAuEWcRGsQ_raw.json": {
+   "signature": "3xkAuEWcRGsQxn7W9hwS6SgufaJ4QBvNjeC1hvAETFjRDA7t8yPtmL7jLbnueSjwebKwPXfM89MbVLveX3kEaXoH",
+   "slot": 454631564,
+   "blockTime": 1791485924,
+   "why": "Mayhem agent path (CPI from the Mayhem program): bonding-curve-v2 PDA derived under the Mayhem program ([16]), GVA writable ([12]) - not our path (T4.8d trap)"
+  },
+  "t48g_rpc_tx_sell_64waqn42fyBs_raw.json": {
+   "signature": "64waqn42fyBsp7Sp4QtLcxXcXLjgUVCA7u8Cn33Svrm3LM3mnbmuMwQ9Mt9wZqnfWDJvztJvk34LhaW1Rksp5Exq",
+   "slot": 454631564,
+   "blockTime": 1791485924,
+   "why": "Mayhem agent path sell: bonding-curve-v2 PDA under the Mayhem program ([14]) - not our path (T4.8d trap)"
+  },
+  "t48g_rpc_tx_event_buy_exact_quote_in_2Sh2zTmnse3s_raw.json": {
+   "signature": "2Sh2zTmnse3svW9jUTDWtyWPZSB1PPTSzMQ6fP1TPkE8YKNdGKXRLBxiA4miZZszLmKDRZoPu7toovyN7bqmPuJk",
+   "slot": 454630531,
+   "blockTime": 1791485641,
+   "why": "TradeEvent ix_name buy_exact_quote_in (397 B body)"
+  },
+  "t48g_rpc_tx_event_buy_exact_sol_in_2Hno2LqYACfE_raw.json": {
+   "signature": "2Hno2LqYACfEJ2sfRQYPjGXWCFtgd9MXgHp9ouUnKKofGsfYsWnaqSZjUf8mWnvzMTdzVtWW5ApN5forYJCTHx3Y",
+   "slot": 454631563,
+   "blockTime": 1791485924,
+   "why": "TradeEvent ix_name buy_exact_sol_in"
+  },
+  "t48g_rpc_tx_event_multi_hop_swap_rRUVF4GSZNRA_raw.json": {
+   "signature": "rRUVF4GSZNRAXfaqNq2r6cQrk9rWRoUQ5kevy4porPugZ9WxRw5ff9UrnxVUcV9g6JwEnuAeWqeMq3kxoLs5EM7",
+   "slot": 454631564,
+   "blockTime": 1791485924,
+   "why": "TradeEvent ix_name multi_hop_swap: the quote mint is another pump token (sol_amount 0) - not a SOL-quoted curve trade"
+  },
+  "t48g_rpc_tx_complete_3qDvAqx3Ssut_raw.json": {
+   "signature": "3qDvAqx3SsutkDg2Qg9BXc6Qw6QoyBqRN6gWvKcF73G1SMQUojTxnWs5e45xvVGCs2AcrDv1E88jzDG2KJpGobRF",
+   "slot": 454633670,
+   "blockTime": 1791486503,
+   "why": "buy that drains the curve plus the program's CompleteEvent (144 B) in the same transaction"
+  },
+  "t48g_rpc_curve_old151_HDko_raw.json": {
+   "slot": 454639095,
+   "address": "2B533N7sZRaRDb6PpMiXqRaVDbUZo8eE87BqHYfMTZxy",
+   "mint": "HDkoEKfP1Q3EAWEYfHwXogfgsFD9uMb9zbqYh6E6hYNa",
+   "why": "BondingCurve account (getAccountInfo base64), 2026-10-08, read-only"
+  },
+  "t48g_rpc_curve_new166_5rL1_raw.json": {
+   "slot": 454639101,
+   "address": "FDPAWfwUSckRFgi8wPEoGnhJKXnufWXbNQAeFi1ucQ3x",
+   "mint": "5rL1fAmwWJcRg7zdakLMgdDnUhJ8MUzGThL3XF1Hpump",
+   "why": "BondingCurve account (getAccountInfo base64), 2026-10-08, read-only"
+  },
+  "t48g_rpc_curve_new166_2Pi6_raw.json": {
+   "slot": 454639107,
+   "address": "49PNKdDqRXHCnh3ZaVcT6qd8KixsuhvSJJCi7jvcRetq",
+   "mint": "2Pi6oMohxY33fSewzdvrLdaGyJS9qLYHUBPsa619pump",
+   "why": "BondingCurve account (getAccountInfo base64), 2026-10-08, read-only"
+  },
+  "t48g_rpc_global_account_raw.json": {
+   "why": "pump Global, 1088 B (T4.8f read: 1087 + one trailing 01)"
+  },
+  "t48g_rpc_fee_config_raw.json": {
+   "why": "pump FeeConfig, byte-identical to rpc_fee_config_raw.json"
+  },
+  "t48g_rpc_idl_account_raw.json": {
+   "why": "pump IDL account, base64 identical to T4.8c's (4th deploy)"
+  },
+  "t48g_rpc_programdata_pump_raw.json": {
+   "why": "ProgramData header, deploy slot 454596459"
+  },
+  "t48g_rpc_programdata_pumpswap_raw.json": {
+   "why": "ProgramData header, deploy slot 454596406"
+  },
+  "t48g_rpc_programdata_pump_fees_raw.json": {
+   "why": "ProgramData header, deploy slot 454596501"
+  },
+  "t48g_rpc_deploy_block_times.json": {
+   "why": "getBlockTime of the three deploy slots"
+  }
+ }
+}
