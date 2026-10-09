@@ -1,6 +1,9 @@
 ---
 tags: [revisao-astra, ops, deploy]
 date: 2026-10-09
+updated: 2026-10-09
+decided_on: 2026-10-09
+by: devops-engineer + astra
 status: registro
 owner: sexta-feira
 ---
