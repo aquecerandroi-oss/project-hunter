@@ -108,3 +108,10 @@ menos +0,05 por SOL. Texto decisório completo, emenda 1 incluída: [[Fila de Hi
 [[EXP-M22-absorcao-de-venda]] · [[EXP-M25-controle-do-recuo]] (precedente de cópia do `params` vivo) ·
 [[KB-0149-o-que-a-mesa-real-ensinou]] (§6 item 4: não mexer no `creator_dump` da mesa) · [[Mapa de Estrategias]] ·
 [[Experiments Index]] · [[golpe_do_criador]]
+
+### Ativação (09/10/2026), registrada pela Sexta-feira
+
+- **T0 = `2026-10-09 04:08:44.404694+00`**: o `created_at` da linha `absorb_semdump_v0/1` (id `01994d00-6c1a-7000-8000-000000000022`), criada pela migração `0069` no deploy do commit `a7cd4443`.
+- `md5(params::text)`: original `absorb_v0/2` `8eca29255620f9f402e9582f7462ea61`; gêmeo `fe2de93889547ab3f1e87f0d12c9b81c` (`exit_on_creator_dump` = `false`).
+- O código da etapa 1 já rodava desde o deploy de 08/10, então o gêmeo nunca abre aposta com a saída ligada.
+- Apostas do gêmeo no momento da conferência: 0. O executor voltou a `program_mode=normal`, com o escopo esgotado (`small_test_below_min=full`) e a `launch_lane` off. Nada muda na mesa.
