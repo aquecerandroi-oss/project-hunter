@@ -39,12 +39,16 @@ __all__ = [
     "launch_candidates",
 ]
 
+_LAUNCH_SCOPE = (
+    "rs.id = p.rule_set_id AND rs.name = :name AND rs.status = 'active' AND p.origin = 'rules' "
+    "  AND p.mode = 'paper' AND p.status IN ('approved', 'filled', 'unfilled') "
+)
+"""What a launch proposal is, one fragment for the read and the claim so the two cannot drift."""
 _CANDIDATES = text(
-    "SELECT p.id, p.mint, p.decision, p.suggested, p.quote, p.reasons, p.decided_at, "
+    "SELECT p.id, p.mint, p.decision, p.suggested, p.quote, p.reasons, p.decided_at, "  # noqa: S608  # nosec B608 -- _LAUNCH_SCOPE is a module-level constant, never an argument or a row; values are bound parameters
     "  p.decided_by, p.status, p.proposed_at, p.features_end_time, rs.params, rs.version "
     "FROM meme_proposals p JOIN meme_rule_sets rs ON rs.id = p.rule_set_id "
-    "WHERE rs.name = :name AND rs.status = 'active' AND p.origin = 'rules' "
-    "  AND p.mode = 'paper' AND p.status IN ('approved', 'filled', 'unfilled') "
+    f"WHERE {_LAUNCH_SCOPE}"
     "  AND p.proposed_at >= :since "
     "  AND NOT EXISTS (SELECT 1 FROM meme_live_orders o "
     "                  WHERE o.proposal_id = p.id AND o.side = 'buy') "
@@ -52,11 +56,14 @@ _CANDIDATES = text(
 )
 _SUBMITTED_AT = text("SELECT submitted_at FROM meme_live_orders WHERE client_order_id = :key")
 _CLAIM = text(
-    "UPDATE meme_proposals SET mode = 'live', "
-    "  decision = coalesce(decision, '{}'::jsonb) || CAST(:note AS jsonb) "
-    "WHERE id = :id AND mode = 'paper' AND origin = 'rules' "
-    "  AND status IN ('approved', 'filled', 'unfilled') RETURNING id"
+    "UPDATE meme_proposals p SET mode = 'live', "  # noqa: S608  # nosec B608 -- _LAUNCH_SCOPE is a module-level constant, never an argument or a row; values are bound parameters
+    "  decision = coalesce(p.decision, '{}'::jsonb) || CAST(:note AS jsonb) "
+    f"FROM meme_rule_sets rs WHERE p.id = :id AND {_LAUNCH_SCOPE}"
+    "  AND p.reasons -> 0 ->> 'series' = :series RETURNING p.id"
 )
+"""H-037 R4 (F3): scoped like :data:`_CANDIDATES` plus the series label ``is_launch`` checks, not by
+id alone — the paper copy lane writes ``rules``/``paper``/``approved|filled|unfilled`` rows too, and
+a caller passing one of their ids must not file it for real money."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,5 +183,8 @@ async def claim_launch_proposal(session: AsyncSession, proposal_id: str, *, now:
     """``mode = 'live'`` on the research row, guarded by ``mode = 'paper'``: ``True``
     when this call claimed it. Same transaction as the order insert (module doc)."""
     note = json.dumps({"launch_lane": {"claimed_at": now.isoformat(), "by": "executor:launch"}})
-    claimed = await session.execute(_CLAIM, {"id": proposal_id, "note": note})
+    claimed = await session.execute(
+        _CLAIM,
+        {"id": proposal_id, "note": note, "name": LAUNCH_RULE_SET_NAME, "series": LAUNCH_SERIES},
+    )
     return claimed.scalar() is not None
