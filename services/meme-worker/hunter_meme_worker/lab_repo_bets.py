@@ -79,7 +79,10 @@ Realized sums count **measured** closes only (T4.16, ``0030``): on 12/09 five
 ``rug_no_snapshot`` artefacts summed −0,25 SOL, past the 0,20 daily cap — the
 instrument, not the market, would have latched the Lab shut."""
 _INDETERMINATE = text(
-    "SELECT count(*) FROM meme_paper_bets WHERE outcome_quality = 'indeterminate'"
+    "SELECT count(*) FROM meme_paper_bets b WHERE b.outcome_quality = 'indeterminate' "
+    # H-037: a copy censored by a leader gap is the copy lane's own count, not the Lab's.
+    "  AND NOT EXISTS (SELECT 1 FROM meme_rule_sets rs WHERE rs.id = b.rule_set_id "
+    "                  AND rs.params ->> 'clock' = 'copy')"
 )
 _EXPOSURE = text(
     "SELECT mint, sum(initial_risk_sol) AS exposure FROM meme_paper_bets "
@@ -113,7 +116,14 @@ _OPEN_BETS = text(
     "         (SELECT f.creator_sold FROM meme_features_1m f WHERE f.mint = b.mint "
     "            AND f.creator_sold IS NOT NULL ORDER BY f.end_time DESC LIMIT 1) END AS creator_sold "
     "FROM meme_paper_bets b LEFT JOIN meme_tokens t ON t.mint = b.mint "
-    "WHERE b.status = 'open' ORDER BY b.entry_at"
+    "WHERE b.status = 'open' "
+    # H-037 (EXP-M28): the copy lane's bets (``clock = 'copy'``, ``copy_spec.COPY_CLOCK``) are
+    # marked and sold by the lane with its own latency model. The Lab marking one on the next
+    # 15-second photo, or closing it by a rule of the bet's own params, would price a copy with
+    # no latency at all. The lane reads its own (``copy_repo._OPEN_COPIES``).
+    "  AND NOT EXISTS (SELECT 1 FROM meme_rule_sets rs WHERE rs.id = b.rule_set_id "
+    "                  AND rs.params ->> 'clock' = 'copy') "
+    "ORDER BY b.entry_at"
 )
 _UPDATE_MARK = text(
     "UPDATE meme_paper_bets SET mark_sol = :mark_sol, mark_at = :mark_at, "
@@ -209,6 +219,7 @@ async def mark_unfilled(session: AsyncSession, proposal_id: str, refusal: str) -
 
 
 async def load_open_bets(session: AsyncSession) -> list[OpenBet]:
+    """The open bets the **Lab** owns: those of the copy lane's sets are not among them (H-037)."""
     out: list[OpenBet] = []
     for r in (await session.execute(_OPEN_BETS)).mappings():
         entry = r["entry"]

@@ -34,6 +34,11 @@ the desk refused, where no desk row pins anything — so its pin would keep
 folding exactly the ``creator_sold`` rows above for mints only an experiment
 holds. Unpinned, the pair is also measured under the same tracker.
 
+**H-037 (EXP-M28): the copy lane's sets (``params.clock = 'copy'``) pin nothing.** The lane prices
+from its own chain reads. Up to 2 x 100 copy mints held for up to 3 600 s would keep
+``fold_minute`` writing ``creator_sold`` (the tape source of the pedigree's dump count) and narrow
+everyone's cap; excluded by the clock, not by id, because the seed is a later task.
+
 **I2 (EXP-M26, design §1.6): a second, separate pin.** :func:`pinned_mints`
 now also excludes every EXP-M26 rule set's own bets/proposals — they move to
 :func:`pinned_mints_exp_m26` instead, which :meth:`MintTracker.prune` never
@@ -71,9 +76,11 @@ _ORDINARY_PINNED_MINTS = text(
     "  AND b.rule_set_id <> CAST(:pullback_rule_set_id AS uuid) "
     "  AND b.rule_set_id <> CAST(:pullback_control_rule_set_id AS uuid) "
     "  AND COALESCE(rs.exp_ref, '') <> :exp_m26 "
+    "  AND COALESCE(rs.params ->> 'clock', '') <> 'copy' "
     "UNION SELECT mint FROM meme_live_positions WHERE status = 'open' "
     "UNION SELECT p.mint FROM meme_proposals p JOIN meme_rule_sets rs ON rs.id = p.rule_set_id "
-    "WHERE p.status = 'proposed' AND p.expires_at > :now AND COALESCE(rs.exp_ref, '') <> :exp_m26"
+    "WHERE p.status = 'proposed' AND p.expires_at > :now AND COALESCE(rs.exp_ref, '') <> :exp_m26 "
+    "  AND COALESCE(rs.params ->> 'clock', '') <> 'copy'"
 )
 
 _EXP_M26_PINNED_MINTS = text(

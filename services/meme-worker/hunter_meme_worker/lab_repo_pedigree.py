@@ -83,6 +83,9 @@ _DUMP_COUNT = (
     "                          AND pb.rule_set_id <> :pullback_rule_set_id "
     "                          AND pb.rule_set_id <> :pullback_control_rule_set_id "
     "                          AND pb.rule_set_id <> ALL(CAST(:mature_rule_set_ids AS uuid[])) "
+    "                          AND NOT EXISTS (SELECT 1 FROM meme_rule_sets prs "
+    "                                WHERE prs.id = pb.rule_set_id "
+    "                                  AND prs.params ->> 'clock' = 'copy') "
     "                          AND pb.creator_sold_seen_at IS NOT NULL "
     "                          AND pb.creator_sold_seen_at < t.created_at)"
     "             OR EXISTS (SELECT 1 FROM meme_paper_bets pb2 WHERE pb2.mint = o.mint "
@@ -90,6 +93,9 @@ _DUMP_COUNT = (
     "                          AND pb2.rule_set_id <> :pullback_rule_set_id "
     "                          AND pb2.rule_set_id <> :pullback_control_rule_set_id "
     "                          AND pb2.rule_set_id <> ALL(CAST(:mature_rule_set_ids AS uuid[])) "
+    "                          AND NOT EXISTS (SELECT 1 FROM meme_rule_sets prs "
+    "                                WHERE prs.id = pb2.rule_set_id "
+    "                                  AND prs.params ->> 'clock' = 'copy') "
     "                          AND pb2.exit ->> 'reason' = 'creator_dump' "
     "                          AND pb2.exit_at < t.created_at)"
     "           )"
@@ -160,6 +166,10 @@ def pedigree_params(mints: Sequence[str], gate: PedigreeGate, *, full: bool) -> 
             "pullback_control_rule_set_id": PULLBACK_CONTROL_RULE_SET_ID,  # T4.95: and its control
             # EXP-M26 (0068): the 3 arms; H-031b: and the twin, through the same list so the
             # statement's text (pinned by test_pedigree_light) does not change.
+            # H-037 (EXP-M28): the copy sets are subtracted by their ``params.clock`` inside the
+            # statement (their ids come with a seed that does not exist yet) - the one deliberate
+            # change of the pinned text: a copied leader's coin, stamped by the creator watch,
+            # must not make the creator's next coin a ``creator_repeat_dumper`` on the real desk.
             "mature_rule_set_ids": [*MATURE_CHART_RULE_SET_IDS, ABSORB_SEMDUMP_RULE_SET_ID],
         }
     return params

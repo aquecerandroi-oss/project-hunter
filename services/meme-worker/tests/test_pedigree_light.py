@@ -35,14 +35,18 @@ from .test_proposals import MINT, T0, _row, _spec
 
 pytestmark = pytest.mark.unit
 
-FULL_SQL_SHA256 = "6b42935c194e875741e4b40e7a4c66f422abd6a77b7d05908bdd92e027ceb74d"
-"""``sha256(str(_PEDIGREE.text))`` as it stood before this fix (3 218 characters). The 15 s
-lane — the real desk — must keep executing exactly this statement."""
+FULL_SQL_SHA256 = "378a7a4483f18b8e27c8967bde844b8058441f858c556d0cc6bf9789a845b67f"
+"""``sha256(str(_PEDIGREE.text))`` (3 635 characters). The 15 s lane — the real desk — must keep
+executing exactly this statement. **Changed deliberately on 09/10/2026 (H-037, guardian finding
+F1):** the two ``meme_paper_bets`` sources of ``creator_prior_dump_count`` gained
+``NOT EXISTS (... prs.params ->> 'clock' = 'copy')``, so a copy bet stamped by the creator watch
+is not evidence the desk ever had. Before it: 3 218 characters, sha256 ``6b42935c…ceb74d``. With
+no copy set in the database the two statements return the same rows."""
 
 
 def test_the_full_read_is_byte_identical_to_the_one_the_desk_always_ran() -> None:
     sql = str(_PEDIGREE.text)
-    assert len(sql) == 3218
+    assert len(sql) == 3635
     assert hashlib.sha256(sql.encode()).hexdigest() == FULL_SQL_SHA256
 
 

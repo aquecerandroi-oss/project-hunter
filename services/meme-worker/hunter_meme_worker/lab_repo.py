@@ -49,6 +49,9 @@ _RULE_SETS = text(
     # ``RuleSetSpec.from_params`` raised ``KeyError`` on them and took the whole
     # worker down in a loop on the first Lab tick after ``alembic upgrade``.
     "AND COALESCE(params ->> 'clock', '') <> 'event' "
+    # H-037 (EXP-M28): the copy lane loads its own sets (``clock = 'copy'``); ``'copy'`` is not
+    # in ``CLOCKS``, so the Lab would count a ``meme_rule_set_load_failed`` on every tick.
+    "AND COALESCE(params ->> 'clock', '') <> 'copy' "
     "ORDER BY name, version"
 )
 
@@ -120,7 +123,12 @@ _EXPIRE = text(
 _APPROVED = text(
     "SELECT p.id, p.mint, p.rule_set_id, p.decision, p.decided_at, t.migrated_at "
     "FROM meme_proposals p LEFT JOIN meme_tokens t ON t.mint = p.mint "
-    "WHERE p.status = 'approved' ORDER BY p.decided_at"
+    "WHERE p.status = 'approved' "
+    # H-037 (EXP-M28): a copy proposal is born ``approved`` and priced by the copy lane alone;
+    # the Lab would mark it ``unfilled/rule_set_inactive`` (no spec for the set).
+    "  AND NOT EXISTS (SELECT 1 FROM meme_rule_sets rs WHERE rs.id = p.rule_set_id "
+    "                  AND rs.params ->> 'clock' = 'copy') "
+    "ORDER BY p.decided_at"
 )
 
 _PENDING_COMMANDS = text(
@@ -135,7 +143,11 @@ _CANCEL = text(
     "UPDATE meme_proposals SET status = 'rejected', "
     "  decided_by = coalesce(decided_by, :issued_by), decided_at = coalesce(decided_at, :now), "
     "  decision = coalesce(decision, '{}'::jsonb) || CAST(:note AS jsonb) "
-    "WHERE id = :id AND status IN ('proposed', 'approved') RETURNING id"
+    "WHERE id = :id AND status IN ('proposed', 'approved') "
+    # H-037: no ``cancel`` on a copy funnel row (``rejected`` is read back as "not admitted").
+    "  AND NOT EXISTS (SELECT 1 FROM meme_rule_sets rs WHERE rs.id = meme_proposals.rule_set_id "
+    "                  AND rs.params ->> 'clock' = 'copy') "
+    "RETURNING id"
 )
 _PROPOSAL_STATUS = text("SELECT status FROM meme_proposals WHERE id = :id")
 
