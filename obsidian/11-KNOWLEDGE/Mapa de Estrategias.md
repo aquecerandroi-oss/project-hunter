@@ -98,7 +98,7 @@ SORT veredito ASC, mercado ASC
 | 13 variáveis de decisão (R65) | snipers, dev share, compradores únicos, progresso, fluxo do criador, idade, volume 1 m, sells/buys, holders, top10, retenção, carteiras novas, flip rápido | **nao_confirma** (todas) | nenhuma sobrevive Benjamini-Hochberg; p mais baixo 0,046 contra limiar 0,0077 ([[KB-0149-o-que-a-mesa-real-ensinou]] item 11) |
 | Sniper de lançamento | entrar cedo no lançamento | **nao_confirma** (tratada como descartada) | 18/18 células negativas, não era latência ([[KB-0141-sniper-de-lancamento]]) |
 | Rajada de compradores | pico súbito de compradores como gatilho | **nao_confirma** (tratada como descartada) | negativa em 54 células (R58/[[KB-0138-explosao-de-compradores-nao-tem-vantagem]]) |
-| Seguir carteira vencedora | copiar quem já ganhou | **nao_confirma** (tratada como descartada) | não é gatilho (R57/KB-0136) |
+| Seguir carteira vencedora | copiar quem já ganhou | **nao_confirma** (tratada como descartada) | não é gatilho (R57/KB-0136); piloto em papel pré-registrado em 09/10 ([[EXP-M28-copiar-carteiras-no-papel]], H-037) |
 | `momentum v2/v4/v6/v10`, `volume_anomaly v2`, `session_orb v1`, `trendline_breakout v1` (Shadow Lab) | variantes de parâmetro/família | aposentadas | negativas em toda coorte que tiveram (T3.56, roster 16→9) |
 
 ### Cripto

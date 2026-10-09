@@ -150,3 +150,6 @@ Sondagem de leitura do programa inteiro (pump + PumpSwap) por RPC público, 144 
 
 ### Decisão (09/10/2026)
 - O Everton aprovou o piloto de copiar ~20 carteiras no papel (compra quando elas compram, vende quando elas vendem), em paralelo ao H-030 completo. [[2026-10-09-piloto-copiar-carteiras-no-papel]]
+
+### Pré-registro do piloto (09/10/2026)
+- O piloto de copiar carteiras no papel virou o H-037 ([[EXP-M28-copiar-carteiras-no-papel]]): escolha pelo quadro público congelada antes de T0, NATS por carteira, saída na redução de posição do líder. Política própria, com parâmetros compartilhados com a `FollowPolicy` v1; um veredito lá não decide o H-030. Desenho: `docs/design/copiar-carteiras-papel.md`.

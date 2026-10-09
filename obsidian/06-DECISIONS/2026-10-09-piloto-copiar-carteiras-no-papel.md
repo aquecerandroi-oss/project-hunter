@@ -26,5 +26,10 @@ by: Everton
 - a seleção congelada no T0, sem trocar carteiras no meio;
 - o projeto completo (H-030) continua em paralelo.
 
+## Desenho e pré-registro (09/10/2026)
+- Desenho: `docs/design/copiar-carteiras-papel.md` (escolha congelada, NATS + fallback, regra de cópia, vista por líder, ondas).
+- Pré-registro: bloco H-037 da [[Fila de Hipoteses]]; experimento [[EXP-M28-copiar-carteiras-no-papel]]; diálogo com a Astra [[Dialogos/copy-paper|copy-paper]]; revisão do pré-registro [[Revisoes-Astra/H-037-prereg|H-037-prereg]].
+- Adendos do Everton no mesmo dia: até 5 carteiras dele num estrato à parte (`escolha_everton`, fora do CONFIRMA) e caminho de compra em milissegundos (decisão no evento da NATS, confirmação na cadeia depois).
+
 ## Relacionado
 [[EXP-M15-carteiras-vencedoras]] · [[2026-10-05-seguir-carteiras-lucrativas-aprovado]] · [[2026-10-05-carteiras-seguidores-como-pergunta-secundaria]] · [[KB-0186-o-tempo-real-da-pumpfun-chega-uns-0-1-s-antes-das-outras-fontes]]
