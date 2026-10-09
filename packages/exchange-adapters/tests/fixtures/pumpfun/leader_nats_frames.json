@@ -1,0 +1,16 @@
+{
+  "_provenance": {
+    "what": "Shape of the pump.fun NATS 'account_balance_change.<wallet>.*' channel (CORE instance, wss://prod-v2.nats.realtime.pump.fun) and of the home-page NatsProvider props, for tests of hunter_exchanges.pumpfun.leader_source_nats*.",
+    "shape_source": "4 real balance frames in .claude/state/pumpfun-rt-latency/run2/samples.json (probe window 2026-10-06 11:39-12:14Z, KB-0186); field names, types and the string-decimal balances are copied from them.",
+    "synthetic": true,
+    "synthetic_why": "Wallet addresses, mints, signatures, balances and the credential below are INVENTED placeholders (not any real trader, not the real credential): no raw capture and no secret is committed. The credential is the literal string 'TEST-ONLY-NOT-A-REAL-PASSWORD'.",
+    "captured_at_utc": null
+  },
+  "home_page_props_escaped": "...\\\"configs\\\":{\\\"CORE\\\":{\\\"servers\\\":\\\"wss://core.nats.invalid\\\",\\\"user\\\":\\\"subscriber\\\",\\\"pass\\\":\\\"TEST-ONLY-NOT-A-REAL-PASSWORD\\\"},\\\"UNIFIED\\\":{\\\"servers\\\":\\\"wss://unified.nats.invalid\\\",\\\"user\\\":\\\"subscriber\\\",\\\"pass\\\":\\\"TEST-ONLY-NOT-A-REAL-PASSWORD\\\"}},\\\"other\\\":1...",
+  "wallet": "LeaderWalletAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "mint": "MintAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApump",
+  "frames": {
+    "sol_leg": {"walletAddress": "LeaderWalletAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "tokenMint": "SOL", "balance": "59760.972304279", "slot": 453890603, "timestamp": "2026-10-06T11:39:09.817Z", "txSignature": "SigAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "txIndex": "512"},
+    "token_leg": {"walletAddress": "LeaderWalletAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "tokenMint": "MintAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApump", "balance": "795761175.792087", "slot": 453890603, "timestamp": "2026-10-06T11:39:09.855Z", "txSignature": "SigAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "txIndex": "512"}
+  }
+}

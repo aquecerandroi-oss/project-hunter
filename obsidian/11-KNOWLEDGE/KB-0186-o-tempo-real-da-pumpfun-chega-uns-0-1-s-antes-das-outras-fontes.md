@@ -107,3 +107,12 @@ Nenhuma. É infraestrutura. Nenhuma estratégia lê a NATS.
 ## Relacionados
 
 [[KB-0134-websocket-do-rpc-lag-medido-ao-vivo|KB-0134]] (o `logsSubscribe` público, outro método) · [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar|KB-0183]] (o custo de coletar o programa inteiro) · [[KB-0185-o-que-a-pumpfun-publica-sobre-carteiras-lucrativas|KB-0185]] (o que o site publica sobre carteiras) · [[KB-0142-kol-e-call-antecipam-ou-confirmam|KB-0142]] · [[KB-0141-sniper-de-lancamento|KB-0141]] · [[KB-0124-latencia-de-decisao-e-o-alvo-de-milissegundos|KB-0124]] · [[KB-0149-o-que-a-mesa-real-ensinou]] · [[EXP-M15-carteiras-vencedoras]] · [[2026-10-06-rea-na-pumpfun-apesar-dos-termos]] · [[2026-10-06-nats-da-pumpfun-escopo-da-credencial]] · [[Exchange Adapters]] · `docs/PUMPFUN.md` §3 e §10 · `.claude/state/rea-pumpfun-capture-2026-10-06.md`
+
+## Atualização de 09/10/2026 — o que a implementação da fonte de líderes mediu
+
+A fonte de líderes do piloto ([[2026-10-09-piloto-copiar-carteiras-no-papel]]; revisão da Astra em [[copy-leader-source]]) abriu o canal `account_balance_change.<carteira>.*` pela primeira vez como código de produção. O que aprendeu, medido hoje nesta máquina (corrida live de 40 s, carteira ocupada do protocolo, sem seguir nenhum trader):
+
+- **A credencial sai da home page em ~3,6 s** (uma leitura) — por isso ela é reaproveitada **só em memória** nas reconexões e relida na hora se o servidor recusar. Nunca gravada nem registrada.
+- **Os quadros são saldos absolutos em decimal de UI**, um por ativo. O wSOL vem com **9 casas**, os mints da pump com 6; outra escala é contada à parte. Dos 2 581 quadros da primeira corrida, 148 (5,7 %) eram o wSOL lido com a escala errada.
+- **Nossa parte do caminho (recv → fila) fica em ~0,2 ms (p50 0,174, p99 1,095, máx 2,873 ms; 1 115 eventos).** Isso é tempo de processamento nosso, **não** vantagem sobre a cadeia: o canal de saldo continua ~0,34 s **depois** do `logsSubscribe` (tabela acima). "Milissegundos" aqui quer dizer que não acrescentamos espera própria.
+- **A ordem das pernas SOL/token da mesma transação não é garantida**: nesta carteira, 788 de 793 pernas de token não tinham a perna de SOL. Por isso a compra espera até 300 ms por ela e sai com SOL `None` se não vier — nunca zero.
