@@ -1,0 +1,798 @@
+{
+ "chain_truth_from_block_audit": {},
+ "ws_url_host": "api.mainnet-beta.solana.com",
+ "commitment": "confirmed",
+ "getTransaction_sampler": {
+  "compared": 0,
+  "equal": 0,
+  "diff": [],
+  "unavailable": 0,
+  "slot_delta": {},
+  "http": {},
+  "http_events": []
+ },
+ "independent_block_audit": {
+  "blocks_requested": 0,
+  "blocks_skipped_or_unavailable": 0,
+  "blocks_before_both_subscriptions_flowed": 0,
+  "pending_censored_at_end": 0,
+  "at_fetch": {
+   "pump": {
+    "txs": 0,
+    "received": 0
+   },
+   "amm": {
+    "txs": 0,
+    "received": 0
+   }
+  },
+  "settled": {
+   "clean": {
+    "blocks": 0,
+    "pump": {
+     "txs": 0,
+     "received": 0,
+     "missed": 0,
+     "missed_failed": 0
+    },
+    "amm": {
+     "txs": 0,
+     "received": 0,
+     "missed": 0,
+     "missed_failed": 0
+    }
+   },
+   "affected_by_reconnect": {
+    "blocks": 0,
+    "pump": {
+     "txs": 0,
+     "received": 0,
+     "missed": 0,
+     "missed_failed": 0
+    },
+    "amm": {
+     "txs": 0,
+     "received": 0,
+     "missed": 0,
+     "missed_failed": 0
+    }
+   }
+  },
+  "truth": {
+   "blocks_ok": 0,
+   "pump": {
+    "txs": 0,
+    "success_txs": 0,
+    "events": {}
+   },
+   "amm": {
+    "txs": 0,
+    "success_txs": 0,
+    "events": {}
+   }
+  },
+  "per_block": [],
+  "missed_examples": []
+ },
+ "pipeline": {
+  "received_frames": {
+   "amm": 3082473,
+   "pump": 1988932
+  },
+  "received_bytes": {
+   "amm": 7829016922,
+   "pump": 2184509128
+  },
+  "processed_frames": {
+   "amm": 3082473,
+   "pump": 1988932
+  },
+  "queue_max_depth": {
+   "amm": 139,
+   "pump": 204
+  },
+  "queue_dropped": {},
+  "queue_residual_at_end": {
+   "pump": 0,
+   "amm": 0
+  },
+  "worker_busy_share": {
+   "amm": 0.22216432112601028,
+   "pump": 0.07978692234094077
+  },
+  "malformed_frames": {},
+  "process_cpu_share_of_one_core": 0.3906275605684757,
+  "rss_mb": null
+ },
+ "started_utc": "2026-10-06T18:47:42Z",
+ "ended_utc": "2026-10-06T19:49:55Z",
+ "elapsed_s": 3732.3,
+ "rates": {
+  "amm": {
+   "frames_per_s": 825.8831425106283,
+   "bytes_per_s": 2097618.7296077684,
+   "gb_per_day_uncompressed": 181.23425823811118,
+   "notifications_per_s_total_time": 822.1975146046009,
+   "notifications_per_s_active_time": 822.4169578341024,
+   "active_s": 3731.3,
+   "downtime_s_incl_open": 1.0,
+   "failed_share": 0.26429090724234267,
+   "gb_per_day_uncompressed_active_time": 181.23740380125025
+  },
+  "pump": {
+   "frames_per_s": 532.892067635288,
+   "bytes_per_s": 585292.8033678778,
+   "gb_per_day_uncompressed": 50.56929821098464,
+   "notifications_per_s_total_time": 529.2064397292605,
+   "notifications_per_s_active_time": 529.3462819572283,
+   "active_s": 3731.3,
+   "downtime_s_incl_open": 1.0,
+   "failed_share": 0.7348869164064367,
+   "gb_per_day_uncompressed_active_time": 50.53679859154764
+  }
+ },
+ "swap_events_per_s": 350.57512594012235,
+ "row_size": {
+  "decoded_rows": 791695,
+  "json_bytes_per_row": 490.36264723157274,
+  "pg_heap_bytes_per_row_estimate": 278.68171454916353,
+  "pg_with_indexes_bytes_per_row_estimate": 529.3671009669127,
+  "hypothesis_bytes_per_row": 350,
+  "rows_per_day": 30289691,
+  "gb_per_day_at_hypothesis_350B": 10.601391808429298,
+  "gb_per_day_at_measured_indexed_estimate": 16.03436585097884
+ },
+ "extrapolation_wallets_per_day": {
+  "swap_events_per_day_at_window_rate": 30289691,
+  "heaps_k": 24.56496501745232,
+  "heaps_beta": 0.6297580422647725,
+  "curve_is_the_primary_result": "see snapshot/curve (every minute)",
+  "scenario_wallets_day_if_no_new_after_window": 170455,
+  "scenario_wallets_day_heaps_fit": 1263926,
+  "scenario_wallets_day_linear_at_last_quarter_marginal_rate": 2431109
+ },
+ "liquidity_join": {
+  "events": {
+   "CreatePoolEvent": 180,
+   "WithdrawEvent": 136,
+   "DepositEvent": 14
+  },
+  "on_a_pool_that_swapped_in_window": {
+   "CreatePoolEvent": 179,
+   "WithdrawEvent": 135,
+   "DepositEvent": 14
+  },
+  "pools_known": 4151
+ },
+ "wallet_concentration_by_swaps_in_window": {
+  "1": {
+   "wallets": 66069,
+   "events": 66069
+  },
+  "2-4": {
+   "wallets": 64495,
+   "events": 172093
+  },
+  "5-19": {
+   "wallets": 30749,
+   "events": 250012
+  },
+  "20-99": {
+   "wallets": 7515,
+   "events": 363421
+  },
+  "100-499": {
+   "wallets": 1493,
+   "events": 248178
+  },
+  "500+": {
+   "wallets": 134,
+   "events": 208691
+  }
+ },
+ "snapshot": {
+  "elapsed_s": 3732.3,
+  "frames": {
+   "amm": {
+    "frames": 3082473,
+    "bytes": 7829016922
+   },
+   "pump": {
+    "frames": 1988932,
+    "bytes": 2184509128
+   }
+  },
+  "notifications": {
+   "pump": {
+    "n": 1975176,
+    "bytes": 2182528468,
+    "failed": 1451531,
+    "truncated": 0,
+    "bad_base64_lines": 1732
+   },
+   "amm": {
+    "n": 3068717,
+    "bytes": 7827063774,
+    "failed": 811034,
+    "truncated": 0,
+    "bad_base64_lines": 4862
+   }
+  },
+  "tx": {
+   "unique": 5035523,
+   "failed": 2260704,
+   "neither": 3454694,
+   "success": 2774819,
+   "amm_only": 1267392,
+   "success_amm_only": 1023367,
+   "success_neither": 1485149,
+   "pump_only": 309985,
+   "success_pump_only": 262872,
+   "both_programs": 3452,
+   "success_both_programs": 3431
+  },
+  "delivery_both_programs": {
+   "expected": 3151,
+   "delivered_by_both": 3151,
+   "only_pump": 0,
+   "only_amm": 0
+  },
+  "events": {
+   "pAMM.BoostBuyAndBurnEvent": {
+    "n": 1367,
+    "payload_bytes": 284336,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1367,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.BuyEvent": {
+    "n": 516769,
+    "payload_bytes": 258307908,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 516769,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.ClaimCashbackEvent": {
+    "n": 500,
+    "payload_bytes": 36000,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 500,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CloseUserVolumeAccumulatorEvent": {
+    "n": 136052,
+    "payload_bytes": 10884160,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 136052,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CollectCoinCreatorFeeEvent": {
+    "n": 423,
+    "payload_bytes": 50760,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 423,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.CreatePoolEvent": {
+    "n": 180,
+    "payload_bytes": 61920,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 180,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.DepositEvent": {
+    "n": 14,
+    "payload_bytes": 3584,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 14,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.ExtendAccountEvent": {
+    "n": 128,
+    "payload_bytes": 12288,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 128,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.InitBoostEvent": {
+    "n": 46,
+    "payload_bytes": 6256,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 46,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.InitUserVolumeAccumulatorEvent": {
+    "n": 523,
+    "payload_bytes": 41840,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 523,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.SellEvent": {
+    "n": 544472,
+    "payload_bytes": 240112152,
+    "decoded_ok": 544472,
+    "decode_failed": 0,
+    "not_attempted_raw": 0,
+    "failure_reasons": {},
+    "layouts": {
+     "2026-10-02/idl_extension_trailing_u64": 544472
+    }
+   },
+   "pAMM.WithdrawEvent": {
+    "n": 136,
+    "payload_bytes": 34816,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 136,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pAMM.unknown:82a42461e48287a5": {
+    "n": 1174,
+    "payload_bytes": 217190,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1174,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.ClaimCashbackEvent": {
+    "n": 233,
+    "payload_bytes": 16776,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 233,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CloseUserVolumeAccumulatorEvent": {
+    "n": 14751,
+    "payload_bytes": 1180080,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 14751,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CollectCreatorFeeEvent": {
+    "n": 2436,
+    "payload_bytes": 214368,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 2436,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CompleteEvent": {
+    "n": 62,
+    "payload_bytes": 8928,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 62,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CompletePumpAmmMigrationEvent": {
+    "n": 62,
+    "payload_bytes": 12400,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 62,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.CreateEvent": {
+    "n": 2938,
+    "payload_bytes": 1052556,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 2938,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.DistributeCreatorFeesEvent": {
+    "n": 2428,
+    "payload_bytes": 583352,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 2428,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.DistributeFeeToHoldersEvent": {
+    "n": 12801,
+    "payload_bytes": 1228896,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 12801,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.ExtendAccountEvent": {
+    "n": 1497,
+    "payload_bytes": 143712,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1497,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.InitUserVolumeAccumulatorEvent": {
+    "n": 465,
+    "payload_bytes": 37200,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 465,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.MigrateBondingCurveCreatorEvent": {
+    "n": 200,
+    "payload_bytes": 35200,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 200,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.TradeEvent": {
+    "n": 247223,
+    "payload_bytes": 95560747,
+    "decoded_ok": 247223,
+    "decode_failed": 0,
+    "not_attempted_raw": 0,
+    "failure_reasons": {},
+    "layouts": {
+     "2026-10-02/trailing_u64": 247223
+    }
+   },
+   "pump.unknown:742b4dbd117a482b": {
+    "n": 1425,
+    "payload_bytes": 218025,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 1425,
+    "failure_reasons": {},
+    "layouts": {}
+   },
+   "pump.unknown:a943276d6686b6e8": {
+    "n": 75,
+    "payload_bytes": 9600,
+    "decoded_ok": 0,
+    "decode_failed": 0,
+    "not_attempted_raw": 75,
+    "failure_reasons": {},
+    "layouts": {}
+   }
+  },
+  "instructions_top": {
+   "pump": {
+    "Sell": 89242,
+    "Buy": 73573,
+    "SellV2": 39999,
+    "BuyExactQuoteInV2": 38050,
+    "BuyExactSolIn": 31611,
+    "DistributeFeeToHolders": 19508,
+    "CloseUserVolumeAccumulator": 14827,
+    "BuyV2": 8214,
+    "BuyExactQuoteInV3": 3881,
+    "CreateV2": 3058,
+    "SellV3": 2942,
+    "CollectCreatorFee": 2514
+   },
+   "pAMM": {
+    "Sell": 643744,
+    "BuyExactQuoteIn": 508811,
+    "Buy": 150874,
+    "CloseUserVolumeAccumulator": 136285,
+    "BuyExactQuoteInV2": 4102,
+    "SellV2": 2828,
+    "BoostBuyAndBurn": 1456,
+    "TransferCreatorFeesToPump": 1016,
+    "CollectCoinCreatorFee": 695,
+    "SweepProtocolFee": 688,
+    "ClaimCashback": 566,
+    "InitUserVolumeAccumulator": 538
+   }
+  },
+  "foreign_data_lines_by_program": {
+   "Prism8hsRo6Ww5jiN5Zeh3YDPLZHqHduCPSAV7JF7qv": 1530401,
+   "jupeiUmn818Jg1ekPURTpr4mFo29p46vygyykFJ3wZC": 40773,
+   "MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e": 38147,
+   "BiSoNHVpsVZW2F7rx2eQ59yQwKxzU5NvBcmKshCSUypi": 28417,
+   "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH": 28096,
+   "DRVSpZ2YUYYKgZP8XtLhAGtT1zYSCKzeHfb4DgRnrgqD": 20583,
+   "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 19426,
+   "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 18768
+  },
+  "liquidity": {
+   "tx_without_swap_instruction": 324,
+   "tx_with_swap_instruction": 6,
+   "instructions": {
+    "CreatePool": 180,
+    "Withdraw": 136,
+    "Deposit": 14
+   }
+  },
+  "silence_gaps": {},
+  "lag_slots_ws_slotsubscribe_same_pipe_NOT_independent": {
+   "pump": {
+    "n": 1974987,
+    "p50": 1.0,
+    "p90": 1.0,
+    "p99": 1.0,
+    "max": 2.0
+   },
+   "amm": {
+    "n": 3068568,
+    "p50": 1.0,
+    "p90": 1.0,
+    "p99": 1.0,
+    "max": 2.0
+   }
+  },
+  "lag_slots_ws_slotsubscribe_same_pipe_by_10min": {
+   "pump": [
+    {
+     "w": 0,
+     "n": 324416,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 1,
+     "n": 236256,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 2,
+     "n": 332988,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 3,
+     "n": 424371,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 4,
+     "n": 303301,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 5,
+     "n": 282353,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 6,
+     "n": 71302,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    }
+   ],
+   "amm": [
+    {
+     "w": 0,
+     "n": 533850,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 1,
+     "n": 453258,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 2,
+     "n": 574661,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 3,
+     "n": 509522,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 1.0
+    },
+    {
+     "w": 4,
+     "n": 502222,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 5,
+     "n": 394498,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    },
+    {
+     "w": 6,
+     "n": 100557,
+     "p50": 1.0,
+     "p90": 1.0,
+     "p99": 1.0,
+     "max": 2.0
+    }
+   ]
+  },
+  "lag_slots_vs_http_tip": {},
+  "age_of_last_log_s_at_poll": {},
+  "observations": {
+   "event_loop_lateness_s": {
+    "n": 36725,
+    "p50": 0.0,
+    "p90": 0.02,
+    "p99": 0.04,
+    "max": 0.64
+   },
+   "queue_age_s.amm": {
+    "n": 3082473,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.0,
+    "max": 0.4
+   },
+   "queue_age_s.pump": {
+    "n": 1988932,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.0,
+    "max": 0.4
+   }
+  },
+  "size_bins_sol": {
+   "<0.001": 25675,
+   "0.001-0.01": 28889,
+   "0.1-1": 88415,
+   "0.01-0.1": 78218,
+   "1-10": 25878,
+   ">=10": 148
+  },
+  "size_unverified_quote": 544472,
+  "suspensions": [],
+  "swap_events_per_minute": {
+   "pump": {
+    "seconds_with_events": 63,
+    "n": 63,
+    "p50": 3843.0,
+    "p90": 4871.0,
+    "p99": 5887.0,
+    "max": 5887.0
+   },
+   "pAMM": {
+    "seconds_with_events": 63,
+    "n": 63,
+    "p50": 16908.0,
+    "p90": 20094.0,
+    "p99": 21807.0,
+    "max": 21807.0
+   }
+  },
+  "lag_slots_vs_http_tip_by_10min": {},
+  "lag_event_ts_s": {
+   "pAMM": {
+    "n": 1061241,
+    "p50": 1.5,
+    "p90": 2.0,
+    "p99": 2.5,
+    "max": 10.0
+   },
+   "pump": {
+    "n": 247223,
+    "p50": 1.5,
+    "p90": 2.0,
+    "p99": 2.5,
+    "max": 5.0
+   }
+  },
+  "reconnects": {
+   "amm": {
+    "connects": 1,
+    "disconnects": 0,
+    "rejects": 0,
+    "downtime_s": 0.9958887100219727,
+    "gap_slots_total": 0,
+    "events": [],
+    "downtime_s_incl_open": 0.9958887100219727
+   },
+   "pump": {
+    "connects": 1,
+    "disconnects": 0,
+    "rejects": 0,
+    "downtime_s": 0.9860050678253174,
+    "gap_slots_total": 0,
+    "events": [],
+    "downtime_s_incl_open": 0.9860050678253174
+   }
+  },
+  "wallets": {
+   "pump": 29781,
+   "amm": 116632,
+   "amm_buy_inferred": 79832,
+   "all": 170455
+  },
+  "keys": {
+   "mints": 6468,
+   "pools": 4151
+  },
+  "rows": {
+   "n": 791695,
+   "json": 388217656,
+   "heap": 220630920,
+   "indexed": 419097287
+  },
+  "per_second_swap_events": {
+   "pump": {
+    "seconds_with_events": 3723,
+    "n": 3723,
+    "p50": 63.0,
+    "p90": 97.0,
+    "p99": 138.0,
+    "max": 280.0
+   },
+   "pAMM": {
+    "seconds_with_events": 3723,
+    "n": 3723,
+    "p50": 281.0,
+    "p90": 397.0,
+    "p99": 559.0,
+    "max": 1012.0
+   }
+  }
+ }
+}

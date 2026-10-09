@@ -1,0 +1,6 @@
+SYNTHETIC (not market data) — per-mint transport around the replay, one process
+ROW {"config": "base", "mints": 532, "window_fills": 18852, "window_events": 27312, "window_mb": 4.680458, "part_mb": 3.468646, "cpu_s": {"load_window": 0.75, "replay": 5.21875, "dump_part": 0.28125, "load_part": 0.25, "merge": 0.078125}}
+base: mints 532 window events 27312 | load_window 0.750s replay 5.219s dump_part 0.281s load_part 0.250s merge 0.078s | load 27 us/event, parts round trip 1.00 ms/mint
+ROW {"config": "window7", "mints": 297, "window_fills": 11624, "window_events": 13457, "window_mb": 2.148449, "part_mb": 1.168273, "cpu_s": {"load_window": 0.15625, "replay": 1.421875, "dump_part": 0.0625, "load_part": 0.140625, "merge": 0.0}}
+window7: mints 297 window events 13457 | load_window 0.156s replay 1.422s dump_part 0.062s load_part 0.141s merge 0.000s | load 12 us/event, parts round trip 0.68 ms/mint
+engine import in a fresh interpreter: 1.30, 1.17, 1.52 s

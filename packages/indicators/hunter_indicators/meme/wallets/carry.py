@@ -25,16 +25,23 @@ The contract this equivalence holds under has two kinds of conditions.
 - **P2** — ``received_at ≥ block_time``; **P3** — one ``block_time`` per slot, never decreasing
   with the slot in a mint;
 - a window holds only events received at or after ``S``; each mint appears once per pass; the
-  carry belongs to this window start; the settle horizon does not reach before ``S``.
+  carry belongs to this window start; the settle horizon does not reach before ``S``;
+- parallel replay: a worker's window has the mint name and the event count the survey saw
+  (``fetch_mismatch`` — a sanity check, not a proof of the guarantee below).
 
 **Guaranteed by the source (storage), NOT checkable one mint at a time** — a breach is silent:
 
 - each identity is delivered once across nights (design §9.6.4); within a night duplicates are
   folded exactly like :func:`.tape.dedupe`;
+- an identity belongs to ONE mint: the same ``(signature, program, ordinal)`` in two mints is a
+  conflicting event, and the per-mint bets (step 3) would keep it in one of them only, where the
+  batch kept both (code review, step 3: reproduced with fabricated input, not with a real tape);
 - the source is complete: every mint with a new event **or a carry** (an omitted carried mint
   loses its lots, frontier and totals);
 - ``shared_signatures`` lists every signature with events in more than one mint;
-- the carry handed in is the one the previous night produced (it is trusted, not re-verified).
+- the carry handed in is the one the previous night produced (it is trusted, not re-verified);
+- parallel replay: the source is immutable for the run — the three passes and every worker's
+  ``fetch(name)`` see the same window, carry and creates of each mint (Astra, step 3 design).
 
 Events come in :func:`canonical_order` and opening lots in :func:`lot_order` (a deterministic
 convention for ties, not the economic order between wallets, which the feed does not know).
@@ -78,6 +85,7 @@ Violation = Literal[
     "settle_beyond_window",
     "received_before_window",
     "repeated_mint",
+    "fetch_mismatch",
 ]
 _WEAK_MINTS = 3
 
@@ -88,6 +96,11 @@ class ContractViolation(ValueError):
     def __init__(self, reason: Violation, detail: str) -> None:
         super().__init__(f"{reason}: {detail}")
         self.reason: Violation = reason
+        self.detail = detail
+
+    def __reduce__(self) -> tuple[type[ContractViolation], tuple[Violation, str]]:
+        """Rebuilt by name when it crosses a process boundary (parallel replay, step 3)."""
+        return (ContractViolation, (self.reason, self.detail))
 
 
 def canonical_order(f: Fill) -> tuple[datetime, int, str, int, str]:

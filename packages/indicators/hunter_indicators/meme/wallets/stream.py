@@ -12,184 +12,59 @@ same-slot evidence and the carry it is handed (:mod:`.carry` says what, why, and
    comes before the caps and ``record`` marks every reason but ``below_min``); those that pass
    the local refusals are capped at the first N per (entity, UTC decision day) in decision order;
 3. **replay** (:mod:`.stream_mint`) — books, W-PnL, exclusions, the bets' copies, and the carry of
-   the next window start.
+   the next window start. Passes 1–2 are the coordinator's :func:`plan_night`; pass 3 is a pure
+   function of the plan and one mint (:func:`replay_window`), so it can run in worker processes
+   (:mod:`.stream_parallel`) and be reduced exactly (:meth:`.stream_mint.Tallies.merge`);
+   :func:`finish_night` assembles the snapshot and the next global carry.
 """
 
 from __future__ import annotations
 
 from bisect import insort
-from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
-from itertools import combinations
 from types import MappingProxyType
 
-from hunter_indicators.meme.wallets.carry import (
-    Carry,
-    ContractViolation,
-    Evidence,
-    MintCarry,
-    canonical_order,
-    merge_evidence,
-)
-from hunter_indicators.meme.wallets.entities import Entities, Link, entities_as_of
+from hunter_indicators.meme.wallets.carry import Carry, ContractViolation, MintCarry
+from hunter_indicators.meme.wallets.entities import Entities, entities_as_of
 from hunter_indicators.meme.wallets.follow import TriggerState, decision_order, refusal
 from hunter_indicators.meme.wallets.metrics import EntityFacts, failing_reasons
 from hunter_indicators.meme.wallets.params import FollowPolicy, RankingParams
 from hunter_indicators.meme.wallets.ranking import assemble_snapshot, cut_of
-from hunter_indicators.meme.wallets.snapshot import RankRow, Snapshot
+from hunter_indicators.meme.wallets.snapshot import RankRow
+from hunter_indicators.meme.wallets.stream_links import Pairs
+from hunter_indicators.meme.wallets.stream_links import absorb as _absorb
+from hunter_indicators.meme.wallets.stream_links import cobuys as _cobuys
+from hunter_indicators.meme.wallets.stream_links import fee_seeds as _fee_seeds
+from hunter_indicators.meme.wallets.stream_links import weak_links as _weak
 from hunter_indicators.meme.wallets.stream_mint import Night, Tallies, earliest_create, replay_mint
-from hunter_indicators.meme.wallets.tape import CreateEvent, Fill, Gap, dedupe, event_order
+from hunter_indicators.meme.wallets.stream_source import (
+    MintWindow,
+    StreamInputs,
+    StreamResult,
+    shared_signatures,
+)
+from hunter_indicators.meme.wallets.stream_source import each_mint as _each
+from hunter_indicators.meme.wallets.stream_source import prepared as _prepared
+from hunter_indicators.meme.wallets.tape import Fill
 
-__all__ = ["MintWindow", "StreamInputs", "StreamResult", "shared_signatures", "stream_snapshot"]
+__all__ = [
+    "MintPart",
+    "MintWindow",
+    "NightPlan",
+    "StreamInputs",
+    "StreamResult",
+    "finish_night",
+    "plan_night",
+    "replay_one",
+    "replay_window",
+    "shared_signatures",
+    "stream_snapshot",
+]
 
-Pairs = dict[tuple[str, str], dict[str, datetime]]
-_Seeds = dict[str, set[tuple[str, str]]]
+_Identity = tuple[str, str, int]
 _NO_STATE = TriggerState()
-
-
-@dataclass(frozen=True, slots=True)
-class MintWindow:
-    carry: MintCarry
-    fills: tuple[Fill, ...] = ()
-    """The mint's events received at or after the window start, in canonical order (later ones
-    than the cut are ignored)."""
-    creates: tuple[CreateEvent, ...] = ()
-    """The mint's ``CreateEvent`` s received at or after the window start."""
-
-
-def _no_funders() -> Mapping[str, tuple[str, datetime]]:
-    return MappingProxyType({})
-
-
-@dataclass(frozen=True, slots=True)
-class StreamInputs:
-    carry: Carry
-    mints: Callable[[], Iterable[MintWindow]]
-    """A re-iterable source (read three times): every mint with a carry or a new event, once.
-    Completeness is the source's guarantee (an omitted mint cannot be seen from here)."""
-    shared_signatures: frozenset[str]
-    """Every signature with events in more than one mint of the window (:func:`shared_signatures`);
-    the tx fee goes to the owner's first event of the transaction across mints. REQUIRED, no
-    default: "none shared" must be said, not assumed. Completeness is the storage's guarantee —
-    one mint at a time cannot see an omission, and an omitted one charges the fee twice."""
-    links: tuple[Link, ...] = ()
-    funders: Mapping[str, tuple[str, datetime]] = field(default_factory=_no_funders)
-    gaps: tuple[Gap, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class StreamResult:
-    snapshot: Snapshot
-    carry: Carry
-    """The global carry at the next window start (``boundary + 1 day``)."""
-    mint_carries: tuple[MintCarry, ...]
-    """The non-empty per-mint carries at the next window start."""
-
-
-def shared_signatures(fills: Iterable[Fill]) -> frozenset[str]:
-    first: dict[str, str] = {}
-    shared: set[str] = set()
-    for f in fills:
-        if first.setdefault(f.signature, f.mint) != f.mint:
-            shared.add(f.signature)
-    return frozenset(shared)
-
-
-def _prepared(window: MintWindow, carry: Carry, start: datetime, cut: datetime) -> tuple[Fill, ...]:
-    """The mint's causal events from the window start on, folded like ``dedupe``, contract-checked."""
-    mint = window.carry.mint
-    if any(f.mint != mint for f in window.fills) or any(c.mint != mint for c in window.creates):
-        raise ValueError(f"an event of another mint in the window of {mint}")
-    early = next((f for f in window.fills if f.received_at < start), None)
-    if early is not None:  # already in the carry: it would be counted twice (Astra, diff review)
-        raise ContractViolation(
-            "received_before_window", f"{early.signature}/{early.event_ordinal}"
-        )
-    fills = tuple(
-        sorted(dedupe(f for f in window.fills if f.received_at < cut), key=canonical_order)
-    )
-    times: dict[int, datetime] = {}
-    for f in (*window.carry.frontier, *fills):
-        if f.received_at < f.block_time:
-            raise ContractViolation("received_before_mined", f"{f.signature}/{f.event_ordinal}")
-        if f.block_time < start and f.received_at >= carry.sealed_until:
-            raise ContractViolation("late_beyond_seal", f"{f.signature}/{f.event_ordinal}")
-        if times.setdefault(f.slot, f.block_time) != f.block_time:
-            raise ContractViolation("slot_time_inconsistent", f"{mint} slot {f.slot}")
-    ordered = sorted(times.items())
-    if any(b[1] < a[1] for a, b in zip(ordered, ordered[1:], strict=False)):
-        raise ContractViolation("slot_time_inconsistent", f"{mint}: time decreases with the slot")
-    return fills
-
-
-def _each(inputs: StreamInputs) -> Iterable[MintWindow]:
-    """One pass over the source, refusing a mint seen twice (it would be replayed twice)."""
-    seen: set[str] = set()
-    for window in inputs.mints():
-        if window.carry.mint in seen:
-            raise ContractViolation("repeated_mint", window.carry.mint)
-        seen.add(window.carry.mint)
-        yield window
-
-
-def _cobuys(buys: Iterable[Fill]) -> dict[tuple[str, str], datetime]:
-    """One mint's same-slot buyer pairs → the earliest instant the coincidence was knowable."""
-    groups: dict[int, dict[str, datetime]] = {}
-    for f in buys:
-        seen = groups.setdefault(f.slot, {})
-        seen[f.wallet] = min(seen.get(f.wallet, f.received_at), f.received_at)
-    out: dict[tuple[str, str], datetime] = {}
-    for buyers in groups.values():
-        for a, b in combinations(sorted(buyers), 2):
-            known = max(buyers[a], buyers[b])
-            out[(a, b)] = min(out.get((a, b), known), known)
-    return out
-
-
-def _absorb(pairs: Pairs, mint: str, found: Mapping[tuple[str, str], datetime]) -> None:
-    for pair, known in found.items():
-        pairs.setdefault(pair, {})[mint] = known
-
-
-def _link(pair: tuple[str, str], evidence: Evidence) -> Link:
-    return Link(pair[0], pair[1], "weak", evidence[-1][0], ",".join(m for _, m in evidence))
-
-
-def _weak(carry: Carry, pairs: Pairs) -> tuple[list[Link], dict[tuple[str, str], Evidence]]:
-    """Links reaching 3 mints once ``pairs`` join the carry's evidence, and the pairs still pending."""
-    done = {(link.a, link.b) for link in carry.weak_links}
-    links, pending = list(carry.weak_links), dict[tuple[str, str], Evidence]()
-    for pair, per_mint in pairs.items():
-        if pair in done:
-            continue
-        merged = merge_evidence(carry.pending.get(pair, ()), per_mint)
-        if len(merged) >= 3:
-            links.append(_link(pair, merged))
-        else:
-            pending[pair] = merged
-    return links, pending
-
-
-def _fee_seeds(shared: list[tuple[Fill, str]]) -> _Seeds:
-    """(owner, signature) → the mints where its fee is NOT due: the owner's first event of the
-    transaction (event order, then input order) carries it."""
-    first: dict[
-        tuple[str, str], tuple[tuple[int, str, int], tuple[datetime, int, str, int, str], str]
-    ]
-    first = {}
-    touched: dict[tuple[str, str], set[str]] = {}
-    for f, owner in shared:
-        key = (owner, f.signature)
-        rank = (event_order(f), canonical_order(f), f.mint)
-        if key not in first or rank[:2] < first[key][:2]:
-            first[key] = rank
-        touched.setdefault(key, set()).add(f.mint)
-    seeds: _Seeds = {}
-    for key, mints in touched.items():
-        for mint in mints - {first[key][2]}:
-            seeds.setdefault(mint, set()).add(key)
-    return seeds
 
 
 @dataclass(slots=True)
@@ -200,14 +75,20 @@ class _Survey:
     horizon: int = -1
     window_fills: int = 0
     max_slot: int = -1
+    events: dict[str, int] = field(default_factory=dict[str, int])
+    """Per mint, in source order: its prepared events (the order, the fetch check, the cost)."""
+    weight: dict[str, int] = field(default_factory=dict[str, int])
+    """Per mint: the size of its carry (frontier, lots, flows) — work without new events."""
 
 
 def _survey(inputs: StreamInputs, start: datetime, cut: datetime, settled: datetime) -> _Survey:
     carry, nxt = inputs.carry, start + timedelta(days=1)
     s = _Survey(horizon=carry.max_slot, max_slot=carry.max_slot)
     for window in _each(inputs):
-        fills = _prepared(window, carry, start, cut)
-        mint = window.carry.mint
+        fills = _prepared(window, carry.sealed_until, start, cut)
+        mint, kept = window.carry.mint, window.carry
+        s.events[mint] = len(fills)
+        s.weight[mint] = len(kept.frontier) + len(kept.lots) + len(kept.flows)
         buys = [f for f in fills if f.side == "buy" and f.block_time >= start]
         _absorb(s.pairs, mint, _cobuys(buys))
         _absorb(s.day_pairs, mint, _cobuys(f for f in buys if f.block_time < nxt))
@@ -222,18 +103,22 @@ def _survey(inputs: StreamInputs, start: datetime, cut: datetime, settled: datet
     return s
 
 
-_Queue = list[tuple[tuple[datetime, int, str, int], tuple[str, str, int]]]
+_Queue = list[tuple[tuple[datetime, int, str, int], _Identity, str]]
 
 
 def _bets(
     inputs: StreamInputs, start: datetime, cut: datetime, policy: FollowPolicy, ents: Entities
-) -> tuple[frozenset[tuple[str, str, int]], dict[str, int]]:
+) -> tuple[dict[str, frozenset[_Identity]], dict[str, int]]:
+    """The bets (per mint, after the global per-entity daily cap) and each entity's trades."""
     capped: dict[tuple[str, date], _Queue] = {}
     trades: dict[str, int] = {}
     previous_day = cut - timedelta(days=1)
     decide = timedelta(seconds=float(policy.decision_seconds))
     for window in _each(inputs):
-        fills = [f for f in _prepared(window, inputs.carry, start, cut) if f.block_time >= start]
+        fills = [
+            f for f in _prepared(window, inputs.carry.sealed_until, start, cut)
+            if f.block_time >= start
+        ]  # fmt: skip
         create = earliest_create(window.carry, window.creates, cut)
         creates = {} if create is None else {create.mint: create}
         seen: set[str] = set()
@@ -247,9 +132,145 @@ def _bets(
             if refusal(f, entity=entity, wallets=wallets, creates=creates, state=_NO_STATE,
                        policy=policy) is None:  # fmt: skip
                 queue = capped.setdefault((entity, (f.received_at + decide).date()), [])
-                insort(queue, (decision_order(f), f.identity))
+                insort(queue, (decision_order(f), f.identity, f.mint))  # identities never tie
                 del queue[policy.max_bets_per_entity_day :]
-    return frozenset(i for queue in capped.values() for _, i in queue), trades
+    by_mint: dict[str, set[_Identity]] = {}
+    for queue in capped.values():
+        for _, identity, mint in queue:
+            by_mint.setdefault(mint, set()).add(identity)
+    return {m: frozenset(v) for m, v in by_mint.items()}, trades
+
+
+@dataclass(frozen=True, slots=True)
+class NightPlan:
+    """Passes 1–2, the coordinator's part of a night (CPU plan step 3): what every mint's replay
+    shares, what the assembly needs, and the survey's per-mint sizes (scheduling, fetch check)."""
+
+    day: date
+    policy: FollowPolicy
+    params: RankingParams
+    carry: Carry
+    """The global carry handed in (its seal checks every window; its links make the next one)."""
+    base: Night
+    """The night without bets and fee seeds: :meth:`mint_night` adds one mint's."""
+    trades: Mapping[str, int]
+    window_fills: int
+    max_slot: int
+    day_pairs: Pairs
+    events: Mapping[str, int]
+    """Prepared events per mint; its keys are the source order."""
+    weight: Mapping[str, int]
+    bets: Mapping[str, frozenset[_Identity]]
+    """Per mint, after the global per-entity daily cap of pass 2."""
+    entity_seeds: Mapping[str, frozenset[tuple[str, str]]]
+    wallet_seeds: Mapping[str, frozenset[tuple[str, str]]]
+
+    @property
+    def order(self) -> tuple[str, ...]:
+        return tuple(self.events)
+
+    def cost(self, mint: str) -> int:
+        """A scheduling estimate, never a result: (events + carry) × (1 + bets) — each copy's
+        stop scans the mint's tape, the super-linear part measured in step 1."""
+        return (self.events[mint] + self.weight[mint]) * (1 + len(self.bets.get(mint, ())))
+
+    def schedule(self) -> tuple[str, ...]:
+        """Largest estimated cost first; ties keep the source order (stable sort)."""
+        return tuple(sorted(self.events, key=lambda m: -self.cost(m)))
+
+    def mint_night(self, mint: str) -> Night:
+        none = frozenset[tuple[str, str]]()
+        return replace(self.base, bets=self.bets.get(mint, frozenset()),
+                       entity_seeds={mint: self.entity_seeds.get(mint, none)},
+                       wallet_seeds={mint: self.wallet_seeds.get(mint, none)})  # fmt: skip
+
+
+def plan_night(
+    inputs: StreamInputs,
+    day: date,
+    *,
+    policy: FollowPolicy | None = None,
+    params: RankingParams | None = None,
+) -> NightPlan:
+    """Passes 1–2 over the whole source: survey, entities, bets (global daily cap), fee seeds."""
+    pol, par = policy or FollowPolicy(), params or RankingParams()
+    cut = cut_of(day)
+    start = cut - timedelta(days=par.window_days)
+    inputs.carry.check(start, par.window_days)
+    if cut - timedelta(seconds=par.settle_seconds) < start:  # the carried max slot may be unsettled
+        raise ContractViolation("settle_beyond_window", f"{par.settle_seconds} s")
+    survey = _survey(inputs, start, cut, cut - timedelta(seconds=par.settle_seconds))
+    links, _ = _weak(inputs.carry, survey.pairs)
+    ents = entities_as_of((*inputs.links, *links), cut)
+    funded = {w: fu for w, (fu, known) in inputs.funders.items() if known < cut}
+    nxt = start + timedelta(days=1)
+    bets, trades = _bets(inputs, start, cut, pol, ents)
+    by_entity = _fee_seeds([(f, ents.of(f.wallet)) for f in survey.shared])
+    by_wallet = _fee_seeds([(f, f.wallet) for f in survey.shared if f.block_time < nxt])
+    base = Night(start, cut, nxt, survey.horizon, ents, MappingProxyType(funded), inputs.gaps, pol,
+                 par, frozenset(), MappingProxyType({}), MappingProxyType({}))  # fmt: skip
+    return NightPlan(
+        day, pol, par, inputs.carry, base, MappingProxyType(trades), survey.window_fills,
+        survey.max_slot, survey.day_pairs, MappingProxyType(survey.events),
+        MappingProxyType(survey.weight), MappingProxyType(bets),
+        MappingProxyType({m: frozenset(v) for m, v in by_entity.items()}),
+        MappingProxyType({m: frozenset(v) for m, v in by_wallet.items()}),
+    )  # fmt: skip
+
+
+@dataclass(frozen=True, slots=True)
+class MintPart:
+    """One mint's pass 3: its tallies (for the exact reduction) and its next carry."""
+
+    mint: str
+    events: int
+    tallies: Tallies
+    carry: MintCarry | None
+    """The next carry; ``None`` when empty (nothing to write)."""
+
+
+def replay_one(night: Night, sealed_until: datetime, window: MintWindow) -> MintPart:
+    """Pass 3 of one mint — a pure function of the night (carrying this mint's bets and fee
+    seeds), the seal and the window: no state shared with any other mint's replay."""
+    fills = _prepared(window, sealed_until, night.start, night.cut)
+    tallies = Tallies()
+    nxt = replay_mint(window.carry, fills, window.creates, night, tallies)
+    return MintPart(window.carry.mint, len(fills), tallies, None if nxt.empty else nxt)
+
+
+def replay_window(plan: NightPlan, window: MintWindow) -> MintPart:
+    return replay_one(plan.mint_night(window.carry.mint), plan.carry.sealed_until, window)
+
+
+def finish_night(
+    plan: NightPlan, tallies: Tallies, carries: tuple[MintCarry, ...], code_version: str = ""
+) -> StreamResult:
+    """The snapshot from the reduced tallies, and the global carry of the next window start."""
+    ents, par = plan.base.entities, plan.params
+    rows: dict[str, RankRow] = {}
+    for entity in sorted(tallies.books):
+        copies = tallies.copies_of(entity)
+        facts = EntityFacts(
+            wallets=ents.wallets_of(entity), c_pnl_lamports=copies.total,
+            trades_previous_day=plan.trades.get(entity, 0),
+            w_pnl_lamports=tallies.w_pnl.get(entity, 0), copies=copies.copies,
+            copies_incomplete=copies.incomplete, copies_contaminated=copies.contaminated,
+        )  # fmt: skip
+        metrics = tallies.books[entity].metrics(entity, facts, par)
+        rows[entity] = RankRow(entity, failing_reasons(metrics, par), None, False, copies.total,
+                               metrics)  # fmt: skip
+    snapshot = assemble_snapshot(
+        rows, day=plan.day, entities=ents, policy=plan.policy, params=par,
+        code_version=code_version, window_fills=plan.window_fills, horizon=plan.base.horizon,
+    )  # fmt: skip
+    prior = plan.carry
+    day_links, day_pending = _weak(prior, plan.day_pairs)
+    pending = {**prior.pending, **day_pending}
+    for link in day_links[len(prior.weak_links) :]:
+        pending.pop((link.a, link.b), None)
+    carry = Carry(plan.base.next_start, plan.base.cut, par.window_days, plan.max_slot,
+                  tuple(day_links), MappingProxyType(pending))  # fmt: skip
+    return StreamResult(snapshot, carry, carries)
 
 
 def stream_snapshot(
@@ -265,53 +286,16 @@ def stream_snapshot(
 
     ``emit`` receives each non-empty next per-mint carry as soon as its mint is replayed (to
     write it out), so the campaign's carry is never resident at once; without it they are
-    collected into :attr:`StreamResult.mint_carries` (tests, small runs).
+    collected into :attr:`StreamResult.mint_carries` (tests, small runs). One process; the
+    parallel form is :func:`.stream_parallel.stream_snapshot_parallel`.
     """
-    pol, par = policy or FollowPolicy(), params or RankingParams()
-    cut = cut_of(day)
-    start = cut - timedelta(days=par.window_days)
-    inputs.carry.check(start, par.window_days)
-    if cut - timedelta(seconds=par.settle_seconds) < start:  # the carried max slot may be unsettled
-        raise ContractViolation("settle_beyond_window", f"{par.settle_seconds} s")
-    survey = _survey(inputs, start, cut, cut - timedelta(seconds=par.settle_seconds))
-    links, _ = _weak(inputs.carry, survey.pairs)
-    ents = entities_as_of((*inputs.links, *links), cut)
-    funded = {w: fu for w, (fu, known) in inputs.funders.items() if known < cut}
-    nxt = start + timedelta(days=1)
-    bets, trades = _bets(inputs, start, cut, pol, ents)
-    by_entity = _fee_seeds([(f, ents.of(f.wallet)) for f in survey.shared])
-    by_wallet = _fee_seeds([(f, f.wallet) for f in survey.shared if f.block_time < nxt])
-    night = Night(
-        start, cut, nxt, survey.horizon, ents, MappingProxyType(funded), inputs.gaps, pol, par,
-        bets, MappingProxyType({m: frozenset(v) for m, v in by_entity.items()}),
-        MappingProxyType({m: frozenset(v) for m, v in by_wallet.items()}),
-    )  # fmt: skip
+    plan = plan_night(inputs, day, policy=policy, params=params)
+    start, cut, seal = plan.base.start, plan.base.cut, plan.carry.sealed_until
     tallies, carries = Tallies(), list[MintCarry]()
-    for window in _each(inputs):
-        fills = _prepared(window, inputs.carry, start, cut)
+    for window in _each(inputs):  # folded straight into one tally (the parallel form merges)
+        fills = _prepared(window, seal, start, cut)
+        night = plan.mint_night(window.carry.mint)
         nxt_carry = replay_mint(window.carry, fills, window.creates, night, tallies)
         if not nxt_carry.empty:
             (carries.append if emit is None else emit)(nxt_carry)
-    rows: dict[str, RankRow] = {}
-    for entity in sorted(tallies.books):
-        copies = tallies.copies_of(entity)
-        facts = EntityFacts(
-            wallets=ents.wallets_of(entity), c_pnl_lamports=copies.total,
-            trades_previous_day=trades.get(entity, 0), w_pnl_lamports=tallies.w_pnl.get(entity, 0),
-            copies=copies.copies, copies_incomplete=copies.incomplete,
-            copies_contaminated=copies.contaminated,
-        )  # fmt: skip
-        metrics = tallies.books[entity].metrics(entity, facts, par)
-        rows[entity] = RankRow(entity, failing_reasons(metrics, par), None, False, copies.total,
-                               metrics)  # fmt: skip
-    snapshot = assemble_snapshot(
-        rows, day=day, entities=ents, policy=pol, params=par, code_version=code_version,
-        window_fills=survey.window_fills, horizon=survey.horizon,
-    )  # fmt: skip
-    day_links, day_pending = _weak(inputs.carry, survey.day_pairs)
-    pending = {**inputs.carry.pending, **day_pending}
-    for link in day_links[len(inputs.carry.weak_links) :]:
-        pending.pop((link.a, link.b), None)
-    carry = Carry(nxt, cut, par.window_days, survey.max_slot, tuple(day_links),
-                  MappingProxyType(pending))  # fmt: skip
-    return StreamResult(snapshot, carry, tuple(carries))
+    return finish_night(plan, tallies, tuple(carries), code_version)

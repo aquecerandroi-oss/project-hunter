@@ -24,7 +24,7 @@ import hashlib
 import json
 import random
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -35,7 +35,13 @@ from hunter_indicators.meme.wallets.params import FollowPolicy, RankingParams
 from hunter_indicators.meme.wallets.policy import simulate_copy
 from hunter_indicators.meme.wallets.pricing import MintTape, buy_atoms, sell_lamports
 from hunter_indicators.meme.wallets.ranking import cut_of
-from hunter_indicators.meme.wallets.stream import StreamInputs, shared_signatures, stream_snapshot
+from hunter_indicators.meme.wallets.stream import (
+    MintWindow,
+    StreamInputs,
+    StreamResult,
+    shared_signatures,
+    stream_snapshot,
+)
 from hunter_indicators.meme.wallets.tape import CreateEvent, Fill, Reserves, dedupe
 from packages.indicators.tests.meme.stream_harness import World, mint_windows, reference_snapshot
 from packages.indicators.tests.meme.stream_world import (
@@ -108,7 +114,19 @@ def dense_world(seed: int) -> World:
     return World(T0, tuple(g.fills), tuple(creates))
 
 
-def _nights(world: World, days: list[date], params: RankingParams) -> list[str]:
+Engine = Callable[[StreamInputs, list[MintWindow], date, RankingParams], StreamResult]
+"""A bounded engine run: the night's inputs, the same windows as a list (a keyed source for the
+parallel replay, step 3), the day and the params."""
+
+
+def _serial(inputs: StreamInputs, _windows: list[MintWindow], day: date,
+            params: RankingParams) -> StreamResult:  # fmt: skip
+    return stream_snapshot(inputs, day, params=params)
+
+
+def _nights(
+    world: World, days: list[date], params: RankingParams, engine: Engine = _serial
+) -> list[str]:
     """Per night: the batch fingerprint, the bounded one, and the bounded next carry."""
     carry, first = initial_carry(world.origin, world.preserved, window_days=params.window_days)
     mints = {m.mint: m for m in first}
@@ -119,7 +137,7 @@ def _nights(world: World, days: list[date], params: RankingParams) -> list[str]:
         windows = mint_windows(world, mints, start)
         inputs = StreamInputs(carry=carry, mints=lambda w=windows: iter(w), links=world.links,
                               funders=world.funders, gaps=world.gaps, shared_signatures=shared)  # fmt: skip
-        result = stream_snapshot(inputs, day, params=params)
+        result = engine(inputs, windows, day, params)
         batch = reference_snapshot(world, day, params=params)
         out += [_digest(fingerprint(batch)), _digest(fingerprint(result.snapshot)),
                 _digest([carry_to_json(result.carry, result.mint_carries)])]  # fmt: skip
@@ -174,17 +192,26 @@ def _quotes(seed: int) -> str:
     return _digest(rows)
 
 
+SMALL = RankingParams(window_days=2, min_episodes=2, min_mints=1, min_active_days=1,
+                      min_e_pnl_lamports=0, min_positive_days=1, top_n=2)  # fmt: skip
+_FIRST = (T0 + timedelta(days=2)).date()
+DAYS = [_FIRST + timedelta(days=k) for k in range(5)]
+
+
+def night_worlds() -> dict[str, tuple[World, list[date]]]:
+    """The worlds and nights of every ``*nights`` key of the frozen reference."""
+    out = {f"random{seed}": (random_world(seed, window_days=2, days=6)[0], DAYS)
+           for seed in range(4)}  # fmt: skip
+    out["dense_nights"] = (dense_world(7), DAYS[:3])
+    return out
+
+
 def compute() -> dict[str, object]:
-    small = RankingParams(window_days=2, min_episodes=2, min_mints=1, min_active_days=1,
-                          min_e_pnl_lamports=0, min_positive_days=1, top_n=2)  # fmt: skip
-    first = (T0 + timedelta(days=2)).date()
-    days = [first + timedelta(days=k) for k in range(5)]
     out: dict[str, object] = {}
-    for seed in range(4):
-        world, _ = random_world(seed, window_days=2, days=6)
-        out[f"random{seed}"] = _nights(world, days, small)
-    dense = dense_world(7)
-    out["dense_nights"] = _nights(dense, days[:3], small)
+    worlds = night_worlds()
+    for key, (world, days) in worlds.items():
+        out[key] = _nights(world, days, SMALL)
+    dense = worlds["dense_nights"][0]
     out["dense_copies"] = _copies(dense)
     out["quotes"] = _quotes(11)
     return out

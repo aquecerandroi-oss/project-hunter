@@ -1,0 +1,19 @@
+SYNTHETIC sweep (not market data) — one hot mint's replay vs its events per hour
+ROW {"hot_fills": 1000, "hot_minutes": 60, "events": 1000, "copies": 109, "stop_quotes": 41659, "cpu_s": 0.28125, "cpu_runs": [0.390625, 0.28125]}
+hot   1000 in 60 min: events   1000 copies   109 stop quotes     41,659 cpu 0.28s
+ROW {"hot_fills": 2000, "hot_minutes": 60, "events": 2000, "copies": 187, "stop_quotes": 148750, "cpu_s": 1.640625, "cpu_runs": [2.015625, 1.640625]}
+hot   2000 in 60 min: events   2000 copies   187 stop quotes    148,750 cpu 1.64s
+ROW {"hot_fills": 4000, "hot_minutes": 60, "events": 4000, "copies": 280, "stop_quotes": 422809, "cpu_s": 3.34375, "cpu_runs": [3.34375, 4.9375]}
+hot   4000 in 60 min: events   4000 copies   280 stop quotes    422,809 cpu 3.34s
+ROW {"hot_fills": 8000, "hot_minutes": 60, "events": 8000, "copies": 420, "stop_quotes": 1128572, "cpu_s": 11.59375, "cpu_runs": [11.59375, 14.59375]}
+hot   8000 in 60 min: events   8000 copies   420 stop quotes  1,128,572 cpu 11.59s
+ROW {"hot_fills": 16000, "hot_minutes": 60, "events": 16000, "copies": 624, "stop_quotes": 3206466, "cpu_s": 37.421875, "cpu_runs": [39.859375, 37.421875]}
+hot  16000 in 60 min: events  16000 copies   624 stop quotes  3,206,466 cpu 37.42s
+local exponent of stop_quotes vs events: 1.84
+local exponent of stop_quotes vs events: 1.51
+local exponent of stop_quotes vs events: 1.42
+local exponent of stop_quotes vs events: 1.51
+local exponent of cpu_s vs events: 2.54
+local exponent of cpu_s vs events: 1.03
+local exponent of cpu_s vs events: 1.79
+local exponent of cpu_s vs events: 1.69

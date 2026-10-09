@@ -105,6 +105,31 @@ class EntityTally:
                     self.active_dates.add(ep.closed_at.date())
         return [*creator, *block, *mev]
 
+    def merge(self, other: EntityTally) -> None:
+        """Add the same entity's tally of other mints (a worker's part, CPU plan step 3).
+
+        Exact and order-free: integer sums, set unions, the largest episode as a max that keeps
+        "none yet" apart from 0, and the holds concatenated — the median, the shares and the
+        drawdown are only taken in :meth:`metrics`, over everything.
+        """
+        if other.days != self.days or len(other.daily) != len(self.daily):
+            raise ValueError("tallies of windows of different lengths")
+        self.episodes += other.episodes
+        self.creator += other.creator
+        self.create_block += other.create_block
+        self.daily = [a + b for a, b in zip(self.daily, other.daily, strict=True)]
+        self.closed_non_neutral += other.closed_non_neutral
+        self.mints |= other.mints
+        self.active_dates |= other.active_dates
+        if other.largest is not None:
+            self.largest = other.largest if self.largest is None else max(self.largest,
+                                                                          other.largest)  # fmt: skip
+        self.holds.extend(other.holds)
+        self.incomplete += other.incomplete
+        self.contaminated += other.contaminated
+        self.sold_atoms += other.sold_atoms
+        self.unmatched_atoms += other.unmatched_atoms
+
     def metrics(self, entity: str, facts: EntityFacts, params: RankingParams) -> EntityMetrics:
         daily = tuple(self.daily)
         holds = self.holds  # read in place; median() makes the one sorted copy it needs

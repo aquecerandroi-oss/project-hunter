@@ -170,7 +170,7 @@ def instrumented(tm: Timers) -> Generator[None]:
 
     def bets(*a: Any, **k: Any) -> Any:
         out = tm.wrap("bets", saved_s["_bets"], phase=True)(*a, **k)
-        tm.bets = len(out[0])
+        tm.bets = sum(len(v) for v in out[0].values())  # per mint since step 3
         return out
 
     def replay(carry: MintCarry, fills: tuple[Fill, ...], *a: Any) -> Any:

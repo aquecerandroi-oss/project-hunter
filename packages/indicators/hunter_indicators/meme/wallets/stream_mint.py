@@ -81,6 +81,12 @@ class CopyTally:
             self.incomplete += 1
             self.contaminated += out.contaminated
 
+    def merge(self, other: CopyTally) -> None:
+        self.total += other.total
+        self.copies += other.copies
+        self.incomplete += other.incomplete
+        self.contaminated += other.contaminated
+
 
 @dataclass(slots=True)
 class Tallies:
@@ -90,6 +96,24 @@ class Tallies:
 
     def copies_of(self, entity: str) -> CopyTally:
         return self.copies.get(entity, CopyTally())
+
+    def merge(self, other: Tallies) -> None:
+        """Reduce another part (other mints) into this one — exact and order-free (step 3).
+
+        The three key sets are united separately: an entity has a row iff some mint gave it a
+        book (even one without episodes); copies and W-PnL never create a book. ``other`` is
+        consumed: its tallies may be moved in, not copied.
+        """
+        for entity, book in other.books.items():
+            mine = self.books.get(entity)
+            if mine is None:
+                self.books[entity] = book
+            else:
+                mine.merge(book)
+        for entity, tally in other.copies.items():
+            self.copies.setdefault(entity, CopyTally()).merge(tally)
+        for entity, value in other.w_pnl.items():
+            self.w_pnl[entity] = self.w_pnl.get(entity, 0) + value
 
 
 def earliest_create(
