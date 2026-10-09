@@ -63,3 +63,11 @@ Nenhuma sobre a regra. Sobre o caminho:
 - **Núcleo inteiro do Decimal (opção 3 da proposta):** concordamos em não fazer agora. O que sobrou do custo não é a cotação do stop. A cotação Decimal ainda pesa no E-PnL (uma liquidação por posse e por fronteira), e o núcleo inteiro voltaria a fazer sentido ali.
 
 [[wallets-cpu]] · [[wallets-cpu-step3]] · [[KB-0187-a-densidade-por-mint-mora-em-poucas-pools]] · [[wallets-1c-bis]]
+
+## Revisão de código independente (09/10/2026, commit 5c364290)
+- **APPROVE**, sem achado CRITICAL/HIGH/MEDIUM. A Astra também aprovou nessa rodada, sem must-fix.
+- **Fuzz diferencial:** 21 600 casos aleatórios comparando `StopIndex.first_stop` com a varredura simples por `quote_stopped`, com **0 divergências**. São 5 343 recusas, todas com a mesma mensagem.
+- **Mutante:** `atoms <= limit` trocado por `<` foi morto por 4 testes.
+- **Testes:** `279 passed` (meme, `-k "stops or golden or wallets"`).
+- **Custo de memória a lembrar:** o índice não tem despejo. Custa O(eventos × pisos distintos) por `MintTape`, cerca de 2 MB por piso numa mint de 124 k eventos. Hoje não pesa, porque há uma política por noite. Uma varredura de parâmetros que reutilize a mesma fita precisa levar isso em conta.
+- **Corrigido junto:** o script de perfil `2026-10-06-wallets-engine-profile.py` contava `policy._stopped`, que não existe mais, e passaria a mostrar "stop quotes 0". Agora soma também `stops.quote_stopped`.

@@ -71,7 +71,7 @@ MATRIX: dict[str, list[dict[str, Any]]] = {
         {"name": "window7", "per_day": 2_000, "days": 9, "window": 7},
     ],
 }  # fmt: skip
-WATCH = ("_stopped", "_find_exit", "_leader_exit", "simulate_copy", "window_books", "fifo",
+WATCH = ("_stopped", "quote_stopped", "stop_limit", "_find_exit", "_leader_exit", "simulate_copy", "window_books", "fifo",
          "liquidation_or_none", "_prepared", "_cobuys", "flow_of", "_advance", "__init__")  # fmt: skip
 
 
@@ -338,7 +338,7 @@ def main() -> None:
         block = [f"\n=== {cfg.name} ===", "ROW " + json.dumps(row, default=str),
                  f"  cpu {row['cpu_s']:.3f} s  wall {row['wall_s']:.3f} s  window fills {row['window_fills']}"
                  f"  -> {row['us_per_window_fill']:.1f} us CPU/fill  copies {row['copies']}"
-                 f"  stop quotes {row['calls'].get('policy._stopped', 0)}", table(row), prof]  # fmt: skip
+                 f"  stop quotes {row['calls'].get('policy._stopped', 0) + row['calls'].get('stops.quote_stopped', 0)}", table(row), prof]  # fmt: skip
         print("\n".join(block), flush=True)
         lines += block
     if args.out:
