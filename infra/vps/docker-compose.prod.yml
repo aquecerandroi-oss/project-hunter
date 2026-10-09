@@ -407,6 +407,11 @@ services:
       # T4.67a: a pista de lançamento (EXP-M18), off por padrão; usa o mesmo
       # SOLANA_RPC_WS_URL/MEME_EVENT_COMMITMENT acima (docs/RISK_ENGINE_MEME.md §9).
       MEME_LAUNCH_LANE: ${MEME_LAUNCH_LANE:-off}
+      # H-037 (EXP-M28): a pista de copiar carteiras no papel, off por padrao. Os valores
+      # sao `off` e `paper`; qualquer outro vira `off` com um aviso. Ligar so DEPOIS da
+      # semente auditada dos conjuntos copy_v0/1 (docs/design/copiar-carteiras-papel.md §9):
+      # sem conjunto ativo a pista fica inerte. Usa SOLANA_RPC_URL/SOLANA_RPC_WS_URL acima.
+      MEME_COPY_LANE: ${MEME_COPY_LANE:-off}
       DB_POOL_SIZE: "2"
       DB_MAX_OVERFLOW: "2"
     logging: *prod-logging

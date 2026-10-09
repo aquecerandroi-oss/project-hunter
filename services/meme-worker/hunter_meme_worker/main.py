@@ -47,6 +47,7 @@ from hunter_meme_worker.chain import chain_once
 from hunter_meme_worker.collect import fold_once, forever, poll_once, prune_once, reconcile_once
 from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState, attach_event_gate
+from hunter_meme_worker.copy_main import build_copy_lane
 from hunter_meme_worker.creator_watch import spawn_creator_watch
 from hunter_meme_worker.cycle_wiring import CycleInstruments, build_cycle_instruments
 from hunter_meme_worker.discovery import run_discovery
@@ -247,6 +248,7 @@ async def _run(
     async def _heartbeat(context: RadarContext) -> None:
         await heartbeat_once(context, write)
 
+    copy_lane = build_copy_lane(ctx, write)  # H-037: None unless MEME_COPY_LANE=paper
     try:
         async with asyncio.TaskGroup() as group:
             group.create_task(_discovery(ctx), name="meme-discovery")
@@ -326,6 +328,9 @@ async def _run(
                 # T4.67a: restart-safe on its own crash (F2 discipline),
                 # exactly like the event gate above.
                 group.create_task(run_launch_lane_forever(ctx.launch_lane), name="meme-launch-lane")
+            if copy_lane is not None:
+                # H-037: paper copy of the frozen leaders; its supervisor keeps a crash inside it.
+                group.create_task(copy_lane.run(), name="meme-copy-lane")
     except BaseException as error:
         if not isinstance(error, asyncio.CancelledError):
             cycles.note_crash()  # before the cleanup: a SIGTERM during it must not hide this
@@ -338,3 +343,5 @@ async def _run(
             await event_gate.ws.aclose()
         if ctx.launch_lane is not None:
             await ctx.launch_lane.ws.aclose()
+        if copy_lane is not None:
+            await copy_lane.aclose()

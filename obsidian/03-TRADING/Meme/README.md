@@ -90,6 +90,10 @@ depende de switch explícito do Everton (`ENABLE_MEME_LIVE_TRADING`) depois do f
 [[11-KNOWLEDGE/README-meme|Meme (Conhecimento)]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[03-TRADING/Meme/Terminal-do-pumpfun|Terminal do pump.fun]] ·
 `docs/plans/T4-MEME-RADAR.md` · `docs/plans/T4-MEME-RADAR-UI.md`
 
+## Pista de cópia no papel (H-037, 09/10/2026)
+
+Como ligar: **primeiro** a semente auditada dos conjuntos `copy_v0/1` (e `copy_everton_v0/1`) pela tarefa E do desenho (`docs/design/copiar-carteiras-papel.md` §9), **depois** `MEME_COPY_LANE=paper` no ambiente do `meme-worker` (valores `off`, o padrão, e `paper`; qualquer outro vira `off` com aviso; não existe `on` nem `live`). Com `off` nada é construído nem aberto; com `paper` sem semente a pista fica inerte (`copy_state=inert`) e não abre NATS nem WS. Rode `paper` com `SOLANA_RPC_URL` pago: o cliente RPC da pista tem baldes próprios e não divide a cota do endpoint com o radar nem com `MEME_WATCH_WALLETS`. Ver [[EXP-M28-copiar-carteiras-no-papel]] e [[Revisoes-Astra/copy-wiring-main|copy-wiring-main]].
+
 ## Operações traçadas
 
 Um gráfico por aposta fechada, uma página por conjunto: [[03-TRADING/Meme/Apostas-tracadas/README|Operações traçadas (meme)]] — desenhadas por `meme_render_bets.py` (`docs/PIPELINE.md` §9c).

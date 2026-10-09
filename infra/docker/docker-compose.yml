@@ -647,6 +647,9 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
       MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-30}
       MEME_TRACKED_MINTS_MAX: ${MEME_TRACKED_MINTS_MAX:-120}
+      # H-037: the paper copy-trade lane, `off` or `paper` (anything else reads as `off`).
+      # Turn on only after the audited seed of the copy_v0/1 rule sets (design §9).
+      MEME_COPY_LANE: ${MEME_COPY_LANE:-off}
       # Its own (small) pool: four loops, one transaction each at a time, and a
       # per-frame upsert on the discovery loop. 2 + 2 is measured headroom over
       # that, not a guess about concurrency this process does not have.
