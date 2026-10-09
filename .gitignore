@@ -54,3 +54,6 @@ vault/.obsidian/cache
 
 # CI junit report (python-test)
 pytest-junit.xml
+
+# Páginas cruas da pump.fun trazem a credencial pública do NATS (revisão de segurança H-037, LOW-5)
+.claude/state/plantao-meme/raw-lane2/*.html
