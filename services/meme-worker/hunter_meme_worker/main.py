@@ -48,6 +48,7 @@ from hunter_meme_worker.collect import fold_once, forever, poll_once, prune_once
 from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState, attach_event_gate
 from hunter_meme_worker.creator_watch import spawn_creator_watch
+from hunter_meme_worker.cycle_wiring import CycleInstruments, build_cycle_instruments
 from hunter_meme_worker.discovery import run_discovery
 from hunter_meme_worker.event_gate import run_event_gate_forever
 from hunter_meme_worker.event_gate_caches import EventGateCaches
@@ -173,6 +174,24 @@ def build_lab_context(
 async def run_meme(runtime: WorkerRuntime) -> None:
     """The entrypoint ``RoleRegistry['meme']`` points at."""
     config = load_config(runtime.settings)
+    write = _heartbeat_writer(runtime)
+    # EXP-M26 §6.8: both cycle meters announce at every boot, even with the radar or a
+    # loop off, so the previous process's numbers never look current (cycle_wiring).
+    cycles = build_cycle_instruments(config, create_session_factory(runtime.engine), write)
+    await cycles.announce()
+    # The history writer runs, and the generations are closed (clean only for a SIGTERM,
+    # never for a loop's crash), around everything below — radar enabled or not.
+    async with cycles.supervised():
+        await _run(runtime, config, write, cycles)
+
+
+async def _run(
+    runtime: WorkerRuntime,
+    config: MemeConfig,
+    write: Callable[[dict[str, str]], Awaitable[None]],
+    cycles: CycleInstruments,
+) -> None:
+    """Everything after the announcement; runs inside ``cycles.supervised()``."""
     if not config.enabled:
         runtime.status_details["radar"] = lambda: "disabled (MEME_ENABLED=false)"
         logger.warning("meme_radar_disabled", reason="MEME_ENABLED is false")
@@ -182,7 +201,6 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         await asyncio.Event().wait()
         return
 
-    write = _heartbeat_writer(runtime)
     launch_lane = build_launch_lane(
         create_session_factory(runtime.engine), wake_publisher(runtime), write
     )
@@ -243,7 +261,8 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                 # T4.2f: every tracked curve from the chain, once a minute; the
                 # top-K reconciliation is a subset of it and does not run.
                 group.create_task(
-                    forever("chain", config.chain_cycle_s, chain_once, ctx), name="meme-chain"
+                    forever("chain", config.chain_cycle_s, cycles.chain_step(chain_once), ctx),
+                    name="meme-chain",
                 )
                 if config.fast_lane_enabled:
                     # T4.16: the mints younger than five minutes, every 15 s.
@@ -294,7 +313,8 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                 )
             if lab is not None:
                 group.create_task(
-                    forever("lab", config.lab_cycle_s, lab_once, lab), name="meme-lab"
+                    forever("lab", config.lab_cycle_s, cycles.lab_step(lab_once), lab),
+                    name="meme-lab",
                 )
             if event_gate is not None:
                 # T4.52b-3/4: waits for the Lab's own first tick internally
@@ -306,6 +326,10 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                 # T4.67a: restart-safe on its own crash (F2 discipline),
                 # exactly like the event gate above.
                 group.create_task(run_launch_lane_forever(ctx.launch_lane), name="meme-launch-lane")
+    except BaseException as error:
+        if not isinstance(error, asyncio.CancelledError):
+            cycles.note_crash()  # before the cleanup: a SIGTERM during it must not hide this
+        raise
     finally:
         await close_clients(ctx, boards)
         if lab is not None and isinstance(lab.quotes, PumpFunRestClient):

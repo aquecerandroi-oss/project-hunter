@@ -8971,3 +8971,52 @@ estrangeira para `meme_rule_sets`, como na `0070` (§69); a quinta só é escrit
 guarda a nomeia em vez de deixar um erro cru de chave estrangeira. Trava e pooler: no upgrade, a trava de linha, dois
 blocos `DO` e um `INSERT … SELECT`; no downgrade, cinco `DO` e um `DELETE` — nada depende de estado de sessão; nenhuma
 janela de manutenção.
+
+## 73. `system_events` como a série durável de tempo de ciclo — `meme-worker`, EXP-M26 §6.8 (sem migração)
+
+A trava de ciclo do §6.8 do EXP-M26 ("+ 20 % no p95 da cadeia e do Lab") precisa de **cada ciclo**, não do anel do
+heartbeat. O `meme-worker` grava essa série em `system_events` (`component = 'meme-worker'`, `level = 'info'`), **sem
+migração**: a tabela é global (sem `organization_id`, sem RLS de tenant), append-only e `hunter_worker` tem `INSERT`
+(§1.2); o `INSERT` pela tabela-pai funciona sem privilégio nas filhas (§15.6). O escritor é
+`services/meme-worker/hunter_meme_worker/cycle_history.py`; a consulta oficial do leitor é `CYCLES_SINCE_SQL`. Revisão do
+`database-architect` (Astra, 09/10/2026): APROVADA no lado do banco; os achados 1–6 estão em
+`obsidian/06-DECISIONS/Revisoes-Astra/meme-cycle-metrics.md` ("Rodada 3").
+
+| `event` | `data` (JSONB) | quando |
+|---|---|---|
+| `cycle` | `{loop, run_id, seq, ended_at, duration_ms}` | um por ciclo concluído; `seq` = `cycles_total` do laço dentro do `run_id` |
+| `generation_start` | `{loop, run_id, started_at, enabled, nominal_ms, window}` | em todo boot, para os dois laços (`chain`, `lab`), ligados ou não |
+| `generation_end` | `{loop, run_id, ended_at, cycles_total, overruns_total, clean}` | no desligamento, se a fila ainda alcança o banco; `clean = false` quando um laço caiu e derrubou o processo, `true` para SIGTERM |
+
+**Contrato do leitor (a tabela não promete unicidade).** A PK é `(created_at, id)`: um COMMIT aplicado com a confirmação
+perdida (ou uma escrita abandonada no orçamento que ainda assim confirma) faz o escritor repetir o lote, e a linha existe
+duas vezes com outro `id` e outro `created_at`. Trocar o `id` por UUID v7 não resolveria — a duplicata tem outro
+`created_at`. A identidade lógica é **`(loop, run_id, seq)`** para `cycle` e **`(event, loop, run_id)`** para
+`generation_*`; o leitor deduplica **antes** de qualquer percentil. Janelas se cortam por `data->>'ended_at'`, nunca por
+`created_at` (o instante da persistência, que se move com o banco fora); a ordem é por `(loop, run_id, seq)` (um lote é
+uma transação: todas as linhas dele têm o mesmo `created_at`). `created_at` só entra na consulta para podar partições,
+**nos dois lados**: `[since − 1 dia, until + 1 dia)`. Uma linha persistida mais de um dia depois do fim da janela (ou de um
+worker com o relógio mais de um dia adiantado em relação ao banco) fica fora do que a consulta lê — e isso aparece como um
+**buraco de `seq`** (cobertura não provada), nunca como "passou"; `dropped_total` não o conta (ele mede só o transbordo da fila).
+
+**Ausência de `generation_end` = término não comprovado**, não necessariamente queda: um `kill -9`, uma queda antes do
+fechamento e um desligamento normal com o banco fora (a fila morre com o processo) deixam a geração igualmente sem fim.
+A cauda é desconhecida: a cobertura só se prova até o último `seq` contíguo, e um salto **dentro** de um `run_id` é buraco
+declarado, nunca preenchido. `generation_end` **com** `clean = false` prova que um laço caiu.
+
+**Desvio declarado em relação ao §1:** a PK é `gen_random_uuid()` (UUID **v4**, gerado no banco), não UUID v7 gerado na
+aplicação — o mesmo precedente de `meme_decision_tapes` e `meme_gate_refusals_by_mint` (§54.2). Ninguém ordena nem pagina
+por `id`; a identidade de leitura é a lógica acima, e o v7 não eliminaria as duplicatas.
+
+**Volume e índice.** ~7 200 ciclos/dia nominais (1 440 da cadeia + 5 760 do Lab; a cadência real inclui a pausa, então é
+aproximado), cerca de 216 mil em 30 dias mais marcadores e repetições. O índice `(component, created_at)` atende a
+igualdade de componente e o intervalo de `created_at`; os filtros JSON e o `DISTINCT ON` são processados em cima disso.
+**Nenhum índice novo sem `EXPLAIN (ANALYZE, BUFFERS)` com volume representativo** (não medido). Retenção: **30 dias, por
+partição mensal inteira** (§1.3) — pode manter mais, nunca menos; a base "antes" e a janela do experimento têm de ser
+exportadas e congeladas antes de expirar.
+
+**Escrita e pool.** O escritor usa o mesmo `engine` do radar (cinco conexões mais cinco de overflow por padrão): disputa o
+pool com os laços, mas sem vazamento demonstrado. Há **uma escrita em voo por vez**, com orçamento duro (a escrita roda numa
+tarefa que o flush abandona ao fim do orçamento, contada em `cycle_history_abandoned_total`); sem a partição do mês, o
+`INSERT` falha e a fila espera (`failed_total`). O `command_timeout` de `hunter_core/db/session.py` **não** limita o
+cancelamento contra um par travado — ver "Open Bugs".

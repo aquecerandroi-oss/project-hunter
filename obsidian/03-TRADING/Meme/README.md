@@ -148,3 +148,109 @@ estado de trabalho. As duas páginas de balanço abaixo continuam sendo a refer�
 - [[03-TRADING/Meme/Balanco-2026-09-18-estagio-1b|Balanço 18/09 — estágio 1b (R56)]] — 7 compras, 6
   fills, **1 vitória (PS, +0,66 R)**, **+0,0078 SOL líquido**; a vitória veio de duas falhas de envio
   com sorte, não de acerto de porta; diagnostica `blockhash_expired` e o buraco cadeia×fita da COVER.
+
+## Tempo de ciclo do `meme-worker` — a série da trava §6.8 (07/10/2026)
+
+Antes de 07/10 nenhum log nem heartbeat guardava quanto tempo a cadeia e o Lab levam por ciclo (o
+`chain_cycle_s` do radar é só o lote de RPC, não o passo inteiro; `meme_lab_ticks` não tem duração). A trava de
+ciclo do §6.8 do [[EXP-M26-grafico-em-moedas-maduras|EXP-M26]] ("+ 20 % no p95") ficava **não mensurável** — e
+"não mensurável" nunca conta como "passou". O Everton decidiu em 07/10 **instrumentar antes do seed**
+(item 3 de "Decisões do Everton (07/10/2026)"). Código: `hunter_meme_worker/cycle_metrics.py`, ligado em
+`main.py` em volta de `chain_once` e `lab_once`. Revisão: [[06-DECISIONS/Revisoes-Astra/meme-cycle-metrics|meme-cycle-metrics]].
+
+**O que é um ciclo.** A duração de parede de **uma chamada do passo** de `collect.forever`, em milissegundos
+inteiros (aritmética inteira sobre `monotonic_ns`), **sem** o `sleep` que o `forever` dorme depois e sem a
+publicação do próprio número (o tempo de publicar fica **fora** do número medido, mas **dentro** da cadência: a
+cadência real é `passo + publicação (≤ 1 s) + período`). No Lab o passo é o `lab_tick` inteiro (inclui `record_tick` e o
+`write_lab_heartbeat`). **Overrun** = ciclo mais longo que o período nominal (`chain_cycle_s` = 60 s;
+`lab_cycle_s` = 15 s). É um **limiar de trabalho, não um prazo perdido**: a cadência real é sempre
+`duração + período`, então um Lab que passa de 10 s para 13 s ficou 30 % mais lento **sem nenhum overrun**. A
+guarda compara o **p95** por conta própria; o contador é só alarme.
+
+**Campos novos em `hb:meme:radar`** (strings; vazio = ainda não medido, nunca `0`; escritos logo após cada
+ciclo, um `HSET` com orçamento próprio de 1 s; prefixo `chain_` para a cadeia e `lab_` para o Lab). O leitor
+**tem de ancorar em `run_id`**: o `ts` geral do heartbeat não diz se esses números são do processo que roda
+(**em todo boot** o processo publica uma geração vazia para **os dois** laços, **inclusive** com o laço desligado
+por configuração ou com o radar inteiro desligado (`MEME_ENABLED=false`), com `<loop>_cycle_enabled=false`: assim os
+campos do processo anterior são sobrescritos e um laço desligado nunca parece ter números atuais. O hash
+compartilhado **não** é apagado — há outros escritores. Pressuposto: **uma instância** do `meme-worker` por chave
+(`hb:meme:radar`); o compose declara um serviço, mas nada impõe exclusão mútua, e dois processos alternariam gerações
+na mesma chave).
+
+| campo | significado |
+|---|---|
+| `<loop>_cycle_run_id` · `<loop>_cycle_since` | a geração da série (uuid do processo) e o início dela (UTC) |
+| `<loop>_cycles_total` | ciclos registrados nesta geração |
+| `<loop>_overruns_total` | ciclos acima do período nominal |
+| `<loop>_last_cycle_ms` · `<loop>_last_cycle_at` | o último ciclo e quando terminou (UTC, ISO-8601) |
+| `<loop>_cycle_ms_p50` · `_p95` · `_p99` · `_max` | posto mais próximo sobre o anel |
+| `<loop>_cycle_window_n` | amostras no anel agora (anel fixo: 120 ciclos concluídos na cadeia, 480 no Lab; só dá ~2 h se o trabalho for desprezível) |
+| `<loop>_cycle_nominal_ms` · `<loop>_cycle_enabled` | o período nominal usado para contar overrun; se o laço está ligado neste processo (`false` = geração vazia anunciada só para limpar o anterior) |
+| `<loop>_cycle_publish_failed_total` | publicações que falharam ou estouraram o orçamento de 1 s |
+
+Log: `meme_cycle_overrun` (warning; `loop`, `duration_ms`, `nominal_ms`, `overruns_total`, `suppressed`) só em
+overrun e no máximo uma vez a cada 300 s por laço; `suppressed` diz quantos foram engolidos. Falha do `HSET` é
+`meme_cycle_metrics_publish_failed`, nunca para o laço. Um passo que levanta exceção não é registrado (o
+`forever` relança e o processo cai, como antes) — para a guarda, uma interrupção é **ausência de evidência**,
+nunca melhora.
+
+**A série durável (histórico por ciclo, 07/10/2026).** Cada ciclo concluído vira **ao menos uma linha em
+`system_events`** (`component = 'meme-worker'`, `level = info`), **sem migração** (a tabela já existe, é
+append-only — `UPDATE`/`DELETE` negados aos dois papéis, provado em Postgres real —, `hunter_worker` tem `INSERT`, não é
+tabela de tenant). Três eventos (`hunter_meme_worker/cycle_history.py`):
+
+| `event` | `data` | quando |
+|---|---|---|
+| `cycle` | `{loop, run_id, seq, ended_at, duration_ms}` | um por ciclo concluído; `seq` = `cycles_total` do laço dentro do `run_id` |
+| `generation_start` | `{loop, run_id, started_at, enabled, nominal_ms, window}` | em todo boot, para **os dois** laços, ligados ou não (laço desligado deixa esta linha e nenhum ciclo: é assim que a ausência se explica) |
+| `generation_end` | `{loop, run_id, ended_at, cycles_total, overruns_total, clean}` | no desligamento, se a fila ainda alcança o banco: `clean = true` para SIGTERM, `false` quando um laço caiu e derrubou o processo. **Geração sem ele = término não comprovado** (não necessariamente queda: `kill -9`, queda antes do fechamento ou desligamento com o banco fora, em que a fila morre com o processo): a cauda é desconhecida e a cobertura só se prova até o último `seq` contíguo |
+
+**Contrato do leitor** (a tabela **não** promete unicidade): um COMMIT aplicado com a confirmação perdida faz o
+escritor repetir o lote, então um ciclo pode existir duas vezes. A identidade é **`(loop, run_id, seq)`**,
+deduplicada **antes** de qualquer percentil (para as linhas `generation_*` a identidade é **`(event, loop, run_id)`**); as janelas se cortam por **`data->>'ended_at'`**, nunca por `created_at`
+(que é o instante da persistência e se move com o banco fora); a ordem é por `(loop, run_id, seq)`, nunca por
+`created_at` (um lote é uma transação: todas as linhas dele têm o mesmo). A consulta pronta é a constante
+`CYCLES_SINCE_SQL` do módulo (`DISTINCT ON`, parâmetros `:since`/`:until` em UTC; provada contra Postgres real,
+inclusive com um ciclo duplicado, um fora da janela e um persistido mais de um dia depois dela). `created_at` só poda partições, **nos dois lados** (`[since − 1 dia, until + 1 dia)`): uma linha persistida mais de um dia depois do fim da janela, ou de um worker com o relógio mais de um dia adiantado, fica fora do que a consulta lê. Um salto de `seq` **dentro** de um `run_id` é **buraco
+declarado**, nunca preenchido.
+
+**Escrita.** O worker enfileira (fila limitada de 4 096 linhas ≈ 13 h; **nunca bloqueia um laço**; cheia, descarta a
+mais antiga e conta — `dropped_total` é um **limite superior** do que se perdeu) e uma tarefa própria (`flush`, depois
+dorme 5 s: não é período fixo; roda também com `MEME_ENABLED=false`) grava em lote de até 500 como `hunter_worker`, sob
+**um** orçamento de 10 s para o banco e os contadores juntos — **teto rígido**: a escrita roda numa tarefa que o flush
+**abandona** ao fim do orçamento (`asyncio.timeout` esperaria o cancelamento terminar, e contra um par travado o cancelamento
+do asyncpg não tem prazo), contada em `_abandoned_total`, com **uma escrita em voo por vez** (uma escrita abandonada que ainda
+confirma depois duplica linhas: o contrato do leitor as colapsa); falha guarda as linhas para a próxima tentativa; no
+desligamento, `generation_end` dos dois laços (`clean` conforme a causa) e depois o esvaziamento da fila em até 3 s (também
+teto rígido; para na primeira falha). Contadores no hash:
+`cycle_history_written_total`, `_failed_total`, `_dropped_total`, `_abandoned_total`, `_queued` (publicados só quando mudam;
+zerados no boot). Volume ~7 200 ciclos/dia (estimativa nominal, não medida em produção). **Retenção de 30 dias, por partição
+mensal inteira**: a base "antes" e a janela do experimento têm de ser **exportadas e congeladas** antes de
+expirarem. Sem a partição do mês da escrita, o lote falha e espera (`failed_total`). A base do "antes" é
+**prospectiva, a partir do deploy** deste código — o desenho do EXP-M26 ainda cita "72 h antes de I1" e **essa série
+não existe** (o instrumento não recupera o passado). **Ainda faltam, antes de a guarda valer:** congelar a janela por
+`ended_at`, a cobertura mínima e o tratamento de reinícios e de caudas desconhecidas (decisão do orquestrador/Everton);
+sem prova de cobertura a guarda é **não mensurável**.
+
+**O que isto não é.** O hash do Redis guarda só o anel de agora; um reinício zera o anel e um seed com o processo
+vivo mistura nele os ciclos de antes com os de depois — por isso a comparação "antes × depois" se faz **pelas linhas
+individuais de `system_events` por `run_id`/janela**, nunca pelo p95 do anel (p95 de p95 não é p95 dos ciclos).
+Interrupção do worker é **ausência de evidência**, nunca melhora. Revisão e aceite:
+[[06-DECISIONS/Revisoes-Astra/meme-cycle-metrics|meme-cycle-metrics]] (o `database-architect` aprovou o lado do banco em
+09/10: Rodada 3 abaixo; contrato em `docs/DATABASE.md` §73).
+
+**Rodada 3 (`database-architect`, 09/10/2026) — APROVADO no lado do banco; 2 pendências de ciclo de vida corrigidas.**
+Bruto: `.claude/state/astra-review-db-meme-cycle-history.md`. Síntese e decisões:
+[[06-DECISIONS/Revisoes-Astra/meme-cycle-metrics|meme-cycle-metrics]] ("Rodada 3").
+
+| # | severidade | achado | situação |
+|---|---|---|---|
+| 1 | HIGH | uma queda de laço recebia `generation_end` "limpo" (o `finally` fechava igual) | **corrigido:** `generation_end` leva `clean`; `false` quando a saída não foi cancelamento — e a causa é lembrada **antes** da limpeza (uma queda seguida de SIGTERM durante o fechamento dos clientes continua queda; conferência da Astra). Texto corrigido: **ausência de `generation_end` = término não comprovado**, não "queda" |
+| 2 | MEDIUM | com `MEME_ENABLED=false` os `generation_start` ficavam na fila e nunca eram gravados | **corrigido:** o gravador e o fechamento rodam em volta de todo o `run_meme` (`CycleInstruments.supervised`), ligado ou não; o gravador não morre com uma exceção inesperada (loga e tenta de novo) |
+| 3 | LOW | os 10 s do flush e os 3 s do close não eram teto rígido contra um par travado | **corrigido no histórico:** escrita abandonada no orçamento (`_abandoned_total`, uma em voo por vez). O defeito de fundo (docstring D3 de `hunter_core/db/session.py`) está em [[Open Bugs]] |
+| 4 | LOW | UUID v4 gerado no banco contra a regra de v7 | **desvio declarado** em `docs/DATABASE.md` §73 (v7 não elimina duplicatas: a PK é `(created_at, id)`) |
+| 5 | LOW | o docstring dizia que atraso de persistência > 1 dia não exclui a linha (só havia limite inferior) | **corrigido:** a consulta ganhou `created_at < :until + 1 dia`; o texto agora diz o que exclui. A exclusão aparece como **buraco de `seq`** (cobertura não provada, guarda não mensurável); a Astra a vê como exclusão sem sinal — decisão do orquestrador em [[06-DECISIONS/Revisoes-Astra/meme-cycle-metrics|meme-cycle-metrics]] |
+| 6 | nit | leitores de `generation_*` deduplicam por `(event, loop, run_id)` | **escrito** (módulo, README, `docs/DATABASE.md` §73) |
+
+Sem índice novo antes de um `EXPLAIN (ANALYZE, BUFFERS)` com volume representativo (não medido). Retenção mensal pode manter
+mais de 30 dias de linhas, nunca menos.

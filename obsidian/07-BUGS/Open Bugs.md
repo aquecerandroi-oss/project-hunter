@@ -13,6 +13,13 @@ closed: ""
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
 
+## `hunter_core/db/session.py` (D3): `command_timeout` não limita o cancelamento contra um par travado (09/10) — MÉDIA
+
+**MÉDIA (sem dinheiro em risco; afeta qualquer chamador que cancele uma consulta com `asyncio.wait_for`/`asyncio.timeout`).** O docstring de `packages/core/hunter_core/db/session.py` (D3) afirma que `connect_args={"command_timeout": 30}` fecha a lacuna do "chamador cancelado que ainda espera o `ROLLBACK`/close do driver num par que sumiu". **Foi refutado** na revisão do `database-architect` do histórico de ciclos do `meme-worker` ([[06-DECISIONS/Revisoes-Astra/meme-cycle-metrics|meme-cycle-metrics]], Rodada 3, achado 3): o cancelamento fora de banda do asyncpg (`Connection._cancel`) **não tem prazo** e o `command_timeout` não o cobre; com o banco em `docker pause` o cancelamento ficou pendurado por mais de 150 s (medição do chamador da tarefa, 09/10; não reproduzida de novo por mim). Consequência: um `asyncio.timeout(10)` em volta de uma sessão **não é um teto rígido de retorno** — o cancelamento começa a limpeza e a limpeza pode não terminar.
+
+- **Mitigação local (só no histórico de ciclos):** a escrita roda numa tarefa que o flush **abandona** ao fim do orçamento (`cycle_history._write_within`, contador `cycle_history_abandoned_total`, uma escrita em voo por vez). Os demais usos de `asyncio.timeout`/`wait_for` em volta de sessão continuam sujeitos ao mesmo defeito.
+- **Dono:** `database-architect`/backend. **A fazer:** reproduzir com um teste de integração (sessão real, `docker pause`, `wait_for`), corrigir o docstring D3 e decidir entre abandonar a tarefa (padrão acima) em um helper comum de `hunter_core` ou um prazo de cancelamento no driver.
+
 ## Upgrade de 08/10 (pump, PumpSwap, taxas) — terceiro redeploy; `meme-executor` em `exits_only`; pino a mover (08/10) — MÉDIA
 
 **MÉDIA (nenhum dinheiro real em risco: 0 posições, mesas pausadas; a guarda funcionou).** Em 08/10, em 27 s, foram reimplantados a PumpSwap (slot 454596406, 16:20:03Z), o pump (454596459, 16:20:17Z) e o programa de taxas (454596501, 16:20:30Z). O `meme-executor` foi para `program_mode = exits_only`, `program_block = program_upgraded` (≈16:21Z) — como desenhado na T4.8f. O pino ainda diz `452654932`.
