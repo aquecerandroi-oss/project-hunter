@@ -1,13 +1,13 @@
 ---
 tags: [dialogo, astra, carteiras, desempenho, h-030]
 date: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-09
 status: registro
 owner: sexta-feira
 decided_on: 2026-10-06
 by: sexta-feira + astra
 tarefa: CPU do motor de carteiras 1c-bis (≈ 31–34 h/núcleo por noite, extrapolação sintética)
-veredito: rodada 1 sem decisão conjunta; rodada 2 com DECISÃO CONJUNTA (ordem perfil → trabalho repetido → fusão e 2 workers → vetorização seletiva); passos 1–2 medidos e executados em 06/10 (≈ 2–3× menos CPU, regra intacta; meta de < 2 h ainda pede 2–4× menos trabalho por fill); passo 3 em 06/10: fusão exata e mints inteiros em processos, provados (digests congelados com 1, 2 e 4 workers; 17/17 mutantes); 2 workers 1,2–1,9× sobre 1 worker, mas só vencem o serial em memória no mint quente (1,09×); densidade real por mint não medida (proposta pronta, sem rodar)
+veredito: rodada 1 sem decisão conjunta; rodada 2 com DECISÃO CONJUNTA (ordem perfil → trabalho repetido → fusão e 2 workers → vetorização seletiva); passos 1–2 medidos e executados em 06/10 (≈ 2–3× menos CPU, regra intacta; meta de < 2 h ainda pede 2–4× menos trabalho por fill); passo 3 em 06/10: fusão exata e mints inteiros em processos, provados (digests congelados com 1, 2 e 4 workers; 17/17 mutantes); 2 workers 1,2–1,9× sobre 1 worker, mas só vencem o serial em memória no mint quente (1,09×); densidade real por mint não medida (proposta pronta, sem rodar); passo 4 em 09/10: venda arredondada provadamente monotônica só numa região (contraexemplo fora; ela cobre a escala de produção), stop por limiar inteiro com fallback Decimal fora dela, digests congelados iguais, 15/15 mutantes; chave quente de 124 mil/h 200 → 10,8 s, noite em cenário 42–69 → 4,3–4,4 h serial (envelope com o bench 4,3–13,3 h; 2 workers 3,6–12,0 h), caminho crítico ≈ 0,5 h; meta de < 2 h ainda a 1,8–6×
 ---
 
 # CPU do motor de carteiras: medir antes de reescrever
@@ -376,3 +376,105 @@ Próximos passos possíveis:
 - medir entidades distintas por pool quente: precisa guardar carteira por chave, e a sonda guarda só contagens;
 - repetir a captura em outro dia;
 - escolher entre o passo 4 e a mudança de universo.
+
+
+## Passo 4 (09/10/2026, quant-engineer): o stop por limiar inteiro
+
+**Tudo o que é bench abaixo é sintético, não é dado de mercado** (gerador `kb0183-shape-v2`). Só a densidade dos cenários é real: a hora de 06/10 do [[KB-0187-a-densidade-por-mint-mora-em-poucas-pools]]. Revisão da Astra deste passo: [[wallets-cpu-step4]]. Nenhuma regra mudou e o universo é o mesmo.
+
+### Prova primeiro: a venda líquida arredondada é monotônica nos átomos?
+
+**Só numa região, e a região contém a escala de produção.** Testes em `test_wallets_stops_monotone.py`; a Astra conferiu a prova contra o código.
+
+- **Pool (inteiros): sim, sempre.** `bruto = min(Q·a // (T + a), S)` não decresce em `a`, qualquer que seja o sinal da cotação virtual. `líquido = bruto − ⌈bruto·b/10⁴⌉ = ⌊bruto·(10⁴ − b)/10⁴⌋` não decresce para `0 ≤ b < 10⁴` (LP, protocolo, criador e cashback somados no `fee_bps`). Nenhuma recusa.
+- **Curva (Decimal, 28 dígitos, HALF_EVEN): sim, se `sol·átomos < 10²⁸`, `token + átomos < 10²⁸` e `0 ≤ real < sol`.** Aí o produto e a soma são exatos, e o quociente é o arredondamento correto de um racional crescente. O `× 10⁹` só acrescenta zeros; o piso e a taxa mantêm a ordem; a recusa de reserva virtual esgotada fica impossível. Para `sol` abaixo de 10 000 SOL virtuais, a região cobre 10¹⁵ átomos, a oferta inteira (o maior virtual registrado em `curve.py`, num Mayhem, foi de 1 977 SOL).
+- **Fora da região: não.** Uma busca dirigida achou vendas que **caem** um lamport entre átomos consecutivos (`sol ≈ 5,7·10²¹` lamports, `sol·átomos` com 44 dígitos): `…479, …479, …478, …478, …479` de `a` a `a + 4`. O caso está fixado em teste.
+- **Grades:** 3 000 pools (cotação real de 1 lamport a 10⁸ SOL, base de 1 a 10²⁴ átomos, virtual negativa, zero e positiva) e 3 000 curvas (de 2 lamports a 10¹⁴, real em todo `[0, sol)`); dez taxas de 0 a 9 999 bps; pares aleatórios e janelas de átomos consecutivos, inclusive na borda da região.
+
+### A mudança (uma só): `stops.py`
+
+- **Por evento e piso**, o maior número de átomos cuja venda fica ≤ piso (`stop_limit`). Ele vem de um palpite inteiro pelo inverso, **certificado por cotações do próprio `sell_lamports`** (`líquido(c) ≤ F < líquido(c + 1)`) e reparado por galope e busca binária quando o palpite erra. A exatidão depende só da monotonia.
+  - **O palpite erra de verdade dentro da região:** em curvas extremas (`sol = 17` lamports, `token ≈ 1,6·10²⁶`), o arredondamento põe o limite um átomo abaixo. É o único mutante que exigiu um caso achado por busca.
+  - Na escala de produção, palpite e limite coincidiram em 200 000 estados.
+- **Cópia com `1 ≤ átomos ≤ região do evento`:** para sse `átomos ≤ limite`. Acima da região, a cotação Decimal antiga, com as recusas. A curva completa nunca para; uma pool marcada `complete` continua cotada (bug achado na autorrevisão e confirmado pela Astra antes de qualquer número).
+- **Índice preguiçoso por (fita, piso):** cada evento é resolvido uma vez, na primeira cópia que chega nele. Blocos de 64 guardam o maior limite e a menor região; um bloco é pulado sse `átomos > maior limite` e `átomos ≤ menor região`. `_find_exit` pula até a próxima parada, passa cada parada por `_landing`, troca o `best` só com pouso estritamente anterior e então encolhe o fim da janela.
+
+### Prova de equivalência
+
+- **Digests congelados do `84704fa1`** ([[wallets-cpu-step2]]) iguais. `uv run pytest packages/indicators`: 1 730 passed (1 700 antes, 30 novos).
+- **Diferencial contra uma cópia congelada do laço antigo** (cotação Decimal por cópia e evento):
+  - 6 sementes × 400 cópias, em fitas com curvas, pools de virtual negativa, zero e positiva, curvas completas, estados fora da região, vários eventos no mesmo slot e recebimento atrasado;
+  - duas políticas (dois pisos) na mesma fita;
+  - mais uma fita com estado recusável: a mesma `ValueError`, mensagem incluída.
+- **Casos dirigidos** (`test_wallets_stops_index.py`): exatamente no limiar; um bloco cujo único impedimento ao salto é a menor região; uma recusa dentro de um bloco; início desalinhado e cauda parcial; piso fracionário negativo; átomos acima da sentinela.
+- **Trabalho:** 300 cópias numa fita de 12 000 eventos que não para ninguém. O laço antigo faria > 100× mais cotações; o índice faz ≤ 3 por evento.
+- **Mutação: 15 de 15 mortos** numa cópia do pacote. Lista e saída no relatório da tarefa. A Astra aprovou o diff na rodada 2 ([[wallets-cpu-step4]]).
+- **Digests do replay da chave quente** iguais antes e depois em todos os pontos das varreduras, e **digest da noite** igual nas 6 configurações do bench (serial, 1 e 2 workers).
+
+### Antes e depois: uma chave quente (`2026-10-09-wallets-stop-sweep.py`)
+
+A varredura do passo 3 não conseguia pôr mais de ≈ 18 mil eventos numa hora, e o venue do mint quente ficava por sorteio. A nova reconstrói a chave quente depois de gerar: até 14 eventos por slot, e o mesmo passeio de preço cotado como curva ou como pool. São duas formas de passeio:
+
+- **por evento:** o do gerador; a distância até o stop é um número fixo de eventos;
+- **no tempo:** o passo dividido pela densidade, o que dá o mesmo caminho de preço no tempo. É o caso que a curva de custo do passo 3 supunha: a cópia varre mais eventos onde há mais eventos.
+
+Antes = motor congelado do HEAD (`PYTHONPATH` para uma cópia do `git archive`), na mesma máquina e no mesmo dia. CPU com a máquina compartilhada; as contagens são determinísticas.
+
+| chave, eventos em 1 h | cópias | cotações do stop antes → depois | CPU antes → depois | razão |
+|---|---|---|---|---|
+| pool, 16 000 (por evento) | 628 | 3 259 032 → 31 974 | 15,53 → 1,16 s | 13× |
+| pool, 64 000 (por evento) | 1 657 | 23 644 526 → 127 900 | 104,75 → 5,27 s | 20× |
+| pool, 124 000 (por evento) | 2 934 | 44 812 148 → 247 806 | 200,23 → 10,83 s | 18× |
+| curva, 32 000 (por evento) | 997 | 9 779 458 → 63 942 | 127,77 → 3,62 s | 35× |
+| pool, 64 000 (no tempo) | 1 657 | 43 106 071 → 127 900 | 188,42 → 4,86 s | 39× |
+| pool, 124 000 (no tempo) | 2 934 | — → 247 806 | não medido → 11,39 s | — |
+
+- **A chave quente ficou quase linear.** Expoentes locais da CPU, de 16 mil a 124 mil/h:
+  - depois: 0,9–1,3;
+  - antes, passeio por evento: 1,5 → 1,2 → 1,0. As cópias param depois de um número fixo de eventos;
+  - antes, passeio no tempo: 1,5 → 1,7 → 1,9, de 4 mil a 64 mil. É o caso que cresce.
+
+  Arquivos `stop-sweep-2026-10-09-{before,after}-{pool,curve}[-timewalk].txt`.
+- **O que sobra na chave de 124 mil/h** (cProfile, passeio no tempo, 31,6 s instrumentados):
+  - a resolução única dos limites, 3,8 s;
+  - a caminhada por blocos, ≈ 4,3 s;
+  - o resto é trabalho linear: E-PnL (`window_books`) 7,9 s, FIFO 5,7 s, entre outros.
+
+### Antes e depois: a noite inteira do bench (`workers-2026-10-09-step4-{before,after}.txt`, pareado em `…-paired.md`)
+
+Antes e depois rodaram ao mesmo tempo, então as razões valem mais que os absolutos.
+
+| config | fills de janela | CPU serial antes → depois | razão | µs CPU/fill antes → depois | f depois | k₂ depois | T2/Ts (modelo) |
+|---|---|---|---|---|---|---|---|
+| base | 18 852 | 7,00 → 3,61 s | 1,94× | 371 → 191 | 15,2 % | 1,78 | 0,90 |
+| hot_4k | 22 852 | 12,61 → 4,31 s | 2,92× | 552 → 189 | 14,1 % | 1,62 | 0,84 |
+| triggers 0,7 | 18 852 | 10,83 → 4,17 s | 2,60× | 574 → 221 | 14,2 % | 1,74 | 0,89 |
+| fills_16k | 31 087 | 11,98 → 6,75 s | 1,78× | 386 → 217 | 14,8 % | 1,65 | 0,85 |
+| window7 | 11 624 | 2,75 → 2,05 s | 1,34× | 237 → 176 | 16,0 % | 1,69 | 0,87 |
+| janela vazia, carry grande | 0 | 3,39 → 3,38 s | 1,00× | — | 14,4 % | 2,05 | 1,02 |
+
+- **O stop deixou de dominar.** Depois do passo 4 (`profile-2026-10-09-step4-after.txt`; só as fatias valem, a máquina estava carregada pela mutação), as cópias ficam com 26–32 % do tempo (11 % em `history_5d`) e o E-PnL com 26–43 %.
+- **Dois workers ficaram relativamente piores:** k₂ subiu de 1,10–1,87 (passo 3) para 1,62–2,05. O replay ficou mais barato, mas o desempacotamento da janela pelo worker (≈ 27 µs por evento, medido no passo 3) não mudou e agora pesa tanto quanto o próprio replay.
+
+### Extrapolação nova para 200–217 M fills por noite (cenário, não medida)
+
+| base | serial (1 núcleo) | 2 workers (× 0,84–0,90) | caminho crítico (a maior chave, 168 h) |
+|---|---|---|---|
+| densidade real × curva da chave quente, passeio por evento (`2026-10-09-wallets-night-scenario.py`) | 42,2 → **4,26 h** | **3,6–3,8 h** | 9,35 → **0,51 h** |
+| idem, passeio no tempo (antes: 124 mil/h extrapolado de 32→64 mil) | 69,1 → **4,38 h** | **3,7–3,9 h** | 31,1 → **0,53 h** |
+| µs/fill do bench pareado (176–221 depois; 237–574 antes) | 13,2–34,6 → **9,8–13,3 h** | **8,2–12,0 h** | — |
+
+- **Conferência do método:** o mesmo script com a varredura do passo 3 dá 114,6 h e 1 194 s/h na maior pool, o teto dos 97–115 h e 819–1 194 s/h do [[KB-0187-a-densidade-por-mint-mora-em-poucas-pools]].
+- **Por que as duas bases discordam (2–3×):**
+  - o cenário ignora plano e fecho (f ≈ 14–16 %) e o custo fixo por chave: a chave mediana tem 2 eventos por hora e é cotada linearmente a partir do ponto de 1 000/h. Ele é otimista;
+  - o µs/fill do bench é a mistura do gerador, com tudo dentro, numa máquina carregada.
+- **Envelope: serial 4,3–13,3 h; 2 workers 3,6–12,0 h.**
+- **A meta de < 2 h com 2 núcleos ainda não foi atingida: faltam ≈ 1,8–6×.** Mas o que era superlinear acabou: o caminho crítico caiu de 9–56 h para ≈ 0,5 h, e mais trabalho por worker agora reduz a noite.
+
+### O que sobra (passo 5 e além; nada disso foi feito)
+
+1. **Transporte da janela:** k₂ = 1,6–2,0. Um formato mais barato que o pickle de `Fill`, lido pelo worker, é a alavanca do lado paralelo (passo 3, item 4).
+2. **E-PnL:** 26–43 % do tempo. É uma liquidação por posse e por fronteira, trabalho necessário. O núcleo inteiro da cotação de curva (a opção 3 desta proposta, não feita) voltaria a fazer sentido ali.
+3. **Passadas 1–2 como mapa por mint + redução exata:** f ≈ 14–16 % (passo 3, item 3).
+4. **Segundo nível do índice** (sugestão da Astra): ≈ 1–2 % da hora do programa na medida de hoje. Fica para depois.
+5. **Medir a densidade de novo**, com apostas elegíveis por chave: a curva de custo por chave continua sintética nas cópias.

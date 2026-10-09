@@ -30,7 +30,8 @@ from typing import Literal
 from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.wallets.clock import NominalClock, SlotClock
 from hunter_indicators.meme.wallets.params import FollowPolicy
-from hunter_indicators.meme.wallets.pricing import Censored, MintTape, sell_lamports
+from hunter_indicators.meme.wallets.pricing import Censored, MintTape
+from hunter_indicators.meme.wallets.stops import stop_index
 from hunter_indicators.meme.wallets.tape import Fill, Gap, event_order, touches_gap
 
 __all__ = ["CopyOutcome", "CopyStatus", "simulate_copy"]
@@ -61,14 +62,6 @@ def _stop_floor(policy: FollowPolicy) -> Decimal:
     """``stop_fraction × budget``, once per copy (it was recomputed per scanned event)."""
     with localcontext(CONTEXT):
         return policy.stop_fraction * policy.budget_lamports
-
-
-def _stopped(event: Fill, atoms: int, floor: Decimal) -> bool:
-    quote = sell_lamports(event.reserves, atoms, fee_bps=event.fee_bps)
-    if quote is None:  # a completed curve cannot be quoted; the timer/censor decide
-        return False
-    with localcontext(CONTEXT):  # same context as before step 2, whatever the caller's traps
-        return Decimal(quote) <= floor
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,19 +144,23 @@ def _find_exit(
     leader = _leader_exit(trigger, leader_wallets, tape, policy, clock, entry_slot, prior, since)
     if leader is not None and leader.landing_slot < best.landing_slot:
         best = leader
-    # Slot order. The stop is only checked after the entry slot, so the scan starts there: an
-    # earlier event never fired it, and one that ended the scan means the first later event
-    # ends it too, before any check (step 2; Astra corrected the first wording).
-    events, floor = tape.fills, None
-    for k in range(tape.first_after(entry_slot), len(events)):
-        event = events[k]
-        if event.slot > best.landing_slot:
-            break
-        floor = _stop_floor(policy) if floor is None else floor  # at the first scanned event
-        if _stopped(event, atoms, floor):
-            landing = _landing(event, policy, clock, entry_slot)
-            if landing < best.landing_slot:
-                best = _Exit("stop", event.slot, landing)
+    # Slot order, from the first event after the entry slot to the last one at or before the
+    # current best landing (step 2). Step 4: the stop index finds the next event that stops the
+    # copy (``stops``: the quote's answer, by threshold where the sale is proven monotone); the
+    # events in between stop nothing, so jumping over them is the old per-event scan. Every stop
+    # still goes through ``_landing``; ``best`` changes only on a strictly earlier landing, and
+    # then the window end shrinks (Astra, step-4 design review).
+    events, k, end = tape.fills, tape.first_after(entry_slot), tape.first_after(best.landing_slot)
+    if k >= end:
+        return best
+    stops = stop_index(tape, _stop_floor(policy))
+    k = stops.first_stop(k, end, atoms)
+    while k < end:
+        landing = _landing(events[k], policy, clock, entry_slot)
+        if landing < best.landing_slot:
+            best = _Exit("stop", events[k].slot, landing)
+            end = tape.first_after(best.landing_slot)
+        k = stops.first_stop(k + 1, end, atoms)
     return best
 
 

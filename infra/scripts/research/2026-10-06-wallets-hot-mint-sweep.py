@@ -26,7 +26,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from hunter_indicators.meme.wallets import policy, pricing, stream
+from hunter_indicators.meme.wallets import policy, pricing, stops, stream
 from hunter_indicators.meme.wallets.params import RankingParams
 
 _spec = importlib.util.spec_from_file_location(
@@ -43,18 +43,21 @@ def point(hot: int, minutes: int, repeat: int) -> dict[str, Any]:
     inputs, ws, day, _ = bench.nights(cfg)
     plan = stream.plan_night(inputs, day, params=RankingParams(window_days=cfg.window))
     window = next(w for w in ws if w.carry.mint == "HOT")
-    saved, calls = policy.sell_lamports, [0]
+    # Step 4 (09/10/2026) moved the stop's quotes from ``policy`` to ``stops``: count them there
+    # when it exists, so this step-3 script still runs; its numbers in the bench files stay step 3's.
+    where: Any = stops if hasattr(stops, "sell_lamports") else policy
+    saved, calls = where.sell_lamports, [0]
 
     def counted(*a: Any, **k: Any) -> Any:
         calls[0] += 1
         return saved(*a, **k)
 
-    policy.sell_lamports = counted  # type: ignore[assignment]
+    where.sell_lamports = counted
     try:
         pricing._curve_of.cache_clear()  # pyright: ignore[reportPrivateUsage]
         stream.replay_window(plan, window)
     finally:
-        policy.sell_lamports = saved  # type: ignore[assignment]
+        where.sell_lamports = saved
     cpus: list[float] = []
     for _ in range(repeat):
         pricing._curve_of.cache_clear()  # pyright: ignore[reportPrivateUsage]

@@ -1,0 +1,10 @@
+SYNTHETIC sweep (not market data) — one hot key's replay vs its events per hour
+python 3.12.14 venue curve virtual 0
+ROW {"venue": "curve", "virtual": 0, "hot_fills": 1000, "hot_minutes": 60, "events": 1000, "copies": 108, "stop_path_quotes": 1992, "cpu_s": 0.09375, "cpu_runs": [0.09375, 0.09375], "digest": "aaabe5c6bc24303e"}
+curve hot   1000 in 60 min: events   1000 copies   108 stop-path quotes      1,992 cpu 0.09s digest aaabe5c6bc24303e
+ROW {"venue": "curve", "virtual": 0, "hot_fills": 4000, "hot_minutes": 60, "events": 4000, "copies": 281, "stop_path_quotes": 7988, "cpu_s": 0.390625, "cpu_runs": [0.484375, 0.390625], "digest": "5e0acf652ffaae08"}
+curve hot   4000 in 60 min: events   4000 copies   281 stop-path quotes      7,988 cpu 0.39s digest 5e0acf652ffaae08
+ROW {"venue": "curve", "virtual": 0, "hot_fills": 16000, "hot_minutes": 60, "events": 16000, "copies": 628, "stop_path_quotes": 31974, "cpu_s": 1.609375, "cpu_runs": [1.765625, 1.609375], "digest": "21386b3de77dea15"}
+curve hot  16000 in 60 min: events  16000 copies   628 stop-path quotes     31,974 cpu 1.61s digest 21386b3de77dea15
+ROW {"venue": "curve", "virtual": 0, "hot_fills": 32000, "hot_minutes": 60, "events": 32000, "copies": 997, "stop_path_quotes": 63942, "cpu_s": 3.625, "cpu_runs": [3.625, 3.671875], "digest": "7dab2250eeef9c85"}
+curve hot  32000 in 60 min: events  32000 copies   997 stop-path quotes     63,942 cpu 3.62s digest 7dab2250eeef9c85

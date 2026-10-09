@@ -1,0 +1,10 @@
+SYNTHETIC sweep (not market data) — one hot key's replay vs its events per hour
+python 3.12.14 venue pool virtual 0 walk time
+ROW {"venue": "pool", "virtual": 0, "walk": "time", "hot_fills": 4000, "hot_minutes": 60, "events": 4000, "copies": 281, "stop_path_quotes": 423562, "cpu_s": 2.140625, "cpu_runs": [2.140625], "digest": "d93077b777a3d38f"}
+pool hot   4000 in 60 min: events   4000 copies   281 stop-path quotes    423,562 cpu 2.14s digest d93077b777a3d38f
+ROW {"venue": "pool", "virtual": 0, "walk": "time", "hot_fills": 16000, "hot_minutes": 60, "events": 16000, "copies": 628, "stop_path_quotes": 3310903, "cpu_s": 15.984375, "cpu_runs": [15.984375], "digest": "684e7f7ff5f4833a"}
+pool hot  16000 in 60 min: events  16000 copies   628 stop-path quotes  3,310,903 cpu 15.98s digest 684e7f7ff5f4833a
+ROW {"venue": "pool", "virtual": 0, "walk": "time", "hot_fills": 32000, "hot_minutes": 60, "events": 32000, "copies": 997, "stop_path_quotes": 11321998, "cpu_s": 50.25, "cpu_runs": [50.25], "digest": "4e18a10ca285e200"}
+pool hot  32000 in 60 min: events  32000 copies   997 stop-path quotes 11,321,998 cpu 50.25s digest 4e18a10ca285e200
+ROW {"venue": "pool", "virtual": 0, "walk": "time", "hot_fills": 64000, "hot_minutes": 60, "events": 64000, "copies": 1657, "stop_path_quotes": 43106071, "cpu_s": 188.421875, "cpu_runs": [188.421875], "digest": "cc44b0bda71bf7dd"}
+pool hot  64000 in 60 min: events  64000 copies  1657 stop-path quotes 43,106,071 cpu 188.42s digest cc44b0bda71bf7dd

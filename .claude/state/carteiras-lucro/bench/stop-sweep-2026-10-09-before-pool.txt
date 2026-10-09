@@ -1,0 +1,14 @@
+SYNTHETIC sweep (not market data) — one hot key's replay vs its events per hour
+python 3.12.14 venue pool virtual 0
+ROW {"venue": "pool", "virtual": 0, "hot_fills": 1000, "hot_minutes": 60, "events": 1000, "copies": 108, "stop_path_quotes": 41659, "cpu_s": 0.21875, "cpu_runs": [0.21875], "digest": "37393d9d1ae4b898"}
+pool hot   1000 in 60 min: events   1000 copies   108 stop-path quotes     41,659 cpu 0.22s digest 37393d9d1ae4b898
+ROW {"venue": "pool", "virtual": 0, "hot_fills": 4000, "hot_minutes": 60, "events": 4000, "copies": 281, "stop_path_quotes": 421574, "cpu_s": 1.96875, "cpu_runs": [1.96875], "digest": "ad599277646fc79e"}
+pool hot   4000 in 60 min: events   4000 copies   281 stop-path quotes    421,574 cpu 1.97s digest ad599277646fc79e
+ROW {"venue": "pool", "virtual": 0, "hot_fills": 16000, "hot_minutes": 60, "events": 16000, "copies": 628, "stop_path_quotes": 3259032, "cpu_s": 15.53125, "cpu_runs": [15.53125], "digest": "75c6c0396eadd2eb"}
+pool hot  16000 in 60 min: events  16000 copies   628 stop-path quotes  3,259,032 cpu 15.53s digest 75c6c0396eadd2eb
+ROW {"venue": "pool", "virtual": 0, "hot_fills": 32000, "hot_minutes": 60, "events": 32000, "copies": 997, "stop_path_quotes": 9779458, "cpu_s": 44.921875, "cpu_runs": [44.921875], "digest": "c6a9e9f0b24c995a"}
+pool hot  32000 in 60 min: events  32000 copies   997 stop-path quotes  9,779,458 cpu 44.92s digest c6a9e9f0b24c995a
+ROW {"venue": "pool", "virtual": 0, "hot_fills": 64000, "hot_minutes": 60, "events": 64000, "copies": 1657, "stop_path_quotes": 23644526, "cpu_s": 104.75, "cpu_runs": [104.75], "digest": "9aec73f721dd950e"}
+pool hot  64000 in 60 min: events  64000 copies  1657 stop-path quotes 23,644,526 cpu 104.75s digest 9aec73f721dd950e
+ROW {"venue": "pool", "virtual": 0, "hot_fills": 124000, "hot_minutes": 60, "events": 124000, "copies": 2934, "stop_path_quotes": 44812148, "cpu_s": 200.234375, "cpu_runs": [200.234375], "digest": "6cbba0c842675ab4"}
+pool hot 124000 in 60 min: events 124000 copies  2934 stop-path quotes 44,812,148 cpu 200.23s digest 6cbba0c842675ab4

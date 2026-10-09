@@ -28,7 +28,7 @@ from collections.abc import Iterable, Sequence
 from datetime import datetime
 from decimal import ROUND_FLOOR, Decimal, localcontext
 from functools import lru_cache
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.curve import CurveReserves, quote_buy, sell_proceeds
@@ -39,6 +39,9 @@ from hunter_indicators.meme.wallets.tape import (
     Reserves,
     event_order,
 )
+
+if TYPE_CHECKING:
+    from hunter_indicators.meme.wallets.stops import StopIndex
 
 __all__ = [
     "CENSORED",
@@ -189,6 +192,7 @@ class MintTape:
         self._valid: dict[datetime, tuple[Fill, ...]] = {}
         self._ids: frozenset[tuple[str, str, int]] | None = None
         self._by_wallet: dict[str, list[int]] | None = None
+        self.stop_indexes: dict[Decimal, StopIndex] = {}  # per floor, ``stops.stop_index``
 
     def of_wallets(self, wallets: Iterable[str]) -> list[Fill]:
         """The events of ``wallets`` in tape order — the same subsequence a filter of

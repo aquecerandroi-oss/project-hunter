@@ -8,7 +8,7 @@ hipotese_testavel: não (é medição de instrumento; serve ao orçamento de CPU
 astra: concorda (REQUEST_CHANGES na leitura, depois APPROVE: os números centrais conferem no recálculo dela; corrigidos os denominadores, a fatia extrapolada de 50–58 % e a identificação indevida com a cópia típica; os limites do cenário continuam) — ver Revisoes-Astra/wallets-cpu-step3
 status: vivo
 owner: quant-engineer
-updated: 2026-10-06
+updated: 2026-10-09
 confiança: "backtest do autor"
 tipo: pesquisa
 hipotese: —
@@ -65,6 +65,14 @@ Cada chave-hora foi cotada na curva sintética de um mint só, medida no passo 3
 
 A meta de < 2 h com 2 núcleos fica a ≈ 12–48× de distância: workers não resolvem. O que ataca isso é o stop em O(1) por evento (passo 4) ou uma mudança de universo, que é decisão do Everton e versão nova do protocolo. Ver [[wallets-cpu]], seção "Densidade real".
 
+### Depois do passo 4 (09/10/2026)
+
+O stop por cópia virou uma comparação de inteiros contra um limiar por evento, exato onde a venda arredondada é provadamente monotônica ([[wallets-cpu]], seção "Passo 4"; revisão [[wallets-cpu-step4]]). As curvas de custo da chave quente foram **medidas de novo**, agora até 124 mil eventos/h e com a chave como pool. Continuam sintéticas nas cópias.
+
+- **A maior pool desta hora** (124 069 eventos): 200 s → 10,8 s de CPU com o passeio de preço do gerador; com o preço andando no tempo, 666 s (extrapolado) → 11,4 s.
+- **Noite de 168 h nesta densidade:** 42–69 h → **4,3–4,4 h** num núcleo. O caminho crítico da maior pool cai para ≈ 0,5 h.
+- **A meta de < 2 h com 2 núcleos ainda não fecha.** O custo que sobra é linear por fill (E-PnL, FIFO, plano e fecho) e o transporte dos workers. A densidade parou de ser o problema dominante, mas os limites abaixo continuam valendo para os números de custo.
+
 ## Limites
 
 - **Uma hora**, numa terça às 18h–19h UTC. Outros dias e horários não foram medidos.
@@ -75,4 +83,4 @@ A meta de < 2 h com 2 núcleos fica a ≈ 12–48× de distância: workers não 
 
 ## Relacionado
 
-[[wallets-cpu]] · [[wallets-cpu-step3]] · [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]] · [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro]] · [[EXP-M15-carteiras-vencedoras]]
+[[wallets-cpu]] · [[wallets-cpu-step3]] · [[wallets-cpu-step4]] · [[KB-0183-o-programa-inteiro-da-pumpfun-e-pumpswap-custa-isto-de-coletar]] · [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro]] · [[EXP-M15-carteiras-vencedoras]]
