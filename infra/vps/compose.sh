@@ -191,10 +191,44 @@ export HUNTER_DEFAULT_SNI="${HUNTER_DEFAULT_SNI:-localhost}"
 # `api` parada em `created`. Isto so reporta (ps + as ultimas linhas de log de
 # quem falhou); nao tenta reiniciar nem contornar - quem decide o proximo
 # passo e quem esta rodando o deploy.
+#
+# `exited` com codigo 0 NAO e falha: `migrate` e um job de uma execucao - roda o
+# alembic, nao acha nada a fazer e sai 0 (deploy b67306a5, 2026-10-09, saiu
+# "ERRO ... migrate" num deploy saudavel; alarme falso treina o operador a
+# ignorar o erro real). So `exited` com codigo != 0, `created` e `dead` contam.
+# O codigo vem do `docker inspect` dos containers (funciona em qualquer versao
+# do compose; o formato de `ps --format json` mudou entre versoes).
+exited_nonzero_services() {
+  local -a ids=()
+  local id code svc
+  while IFS= read -r id; do
+    [ -n "$id" ] && ids+=("$id")
+  done < <("${COMPOSE[@]}" "${PROFILE_ARGS[@]}" ps -q --filter "status=exited" 2>/dev/null || true)
+  [ "${#ids[@]}" -eq 0 ] && return 0
+  # Se o inspect falhar nao da para provar que saiu 0: falha fechado, como antes
+  # (todo `exited` conta). Nunca engolir o erro e devolver "tudo certo".
+  local inspected
+  if ! inspected="$(docker inspect -f '{{.State.ExitCode}} {{index .Config.Labels "com.docker.compose.service"}}' "${ids[@]}" 2>/dev/null)"; then
+    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" ps --filter "status=exited" --services 2>/dev/null || true
+    return 0
+  fi
+  while read -r code svc; do
+    if [ "$code" != "0" ]; then
+      echo "$svc"
+    fi
+  done <<< "$inspected"
+}
+
 check_up_status() {
   local status svc
   local -a failed=()
   for status in created exited dead; do
+    if [ "$status" = "exited" ]; then
+      while IFS= read -r svc; do
+        [ -n "$svc" ] && failed+=("$svc")
+      done < <(exited_nonzero_services)
+      continue
+    fi
     while IFS= read -r svc; do
       [ -n "$svc" ] && failed+=("$svc")
     done < <("${COMPOSE[@]}" "${PROFILE_ARGS[@]}" ps --filter "status=$status" --services 2>/dev/null || true)

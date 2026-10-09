@@ -114,6 +114,8 @@ Uma VPS Ubuntu 22.04/24.04 roda a mesma stack do compose de dev mais um override
 
 Decisões: `HUNTER_ENV=staging` (não `production` — Clerk ainda é instância de dev e `ENABLE_LIVE_TRADING=false`); Caddy em vez de nginx (TLS automático, 40 linhas de config); origem única para o navegador (sem CORS; `/health`, `/ready` e `/metrics` inalcançáveis de fora); só 22/80/443 públicas, api e web em `127.0.0.1`, Postgres e Redis sem porta publicada — **portas publicadas pelo Docker furam o ufw**, então a defesa é não publicar. Detalhe completo em `docs/DEPLOYMENT.md` §9 e `infra/vps/README.md`.
 
+**Alarme falso do `compose.sh` corrigido (09/10/2026):** depois do deploy saudável de `b67306a5` o `check_up_status` imprimiu `ERRO: servico(s) nao subiram ... migrate`, porque contava todo serviço `exited` como falha e o `migrate` é um job de uma execução que sai com código 0 quando não há nada a migrar. Agora só `exited` com código ≠ 0, `created` e `dead` contam (o código vem de `docker inspect`; se o inspect falhar a checagem falha fechado, como antes). Sem harness de teste para o `compose.sh`: verificado com um stub de `docker` em cinco cenários (nenhum, exit 0, exit 1, created, misto) mais inspect quebrado. Um `ERRO` desta checagem volta a significar algo real, por exemplo a `api` parada em `created` ([[Open Bugs]], [[Workers]]).
+
 Limitações: uma máquina só (sem HA, sem réplica, sem backup fora do host), Clerk em instância de desenvolvimento, sem monitoramento externo (nada avisa se a VPS inteira cair).
 
 ## Relacionadas
