@@ -147,3 +147,6 @@ Sondagem de leitura do programa inteiro (pump + PumpSwap) por RPC público, 144 
 
 ### Decisão (06/10/2026)
 - NATS da pump.fun entra para acompanhar as carteiras escolhidas na fase de seguir/papel, com fallback on-chain e lacuna explícita; o ranking continua vindo da fita do programa inteiro. [[2026-10-06-nats-da-pumpfun-no-projeto-das-carteiras]]
+
+### Decisão (09/10/2026)
+- O Everton aprovou o piloto de copiar ~20 carteiras no papel (compra quando elas compram, vende quando elas vendem), em paralelo ao H-030 completo. [[2026-10-09-piloto-copiar-carteiras-no-papel]]
