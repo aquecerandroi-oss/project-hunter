@@ -118,3 +118,5 @@ Nada disto muda estratégia nem parâmetro; é decisão do Everton e precisa de 
 [[KB-0171-custo-real-da-spot-1]] · [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] · [[Market Collector]] ·
 [[Fila de Hipoteses]] · [[Mapa de Estrategias]] · [[06-DECISIONS/Revisoes-Astra/H-036-prereg|revisão da Astra]] ·
 [[11-KNOWLEDGE/Index|Conhecimento]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

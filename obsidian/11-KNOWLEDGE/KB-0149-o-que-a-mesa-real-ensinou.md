@@ -92,3 +92,5 @@ mercado: meme
 ## Relacionado
 
 [[KB-0143-o-que-antecede-o-dump]] · [[KB-0146-trailing-apertado-e-rent-de-ata]] · [[KB-0147-custo-e-o-prejuizo-e-buys-1m-e-a-unica-pista]] · [[KB-0148-a-graduacao-nao-e-a-saida-barata]] · [[KB-0145-binance-como-sinal-solana-como-execucao]] · [[2026-09-12-teste-pequeno-meme-real]] · [[Mesa-operator-6]] · [[Registro de Tentativas]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN, conta do Everton na Rico — e memes e cripto pausaram; a H-036 continua: [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]]. Contexto do mercado novo: [[KB-0194-day-trade-no-mini-indice-quase-ninguem-vive-disso]].)*

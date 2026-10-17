@@ -345,3 +345,5 @@ orquestrador — não criei variável nem mexi em experimento numa leitura. **Di
 [[EXP-M26-grafico-em-moedas-maduras]] · [[EXP-0017-sweep-reclaim]]
 
 **Base de evidência da C1/H-027 (01/10/2026):** [[KB-0173-tendencia-diaria-em-cripto-o-tamanho-publicado]] · [[KB-0174-o-filtro-de-tendencia-corta-queda-nao-acrescenta-alta]] · [[KB-0175-estado-de-mercado-condiciona-momentum-mas-em-que-direcao]] · [[KB-0176-momento-intradiario-condicionado-o-vizinho-mais-perto]] · [[KB-0177-decaimento-e-regime-o-que-a-literatura-de-cripto-mostra]] · [[KB-0178-data-snooping-e-poucos-clusters-o-que-vale-para-a-h-027]] · síntese em [[KB-0179-o-que-um-resultado-da-c1-pode-e-nao-pode-dizer]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

@@ -118,3 +118,5 @@ outro candidato, com custo de implementação, não de parâmetro.
 [[Strategy Backlog]] · [[KB-0002-momentum-e-reversao-em-cripto]] ·
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] · [[EXP-0001-momentum-v1]] ·
 [[Momentum Agent]] · [[Features]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

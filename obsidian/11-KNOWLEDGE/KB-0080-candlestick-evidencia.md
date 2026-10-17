@@ -388,3 +388,5 @@ distância real (o stop clássico fica um tick **além** do extremo).
 Arquivos baixados ficaram no scratchpad da sessão (`caginalp1998.pdf`, `mql5_markettiming.pdf`,
 `parkirwin_review.pdf`, `cuni_thesis.pdf`, `lund_thesis.pdf`, `copernicus_crypto.pdf` e os `.txt`
 extraídos com `pdftotext`); nada foi copiado para o repositório.
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

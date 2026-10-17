@@ -87,3 +87,5 @@ Revisada junto da síntese — ver [[KB-0179-o-que-um-resultado-da-c1-pode-e-nao
 [[KB-0173-tendencia-diaria-em-cripto-o-tamanho-publicado]] · [[KB-0164-momentum-semanal-em-cripto-grande]] ·
 [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] · [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]] ·
 [[KB-0178-data-snooping-e-poucos-clusters-o-que-vale-para-a-h-027]] · [[Fila de Hipoteses]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

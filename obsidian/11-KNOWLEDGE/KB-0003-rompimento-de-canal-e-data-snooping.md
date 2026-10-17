@@ -120,3 +120,5 @@ Divergência: nenhuma.
 [[Strategy Backlog]] · [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] ·
 [[KB-0004-proximidade-da-maxima-e-confirmacao-por-volume]] · [[EXP-0001-momentum-v1]] ·
 [[Strategy Performance]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

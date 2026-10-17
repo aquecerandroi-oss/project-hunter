@@ -139,3 +139,5 @@ a tese que ela sustentava.
 [[KB-0018-volume-relatado-e-o-denominador-que-usamos]] ·
 [[KB-0028-o-nosso-estimador-de-volatilidade-e-o-mais-ineficiente]] ·
 [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] · [[Risk Engine]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

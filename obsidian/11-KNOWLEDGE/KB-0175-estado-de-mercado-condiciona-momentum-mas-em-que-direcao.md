@@ -100,3 +100,5 @@ Revisada junto da síntese — ver [[KB-0179-o-que-um-resultado-da-c1-pode-e-nao
 [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] · [[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]] ·
 [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] · [[KB-0174-o-filtro-de-tendencia-corta-queda-nao-acrescenta-alta]] ·
 [[Fila de Hipoteses]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

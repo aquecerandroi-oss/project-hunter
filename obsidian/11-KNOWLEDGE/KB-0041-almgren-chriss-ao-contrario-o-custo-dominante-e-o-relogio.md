@@ -254,3 +254,5 @@ Divergência: nenhuma que sobreviva à revisão.
 [[KB-0040-a-lei-da-raiz-quadrada-e-o-regime-que-nao-e-o-nosso]] ·
 [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] · [[EXP-0001-momentum-v1]] ·
 [[EXP-0002-volume-anomaly-v1]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

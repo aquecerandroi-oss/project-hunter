@@ -155,3 +155,5 @@ Reescrito em condicional.
 [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] ·
 [[KB-0030-o-regime-nao-chega-ao-sinal]] ·
 [[KB-0001-momentum-academico-e-o-que-nao-se-transfere]] · [[Strategy Backlog]] · [[EXP-0001-momentum-v1]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

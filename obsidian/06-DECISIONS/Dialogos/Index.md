@@ -22,3 +22,4 @@ Cada diálogo é uma sessão de pensamento da [[Mente da Sexta-feira]]: o Claude
 - [[Dialogos/copy-paper|copy-paper]] — piloto de copiar ~20 carteiras no papel (H-037, EXP-M28): 4 rodadas, 8 + 5 + 1 must-fix absorvidos (invalidadas no primário, dono único das linhas, fronteira com o executor, censura, colisão do funil); DECISÃO CONJUNTA em 09/10
 
 Revisões avulsas da Astra: [[Revisoes-Astra/Index|índice de revisões]].
+- [[Dialogos/mercado-tradicional|mercado-tradicional]] — memes e cripto pausados; a H-038 (momento intradiário de mercado no WIN, B3/Rico), entrada manual do sinal, capital e módulo puro compartilhado com o robô MT5: 6 rodadas, DECISÃO CONJUNTA em 17/10; plano `docs/plans/MERCADO-TRADICIONAL.md`

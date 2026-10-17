@@ -171,3 +171,5 @@ Confirmou, por construção, que contração, `atr_pct` e `ER` são medidas dist
 [[KB-0052-meta-rotulagem-o-formato-de-todo-filtro-que-propusemos]] ·
 [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] ·
 [[KB-0004-proximidade-da-maxima-e-confirmacao-por-volume]] · [[EXP-0001-momentum-v1]]
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

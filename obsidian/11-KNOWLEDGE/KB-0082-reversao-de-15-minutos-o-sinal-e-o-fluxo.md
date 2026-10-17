@@ -185,3 +185,5 @@ acima não tinha e que a [[EXP-0028-mean-reversion-5-min|EXP-0028]] tornou relev
 
 O que continua valendo da nota: o edge bruto "never leaves the low single digits of a basis point"
 e não paga nem a banda maker de 5 bp — o adendo não muda o veredito, muda a **pergunta** a medir.
+
+*(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*

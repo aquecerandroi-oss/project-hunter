@@ -93,3 +93,12 @@ Revisada junto da síntese — ver [[KB-0179-o-que-um-resultado-da-c1-pode-e-nao
 [[KB-0179-o-que-um-resultado-da-c1-pode-e-nao-pode-dizer]] · [[KB-0175-estado-de-mercado-condiciona-momentum-mas-em-que-direcao]] ·
 [[KB-0167-analise-grafica-o-que-sobra-depois-do-custo]] · [[KB-0163-perto-da-maxima-de-24h-nao-separa-os-sinais-do-lab]] ·
 [[KB-0007-atr-e-escala-por-volatilidade]] · [[Fila de Hipoteses]]
+
+## Mercado tradicional (17/10/2026)
+
+Esta nota virou a base da **H-038** (momento intradiário de mercado no WIN, B3), rascunho de pré-registro em
+`docs/plans/MERCADO-TRADICIONAL.md` §1, decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]]. Três coisas distintas, que não se confundem (Astra,
+[[Dialogos/mercado-tradicional|diálogo mercado-tradicional]]): (1) o **efeito externo** desta nota (SPY e 12 de 16
+mercados desenvolvidos; o Brasil não está na amostra); (2) a **hipótese local** no Ibovespa, sem replicação conhecida;
+(3) o **modelo executável** no WIN, com stop, custo condicionado e fonte de dado limitada. A escala de ~2,5 bp por
+operação usada no poder é suposição, não teto medido.

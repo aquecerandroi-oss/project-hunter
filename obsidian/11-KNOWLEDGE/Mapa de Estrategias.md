@@ -141,3 +141,7 @@ O que alimenta as consultas Dataview é o frontmatter de cada nota — `tipo`, `
 [[KB-0168-fibonacci-elliott-e-lta-diaria]] · [[KB-0169-fibonacci-e-lta-diaria-no-dado]] ·
 [[KB-0170-tendencia-diaria-nao-separa-os-sinais-do-lab]] · [[KB-0191-oi-acima-da-semana-nao-separa-os-sinais-do-lab]] · [[KB-0192-o-custo-do-lab-explica-a-perda-mas-nao-o-sinal]] · [[KB-0193-o-custo-binance-medido-nos-instantes-do-lab]] · [[Perdas/Index|Perdas]] · [[Estratégias.base]] ·
 [[Experimentos.base]] · `docs/RESEARCH.md`
+
+*(17/10/2026: memes e cripto pausados; o foco passou para o mercado tradicional — B3/WIN na Rico. A candidata é a
+H-038, momento intradiário de mercado no WIN, **sem vantagem brasileira demonstrada**; rascunho de pré-registro em
+`docs/plans/MERCADO-TRADICIONAL.md`, ainda não gravado na Fila. A H-036 segue viva. Decisão: [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*
