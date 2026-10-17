@@ -18,5 +18,6 @@ dependencies = [
 [tool.hatch.build.targets.wheel]
 # T4.14: ``hunter_risk_meme`` is the sibling engine of docs/RISK_ENGINE_MEME.md §13 —
 # same distribution, separate package, never imported by ``hunter_risk`` (nor the
-# reverse; ``tests/unit/meme/test_boundary.py`` proves it).
-packages = ["hunter_risk", "hunter_risk_meme"]
+# reverse; ``tests/unit/meme/test_boundary.py`` proves it). R1: ``hunter_risk_b3`` is the
+# third sibling (docs/RISK_ENGINE_B3.md), same rule (``tests/unit/b3/test_boundary.py``).
+packages = ["hunter_risk", "hunter_risk_meme", "hunter_risk_b3"]

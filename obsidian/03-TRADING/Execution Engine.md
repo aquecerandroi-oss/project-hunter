@@ -73,7 +73,7 @@ class ExecutionAdapter(Protocol):
 
 **Falha planejada:** worker reinicia → relê posições `open` do Postgres e retoma; propostas `approved` sem ordem após 30 s expiram e nunca são executadas tarde; se o mercado ficar `degraded`, o worker não abre posição nova mas continua gerenciando saídas com o último preço válido.
 
-## Linha B3 (desenho, 17/10/2026 — nada implementado)
+## Linha B3 (desenho, 17/10/2026 — só o motor puro R1 escrito; nada ligado a serviço nem a corretora)
 
 Decisão do Everton: robô de execução real dele na B3, via MetaTrader 5, na conta dele na Rico. Desenho em
 `docs/design/robo-b3-mt5.md`, fechado com a Astra em [[Dialogos/robo-b3-mt5]]. O `LiveExecutionAdapter` da linha
@@ -87,6 +87,7 @@ Lições de execução que valem para qualquer corretora com stop guardado no se
 - **Nenhuma mutação sem identidade e autoridade verificadas** — nem recolocar um stop: "recolocar se ausente" não é
   escrita condicional.
 - Contrato normativo `docs/RISK_ENGINE_B3.md` (R0a, 17/10/2026): ler um nível não prova que a requisição terminou; nenhuma SLTP sem registro durável; a identidade é `position_id`, não o ticket — revisão em [[Revisoes-Astra/R0a-risk-engine-b3|R0a-risk-engine-b3]].
+- Motor puro `hunter_risk_b3` (R1, 17/10/2026, em `packages/risk-core`, ainda não commitado nem ligado a serviço nenhum): os 25 checks com os nomes do contrato, sizing com `binding_constraint`, `evaluate_exit` que sempre aprova, kill switch "o mais restritivo"; o calendário entra como dado (o motor não importa o pacote de pesquisa) — revisão em [[Revisoes-Astra/R1-hunter-risk-b3|R1-hunter-risk-b3]].
 
 ## Relacionadas
 
