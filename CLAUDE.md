@@ -20,7 +20,7 @@
 ## Hard rules of this product (from the spec; non-negotiable)
 
 - **No agent executes orders.** Every entry goes AGENT → PROPOSAL → RISK ENGINE → EXECUTION. Exit orders (stop, target, manual close, kill switch) are always allowed.
-- **No live trading** until Phase 4. `LiveExecutionAdapter` raises `LiveTradingDisabled`. Do not build UI for it.
+- **No live trading** until Phase 4. `LiveExecutionAdapter` raises `LiveTradingDisabled`. Do not build UI for it. The single exception is Everton's B3 robot (MetaTrader 5 on his Rico account), authorized by him on 2026-10-17 under ADR 0007 (`docs/decisions/0007-robo-b3-mt5-excecao-live.md`; scope and review date 2026-12-31 are in the ADR).
 - **No fake anything in production:** no permanent mock data, no inert buttons, no fake charts, no invented PnL, no "coming soon" pages in the nav. Mocks/fixtures live only in tests and are labeled.
 - **No local state:** no SQLite, no JSON state files, no browser-only state, no cron on a dev box. Postgres + Redis only.
 - **Secrets never reach the frontend, the repo, or logs.** `.env*` files are never written by agents (hook-enforced).

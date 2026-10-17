@@ -94,3 +94,5 @@ Diálogo com a Astra (seis rodadas; a 1.ª saiu vazia por erro de chamada): [[Di
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[Fila de Hipoteses]] · [[Mapa de Estrategias]] · [[Strategy Backlog]] ·
 [[KB-0194-day-trade-no-mini-indice-quase-ninguem-vive-disso]] · [[KB-0193-o-custo-binance-medido-nos-instantes-do-lab]] ·
 [[2026-10-09-piloto-copiar-carteiras-no-papel]] · plano `docs/plans/MERCADO-TRADICIONAL.md`
+
+- **2026-10-17 (mais tarde):** o Everton autorizou, com a palavra "autorizado", o robô da B3 com dinheiro real como exceção à Fase 4 (recusando a fase de papel e dispensando o Portão B de evidência). Escopo, o que continua obrigatório e revisão em 2026-12-31 em `docs/decisions/0007-robo-b3-mt5-excecao-live.md` (ADR 0007); desenho em `docs/design/robo-b3-mt5.md`. Ver [[Architecture Decisions]] → ADR 0007.

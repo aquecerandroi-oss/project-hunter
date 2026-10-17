@@ -219,3 +219,7 @@ quem aprova, a única defesa é essa: renegociar o alvo nunca conta como medir.
 
 Ver [[Portfolio]], [[Strategies]], [[Paper Trading]], [[EXP-0001-momentum-v1]],
 [[EXP-0002-volume-anomaly-v1]], [[Diario/2026-09-07]], [[Dialogos/M3]] e [[Open Bugs]].
+
+## ADR 0007 — Exceção à Fase 4 para o robô da B3 do Everton (2026-10-17)
+
+**Status:** aceito (2026-10-17, "autorizado" pelo Everton). Único trading com dinheiro real antes da Fase 4: o robô da B3 dele (MetaTrader 5, conta Rico, WIN, 1 contrato por posição e 1 operação por dia na primeira semana, teto de R$ 250 por operação a confirmar), só depois de duas sessões demo T1–T17, um host (o PC dele), revisão em **2026-12-31**. Continuam obrigatórios: risk engine em toda entrada, saídas sempre permitidas, stop em repouso na corretora, kill switch, auditoria, nenhum agente envia ordem ou toca credencial, nenhum `ENABLE_*` em arquivo versionado. O Portão B (evidência) está dispensado por escolha dele, contra a recomendação da Sexta-feira, com a taxa-base de [[KB-0194-day-trade-no-mini-indice-quase-ninguem-vive-disso]] (97 % perderam) como contexto; o robô não conta como `CONFIRMA`. Dois arquivos locais declarados como exceção a "sem estado local" (batimento do EA e buffer de indisponibilidade). Texto completo: `docs/decisions/0007-robo-b3-mt5-excecao-live.md`; origem: [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]]. A regra "Paper antes de live, sempre" acima tem, desde esta data, essa única exceção.
