@@ -55,6 +55,14 @@ class CopyStats:
     outbox_dropped: int = 0
     closed_elsewhere: int = 0
     bad_items: int = 0
+    annotation_lost: int = 0
+    gaps_lost: int = 0
+    side_failed: int = 0
+    unverified: int = 0
+    mark_write_failed: int = 0
+    stale_states_ignored: int = 0
+    recomposed: int = 0
+    recompose_failed: int = 0
     last_error: str = ""
     persist_dropped: int = 0
     last_event_at: datetime | None = None
@@ -141,7 +149,14 @@ def _int(values: deque[int], fraction: float) -> str:
 
 
 def heartbeat_fields(
-    stats: CopyStats, *, now: datetime, open_count: int, queue_depth: int, outbox_depth: int = 0
+    stats: CopyStats,
+    *,
+    now: datetime,
+    open_count: int,
+    queue_depth: int,
+    outbox_depth: int = 0,
+    recompositions_pending: int = 0,
+    funnel_unavailable: bool = False,
 ) -> dict[str, str]:
     per_leader = {
         wallet: {
@@ -175,6 +190,16 @@ def heartbeat_fields(
         "outbox_dropped": str(stats.outbox_dropped),
         "closed_elsewhere": str(stats.closed_elsewhere),
         "bad_items": str(stats.bad_items),
+        "annotation_lost": str(stats.annotation_lost),
+        "gaps_lost": str(stats.gaps_lost),
+        "side_failed": str(stats.side_failed),
+        "unverified": str(stats.unverified),
+        "mark_write_failed": str(stats.mark_write_failed),
+        "stale_states_ignored": str(stats.stale_states_ignored),
+        "recomposed_windows": str(stats.recomposed),
+        "recompose_failed": str(stats.recompose_failed),
+        "recompositions_pending": str(recompositions_pending),
+        "funnel_unavailable": "true" if funnel_unavailable else "false",
         "last_error": stats.last_error,
         "decide_us_p99": _int(stats.decide_us, 0.99),
         "confirm_delay_ms_p50": _int(stats.confirm_delay_ms, 0.50),

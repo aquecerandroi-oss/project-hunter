@@ -117,7 +117,12 @@ async def test_the_fleet_opens_one_source_for_the_union_and_routes_each_wallet_t
     now = utcnow()
     feed = _Feed(
         [
-            gap(now - timedelta(seconds=5), now - timedelta(seconds=4), wallet=only_everton),
+            gap(
+                now - timedelta(seconds=5),
+                now - timedelta(seconds=4),
+                wallet=only_everton,
+                reason="nats_silent",  # source health: routed to the lane that follows it, censors nothing
+            ),
             buy(shared, mint, at=utcnow(), block_time=utcnow() - timedelta(seconds=1)),
             buy(only_everton, mint_e, at=utcnow(), block_time=utcnow() - timedelta(seconds=1)),
         ],
@@ -275,6 +280,58 @@ async def test_the_fleet_recovers_every_lane_before_it_opens_the_source(
                 break
             await asyncio.sleep(0.05)
         assert order == ["recovering", "recovered", "source_opened"]
+    finally:
+        runner.cancel()
+        await asyncio.gather(runner, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_entries_are_not_armed_and_t0_is_not_written_until_the_source_says_it_is_ready(
+    db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    from .copy_rig import gap_rows
+
+    leader, mint = _addr("A"), b58encode(os.urandom(32))
+    spec = await _insert_set(db_engine, "copy_v0", [{"wallet": leader, "stratum": "regra"}])
+
+    class _ReadySource(_Feed):
+        def __init__(self, items: list[Any]) -> None:
+            super().__init__(items, hang=True)
+            self.release = asyncio.Event()
+            self.waited = 0
+
+        async def wait_ready(self, wallets: Any) -> None:
+            self.waited += 1
+            await self.release.wait()
+
+    feed = _ReadySource(
+        [buy(leader, mint, at=utcnow(), block_time=utcnow() - timedelta(seconds=1))]
+    )
+    lane = CopyLane(spec=spec, session_factory=db_session_factory, chain=FakeChain(_RealClock()))  # type: ignore[arg-type]
+    runner = asyncio.create_task(CopyFleet([lane], feed).run())  # type: ignore[arg-type]
+    try:
+        await asyncio.sleep(
+            0.6
+        )  # the stream is up and delivered its event; the source is NOT ready
+        assert feed.waited == 1 and lane.stats.skipped_by_reason["not_armed"] == 1
+        not_started = [
+            r for r in await gap_rows(db_session_factory, spec) if r["reason"] == "lane_not_started"
+        ]
+        assert not_started == []
+        released_at = utcnow()
+        feed.release.set()
+        rows: list[dict[str, Any]] = []
+        for _ in range(100):
+            rows = [
+                r
+                for r in await gap_rows(db_session_factory, spec)
+                if r["reason"] == "lane_not_started"
+            ]
+            if rows:
+                break
+            await asyncio.sleep(0.05)
+        assert len(rows) == 1 and rows[0]["gap_end"] >= released_at  # T0 is the ready instant
+        assert lane.book.t0 == rows[0]["gap_end"]
     finally:
         runner.cancel()
         await asyncio.gather(runner, return_exceptions=True)

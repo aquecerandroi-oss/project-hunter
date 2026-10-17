@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
     from hunter_exchanges.pumpfun.leader_events import LeaderSource
     from hunter_meme_worker.context import ChainSource
+    from hunter_meme_worker.copy_history import LeaderHistory
 
 __all__ = ["start_copy_lane"]
 
@@ -48,6 +49,7 @@ async def start_copy_lane(
     source: LeaderSource,
     heartbeat: Callable[[dict[str, str]], Awaitable[None]] | None = None,
     clock: Callable[[], datetime] = utcnow,
+    history: LeaderHistory | None = None,
 ) -> None:
     """Run the copy lane until cancelled. Never raises into the caller's ``TaskGroup``: a crash of
     the lane is logged and the lane restarts (``run_copy_lane_forever``)."""
@@ -58,4 +60,5 @@ async def start_copy_lane(
         source=source,
         heartbeat=heartbeat,
         clock=clock,
+        history=history,
     )

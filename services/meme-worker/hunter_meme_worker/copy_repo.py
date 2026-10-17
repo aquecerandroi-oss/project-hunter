@@ -1,68 +1,34 @@
-"""The copy lane's database writes and reads (H-037), as ``hunter_worker``. Every write reuses the
-Lab's own repository functions — ``insert_proposals``/``mark_filled``/``mark_unfilled``/
-``close_bet_row``/``update_mark`` — so a copy is the same row shape every paper lane writes; this
-module adds only what is the copy lane's own: the funnel row that carries the leader, the late
-confirmation facts, and the restart recovery.
-
-**The funnel is durable** (design §4.1): every first observation of a (leader, mint) pair is one
-``meme_proposals`` row — ``approved`` then ``filled``/``unfilled`` when admitted, ``rejected`` (born
-decided, ``decision.reason``) when not. A proposal is **born decided** (never ``proposed``), so the
-live-order approval path (``WHERE status = 'proposed'``) can never promote it. A copy that was censored
-**after** entry is a closed bet with ``outcome_quality = 'indeterminate'`` and the named reason.
+"""The copy lane's bet-side database access (H-037), as ``hunter_worker``: closing a copy with the Lab's
+own ``close_bet_row`` and proving it landed, late facts on a copy's ``entry.copy`` / ``exit.copy`` block,
+and the restart read of the copies still open. The funnel (proposals) is ``copy_repo_funnel.py``; the
+coverage holes and T0 are ``copy_repo_gaps.py``.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
-from hunter_core.domain.types import uuid7
-from hunter_core.logging import get_logger
-from hunter_meme_worker.copy_events import ms_iso
 from hunter_meme_worker.lab_models import MARK_CURVE, BetState, EffectiveParams, decimal_of
-from hunter_meme_worker.lab_repo import insert_proposals
-from hunter_meme_worker.lab_repo_bets import (
-    close_bet_row,
-    mark_filled,
-    mark_unfilled,
-)
-from hunter_meme_worker.lab_rows import ApprovedProposal
-from hunter_meme_worker.proposals import ProposalDraft
+from hunter_meme_worker.lab_repo_bets import close_bet_row
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from hunter_meme_worker.copy_events import LeaderRef
     from hunter_meme_worker.copy_spec import CopySpec
-    from hunter_meme_worker.lab_models import BetEntry, BetExit
+    from hunter_meme_worker.lab_models import BetExit
 
 __all__ = [
-    "DECIDED_BY",
-    "Funnel",
     "RecoveredCopy",
-    "censor_entry",
     "close_copy_bet",
-    "load_funnel",
     "load_open_copies",
-    "open_copy_bet",
-    "reject_entry",
     "set_copy_fact",
 ]
 
-logger = get_logger(__name__)
-
-PROPOSAL_TTL = timedelta(hours=1)
-DECIDED_BY = "rules:copy"
-
-_FUNNEL = text(
-    "SELECT quote ->> 'leader_wallet' AS wallet, quote ->> 'stratum' AS stratum, mint, status, "
-    "       decided_at FROM meme_proposals "
-    "WHERE rule_set_id = :rule_set_id AND quote ->> 'leader_wallet' IS NOT NULL"
-)
 _LANDED = text(
     "SELECT 1 FROM meme_paper_bets WHERE id = CAST(:id AS uuid) AND status = 'closed' "
     "  AND exit -> 'copy' -> 'ts' ->> 'persisted_at' = :stamp"
@@ -85,142 +51,17 @@ _SET_EXIT_FACT = text(
 )
 
 
-def _draft(
-    spec: CopySpec,
-    mint: str,
-    ref: LeaderRef,
-    decided_at: datetime,
-    *,
-    status: str,
-    decision: dict[str, Any],
-) -> ProposalDraft:
-    return ProposalDraft(
-        id=str(uuid7()),
-        mint=mint,
-        rule_set_id=spec.id,
-        origin="rules",
-        status=status,
-        proposed_at=decided_at,
-        expires_at=decided_at + PROPOSAL_TTL,
-        features_end_time=ref.fields_complete_at,
-        quote={
-            "leader_wallet": ref.wallet,
-            "stratum": ref.stratum,
-            "leader_signature": ref.signature,
-        },
-        reasons=[
-            {
-                "rule": "copy_leader_first_observation",
-                "leader_wallet": ref.wallet,
-                "stratum": ref.stratum,
-                "signature": ref.signature,
-                "slot": ref.slot,
-                "observed_at": ms_iso(ref.observed_at),
-                "decided_at": ms_iso(decided_at),
-            }
-        ],
-        suggested={"size_sol": str(spec.size_sol)},
-        decision=decision,
-        decided_by=DECIDED_BY,
-        decided_at=decided_at,
-    )
-
-
-async def _insert(session: AsyncSession, draft: ProposalDraft) -> ApprovedProposal | None:
-    """``None`` when the unique funnel index already holds this (set, mint, instant)."""
-    if not await insert_proposals(session, [draft]):
-        return None
-    assert draft.decided_at is not None and draft.decision is not None
-    return ApprovedProposal(
-        id=draft.id,
-        mint=draft.mint,
-        rule_set_id=draft.rule_set_id,
-        decision=draft.decision,
-        decided_at=draft.decided_at,
-        migrated=False,
-    )
-
-
-async def open_copy_bet(
-    session: AsyncSession,
-    spec: CopySpec,
-    *,
-    mint: str,
-    ref: LeaderRef,
-    decided_at: datetime,
-    entry: BetEntry,
-) -> str:
-    """The approved proposal and the filled bet, one transaction (``mark_filled`` is the Lab's)."""
-    draft = _draft(
-        spec,
-        mint,
-        ref,
-        decided_at,
-        status="approved",
-        decision={"size_sol": str(spec.size_sol), "decided_at": ms_iso(decided_at)},
-    )
-    proposal = await _insert(session, draft)
-    if proposal is None:
-        raise RuntimeError(f"copy proposal for {mint} already exists at this instant")
-    return await mark_filled(session, proposal, entry)
-
-
-async def censor_entry(
-    session: AsyncSession,
-    spec: CopySpec,
-    *,
-    mint: str,
-    ref: LeaderRef,
-    decided_at: datetime,
-    reason: str,
-) -> None:
-    """An admitted attempt that never filled: the proposal exists and says why."""
-    draft = _draft(
-        spec,
-        mint,
-        ref,
-        decided_at,
-        status="approved",
-        decision={"size_sol": str(spec.size_sol), "decided_at": ms_iso(decided_at)},
-    )
-    proposal = await _insert(session, draft)
-    if proposal is None:
-        raise RuntimeError(f"copy proposal for {mint} already exists at this instant")
-    await mark_unfilled(session, proposal.id, reason)
-
-
-async def reject_entry(
-    session: AsyncSession,
-    spec: CopySpec,
-    *,
-    mint: str,
-    ref: LeaderRef,
-    decided_at: datetime,
-    reason: str,
-) -> bool:
-    """A first observation that was not admitted: one ``rejected`` row, born decided. ``False`` when
-    the unique index already holds the instant (two leaders, one mint, one microsecond) — counted by
-    the caller, never an error: the pair is still known from memory."""
-    draft = _draft(
-        spec,
-        mint,
-        ref,
-        decided_at,
-        status="rejected",
-        decision={"reason": reason, "decided_at": ms_iso(decided_at)},
-    )
-    return await _insert(session, draft) is not None
-
-
 async def set_copy_fact(
     session: AsyncSession, bet_id: str, *, where: str, name: str, value: Any
-) -> None:
+) -> bool:
     """Late facts about a copy (the confirmation delay, an invalid reason) on its ``entry.copy`` or
-    ``exit.copy`` block — a value the lane learned after the row was written."""
+    ``exit.copy`` block — a value the lane learned after the row was written. ``False`` when no row took
+    it (the close has not landed, the bet is not there): the caller must not treat that as done."""
     statement = _SET_ENTRY_FACT if where == "entry" else _SET_EXIT_FACT
-    await session.execute(
+    result = await session.execute(
         statement, {"id": bet_id, "path": "{copy," + name + "}", "value": json.dumps(value)}
     )
+    return bool(result.rowcount)  # type: ignore[attr-defined]  # a zero-row update is NOT a success
 
 
 async def close_copy_bet(
@@ -232,29 +73,6 @@ async def close_copy_bet(
     await close_bet_row(session, bet_id, closed, mark_source=mark_source)
     landed = await session.execute(_LANDED, {"id": bet_id, "stamp": stamp})
     return landed.first() is not None
-
-
-@dataclass(frozen=True, slots=True)
-class Funnel:
-    """What the durable funnel says the book must know before the source opens."""
-
-    pairs: list[tuple[str, str]]
-    """Every (leader, mint) pair ever observed by this rule set."""
-    consumed: list[tuple[str, str]]
-    """(stratum, mint) keys consumed by an admitted attempt."""
-    attempts: list[tuple[str, date]]
-    """One (leader, UTC day) per admitted attempt."""
-
-
-async def load_funnel(session: AsyncSession, spec: CopySpec) -> Funnel:
-    rows = (await session.execute(_FUNNEL, {"rule_set_id": spec.id})).mappings().all()
-    pairs = [(str(r["wallet"]), str(r["mint"])) for r in rows]
-    admitted = [r for r in rows if r["status"] != "rejected"]
-    return Funnel(
-        pairs=pairs,
-        consumed=[(str(r["stratum"]), str(r["mint"])) for r in admitted],
-        attempts=[(str(r["wallet"]), r["decided_at"].date()) for r in admitted],
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -310,6 +128,7 @@ async def load_open_copies(session: AsyncSession, spec: CopySpec) -> list[Recove
                     if leader.get("confirmed_at_decision") is False
                     and copy.get("confirmation_delay_ms") is None
                     and copy.get("invalid_reason") is None
+                    and not copy.get("unverified")
                     else None
                 ),
                 leader_observed_at=datetime.fromisoformat(str(leader["observed_at"])),

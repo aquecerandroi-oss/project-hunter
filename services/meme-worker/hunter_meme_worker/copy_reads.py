@@ -75,14 +75,14 @@ class CopyReader:
         mint: str,
         *,
         not_before: datetime,
-        window_s: int,
+        deadline: datetime,
         min_slot: int,
         after: datetime | None = None,
     ) -> CurveRead | None:
-        """The eligible curve state (see the module docstring), retrying for ``window_s``; ``None``
+        """The eligible curve state (see the module docstring), retrying until ``deadline``; ``None``
         when none came back — never a guess."""
         await self.sleep_until(not_before)
-        deadline = not_before + timedelta(seconds=window_s)
+        self.last_refused.pop(mint, None)
         while True:
             remaining = max(0.001, (deadline - self._clock()).total_seconds())
             try:

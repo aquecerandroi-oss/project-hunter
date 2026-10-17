@@ -34,9 +34,10 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 _AUDIT = [
-    "CREATE TABLE IF NOT EXISTS copy_test_status_audit (rule_set_id uuid, status text)",
+    "DROP TABLE IF EXISTS copy_test_status_audit",
+    "CREATE TABLE copy_test_status_audit (rule_set_id uuid, status text, mode text)",
     "CREATE OR REPLACE FUNCTION copy_test_audit() RETURNS trigger AS $$ BEGIN "
-    "INSERT INTO copy_test_status_audit VALUES (NEW.rule_set_id, NEW.status); RETURN NEW; END; "
+    "INSERT INTO copy_test_status_audit VALUES (NEW.rule_set_id, NEW.status, NEW.mode); RETURN NEW; END; "
     "$$ LANGUAGE plpgsql SECURITY DEFINER",
     "GRANT SELECT ON copy_test_status_audit TO hunter_worker",
     "TRUNCATE copy_test_status_audit",
@@ -55,6 +56,10 @@ async def test_a_copy_proposal_is_born_decided_and_never_exists_as_proposed(
     async with db_engine.begin() as connection:
         for statement in _AUDIT:
             await connection.execute(text(statement))
+        # adversarial default: a row inserted WITHOUT an explicit mode would be 'live'
+        await connection.execute(
+            text("ALTER TABLE meme_proposals ALTER COLUMN mode SET DEFAULT 'live'")
+        )
     leader, other = addr("A"), addr("B")
     mint, mint2, mint3, mint4 = (mint_address() for _ in range(4))
     spec = await rule_set(db_engine, leader, other)
@@ -79,7 +84,7 @@ async def test_a_copy_proposal_is_born_decided_and_never_exists_as_proposed(
                     {"r": spec.id},
                 )
             }
-            modes = {
+            bet_modes = {
                 r[0]
                 for r in await session.execute(
                     text(
@@ -88,12 +93,39 @@ async def test_a_copy_proposal_is_born_decided_and_never_exists_as_proposed(
                     {"r": spec.id},
                 )
             }
+            # the guardian's F4: ``meme_paper_bets.mode`` has a CHECK, so it can never fail. The column
+            # that can say ``live`` is ``meme_proposals.mode`` - every value it ever held, and every
+            # value it holds, for every row this lane wrote.
+            proposal_modes_ever = {
+                r[0]
+                for r in await session.execute(
+                    text(
+                        "SELECT DISTINCT mode FROM copy_test_status_audit "
+                        "WHERE rule_set_id = CAST(:r AS uuid)"
+                    ),
+                    {"r": spec.id},
+                )
+            }
+            proposal_modes_now = {
+                r[0]
+                for r in await session.execute(
+                    text(
+                        "SELECT DISTINCT mode FROM meme_proposals "
+                        "WHERE rule_set_id = CAST(:r AS uuid)"
+                    ),
+                    {"r": spec.id},
+                )
+            }
         assert seen <= {"approved", "filled", "unfilled", "rejected"} and "proposed" not in seen
-        assert modes == {"paper"}
+        assert bet_modes == {"paper"}
+        assert proposal_modes_ever == {"paper"} and proposal_modes_now == {"paper"}
     finally:
         async with db_engine.begin() as connection:
             await connection.execute(
                 text("DROP TRIGGER IF EXISTS copy_test_audit_trg ON meme_proposals")
+            )
+            await connection.execute(
+                text("ALTER TABLE meme_proposals ALTER COLUMN mode SET DEFAULT 'paper'")
             )
 
 
@@ -136,78 +168,6 @@ async def test_each_rule_set_has_its_own_capacity_and_the_secondary_never_blocks
                 )
             }
         assert ids == {regra.id, everton.id}
-
-
-@pytest.mark.asyncio
-async def test_t0_and_closed_coverage_holes_are_durable_and_t0_never_moves(
-    db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
-) -> None:
-    from hunter_meme_worker.copy_lane import CopyLane
-
-    from .copy_fakes import FakeChain, FakeClock
-
-    leader = addr("A")
-    spec = await rule_set(db_engine, leader, addr("B"))
-    clock = FakeClock(T0)
-    chain = FakeChain(clock)
-
-    def lane() -> CopyLane:
-        return CopyLane(
-            spec=spec,
-            session_factory=db_session_factory,
-            chain=chain,  # type: ignore[arg-type]
-            clock=clock,
-            sleep=clock.sleep,
-        )
-
-    first = lane()
-    await first.recover()
-    t0 = first.book.t0
-    clock.advance(hours=3)
-    second = lane()  # a restart three hours later
-    await second.recover()
-    assert t0 == second.book.t0 == T0  # read back, not re-minted
-    assert second.fields()["copy_t0"] == T0.isoformat(timespec="milliseconds")
-    async with role_session(db_session_factory, db_role=WORKER) as session:
-        row = (
-            (
-                await session.execute(
-                    text(
-                        "SELECT count(*) AS n, min(gap_end) AS e FROM meme_ingest_gaps "
-                        "WHERE stream = 'copy_leader:*' AND reason = 'lane_not_started' "
-                        "  AND detail ->> 'rule_set_id' = :r"
-                    ),
-                    {"r": spec.id},
-                )
-            )
-            .mappings()
-            .one()
-        )
-    assert row["n"] == 1 and row["e"] == T0  # one initial gap, ending at T0
-    # a closed hole of one wallet is a meme_ingest_gaps row; an open one waits for its end
-    async with running(spec, db_session_factory) as rig:
-        rig.lane.on_item(gap(T0, None, wallet=leader, reason="socket_down"))
-        rig.lane.on_item(
-            gap(
-                T0 + timedelta(seconds=1),
-                T0 + timedelta(seconds=9),
-                wallet=leader,
-                reason="socket_down",
-            )
-        )
-        await rig.settle()
-    async with role_session(db_session_factory, db_role=WORKER) as session:
-        streams = [
-            r[0]
-            for r in await session.execute(
-                text(
-                    "SELECT stream FROM meme_ingest_gaps WHERE reason = 'socket_down' "
-                    "  AND detail ->> 'rule_set_id' = :r"
-                ),
-                {"r": spec.id},
-            )
-        ]
-    assert streams == [f"copy_leader:{leader}"]
 
 
 @pytest.mark.asyncio

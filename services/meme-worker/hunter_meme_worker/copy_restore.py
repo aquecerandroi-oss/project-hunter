@@ -22,6 +22,7 @@ class BookRestore:
     _spec: CopySpec
     _t0: datetime
     _end: datetime
+    _armed: bool
     _observed: set[tuple[str, str]]
     _consumed: set[tuple[str, str]]
     _attempts: dict[tuple[str, date], int]
@@ -105,4 +106,5 @@ class BookRestore:
     def set_t0(self, t0: datetime) -> None:
         """The durable T0, once read (design §5): entries run from it for ``horizon_days``."""
         self._t0 = t0
+        self._armed = True
         self._end = t0 + timedelta(days=self._spec.horizon_days)

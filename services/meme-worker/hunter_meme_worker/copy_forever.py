@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
     from hunter_exchanges.pumpfun.leader_events import LeaderItem, LeaderSource
     from hunter_meme_worker.context import ChainSource
+    from hunter_meme_worker.copy_history import LeaderHistory
 
 __all__ = ["CopyFleet", "run_copy_lane_forever"]
 
@@ -43,6 +44,7 @@ SPEC_CHECK_S = 30.0
 INERT_RECHECK_S = 30.0
 SOURCE_RESTART_S = 5.0
 SOURCE_LOST = "source_lost"
+READY_TIMEOUT_S = 60.0
 
 
 class CopyFleet:
@@ -58,6 +60,8 @@ class CopyFleet:
         self._source = source
         self._clock = clock
         self._sleep = sleep
+        self._started = asyncio.Event()
+        self.ready_signal = False
         self._route: dict[str, list[CopyLane]] = {}
         for lane in lanes:
             for wallet in lane.spec.wallets:
@@ -82,36 +86,76 @@ class CopyFleet:
                 lane.stats.bad_items += 1  # a blocked stderr must not hold the shared source
                 lane.stats.last_error = f"{type(exc).__name__}: {exc}"[:200]
 
+    async def arm(self) -> None:
+        """T0 / the declared downtime, and entries armed (every lane) - once the source is **ready**.
+
+        Ready is the source's own word: ``await source.wait_ready(wallets)`` when it has one (it returns
+        once every followed wallet has at least one live road - the explicit signal this lane asked the
+        source side for). A source without it is armed as soon as its stream has started (a weaker
+        criterion, visible as ``CopyFleet.ready_signal = False``). Until then the lanes are
+        not armed: an event is ``not_armed``, never a copy."""
+        await self._started.wait()
+        ready: Callable[[list[str]], Awaitable[None]] | None = getattr(
+            self._source, "wait_ready", None
+        )
+        self.ready_signal = ready is not None
+        while ready is not None:
+            try:
+                await asyncio.wait_for(ready(self.wallets), READY_TIMEOUT_S)
+                break
+            except TimeoutError:
+                logger.warning("meme_copy_source_not_ready_yet", wallets=len(self.wallets))
+        await asyncio.gather(*(lane.source_up() for lane in self.lanes))
+
     async def read_source(self) -> None:
         """Feed the lanes from the source. A source that ends or fails is a **loss of coverage**: a
         global gap opens at once (entries become ``lacuna``, leader-driven exits are censored) and
-        closes when the stream speaks again — never a lane that says ``running`` over silence."""
+        closes when the stream speaks again — never a lane that says ``running`` over silence.
+
+        The first time the stream is created and has started (its generator has run to its first
+        suspension) :meth:`arm` may proceed - and, once the source says it is ready, that instant is T0
+        of a new cohort, or the end of the downtime of a restarted one."""
         lost_at: datetime | None = None
         if not self._route:  # every set is empty (escolha_everton may be): nothing to follow
             await asyncio.Event().wait()
         while True:
+            it = self._source.stream(self.wallets).__aiter__()
+            pending: asyncio.Future[LeaderItem] = asyncio.ensure_future(anext(it))
             try:
-                async for item in self._source.stream(self.wallets):
+                if not self._started.is_set():
+                    await asyncio.sleep(0)  # let the generator start its children
+                    await asyncio.sleep(0)
+                    self._started.set()
+                while True:
+                    item = await pending
                     if lost_at is not None:
                         self.dispatch(LeaderGap(None, lost_at, self._clock(), SOURCE_LOST))
                         lost_at = None
                     self.dispatch(item)
+                    pending = asyncio.ensure_future(anext(it))
+            except StopAsyncIteration:
                 logger.warning("meme_copy_source_ended")
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 logger.warning("meme_copy_source_failed", error=str(exc)[:200], exc_info=True)
+            finally:
+                pending.cancel()
+                aclose = getattr(it, "aclose", None)
+                if aclose is not None:
+                    await asyncio.gather(aclose(), return_exceptions=True)
             if lost_at is None:
                 lost_at = self._clock()
                 self.dispatch(LeaderGap(None, lost_at, None, SOURCE_LOST))
             await self._sleep(SOURCE_RESTART_S)
 
     async def run(self) -> None:
-        """Recover EVERY lane first (T0, the funnel, the open copies), then open the one source: the
-        barrier that keeps an early event from meeting an empty memory."""
+        """Recover EVERY lane first (the funnel, the open copies), then open the one source: the barrier
+        that keeps an early event from meeting an empty memory."""
         await asyncio.gather(*(lane.start() for lane in self.lanes))
         async with asyncio.TaskGroup() as group:
             group.create_task(self.read_source(), name="meme-copy-source")
+            group.create_task(self.arm(), name="meme-copy-arm")
             for lane in self.lanes:
                 group.create_task(lane.run(), name=f"meme-copy-{lane.spec.name}")
 
@@ -141,6 +185,7 @@ async def run_copy_lane_forever(
     source: LeaderSource,
     heartbeat: Callable[[dict[str, str]], Awaitable[None]] | None = None,
     clock: Callable[[], datetime] = utcnow,
+    history: LeaderHistory | None = None,
 ) -> None:
     """Inert until an active copy rule set exists; then run them all; restart when the set changes."""
     while True:
@@ -163,6 +208,7 @@ async def run_copy_lane_forever(
                 chain=chain,
                 heartbeat=heartbeat,
                 clock=clock,
+                history=history,
             )
             for spec in specs
         ]

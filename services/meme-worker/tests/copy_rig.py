@@ -8,7 +8,7 @@ import json
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -17,6 +17,7 @@ from sqlalchemy import text
 
 from hunter_core.db.session import role_session
 from hunter_exchanges.pumpfun.solana_codec import b58encode
+from hunter_meme_worker.copy_history import LeaderHistory, MintTrace, WindowTrace
 from hunter_meme_worker.copy_lane import CopyLane
 from hunter_meme_worker.copy_spec import CopySpec
 
@@ -64,11 +65,17 @@ class Rig:
     def __init__(self, lane: CopyLane, clock: FakeClock, chain: FakeChain) -> None:
         self.lane, self.clock, self.chain = lane, clock, chain
 
+    def _quiet(self) -> bool:
+        lane = self.lane
+        return lane.queue.empty() and lane.executor.idle and not lane.outbox
+
     async def settle(self) -> None:
         for _ in range(2000):
-            if self.lane.queue.empty() and self.lane.executor.idle:
+            self.lane._flush_outbox()  # pyright: ignore[reportPrivateUsage]  # what the 1 s sweep does
+            if self._quiet():
                 await asyncio.sleep(0.02)
-                if self.lane.queue.empty() and self.lane.executor.idle:
+                self.lane._flush_outbox()  # pyright: ignore[reportPrivateUsage]
+                if self._quiet():
                     return
             await asyncio.sleep(0.01)
         raise AssertionError("the executor never went idle")
@@ -76,15 +83,23 @@ class Rig:
 
 @asynccontextmanager
 async def running(
-    spec: CopySpec, factory: async_sessionmaker[AsyncSession], *, recover: bool = False
+    spec: CopySpec,
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    recover: bool = False,
+    history: LeaderHistory | None = None,
 ) -> AsyncGenerator[Rig]:
-    async with running_many([spec], factory, recover=recover) as rigs:
+    async with running_many([spec], factory, recover=recover, history=history) as rigs:
         yield rigs[0]
 
 
 @asynccontextmanager
 async def running_many(
-    specs: list[CopySpec], factory: async_sessionmaker[AsyncSession], *, recover: bool = False
+    specs: list[CopySpec],
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    recover: bool = False,
+    history: LeaderHistory | None = None,
 ) -> AsyncGenerator[list[Rig]]:
     """One lane per rule set, sharing a clock and a chain (what the fleet does in production)."""
     clock = FakeClock(T0 + timedelta(milliseconds=10))
@@ -97,6 +112,7 @@ async def running_many(
             clock=clock,
             sleep=clock.sleep,
             t0=T0 - timedelta(hours=1),
+            history=history,
         )
         for spec in specs
     ]
@@ -110,6 +126,8 @@ async def running_many(
         for runner in runners:
             runner.cancel()
         await asyncio.gather(*runners, return_exceptions=True)
+        for lane in lanes:
+            await lane.executor.shutdown()
 
 
 async def bets(factory: async_sessionmaker[AsyncSession], spec: CopySpec) -> list[dict[str, Any]]:
@@ -164,3 +182,48 @@ async def retire_copy_sets(engine: AsyncEngine) -> None:
 
 def mint_address() -> str:
     return addr("M")
+
+
+async def gap_rows(
+    factory: async_sessionmaker[AsyncSession], spec: CopySpec
+) -> list[dict[str, Any]]:
+    """Every hole row this rule set wrote (and its alive markers), oldest first."""
+    async with role_session(factory, db_role=WORKER) as session:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT stream, gap_start, gap_end, reason, detail FROM meme_ingest_gaps "
+                    "WHERE detail ->> 'rule_set_id' = :r ORDER BY gap_start, gap_end, reason"
+                ),
+                {"r": spec.id},
+            )
+        ).mappings()
+        return [dict(r) for r in rows]
+
+
+class FakeHistory:
+    """A labeled fake of the chain-history hook (`LeaderHistory`): what the source side must provide."""
+
+    def __init__(
+        self,
+        *,
+        complete: bool = True,
+        bought: frozenset[str] = frozenset(),
+        trace: MintTrace | None = None,
+        boom: bool = False,
+    ) -> None:
+        self.complete, self.bought, self.trace, self.boom = complete, bought, trace, boom
+        self.windows: list[tuple[str, datetime, datetime, int]] = []
+        self.traces: list[tuple[str, str, datetime]] = []
+
+    async def window(
+        self, wallet: str, start: datetime, end: datetime, *, limit: int = 1000
+    ) -> WindowTrace:
+        self.windows.append((wallet, start, end, limit))
+        if self.boom:
+            raise RuntimeError("history node down")
+        return WindowTrace(self.complete, self.bought)
+
+    async def mint_trace(self, wallet: str, mint: str, since: datetime) -> MintTrace | None:
+        self.traces.append((wallet, mint, since))
+        return self.trace

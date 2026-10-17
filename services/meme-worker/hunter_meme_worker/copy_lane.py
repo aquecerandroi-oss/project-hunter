@@ -7,15 +7,17 @@ what they buy and sell what they sell — priced with our own latency and the La
   decide against the in-memory :class:`~hunter_meme_worker.copy_book.CopyBook`, ``put_nowait`` the
   job, record the latencies. No ``await``, no database, no HTTP, no lock and no logging. When the
   queue is full the job is **deferred to an in-memory outbox** (never dropped, never waited for) and
-  the sweep re-submits it; only an entry that cannot be queued is given back (``sobrecarga``).
+  the sweep re-submits it; only an entry that cannot be queued is given back (``sobrecarga``). An outbox
+  that itself overflows is a lost fact and declares the funnel unavailable.
 * the **executor** (``copy_exec.py``) — prices each job at the market state at
   ``decided_at`` + the declared execution latency and persists it, off the hot path, with a cap on
   the jobs in flight.
 
 Around them: a 1 s sweep (time caps, confirmation timeouts, the outbox), the mark pass (live marks and
-the safety stop) and the heartbeat. The lane never touches the executor service, a wallet or an order;
-every row it writes is ``mode = 'paper'`` of a ``research_only`` rule set. The supervisor that keeps it
-inert until a ``copy_v0`` set is active lives in ``copy_forever.py``.
+the safety stop), the recomposition of holes, the durable liveness marker and the heartbeat. The lane
+never touches the executor service, a wallet or an order; every row it writes is ``mode = 'paper'`` of a
+``research_only`` rule set. The supervisor that keeps it inert until a ``copy_v0`` set is active lives in
+``copy_forever.py``; start/stop/recovery in ``copy_lane_recover.py``.
 """
 
 from __future__ import annotations
@@ -25,25 +27,24 @@ from collections import deque
 from time import perf_counter_ns
 from typing import TYPE_CHECKING
 
-from hunter_core.db.session import role_session
-from hunter_core.domain.types import utcnow, uuid7
+from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.leader_events import LeaderConfirmation, LeaderGap
 from hunter_meme_worker.copy_book import CopyBook
 from hunter_meme_worker.copy_events import (
+    FUNIL_INDISPONIVEL,
     SOBRECARGA,
     CensorEntry,
     CloseIntent,
     OpenIntent,
+    RecomposeDone,
     RecordGap,
     RejectEntry,
 )
 from hunter_meme_worker.copy_exec import CopyExecutor
+from hunter_meme_worker.copy_lane_recover import MARKER_S, LaneRecovery
 from hunter_meme_worker.copy_marks import mark_pass
-from hunter_meme_worker.copy_position import Live
 from hunter_meme_worker.copy_reads import CopyReader
-from hunter_meme_worker.copy_repo import load_funnel, load_open_copies
-from hunter_meme_worker.copy_repo_gaps import ensure_t0
 from hunter_meme_worker.copy_stats import CopyStats, heartbeat_fields
 
 if TYPE_CHECKING:
@@ -55,19 +56,21 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.leader_events import LeaderItem
     from hunter_meme_worker.context import ChainSource
     from hunter_meme_worker.copy_events import Job
+    from hunter_meme_worker.copy_history import LeaderHistory, MintTrace
     from hunter_meme_worker.copy_spec import CopySpec
 
 __all__ = ["CopyLane"]
 
 logger = get_logger(__name__)
 
-WORKER_ROLE = "hunter_worker"
 SWEEP_S = 1.0
+RECOMPOSE_S = 2.0
 HEARTBEAT_S = 5.0
 OUTBOX_MAX = 10_000
+OWED_MAX = 1_000
 
 
-class CopyLane:
+class CopyLane(LaneRecovery):
     def __init__(
         self,
         *,
@@ -78,18 +81,25 @@ class CopyLane:
         clock: Callable[[], datetime] = utcnow,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         t0: datetime | None = None,
+        history: LeaderHistory | None = None,
     ) -> None:
         self.spec = spec
         self.stats = CopyStats(sorted(spec.wallets))
         self._t0_given = t0
-        self.book = CopyBook(spec, t0=t0 or clock())
+        self.book = CopyBook(spec, t0=t0 or clock(), armed=t0 is not None)
         self.queue: asyncio.Queue[Job] = asyncio.Queue(maxsize=spec.queue_max)
         self.outbox: deque[Job] = deque()
+        self.owed: deque[RecordGap] = deque()
+        """Gap records the outbox had no room for: re-submitted by the sweep, never forgotten."""
+        self.history = history
+        self._unlanded: dict[str, datetime] = {}
         self._sessions = session_factory
         self._chain = chain
         self._heartbeat = heartbeat
         self._clock = clock
         self._sleep = sleep
+        self._alive_from: datetime | None = None
+        self._trace_next: dict[str, tuple[int, datetime]] = {}
         self.executor = CopyExecutor(
             spec=spec,
             session_factory=session_factory,
@@ -100,13 +110,17 @@ class CopyLane:
             stats=self.stats,
             clock=clock,
             defer=self._defer,
+            funnel_failed=self.funnel_failed,
+            funnel_ok=self.funnel_ok,
+            settled=self.settled,
+            retrace=self._trace_for,
         )
 
     # ================================================================ hot path
     def on_item(self, item: LeaderItem) -> None:
-        """Decide one leader event or gap **in memory**. Synchronous by construction: nothing here
-        can await, so nothing here can wait on IO (and nothing logs: a blocked stderr must not
-        hold the decision — counters are published by the heartbeat instead)."""
+        """Decide one leader event, gap or confirmation **in memory**. Synchronous by construction:
+        nothing here can await, so nothing here can wait on IO (and nothing logs: a blocked stderr must
+        not hold the decision — counters are published by the heartbeat instead)."""
         started = perf_counter_ns()
         now = self._clock()
         if isinstance(item, LeaderConfirmation):
@@ -116,8 +130,9 @@ class CopyLane:
         if isinstance(item, LeaderGap):
             self.stats.gaps_seen += 1
             self.book.on_gap(item, now)
-            if item.end is not None:
-                self.submit(RecordGap(item))
+            self.submit(
+                RecordGap(item)
+            )  # opening and closing: a hole is durable the moment it opens
             return
         decision = self.book.on_event(item, now)
         if not decision.wallet_known:
@@ -148,36 +163,96 @@ class CopyLane:
         """Hand a decided job to the executor without ever waiting for room. A refused job is an
         **obligation kept**, not a loss: it waits in the outbox for the next sweep. Only an entry is
         given back (the book rolls it back and a ``sobrecarga`` row is owed instead)."""
+        self._track(job)
         self._flush_outbox()  # older obligations first: a new job never overtakes a deferred one
         if self.outbox:
-            self.stats.queue_full += 1
-            if isinstance(job, OpenIntent):
-                self.book.rollback(job)
-                job = CensorEntry(job.mint, job.leader, SOBRECARGA, job.decided_at)
-            self._defer(job)
-            return False
+            return self._refused(job)
         try:
             self.queue.put_nowait(job)
         except asyncio.QueueFull:
-            self.stats.queue_full += 1
-            if isinstance(job, OpenIntent):
-                self.book.rollback(job)
-                job = CensorEntry(job.mint, job.leader, SOBRECARGA, job.decided_at)
-            self._defer(job)
-            return False
+            return self._refused(job)
         return True
+
+    def _refused(self, job: Job) -> bool:
+        self.stats.queue_full += 1
+        if isinstance(job, OpenIntent):
+            self.book.rollback(job)
+            self.settled(job.oid)  # the entry is given back; its censor takes over the obligation
+            job = CensorEntry(job.mint, job.leader, SOBRECARGA, job.decided_at)
+            self._track(job)
+        self._defer(job)
+        return False
 
     def _flush_outbox(self) -> None:
         while self.outbox and not self.queue.full():
             self.queue.put_nowait(self.outbox.popleft())
 
     def _defer(self, job: Job) -> None:
-        if len(self.outbox) >= OUTBOX_MAX:
-            self.stats.outbox_dropped += 1  # declared: the outbox itself overflowed
-            if isinstance(job, CloseIntent):
-                self.book.rollback(job)  # back to open: the sweep's time cap still sees it
+        if len(self.outbox) < OUTBOX_MAX:
+            self.outbox.append(job)
             return
-        self.outbox.append(job)
+        self.stats.outbox_dropped += 1  # declared: the outbox itself overflowed
+        if not isinstance(job, RecordGap):
+            self.settled(job.oid)  # whatever follows (a funnel hole) is tracked on its own
+        if isinstance(job, OpenIntent):
+            self.book.mark_closed(job.key)  # no row will exist: release the slot, never an orphan
+            self.funnel_failed(job.decided_at)
+        elif isinstance(job, CloseIntent):
+            self.book.rollback(job)  # back to open: the sweep's time cap still sees it
+        elif isinstance(job, RejectEntry | CensorEntry):
+            self.funnel_failed(job.decided_at)  # a first observation was lost for good
+        elif isinstance(job, RecomposeDone):
+            self.funnel_failed(job.start)  # the window is owed again
+        elif isinstance(job, RecordGap):
+            if len(self.owed) < OWED_MAX:
+                self.owed.append(
+                    job
+                )  # a hole record is never dropped while there is room to keep it
+            if job.gap.reason != FUNIL_INDISPONIVEL:
+                self.funnel_failed(job.gap.start)
+
+    def drain_pending(self) -> list[Job]:
+        """Everything queued or deferred, in order (the lane is stopping)."""
+        items: list[Job] = []
+        while not self.queue.empty():
+            items.append(self.queue.get_nowait())
+        items.extend(self.outbox)
+        self.outbox.clear()
+        items.extend(self.owed)
+        self.owed.clear()
+        return items
+
+    # ================================================================ the funnel's state
+    def funnel_failed(self, since: datetime | None = None) -> None:
+        """A fact the funnel needed could not be written: from **that fact** (``since``: the instant it was
+        decided - the hole must reach back to what was lost, not start when the retries gave up) to the
+        next successful write the funnel is down - a durable, global hole (``funil_indisponivel``):
+        entries are rejected meanwhile and every leader is recomposed afterwards. Idempotent."""
+        now = self._clock()
+        start = min(since, now) if since is not None else now
+        if any(open_start <= start for open_start in self.book.gaps.funnel_starts()):
+            return  # an open hole already reaches back at least this far
+        gap = LeaderGap(None, start, None, FUNIL_INDISPONIVEL)
+        self.book.on_gap(gap, start)
+        self.submit(RecordGap(gap))
+
+    def funnel_ok(self) -> None:
+        """The database took a fact: if the funnel was down, it is back, and every open hole closes."""
+        now = self._clock()
+        for start in self.book.gaps.funnel_starts():
+            closed = LeaderGap(None, start, max(now, start), FUNIL_INDISPONIVEL)
+            self.book.on_gap(closed, now)
+            self.submit(RecordGap(closed))
+
+    async def _trace_for(self, wallet: str, mint: str, since: datetime) -> MintTrace | None:
+        """The leader's position in ``mint`` re-read from the chain's history; ``None`` = cannot."""
+        if self.history is None:
+            return None
+        try:
+            return await self.history.mint_trace(wallet, mint, since)
+        except Exception as exc:
+            logger.warning("meme_copy_trace_failed", error=str(exc)[:200])
+            return None
 
     # ================================================================ off the hot path
     async def start(self) -> None:
@@ -185,52 +260,11 @@ class CopyLane:
         it opens the source, so no event meets an empty memory."""
         await self.recover()
 
-    async def recover(self) -> None:
-        """Rebuild the book from the database before the source opens: T0, the funnel, the copies
-        still open and the confirmations still owed."""
-        async with role_session(self._sessions, db_role=WORKER_ROLE) as session:
-            if self._t0_given is None:
-                self.book.set_t0(await ensure_t0(session, self.spec, self._clock()))
-            funnel = await load_funnel(session, self.spec)
-            opens = await load_open_copies(session, self.spec)
-        for leader, mint in funnel.pairs:
-            self.book.restore_pair(leader, mint)
-        for stratum, mint in funnel.consumed:
-            self.book.restore_consumed(stratum, mint)
-        for leader, day in funnel.attempts:
-            self.book.restore_attempt(leader, day)
-        for copy in opens:
-            key = str(uuid7())
-            self.book.recover_open(
-                key=key,
-                mint=copy.state.mint,
-                leader=copy.leader,
-                stratum=copy.stratum,
-                bet_id=copy.state.id,
-                entry_at=copy.state.entry_at,
-                peak_atoms=copy.peak_atoms,
-            )
-            if copy.unconfirmed_signature is not None:
-                self.book.restore_pending(
-                    key,
-                    copy.unconfirmed_signature,
-                    copy.leader,
-                    copy.state.mint,
-                    first_observed_at=copy.leader_observed_at,
-                    position_after=copy.peak_atoms,
-                    token_delta=copy.leader_token_delta,
-                    slot=copy.leader_slot,
-                )
-            self.executor.live[key] = Live(
-                bet_id=copy.state.id,
-                state=copy.state,
-                leader=copy.leader,
-                last_slot=copy.priced_slot,
-            )
-
     async def sweep_once(self) -> None:
         now = self._clock()
         self._flush_outbox()
+        while self.owed and len(self.outbox) < OUTBOX_MAX:
+            self.submit(self.owed.popleft())
         for job in self.book.due_time_caps(now):
             self.submit(job)
         for invalid in self.book.expired_confirmations(now):
@@ -245,6 +279,7 @@ class CopyLane:
             live=self.executor.live,
             submit=self._submit_close,
             now=self._clock,
+            stats=self.stats,
         )
 
     def _submit_close(self, job: CloseIntent) -> None:
@@ -257,6 +292,8 @@ class CopyLane:
             open_count=self.book.open_count,
             queue_depth=self.queue.qsize(),
             outbox_depth=len(self.outbox),
+            recompositions_pending=self.book.recompositions_pending(),
+            funnel_unavailable=self.book.funnel_unavailable,
         )
         fields = {
             **base,
@@ -289,16 +326,13 @@ class CopyLane:
         try:
             async with asyncio.TaskGroup() as group:
                 group.create_task(self.executor.run(self.queue), name="meme-copy-executor")
-                group.create_task(
-                    self._guard("sweep", self.sweep_once, SWEEP_S), name="meme-copy-sweep"
-                )
-                group.create_task(
-                    self._guard("mark", self.mark_once, float(self.spec.mark_every_s)),
-                    name="meme-copy-mark",
-                )
-                group.create_task(
-                    self._guard("heartbeat", self.heartbeat_once, HEARTBEAT_S),
-                    name="meme-copy-hb",
-                )
+                for name, step, every in (
+                    ("sweep", self.sweep_once, SWEEP_S),
+                    ("mark", self.mark_once, float(self.spec.mark_every_s)),
+                    ("recompose", self.recompose_once, RECOMPOSE_S),
+                    ("alive", self.marker_once, MARKER_S),
+                    ("heartbeat", self.heartbeat_once, HEARTBEAT_S),
+                ):
+                    group.create_task(self._guard(name, step, every), name=f"meme-copy-{name}")
         finally:  # no job outlives the lane: an old lane must never write after a new one recovers
-            await self.executor.shutdown()
+            await self.stop()

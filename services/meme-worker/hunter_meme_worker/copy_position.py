@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from hunter_meme_worker.copy_events import Job
 
@@ -35,6 +35,9 @@ class Position:
     bet_id: str | None = None
     gap_reason: str | None = None
     """A censor reason once the book can no longer vouch for the leader's exit (a gap, a restart)."""
+    contam: str | None = None
+    """A reason the copy is flagged ``contaminated`` while still priced normally (a degraded source, a hole
+    whose window was recomposed, an exit that could not be persisted)."""
     was: State = "opening"
     """The state to go back to when a close job is refused by the queue."""
 
@@ -58,3 +61,5 @@ class Live:
     last_slot: int
     """The slot of the last chain state this copy accepted (its entry, then every mark): an exit never
     prices a state below it — the design's non-regression rule."""
+    p90: dict[str, Any] | None = None
+    """The p90 sensitivity entry once read (secondary: never used to decide anything)."""

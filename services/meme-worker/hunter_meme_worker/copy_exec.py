@@ -1,75 +1,66 @@
 """The copy lane's executor (H-037): everything that happens **after** the hot path decided. It
 drains the bounded queue (``copy_lane.py`` fills it with ``put_nowait`` and never waits), prices
 each job at the market state at ``decided_at`` + the declared latency (``copy_reads.py``), and
-persists with the Lab's own repository functions (``copy_repo.py``).
+persists with the Lab's own repository functions (``copy_repo*.py``).
 
 Jobs of one copy never overlap: a per-key lock is taken first thing in every task, tasks are created
 in queue order and asyncio locks wake FIFO, so an exit always runs after the entry it closes (and prices
-a state **after** it), a confirmation after the row it annotates, and an invalidation after both.
+a state **after** it).
 
-A failure to price is a **named refusal**, never a guessed fill: an admitted attempt with no eligible
-state is ``unfilled/sem_estado``; a mint already on the pool is ``unfilled/fora_de_praca`` (the paper
-machinery has no pool *buy* quote — design §3.3 "P"); an exit with no eligible state or pool trade
-closes ``indeterminate``. A failure to write (the database down) is logged and counted
-(``persist_dropped``); the book lets go of an entry that has no row, and takes a lost exit back to
-``open`` so the time cap retries it.
+**Every job is an obligation with its own budget** (R2 fix B6). A failure is retried with a growing delay
+(``RETRY_BASE_S``) up to ``MAX_RETRIES`` times, keyed by the job's own ``oid`` — six distinct gaps that
+each fail once are six budgets, not one; what was already priced is held, so a database failure never
+changes the photograph of a sale. A job that is not ready yet (a confirmation whose row has not landed) is
+*parked*, not failed. When the budget is exhausted the failure becomes durable state: the funnel is
+declared unavailable (``funil_indisponivel``, a global hole that is recorded and later recomposed), the
+copy's lost exit is flagged, never silently forgotten.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections import OrderedDict
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from hunter_core.db.session import role_session
 from hunter_core.logging import get_logger
-from hunter_meme_worker.copy_bets import (
-    censored_exit,
-    close_on_curve,
-    close_on_pool_trade,
-)
 from hunter_meme_worker.copy_events import (
-    MIGROU_FORA_DE_PRACA,
-    NO_EXIT_STATE,
-    NO_POOL_TRADE,
     CensorEntry,
     CloseIntent,
     ConfirmIntent,
-    InvalidateIntent,
     OpenIntent,
+    RecomposeDone,
     RecordGap,
     RejectEntry,
-    ms_iso,
+    UnverifiedIntent,
 )
 from hunter_meme_worker.copy_exec_entry import EntryJobs
+from hunter_meme_worker.copy_exec_exit import ExitJobs
+from hunter_meme_worker.copy_exec_facts import FactJobs, NotYet
 from hunter_meme_worker.copy_position import Live
-from hunter_meme_worker.copy_repo import (
-    close_copy_bet,
-    set_copy_fact,
-)
-from hunter_meme_worker.lab_models import MARK_CURVE, MARK_POOL_TAPE
+from hunter_meme_worker.copy_retry import Held, PricedEntry, PricedExit, Retries
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable, Coroutine
     from datetime import datetime
+    from typing import Any
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from hunter_meme_worker.copy_book import CopyBook
     from hunter_meme_worker.copy_events import Job
+    from hunter_meme_worker.copy_history import MintTrace
     from hunter_meme_worker.copy_reads import CopyReader
     from hunter_meme_worker.copy_spec import CopySpec
     from hunter_meme_worker.copy_stats import CopyStats
-    from hunter_meme_worker.lab_models import BetExit, BetState
 
 __all__ = ["CopyExecutor"]
 
 logger = get_logger(__name__)
 
-WORKER_ROLE = "hunter_worker"
 CLOSED_MEMORY = 5000
 MAX_RETRIES = 5
+RETRY_BASE_S = 1.0
+MAX_WAITS = 120
+WAIT_S = 1.0
 MAX_INFLIGHT = 32
 MAX_INFLIGHT_SECONDARY = 8
 """Jobs being priced or written at once. The executor takes no new job while it is at the cap, so the
@@ -77,7 +68,7 @@ queue fills and the hot path's ``put_nowait`` is refused (counted, deferred) ins
 set of tasks piling up behind a slow RPC or database."""
 
 
-class CopyExecutor(EntryJobs):
+class CopyExecutor(EntryJobs, ExitJobs, FactJobs):
     def __init__(
         self,
         *,
@@ -88,6 +79,10 @@ class CopyExecutor(EntryJobs):
         stats: CopyStats,
         clock: Callable[[], datetime],
         defer: Callable[[Job], None],
+        funnel_failed: Callable[[datetime | None], None] = lambda since=None: None,
+        funnel_ok: Callable[[], None] = lambda: None,
+        settled: Callable[[str], None] = lambda oid: None,
+        retrace: Callable[[str, str, datetime], Awaitable[MintTrace | None]] | None = None,
     ) -> None:
         self.spec = spec
         self.live: dict[str, Live] = {}
@@ -97,12 +92,23 @@ class CopyExecutor(EntryJobs):
         self._stats = stats
         self._clock = clock
         self._defer = defer
-        self._tries: dict[tuple[str, str, str], int] = {}
+        self._funnel_failed = funnel_failed
+        self._funnel_ok = funnel_ok
+        self._settled = settled
+        self._retrace = retrace
+        self._cancelled: list[Job] = []
+        self._retries = Retries()
+        self._waits = Retries()
+        self._held_exit: Held[PricedExit] = Held()
+        self._held_entry: Held[PricedEntry] = Held()
+        self._parked: dict[str, tuple[asyncio.TimerHandle, Job]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._inflight: dict[str, int] = {}
         self._gate = asyncio.Semaphore(MAX_INFLIGHT if spec.is_primary else MAX_INFLIGHT_SECONDARY)
-        self._closed: OrderedDict[str, str] = OrderedDict()
+        self._closed: dict[str, str] = {}
         self._tasks: set[asyncio.Task[None]] = set()
+        self._owned: dict[asyncio.Task[None], Job] = {}
+        self._side: set[asyncio.Task[None]] = set()
         self._closing = False
 
     # ------------------------------------------------------------------ drain
@@ -110,15 +116,28 @@ class CopyExecutor(EntryJobs):
         while True:
             await self._gate.acquire()
             job = await queue.get()
-            if self._closing:  # shut down: take nothing new
+            if self._closing:  # shut down: take nothing new - and give back what was just taken
+                queue.put_nowait(job)
                 return
-            key = getattr(job, "key", None)
-            if key:
-                self._locks.setdefault(key, asyncio.Lock())
-                self._inflight[key] = self._inflight.get(key, 0) + 1
+            self._admit(job)
             task = asyncio.create_task(self._guarded(job), name="meme-copy-job")
             self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+            # remembered before it starts: a cancel-before-start loses nothing
+            self._owned[task] = job
+            task.add_done_callback(self._forget)
+
+    def _forget(self, task: asyncio.Task[None]) -> None:
+        self._tasks.discard(task)
+        self._owned.pop(task, None)
+
+    def _admit(self, job: Job) -> None:
+        key = getattr(job, "key", None)
+        if key:
+            self._locks.setdefault(key, asyncio.Lock())
+            self._inflight[key] = self._inflight.get(key, 0) + 1
+
+    def is_parked(self, oid: str) -> bool:
+        return oid in self._parked
 
     @property
     def in_flight(self) -> int:
@@ -126,17 +145,43 @@ class CopyExecutor(EntryJobs):
 
     @property
     def idle(self) -> bool:
-        """No job in flight (the queue is the lane's to check)."""
-        return not self._tasks
+        """No job in flight, none parked waiting for its row, no sensitivity read running."""
+        return not self._tasks and not self._side and not self._parked
 
-    async def shutdown(self) -> None:
+    def spawn_side(self, coro: Coroutine[Any, Any, None]) -> None:
+        """A secondary read (the p90 sensitivity) — never on the gate, never able to fail a job."""
+        task = asyncio.create_task(coro, name="meme-copy-side")
+        self._side.add(task)
+        task.add_done_callback(self._side.discard)
+
+    async def shutdown(self) -> list[Job]:
         """Tie every job in flight to the lane's life: cancel them and wait, so an old lane can never
-        write a bet after a new one has recovered the book."""
+        write a bet after a new one has recovered the book. Returns the obligations that were parked."""
         self._closing = True
-        tasks = list(self._tasks)
+        tasks = [*self._tasks, *self._side]
+        owned = dict(self._owned)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        parked: list[Job] = list(self._cancelled)  # jobs the cancellation interrupted come back too
+        self._cancelled.clear()
+        seen = {job.oid for job in parked}
+        for (
+            task,
+            job,
+        ) in owned.items():  # cancelled before its first step: its own handler never ran
+            if task.cancelled() and job.oid not in seen:
+                parked.append(job)
+        for oid in list(self._parked):
+            handle, job = self._parked.pop(oid)
+            handle.cancel()
+            parked.append(job)
+        return parked
+
+    async def run_now(self, job: Job) -> None:
+        """Process one job right here, outside the gate and the retry budget (the lane is stopping)."""
+        await self._handle(job)
+        self._landed(job)
 
     async def drain(self) -> None:
         """Wait for every job in flight (tests, and a clean shutdown)."""
@@ -152,8 +197,15 @@ class CopyExecutor(EntryJobs):
             else:
                 async with lock:
                     await self._handle(job)
+            self._landed(job)
         except asyncio.CancelledError:
+            if (
+                self._closing
+            ):  # the lane is stopping: the obligation goes back to it, not to the floor
+                self._cancelled.append(job)
             raise
+        except NotYet:
+            self._wait(job)
         except (
             Exception
         ) as exc:  # a failed job is an obligation: retried, then declared, never silent
@@ -173,27 +225,79 @@ class CopyExecutor(EntryJobs):
                     del self._inflight[key]
                     self._locks.pop(key, None)
 
-    def _failed(self, job: Job) -> None:
-        """Keep the obligation: the original intent goes back to the outbox (a bounded number of
-        times) so a database blip cannot turn a leader's exit into someone else's time cap. An entry
-        that never got its row is given up — and the funnel is then declared unrecoverable."""
-        if isinstance(job, OpenIntent):
-            self._stats.persist_dropped += 1
-            self._book.mark_closed(job.key)  # no row exists: do not hold the slot forever
-            self._book.funnel_unavailable = True
-            return
-        ident = getattr(job, "key", None) or getattr(job, "mint", "") or ""
-        tag = (type(job).__name__, str(ident), str(getattr(job, "decided_at", "")))
-        tries = self._tries.get(tag, 0) + 1
-        self._tries[tag] = tries
-        if tries <= MAX_RETRIES:
+    def _landed(self, job: Job) -> None:
+        self._settled(job.oid)
+        self._book.landed(job)
+        self._retries.clear(job.oid)
+        self._waits.clear(job.oid)
+        self._held_exit.drop(job.oid)
+        self._held_entry.drop(job.oid)
+        if isinstance(
+            job, OpenIntent | CloseIntent | RejectEntry | CensorEntry | RecordGap | RecomposeDone
+        ):
+            self._funnel_ok()  # the database took a fact: if the funnel was declared down, it is back
+
+    def _park(self, job: Job, delay: float) -> None:
+        if self._closing:
             self._defer(job)
             return
+        handle = asyncio.get_running_loop().call_later(delay, self._unpark, job.oid)
+        self._parked[job.oid] = (handle, job)
+
+    def _unpark(self, oid: str) -> None:
+        pair = self._parked.pop(oid, None)
+        if pair is not None:
+            self._defer(pair[1])  # the lane's outbox: older obligations first, in order
+
+    def _wait(self, job: Job) -> None:
+        """Not ready yet (its row has not landed): neither a success nor a failure."""
+        if self._waits.bump(job.oid) > MAX_WAITS:
+            self._waits.clear(job.oid)
+            # the row it waited for never came: a lost obligation, not a lost note
+            self._give_up(job)
+            return
+        self._park(job, WAIT_S)
+
+    def _failed(self, job: Job) -> None:
+        """Keep the obligation: the original intent comes back after a growing delay, a bounded number of
+        times. Out of budget, the failure becomes durable state (see the module docstring)."""
+        tries = self._retries.bump(job.oid)
+        if tries <= MAX_RETRIES:
+            self._park(job, RETRY_BASE_S * tries)
+            return
+        self._retries.clear(job.oid)
         self._stats.persist_dropped += 1
-        if isinstance(job, CloseIntent):
-            self._book.rollback(job)  # out of retries: the time cap decides
+        self._give_up(job)
+
+    def _give_up(self, job: Job) -> None:
+        """Out of budget: the failure becomes durable state (a funnel hole from the lost fact). A hole
+        record that could not be written stays *unsettled*: the liveness marker does not pass it, so a
+        restart declares the downtime from before it instead of trusting a record that never landed."""
+        if not isinstance(job, RecordGap):
+            self._settled(job.oid)
+        self._held_exit.drop(job.oid)
+        self._held_entry.drop(job.oid)
+        since = getattr(
+            job, "decided_at", None
+        )  # the hole must reach back to the fact that was lost
+        if isinstance(job, OpenIntent):
+            self._book.mark_closed(job.key)  # no row exists: do not hold the slot forever
+            self._funnel_failed(since)
+        elif isinstance(job, CloseIntent):
+            self._book.rollback(job)  # the row is still open: the time cap decides, flagged
+            self._funnel_failed(since)
         elif isinstance(job, RejectEntry | CensorEntry):
-            self._book.funnel_unavailable = True  # a first observation was lost for good
+            self._funnel_failed(since)  # a first observation was lost for good
+        elif isinstance(job, RecomposeDone):
+            self._funnel_failed(
+                job.start
+            )  # its pairs / marker did not land: the window is owed again
+        elif isinstance(job, RecordGap):
+            self._stats.gaps_lost += 1
+            if job.gap.reason != "funil_indisponivel":
+                self._funnel_failed(job.gap.start)
+        else:  # ConfirmIntent | InvalidateIntent | UnverifiedIntent: the annotation, not the fact
+            self._stats.annotation_lost += 1
 
     async def _handle(self, job: Job) -> None:
         if isinstance(job, OpenIntent):
@@ -201,132 +305,16 @@ class CopyExecutor(EntryJobs):
         elif isinstance(job, CloseIntent):
             await self._close(job)
         elif isinstance(job, CensorEntry):
-            await self._censor(job.mint, job.leader, job.decided_at, job.reason, key=None)
+            await self._censor(job)
         elif isinstance(job, RejectEntry):
             await self._reject(job)
         elif isinstance(job, ConfirmIntent):
             await self._confirm(job)
         elif isinstance(job, RecordGap):
             await self._record_gap(job)
+        elif isinstance(job, RecomposeDone):
+            await self._recomposed(job)
+        elif isinstance(job, UnverifiedIntent):
+            await self._unverified(job)
         else:
             await self._invalidate(job)
-
-    # ------------------------------------------------------------------ exit
-    async def _close(self, job: CloseIntent) -> None:
-        live = self.live.get(job.key)
-        if live is None:  # the entry never became a bet (refused): nothing to sell
-            self._book.mark_closed(job.key)
-            return
-        censor = job.censor
-        mark_source: str | None = None
-        closed: BetExit | None = None
-        if censor is None:
-            closed, mark_source = await self._priced_exit(live, job)
-            if closed is None:
-                censor = mark_source  # the reason the price could not be read
-        if closed is None:
-            assert censor is not None
-            closed = censored_exit(live.state, job, censor=censor, now=self._clock())
-            mark_source = None
-        else:
-            self._stats.record_priced(
-                round((closed.exit_at - job.decided_at).total_seconds() * 1000)
-            )
-        pos = self._book.position(job.key)
-        closed.exit["copy"]["contaminated"] = job.contaminated or (pos.gap_reason if pos else None)
-        started = self._clock()
-        stamp = ms_iso(started)
-        closed.exit["copy"]["ts"]["persisted_at"] = stamp
-        async with role_session(self._sessions, db_role=WORKER_ROLE) as session:
-            landed = await close_copy_bet(
-                session, live.bet_id, closed, mark_source=mark_source, stamp=stamp
-            )
-        self._stats.record_persisted(round((self._clock() - started).total_seconds() * 1000))
-        if not landed:  # another writer (the Lab, an operator) closed this row first
-            self._stats.closed_elsewhere += 1
-            logger.warning("meme_copy_closed_by_another_writer", bet_id=live.bet_id, key=job.key)
-            del self.live[job.key]
-            self._book.mark_closed(job.key)
-            return
-        del self.live[job.key]
-        self._closed[job.key] = live.bet_id
-        while len(self._closed) > CLOSED_MEMORY:
-            self._closed.popitem(last=False)
-        self._book.mark_closed(job.key)
-        if censor is None:
-            self._stats.record_exit(live.leader)
-        else:
-            self._stats.record_censored(live.leader, censor)
-
-    async def _priced_exit(self, live: Live, job: CloseIntent) -> tuple[BetExit | None, str | None]:
-        """``(exit, mark_source)`` priced at the pricing instant, or ``(None, censor_reason)``."""
-        state = live.state
-        floor = live.last_slot
-        if job.leader is not None:
-            floor = max(floor, job.leader.slot)  # the sale prices a slot after the leader's event
-        # an exit decided before the fill still waits the latency AFTER the entry: max(intent, entry_at)
-        landed = state.entry_at + timedelta(milliseconds=self.spec.execution_latency_ms)
-        not_before = max(job.target_at, landed)
-        read = await self._reader.curve_at(
-            state.mint,
-            not_before=not_before,
-            window_s=self.spec.exit_window_s,
-            min_slot=floor + 1,
-            after=state.entry_at,
-        )
-        if read is None and self._reader.last_refused.get(state.mint) == "curve_emptied":
-            return await self._migrated(state, job, not_before)
-        if read is None:
-            return None, NO_EXIT_STATE
-        snapshot = read.snapshot
-        if not (snapshot.complete or snapshot.reserves.complete):
-            return close_on_curve(state, snapshot, job), MARK_CURVE
-        return await self._migrated(state, job, not_before)
-
-    async def _migrated(
-        self, state: BetState, job: CloseIntent, not_before: datetime
-    ) -> tuple[BetExit | None, str | None]:
-        """The curve is gone (``complete`` or emptied): out by name unless the pool is a venue."""
-        if "pumpswap" not in self.spec.venues:  # the pool is not a venue of this cohort
-            return None, MIGROU_FORA_DE_PRACA
-        found = await self._reader.pool_sale_trades(
-            state.mint,
-            not_before=not_before,
-            after=state.entry_at,
-            window_s=self.spec.exit_window_s,
-        )
-        if found is None:
-            return None, NO_POOL_TRADE
-        trade, known = found
-        return close_on_pool_trade(state, trade, known, job), MARK_POOL_TAPE
-
-    # ------------------------------------------------------------------ late facts
-    async def _confirm(self, job: ConfirmIntent) -> None:
-        bet_id = self._bet_of(job.key)
-        self._stats.record_confirmation(job.delay_ms)
-        if bet_id is None:
-            return
-        async with role_session(self._sessions, db_role=WORKER_ROLE) as session:
-            await set_copy_fact(
-                session, bet_id, where=job.kind, name="confirmation_delay_ms", value=job.delay_ms
-            )
-
-    async def _invalidate(self, job: InvalidateIntent) -> None:
-        """The event behind a copy was not confirmed: the reason is written on the copy and the copy
-        **stays** in the primary with its economic result — an open one was already sent to market
-        (``invalidated``) by the book, ahead of this job in the same lock."""
-        self._stats.record_invalidated()
-        bet_id = self._bet_of(job.key)
-        if bet_id is None:
-            return
-        async with role_session(self._sessions, db_role=WORKER_ROLE) as session:
-            await set_copy_fact(
-                session, bet_id, where="entry", name="invalid_reason", value=job.reason
-            )
-            await set_copy_fact(
-                session, bet_id, where="entry", name="invalid_event", value=job.kind
-            )
-
-    def _bet_of(self, key: str) -> str | None:
-        live = self.live.get(key)
-        return live.bet_id if live is not None else self._closed.get(key)

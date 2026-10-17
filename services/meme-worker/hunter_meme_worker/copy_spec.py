@@ -55,6 +55,8 @@ __all__ = [
 ]
 
 COPY_CLOCK = "copy"
+FILL_DEADLINE_S = 30
+"""The fill window, counted from the decision (R2 fix F9, pending emenda 5)."""
 PRIMARY_STRATUM = "regra"
 """The stratum of the cohort's only population (``copy_v0/1``); ``escolha_everton`` is descriptive."""
 LAMPORTS_PER_SOL = Decimal(1_000_000_000)
@@ -101,6 +103,7 @@ class CopySpec:
     stop_fraction: Decimal
     time_cap_s: int
     exec_latency_s: Decimal
+    stress_latency_s: Decimal
     fill_window_s: int
     exit_window_s: int
     max_attempts_per_leader_day: int
@@ -139,6 +142,10 @@ class CopySpec:
         return int(self.exec_latency_s * 1000)
 
     @property
+    def stress_latency_ms(self) -> int:
+        return int(self.stress_latency_s * 1000)
+
+    @property
     def min_trigger_lamports(self) -> int:
         return int(self.min_trigger_sol * LAMPORTS_PER_SOL)
 
@@ -163,6 +170,7 @@ class CopySpec:
         size = decimal_of(params["size_sol"])
         floor = decimal_of(params["min_trigger_sol"])
         latency = decimal_of(params["exec_latency_s"])
+        stress = decimal_of(params.get("stress_latency_s", "3.9"))
         venues = tuple(str(v) for v in params.get("venues", ["curve"]))
         if size <= 0 or floor < 0 or latency < 0:
             raise ValueError(
@@ -181,7 +189,8 @@ class CopySpec:
             stop_fraction=_fraction(params, "stop_fraction"),
             time_cap_s=_count(params, "time_cap_s", 3600),
             exec_latency_s=latency,
-            fill_window_s=_count(params, "fill_window_s", 30),
+            stress_latency_s=stress,
+            fill_window_s=_count(params, "fill_window_s", FILL_DEADLINE_S),
             exit_window_s=_count(params, "exit_window_s", 60),
             max_attempts_per_leader_day=_count(params, "max_attempts_per_leader_day", 20),
             max_open_per_stratum=_count(params, "max_open_per_stratum", 100),

@@ -48,6 +48,8 @@ class Pending:
     kind: Kind
     deadline: datetime
     first_observed_at: datetime
+    rpc_only: bool = False
+    """Only ``rpc_error`` ever answered: a node that did not answer is not a verdict."""
 
 
 class Confirmations:
@@ -72,6 +74,15 @@ class Confirmations:
             self._pending[seen_key(event)] = Pending(
                 key, event.signature, kind, now + self._timeout, event.first_seen_at
             )
+
+    def note_rpc_error(self, signature: str, wallet: str, mint: str) -> bool:
+        """``rpc_error`` says nothing: the copy keeps waiting, and remembers that nothing else came."""
+        for side in ("buy", "sell"):
+            pending = self._pending.get((signature, wallet, mint, side))
+            if pending is not None:
+                pending.rpc_only = True
+                return True
+        return False
 
     def restore(self, pending: Pending, event_key: SeenKey, seen: Seen) -> None:
         """A provisional copy that survived a restart still waits for its confirmation."""

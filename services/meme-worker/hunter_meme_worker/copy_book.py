@@ -8,13 +8,14 @@ Rules (``docs/design/copiar-carteiras-papel.md`` §3.2/§3.4, pre-registered in 
 
 * **entry** = the first observation of a (leader, mint) pair, if it is a first purchase (position
   before = 0) of at least ``min_trigger_sol``, on the curve, with the (stratum, mint) key free, under
-  ``max_attempts_per_leader_day`` and not gapped; an admitted attempt **consumes the key** even if it
-  ends unfilled. Every first observation not admitted is a durable ``rejected`` funnel row;
+  ``max_attempts_per_leader_day``, not inside an effective-loss hole and not owed a recomposition; an
+  admitted attempt **consumes the key** even if it ends unfilled. Every first observation not admitted
+  is a durable ``rejected`` funnel row;
 * **exit** = the leader's ``position_after`` at 0 or at ``exit_leader_drop_fraction`` of its peak; our
-  own exits (stop, time cap) come from the sweep and the mark pass; a gap censors a leader-driven exit;
-* **confirmation**: act on the first trustworthy signal; the chain's verdict (``LeaderConfirmation``, or
-  the same fact re-sent) records the delay, and ``divergent``/``failed_tx``/``not_found`` **invalidate**
-  the copy by name — it stays in the primary, sold at market (``invalidated``).
+  own exits (stop, time cap) come from the sweep and the mark pass;
+* **holes**: see ``copy_book_gaps.py`` (source-health gaps flag, coverage gaps censor and block);
+* **confirmation**: see ``copy_book_confirm.py`` (act on the first trustworthy signal, the chain's
+  verdict arrives later).
 """
 
 from __future__ import annotations
@@ -24,28 +25,27 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from hunter_core.domain.types import uuid7
-from hunter_meme_worker.copy_confirm import Confirmations, Pending, Seen
+from hunter_meme_worker.copy_book_confirm import BookConfirm
+from hunter_meme_worker.copy_book_gaps import BookGaps
+from hunter_meme_worker.copy_confirm import Confirmations
 from hunter_meme_worker.copy_events import (
     ABAIXO_DO_PISO,
     AFTER_HORIZON,
     ALREADY_OBSERVED,
     BEFORE_T0,
     CO_COMPRA,
-    DUPLICATE_SIGNATURE,
     EVIDENCIA_INSUFICIENTE,
-    EXIT_INVALIDATED,
     EXIT_LEADER_FULL,
     EXIT_LEADER_PEAK_DROP,
     EXIT_LEADER_TRANSFER,
     EXIT_NOT_TRIGGERED,
     EXIT_TIME_CAP,
-    FUNIL_INDISPONIVEL,
-    INVALID_DIVERGENT,
-    INVALID_NOT_FOUND,
     LACUNA,
     LEADER_GAP_EXIT,
     MULTI_MINT,
     NAO_PRIMEIRA,
+    NOT_ARMED,
+    RECOMPOSICAO_PENDENTE,
     RULE_SET_RETIRED,
     SELL_WITHOUT_ENTRY,
     TETO_ABERTO,
@@ -55,8 +55,6 @@ from hunter_meme_worker.copy_events import (
     VENUE_FORA_DO_ESCOPO,
     CensorEntry,
     CloseIntent,
-    ConfirmIntent,
-    InvalidateIntent,
     Job,
     LeaderRef,
     OpenIntent,
@@ -64,12 +62,12 @@ from hunter_meme_worker.copy_events import (
     leader_ref,
     target_of,
 )
-from hunter_meme_worker.copy_gaps import GapRegistry
+from hunter_meme_worker.copy_gaps import GapRegistry, Recompositions
 from hunter_meme_worker.copy_position import Decision, Position
 from hunter_meme_worker.copy_restore import BookRestore
 
 if TYPE_CHECKING:
-    from hunter_exchanges.pumpfun.leader_events import LeaderConfirmation, LeaderEvent, LeaderGap
+    from hunter_exchanges.pumpfun.leader_events import LeaderEvent
     from hunter_meme_worker.copy_spec import CopySpec
 
 __all__ = ["CopyBook", "Decision", "Position"]
@@ -77,27 +75,34 @@ __all__ = ["CopyBook", "Decision", "Position"]
 ONE = Decimal(1)
 
 
-class CopyBook(BookRestore):
-    def __init__(self, spec: CopySpec, *, t0: datetime) -> None:
+class CopyBook(BookConfirm, BookGaps, BookRestore):
+    def __init__(self, spec: CopySpec, *, t0: datetime, armed: bool = True) -> None:
         self._spec = spec
         self._t0 = t0
+        self._armed = armed
         self._stratum = {leader.wallet: leader.stratum for leader in spec.leaders}
         self._by_key: dict[str, Position] = {}
         self._by_pair: dict[tuple[str, str], Position] = {}
         self._observed: set[tuple[str, str]] = set()
+        self._unlanded: set[tuple[str, str]] = set()
         self._consumed: set[tuple[str, str]] = set()
         self._attempts: dict[tuple[str, date], int] = {}
         self._occupied: dict[str, int] = {}
         self._end = t0 + timedelta(days=spec.horizon_days)
         self._confirm = Confirmations(spec.confirm_timeout_s)
         self._pool_mints: set[str] = set()
-        self.funnel_unavailable = False
         self._gaps = GapRegistry()
+        self._recomp = Recompositions(self._stratum, spec.id)
+        self._window_seq = 0
 
     # ---------------------------------------------------------------- reads
     @property
     def open_count(self) -> int:
         return len(self._by_key)
+
+    @property
+    def funnel_unavailable(self) -> bool:
+        return self._gaps.funnel_open()
 
     def position(self, key: str) -> Position | None:
         return self._by_key.get(key)
@@ -107,18 +112,6 @@ class CopyBook(BookRestore):
 
     def occupied(self, stratum: str) -> int:
         return self._occupied.get(stratum, 0)
-
-    # ---------------------------------------------------------------- gaps
-    def on_gap(self, gap: LeaderGap, now: datetime) -> None:
-        self._gaps.add(gap)
-        for pos in self._by_key.values():
-            affected = gap.wallet is None or gap.wallet == pos.leader
-            if (
-                affected
-                and GapRegistry.overlaps_life(gap, pos.opened_by)
-                and pos.gap_reason is None
-            ):
-                pos.gap_reason = LEADER_GAP_EXIT
 
     # ---------------------------------------------------------------- events
     def on_event(self, event: LeaderEvent, now: datetime) -> Decision:
@@ -133,43 +126,32 @@ class CopyBook(BookRestore):
         if event.fields_complete_at < self._t0:  # the design's T0 test: the legs were all there
             return Decision(skipped=BEFORE_T0)
         if event.side == "buy":
+            if not self._armed:
+                return Decision(skipped=NOT_ARMED)  # T0 is the source's first moment up
             if not self._spec.accepting_entries:
                 return Decision(skipped=RULE_SET_RETIRED)  # only keeping what is open
             if now >= self._end:
                 return Decision(skipped=AFTER_HORIZON)
-            if (
-                self.funnel_unavailable
-            ):  # a funnel write was lost: eligibility is no longer recoverable
-                return Decision(skipped=FUNIL_INDISPONIVEL)
         self._confirm.remember(event)
         ref = leader_ref(event, stratum)
         if event.side == "buy":
             return self._on_buy(event, ref, now)
         return self._on_sell(event, ref, now)
 
-    def _repeat(self, event: LeaderEvent, seen: Seen, now: datetime) -> Decision:
-        outcome = self._confirm.confirmed(event, seen)
-        if outcome is None:
-            return Decision(skipped=DUPLICATE_SIGNATURE)
-        pending, same = outcome
-        if not same:  # the same transaction confirmed with another fact: what we acted on was wrong
-            return Decision(jobs=self._invalidate(pending, INVALID_DIVERGENT, now))
-        delay = int((event.first_seen_at - pending.first_observed_at).total_seconds() * 1000)
-        return Decision(
-            jobs=[ConfirmIntent(pending.key, event.signature, pending.kind, max(0, delay))]
-        )
-
     # ---------------------------------------------------------------- entry
     def _on_buy(self, event: LeaderEvent, ref: LeaderRef, now: datetime) -> Decision:
         pair = (event.wallet, event.mint)
         live = self._by_pair.get(pair)
         if live is not None:
-            live.peak_atoms = max(live.peak_atoms, event.position_after_atoms)
+            if event.position_after_atoms > live.peak_atoms:
+                live.peak_atoms = event.position_after_atoms
+                self._confirm.expect(
+                    event, live.key, "entry", now
+                )  # it moved the policy: confirm it
         if pair in self._observed:
-            return Decision(
-                skipped=ALREADY_OBSERVED
-            )  # only the first observation of a pair is a fact
+            return Decision(skipped=ALREADY_OBSERVED)
         self._observed.add(pair)
+        self._unlanded.add(pair)  # observed in memory; durable once its row lands
         reason = self._refusal(event, ref.stratum, now)
         if reason is not None:
             return Decision(jobs=[RejectEntry(event.mint, ref, reason, now)])
@@ -186,6 +168,7 @@ class CopyBook(BookRestore):
             opened_by=event.first_seen_at,
             decided_at=now,
             peak_atoms=event.position_after_atoms,
+            contam=self._gaps.health_reason(event.wallet, event.block_time, event.first_seen_at),
         )
         self._add(pos)
         self._confirm.expect(event, pos.key, "entry", now)
@@ -211,8 +194,10 @@ class CopyBook(BookRestore):
             >= self._spec.max_attempts_per_leader_day
         ):
             return TETO_DIA
-        if self._gaps.covers(event.wallet, event.block_time, event.first_seen_at):
+        if self._gaps.blocks_entry(event.wallet, event.block_time, event.first_seen_at, now):
             return LACUNA
+        if self.is_blocked(event.wallet):
+            return RECOMPOSICAO_PENDENTE
         return None
 
     def _add(self, pos: Position) -> None:
@@ -237,44 +222,24 @@ class CopyBook(BookRestore):
         if event.kind == "transfer":  # we measure "the leader reduced", not "the leader sold"
             reason = EXIT_LEADER_TRANSFER
         censor = pos.gap_reason
-        if censor is None and self._gaps.covers(
+        if censor is None and self._gaps.blinds(
             event.wallet, event.block_time, event.first_seen_at
         ):
             censor = LEADER_GAP_EXIT
+        if pos.contam is None:
+            pos.contam = self._gaps.health_reason(
+                event.wallet, event.block_time, event.first_seen_at
+            )
         job = self._close(pos, reason, ref, now, censor)
         self._confirm.expect(event, pos.key, "exit", now)
         return Decision(jobs=[job])
-
-    def on_confirmation(self, conf: LeaderConfirmation, now: datetime) -> Decision:
-        """The chain's verdict on a fact we acted on. ``confirmed`` records the delay; ``divergent``,
-        ``failed_tx`` and ``not_found`` invalidate the copy by that name (it stays in the primary);
-        ``rpc_error`` says nothing and leaves the timeout running. Idempotent per fact."""
-        if conf.wallet not in self._stratum or conf.status == "rpc_error":
-            return Decision(skipped=UNKNOWN_WALLET if conf.wallet not in self._stratum else None)
-        found = self._confirm.of_fact(conf.signature, conf.wallet, conf.mint)
-        if found is None:
-            return Decision(skipped=DUPLICATE_SIGNATURE)
-        pending, seen = found
-        if conf.status == "confirmed":
-            chain = (conf.chain_position_after_atoms, conf.chain_token_delta_atoms)
-            same = all(
-                c is None or c == s
-                for c, s in zip(chain, (seen.position_after, seen.token_delta), strict=True)
-            )
-            if not same:
-                return Decision(jobs=self._invalidate(pending, INVALID_DIVERGENT, now))
-            delay = int((conf.confirmed_at - pending.first_observed_at).total_seconds() * 1000)
-            return Decision(
-                jobs=[ConfirmIntent(pending.key, pending.signature, pending.kind, max(0, delay))]
-            )
-        return Decision(jobs=self._invalidate(pending, conf.status, now))
 
     def _close(
         self, pos: Position, reason: str, ref: LeaderRef | None, now: datetime, censor: str | None
     ) -> CloseIntent:
         pos.was, pos.state = pos.state, "closing"
         target = target_of(now, self._spec.execution_latency_ms)
-        contaminated = pos.gap_reason if censor is None else None
+        contaminated = pos.contam or (pos.gap_reason if censor is None else None)
         return CloseIntent(pos.key, pos.mint, reason, ref, now, target, censor, contaminated)
 
     def request_exit(
@@ -292,24 +257,6 @@ class CopyBook(BookRestore):
             for p in self.open_positions()
             if p.entry_at is not None and now - p.entry_at >= cap
         ]
-
-    # ---------------------------------------------------------------- confirmation
-    def expired_confirmations(self, now: datetime) -> list[Job]:
-        """Events that never confirmed inside the timeout. The copy is **invalidated, not dropped**:
-        if still held it is sold at market (``invalidated``) and stays in the primary, and either way
-        the named reason is written on it."""
-        out: list[Job] = []
-        for pending in self._confirm.expired(now):
-            out.extend(self._invalidate(pending, INVALID_NOT_FOUND, now))
-        return out
-
-    def _invalidate(self, pending: Pending, reason: str, now: datetime) -> list[Job]:
-        jobs: list[Job] = []
-        pos = self._by_key.get(pending.key)
-        if pos is not None and pos.state != "closing":
-            jobs.append(self._close(pos, EXIT_INVALIDATED, None, now, None))
-        jobs.append(InvalidateIntent(pending.key, pending.signature, pending.kind, reason, now))
-        return jobs
 
     # ---------------------------------------------------------------- executor callbacks
     def pool_mint_found(self, key: str, leader: str, stratum: str, mint: str, day: date) -> None:
@@ -340,10 +287,14 @@ class CopyBook(BookRestore):
         self._occupied[pos.stratum] = max(0, self._occupied.get(pos.stratum, 0) - 1)
 
     def rollback(self, job: Job) -> None:
-        """The persistence queue refused ``job``: undo the book's side of the decision."""
+        """A job was refused or could not be persisted: undo the book's side of the decision."""
         if isinstance(job, OpenIntent):
             self.mark_closed(job.key)
         elif isinstance(job, CloseIntent):
             pos = self._by_key.get(job.key)
             if pos is not None and pos.state == "closing":
                 pos.state = pos.was  # a lost exit is retried by the time cap, never forgotten
+                if (
+                    job.leader is not None
+                ):  # the leader's own exit was lost: the time cap is another policy
+                    pos.contam = pos.contam or "exit_not_persisted"

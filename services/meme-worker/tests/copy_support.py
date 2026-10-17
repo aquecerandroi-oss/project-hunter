@@ -12,6 +12,8 @@ from hunter_exchanges.pumpfun.leader_events import (
     LeaderConfirmation,
     LeaderEvent,
     LeaderGap,
+    PostReserves,
+    Source,
 )
 from hunter_meme_worker.copy_spec import CopyLeader, CopySpec
 
@@ -75,6 +77,7 @@ def buy(
     slot: int | None = None,
     multi_mint: bool = False,
     kind: Kind = "unknown",
+    source: Source = "nats",
 ) -> LeaderEvent:
     _counter["n"] += 1
     return LeaderEvent(
@@ -91,7 +94,7 @@ def buy(
         block_time=block_time if block_time is not None else at - timedelta(seconds=1),
         first_seen_at=at,
         fields_complete_at=at + timedelta(milliseconds=2),
-        source="nats",
+        source=source,
         confirmed=confirmed,
         multi_mint=multi_mint,
         kind=kind,
@@ -108,6 +111,7 @@ def sell(
     signature: str | None = None,
     block_time: datetime | None = None,
     kind: Kind = "unknown",
+    source: Source = "nats",
 ) -> LeaderEvent:
     _counter["n"] += 1
     return LeaderEvent(
@@ -122,7 +126,7 @@ def sell(
         block_time=block_time if block_time is not None else at - timedelta(seconds=1),
         first_seen_at=at,
         fields_complete_at=at + timedelta(milliseconds=2),
-        source="nats",
+        source=source,
         confirmed=confirmed,
         multi_mint=False,
         kind=kind,
@@ -149,6 +153,7 @@ def confirmation(
     at: datetime | None = None,
     chain_position_after: int | None = None,
     chain_token_delta: int | None = None,
+    post_reserves: PostReserves | None = None,
 ) -> LeaderConfirmation:
     return LeaderConfirmation(
         wallet=event.wallet,
@@ -161,4 +166,5 @@ def confirmation(
         block_time=None,
         chain_position_after_atoms=chain_position_after,
         chain_token_delta_atoms=chain_token_delta,
+        post_reserves=post_reserves,
     )

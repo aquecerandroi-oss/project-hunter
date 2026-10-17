@@ -93,3 +93,61 @@ estende.
 
 [[Revisoes-Astra/Index|índice das revisões]] · [[EXP-M15-carteiras-vencedoras]] ·
 [[KB-0149-o-que-a-mesa-real-ensinou]] · [[Open Bugs]]
+
+## Revisão R2 integrada (09/10/2026)
+
+A R2 integrada do piloto (pista + fonte + combinação) deu REQUEST_CHANGES com 8 must-fix. As decisões que vieram dela estão na emenda 5 do H-037, que segue em rascunho. Síntese, aceites e os quatro deltas levados à Sexta-feira: [[cr-copy-pilot]].
+
+Revisão de fronteira do guardião (R4, 09/10): [[guardian-copy-boundary]] — nenhum caminho de ordem real; F1/F2 (pedigree e pinos) abertos, F3 corrigido.
+
+## Correção da R2 (09/10/2026): rodadas 3 e 4 com a Astra
+
+Contexto: a revisão de código do commit `0736023a` deu REQUEST_CHANGES (B1 a B6, F7 a F9, sensibilidades,
+F4); a síntese dela está em [[cr-copy-pilot]]. A correção foi feita com teste que falha antes, e a Astra
+revisou o diff duas vezes (`.claude/state/astra-review-copy-lane-fix-r2.md` e `...-fix-r2b.md`), as duas
+com REQUEST_CHANGES, a segunda mais estreita.
+
+**Rodada 3 (8 achados), todos corrigidos em código e teste:** a saída que passava na frente de uma
+entrada estacionada (agora espera a linha da entrada: `NotYet`); o desligamento que perdia o job em
+andamento (o executor devolve o job cancelado e `stop()` o escreve); a lacuna fechada cuja janela não foi
+lida e que o reinício esquecia (`owed_gaps` mais o marcador `recomposed`); a lacuna de saúde promovida a
+downtime global no reinício (agora cada buraco mantém escopo e tipo, e o downtime começa no último
+marcador); o `unverified` ressuscitado como pendência após reinício; o buraco do funil que começava
+depois do fato perdido (`funnel_failed(since)`); a posição sobrevivente censurada antes de tentar reler
+(`mint_trace` antes de manter a censura); e T0 sem prontidão da fonte (`wait_ready`).
+
+**Rodada 4 (5 achados):**
+
+| # | Achado da Astra | O que foi feito |
+|---|---|---|
+| 1 | entrada perdida no estouro do outbox deixava posição sem linha | `_defer` abandona a entrada (`mark_closed`) e abre o buraco desde `decided_at`; a espera esgotada de uma saída vira `_give_up` (volta a aberta e abre buraco), não só `annotation_lost` |
+| 2 | `stop()` ainda perdia obrigações | o executor guarda a tarefa de cada job antes de ela começar (cancelada antes do primeiro passo não se perde); job tirado da fila durante o fechamento volta à fila; nota terminal (`unverified`/`invalidated`) que o `stop()` não escreve vira buraco declarado |
+| 3 | `recomposed` gravado sem o par cuja escrita se perdeu | o livro separa "observado em memória" de "linha gravada" (`_unlanded`, `landed(job)`): a janela reemite o par que só está em memória e não reemite o que já está no banco |
+| 4 | `copy_alive` avançava além do recuperável | o downtime do reinício e o fechamento dos buracos abertos são gravados na mesma transação que o primeiro marcador, antes dele; em operação o marcador para no fato mais antigo ainda não durável (`oldest_unlanded`) |
+| 5 | prontidão da fonte opcional mantém o achado 8 aberto | não feito, decisão do orquestrador (ver abaixo) |
+
+**Onde discordo da Astra:**
+
+- Item 2, `CloseIntent` já precificado e perdido no `stop()`: a Astra pede registrar a saída como
+  obrigação durável. Mantive a posição aberta no banco; no reinício ela volta marcada `worker_restart_gap`,
+  relida na cadeia (`mint_trace`) e só é censurada, com nome, se a posição do líder não puder ser lida.
+  Uma saída de stop interna cujo preço se recuperou antes do reinício, porém, se perde: o resultado fica
+  sinalizado `contaminated`, não corrigido. É escolha de custo (reconstruir o gatilho exigiria guardar o
+  estado do stop), não prova de que é inofensivo.
+- Item 5, prontidão obrigatória: sem `wait_ready` a pista ainda arma quando o stream inicia (T0 pode
+  cair até cerca de 20 s antes de a rede responder; `CopyFleet.ready_signal = False` mostra isso). Tornar
+  o método obrigatório deixa o piloto sem armar até a tarefa A e o `copy_main` (o wrapper
+  `_RenewedLeaderSource` só expõe `stream`) o entregarem; isso é decisão de prontidão do T0, não minha.
+
+**Aberto, para o orquestrador:** (a) o gancho `LeaderHistory` (`window`, `mint_trace`) e `wait_ready` na
+fonte da tarefa A, e o `copy_main` passar `history=` à pista (hoje não passa: sem histórico toda
+recomposição falha fechada e o líder fica bloqueado); (b) a tabela `meme_ingest_gaps` é append-only, então
+abertura e fechamento são duas linhas com `gap_id` determinístico e o marcador `copy_alive:<rule_set_id>`
+é outra linha a cada 30 s: se isso incomodar, o `database-architect` decide se vira tabela própria;
+(c) a reconciliação de multi-mint por confirmação (achado 6 do CR) segue sem fazer porque
+`LeaderConfirmation` não traz o dado.
+
+Aprendizado: o checkpoint de vida (`copy_alive`) só vale se for limitado pelo fato mais antigo ainda sem
+representação durável; separar três estados (conhecido, durável, concluído) explica cinco dos oito achados
+da rodada 3. Prova das correções: 37 mutações (21 de unidade e 16 da rodada 4) rodadas no código final,
+todas mortas pelos testes.

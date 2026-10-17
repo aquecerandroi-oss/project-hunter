@@ -10,12 +10,15 @@ chain's resolution, not ours).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final, Literal
+from uuid import uuid4
+
+from hunter_meme_worker.copy_ref import LeaderRef, leader_ref, ms_iso, window_ref
 
 if TYPE_CHECKING:
-    from hunter_exchanges.pumpfun.leader_events import LeaderEvent, LeaderGap
+    from hunter_exchanges.pumpfun.leader_events import LeaderGap
 
 __all__ = [
     "CENSOR_REASONS",
@@ -29,7 +32,10 @@ __all__ = [
     "Job",
     "LeaderRef",
     "OpenIntent",
+    "RecomposeDone",
     "RecordGap",
+    "UnverifiedIntent",
+    "window_ref",
     "RejectEntry",
     "leader_ref",
     "ms_iso",
@@ -46,6 +52,8 @@ LACUNA: Final = "lacuna"
 MULTI_MINT: Final = "multi_mint"
 EVIDENCIA_INSUFICIENTE: Final = "evidencia_insuficiente"
 VENUE_FORA_DO_ESCOPO: Final = "venue_fora_do_escopo"
+RECOMPOSICAO_PENDENTE: Final = "recomposicao_pendente"
+VISTO_NA_LACUNA: Final = "visto_na_lacuna"
 
 REJECT_REASONS: Final = frozenset(
     {
@@ -57,6 +65,8 @@ REJECT_REASONS: Final = frozenset(
         MULTI_MINT,
         EVIDENCIA_INSUFICIENTE,
         VENUE_FORA_DO_ESCOPO,
+        RECOMPOSICAO_PENDENTE,
+        VISTO_NA_LACUNA,
     }
 )
 
@@ -90,6 +100,7 @@ copy that priced nothing. A new reason is a code change and a test, never a stri
 
 # --- invalidation: the event behind a copy was not confirmed; the copy STAYS in the primary -------------
 INVALID_NOT_FOUND: Final = "not_found"
+UNVERIFIED: Final = "unverified"
 INVALID_DIVERGENT: Final = "divergent"
 EXIT_INVALIDATED: Final = "invalidated"
 
@@ -101,9 +112,11 @@ ALREADY_OBSERVED: Final = "already_observed"
 SELL_WITHOUT_ENTRY: Final = "sell_without_entry"
 EXIT_NOT_TRIGGERED: Final = "exit_not_triggered"
 BEFORE_T0: Final = "before_t0"
+NOT_ARMED: Final = "not_armed"
 AFTER_HORIZON: Final = "after_horizon"
 RULE_SET_RETIRED: Final = "rule_set_retired"
 FUNIL_INDISPONIVEL: Final = "funil_indisponivel"
+WORKER_DOWNTIME: Final = "worker_downtime"
 
 SKIP_REASONS: Final = frozenset(
     {
@@ -114,9 +127,9 @@ SKIP_REASONS: Final = frozenset(
         SELL_WITHOUT_ENTRY,
         EXIT_NOT_TRIGGERED,
         BEFORE_T0,
+        NOT_ARMED,
         AFTER_HORIZON,
         RULE_SET_RETIRED,
-        FUNIL_INDISPONIVEL,
     }
 )
 
@@ -128,71 +141,8 @@ EXIT_SAFETY_STOP: Final = "safety_stop"
 EXIT_TIME_CAP: Final = "time_cap"
 
 
-def ms_iso(value: datetime) -> str:
-    """ISO-8601 with millisecond precision — the lane's stamp format."""
-    return value.isoformat(timespec="milliseconds")
-
-
-@dataclass(frozen=True, slots=True)
-class LeaderRef:
-    """What we know of the leader's transaction behind a decision (stored on the row)."""
-
-    wallet: str
-    stratum: str
-    signature: str
-    slot: int
-    block_time: datetime | None
-    observed_at: datetime
-    """The event's ``first_seen_at``: our clock when the first leg woke ``recv``."""
-    fields_complete_at: datetime
-    source: str
-    confirmed: bool
-    token_delta_atoms: int
-    sol_delta_lamports: int | None
-    position_after_atoms: int
-    kind: str = "unknown"
-    multi_mint: bool = False
-    server_ts: datetime | None = None
-
-    def as_json(self) -> dict[str, Any]:
-        return {
-            "wallet": self.wallet,
-            "stratum": self.stratum,
-            "signature": self.signature,
-            "slot": self.slot,
-            "block_time": None if self.block_time is None else ms_iso(self.block_time),
-            "observed_at": ms_iso(self.observed_at),
-            "first_seen_at": ms_iso(self.observed_at),
-            "fields_complete_at": ms_iso(self.fields_complete_at),
-            "server_ts": None if self.server_ts is None else ms_iso(self.server_ts),
-            "kind": self.kind,
-            "multi_mint": self.multi_mint,
-            "source": self.source,
-            "confirmed_at_decision": self.confirmed,
-            "token_delta_atoms": self.token_delta_atoms,
-            "sol_delta_lamports": self.sol_delta_lamports,
-            "position_after_atoms": self.position_after_atoms,
-        }
-
-
-def leader_ref(event: LeaderEvent, stratum: str) -> LeaderRef:
-    return LeaderRef(
-        wallet=event.wallet,
-        stratum=stratum,
-        signature=event.signature,
-        slot=event.slot,
-        block_time=event.block_time,
-        observed_at=event.first_seen_at,
-        fields_complete_at=event.fields_complete_at,
-        source=event.source,
-        confirmed=event.confirmed,
-        token_delta_atoms=event.token_delta_atoms,
-        sol_delta_lamports=event.sol_delta_lamports,
-        position_after_atoms=event.position_after_atoms,
-        kind=event.kind,
-        multi_mint=event.multi_mint,
-        server_ts=event.server_ts,
-    )
+def _oid() -> str:
+    return uuid4().hex
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +155,7 @@ class OpenIntent:
     leader: LeaderRef
     decided_at: datetime
     target_at: datetime
+    oid: str = field(default_factory=_oid)
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,6 +175,7 @@ class CloseIntent:
     """Set when the copy lived across a gap or a restart: the sale is still priced (an own exit does
     not depend on the leader) but the copy leaves the primary set — it is flagged, never silently
     ``measured`` (the design's ``contaminated``)."""
+    oid: str = field(default_factory=_oid)
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,6 +187,7 @@ class CensorEntry:
     leader: LeaderRef
     reason: str
     decided_at: datetime
+    oid: str = field(default_factory=_oid)
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,6 +199,22 @@ class RejectEntry:
     leader: LeaderRef
     reason: str
     decided_at: datetime
+    oid: str = field(default_factory=_oid)
+
+
+@dataclass(frozen=True, slots=True)
+class RecomposeDone:
+    """A leader's window was read from the chain's history: persist the pairs it bought inside the hole
+    (``rejected/visto_na_lacuna``) and **then** the durable marker that the window is done - one job, so a
+    crash can never leave the marker without the pairs."""
+
+    wallet: str
+    gap_id: str
+    start: datetime
+    end: datetime
+    reason: str
+    seen: tuple[RejectEntry, ...] = ()
+    oid: str = field(default_factory=_oid)
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,6 +225,9 @@ class ConfirmIntent:
     signature: str
     kind: Literal["entry", "exit"]
     delay_ms: int
+    post_reserves: dict[str, Any] | None = None
+    """The market right after the leader's trade, as the chain reported it: the ``ideal`` sensitivity."""
+    oid: str = field(default_factory=_oid)
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,13 +239,28 @@ class InvalidateIntent:
     kind: Literal["entry", "exit"]
     reason: str
     decided_at: datetime
+    oid: str = field(default_factory=_oid)
+
+
+@dataclass(frozen=True, slots=True)
+class UnverifiedIntent:
+    """Only ``rpc_error`` ever answered for the event behind ``key``: the copy is flagged
+    ``unverified`` and kept — a node that did not answer is not a verdict."""
+
+    key: str
+    signature: str
+    kind: Literal["entry", "exit"]
+    decided_at: datetime
+    oid: str = field(default_factory=_oid)
 
 
 @dataclass(frozen=True, slots=True)
 class RecordGap:
-    """A closed coverage hole to persist in ``meme_ingest_gaps`` (``copy_leader:<wallet>`` or ``:*``)."""
+    """A coverage hole to persist in ``meme_ingest_gaps`` (``copy_leader:<wallet>`` or ``:*``): once when
+    it **opens** and once when it closes (the table is append-only)."""
 
     gap: LeaderGap
+    oid: str = field(default_factory=_oid)
 
 
 Job = (
@@ -283,7 +270,9 @@ Job = (
     | RejectEntry
     | ConfirmIntent
     | InvalidateIntent
+    | UnverifiedIntent
     | RecordGap
+    | RecomposeDone
 )
 
 

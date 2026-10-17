@@ -140,3 +140,14 @@ def test_a_migrated_mint_is_sold_on_the_pool_trade_with_the_pool_marks_arithmeti
     closed = close_on_pool_trade(state, trade, [trade], close)
     assert closed.exit["venue"] == "pump_amm" and closed.exit["fill"] == "next_trade"
     assert closed.exit_at == when and closed.exit["copy"]["trigger"] == "copy_leader"
+
+
+def test_the_priority_fee_is_inside_the_cost_of_the_leg_once() -> None:
+    intent, spec = _open_intent()
+    snap = snapshot_of(_state(vsol="30", vtok="1073000000", real_sol="0.5", mayhem=False))
+    entry = build_entry(spec, snap, intent, queued_at=intent.decided_at, slot=1)
+    curve_cost, fee = Decimal(entry.entry["curve_cost_sol"]), Decimal(entry.entry["fee_sol"])
+    assert spec.priority_fee_sol > 0
+    assert entry.sol_spent == curve_cost + fee + spec.priority_fee_sol  # the leg's whole cost
+    assert entry.initial_risk_sol == entry.sol_spent
+    assert Decimal(entry.entry["sol_spent"]) == entry.sol_spent

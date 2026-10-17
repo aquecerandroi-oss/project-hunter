@@ -17,6 +17,7 @@ from hunter_meme_worker.copy_events import (
     CloseIntent,
     ConfirmIntent,
     OpenIntent,
+    RecordGap,
 )
 from hunter_meme_worker.copy_lane import CopyLane
 
@@ -80,6 +81,7 @@ def test_a_leader_sell_and_a_gap_are_also_decided_with_no_io() -> None:
     lane.book.mark_open(opened.key, bet_id="b", entry_at=T0)
     lane.on_item(gap(T0, None, wallet=LEADER_B))
     lane.on_item(sell(at=T0 + timedelta(seconds=9)))
+    assert isinstance(lane.queue.get_nowait(), RecordGap)  # a hole is durable the moment it opens
     assert isinstance(lane.queue.get_nowait(), CloseIntent)
     assert lane.stats.gaps_seen == 1
 

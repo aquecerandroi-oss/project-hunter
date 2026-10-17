@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from hunter_meme_worker.copy_events import CloseIntent
     from hunter_meme_worker.copy_position import Live
     from hunter_meme_worker.copy_spec import CopySpec
+    from hunter_meme_worker.copy_stats import CopyStats
 
 __all__ = ["mark_pass", "stop_hit"]
 
@@ -70,6 +71,27 @@ async def _mark_on_pool(
     return pool.mark.mark_sol, pool.mark.high_water_x, trade.block_time
 
 
+async def _write_mark(
+    session_factory: async_sessionmaker[AsyncSession],
+    bet_id: str,
+    *,
+    mark_sol: Decimal,
+    mark_at: datetime,
+    high_water: Decimal,
+    source: str,
+) -> None:
+    async with role_session(session_factory, db_role=WORKER_ROLE) as session:
+        await update_mark(
+            session,
+            bet_id,
+            mark_sol=mark_sol,
+            mark_at=mark_at,
+            high_water_x=high_water,
+            exit_intent=None,
+            mark_source=source,
+        )
+
+
 async def mark_pass(
     *,
     spec: CopySpec,
@@ -79,8 +101,14 @@ async def mark_pass(
     live: dict[str, Live],
     submit: Callable[[CloseIntent], None],
     now: Callable[[], datetime],
+    stats: CopyStats | None = None,
 ) -> int:
-    """Mark every open copy once; returns how many were marked. Never raises on a failed read."""
+    """Mark every open copy once; returns how many were marked. Never raises on a failed read.
+
+    **The stop is decided from the state that was read, before and independently of any write** (R2 fix
+    B4): a database error on the mark must not skip a stop - if the price then recovers, the touch would
+    be lost for good. A state whose slot is below the copy's last accepted slot is an old read arriving
+    late and is ignored (it could fake a stop or hide one)."""
     open_keys = {p.key for p in book.open_positions() if p.key in live}
     if not open_keys:
         return 0
@@ -92,51 +120,61 @@ async def mark_pass(
         return 0
     marked = 0
     pool_venue = "pumpswap" in spec.venues
-    async with role_session(session_factory, db_role=WORKER_ROLE) as session:
-        for key in open_keys:
-            entry = live.get(key)
-            state = batch.states.get(entry.state.mint) if entry is not None else None
-            emptied = entry is not None and batch.refused.get(entry.state.mint) == "curve_emptied"
-            if entry is None or (state is None and not emptied):
+    for key in open_keys:
+        entry = live.get(key)
+        state = batch.states.get(entry.state.mint) if entry is not None else None
+        emptied = entry is not None and batch.refused.get(entry.state.mint) == "curve_emptied"
+        if entry is None or (state is None and not emptied):
+            continue
+        if state is not None and state.slot is not None and state.slot < entry.last_slot:
+            if stats is not None:
+                stats.stale_states_ignored += 1
+            continue
+        if emptied or (state is not None and state.complete):
+            if not pool_venue:  # the pool is not a venue: out, unpriced, by name
+                job = book.request_exit(key, MIGRATED_REASON, now(), censor=MIGROU_FORA_DE_PRACA)
+                if job is not None:
+                    submit(job)
                 continue
-            if emptied or (state is not None and state.complete):
-                if not pool_venue:  # the pool is not a venue: out, unpriced, by name
-                    job = book.request_exit(
-                        key, MIGRATED_REASON, now(), censor=MIGROU_FORA_DE_PRACA
-                    )
-                    if job is not None:
-                        submit(job)
-                    continue
-                pooled = await _mark_on_pool(session, entry, now())
-                if pooled is None:
-                    continue
-                mark_sol, high_water, mark_at = pooled
-                source = MARK_POOL_TAPE
-            else:
-                assert state is not None
-                snapshot = snapshot_of(state)
-                mark = mark_bet(entry.state, snapshot)
-                mark_sol, high_water, mark_at, source = (
-                    mark.mark_sol,
-                    mark.high_water_x,
-                    snapshot.observed_at,
-                    "curve",
-                )
-                if state.slot is not None:
-                    entry.last_slot = max(entry.last_slot, state.slot)
-            entry.state = replace(entry.state, high_water_x=high_water)
-            await update_mark(
-                session,
+            try:
+                async with role_session(session_factory, db_role=WORKER_ROLE) as session:
+                    pooled = await _mark_on_pool(session, entry, now())
+            except Exception as exc:  # the pool tape could not be read: no mark this pass
+                logger.warning("meme_copy_pool_mark_failed", error=str(exc)[:200])
+                continue
+            if pooled is None:
+                continue
+            mark_sol, high_water, mark_at = pooled
+            source = MARK_POOL_TAPE
+        else:
+            assert state is not None
+            snapshot = snapshot_of(state)
+            mark = mark_bet(entry.state, snapshot)
+            mark_sol, high_water, mark_at, source = (
+                mark.mark_sol,
+                mark.high_water_x,
+                snapshot.observed_at,
+                "curve",
+            )
+            if state.slot is not None:
+                entry.last_slot = max(entry.last_slot, state.slot)
+        entry.state = replace(entry.state, high_water_x=high_water)
+        if stop_hit(mark_sol, entry.state.sol_spent, spec.stop_fraction):
+            job = book.request_exit(key, EXIT_SAFETY_STOP, now())
+            if job is not None:
+                submit(job)
+        try:
+            await _write_mark(
+                session_factory,
                 entry.bet_id,
                 mark_sol=mark_sol,
                 mark_at=mark_at,
-                high_water_x=high_water,
-                exit_intent=None,
-                mark_source=source,
+                high_water=high_water,
+                source=source,
             )
             marked += 1
-            if stop_hit(mark_sol, entry.state.sol_spent, spec.stop_fraction):
-                job = book.request_exit(key, EXIT_SAFETY_STOP, now())
-                if job is not None:
-                    submit(job)
+        except Exception as exc:  # the mark is for the eye; the stop above already decided
+            if stats is not None:
+                stats.mark_write_failed += 1
+            logger.warning("meme_copy_mark_write_failed", error=str(exc)[:200])
     return marked
