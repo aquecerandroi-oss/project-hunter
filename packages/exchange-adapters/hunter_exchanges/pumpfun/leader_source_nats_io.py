@@ -7,8 +7,13 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 from typing import Protocol, cast
 
+import httpx
+
+from hunter_core.domain.types import utcnow
 from hunter_exchanges.pumpfun.leader_source_nats_wire import (
     HOME_URL,
     NatsConfig,
@@ -18,10 +23,43 @@ from hunter_exchanges.pumpfun.leader_source_nats_wire import (
 
 REFUSAL_STATUS = frozenset({401, 403, 418, 429})
 OPEN_TIMEOUT_S = 15.0
+RETRY_AFTER_MAX_S = 86_400.0
+"""A day: what the page asks for is honoured up to here (a hostile ``Retry-After`` cannot park us forever)."""
+RECV_QUEUE = 64
+"""Frames the WebSocket library may hold unread: finite, so a flood is backpressure on the socket, not
+unbounded memory (a ``None`` here removed it)."""
+MAX_FRAME = 2 * 1024 * 1024
+
+
+def is_refusal(status: object) -> bool:
+    """401/403/418/429, and any 5xx: the first block stops the fast path (decision 06/10, REA)."""
+    return isinstance(status, int) and (status in REFUSAL_STATUS or status >= 500)
+
+
+def _retry_after(raw: str | None, now: datetime) -> float | None:
+    """``Retry-After`` as seconds (a number, or an HTTP-date counted from ``now``), capped at a day;
+    a past date or anything unreadable is ignored."""
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        try:
+            when = parsedate_to_datetime(raw)
+        except (TypeError, ValueError, IndexError):
+            return None
+        if when.tzinfo is None:
+            return None
+        value = (when - now).total_seconds()
+    if not 0 < value < float("inf"):
+        return None
+    return min(value, RETRY_AFTER_MAX_S)
+
 
 __all__ = [
     "OPEN_TIMEOUT_S",
     "REFUSAL_STATUS",
+    "RETRY_AFTER_MAX_S",
     "ConnectFn",
     "FetchConfig",
     "Seeder",
@@ -29,6 +67,7 @@ __all__ = [
     "WsLike",
     "default_connect",
     "default_fetch_config",
+    "is_refusal",
     "to_bytes",
 ]
 
@@ -56,14 +95,22 @@ FetchConfig = Callable[[], Awaitable[NatsConfig]]
 Seeder = Callable[[str], Awaitable[WalletSnapshot]]
 
 
-async def default_fetch_config() -> NatsConfig:
-    """The anonymous home page is where the site's own client gets its NATS credential."""
-    import httpx
-
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+async def default_fetch_config(
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
+    now: Callable[[], datetime] = utcnow,
+) -> NatsConfig:
+    """The anonymous home page is where the site's own client gets its NATS credential. A block or a
+    server error (``is_refusal``) is a :class:`NatsRefused` carrying ``Retry-After``; the caller backs
+    off on the slow ladder — the page is never hammered."""
+    async with httpx.AsyncClient(
+        timeout=15.0, follow_redirects=True, transport=transport
+    ) as client:
         response = await client.get(HOME_URL)
-    if response.status_code in REFUSAL_STATUS:
-        raise NatsRefused(response.status_code)
+    if is_refusal(response.status_code):
+        raise NatsRefused(
+            response.status_code, _retry_after(response.headers.get("Retry-After"), now())
+        )
     if response.is_error:
         raise ConnectionError(f"home page HTTP {response.status_code}")
     return home_nats_config(response.text)
@@ -77,10 +124,10 @@ def default_connect(url: str) -> AbstractAsyncContextManager[WsLike]:
         websockets.connect(
             url,
             open_timeout=OPEN_TIMEOUT_S,
-            max_size=8_000_000,
+            max_size=MAX_FRAME,
             ping_interval=20,
             ping_timeout=30,
-            max_queue=None,
+            max_queue=RECV_QUEUE,
         ),
     )
 

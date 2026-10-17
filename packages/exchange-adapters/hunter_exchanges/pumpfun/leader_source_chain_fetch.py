@@ -24,7 +24,7 @@ from typing import Any
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import RateLimited
-from hunter_exchanges.pumpfun.leader_source_rpc_guard import RpcRefused
+from hunter_exchanges.pumpfun.leader_source_rpc_guard import RpcRefused, is_blocking
 from hunter_exchanges.pumpfun.leader_source_stats import LeaderSourceStats
 
 logger = get_logger(__name__)
@@ -37,7 +37,6 @@ MAX_INFLIGHT = 8
 REFUSAL_COOLDOWN_S = 30.0
 CACHE_MAX = 256
 _HTTP_STATUS = re.compile(r"HTTP (\d{3})")
-_REFUSAL_STATUS = frozenset({401, 403, 418})
 
 __all__ = ["DEADLINE_S", "RETRY_DELAYS_S", "FetchTx", "TxFetcher"]
 
@@ -109,7 +108,7 @@ class TxFetcher:
         if isinstance(exc, RateLimited):
             return "rate_limited", max(exc.retry_after_s, 1.0)
         found = _HTTP_STATUS.search(str(exc))
-        if found is not None and int(found[1]) in _REFUSAL_STATUS:
+        if found is not None and is_blocking(int(found[1])):
             return f"refused_{found[1]}", REFUSAL_COOLDOWN_S
         return None
 

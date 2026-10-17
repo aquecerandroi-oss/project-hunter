@@ -47,6 +47,7 @@ from hunter_exchanges.pumpfun.leader_source_chain_fetch import (
 )
 from hunter_exchanges.pumpfun.leader_source_chain_run import ChainRun, ListSignatures, LogsFeed
 from hunter_exchanges.pumpfun.leader_source_stats import LeaderSourceStats
+from hunter_exchanges.pumpfun.leader_source_wallets import validate_wallets
 
 logger = get_logger(__name__)
 
@@ -55,22 +56,16 @@ SETTLE_S = 1.0
 
 __all__ = ["ChainLeaderSource", "LogsFeed"]
 
-_CANNOT_VERIFY = frozenset({"logs_unreadable", "mint_unresolved"})
-"""The transaction was reached but could not be read into a verdict: not a divergence."""
 
-
-def _status_of(reason: str) -> ConfirmationStatus:
+def status_of(reason: str) -> ConfirmationStatus:
+    """``divergent`` is only ever produced where a transaction WAS read and disagrees (``confirm`` below);
+    any reason that leaves no events to compare — including one this code has never seen — is
+    unverifiable (``rpc_error``), never a divergence."""
     if reason == "not_found":
         return "not_found"
     if reason == "tx_failed":
         return "failed_tx"
-    if (
-        reason in _CANNOT_VERIFY
-        or reason in ("rate_limited", "unavailable")
-        or reason.startswith("refused_")
-    ):
-        return "rpc_error"
-    return "divergent"
+    return "rpc_error"
 
 
 class ChainLeaderSource:
@@ -137,7 +132,7 @@ class ChainLeaderSource:
         if not read.events:
             reason = read.reason or "not_a_trade"
             return LeaderConfirmation(
-                status=_status_of(reason), reason=reason, block_time=None, **base
+                status=status_of(reason), reason=reason, block_time=None, **base
             )
         chain = next((e for e in read.events if e.mint == event.mint), None)
         if chain is None and read.partial:  # the trade may sit in the part that could not be read
@@ -172,9 +167,7 @@ class ChainLeaderSource:
 
     # ------------------------------------------------------------------ the stream
     async def stream(self, wallets: Collection[str]) -> AsyncIterator[LeaderItem]:
-        followed = frozenset(wallets)
-        if not followed:
-            raise ValueError("a leader source needs at least one wallet")
+        followed = validate_wallets(wallets)  # fail closed: only real keys reach a SUB line
         run = ChainRun(
             followed=followed,
             feed=self._feed,
@@ -187,9 +180,9 @@ class ChainLeaderSource:
             settle_s=self._settle,
         )
         tasks = [
-            asyncio.create_task(run.listen()),
-            asyncio.create_task(run.setup()),
-            asyncio.create_task(run.monitor()),
+            asyncio.create_task(run.supervise("listen", run.listen, restart_on_return=True)),
+            asyncio.create_task(run.supervise("setup", run.setup, restart_on_return=False)),
+            asyncio.create_task(run.supervise("monitor", run.monitor, restart_on_return=True)),
         ]
         try:
             while True:

@@ -122,15 +122,52 @@ def test_a_pumpswap_swap_is_attributed_by_its_own_event_and_priced_from_the_bala
 CURVE = "ChDRd2ZZ1NTFZ2sx6PAWH9iaL7wv3jSdnCFMzSBxNCaS"  # owner of the bonding curve's token account
 
 
-def test_a_wallet_whose_tokens_moved_without_a_swap_event_of_its_own_is_not_a_trade() -> None:
-    """The curve's token balance fell by exactly what the leader got and its SOL rose, yet it is not
-    the trader: only a swap event attributed to the wallet (KB-0184 readers) proves a trade."""
+def test_a_wallet_whose_tokens_left_without_a_swap_of_its_own_is_a_transfer_out() -> None:
+    """The curve's token balance fell and it made no swap: the position change is real (the exit only
+    needs the position) but it is NOT a trade — ``kind='transfer'``, no SOL attributed."""
     tx = _tx("pumpfun/rpc_tx_buy_raw.json")
     assert _held(tx, "preTokenBalances", CURVE, MINT) != _held(tx, "postTokenBalances", CURVE, MINT)
     read = leader_events_from_transaction(
         tx, wallet=CURVE, signature="S", first_seen_at=OBS, fields_complete_at=OBS
     )
+    (event,) = read.events
+    assert (event.side, event.kind, event.mint, event.confirmed, event.source) == (
+        "sell",
+        "transfer",
+        MINT,
+        True,
+        "chain",
+    )
+    assert event.token_delta_atoms == _held(tx, "postTokenBalances", CURVE, MINT) - _held(
+        tx, "preTokenBalances", CURVE, MINT
+    )
+    assert event.position_after_atoms == _held(tx, "postTokenBalances", CURVE, MINT)
+    assert event.sol_delta_lamports is None and not event.multi_mint
+
+
+def test_tokens_that_arrive_without_a_swap_are_not_an_event() -> None:
+    tx = copy.deepcopy(_tx("pumpfun/rpc_tx_buy_raw.json"))
+    tx["meta"]["postTokenBalances"].append(
+        {
+            "accountIndex": 9,
+            "mint": MINT,
+            "owner": "Recipient",
+            "uiTokenAmount": {"amount": "5", "decimals": 6},
+        }
+    )
+    read = leader_events_from_transaction(
+        tx, wallet="Recipient", signature="S", first_seen_at=OBS, fields_complete_at=OBS
+    )
     assert read.events == () and read.reason == "not_a_trade"
+
+
+def test_a_transfer_out_with_unreadable_logs_is_not_guessed() -> None:
+    tx = copy.deepcopy(_tx("pumpfun/rpc_tx_buy_raw.json"))
+    tx["meta"]["logMessages"].append("Log truncated")
+    read = leader_events_from_transaction(
+        tx, wallet=CURVE, signature="S", first_seen_at=OBS, fields_complete_at=OBS
+    )
+    assert read.events == () and read.reason == "logs_unreadable"
 
 
 def test_a_transaction_without_logs_is_unreadable_never_assumed_to_be_no_trade() -> None:
@@ -248,3 +285,42 @@ def test_a_truncated_log_makes_the_sol_attribution_ambiguous_too() -> None:
         tx, wallet=BUYER, signature="S", first_seen_at=OBS, fields_complete_at=OBS
     ).events
     assert event.sol_delta_lamports is None
+
+
+def test_a_transfer_out_of_another_mint_in_the_same_transaction_as_a_swap_is_not_lost() -> None:
+    tx = copy.deepcopy(_tx("pumpfun/rpc_tx_buy_raw.json"))
+    for label, amount in (("preTokenBalances", "50"), ("postTokenBalances", "0")):
+        tx["meta"][label].append(
+            {
+                "accountIndex": 9,
+                "mint": "OtherMint",
+                "owner": BUYER,
+                "uiTokenAmount": {"amount": amount, "decimals": 6},
+            }
+        )
+    read = leader_events_from_transaction(
+        tx, wallet=BUYER, signature="S", first_seen_at=OBS, fields_complete_at=OBS
+    )
+    by_mint = {e.mint: e for e in read.events}
+    assert by_mint[MINT].kind == "swap" and by_mint[MINT].side == "buy"
+    assert by_mint["OtherMint"].kind == "transfer" and by_mint["OtherMint"].token_delta_atoms == -50
+    assert by_mint["OtherMint"].position_after_atoms == 0
+
+
+def test_a_swap_whose_wallet_has_no_lamport_row_is_unreadable_not_a_non_trade(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hunter_exchanges.pumpfun import leader_source_chain_derive as module
+
+    def no_lamports(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr(module, "_lamport_change", no_lamports)
+    read = module.leader_events_from_transaction(
+        _tx("pumpfun/rpc_tx_buy_raw.json"),
+        wallet=BUYER,
+        signature="S",
+        first_seen_at=OBS,
+        fields_complete_at=OBS,
+    )
+    assert read.events == () and read.reason == "balances_unreadable"

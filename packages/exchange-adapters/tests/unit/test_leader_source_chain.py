@@ -23,6 +23,7 @@ from hunter_exchanges.pumpfun.leader_events import LeaderConfirmation, LeaderEve
 from hunter_exchanges.pumpfun.leader_source_chain import ChainLeaderSource
 from hunter_exchanges.pumpfun.rpc_wallet import SignatureInfo
 from hunter_exchanges.pumpfun.rpc_ws_models import ConnectionState, LogsNotification
+from hunter_exchanges.pumpfun.solana_codec import b58encode
 
 pytestmark = pytest.mark.unit
 
@@ -430,7 +431,6 @@ async def test_confirm_says_confirmed_with_the_reserves_and_the_chain_numbers() 
         ({"token_delta_atoms": 22_628_881_309_132, "position_after_atoms": 1}, "token_delta"),
         ({"slot": 1}, "slot"),
         ({"mint": "OtherMint"}, "mint_not_in_tx"),
-        ({"wallet": "Nobody"}, "not_a_trade"),
     ],
 )
 async def test_confirm_says_divergent_and_names_the_field(
@@ -537,3 +537,37 @@ async def test_a_history_that_was_empty_at_the_cut_is_still_backfilled_after_the
     assert [e.signature for e in got if isinstance(e, LeaderEvent)] == ["FIRST"]
     assert rpc.sig_calls[0] == (BUYER, None, 1, None) and rpc.sig_calls[1][1] is None
     await agen.aclose()  # type: ignore[attr-defined]
+
+
+async def test_a_wallet_that_is_not_a_public_key_never_reaches_a_subscription() -> None:
+    bad = ["*", "x y", "A" * 43 + "\r\nSUB > 1"]
+    for wallet in bad:
+        await _stream_refuses(wallet)
+    with pytest.raises(ValueError, match="at most 24"):
+        await _stream_of([b58encode(bytes([n]) * 32) for n in range(1, 26)]).__anext__()
+
+
+def _stream_of(wallets: list[str]) -> Any:
+    return make(FakeFeed(), Rpc()).stream(wallets)
+
+
+async def _stream_refuses(wallet: str) -> None:
+    with pytest.raises(ValueError, match="wallet"):
+        await _stream_of([wallet]).__anext__()
+
+
+async def test_a_transaction_that_is_readable_but_not_a_trade_of_the_wallet_is_unverifiable_not_divergent() -> (
+    None
+):
+    c = await make(FakeFeed(), Rpc({"SIG-B": BUY_TX})).confirm(preview(wallet="Nobody"))
+    assert (c.status, c.reason) == ("rpc_error", "not_a_trade")
+
+
+@pytest.mark.parametrize(
+    "reason", ["something_new", "sign_mismatch", "mint_unresolved", "logs_unreadable"]
+)
+def test_an_unknown_reason_never_maps_to_divergent(reason: str) -> None:
+    from hunter_exchanges.pumpfun.leader_source_chain import status_of
+
+    assert status_of(reason) == "rpc_error"
+    assert status_of("not_found") == "not_found" and status_of("tx_failed") == "failed_tx"

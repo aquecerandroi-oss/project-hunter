@@ -53,12 +53,34 @@ from hunter_exchanges.pumpfun.leader_source_stats import LeaderSourceStats
 logger = get_logger(__name__)
 
 SEED_RETRY_MAX_S = 30.0
+SEED_MIN_INTERVAL_S = 5.0
+"""At most one balance snapshot per wallet in this interval, however many legs were lost: a schema change
+on the server's side must not turn into an RPC storm on the shared (paid) key."""
 SILENCE_S = 60.0
 ACTIVE_WINDOW_S = 3600.0
 WATCH_INTERVAL_S = 5.0
-_RESYNC_REASONS = ("nats_unseeded", "nats_malformed", "nats_message_error")
+_RESYNC_REASONS = (
+    "nats_unseeded",
+    "nats_malformed",
+    "nats_message_error",
+    "nats_baseline_overflow",
+)
 
-__all__ = ["NatsSession"]
+__all__ = ["NatsSession", "SeedPolicy"]
+
+
+class SeedPolicy:
+    """The seed throttle, owned by the source so it survives reconnects: when each wallet's last snapshot
+    started and how many times in a row it failed (the backoff must not restart at one second on every
+    trigger)."""
+
+    def __init__(self, min_interval_s: float = SEED_MIN_INTERVAL_S) -> None:
+        self.min_interval_s = min_interval_s
+        self.started: dict[str, float] = {}
+        self.fails: dict[str, int] = {}
+        self.next_at: dict[
+            str, float
+        ] = {}  # a backoff deadline survives the session that was serving it
 
 
 class NatsSession:
@@ -81,6 +103,7 @@ class NatsSession:
         silence_s: float = SILENCE_S,
         active_s: float = ACTIVE_WINDOW_S,
         watch_s: float = WATCH_INTERVAL_S,
+        seed_policy: SeedPolicy | None = None,
     ) -> None:
         self.cfg, self.followed, self.queue, self.gaps, self.proc = cfg, followed, queue, gaps, proc
         self.stats, self._connect, self._seeder = stats, connect, seeder
@@ -89,6 +112,8 @@ class NatsSession:
         self._silence_s, self._active_s, self._watch_s = silence_s, active_s, watch_s
         self._last_leg: dict[str, float] = {}
         self._seeding: dict[str, asyncio.Task[None]] = {}
+        self._dirty: set[str] = set()  # a loss happened while this wallet's snapshot was in flight
+        self._policy = seed_policy or SeedPolicy()
         self.parser = NatsParser()
         self.ready = False
         self.ready_at: float | None = None
@@ -141,9 +166,7 @@ class NatsSession:
             self.queue.put_nowait(loss_gap(wallet, at, self._wall(), reason))
             return
         self._announce(self.gaps.open(reason, at, wallet=wallet))
-        self._start_seed(
-            wallet, self._seeder
-        )  # restarts any read still in flight: it may predate this
+        self._request_seed(wallet, self._seeder)
 
     def _on_message(self, subject: str, payload: bytes, t0: float, seen_at: datetime) -> None:
         body = decode_payload(payload)
@@ -167,6 +190,8 @@ class NatsSession:
             self._lost(subject, "nats_message_error", seen_at)
             return
         self.stats.count(out.reason)
+        if out.reason == "held_overflow":  # the book is full: say so, debounced like any other loss
+            self._lost(subject, "nats_baseline_overflow", seen_at)
         for event in out.events:
             self.queue.put_nowait(event)
             self.stats.receive_to_emit.record(self._mono() - t0)
@@ -202,7 +227,7 @@ class NatsSession:
             if self._seeder is not None:
                 for wallet in sorted(self.followed):
                     self._announce(self.gaps.open("nats_unseeded", self._wall(), wallet=wallet))
-                    self._start_seed(wallet, self._seeder)
+                    self._request_seed(wallet, self._seeder)
         elif kind == "err":
             err = classify_err(text)
             if err == "auth":
@@ -219,10 +244,15 @@ class NatsSession:
         if gap is not None:
             self.queue.put_nowait(gap)
 
-    def _start_seed(self, wallet: str, seeder: Seeder) -> None:
-        previous = self._seeding.pop(wallet, None)
-        if previous is not None:
-            previous.cancel()  # a read that began before the latest loss must not seed the baseline
+    def _request_seed(self, wallet: str, seeder: Seeder) -> None:
+        """Ask for a fresh snapshot of ``wallet`` — never more than one in flight or waiting. A request
+        while one exists is coalesced into it: the read in flight may predate the loss, so it is marked
+        dirty and followed by exactly one more (itself spaced by the policy interval)."""
+        running = self._seeding.get(wallet)
+        if running is not None and not running.done():
+            self._dirty.add(wallet)
+            self.stats.count("seed_coalesced")
+            return
         task = asyncio.create_task(self._seed(wallet, seeder))
         self._seeding[wallet] = task
         self.tasks.add(task)
@@ -248,7 +278,7 @@ class NatsSession:
                         # leg after the silence is compared with a fresh baseline, not a stale one
                         self.proc.book.forget(wallet)
                         self.proc.drop_wallet(wallet)
-                        self._start_seed(wallet, self._seeder)
+                        self._request_seed(wallet, self._seeder)
 
     async def _watchdog(self) -> None:
         while True:
@@ -257,8 +287,19 @@ class NatsSession:
 
     async def _seed(self, wallet: str, seeder: Seeder) -> None:
         """Snapshot the wallet's balances; retried with backoff until it lands (the gap stays open)."""
-        attempt = 0
+        policy = self._policy
         while True:
+            earliest = max(
+                policy.started.get(wallet, float("-inf")) + policy.min_interval_s,
+                policy.next_at.get(wallet, float("-inf")),
+            )
+            wait = earliest - self._mono()
+            if wait > 0:
+                await asyncio.sleep(wait)  # the debounce: one snapshot per interval per wallet
+            policy.started[wallet] = self._mono()
+            self._dirty.discard(
+                wallet
+            )  # everything lost so far is covered by the read about to start
             try:
                 snap = await seeder(wallet)
             except asyncio.CancelledError:
@@ -266,10 +307,25 @@ class NatsSession:
             except Exception as exc:
                 self.stats.count("seed_failed")
                 logger.warning("leader_nats_seed_failed", error=type(exc).__name__)
-                await self._sleep(min(1.0 * 2 ** min(attempt, 30), SEED_RETRY_MAX_S))
-                attempt += 1
+                fails = policy.fails.get(wallet, 0)
+                policy.fails[wallet] = fails + 1  # kept across triggers and reconnects
+                backoff = min(1.0 * 2 ** min(fails, 30), SEED_RETRY_MAX_S)
+                policy.next_at[wallet] = self._mono() + backoff
+                await self._sleep(backoff)
+                policy.next_at.pop(
+                    wallet, None
+                )  # served; if cancelled before, the next session serves it
                 continue
-            self.proc.book.seed(wallet, snap)
+            if wallet in self._dirty:
+                continue  # a leg was lost while reading: this snapshot may predate it, read once more
+            policy.fails.pop(wallet, None)
+            if not self.proc.book.seed(wallet, snap):
+                # more assets than the book may hold: stay degraded, say why, and do not retry in a loop
+                self._announce(
+                    self.gaps.open("nats_baseline_overflow", self._wall(), wallet=wallet)
+                )
+                self._seeding.pop(wallet, None)
+                return
             for reason in _RESYNC_REASONS:
                 self._announce(self.gaps.close(reason, self._wall(), wallet=wallet))
             self._seeding.pop(wallet, None)

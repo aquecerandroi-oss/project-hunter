@@ -17,6 +17,7 @@ from hunter_exchanges.pumpfun.leader_source_nats_wire import (
     NatsAuthError,
     NatsConfig,
     NatsParser,
+    NatsProtocolError,
     classify_err,
     connect_line,
     decode_payload,
@@ -195,3 +196,93 @@ def test_a_mint_on_another_scale_is_told_apart_from_a_malformed_frame() -> None:
     assert refused_for_scale(SUBJECT, other)
     assert not refused_for_scale(SUBJECT, {**TOKEN_FRAME, "balance": "nonsense"})
     assert not refused_for_scale(SUBJECT, {**TOKEN_FRAME, "txSignature": None})
+
+
+# ----------------------------------------------------------------------------- hostile framing (security R1)
+@pytest.mark.parametrize(
+    "line",
+    [
+        b"MSG account_balance_change.W.x 1 -100\r\n",
+        b"MSG account_balance_change.W.x 1 -1\r\nPING\r\n",
+        b"HMSG account_balance_change.W.x 1 -5 10\r\n",
+        b"HMSG account_balance_change.W.x 1 20 10\r\n",  # header longer than the whole message
+        b"HMSG account_balance_change.W.x 1 5 -10\r\n",
+    ],
+)
+def test_a_negative_or_inverted_size_is_a_protocol_error_not_a_hang_or_a_swallowed_frame(
+    line: bytes,
+) -> None:
+    with pytest.raises(NatsProtocolError):
+        NatsParser().push(line)
+
+
+def test_a_declared_size_above_the_cap_is_refused_before_any_byte_is_buffered() -> None:
+    parser = NatsParser(max_payload=1000)
+    with pytest.raises(NatsProtocolError):
+        parser.push(b"MSG account_balance_change.W.x 1 1001\r\n")
+    ok = NatsParser(max_payload=1000)
+    assert ok.push(b"MSG s 1 3\r\nabc\r\n")[0].payload == b"abc"
+
+
+def test_a_line_that_never_ends_is_cut_off_instead_of_buffered_forever() -> None:
+    parser = NatsParser(max_payload=1000)
+    with pytest.raises(NatsProtocolError):
+        for _ in range(100):
+            parser.push(b"x" * 100)  # no CRLF, ever
+
+
+def test_the_buffer_of_a_pending_message_stays_inside_the_cap() -> None:
+    parser = NatsParser(max_payload=1000)
+    parser.push(b"MSG s 1 900\r\n" + b"y" * 500)
+    parser.push(b"y" * 399)
+    ops = parser.push(b"y\r\n")
+    assert len(ops) == 1 and len(ops[0].payload) == 900
+
+
+def test_the_server_info_can_lower_the_cap_but_never_raise_it_past_the_hard_one() -> None:
+    parser = NatsParser()
+    parser.push(b'INFO {"max_payload": 2000}\r\n')
+    with pytest.raises(NatsProtocolError):
+        parser.push(b"MSG s 1 2001\r\n")
+    huge = NatsParser()
+    huge.push(b'INFO {"max_payload": 999999999999}\r\n')
+    with pytest.raises(NatsProtocolError):
+        huge.push(b"MSG s 1 99999999\r\n")
+
+
+def test_a_malformed_msg_line_is_a_protocol_error() -> None:
+    with pytest.raises(NatsProtocolError):
+        NatsParser().push(b"MSG s 1 notanumber\r\n")
+
+
+def test_a_message_not_followed_by_its_crlf_is_a_protocol_error_not_a_swallowed_frame() -> None:
+    """``MSG first 1 2`` + ``{}`` + the NEXT command glued on: the two bytes after the payload must be CRLF."""
+    with pytest.raises(NatsProtocolError):
+        NatsParser().push(b"MSG first 1 2\r\n{}MSG second 2 2\r\n{}\r\n")
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        b"MSG subject 1\r\n",  # too few fields
+        b"MSG a b c d e f\r\n",  # too many
+        b"HMSG subject 1 5\r\n",
+        b"HMSG a b c d e f g\r\n",
+    ],
+)
+def test_a_msg_or_hmsg_line_with_the_wrong_number_of_fields_is_a_protocol_error(
+    line: bytes,
+) -> None:
+    with pytest.raises(NatsProtocolError):
+        NatsParser().push(line)
+
+
+def test_a_reply_to_field_is_legal_and_still_parsed() -> None:
+    (op,) = NatsParser().push(b"MSG subj 1 reply 2\r\n{}\r\n")
+    assert op.payload == b"{}" and op.subject == "subj"
+
+
+@pytest.mark.parametrize("line", [b"MSG\r\n", b"HMSG\r\n", b"msg\r\n", b"MSG   \r\n"])
+def test_a_bare_msg_or_hmsg_command_is_a_protocol_error_too(line: bytes) -> None:
+    with pytest.raises(NatsProtocolError):
+        NatsParser().push(line)

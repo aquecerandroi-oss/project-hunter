@@ -40,7 +40,9 @@ from hunter_exchanges.pumpfun.leader_events import (
     LeaderItem,
     LeaderSource,
 )
+from hunter_exchanges.pumpfun.leader_source_queue import QUEUE_MAX, OverflowQueue
 from hunter_exchanges.pumpfun.leader_source_stats import LeaderSourceStats
+from hunter_exchanges.pumpfun.leader_source_wallets import validate_wallets
 
 logger = get_logger(__name__)
 
@@ -83,21 +85,21 @@ class CombinedLeaderSource:
         self.stats = stats or LeaderSourceStats()
 
     def stream(self, wallets: Collection[str]) -> AsyncIterator[LeaderItem]:
-        return _Run(self, frozenset(wallets)).run()
+        return _Run(self, wallets).run()
 
 
 class _Run:
-    def __init__(self, owner: CombinedLeaderSource, followed: frozenset[str]) -> None:
-        self.o, self.followed = owner, followed
-        self.queue: asyncio.Queue[LeaderItem] = asyncio.Queue()
+    def __init__(self, owner: CombinedLeaderSource, wallets: Collection[str]) -> None:
+        self.o, self.wallets = owner, wallets
+        self.followed: frozenset[str] = frozenset()
+        self.queue = OverflowQueue("combined_queue", cap=QUEUE_MAX, wall=owner.wall)
         self.states: OrderedDict[Key, _State] = OrderedDict()
         self.inflight: set[asyncio.Task[None]] = set()
         self.books: dict[str, dict[tuple[str | None, str], datetime]] = {"nats": {}, "chain": {}}
         self.announced: dict[str | None, LeaderGap] = {}
 
     async def run(self) -> AsyncIterator[LeaderItem]:
-        if not self.followed:
-            raise ValueError("a leader source needs at least one wallet")
+        self.followed = validate_wallets(self.wallets)  # fail closed, before any child starts
         pumps = [
             asyncio.create_task(
                 self._pump("nats", self.o.nats.stream(self.followed), self._on_nats)

@@ -234,18 +234,47 @@ def test_the_second_mint_after_the_first_was_emitted_is_multi_mint_too() -> None
     assert second.multi_mint is True and second.sol_delta_lamports is None
 
 
-def test_tokens_in_without_sol_out_are_labelled_transfers_not_dropped() -> None:
+def test_tokens_in_with_neither_sol_nor_wsol_paying_are_labelled_transfers_not_dropped() -> None:
     proc = seeded()
     feed(proc, leg("SOL", 10**10 + 2_000_000, "s1"), 0)  # SOL came IN
+    feed(proc, leg(WSOL, 0, "s1"), 0)  # and no wrapped SOL paid either
     (ev,) = feed(proc, leg(M, 4_000_000, "s1"), 1).events
     assert ev.kind == "transfer" and ev.side == "buy"
 
 
-def test_tokens_out_without_sol_in_are_labelled_transfers_so_the_exit_still_sees_them() -> None:
+def test_tokens_out_with_neither_sol_nor_wsol_coming_in_are_transfers_so_the_exit_still_sees_them() -> (
+    None
+):
     proc = seeded({M: 5_000_000})
     feed(proc, leg("SOL", 10**10 - 5_000, "s1"), 0)  # only the fee left
+    feed(proc, leg(WSOL, 0, "s1"), 0)
     (ev,) = feed(proc, leg(M, 0, "s1"), 1).events
     assert ev.kind == "transfer" and ev.side == "sell" and ev.position_after_atoms == 0
+
+
+def test_a_pumpswap_sale_paid_in_wsol_is_not_called_a_transfer() -> None:
+    """The quote of a pool sale arrives as WRAPPED SOL: the native SOL leg only shows the fee."""
+    book_proc = seeded({M: 5_000_000})
+    feed(book_proc, leg("SOL", 10**10 - 5_000, "s1"), 0)
+    feed(book_proc, leg(WSOL, 700_000_000, "s1"), 0)  # 0.7 SOL of WSOL came in
+    (ev,) = feed(book_proc, leg(M, 0, "s1"), 1).events
+    assert ev.kind == "unknown" and ev.side == "sell"
+
+
+def test_a_pumpswap_purchase_paid_in_wsol_is_not_called_a_transfer() -> None:
+    proc = LegProcessor(BalanceBook())
+    proc.book.seed(W, WalletSnapshot(10**10, 90, {WSOL: (900_000_000, 90)}, 90))
+    feed(proc, leg("SOL", 10**10 - 5_000, "s1"), 0)  # native SOL: only the fee
+    feed(proc, leg(WSOL, 100_000_000, "s1"), 0)  # 0.8 SOL of WSOL left
+    (ev,) = feed(proc, leg(M, 4_000_000, "s1"), 1).events
+    assert ev.kind == "unknown" and ev.side == "buy"
+
+
+def test_without_any_wsol_leg_we_cannot_say_transfer_and_stay_unknown() -> None:
+    proc = seeded({M: 5_000_000})
+    feed(proc, leg("SOL", 10**10 - 5_000, "s1"), 0)
+    (ev,) = feed(proc, leg(M, 0, "s1"), 1).events
+    assert ev.kind == "unknown"  # harmless: the exit looks at the position, not at the label
 
 
 def test_a_redelivered_leg_is_stale_and_never_a_second_event() -> None:
@@ -271,3 +300,51 @@ def test_the_metadata_of_a_pending_buy_survives_the_bound_that_trims_old_transac
         ("Other", True, None),
     ]
     assert all(e.first_seen_at == at(0) for e in out.events)
+
+
+def test_the_book_per_wallet_is_finite_and_the_overflow_is_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hunter_exchanges.pumpfun import leader_source_nats_state as module
+
+    monkeypatch.setattr(module, "HELD_MAX", 5)
+    proc = seeded()  # SOL already counts as one asset
+    outcomes = [feed(proc, leg(f"Mint{i}", 1_000_000, f"s{i}", slot=100 + i)) for i in range(8)]
+    assert [o.reason for o in outcomes].count("held_overflow") >= 3
+    again = feed(proc, leg("Mint0", 3_000_000, "s9", slot=200))  # a known asset still works
+    assert again.reason != "held_overflow"
+    proc.book.forget(W)
+    assert (
+        feed(proc, leg("Fresh", 1, "s10", slot=300)).reason != "held_overflow"
+    )  # a forgotten wallet restarts
+
+
+def test_a_snapshot_over_the_book_cap_is_refused_whole_never_truncated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hunter_exchanges.pumpfun import leader_source_nats_state as module
+
+    monkeypatch.setattr(module, "HELD_MAX", 5)
+    book = BalanceBook()
+    too_many = {f"M{i}": (1, 90) for i in range(6)}  # SOL + 6 = 7 assets
+    assert book.seed(W, WalletSnapshot(10**10, 90, too_many, 90)) is False
+    assert not book.is_seeded(W)  # still degraded: no half-snapshot became a baseline
+    fits = {f"M{i}": (1, 90) for i in range(4)}
+    assert book.seed(W, WalletSnapshot(10**10, 90, fits, 90)) is True and book.is_seeded(W)
+
+
+def test_the_union_of_a_snapshot_and_what_was_learned_meanwhile_must_fit_the_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hunter_exchanges.pumpfun import leader_source_nats_state as module
+
+    monkeypatch.setattr(module, "HELD_MAX", 3)
+    book = BalanceBook()
+    proc = LegProcessor(book)
+    feed(proc, leg("M1", 5, "a", slot=60))
+    feed(proc, leg("M2", 5, "b", slot=61))  # two learned while the snapshot was in flight
+    snapshot = WalletSnapshot(
+        10**10, 50, {"M3": (1, 50), "M4": (1, 50)}, 50
+    )  # alone: SOL + 2 = 3, fits
+    assert book.seed(W, snapshot) is False  # ... but the union (M1, M2, SOL, M3, M4) does not
+    assert not book.is_seeded(W)

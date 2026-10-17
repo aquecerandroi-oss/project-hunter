@@ -134,3 +134,30 @@ async def test_a_malformed_seed_answer_is_an_error_not_a_zero_balance() -> None:
     )
     with pytest.raises(ValueError, match="seed"):
         await rpc_wallet_seeder(rpc)("W")
+
+
+async def test_the_recomposer_shares_the_pause_of_the_live_source() -> None:
+    from datetime import UTC, datetime
+
+    from hunter_exchanges.base import RateLimited
+    from hunter_exchanges.pumpfun.leader_source_rpc_guard import RpcGuard, RpcRefused
+    from hunter_exchanges.pumpfun.leader_source_wiring import make_recomposer
+    from hunter_exchanges.pumpfun.solana_codec import b58encode
+
+    class Limited(FakeRpc):
+        async def call(self, method: str, params: list[Any]) -> Any:
+            self.calls.append((method, params))
+            raise RateLimited("429", exchange="p", retry_after_s=60.0)
+
+    rpc = Limited({})
+    guard = RpcGuard(rpc)
+    recompose = make_recomposer(guard)
+    wallet = b58encode(bytes([9]) * 32)
+    start, end = datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 1, 2, tzinfo=UTC)
+    first = await recompose(wallet, start, end)
+    assert not first.complete and "list_failed" in first.reasons
+    with pytest.raises(RpcRefused):
+        await guard.call(
+            "getBalance", []
+        )  # the recomposer's refusal paused the live source's calls too
+    assert len(rpc.calls) == 1

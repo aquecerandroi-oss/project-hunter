@@ -6,16 +6,18 @@ import asyncio
 import contextlib
 from collections.abc import AsyncIterator, Collection
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 
 from hunter_exchanges.pumpfun.leader_events import LeaderConfirmation, LeaderEvent, LeaderGap
 from hunter_exchanges.pumpfun.leader_source import CombinedLeaderSource
 from hunter_exchanges.pumpfun.leader_source_stats import LeaderSourceStats
+from hunter_exchanges.pumpfun.solana_codec import b58encode
 
 pytestmark = pytest.mark.unit
 
-W, W2, M = "WalletA", "WalletB", "MintA"
+W, W2, M = b58encode(bytes([7]) * 32), b58encode(bytes([8]) * 32), "MintA"
 T0 = datetime(2026, 10, 9, 12, 0, 0, tzinfo=UTC)
 Item = LeaderEvent | LeaderGap | LeaderConfirmation
 
@@ -448,3 +450,20 @@ async def test_an_empty_wallet_set_is_refused() -> None:
     src, *_ = build()
     with pytest.raises(ValueError, match="wallet"):
         await src.stream([]).__anext__()
+
+
+async def test_a_wallet_that_is_not_a_public_key_never_reaches_a_subscription() -> None:
+    bad = ["*", "x y", "A" * 43 + "\r\nSUB > 1"]
+    for wallet in bad:
+        await _stream_refuses(wallet)
+    with pytest.raises(ValueError, match="at most 24"):
+        await _stream_of([b58encode(bytes([n]) * 32) for n in range(1, 26)]).__anext__()
+
+
+def _stream_of(wallets: list[str]) -> Any:
+    return build()[0].stream(wallets)
+
+
+async def _stream_refuses(wallet: str) -> None:
+    with pytest.raises(ValueError, match="wallet"):
+        await _stream_of([wallet]).__anext__()

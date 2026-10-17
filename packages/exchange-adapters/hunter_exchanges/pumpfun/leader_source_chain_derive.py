@@ -93,6 +93,65 @@ def _traded_mint(swap: SwapRecord) -> str | None:
     return swap.base_mint
 
 
+def _transfers_out(
+    tx: dict[str, Any],
+    meta: dict[str, Any],
+    wallet: str,
+    signature: str,
+    first_seen_at: datetime,
+    fields_complete_at: datetime,
+) -> ChainRead:
+    """No swap of the wallet in readable logs: a token balance that FELL is still a position change the
+    exit must see (``docs/design`` §3.4: "vale a posição, seja qual for a causa"). It is labelled
+    ``kind='transfer'`` (a send, a burn, a close) with no SOL attributed; a balance that rose without a
+    swap is not an event (nothing to copy)."""
+    events = _transfer_events(meta, wallet, signature, first_seen_at, fields_complete_at, tx)
+    return ChainRead(tuple(events), None if events else "not_a_trade")
+
+
+def _transfer_events(
+    meta: dict[str, Any],
+    wallet: str,
+    signature: str,
+    first_seen_at: datetime,
+    fields_complete_at: datetime,
+    tx: dict[str, Any],
+    *,
+    exclude: set[str] | None = None,
+) -> list[LeaderEvent]:
+    """The mints (outside ``exclude``) whose balance of ``wallet`` fell: transfer-out events."""
+    skip = exclude or set()
+    pre, post = _held(meta, "preTokenBalances", wallet), _held(meta, "postTokenBalances", wallet)
+    raw_slot, raw_time = tx.get("slot"), tx.get("blockTime")
+    slot = raw_slot if isinstance(raw_slot, int) and raw_slot >= 0 else 0
+    block_time = (
+        datetime.fromtimestamp(raw_time, tz=UTC)
+        if isinstance(raw_time, int) and raw_time > 0
+        else None
+    )
+    return [
+        LeaderEvent(
+            wallet=wallet,
+            mint=mint,
+            side="sell",
+            token_delta_atoms=post.get(mint, 0) - before,
+            sol_delta_lamports=None,
+            position_after_atoms=post.get(mint, 0),
+            signature=signature,
+            slot=slot,
+            block_time=block_time,
+            first_seen_at=first_seen_at,
+            fields_complete_at=max(fields_complete_at, first_seen_at),
+            source="chain",
+            confirmed=True,
+            multi_mint=len(pre) > 1,
+            kind="transfer",
+        )
+        for mint, before in sorted(pre.items())
+        if mint != WSOL_MINT and mint not in skip and post.get(mint, 0) < before
+    ]
+
+
 def leader_events_from_transaction(
     tx: dict[str, Any],
     *,
@@ -110,10 +169,12 @@ def leader_events_from_transaction(
         return ChainRead((), "logs_unreadable")
     mine = [s for s in read.swaps if s.wallet == wallet]
     if not mine:
-        return ChainRead((), "logs_unreadable" if read.gap else "not_a_trade")
+        if read.gap:
+            return ChainRead((), "logs_unreadable")
+        return _transfers_out(tx, meta, wallet, signature, first_seen_at, fields_complete_at)
     lamports = _lamport_change(tx, wallet)
-    if lamports is None:
-        return ChainRead((), "not_a_trade")
+    if lamports is None:  # a swap of the wallet that cannot be priced: not "no trade"
+        return ChainRead((), "balances_unreadable")
     pre, post = _held(meta, "preTokenBalances", wallet), _held(meta, "postTokenBalances", wallet)
     raw_slot, raw_time = tx.get("slot"), tx.get("blockTime")
     slot = raw_slot if isinstance(raw_slot, int) and raw_slot >= 0 else mine[0].slot
@@ -168,6 +229,9 @@ def leader_events_from_transaction(
                 kind="swap",
             )
         )
+    events += _transfer_events(
+        meta, wallet, signature, first_seen_at, fields_complete_at, tx, exclude=set(by_mint)
+    )
     if events:
         return ChainRead(tuple(events), None, reserves, partial=partial)
     return ChainRead((), "mint_unresolved" if unresolved else "not_a_trade")

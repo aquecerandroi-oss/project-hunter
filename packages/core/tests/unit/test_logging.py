@@ -192,3 +192,84 @@ def test_httpx_info_record_does_not_pass_the_default_level(
     with caplog.at_level(stdlib_logging.DEBUG):
         httpx_logger.info(f"HTTP Request: POST {FAKE_KEYED_URL}")
     assert not any(record.name == "httpx" for record in caplog.records)
+
+
+SYNTH_PASSWORD = "SYNTHETIC-PASSWORD-1234"
+
+
+def test_a_json_pass_value_is_masked_in_any_string_field() -> None:
+    out = redact_secret_values_processor(
+        None,  # type: ignore[arg-type]
+        "info",
+        {"event": 'sent CONNECT {"user":"subscriber","pass":"' + SYNTH_PASSWORD + '","lang":"js"}'},
+    )
+    assert SYNTH_PASSWORD not in out["event"] and '"user":"subscriber"' in out["event"]
+
+
+def test_a_python_repr_pass_value_is_masked_too() -> None:
+    out = redact_secret_values_processor(
+        None,  # type: ignore[arg-type]
+        "info",
+        {"error": f"bad CONNECT {{'pass': '{SYNTH_PASSWORD}'}}"},
+    )
+    assert SYNTH_PASSWORD not in out["error"]
+
+
+def test_redact_url_masks_userinfo_passwords() -> None:
+    masked = redact_url(f"wss://subscriber:{SYNTH_PASSWORD}@core.nats.invalid/path")
+    assert SYNTH_PASSWORD not in masked and "subscriber" in masked and "core.nats.invalid" in masked
+
+
+def test_userinfo_masking_leaves_a_plain_url_alone() -> None:
+    assert redact_url("https://example.invalid:8080/a?b=c") == "https://example.invalid:8080/a?b=c"
+
+
+def test_configure_logging_pins_websockets_to_warning_even_at_debug(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """websockets logs every frame at DEBUG (``> TEXT 'CONNECT {...pass...}'``); LOG_LEVEL=DEBUG must not
+    turn that on — the NATS credential travels in the first frame we send."""
+    monkeypatch.setenv("WEBSOCKETS_MAX_LOG_SIZE", "1000")
+    settings = _settings("development").model_copy(update={"log_level": "DEBUG"})
+    configure_logging(settings, role="api")
+    assert stdlib_logging.getLogger("websockets").getEffectiveLevel() >= stdlib_logging.WARNING
+    frame = f'> TEXT \'CONNECT {{"user":"subscriber","pass":"{SYNTH_PASSWORD}"}}\''
+    with caplog.at_level(stdlib_logging.DEBUG):
+        stdlib_logging.getLogger("websockets.client").debug(frame)
+    assert SYNTH_PASSWORD not in caplog.text
+
+
+@pytest.mark.parametrize("short", ["xy12", "a", "1234"])
+def test_short_passwords_are_masked_whole_not_left_clear(short: str) -> None:
+    out = redact_secret_values_processor(
+        None,  # type: ignore[arg-type]
+        "info",
+        {"event": f'{{"pass":"{short}"}} and wss://u:{short}@host'},
+    )
+    assert f'"{short}"' not in out["event"] and f":{short}@" not in out["event"]
+
+
+def test_a_json_password_with_a_single_quote_inside_is_masked_whole() -> None:
+    out = redact_secret_values_processor(
+        None,  # type: ignore[arg-type]
+        "info",
+        {"event": '{"pass":"TEST\'TAIL-SYNTHETIC","user":"u"}'},
+    )
+    assert "TAIL-SYNTHETIC" not in out["event"] and '"user":"u"' in out["event"]
+
+
+def test_the_exact_key_pass_is_masked_in_structured_fields() -> None:
+    out = redact_processor(
+        None, "info", {"pass": SYNTH_PASSWORD, "passed": "yes", "nested": {"pass": "x"}}
+    )  # type: ignore[arg-type]
+    assert out["pass"] == "***REDACTED***" and out["nested"]["pass"] == "***REDACTED***"
+    assert out["passed"] == "yes"  # only the exact key, not every word that starts with it
+
+
+def test_redacting_a_long_hostile_string_is_linear_not_quadratic() -> None:
+    import time
+
+    start = time.perf_counter()
+    redact_url("a." * 20_000)
+    redact_secret_values_processor(None, "info", {"event": "a." * 20_000})  # type: ignore[arg-type]
+    assert time.perf_counter() - start < 1.0  # was 3.6 s for 16 000 characters with the old pattern

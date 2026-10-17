@@ -22,6 +22,13 @@ from hunter_exchanges.base import RateLimited
 logger = get_logger(__name__)
 
 REFUSAL_STATUS = frozenset({401, 403, 418})
+
+
+def is_blocking(status: int) -> bool:
+    """401/403/418 and any 5xx: the first block stops the calls (decision 06/10)."""
+    return status in REFUSAL_STATUS or status >= 500
+
+
 COOLDOWN_S = 30.0
 _HTTP_STATUS = re.compile(r"HTTP (\d{3})")
 
@@ -53,9 +60,13 @@ class RpcGuard:
         self._until: datetime | None = None
         self._reason = "rate_limited"
 
-    async def call(self, method: str, params: list[Any]) -> Any:
+    def check(self) -> None:
+        """Raise :class:`RpcRefused` while the pause is on (also installed as the client's pre-send hook)."""
         if self._until is not None and self._wall() < self._until:
             raise RpcRefused(self._reason)
+
+    async def call(self, method: str, params: list[Any]) -> Any:
+        self.check()
         try:
             return await self._rpc.call(method, params)
         except RateLimited as exc:
@@ -63,10 +74,14 @@ class RpcGuard:
             raise RpcRefused("rate_limited") from None
         except Exception as exc:
             found = _HTTP_STATUS.search(str(exc))
-            if found is not None and int(found[1]) in REFUSAL_STATUS:
+            if found is not None and is_blocking(int(found[1])):
                 self._trip(f"refused_{found[1]}", self._cooldown_s)
                 raise RpcRefused(self._reason) from None
             raise
+
+    def trip(self, reason: str, seconds: float) -> None:
+        """Start the pause (a refusal seen by this guard, or by another path that shares it)."""
+        self._trip(reason, seconds)
 
     def _trip(self, reason: str, seconds: float) -> None:
         self._reason = reason

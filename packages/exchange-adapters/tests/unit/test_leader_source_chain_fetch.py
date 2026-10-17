@@ -192,3 +192,16 @@ def test_the_default_ladder_is_the_designs_three_attempts_inside_thirty_seconds(
     from hunter_exchanges.pumpfun.leader_source_chain_fetch import DEADLINE_S, RETRY_DELAYS_S
 
     assert len(RETRY_DELAYS_S) + 1 == 3 and DEADLINE_S == 30.0
+
+
+async def test_a_503_stops_the_ladder_like_any_other_refusal() -> None:
+    clock, calls = Clock(), list[str]()
+
+    async def fetch(sig: str) -> dict[str, Any] | None:
+        calls.append(sig)
+        raise ExchangeUnavailable("Solana RPC HTTP 503", exchange="pumpfun")
+
+    f = fetcher(fetch, clock)
+    assert await f.get("a") == (None, "refused_503")
+    assert await f.get("b") == (None, "refused_503")  # inside the pause: no call
+    assert calls == ["a"]

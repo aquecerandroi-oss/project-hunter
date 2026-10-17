@@ -60,6 +60,15 @@ Multi-mint on-chain levantava exceção antes de tirar o SOL; mint ausente do sn
 - **Confirmação depois da lacuna:** a pista não reavalia a cobertura pelo `block_time` quando a confirmação chega; falta teste integrado dessa fronteira (pista C).
 - **Número de tentativas:** o desenho diz "até 3 tentativas em 30 s"; está implementado assim (0, +1 s, +6 s). Se o orquestrador preferir mais tentativas cedo, é um parâmetro (`retry_delays_s`).
 
+## Depois do commit 4ca1055f: segurança, revisão de código e limites conhecidos (09/10)
+
+A revisão de segurança R1 e a de código R2 pediram correções que estão em [[sec-copy-leader-source]] (parser limitado, semente com debounce, escada lenta de recusa com parada de 1 h, validação de carteiras, fila finita, máscara de senha no log). Do lado da R2, o que muda o que a fonte promete:
+
+- **A cadeia agora enxerga a saída por transferência** (`kind='transfer'`, só queda de posição, só com logs legíveis; também de outro mint na mesma transação de um swap). **Limite:** uma transferência **de entrada** não é evento (não há o que copiar), e uma queda de saldo por queima/fechamento de conta aparece igual a um envio.
+- **Na NATS, `transfer` só sai com as pernas de SOL e WSOL vistas** e nenhuma pagando; sem isso o rótulo é `unknown` (inofensivo: a saída olha a posição). Uma venda na PumpSwap paga em WSOL deixou de virar `leader_transfer`.
+- **`recompose(wallet, start, end)`** (`leader_source_recompose.py`) devolve as compras, vendas e quedas de posição por mint a partir do histórico da cadeia, até 1 000 assinaturas, e diz **explicitamente** quando está incompleto. A ordem dentro de um slot vem da **listagem** do RPC (a documentação e o Agave garantem do mais novo ao mais antigo; **não validado no provedor pago**).
+- `confirm` agora devolve `rpc_error` para qualquer razão desconhecida (inclusive "readable mas não é trade desta carteira"); `divergent` só quando uma transação foi lida e discorda.
+
 ## Relacionados
 
-[[2026-10-09-piloto-copiar-carteiras-no-papel]] · [[2026-10-06-nats-da-pumpfun-no-projeto-das-carteiras]] · [[EXP-M28-copiar-carteiras-no-papel]] · [[copy-leader-selection]] · [[pumpfun-rt-latency]] · [[KB-0186-o-tempo-real-da-pumpfun-chega-uns-0-1-s-antes-das-outras-fontes]] · [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro]]
+[[sec-copy-leader-source]] · [[2026-10-09-piloto-copiar-carteiras-no-papel]] · [[2026-10-06-nats-da-pumpfun-no-projeto-das-carteiras]] · [[EXP-M28-copiar-carteiras-no-papel]] · [[copy-leader-selection]] · [[pumpfun-rt-latency]] · [[KB-0186-o-tempo-real-da-pumpfun-chega-uns-0-1-s-antes-das-outras-fontes]] · [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro]]

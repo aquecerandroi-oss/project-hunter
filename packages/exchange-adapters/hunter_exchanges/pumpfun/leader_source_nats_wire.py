@@ -48,12 +48,13 @@ class NatsAuthError(Exception):
 
 
 class NatsRefused(Exception):
-    """The page or the socket said no with an HTTP status (401/403/418/429): a rate limit or a block.
+    """The page or the socket said no with an HTTP status (401/403/418/429 or any 5xx, Cloudflare's included): a rate limit or a block.
     Never retried in a tight loop and never evaded; it is a ``system_event`` and a named gap."""
 
-    def __init__(self, status: int) -> None:
+    def __init__(self, status: int, retry_after_s: float | None = None) -> None:
         super().__init__(f"HTTP {status}")
         self.status = status
+        self.retry_after_s = retry_after_s
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,11 +112,31 @@ def connect_line(cfg: NatsConfig) -> str:
     return "CONNECT " + json.dumps(body, separators=(",", ":")) + "\r\nPING\r\n"
 
 
-class NatsParser:
-    """Incremental parser: feed WebSocket frames, get complete operations (a frame may split a message)."""
+class NatsProtocolError(Exception):
+    """The server sent something no NATS server sends (a negative or oversized length, a line that never
+    ends...). The connection is not trustworthy: the session drops it and names the gap. Fixed messages
+    only: never the offending bytes."""
 
-    def __init__(self) -> None:
+
+HARD_MAX_PAYLOAD: Final = 8 * 1024 * 1024
+DEFAULT_MAX_PAYLOAD: Final = 1024 * 1024
+"""NATS' own default ``max_payload`` is 1 MiB; the server's INFO may lower it, never raise it past
+:data:`HARD_MAX_PAYLOAD`."""
+MAX_CONTROL_LINE: Final = 4096
+HEADER_SLACK: Final = 4096
+
+
+class NatsParser:
+    """Incremental parser: feed WebSocket frames, get complete operations (a frame may split a message).
+
+    Bounded by construction: a declared size above ``max_payload``, a negative size, a header longer
+    than its message, or a control line that does not end within :data:`MAX_CONTROL_LINE` bytes raise
+    :class:`NatsProtocolError` — nothing is ever buffered without limit and the loop below always
+    advances."""
+
+    def __init__(self, *, max_payload: int = DEFAULT_MAX_PAYLOAD) -> None:
         self._rest: bytes = b""
+        self.max_payload = min(max_payload, HARD_MAX_PAYLOAD)
         # subject, sid, header bytes, total bytes of the message whose body is still to come
         self._want: tuple[str, int, int, int] | None = None
 
@@ -129,34 +150,54 @@ class NatsParser:
                 subject, sid, hdr, size = want
                 if len(buf) - pos < size + 2:
                     break
+                if buf[pos + size : pos + size + 2] != b"\r\n":
+                    raise NatsProtocolError("message not closed by CRLF")
                 ops.append(Op("msg", subject, sid, buf[pos + hdr : pos + size]))
                 pos += size + 2
                 self._want = None
                 continue
             end = buf.find(b"\r\n", pos)
             if end < 0:
+                if len(buf) - pos > MAX_CONTROL_LINE:
+                    raise NatsProtocolError("control line too long")
                 break
+            if end - pos > MAX_CONTROL_LINE:
+                raise NatsProtocolError("control line too long")
             line = buf[pos:end].decode("utf-8", "replace")
             pos = end + 2
             op = self._control(line)
             if op is not None:
                 ops.append(op)
         self._rest = buf[pos:]
+        if len(self._rest) > self.max_payload + HEADER_SLACK:
+            raise NatsProtocolError("buffer over the cap")
         return ops
+
+    def _declare(self, subject: str, sid: str, hdr: str, size: str) -> None:
+        try:
+            n_sid, n_hdr, n_size = int(sid), int(hdr), int(size)
+        except ValueError:
+            raise NatsProtocolError("malformed MSG line") from None
+        if n_size < 0 or n_hdr < 0 or n_hdr > n_size or n_size > self.max_payload:
+            raise NatsProtocolError("message length out of range")
+        self._want = (subject, n_sid, n_hdr, n_size)
 
     def _control(self, line: str) -> Op | None:
         head = line[:5].upper()
         parts = line.split()
-        try:
-            if head.startswith("MSG ") and len(parts) in (4, 5):
-                self._want = (parts[1], int(parts[2]), 0, int(parts[-1]))
-                return None
-            if head.startswith("HMSG ") and len(parts) in (5, 6):
-                self._want = (parts[1], int(parts[2]), int(parts[-2]), int(parts[-1]))
-                return None
-        except ValueError:
-            return Op("err", text="malformed MSG line")
+        command = parts[0].upper() if parts else ""
+        if command == "MSG":
+            if len(parts) not in (4, 5):
+                raise NatsProtocolError("malformed MSG line")
+            self._declare(parts[1], parts[2], "0", parts[-1])
+            return None
+        if command == "HMSG":
+            if len(parts) not in (5, 6):
+                raise NatsProtocolError("malformed HMSG line")
+            self._declare(parts[1], parts[2], parts[-2], parts[-1])
+            return None
         if head.startswith("INFO"):
+            self._learn_limit(line[5:])
             return Op("info", text=line[5:])
         if head.startswith("PING"):
             return Op("ping")
@@ -167,6 +208,16 @@ class NatsParser:
         if line.startswith("-ERR"):
             return Op("err", text=line[4:].strip())
         return None
+
+    def _learn_limit(self, text: str) -> None:
+        """The server's own ``max_payload`` can lower the cap, never raise it past the hard one."""
+        try:
+            info: Any = json.loads(text)
+        except json.JSONDecodeError:
+            return
+        value = cast("dict[str, Any]", info).get("max_payload") if isinstance(info, dict) else None
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            self.max_payload = min(value, HARD_MAX_PAYLOAD)
 
 
 def decode_payload(payload: bytes) -> dict[str, Any] | None:

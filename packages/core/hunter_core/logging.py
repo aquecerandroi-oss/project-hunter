@@ -17,7 +17,9 @@ import structlog
 if TYPE_CHECKING:
     from hunter_core.settings import Settings
 
-_REDACT_KEY_RE = re.compile(r"(?i)(secret|token|password|api_key|authorization|cookie)")
+_REDACT_KEY_RE = re.compile(
+    r"(?i)(secret|token|password|api_key|authorization|cookie)|^(pass|passwd|pwd)$"
+)
 _REDACTED = "***REDACTED***"
 
 
@@ -57,12 +59,27 @@ def redact_processor(
 _SECRET_VALUE_RE = re.compile(r"(?i)\b(api[-_]?key|token|key|secret|password)=([^\s&\"'<>]+)")
 
 
+# T4.9x security review R1 (leader source): a ``"pass": "..."`` JSON/repr value (the NATS CONNECT line)
+# and the password of ``scheme://user:password@host`` userinfo are secrets that no ``name=value`` marker
+# catches. Masked WHOLE (a short password must not slip through under the four-character rule).
+_PASS_JSON_RE = re.compile(r"""(?i)("(?:pass|password|passwd|pwd)"\s*:\s*")((?:[^"\\]|\\.)*)(")""")
+_PASS_REPR_RE = re.compile(r"""(?i)('(?:pass|password|passwd|pwd)'\s*:\s*')((?:[^'\\]|\\.)*)(')""")
+# ``://user:password@``: anchored on the literal ``://`` (no scheme pattern to restart at every dot, which
+# was quadratic on long strings full of dots) and masked whole.
+_USERINFO_RE = re.compile(r"(://[^\s/:@]+:)([^\s/@]+)(@)")
+
+
 def _mask_secret_value(value: str) -> str:
     return value if len(value) <= 4 else f"{value[:4]}***"
 
 
 def _redact_secret_string(text: str) -> str:
-    return _SECRET_VALUE_RE.sub(lambda m: f"{m.group(1)}={_mask_secret_value(m.group(2))}", text)
+    text = _SECRET_VALUE_RE.sub(lambda m: f"{m.group(1)}={_mask_secret_value(m.group(2))}", text)
+    if "pass" not in text.lower() and "://" not in text:
+        return text  # nothing below can match: skip the scans
+    text = _PASS_JSON_RE.sub(lambda m: f"{m.group(1)}{_REDACTED}{m.group(3)}", text)
+    text = _PASS_REPR_RE.sub(lambda m: f"{m.group(1)}{_REDACTED}{m.group(3)}", text)
+    return _USERINFO_RE.sub(lambda m: f"{m.group(1)}{_REDACTED}{m.group(3)}", text)
 
 
 def _redact_secret_values_deep(value: Any) -> Any:
@@ -136,6 +153,8 @@ def configure_logging(settings: Settings, role: str) -> None:
     # too, but there's no reason to compute the line at all).
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # websockets logs every frame at DEBUG, the ``CONNECT`` line (with the NATS credential) included.
+    logging.getLogger("websockets").setLevel(logging.WARNING)
     structlog.configure(
         processors=[*shared_processors, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
         logger_factory=structlog.stdlib.LoggerFactory(),

@@ -24,6 +24,7 @@ from hunter_exchanges.pumpfun.leader_source_nats import (
     default_connect,
     default_fetch_config,
 )
+from hunter_exchanges.pumpfun.leader_source_recompose import Recomposition, recompose
 from hunter_exchanges.pumpfun.leader_source_rpc_guard import RpcGuard
 from hunter_exchanges.pumpfun.leader_source_stats import LeaderSourceStats
 from hunter_exchanges.pumpfun.rpc_wallet import SignatureInfo
@@ -31,11 +32,25 @@ from hunter_exchanges.pumpfun.rpc_wallet import SignatureInfo
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"  # noqa: S105 - a program id
 TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"  # noqa: S105 - a program id
 
-__all__ = ["build_leader_source", "rpc_fetch_tx", "rpc_list_signatures", "rpc_wallet_seeder"]
+__all__ = [
+    "attach_guard",
+    "build_leader_source",
+    "make_recomposer",
+    "rpc_fetch_tx",
+    "rpc_list_signatures",
+    "rpc_wallet_seeder",
+]
 
 
 class RpcCall(Protocol):
     async def call(self, method: str, params: list[Any]) -> Any: ...
+
+
+def attach_guard(guard: RpcGuard, rpc: object) -> None:
+    """Install the guard's pause check as the client's pre-send hook, when the client has one."""
+    setter = getattr(rpc, "set_pre_send_hook", None)
+    if callable(setter):
+        setter(guard.check)
 
 
 def rpc_fetch_tx(rpc: RpcCall) -> Callable[[str], Awaitable[dict[str, Any] | None]]:
@@ -153,12 +168,14 @@ def build_leader_source(
     stats: LeaderSourceStats | None = None,
     fetch_config: FetchConfig = default_fetch_config,
     connect: ConnectFn = default_connect,
+    guard: RpcGuard | None = None,
 ) -> CombinedLeaderSource:
     """NATS first, the chain confirms — the :class:`LeaderSource` the copy lane consumes. ``rpc`` is a
     ``SolanaRpcClient`` (its ``call``), ``feed`` a ``SolanaWsClient``; one ``stats`` object is shared by
     the three parts so a single ``stats.snapshot()`` carries both latency distributions."""
     shared = stats or LeaderSourceStats()
-    guarded = RpcGuard(rpc)  # one pause for the fetch, the listing and the seed
+    guarded = guard or RpcGuard(rpc)  # one pause for the fetch, the listing and the seed
+    attach_guard(guarded, rpc)  # ... including a call already queued inside the client's buckets
     nats = NatsLeaderSource(
         fetch_config=fetch_config, connect=connect, seeder=rpc_wallet_seeder(guarded), stats=shared
     )
@@ -169,3 +186,16 @@ def build_leader_source(
         stats=shared,
     )
     return CombinedLeaderSource(nats=nats, chain=chain, stats=shared)
+
+
+def make_recomposer(
+    guard: RpcGuard,
+) -> Callable[[str, datetime, datetime], Awaitable[Recomposition]]:
+    """``recompose(wallet, start, end)`` over the same guarded RPC as the live source (pass the guard given
+    to :func:`build_leader_source`): a refusal seen by either pauses both."""
+    lister, fetch = rpc_list_signatures(guard), rpc_fetch_tx(guard)
+
+    async def go(wallet: str, start: datetime, end: datetime) -> Recomposition:
+        return await recompose(wallet, start, end, list_signatures=lister, fetch_tx=fetch)
+
+    return go

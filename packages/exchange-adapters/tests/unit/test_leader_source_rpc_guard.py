@@ -80,3 +80,18 @@ async def test_other_errors_pass_through_and_do_not_trip() -> None:
     with pytest.raises(ExchangeUnavailable):
         await guard.call("getTransaction", [])
     assert await guard.call("getTransaction", []) == {"ok": 1}
+
+
+@pytest.mark.parametrize("status", [500, 502, 503, 504])
+async def test_a_server_error_also_pauses_everything_the_first_block_stops_the_rpc_too(
+    status: int,
+) -> None:
+    clock = Clock()
+    rpc = Rpc(ExchangeUnavailable(f"Solana RPC HTTP {status}", exchange="pumpfun"), {"ok": 1})
+    guard = RpcGuard(rpc, wall=clock, cooldown_s=30.0)
+    with pytest.raises(RpcRefused) as err:
+        await guard.call("getTransaction", [])
+    assert err.value.reason == f"refused_{status}"
+    with pytest.raises(RpcRefused):
+        await guard.call("getTransaction", [])
+    assert rpc.calls == ["getTransaction"]  # the second call never reached the node

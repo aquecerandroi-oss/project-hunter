@@ -20,10 +20,11 @@ from hunter_exchanges.pumpfun.leader_events import LeaderConfirmation, LeaderEve
 from hunter_exchanges.pumpfun.leader_source_nats import NatsLeaderSource
 from hunter_exchanges.pumpfun.leader_source_nats_io import WalletSnapshot
 from hunter_exchanges.pumpfun.leader_source_nats_wire import NatsAuthError, NatsConfig, NatsRefused
+from hunter_exchanges.pumpfun.solana_codec import b58encode
 
 pytestmark = pytest.mark.unit
 
-W, W2, M = "WalletA", "WalletB", "MintA"
+W, W2, M = b58encode(bytes([7]) * 32), b58encode(bytes([8]) * 32), "MintA"
 PW = "TEST-ONLY-NOT-A-REAL-PASSWORD"
 CFG = NatsConfig("wss://core.nats.invalid", "subscriber", PW)
 T0 = datetime(2026, 10, 9, 12, 0, 0, tzinfo=UTC)
@@ -130,6 +131,7 @@ class Harness:
             sleep=self.sleep,
             rand=lambda: 0.5,
             idle_timeout_s=kw.pop("idle_timeout_s", 5.0),
+            seed_min_interval_s=kw.pop("seed_min_interval_s", 0.0),
             **kw,
         )
 
@@ -473,7 +475,7 @@ async def test_a_session_that_stayed_up_resets_the_backoff() -> None:
     h.mono += 120.0  # the first session lived two minutes
     ws1.push(ConnectionError("reset"))
     await take(agen, 2)
-    assert h.delays == [0.1]
+    assert len(h.delays) == 1 and 0.1 <= h.delays[0] < 0.2  # the first rung again
     await agen.aclose()  # type: ignore[attr-defined]
 
 
@@ -583,29 +585,6 @@ async def test_without_a_seeder_a_lost_leg_is_an_interval_gap_and_the_baseline_i
     ws.push(msg(W, M, "9", "s1", slot=2))  # must NOT become a delta against the pre-loss baseline
     await asyncio.sleep(0.05)
     assert src.stats.counters["no_baseline"] == 2
-    await agen.aclose()  # type: ignore[attr-defined]
-
-
-async def test_a_loss_during_a_seed_restarts_the_seed_so_it_cannot_predate_the_loss() -> None:
-    ws = FakeWs()
-    h = Harness([ws])
-    gate = asyncio.Event()
-    calls: list[int] = []
-
-    async def slow(wallet: str) -> WalletSnapshot:
-        calls.append(1)
-        if len(calls) == 1:
-            await gate.wait()  # the first read is still in flight when the loss happens
-        return WalletSnapshot(10**10, 50, {}, 50)
-
-    agen = h.source(seeder=slow).stream([W])
-    await ready(agen)
-    await take(agen, 1)  # nats_unseeded opened
-    junk = b"x"
-    ws.push(b"MSG account_balance_change.%s.X 1 %d\r\n%s\r\n" % (W.encode(), len(junk), junk))
-    items = await take(agen, 2)
-    assert len(calls) == 2  # restarted, not reused
-    assert any(isinstance(i, LeaderGap) and i.end is not None for i in items)
     await agen.aclose()  # type: ignore[attr-defined]
 
 
@@ -724,3 +703,20 @@ async def test_a_silent_wallet_is_resynced_while_it_is_quiet_so_the_next_leg_has
         10_000_000,
     )  # vs the fresh zero, not a sell of 90
     await agen.aclose()  # type: ignore[attr-defined]
+
+
+async def test_a_wallet_that_is_not_a_public_key_never_reaches_a_subscription() -> None:
+    bad = ["*", "x y", "A" * 43 + "\r\nSUB > 1"]
+    for wallet in bad:
+        await _stream_refuses(wallet)
+    with pytest.raises(ValueError, match="at most 24"):
+        await _stream_of([b58encode(bytes([n]) * 32) for n in range(1, 26)]).__anext__()
+
+
+def _stream_of(wallets: list[str]) -> Any:
+    return Harness([]).source(seeder=None).stream(wallets)
+
+
+async def _stream_refuses(wallet: str) -> None:
+    with pytest.raises(ValueError, match="wallet"):
+        await _stream_of([wallet]).__anext__()

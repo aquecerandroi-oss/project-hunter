@@ -22,7 +22,7 @@ about six calls a minute in total.
 from __future__ import annotations
 
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -85,6 +85,7 @@ class SolanaRpcClient:
         method_limiter: TokenBucketRateLimiter | None = None,
     ) -> None:
         self._url = rpc_url or os.environ.get("SOLANA_RPC_URL") or PUBLIC_RPC_URL
+        self._pre_send: Callable[[], None] | None = None
         self._owns_client = http_client is None
         self._client = http_client or httpx.AsyncClient(timeout=10)
         self._limiter = rate_limiter or TokenBucketRateLimiter(
@@ -102,11 +103,19 @@ class SolanaRpcClient:
         if self._owns_client:
             await self._client.aclose()
 
+    def set_pre_send_hook(self, hook: Callable[[], None] | None) -> None:
+        """A synchronous check run after the buckets and right before the request is sent; it may raise to
+        stop the call (the leader source's pause after a 403/429, so a call already queued in a bucket
+        cannot leave during it). ``None`` (the default) changes nothing."""
+        self._pre_send = hook
+
     async def _call(self, method: str, params: list[Any]) -> Any:
         """One JSON-RPC call under both buckets; returns ``result`` or raises."""
         await self._limiter.acquire("requests", 1)
         if self._method_limiter is not None:
             await self._method_limiter.acquire(method, 1)
+        if self._pre_send is not None:
+            self._pre_send()
         try:
             response = await self._client.post(
                 self._url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params}

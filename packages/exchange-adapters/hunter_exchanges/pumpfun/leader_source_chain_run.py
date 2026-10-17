@@ -1,16 +1,11 @@
 """The state of one ``ChainLeaderSource.stream()`` call (H-037): subscriptions, notifications, the
-reconnect monitor and the REST recovery. Split from :mod:`leader_source_chain` for the file-size budget;
-it takes its collaborators explicitly and touches nothing private of the source.
+reconnect monitor and the REST recovery (split out for the file-size budget).
 
-**Recovery model.** Per wallet an *anchor* (the newest signature seen while the feed was healthy) is the
-frozen cut: it does not advance while the feed is degraded (not connected, a reconnect not yet
-recovered, or a gap open), so a notification that arrives right after a reconnect cannot hide what the
-dead socket missed. Recovery pages ``getSignaturesForAddress`` (newest first, ``before`` the last page's
-end, ``until`` the anchor) until the anchor is reached, then processes the signatures oldest first. At
-start the same machinery runs once per wallet from an anchor read **before** subscribing, which also
-catches a notification the client dropped for a subscription whose id it had not yet registered.
-A gap is closed only after a recovery that finished; if it cannot, the gap closes with an extra
-``chain_recovery_failed`` gap over the same interval, so the loss stays on record.
+**Recovery model.** Per wallet an *anchor* (newest signature seen while the feed was healthy) is the frozen
+cut: it does not advance while degraded (socket down, reconnect/drop/crash not yet recovered, gap open).
+Recovery pages ``getSignaturesForAddress`` back to the anchor, then processes oldest first; at start the
+same runs from an anchor read **before** subscribing. A gap closes only after a recovery that finished,
+else an extra ``chain_recovery_failed`` gap keeps the loss on record.
 """
 
 from __future__ import annotations
@@ -22,9 +17,10 @@ from datetime import datetime
 from typing import Protocol
 
 from hunter_core.logging import get_logger
-from hunter_exchanges.pumpfun.leader_events import LeaderItem
 from hunter_exchanges.pumpfun.leader_source_chain_derive import ChainRead
+from hunter_exchanges.pumpfun.leader_source_chain_supervise import supervise
 from hunter_exchanges.pumpfun.leader_source_gaps import GapTracker, loss_gap
+from hunter_exchanges.pumpfun.leader_source_queue import QUEUE_MAX, OverflowQueue
 from hunter_exchanges.pumpfun.leader_source_stats import LeaderSourceStats
 from hunter_exchanges.pumpfun.rpc_wallet import SignatureInfo
 from hunter_exchanges.pumpfun.rpc_ws_models import ConnectionState, LogsNotification, Notification
@@ -46,6 +42,7 @@ _NAMED_LOSS = {
     "logs_unreadable": "chain_logs_unreadable",
     "mint_unresolved": "chain_mint_unresolved",
     "sign_mismatch": "chain_sign_mismatch",
+    "balances_unreadable": "chain_balances_unreadable",
 }
 
 
@@ -76,7 +73,7 @@ class ChainRun:
         self.followed, self.feed, self.read, self.lister = followed, feed, read, lister
         self.stats, self.wall, self.sleep = stats, wall, sleep
         self.interval_s, self.settle_s = interval_s, settle_s
-        self.queue: asyncio.Queue[LeaderItem] = asyncio.Queue()
+        self.queue = OverflowQueue("chain_queue", cap=QUEUE_MAX, wall=wall)
         self.gaps = GapTracker()
         self.wallet_of: dict[int, str] = {}
         self.pending: dict[int, list[LogsNotification]] = {}
@@ -86,6 +83,10 @@ class ChainRun:
         self.ready = asyncio.Event()
         self.seen_reconnects: int = 0
         self.seen_dropped: int = 0
+        self.crashes = (
+            0  # supervised-task crashes and handler errors; recovery treats them as a drop
+        )
+        self.seen_crashes = 0
         self.empty: set[str] = set()  # wallets whose history was read and is empty
         self.unknown_cut: set[str] = set()  # wallets whose start cut could not be read
         self.start_failed = False
@@ -100,13 +101,36 @@ class ChainRun:
             or state.ws_state != "connected"
             or state.reconnects != self.seen_reconnects
             or state.dropped != self.seen_dropped
+            or self.crashes != self.seen_crashes
         )
+
+    # -- supervision ---------------------------------------------------------
+    async def supervise(
+        self, name: str, body: Callable[[], Awaitable[None]], *, restart_on_return: bool
+    ) -> None:
+        await supervise(
+            name,
+            body,
+            restart_on_return=restart_on_return,
+            on_crash=self._crashed,
+            sleep=self.sleep,
+        )
+
+    def _crashed(self, name: str) -> None:
+        """A child task crashed: counted, a named gap, and the fallback is degraded until the REST
+        recovery ran (the monitor treats ``crashes`` like a socket drop)."""
+        self.stats.count(f"{name}_crashed")
+        self.crashes += 1
+        now = self.wall()
+        self.queue.put_nowait(loss_gap(None, now, now, f"chain_{name}_crashed"))
 
     # -- subscriptions -------------------------------------------------------
     async def setup(self) -> None:
         self.seen_reconnects = self.feed.state.reconnects
         self.seen_dropped = int(self.feed.state.dropped)
-        for wallet in sorted(self.followed):
+        for wallet in sorted(
+            self.followed - set(self.wallet_of.values())
+        ):  # a restart skips done ones
             before, cut_state = await self._newest(wallet)  # BEFORE subscribing: the start cut
             if cut_state == "empty":
                 self.empty.add(wallet)
@@ -126,7 +150,7 @@ class ChainRun:
                     attempt += 1
             self.wallet_of[sub] = wallet
             for note in self.pending.pop(sub, []):
-                self.on_notification(note, wallet)
+                self.handle(note, wallet)
             if before is not None:
                 self.anchor.setdefault(wallet, before)
             if cut_state == "error":
@@ -171,7 +195,19 @@ class ChainRun:
                 if len(bucket) < SEEN_MAX:
                     bucket.append(note)
                 continue
+            self.handle(note, wallet)
+
+    def handle(self, note: LogsNotification, wallet: str) -> None:
+        """One notification: a bug in handling it costs that notification (a named gap for the wallet and
+        a REST recovery), never the fallback."""
+        try:
             self.on_notification(note, wallet)
+        except Exception as exc:
+            logger.error("leader_chain_notification_error", error=type(exc).__name__)
+            self.stats.count("notification_error")
+            self.crashes += 1
+            now = self.wall()
+            self.queue.put_nowait(loss_gap(wallet, now, now, "chain_notification_error"))
 
     def on_notification(self, note: LogsNotification, wallet: str) -> None:
         if note.err is not None:
@@ -233,6 +269,7 @@ class ChainRun:
                 state.ws_state == "connected"
                 and state.reconnects == self.seen_reconnects
                 and state.dropped == self.seen_dropped
+                and self.crashes == self.seen_crashes
             )
             if healthy and not self.gaps.is_open():
                 last_ok = self.wall()
@@ -245,8 +282,13 @@ class ChainRun:
             await asyncio.sleep(self.settle_s)  # let the client resubscribe
             reconnects: int = state.reconnects
             dropped: int = state.dropped
+            crashes = self.crashes
             recovered = await self.recover_all()
-            self.seen_reconnects, self.seen_dropped = reconnects, dropped
+            self.seen_reconnects, self.seen_dropped, self.seen_crashes = (
+                reconnects,
+                dropped,
+                crashes,
+            )
             now = self.wall()
             closed = self.gaps.close_all(now)
             for gap in closed:

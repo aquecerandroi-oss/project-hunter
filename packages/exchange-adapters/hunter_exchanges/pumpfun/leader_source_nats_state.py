@@ -16,8 +16,9 @@ The SOL leg of a transaction may arrive before or after its token leg, so it is 
 * a **buy** whose SOL leg is unknown waits at most :data:`PAIR_WAIT_S` and is emitted the instant the
   SOL leg arrives (``fields_complete_at`` = that instant) or, at the deadline, with ``None``;
 * a transaction with several token legs is ``multi_mint`` and carries no SOL (one debit is not N);
-* tokens in with SOL not out, or tokens out with SOL not in, are labelled ``kind="transfer"`` (they
-  still move the position, so they are emitted, not dropped).
+* tokens in with neither SOL nor wrapped SOL out, or tokens out with neither coming in (both legs seen),
+  are labelled ``kind="transfer"``, otherwise ``unknown`` (a PumpSwap trade settles in wrapped SOL).
+  Either way they still move the position, so they are emitted, not dropped.
 
 ``first_seen_at`` is our clock at the first leg of the transaction; ``server_ts`` the NATS server's
 stamp of the token leg. A leg arriving after the event was emitted never rewrites it.
@@ -37,6 +38,9 @@ SOL = "SOL"
 PAIR_WAIT_S = 0.3
 _SEED_TX = 2**62
 _KEEP = 512
+HELD_MAX = 4096
+"""Assets (SOL + token mints) remembered per wallet: a hostile server cannot grow the book by inventing
+mints. Past it a leg is not learned and the session names a ``nats_baseline_overflow`` gap."""
 
 __all__ = ["PAIR_WAIT_S", "BalanceBook", "LegOutcome", "LegProcessor"]
 
@@ -47,31 +51,43 @@ class BalanceBook:
     def __init__(self) -> None:
         self._held: dict[tuple[str, str], tuple[int, tuple[int, int]]] = {}
         self._cut: dict[str, int] = {}
+        self._n: dict[str, int] = {}  # assets held per wallet
 
     def is_seeded(self, wallet: str) -> bool:
         return wallet in self._cut
 
-    def seed(self, wallet: str, snap: WalletSnapshot) -> None:
-        """A complete snapshot. Never overwrites something read at a later slot."""
+    def seed(self, wallet: str, snap: WalletSnapshot) -> bool:
+        """A complete snapshot. Never overwrites something read at a later slot. ``False`` (nothing stored)
+        when it holds more assets than :data:`HELD_MAX`: a truncated snapshot would be a false baseline."""
+        entries_keys = {SOL, *snap.tokens}
+        new = sum(1 for asset in entries_keys if (wallet, asset) not in self._held)
+        if (
+            self._n.get(wallet, 0) + new > HELD_MAX
+        ):  # the FINAL state must fit, not just the snapshot
+            return False
         entries = {SOL: (snap.sol_lamports, snap.sol_slot), **snap.tokens}
         for asset, (atoms, slot) in entries.items():
             order = (slot, _SEED_TX)
             current = self._held.get((wallet, asset))
             if current is None or current[1] < order:
+                if current is None:
+                    self._n[wallet] = self._n.get(wallet, 0) + 1
                 self._held[(wallet, asset)] = (atoms, order)
         for asset, (_, order) in [(k[1], v) for k, v in self._held.items() if k[0] == wallet]:
             if asset != SOL and asset not in entries and order[0] <= snap.tokens_slot:
                 del self._held[(wallet, asset)]  # learned before the cut, absent from the snapshot
         self._cut[wallet] = snap.tokens_slot
+        return True
 
     def forget(self, wallet: str) -> None:
         """Drop everything known about ``wallet`` (a reconnect missed legs: the baseline is stale)."""
         self._cut.pop(wallet, None)
+        self._n.pop(wallet, None)
         for key in [k for k in self._held if k[0] == wallet]:
             del self._held[key]
 
     def apply(self, leg: BalanceLeg) -> tuple[int | None, str | None]:
-        """``(delta_atoms, None)`` or ``(None, reason)`` with reason ``stale`` | ``no_baseline``.
+        """``(delta_atoms, None)`` or ``(None, reason)`` with reason ``stale`` | ``no_baseline`` | ``held_overflow``.
         A non-stale leg becomes the new baseline either way."""
         key = (leg.wallet, leg.mint)
         current = self._held.get(key)
@@ -83,6 +99,10 @@ class BalanceBook:
                 None,
                 "stale",
             )  # inside the snapshot window of an absent mint: unknowable, not learned
+        if current is None and self._n.get(leg.wallet, 0) >= HELD_MAX:
+            return None, "held_overflow"  # not learned: the book stays finite
+        if current is None:
+            self._n[leg.wallet] = self._n.get(leg.wallet, 0) + 1
         self._held[key] = (leg.balance_atoms, leg.order)
         if current is not None:
             return leg.balance_atoms - current[0], None
@@ -107,17 +127,24 @@ class _Pending:
     deadline: float
 
 
+def _did_not_pay(token_delta: int, other_delta: int) -> bool:
+    """True when ``other_delta`` is NOT the counter-leg of a trade of the tokens: a buy is paid by a fall
+    in SOL/WSOL (so a non-negative change did not pay), a sale is paid by a rise (non-positive did not)."""
+    return other_delta >= 0 if token_delta > 0 else other_delta <= 0
+
+
 class LegProcessor:
     def __init__(self, book: BalanceBook) -> None:
         self.book = book
         self._sol: OrderedDict[tuple[str, str], int] = OrderedDict()
         self._first: OrderedDict[tuple[str, str], datetime] = OrderedDict()
         self._tokens: OrderedDict[tuple[str, str], int] = OrderedDict()
+        self._wsol: OrderedDict[tuple[str, str], int] = OrderedDict()
         self._pending: OrderedDict[tuple[str, str], list[_Pending]] = OrderedDict()
 
     def drop_wallet(self, wallet: str) -> None:
         """Forget the transactions in flight of one wallet (its baseline was reset)."""
-        for book in (self._sol, self._first, self._tokens, self._pending):
+        for book in (self._sol, self._first, self._tokens, self._wsol, self._pending):
             for key in [k for k in book if k[0] == wallet]:
                 del book[key]
 
@@ -126,6 +153,7 @@ class LegProcessor:
         self._sol.clear()
         self._first.clear()
         self._tokens.clear()
+        self._wsol.clear()
         self._pending.clear()
 
     def on_leg(self, leg: BalanceLeg, *, seen_at: datetime, now_mono: float) -> LegOutcome:
@@ -135,6 +163,9 @@ class LegProcessor:
         if leg.is_sol:
             return self._on_sol(key, delta, why, seen_at, now_mono)
         if leg.mint == WSOL_MINT:
+            if delta is not None:  # wrapped SOL is where a pool trade's quote travels: remember it
+                self._wsol[key] = delta
+                self._trim()
             return LegOutcome((), "wsol")
         if delta is None:
             return LegOutcome((), why or "no_baseline")
@@ -196,7 +227,7 @@ class LegProcessor:
         return out
 
     def _trim(self) -> None:
-        for book in (self._sol, self._first, self._tokens):
+        for book in (self._sol, self._first, self._tokens, self._wsol):
             while len(book) > _KEEP:
                 # never the metadata of a transaction that still has a buy waiting on its SOL leg
                 victim = next((k for k in book if k not in self._pending), None)
@@ -209,7 +240,17 @@ class LegProcessor:
     ) -> LeaderEvent:
         key = (leg.wallet, leg.signature)
         first = self._first.get(key, complete_at)
-        transfer = sol is not None and ((delta > 0 and sol >= 0) or (delta < 0 and sol <= 0))
+        wsol = self._wsol.get(key)
+        # ``transfer`` only when BOTH legs that could have paid for / been paid by the tokens were seen and
+        # neither did: a PumpSwap trade settles in wrapped SOL, so a native-SOL leg that merely shows the
+        # fee must not make a real sale a transfer. Anything less certain stays ``unknown`` — harmless,
+        # because the exit looks at the position, not at the label.
+        transfer = (
+            sol is not None
+            and wsol is not None
+            and _did_not_pay(delta, sol)
+            and _did_not_pay(delta, wsol)
+        )
         return LeaderEvent(
             wallet=leg.wallet,
             mint=leg.mint,
