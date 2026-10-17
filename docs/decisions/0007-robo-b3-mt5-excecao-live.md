@@ -72,3 +72,12 @@ Postgres continua sendo o registro; a corretora é a verdade do dinheiro (posiç
 ## Alterações de escopo
 
 (Linhas datadas, só acrescentadas. Vazio em 2026-10-17.)
+
+### 2026-10-17 — alinhamento com o contrato R0a
+
+Esclarecimentos de precisão a partir do contrato congelado `docs/RISK_ENGINE_B3.md` (commit `5e71f345`, §13). Não mudam o escopo autorizado pelo Everton; o texto acima fica como está e estas linhas o precisam.
+
+- **(a) "Saídas sempre permitidas".** Significa que o motor de risco nunca bloqueia uma saída. Mas uma instância sem autoridade verificada (partida sem API, conta trocada, host não autorizado, autoridade vencida) ou uma conta real sem K1 **não envia nada, nem saída**: a posição fica com o `sl` no servidor e as rotas manuais R3/R4 do Everton (contrato §13 item 3; limitação D16b do desenho). É o preço de nunca mexer numa conta não verificada.
+- **(b) Conteúdo do `hunter_hb`.** O arquivo de batimento carrega `v`, `ts`, `seq`, `inst`, a conta como sha256 e `end`; não é só o instante e a conta, como a tabela de exceções acima resume. O EA precisa de `inst` e `seq` para detectar um batimento velho. Continua sendo sinal de vida, nunca estado de negócio, e o EA continua sem enviar ordem.
+- **(c) API e disco falhando juntos.** O robô para de enviar SLTP e mantém o último `sl` confirmado no servidor (contrato §13 item 8). Isso **substitui** a regra 5 do desenho §3.8 ("falha de disco nunca aborta nem atrasa uma saída"), escrita quando a saída ainda podia ser ordem direcional. Falha só de disco, ou só da API, não atrasa nada além do orçamento de 500 ms.
+- **D17, pendente com o Everton (contrato §9, §4.4):** quando o piso do stop não pode ser colocado (posição de um pregão para o outro que abriu além do stop, ou stop rompido com a posição sem `sl`), o padrão é o robô **só alertar** (`floor_unplaceable`, rota manual); a alternativa é tentar sair por um colchete mais largo que o stop aprovado, exceção de risco que só ele decide. Até ele responder vale o padrão.
