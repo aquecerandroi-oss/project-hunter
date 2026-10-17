@@ -147,3 +147,5 @@ H-038, momento intradiário de mercado no WIN, **sem vantagem brasileira demonst
 `docs/plans/MERCADO-TRADICIONAL.md`, ainda não gravado na Fila. A H-036 segue viva. Decisão: [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*
 
 *(17/10/2026, 21:51Z: três candidatas intradiárias no WIN pré-registradas na [[Fila de Hipoteses]] a pedido do Everton — H-039 (faixa de abertura), H-040 (reversão de 15 min) e H-041 (rompimento depois de contração) —, família com Holm, retrospectiva no export do MT5 que ainda não existe; **nenhuma tem evidência local nem veredito**. Revisão: [[Revisoes-Astra/H-039-041-prereg|H-039-041-prereg]].)*
+
+*(17/10/2026: H-042 — uma IA de visão lendo o gráfico de 5 min do WIN — está só em **desenho acordado** com a Astra ([[Dialogos/ia-le-grafico|diálogo ia-le-grafico]]): rascunho de pré-registro fora da [[Fila de Hipoteses]], arnês com dados sintéticos, nenhum dado real mostrado a modelo, nenhum resultado; congelamento depende do export do MT5, do manifesto e da escolha do cliente pelo Everton.)*
