@@ -86,6 +86,7 @@ Lições de execução que valem para qualquer corretora com stop guardado no se
 - **Batimento não é exclusão** entre dois processos; um só remetente de ordens (o EA do terminal só avisa o celular).
 - **Nenhuma mutação sem identidade e autoridade verificadas** — nem recolocar um stop: "recolocar se ausente" não é
   escrita condicional.
+- Contrato normativo `docs/RISK_ENGINE_B3.md` (R0a, 17/10/2026): ler um nível não prova que a requisição terminou; nenhuma SLTP sem registro durável; a identidade é `position_id`, não o ticket — revisão em [[Revisoes-Astra/R0a-risk-engine-b3|R0a-risk-engine-b3]].
 
 ## Relacionadas
 
