@@ -450,3 +450,5 @@ registra. **Result: não iniciado** (naquele instante). Fonte: `.claude/state/no
 `.claude/state/notes-T3.33.md` · `.claude/state/brief-T3.33c-session_orb_v1.md` ·
 `infra/scripts/seed_reference.py` · `infra/scripts/activate_strategy_version.py` ·
 `services/strategy-worker/hunter_strategy_worker/replay/run.py`
+
+*(Acréscimo de 17/10/2026, 21:51Z, sem mudar nada acima: a família volta ao mercado de origem, onde há abertura de pregão de verdade, como a H-039 da [[Fila de Hipoteses]] — rompimento da faixa dos 30 minutos iniciais do à vista no WIN, retrospectiva em dado novo do MT5 (nunca releitura deste replay de cripto, que ficou com 20 decisões e líquida −0,1928 R). Revisão: [[Revisoes-Astra/H-039-041-prereg|H-039-041-prereg]].)*

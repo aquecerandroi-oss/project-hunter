@@ -173,3 +173,5 @@ Confirmou, por construção, que contração, `atr_pct` e `ER` são medidas dist
 [[KB-0004-proximidade-da-maxima-e-confirmacao-por-volume]] · [[EXP-0001-momentum-v1]]
 
 *(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*
+
+*(17/10/2026, 21:51Z: a família volta ao mercado de origem, em dado novo, como a H-041 da [[Fila de Hipoteses]] — razão de contração intradiária no WIN (6 barras de 5 min terminando em t−1, contra a mediana da mesma posição do dia nos 20 pregões anteriores; θ = 0,6; alvo 2 R), pré-registrada antes de existir qualquer export do MT5. A base pela mesma hora do dia existe porque a amplitude intradiária tem forma em U. Revisão: [[Revisoes-Astra/H-039-041-prereg|H-039-041-prereg]].)*

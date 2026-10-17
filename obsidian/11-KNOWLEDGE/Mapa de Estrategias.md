@@ -145,3 +145,5 @@ O que alimenta as consultas Dataview é o frontmatter de cada nota — `tipo`, `
 *(17/10/2026: memes e cripto pausados; o foco passou para o mercado tradicional — B3/WIN na Rico. A candidata é a
 H-038, momento intradiário de mercado no WIN, **sem vantagem brasileira demonstrada**; rascunho de pré-registro em
 `docs/plans/MERCADO-TRADICIONAL.md`, ainda não gravado na Fila. A H-036 segue viva. Decisão: [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*
+
+*(17/10/2026, 21:51Z: três candidatas intradiárias no WIN pré-registradas na [[Fila de Hipoteses]] a pedido do Everton — H-039 (faixa de abertura), H-040 (reversão de 15 min) e H-041 (rompimento depois de contração) —, família com Holm, retrospectiva no export do MT5 que ainda não existe; **nenhuma tem evidência local nem veredito**. Revisão: [[Revisoes-Astra/H-039-041-prereg|H-039-041-prereg]].)*

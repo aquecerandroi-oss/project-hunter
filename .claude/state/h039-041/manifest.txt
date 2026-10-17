@@ -1,0 +1,7 @@
+# h039-041 — manifesto (sha256), gerado em 2026-10-17T21:51:04Z, no congelamento de H-039/H-040/H-041 na Fila, antes de existir qualquer export do MT5
+a4887cdae6ffc529b0e12c44f997e45a1f70f4bac151cb3942f25e84c9a8c37c *prereg_frozen.md
+3ea6b633ed559b70fa9b6393c7f55457292618da9a857346d74e9edbdae3889d *prereg_draft.md
+817ad34c96d21ce2351c0d947d4dd1500316262634772ac6b99190fff5749c2e *prereg_draft_r1.md
+a89fb2cc7188fdf7f300e29eff614f0ea86a3d2d47cc1a29b402afe42b5fd42a *prereg_draft_r2.md
+# emenda 1 anexada em 2026-10-17T22:55:36Z, antes de qualquer export do MT5 (o frozen acima nao muda)
+b01dc273dd7aaa7c03a9b85bfb60ff6140ae048dd7d9577585728ce273f65876 *emenda_1.md

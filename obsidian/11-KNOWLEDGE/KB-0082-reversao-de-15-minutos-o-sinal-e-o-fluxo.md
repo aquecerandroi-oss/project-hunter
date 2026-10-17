@@ -187,3 +187,5 @@ O que continua valendo da nota: o edge bruto "never leaves the low single digits
 e não paga nem a banda maker de 5 bp — o adendo não muda o veredito, muda a **pergunta** a medir.
 
 *(17/10/2026: o foco do projeto passou para o mercado tradicional — B3/WIN — e esta nota, cuja evidência original é de ações ou futuros, entrou no mapa de evidência do plano `docs/plans/MERCADO-TRADICIONAL.md` §7; decisão em [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]].)*
+
+*(17/10/2026, 21:51Z: pré-registrada no WIN como a H-040 da [[Fila de Hipoteses]] — contra o sinal da última barra de 15 min, a pedido do Everton. Prior declarado: REFUTA, porque esta nota mostra o efeito em só 2,7 % das ações/ETFs dos EUA e bruto de ~1,3 bp no melhor caso cripto, da ordem do custo do WIN. É a única das três com poder para refutar o tamanho, na aproximação independente declarada. Revisão: [[Revisoes-Astra/H-039-041-prereg|H-039-041-prereg]].)*
