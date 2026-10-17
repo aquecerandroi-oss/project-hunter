@@ -1,6 +1,6 @@
 ---
 tags: [trading, execucao, m3, m4]
-updated: 2026-09-08
+updated: 2026-10-17
 status: implementado e rodando na VPS em modo paper com a ponte desligada; o caminho autônomo nunca rodou de ponta a ponta (aceite operacional em T3.29)
 owner: sexta-feira
 ---
@@ -73,10 +73,24 @@ class ExecutionAdapter(Protocol):
 
 **Falha planejada:** worker reinicia → relê posições `open` do Postgres e retoma; propostas `approved` sem ordem após 30 s expiram e nunca são executadas tarde; se o mercado ficar `degraded`, o worker não abre posição nova mas continua gerenciando saídas com o último preço válido.
 
+## Linha B3 (desenho, 17/10/2026 — nada implementado)
+
+Decisão do Everton: robô de execução real dele na B3, via MetaTrader 5, na conta dele na Rico. Desenho em
+`docs/design/robo-b3-mt5.md`, fechado com a Astra em [[Dialogos/robo-b3-mt5]]. O `LiveExecutionAdapter` da linha
+cripto **não muda**; a linha B3 teria adaptador, serviço e flag próprios, e depende do ADR que só o Everton assina.
+Lições de execução que valem para qualquer corretora com stop guardado no servidor:
+
+- **Em conta *netting*, fechar não é só-redução.** O stop do servidor é um segundo remetente; um "vende 1" nosso no
+  mesmo instante deixa a conta vendida. A saída segura mexe só no colchete (`sl`/`tp`) da própria posição, e o servidor
+  fecha; nenhuma ordem direcional de saída na v1.
+- **Batimento não é exclusão** entre dois processos; um só remetente de ordens (o EA do terminal só avisa o celular).
+- **Nenhuma mutação sem identidade e autoridade verificadas** — nem recolocar um stop: "recolocar se ausente" não é
+  escrita condicional.
+
 ## Relacionadas
 
 [[Paper Trading]] · [[Risk Engine]] · [[Portfolio]] · [[Workers]] · [[Open Bugs]] ·
-[[2026-09-08-shadow-lab-pronto]] · [[Diario/2026-09-08]]
+[[2026-09-08-shadow-lab-pronto]] · [[Diario/2026-09-08]] · [[Dialogos/robo-b3-mt5]]
 
 ## Fontes
 

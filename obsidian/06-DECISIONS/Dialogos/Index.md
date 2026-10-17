@@ -23,3 +23,4 @@ Cada diálogo é uma sessão de pensamento da [[Mente da Sexta-feira]]: o Claude
 
 Revisões avulsas da Astra: [[Revisoes-Astra/Index|índice de revisões]].
 - [[Dialogos/mercado-tradicional|mercado-tradicional]] — memes e cripto pausados; a H-038 (momento intradiário de mercado no WIN, B3/Rico), entrada manual do sinal, capital e módulo puro compartilhado com o robô MT5: 6 rodadas, DECISÃO CONJUNTA em 17/10; plano `docs/plans/MERCADO-TRADICIONAL.md`
+- [[Dialogos/robo-b3-mt5|robo-b3-mt5]] — robô de execução real do Everton na B3 (MetaTrader 5, conta dele na Rico): EA só avisa, saída pelo aperto do colchete no servidor, nenhuma ordem direcional de saída, autoridade por instância em três fases; 6 rodadas, DECISÃO CONJUNTA em 17/10; desenho `docs/design/robo-b3-mt5.md` (aguarda a Sexta-feira e o ADR do Everton)
