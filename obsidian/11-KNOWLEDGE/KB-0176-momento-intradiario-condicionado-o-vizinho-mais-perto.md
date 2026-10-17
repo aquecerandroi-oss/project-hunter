@@ -102,3 +102,5 @@ Esta nota virou a base da **H-038** (momento intradiário de mercado no WIN, B3)
 mercados desenvolvidos; o Brasil não está na amostra); (2) a **hipótese local** no Ibovespa, sem replicação conhecida;
 (3) o **modelo executável** no WIN, com stop, custo condicionado e fonte de dado limitada. A escala de ~2,5 bp por
 operação usada no poder é suposição, não teto medido.
+
+**Congelada (17/10/2026 17:56:30Z):** [[Fila de Hipoteses#H-038 — Momento intradiário de mercado no WIN, coorte prospectiva (o sinal da 1.ª meia hora do Ibovespa prevê o WIN entre C−30 e C?)|H-038]] (prospectiva, consulta final em 825 pregões de calendário, futilidade em 125) e H-038r (retrospectiva no histórico do MT5, primário 80 % + holdout 20 %), revisadas pela Astra em [[Revisoes-Astra/H-038-prereg|H-038-prereg]]. A regra virou o módulo puro `packages/indicators/hunter_indicators/b3/intraday_momentum.py` (r1 = `ibov_r1_open30` v1) e o cartão do dia `infra/scripts/b3_signal_card.py`. Nenhum dado intradiário do Ibovespa foi lido até o congelamento.

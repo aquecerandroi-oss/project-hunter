@@ -54,3 +54,5 @@ nesta regra"); o Everton decidiu operar.
 [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional]] · [[KB-0194-day-trade-no-mini-indice-quase-ninguem-vive-disso]] ·
 [[KB-0176-momento-intradiario-condicionado-o-vizinho-mais-perto]] · [[KB-0149-o-que-a-mesa-real-ensinou]] ·
 [[Fila de Hipoteses]] · [[Mapa de Estrategias]] · [[Dialogos/Index|diálogos]]
+
+*(17/10/2026 17:56:30Z: o rascunho do plano §1.3 foi congelado na [[Fila de Hipoteses]] como H-038 e H-038r depois de duas rodadas curtas da Astra, com três precisões aceitas sobre esta decisão conjunta — consulta final prospectiva fixada pelo calendário (futilidade em 125, final em 825 pregões), funil de cobertura com um só "sem sinal", e a exceção retrospectiva que não fabrica `received_at`: [[Revisoes-Astra/H-038-prereg|H-038-prereg]].)*
