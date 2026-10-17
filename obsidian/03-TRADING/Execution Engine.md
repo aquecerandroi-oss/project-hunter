@@ -89,6 +89,13 @@ Lições de execução que valem para qualquer corretora com stop guardado no se
 - Contrato normativo `docs/RISK_ENGINE_B3.md` (R0a, 17/10/2026): ler um nível não prova que a requisição terminou; nenhuma SLTP sem registro durável; a identidade é `position_id`, não o ticket — revisão em [[Revisoes-Astra/R0a-risk-engine-b3|R0a-risk-engine-b3]].
 - Motor puro `hunter_risk_b3` (R1, 17/10/2026, em `packages/risk-core`, ainda não commitado nem ligado a serviço nenhum): os 25 checks com os nomes do contrato, sizing com `binding_constraint`, `evaluate_exit` que sempre aprova, kill switch "o mais restritivo"; o calendário entra como dado (o motor não importa o pacote de pesquisa) — revisão em [[Revisoes-Astra/R1-hunter-risk-b3|R1-hunter-risk-b3]].
 
+- Adaptador MT5 (R2, 17/10/2026; `hunter_exchanges.mt5`, nada ligado a worker) — lições de execução: **o prazo de uma
+  chamada IPC não é o de uma ordem** (trabalho em fila que não começou nunca começa depois de a pista travar; um envio
+  cujo `await` foi cancelado é `unknown` até recolher o resultado tardio); **objeto cru do fornecedor não atravessa a
+  fronteira** (`account_info` carrega `login`/`server`); **o falso do MT5 tem de reconciliar custos e zerar stops na virada
+  do pregão**, senão R5 passa por motivo errado. Revisão: [[Revisoes-Astra/R2-mt5-adapter|R2-mt5-adapter]]; módulo em
+  [[Exchange Adapters]].
+
 ## Relacionadas
 
 [[Paper Trading]] · [[Risk Engine]] · [[Portfolio]] · [[Workers]] · [[Open Bugs]] ·

@@ -1,6 +1,6 @@
 ---
 tags: [mercado, exchanges, binance, bybit, m1]
-updated: 2026-10-05
+updated: 2026-10-17
 status: implementado
 owner: sexta-feira
 ---
@@ -101,9 +101,44 @@ O `BuyEvent` tem armadilhas só vistas na cadeia (campos trocados no `buy_exact_
 `pumpfun/curve_completion.py` (decodificador do `CompleteEvent`, 144 B, qualquer outro tamanho recusado; o tri-estado `complete` / `not_complete` / `unknown` de `SwapRecord.curve_completion`, pontual: `real_token_reserves` depois do trade corroborado pelo `CompleteEvent` do próprio programa, nunca por leitura posterior da conta) e
 `pumpswap/pool_legs.py` (casa o evento com a instrução de swap, direta ou por roteador, pelas contas 0, 1, 5 e 6 e anexa `base_mint`/`quote_mint`, conferidos contra os saldos de token dos cofres; `quote_is_sol` vem da mint da quote e `wsol_is_base` marca as pools com WSOL na base). `SwapRecord` ganha `real_token_reserves`, `curve_completion` (+ `curve_complete`), `base_mint`, `quote_mint` e as contas de token do usuário. `read_transaction_logs` (REST/recuperação) anexa as pernas e conta `pool_mints_unresolved` e `pool_mints_conflict` (**não** são lacuna); `read_program_logs` (logs de um `logsSubscribe`) não tem contas e as deixa `None`. **Perto de dois quintos dos eventos de pool são em pools com WSOL na base** (41,6 % numa amostra de 40 blocos) e as instruções `SellV2`, `BuyExactQuoteInV2` e `BoostBuyAndBurn` ainda não têm layout: [[Open Bugs]]. Prova, fixtures `t1b_*` com proveniência em `tests/fixtures/t1b_provenance.json` e medição: [[KB-0184-o-buyevent-da-pumpswap-e-as-armadilhas-de-ler-eventos-do-programa-inteiro|KB-0184]]. Revisão: [[wallets-1b-record]]. **Integração pendente na ponte** (`hunter_indicators.meme.wallets.bridge`, outro dono): ela ainda exige `curve_complete=record.curve_complete` e `PoolMints(pool, record.base_mint, record.quote_mint)` passados pelo chamador; os campos novos existem no registro, mas a ponte não os lê sozinha, e cada recusa dela é buraco de cobertura da fita. `orphan_complete_events` é lacuna (inclui o `CompleteEvent` cujo trade fechador ainda tinha tokens: o que drena sumiu); `pool_mints_unresolved`, `pool_mints_conflict`, `pool_mints_via_sibling` (mints certas por construção, mas a invocação é de um swap desconhecido como `SellV2`, que só empresta a evidência de uma conhecida) e `curve_completion_unknown` não são. Limite: o casamento evento → instrução é por pool, usuário e contas, não por invocação; só `encoding=json` é entendido (`jsonParsed` dá `unresolved`, sem atribuição errada).
 
+### Adaptador MT5 — robô B3 do Everton (R2, 17/10/2026; nada ligado a worker)
+
+`packages/exchange-adapters/hunter_exchanges/mt5/` (tarefa R2 do desenho `docs/design/robo-b3-mt5.md` §9, contrato
+`docs/RISK_ENGINE_B3.md`, pós-congelamento). Não é um `ExchangeAdapter` de mercado: é a **porta** `Mt5Port` (Protocol) de
+tudo que o robô precisa do MetaTrader 5 — ler terminal/conta/símbolo/tick/posições/ordens/negócios (com `magic` e `reason`),
+`order_check`, margem, e três mutações: entrada com `sl`/`tp` anexados, `TRADE_ACTION_SLTP` e cancelamento. Forma e regras:
+
+- **`float` só na fronteira** (`convert.py`/`builders.py`/`parse.py`): saindo, o valor tem de ser múltiplo exato do tick/step
+  (senão `Mt5NotSent`, nunca arredonda); entrando, 1 ULP de ruído volta exato à grade e o que não é de grade (VWAP de
+  `price_open`) fica com o repr curto, sem recusar um relato do terminal. Dinheiro da conta usa `currency_digits`.
+- **Antes do terminal, nomeado:** `would_delete_stop` (aumenta/inverte com `sl=0`, a armadilha do *netting*), `would_loosen_stop`,
+  SLTP com `sl=0`/mais largo que o confirmado ou que o piso/ticket que não é o atual/posição de outro `magic`. Redução e fechamento
+  total **nunca** são recusados por isso. Depois que a requisição pode ter saído (`None`, exceção, estouro de prazo) não há
+  exceção: é `SendOutcome` com veredito `UNCERTAIN` — nunca reenviar.
+- **Tabela de retcodes fechada por ação × retcode** (`retcodes.py`): construída para os 41 códigos × 3 ações; o que não está numa
+  linha terminal da própria ação é incerto (`PLACED`/`DONE_PARTIAL` não concluem uma SLTP; só `DONE` aceita um cancelamento, e
+  cancelado só com a ordem final no histórico).
+- **Uma pista IPC com prazo** (`ipc.py`): um fio, `ipc_call_timeout_s`, trava `ipc_hung` que só cai com reinício; trabalho em fila
+  que não começou nunca começa depois da trava; envio cujo `await` foi cancelado deixa a pista `unresolved` (nenhuma mutação nova)
+  até o resultado tardio — normalizado, nunca o objeto cru — ser recolhido em `drain_late_results()`. SLTP também é recusada
+  localmente se o nível ficaria do lado errado do toque (`floor_unplaceable`, §4.2).
+- **Vigia da especificação** (`spec.py`): divergência de tick/step/modo/versões recusa entradas e é *latched*; 3 falhas seguidas =
+  `UNREADABLE`; só `rearm` limpa. Saídas seguem.
+- **Segredo:** a API não tem onde pôr `login`/`password`/`server`; `initialize` só recebe `path`/`timeout`; a conta é
+  `account_hash`. `MetaTrader5` só é importado sob demanda e só no Windows (a CI Linux importa o pacote sem a roda).
+- **Teste:** o falso (`services/b3-robot/tests/fakes/mt5_fake.py` e vizinhos, rotulado FAKE) fala a superfície do módulo
+  `MetaTrader5` (floats, tuplas nomeadas); a suíte de contrato em `tests/mt5/` roda contra ele e, marcada `live` (e só com
+  `HUNTER_LIVE_TESTS=1` + `HUNTER_LIVE_MT5_SYMBOL`, só em conta DEMO), contra um terminal. Revisão: [[Revisoes-Astra/R2-mt5-adapter|R2-mt5-adapter]].
+
+**Premissas sobre o terminal que o código assume e só a sessão demo confirma:** `positions_get`/`orders_get` devolvem `()` quando não há
+nada e `None` só em erro (`None` vira `Mt5ReadError`, nunca lista vazia); `history_orders_get(ticket=…)` devolve `()` para ticket
+desconhecido; `order_check` aprova com `retcode 0`; o `time` do tick é o relógio do servidor, sem correção (T11 mede o
+deslocamento). O `TRADE_RETCODE_HEDGE_PROHIBITED` (10046) está na documentação da MetaQuotes mas **não** na roda 5.0.6231.
+O falso é uma hipótese de modelagem (reversão = dois negócios, parcial de IOC = `CANCELED`), não a Rico.
+
 ## Relacionadas
 
-[[Market Collector]] · [[WebSockets]] · [[System Overview]]
+[[Market Collector]] · [[WebSockets]] · [[System Overview]] · [[Execution Engine]]
 
 ## Fontes
 
