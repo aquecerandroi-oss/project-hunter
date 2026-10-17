@@ -1,0 +1,1175 @@
+{
+ "entries": [
+  {
+   "rank": 1,
+   "walletAddress": "FxT2z6M4QDusKGLtDNQFJPZEAULa1nnQTa",
+   "pnlSol": 1468.0506554082983,
+   "pnlUsd": 162204.91691606288,
+   "pnlPercent": 43338.95387773658,
+   "buySpendSol": 1274.3530851114767,
+   "lastRefreshedAtMs": 1791519432193,
+   "realizedPnlSol": 1468.052327627872,
+   "realizedPnlUsd": 162205.10167960357,
+   "unrealizedPnlSol": -0.0016722195736714005,
+   "unrealizedPnlUsd": -0.18476354069495304,
+   "positionsCount": 5,
+   "topPositions": [
+    {
+     "mint": "MnEUTq2Hvx65XPyVZyFZ8B5bi9EDMr2Pkx",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnzQnbrF3ZdaXGobi3JB5geQRDexwZX4dv",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnbkChRV82xxN8yKWXriQMZHxEmVrYnbPn",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 2,
+   "walletAddress": "Fx823BvXPtPEUW4WaY4jKXhto14eTxX2kC",
+   "pnlSol": 949.7888843427817,
+   "pnlUsd": 104548.36829871131,
+   "pnlPercent": 7886.639568117252,
+   "buySpendSol": 3032.0328570511274,
+   "lastRefreshedAtMs": 1791521007813,
+   "realizedPnlSol": 949.7896216063696,
+   "realizedPnlUsd": 104548.44945327776,
+   "unrealizedPnlSol": -0.000737263587886748,
+   "unrealizedPnlUsd": -0.08115456644130903,
+   "positionsCount": 3,
+   "topPositions": [
+    {
+     "mint": "MnyKWq9Aic7AZqoE43yVZbMEj5cJJuHYZZ",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnGTGdUNHVeBsFUBt9dVG5RunKRQ4JfLYG",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mn96piNySyFSS8cd1Kb3uLCTvRVHak3Suk",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 3,
+   "walletAddress": "FxMMfzvAuJtxwBLixW2T7tRcJECoWfvnGX",
+   "pnlSol": 788.6428910691324,
+   "pnlUsd": 86697.75917034113,
+   "pnlPercent": 18892.22800705636,
+   "buySpendSol": 3645.8446993541447,
+   "lastRefreshedAtMs": 1791521212677,
+   "realizedPnlSol": 788.7863008831289,
+   "realizedPnlUsd": 86713.52461964314,
+   "unrealizedPnlSol": -0.14340981399653405,
+   "unrealizedPnlUsd": -15.765449302002295,
+   "positionsCount": 19,
+   "topPositions": [
+    {
+     "mint": "MnN8jKZsgsAAYdEJf692uJiwS3MfqTATK4",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnsfuppNozQBDDxjK5bHra1UyUN2wEVFUM",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mn9KRLHBFNVFU7d9MhfxCyU6Vs3WMCPaNu",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 4,
+   "walletAddress": "FxVN9nTgPjiEDgCswKNES4UmKVkkJVNCsv",
+   "pnlSol": 783.7011947287831,
+   "pnlUsd": 86286.1285005948,
+   "pnlPercent": 8836.046966516762,
+   "buySpendSol": 3711.75356068301,
+   "lastRefreshedAtMs": 1791520918454,
+   "realizedPnlSol": 783.7406793463928,
+   "realizedPnlUsd": 86290.47578858133,
+   "unrealizedPnlSol": -0.039484617609691235,
+   "unrealizedPnlUsd": -4.347287986521093,
+   "positionsCount": 1,
+   "topPositions": [
+    {
+     "mint": "Mnogqdj91apuF3heUAHcMa3safzDFDoCR8",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 5,
+   "walletAddress": "Fx8pRf6cVSYyTS9SzRSt3x3y4Rc8DgNDbE",
+   "pnlSol": 720.8224077676997,
+   "pnlUsd": 79460.53078669755,
+   "pnlPercent": 371.77856501817513,
+   "buySpendSol": 2969.9317336117515,
+   "lastRefreshedAtMs": 1791520788456,
+   "realizedPnlSol": 721.4544206367989,
+   "realizedPnlUsd": 79530.20131511267,
+   "unrealizedPnlSol": -0.6320128690992317,
+   "unrealizedPnlUsd": -69.67052841513916,
+   "positionsCount": 900,
+   "topPositions": [
+    {
+     "mint": "MnVQLHNJLSM3NGZrvSPYQxuGB2VpPdsqyg",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnwF6GbxmQ1SP9dovALQwSLQQ1CH2ETVPp",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnjJEwD57usQMj9JqUchorQPdVmXo6gFRB",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 6,
+   "walletAddress": "FxB8d27aTMfTNdYLCt92R9gAwxxavGs1Ms",
+   "pnlSol": 663.1118086374855,
+   "pnlUsd": 73207.5436735784,
+   "pnlPercent": 6399.091397221006,
+   "buySpendSol": 2230.395615942158,
+   "lastRefreshedAtMs": 1791519993376,
+   "realizedPnlSol": 663.1126564826635,
+   "realizedPnlUsd": 73207.63727568605,
+   "unrealizedPnlSol": -0.0008478451779875058,
+   "unrealizedPnlUsd": -0.09360210764982065,
+   "positionsCount": 0,
+   "topPositions": [],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 7,
+   "walletAddress": "FxXFLwrARr1LRSLPy25EhUdPBEJ74oGoFx",
+   "pnlSol": 654.8583762334555,
+   "pnlUsd": 72270.17040112415,
+   "pnlPercent": 1100.8593714899685,
+   "buySpendSol": 2486.8316357857275,
+   "lastRefreshedAtMs": 1791520008739,
+   "realizedPnlSol": 655.1697132712748,
+   "realizedPnlUsd": 72304.52955661788,
+   "unrealizedPnlSol": -0.31133703781919964,
+   "unrealizedPnlUsd": -34.359155493726874,
+   "positionsCount": 7,
+   "topPositions": [
+    {
+     "mint": "MnpgjDvgjW99TuLS6W994GPf26Xq9XnNna",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mn4tA83GPtNFuA1BQb5KWWFANMvPuTFUAu",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnMKbrxbRoh4xCBRW7ASnqSn5Nj8LSoAwr",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 8,
+   "walletAddress": "FxSJ6TRQdc16ErcmhXJptdd92Buju4Mkr1",
+   "pnlSol": 629.5117852632154,
+   "pnlUsd": 69257.90724225636,
+   "pnlPercent": 2148.8862161525453,
+   "buySpendSol": 1109.8689584471022,
+   "lastRefreshedAtMs": 1791521056317,
+   "realizedPnlSol": 629.3200401454728,
+   "realizedPnlUsd": 69236.81174271267,
+   "unrealizedPnlSol": 0.19174511774257644,
+   "unrealizedPnlUsd": 21.095499543695155,
+   "positionsCount": 2,
+   "topPositions": [
+    {
+     "mint": "Mnmsp2AAUiJJLLSuMLbiru5AEN4j1A7dsf",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnHqQxR62q2DnATtt12CV4wygvMpx3Df9R",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 9,
+   "walletAddress": "Fxj57Cnw47YnLkHB4EVdc8adxANTAdMURE",
+   "pnlSol": 612.1306655097035,
+   "pnlUsd": 67438.43541920403,
+   "pnlPercent": 1999.4647923195987,
+   "buySpendSol": 1708.3125342471596,
+   "lastRefreshedAtMs": 1791520862337,
+   "realizedPnlSol": 616.9459763552924,
+   "realizedPnlUsd": 67968.93821506256,
+   "unrealizedPnlSol": -4.815310845588915,
+   "unrealizedPnlUsd": -530.5027958585307,
+   "positionsCount": 8,
+   "topPositions": [
+    {
+     "mint": "Mn4pvhGhDjfV9MT73sfqkB3MyqioCv4sPu",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnGBGXm8NbdT54NknimWpo9pKgm35VTUeA",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mn8f8duimPLmHNyoQBzZXyFkBqFN71L8hi",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": false,
+   "verifiedBadgeVisible": true,
+   "userId": "redacted"
+  },
+  {
+   "rank": 10,
+   "walletAddress": "FxEX51jK3gfJQTFMWHb7LzK7d23oDhvt7f",
+   "pnlSol": 608.2440731439581,
+   "pnlUsd": 66952.69488078434,
+   "pnlPercent": 10550.496674634593,
+   "buySpendSol": 2049.8467687238203,
+   "lastRefreshedAtMs": 1791521013038,
+   "realizedPnlSol": 599.490119496191,
+   "realizedPnlUsd": 65989.10014397092,
+   "unrealizedPnlSol": 8.753953647766924,
+   "unrealizedPnlUsd": 963.5947368134086,
+   "positionsCount": 6,
+   "topPositions": [
+    {
+     "mint": "MnQ4pfFWUN5h9N1P6gJLxikucJNtAffXwA",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnQELx4dWwXjL5XxJituJBEfbfEQgfx7aS",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MniiP67faAKPefEkojUJGAvCwFPXL9P19C",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 11,
+   "walletAddress": "FxNkX88rfQqbyJGWooQnpk5K72ezhCZBMG",
+   "pnlSol": 565.0233676009358,
+   "pnlUsd": 62126.716750580286,
+   "pnlPercent": 183.671928775421,
+   "buySpendSol": 2207.7833858372314,
+   "lastRefreshedAtMs": 1791521192485,
+   "realizedPnlSol": 557.6982125215877,
+   "realizedPnlUsd": 61321.28486782291,
+   "unrealizedPnlSol": 7.325155079348117,
+   "unrealizedPnlUsd": 805.4318827573765,
+   "positionsCount": 314,
+   "topPositions": [
+    {
+     "mint": "Mn7uuGXfnoHCuKyXAhVoqYDyaDTEc3ABaV",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnJUK8oFVpMHJAtepnmRgeBJuzA1NPC4bV",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnBGMKejKnjPyJgrg5dKrSrfMh2zbCEYkj",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 12,
+   "walletAddress": "FxBpNrNfuXrCukQy56JA1FJY3vadC6gYeZ",
+   "pnlSol": 556.3572746628453,
+   "pnlUsd": 61209.56179723082,
+   "pnlPercent": 292.6013923424223,
+   "buySpendSol": 1836.0672897731133,
+   "lastRefreshedAtMs": 1791521053303,
+   "realizedPnlSol": 556.3572746628453,
+   "realizedPnlUsd": 61209.56179723082,
+   "unrealizedPnlSol": -3.5194572001356055e-15,
+   "unrealizedPnlUsd": -3.8720520571058836e-13,
+   "positionsCount": 0,
+   "topPositions": [],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": false,
+   "verifiedBadgeVisible": true,
+   "userId": "redacted"
+  },
+  {
+   "rank": 13,
+   "walletAddress": "Fxz3NPisGoWnge2xdMqJMdrsmeh8nbLkt3",
+   "pnlSol": -2638.523323348547,
+   "pnlUsd": -290219.64853850973,
+   "pnlPercent": -21.631046755773813,
+   "buySpendSol": 5170.211227859196,
+   "lastRefreshedAtMs": 1791521087027,
+   "realizedPnlSol": 551.0801215500768,
+   "realizedPnlUsd": 60615.07123228689,
+   "unrealizedPnlSol": -3189.6034448986234,
+   "unrealizedPnlUsd": -350834.7197707966,
+   "positionsCount": 113,
+   "topPositions": [
+    {
+     "mint": "MnjG3sR9ayjdotfPoRLCyCfgqCN3r9iS7i",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MntJ3FPCNNsssaHk64hMYZevigVYH9Hpec",
+     "chainId": 56,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnZon2cLsbqUPF8KGtWVLBkfpk92xpn4FN",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 14,
+   "walletAddress": "FxL17y3AVYCgUCSDo3sKcJxQ4tWyBmKwYQ",
+   "pnlSol": 548.1169131954962,
+   "pnlUsd": 60386.04032674781,
+   "pnlPercent": 182.31914779613402,
+   "buySpendSol": 395.76737437347816,
+   "lastRefreshedAtMs": 1791520845669,
+   "realizedPnlSol": 549.8005300081481,
+   "realizedPnlUsd": 60571.524390997685,
+   "unrealizedPnlSol": -1.6836168126520579,
+   "unrealizedPnlUsd": -185.4840642498772,
+   "positionsCount": 69,
+   "topPositions": [
+    {
+     "mint": "Mn9xDeyKQYuHtGB6gGjRzGSqKirmnPjNok",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnwF6GbxmQ1SP9dovALQwSLQQ1CH2ETVPp",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnRipd89UUBMpEbEbZaq2shW41KTekZLQz",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 15,
+   "walletAddress": "FxbWGkM9qQJevewEBkPqzHboUgQrY5gGsm",
+   "pnlSol": 548.0337748081575,
+   "pnlUsd": 60293.823292627836,
+   "pnlPercent": 1208.174566253809,
+   "buySpendSol": 1598.729538076552,
+   "lastRefreshedAtMs": 1791521050027,
+   "realizedPnlSol": 548.0337748081575,
+   "realizedPnlUsd": 60293.823292627836,
+   "unrealizedPnlSol": 0,
+   "unrealizedPnlUsd": 0,
+   "positionsCount": 0,
+   "topPositions": [],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": false,
+   "verifiedBadgeVisible": true,
+   "userId": "redacted"
+  },
+  {
+   "rank": 16,
+   "walletAddress": "FxmAXDPE8ir4wnXXcDFGBB8cxqs2Ccu5hc",
+   "pnlSol": -31.422273576845786,
+   "pnlUsd": -3458.042260055175,
+   "pnlPercent": -0.5802481451878844,
+   "buySpendSol": 1859.0004930392404,
+   "lastRefreshedAtMs": 1791521044581,
+   "realizedPnlSol": 534.9342983305802,
+   "realizedPnlUsd": 58869.87793726023,
+   "unrealizedPnlSol": -566.356571907426,
+   "unrealizedPnlUsd": -62327.920197315405,
+   "positionsCount": 87,
+   "topPositions": [
+    {
+     "mint": "MnjG3sR9ayjdotfPoRLCyCfgqCN3r9iS7i",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnKdri9xQfhuKPiQwDfR24UQfDKH4K4NG6",
+     "chainId": 4663,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnN8jKZsgsAAYdEJf692uJiwS3MfqTATK4",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 17,
+   "walletAddress": "FxVFAfWkGQpPgjdr1z2Hy12nfX7E6XgAP1",
+   "pnlSol": 498.9104612938625,
+   "pnlUsd": 55154.551496036496,
+   "pnlPercent": 180.0921626930916,
+   "buySpendSol": 1233.3812613638217,
+   "lastRefreshedAtMs": 1791519467392,
+   "realizedPnlSol": 518.1888778472851,
+   "realizedPnlUsd": 57285.780446017365,
+   "unrealizedPnlSol": -19.278416553422613,
+   "unrealizedPnlUsd": -2131.22894998087,
+   "positionsCount": 7,
+   "topPositions": [
+    {
+     "mint": "Mng32kC7a84qYZGKjRBBQZwD2RZreGGfQj",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MndWBRQs1cNnXjNRRnrGu5Fa7eUWeL3D8G",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnGUHdZMiQLwx38NtMDpv92VA6U1tCGKKU",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 18,
+   "walletAddress": "FxTJtpMNQATcfn11g59EWzarcuLLNCH6zj",
+   "pnlSol": 448.38399994814733,
+   "pnlUsd": 49513.687141630355,
+   "pnlPercent": 2084.9985287957848,
+   "buySpendSol": 3592.3404256399963,
+   "lastRefreshedAtMs": 1791518764058,
+   "realizedPnlSol": 498.8112261805498,
+   "realizedPnlUsd": 55082.21301093018,
+   "unrealizedPnlSol": -50.427226232402404,
+   "unrealizedPnlUsd": -5568.52586929982,
+   "positionsCount": 2,
+   "topPositions": [
+    {
+     "mint": "MnBGJy2t5J5MXqr1V8f1FfmAo7kGGL1FLf",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnN8jKZsgsAAYdEJf692uJiwS3MfqTATK4",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 19,
+   "walletAddress": "FxWd9nCS3w1RzDiJWzY1xGiBuoNwMuFN7A",
+   "pnlSol": 494.21134019446464,
+   "pnlUsd": 54330.06020423921,
+   "pnlPercent": 6449.0506792971955,
+   "buySpendSol": 2488.6996702369474,
+   "lastRefreshedAtMs": 1791521199354,
+   "realizedPnlSol": 494.3158864086285,
+   "realizedPnlUsd": 54341.55326732314,
+   "unrealizedPnlSol": -0.10454621416386992,
+   "unrealizedPnlUsd": -11.493063083929528,
+   "positionsCount": 104,
+   "topPositions": [
+    {
+     "mint": "MnJcqDbHBVW3fV6sKRAiMvV2sabicwQ43v",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnN8jKZsgsAAYdEJf692uJiwS3MfqTATK4",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mnc9jWbcbpX6Q3SLtxza6UHpeR5zudXfGe",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 20,
+   "walletAddress": "FxfprmCRQs535mX73TDuBQbfjpnK2vD2Ga",
+   "pnlSol": 490.79333316844895,
+   "pnlUsd": 54035.40856657988,
+   "pnlPercent": 3334.210610395331,
+   "buySpendSol": 1137.0006313626643,
+   "lastRefreshedAtMs": 1791520955804,
+   "realizedPnlSol": 490.79335749471005,
+   "realizedPnlUsd": 54035.41124485476,
+   "unrealizedPnlSol": -2.43262610404099e-05,
+   "unrealizedPnlUsd": -0.0026782748773905426,
+   "positionsCount": 7,
+   "topPositions": [
+    {
+     "mint": "MnsrRXH8oqy599n59eFxfdFQ6B1nTqzFuG",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnwvEA5cmkkU7gGhVCsdXJsjtn9c6R7hM5",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mn9RpREGU9tv7UJbCtskyGf7HBzTZuxHUH",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 21,
+   "walletAddress": "FxJeU8o4EqhFr5WPmibKF5EhTWGWgQM564",
+   "pnlSol": 553.801187788996,
+   "pnlUsd": 61153.99918780267,
+   "pnlPercent": 3084.2229472009217,
+   "buySpendSol": 1402.3135487009704,
+   "lastRefreshedAtMs": 1791520112697,
+   "realizedPnlSol": 476.3408985614812,
+   "realizedPnlUsd": 52600.37639147301,
+   "unrealizedPnlSol": 77.4602892275148,
+   "unrealizedPnlUsd": 8553.622796329662,
+   "positionsCount": 6,
+   "topPositions": [
+    {
+     "mint": "MniTL7nHXgJ97HLEZQiSAN5nnMHmgQXQq7",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mnrfp3DQocyDs8w49METBxgpD194LHEmRc",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnN8jKZsgsAAYdEJf692uJiwS3MfqTATK4",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": false,
+   "verifiedBadgeVisible": true,
+   "userId": "redacted"
+  },
+  {
+   "rank": 22,
+   "walletAddress": "FxKNtEyGjTXgfK5JkPJhV4jCQQG26Ho1Pi",
+   "pnlSol": 453.8918514470862,
+   "pnlUsd": 49877.71669673033,
+   "pnlPercent": 2411.592426794152,
+   "buySpendSol": 1804.5078997232765,
+   "lastRefreshedAtMs": 1791521245522,
+   "realizedPnlSol": 454.11636096343926,
+   "realizedPnlUsd": 49902.38782051604,
+   "unrealizedPnlSol": -0.22450951635308525,
+   "unrealizedPnlUsd": -24.67112378571655,
+   "positionsCount": 44,
+   "topPositions": [
+    {
+     "mint": "Mn9TTg8eiEE9yqo3dAPi8B9qcY4b947Ykr",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mntu6JBhEtdGLczJScqrVdYX3ZqQPC94Fx",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnAyKFrRJLm7XHr46Pt3EjenMLJmy5hLHk",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 23,
+   "walletAddress": "FxrorhGbjyJiMFwTH7J81RCXCV1MsHgiDo",
+   "pnlSol": 393.06019859234874,
+   "pnlUsd": 43329.357792853465,
+   "pnlPercent": 59.132418813402964,
+   "buySpendSol": 1111.798197285855,
+   "lastRefreshedAtMs": 1791520778428,
+   "realizedPnlSol": 408.3420203925969,
+   "realizedPnlUsd": 45013.96367989296,
+   "unrealizedPnlSol": -15.281821800248279,
+   "unrealizedPnlUsd": -1684.6058870395002,
+   "positionsCount": 207,
+   "topPositions": [
+    {
+     "mint": "MnTnLhetLD6fkAJxmc32UTyzFJSecV48CP",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnFt5niMueXm9UiM2QKngNnkR6atJfXjLn",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnpzeK2E8y5B3RA8dJJiXnbA2CEgFJp3K2",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 24,
+   "walletAddress": "FxgC98NC6WKC6Zp1uwGRkKfuDHQidX4f6H",
+   "pnlSol": 400.2508374301054,
+   "pnlUsd": 44100.237017912594,
+   "pnlPercent": 7001.369413016584,
+   "buySpendSol": 668.4496187897915,
+   "lastRefreshedAtMs": 1791520814373,
+   "realizedPnlSol": 400.2508374301054,
+   "realizedPnlUsd": 44100.237017912594,
+   "unrealizedPnlSol": 0,
+   "unrealizedPnlUsd": 0,
+   "positionsCount": 0,
+   "topPositions": [],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": false,
+   "verifiedBadgeVisible": true,
+   "userId": "redacted"
+  },
+  {
+   "rank": 25,
+   "walletAddress": "Fx3tj5AjcFs4y8vSU2Rw77Fqt4rfLC5NSD",
+   "pnlSol": 371.233202645276,
+   "pnlUsd": 40825.53342441886,
+   "pnlPercent": 1437.0884575153264,
+   "buySpendSol": 1730.4392626182507,
+   "lastRefreshedAtMs": 1791517820135,
+   "realizedPnlSol": 386.10765369156354,
+   "realizedPnlUsd": 42461.317600061004,
+   "unrealizedPnlSol": -14.874451046287549,
+   "unrealizedPnlUsd": -1635.7841756421403,
+   "positionsCount": 9,
+   "topPositions": [
+    {
+     "mint": "MnnEqvhWcArFZU8D7B9CEUQPvVnLd26P99",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnLu2zurP2qnB5X3AwDq4VbZQXCPcDKtzS",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mny3JzEv9V4cDvLiK44VB4CgadSJN134Hr",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": false,
+   "verifiedBadgeVisible": true,
+   "userId": "redacted"
+  },
+  {
+   "rank": 26,
+   "walletAddress": "FxRWJRABAtoPJBBP6AFfA3ByunyJTHzHMW",
+   "pnlSol": 379.93148274905786,
+   "pnlUsd": 41944.43569549599,
+   "pnlPercent": 8196.913522797138,
+   "buySpendSol": 3090.0703575086836,
+   "lastRefreshedAtMs": 1791519994788,
+   "realizedPnlSol": 382.9615357709812,
+   "realizedPnlUsd": 42278.953549116326,
+   "unrealizedPnlSol": -3.030053021923378,
+   "unrealizedPnlUsd": -334.51785362034093,
+   "positionsCount": 19,
+   "topPositions": [
+    {
+     "mint": "Mn4R7sSsZaXAsUYSjAcoJtu1nMbtGp7YN6",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnvfKWR1AVw7Cqtm2QPASF5hY1iDxFaw53",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MndfHdT1LKq976XLRQYUNiHgwfnkA7aQcp",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 27,
+   "walletAddress": "FxErS2pTGzTs9qKwfKVW6sBDHe43Lo1L1j",
+   "pnlSol": 338.4551640351216,
+   "pnlUsd": 37223.298940582674,
+   "pnlPercent": 229.98008310394465,
+   "buySpendSol": 2034.7779355998227,
+   "lastRefreshedAtMs": 1791521164160,
+   "realizedPnlSol": 382.2294079683997,
+   "realizedPnlUsd": 42037.5902883646,
+   "unrealizedPnlSol": -43.7742439332781,
+   "unrealizedPnlUsd": -4814.291347781926,
+   "positionsCount": 7,
+   "topPositions": [
+    {
+     "mint": "Mn8k9SL7XjvmSaJMBPpZkYDRmoBdhXPATx",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnnQa5YJ9yLLNL4y1VupjL67VZzAuUm9vC",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mnub3JjLGwGKqSPV8To5GKyjkwKD6KLpfE",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 28,
+   "walletAddress": "FxHm6ZcfTCSA5Z9bWtB6kiuisrX7EYAtXM",
+   "pnlSol": 377.7910257656912,
+   "pnlUsd": 41706.58215968072,
+   "pnlPercent": 582.3824287279759,
+   "buySpendSol": 1770.5395994847938,
+   "lastRefreshedAtMs": 1791520275088,
+   "realizedPnlSol": 377.79419379869705,
+   "realizedPnlUsd": 41706.93189755122,
+   "unrealizedPnlSol": -0.003168033005891689,
+   "unrealizedPnlUsd": -0.34973787049867266,
+   "positionsCount": 2,
+   "topPositions": [
+    {
+     "mint": "Mn9KRLHBFNVFU7d9MhfxCyU6Vs3WMCPaNu",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mn7uuGXfnoHCuKyXAhVoqYDyaDTEc3ABaV",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": false,
+   "verifiedBadgeVisible": true,
+   "userId": "redacted"
+  },
+  {
+   "rank": 29,
+   "walletAddress": "Fx93MWpiKUKBecVa8nP29CPKj77pf9hh2e",
+   "pnlSol": 371.08620251650296,
+   "pnlUsd": 40956.78417174643,
+   "pnlPercent": 1177.7390062083352,
+   "buySpendSol": 946.0820155408463,
+   "lastRefreshedAtMs": 1791518321033,
+   "realizedPnlSol": 371.11267470091116,
+   "realizedPnlUsd": 40959.70590673957,
+   "unrealizedPnlSol": -0.02647218440815269,
+   "unrealizedPnlUsd": -2.9217349931278127,
+   "positionsCount": 5,
+   "topPositions": [
+    {
+     "mint": "MnwioFVrg1oAvnFBVX6Q44xUBmjuoHSVeZ",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnA26V38MGCdy5pnH3YBqnW2H1gEhXYY8J",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnXhQW2ydkH5M6QWsrgm2sw5fnsN5kSQ7V",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  },
+  {
+   "rank": 30,
+   "walletAddress": "Fxe6VpU9Dnsso74mtp2ZhysNUVGY4frx8P",
+   "pnlSol": 326.65728028157724,
+   "pnlUsd": 36066.23031588894,
+   "pnlPercent": 306.9241891357714,
+   "buySpendSol": 976.9507783935844,
+   "lastRefreshedAtMs": 1791518875955,
+   "realizedPnlSol": 354.0019795268462,
+   "realizedPnlUsd": 39085.358559559085,
+   "unrealizedPnlSol": -27.344699245268917,
+   "unrealizedPnlUsd": -3019.128243670141,
+   "positionsCount": 16,
+   "topPositions": [
+    {
+     "mint": "MnssmNPfRbKXasTuJZnCg4DzeNwK6tvGsF",
+     "chainId": 56,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "MnQpPLbEkGEAfRz77PPqKM2L5RoqbRRJpt",
+     "chainId": 8453,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    },
+    {
+     "mint": "Mne49MJHWAvwFAKt95P8nN2YNiYcnBV8Ch",
+     "chainId": 1399811149,
+     "symbol": "REDACTED",
+     "name": "REDACTED",
+     "imageUri": null
+    }
+   ],
+   "username": "redacted",
+   "profileImage": null,
+   "xUsername": "redacted",
+   "isVerified": true,
+   "verifiedBadgeVisible": false,
+   "userId": "redacted"
+  }
+ ],
+ "periodType": 1,
+ "periodLabel": "7d",
+ "windowStartSec": 1790913600,
+ "_fixture": "FIXTURE recorded from the real GET on 2026-10-09 04:47Z (docs/PUMPFUN.md 10.3), truncated to the first 30 rows; wallet addresses and mints replaced by deterministic synthetic ones; names, images, handles and ids redacted. Numbers are the real ones. Tests only."
+}

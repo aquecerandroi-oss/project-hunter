@@ -81,6 +81,24 @@ As duas listas compartilham **17 de 20** carteiras: o quadro é vivo. Funil da s
 
 Nenhuma de fundo. Duas precisões: ela leu os números dos dry-runs como "informados, não reconsultados" (corretos: ela não chama o site); e o nome do estrato `regra` veio do desenho do quant-engineer, não dela.
 
+## Rodada 4 — correções do code-review (09/10/2026, antes da execução definitiva)
+
+O `code-reviewer` devolveu REQUEST_CHANGES na ferramenta depois do commit `c1a171d2`. Filtros e ordem foram confirmados iguais à regra congelada e **não foram tocados**; o texto da regra e o hash `d0460e85…85e18c` ficaram **byte a byte iguais** (o teste do hash fixado continua verde). Cada correção nasceu de um teste vermelho (10 falhas antes, 79 verdes depois). Bruto: `.claude/state/astra-review-copy-leader-selection-fix.md`.
+
+| # | Achado (cenário) | Decisão |
+|---|---|---|
+| 1 | Endereço repetido dentro de uma visão: a linha de referência tomava a 1.ª ocorrência e a posição a última; uma carteira nas posições 1 e 90 do `weekly:realized` pontuava 64 | **Corrigido sem tocar a regra:** a repetição é linha malformada (item 11, "sem linha malformada"), a visão fica incompleta e a execução termina em 2 sem gravar. Teste com visão de 100 linhas e um duplicado. A leitura de uma visão saiu de `copy_leaders_rule.py` para `copy_leaders_parse.py` (o módulo estava em 346/350 linhas) |
+| 2 | `is_solana_address(a + "\n")` era verdadeiro (`$` casa antes do `\n` final) | **Corrigido:** `fullmatch`. `validate_includes([a, a + "\n"])` recusa; nenhum líder extra |
+| 3 | Arquivo rasgado: escrita direta em `leaders-*.json`; predecessor corrompido virava `JSONDecodeError` | **Corrigido:** temp no mesmo diretório, `fsync`, publicação por `os.link` (falha se existir), temp removido sempre. Predecessor ilegível ou com `list_sha256` que não recalcula = recusa clara, saída 4, antes de qualquer requisição |
+| 4 | `cohort_id`, nome do arquivo e `known_at` saíam de instantes diferentes (segundo truncado × milissegundo para cima) | **Corrigido:** um só instante, `ceil_ms`; o nome vem do `cohort_id` |
+| 5 | Fronteiras sem teste | Testes: saldo exatamente 0 é rejeitado; realizado exatamente 0 é rejeitado sem divisão por zero (e `realized_share` fica nulo num include) |
+| 6 | Ordem dos includes | O texto do item 10 **não** fixa ordem, então os includes são ordenados canonicamente antes do hash e das leituras de seguidores; o mesmo conjunto em outra ordem congela o mesmo `list_sha256` |
+| 9 | Texto de uso | `--new-cohort` sem predecessor é ignorado; `--out-dir` muda onde o write-once olha; `--dry-run` não faz a checagem |
+
+**Segunda opinião (Astra, `code-reviewer`):** APPROVE_WITH_NITS, nenhum must-fix para execução única. Ela confirmou que marcar a 2.ª ocorrência como malformada não esconde carteira (invalida a visão inteira antes da seleção), que `os.link` existe em NTFS e Linux e que `.partial-*.tmp` não casa com `leaders-*.json`. Não executou testes (modo opinião). Dois nits: (i) **não há trava entre processos**: duas execuções simultâneas poderiam achar o diretório vazio e cada uma publicar uma coorte; absorvido como regra de operação ("uma instância por vez", escrito no texto de uso) em vez de código; (ii) `list_sha256` cobre os objetos completos das carteiras, inclusive seguidores e hora de leitura, então as mesmas carteiras em outra execução dão outro hash, e `cohort_id`/nome guardam segundos enquanto `known_at` guarda milissegundos: o corte temporal vem de `known_at`, nunca do nome. Divergências: nenhuma.
+
+Para o veredito do [[EXP-M28-copiar-carteiras-no-papel|EXP-M28]]: depois da execução definitiva, registrar o arquivo e os hashes na página do experimento; T0 continua separado da gravação.
+
 ## Relacionado
 
 [[2026-10-09-piloto-copiar-carteiras-no-papel]] · [[EXP-M28-copiar-carteiras-no-papel]] · [[KB-0185-o-que-a-pumpfun-publica-sobre-carteiras-lucrativas]] · [[KB-0136-carteiras-vencedoras-nao-sao-gatilho]] · [[KB-0142-kol-e-call-antecipam-ou-confirmam]] · [[2026-10-05-carteiras-seguidores-como-pergunta-secundaria]] · [[EXP-M15-carteiras-vencedoras]] · [[pumpfun-releitura]]
