@@ -6,6 +6,7 @@ requires-python = "==3.12.*"
 members = [
     "hunter-analytics-worker",
     "hunter-api",
+    "hunter-b3-robot",
     "hunter-core",
     "hunter-exchanges",
     "hunter-execution-worker",
@@ -571,6 +572,25 @@ requires-dist = [
 ]
 
 [[package]]
+name = "hunter-b3-robot"
+version = "0.0.0"
+source = { editable = "services/b3-robot" }
+dependencies = [
+    { name = "hunter-core" },
+    { name = "hunter-exchanges" },
+    { name = "hunter-risk" },
+    { name = "metatrader5", marker = "sys_platform == 'win32'" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "hunter-core", editable = "packages/core" },
+    { name = "hunter-exchanges", editable = "packages/exchange-adapters" },
+    { name = "hunter-risk", editable = "packages/risk-core" },
+    { name = "metatrader5", marker = "sys_platform == 'win32'", specifier = "==5.0.6231" },
+]
+
+[[package]]
 name = "hunter-core"
 version = "0.0.0"
 source = { editable = "packages/core" }
@@ -935,6 +955,17 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "metatrader5"
+version = "5.0.6231"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/90/ed/525a69afbc050f5b19342a6ddada4f086e2aa9ef63b987bef5d723f29586/metatrader5-5.0.6231-cp312-cp312-win_amd64.whl", hash = "sha256:b94b1f8f52087ae36dfac5f352a96f5d04fe308704d9515f82cf5d1470bc31d4", size = 47968, upload-time = "2026-09-27T12:22:35.219Z" },
 ]
 
 [[package]]

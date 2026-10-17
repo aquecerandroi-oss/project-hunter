@@ -125,3 +125,7 @@ Limitações: uma máquina só (sem HA, sem réplica, sem backup fora do host), 
 ## Fontes
 
 `docs/DEPLOYMENT.md`, `infra/vps/README.md`, `.claude/state/vps.md`, `.claude/state/milestone.json`
+
+- **17/10/2026 — membro novo do workspace uv (`services/b3-robot`, robô B3 do [[2026-10-17-pausar-memes-e-cripto-ir-para-mercado-tradicional|mercado tradicional]]):**
+  - Todo membro novo precisa de 3 linhas `COPY` no `infra/docker/Dockerfile.api-workers`: na camada do manifesto, na camada do código e no estágio de runtime. Sem elas, o `uv sync --frozen` da imagem quebra no deploy.
+  - Risco visto no build local: `UV_COMPILE_BYTECODE=1` estourou o tempo de 60 s compilando os testes do numpy numa máquina lenta. Na segunda tentativa passou. Se acontecer na VPS, a saída é definir `UV_COMPILE_BYTECODE_TIMEOUT` no Dockerfile.
