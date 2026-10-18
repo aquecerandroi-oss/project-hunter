@@ -54,6 +54,32 @@ from hunter_core.db.models.analysis import (
     OpportunityWeights,
 )
 from hunter_core.db.models.analysis_baselines import FeatureBaseline
+from hunter_core.db.models.b3 import (
+    B3Contract,
+    B3FeeSchedule,
+    B3Holiday,
+    B3RiskProfile,
+    B3SessionGrid,
+    B3SpecPin,
+    B3StrategyMagic,
+)
+from hunter_core.db.models.b3_broker import (
+    B3Deal,
+    B3Order,
+    B3Position,
+    B3Reconciliation,
+    B3SessionAnchor,
+)
+from hunter_core.db.models.b3_entries import B3EntryIntent, B3EntryProposal, B3RobotEvent
+from hunter_core.db.models.b3_protection import B3BracketLearning, B3ExitIntent, B3SltpRequest
+from hunter_core.db.models.b3_robot import (
+    B3KillSwitchTransition,
+    B3ManagementEpoch,
+    B3RobotAccount,
+    B3RobotAuthority,
+    B3RobotHeartbeat,
+    B3RobotInstance,
+)
 from hunter_core.db.models.backtests import Backtest, BacktestResult, BacktestTrade
 from hunter_core.db.models.betas import MarketBeta
 from hunter_core.db.models.billing import (
@@ -196,6 +222,30 @@ __all__ = [
     "ApiKey",
     "Asset",
     "AuditLog",
+    "B3BracketLearning",
+    "B3Contract",
+    "B3Deal",
+    "B3EntryIntent",
+    "B3EntryProposal",
+    "B3ExitIntent",
+    "B3FeeSchedule",
+    "B3Holiday",
+    "B3KillSwitchTransition",
+    "B3ManagementEpoch",
+    "B3Order",
+    "B3Position",
+    "B3Reconciliation",
+    "B3RiskProfile",
+    "B3RobotAccount",
+    "B3RobotAuthority",
+    "B3RobotEvent",
+    "B3RobotHeartbeat",
+    "B3RobotInstance",
+    "B3SessionAnchor",
+    "B3SessionGrid",
+    "B3SltpRequest",
+    "B3SpecPin",
+    "B3StrategyMagic",
     "Backtest",
     "BacktestResult",
     "BacktestTrade",

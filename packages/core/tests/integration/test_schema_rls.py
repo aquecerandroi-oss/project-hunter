@@ -265,6 +265,7 @@ async def test_rls_is_forced_on_every_relation_that_holds_tenant_data(
     frozen: tuple[str, ...] = (
         *security.TENANT_TABLES,
         *migration_ddl("paper").PAPER_TENANT_TABLES,
+        *migration_ddl("b3_robot").B3_TENANT_TABLES,
     )
 
     assert set(frozen) == set(tenant_tables()), (

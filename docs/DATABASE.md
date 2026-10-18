@@ -9020,3 +9020,237 @@ pool com os laços, mas sem vazamento demonstrado. Há **uma escrita em voo por 
 tarefa que o flush abandona ao fim do orçamento, contada em `cycle_history_abandoned_total`); sem a partição do mês, o
 `INSERT` falha e a fila espera (`failed_total`). O `command_timeout` de `hunter_core/db/session.py` **não** limita o
 cancelamento contra um par travado — ver "Open Bugs".
+
+
+## 74. O robô B3 vira schema — `b3_*` — R3 (`0071_b3_robot`)
+
+**Por quê.** Tarefa R3 de `docs/design/robo-b3-mt5.md` §9, contra o contrato congelado `docs/RISK_ENGINE_B3.md` v1.0
+(commit `5e71f345`). O desenho §3.7 põe no Postgres, pela **API** com o token do robô, tudo o que é registro do robô
+(perfis, grades, feriados, contratos, custos, armamento, kill switch, propostas, decisões, ordens, negócios,
+reconciliações, batimentos); a corretora continua sendo a verdade da posição e do dinheiro. São as **primeiras tabelas
+de tenant desde a `0006`**: as 24 têm `organization_id NOT NULL`, FK para `organizations`, RLS habilitada **e forçada**
+com `tenant_isolation` (o padrão da §1.2), e todo índice começa por `organization_id` (exceto as PKs e os dois únicos
+globais `client_order_id`/`authority_id`, asserido em teste). Dinheiro, preço e volume em `NUMERIC(28,10)`; tempo em
+`timestamptz` (nenhuma coluna `timestamp` sem fuso, `real` ou `double` — asserido). DDL em `ddl/b3_robot.py` (catálogo,
+RLS, grants, gatilhos comuns, guarda do downgrade) e `ddl/b3_robot_guards.py` (máquinas de estado); modelos em
+`hunter_core/db/models/b3.py` (configuração), `b3_robot.py` (conta, autoridade, kill switch, instâncias, épocas,
+batimentos), `b3_entries.py` (proposta, intenção, recibos), `b3_broker.py` (ordens, negócios, posições, reconciliações,
+âncora) e `b3_protection.py` (SLTP, intenção de saída, `k`) — cinco arquivos porque o orçamento é 350 linhas.
+
+**Numeração.** A cabeça commitada é `0069_meme_absorb_semdump_arm`; a `0070_meme_mature_chart_arms` existe só na árvore
+e está **retida** (EXP-M26, §69/§72). A `0071` **não depende dela**: `down_revision = 0069`. Com o arquivo retido
+presente a árvore tem **duas cabeças** e `upgrade head` fica ambíguo — o mesmo problema que a §72 resolveu
+re-encadeando a semente retida sobre a revisão que vai ao ar primeiro. **Para o orquestrador:** no commit desta tarefa,
+`test_migrations.py` leva `HEAD_REVISION = "0071_b3_robot"` (a árvore diz `0070`, edição de outra tarefa); quando a
+semente for liberada, ela passa a descer da `0071`. O slug tem 13 caracteres (§17.6).
+
+### 74.1 Enums — os nomes do contrato, verbatim
+
+Treze tipos novos, os rótulos e a ordem do §1.2 do contrato (`ddl/enums.py` `B3_ENUMS`; Python em
+`hunter_core/domain/b3_enums.py`, registrado em `ALL_ENUMS`): `b3_authority_phase`, `b3_authority_status`,
+`b3_entry_intent_status`, `b3_unknown_cause`, `b3_position_state`, `b3_degraded_reason`, `b3_sltp_slot`,
+`b3_sltp_request_status`, `b3_exit_reason`, `b3_close_cause`, `b3_attribution`, `b3_check_state` (só dentro de
+`checks[]`; o tipo existe para o espelho 1:1, como `backtest_warning_code` na §15.1) e `b3_kill_cause`.
+
+**Desvio declarado — `b3_kill_state` não é tipo novo.** O contrato o escreve "mesmo enum do SPOT", e a §1 manda um enum
+por conceito: as colunas usam `kill_switch_state` e o Python tem `B3KillState = KillSwitchState` (alias, como
+`SignalDirection`). Astra concordou. O lado (`buy|sell`) reusa `order_side` pelo mesmo motivo. Rótulos fora do contrato
+que o schema precisa (`purpose` da SLTP, `actor_type` da transição, `entry`/`reason`/`state` da corretora) são `text`
+com `CHECK` ou texto livre normalizado pelo adaptador (R2) — não inventei nome de enum que o contrato não deu.
+
+### 74.2 As tabelas — identidade, chaves, o que nunca muda, e quem audita
+
+| Tabela | Identidade (auditoria: `entity_id`) | Únicos / FKs compostas | Forma | Guarda |
+|---|---|---|---|---|
+| `b3_risk_profiles` | `id` | `(org, limits_version)`; um vigente por org (`superseded_at IS NULL`) | aposenta uma vez | versão contígua; nenhum número JSON em lugar nenhum (contrato §9) |
+| `b3_session_grids` | `id` | `(org, symbol_root, grid_version)` | aposenta uma vez | versão contígua por raiz; duas vigentes do mesmo tipo não se sobrepõem; `special_day` = grade de um dia que vence a regular |
+| `b3_holidays` | `id` | uma vigente por `(org, data)` | aposenta uma vez | fonte obrigatória; `is_shortened` exige grade própria (check 5, no motor) |
+| `b3_contracts` | `id` | — | aposenta uma vez | vigência sem sobreposição por raiz; `valid_until ≤ expiry_date` |
+| `b3_fee_schedules` | `id` | — | aposenta uma vez | vigência sem sobreposição; fonte e data da fonte obrigatórias (KB-0149 §1) |
+| `b3_spec_pins` | `id` | `(org, account_hash, id)`; FK conta | append-only | o `SpecPin` do armamento + evidência de T8/T13/T14 |
+| `b3_strategy_magics` | `id` | `(org, magic)`, `(org, key, version)` | append-only | magic nunca reaproveitado |
+| `b3_robot_accounts` | `id` | `(org, registered_account_hash)` | mutável | nasce `ACTIVE` sem trava; hash imutável; cada movimento do kill switch exige a transição (§74.5) |
+| `b3_kill_switch_transitions` | `id` | FK conta | append-only | `changed_at` = relógio do banco; regras de quem solta o quê em `CHECK` |
+| `b3_robot_instances` | `instance_id` | `(org, instance_id)` | append-only | `account_hash_seen` **não** é FK (registra a conta errada, de propósito) |
+| `b3_robot_authority` | `id` (estável; `authority_id` troca por concessão) | **uma por conta**; `authority_id` único | mutável | §74.4 |
+| `b3_management_epochs` | `epoch_id` | `(org, account_hash, epoch_id)`; uma aberta por conta | fecha uma vez | a concessão seguinte fecha a da instância morta com `closed_clean = false` |
+| `b3_robot_heartbeats` | — (não auditado) | PK `instance_id` | upsert | a última batida **de cada instância** — a primeira da nova não apaga a última da anterior (herança §4.3) |
+| `b3_entry_proposals` | `proposal_id` | `(org, strategy_key, strategy_version, session_date, window_id)` | append-only | "uma proposta por janela" (§3.1) |
+| `b3_entry_intents` | `proposal_id` | FK `(org, proposal_id, instance_id, account_hash)` → proposta; FK `(org, account_hash, spec_pin_id)`; `(org, account_hash, proposal_id)`; `client_order_id` único | máquina B | §74.3 |
+| `b3_robot_events` | — (recibo; os efeitos são auditados) | `(org, event_id)` | append-only | o recibo de ingestão do `Idempotency-Key = event_id` (§6.7), gravado na transação dos efeitos |
+| `b3_orders` | `id` | `(org, account_hash, ticket)`; FK `(org, account_hash, proposal_id)` → intenção | mutável | identidade congelada |
+| `b3_deals` | `id` | `(org, account_hash, deal_ticket)` | append-only | "cada negócio entra uma vez" (§8.3); `time_msc` bruto + UTC derivado; comissão com o sinal da corretora |
+| `b3_positions` | `id` | `(org, account_hash, position_id)` | máquina C | §74.6 |
+| `b3_sltp_requests` | `sltp_request_id` | FK posição e época, as duas **com a conta**; **uma em voo por posição** | máquina | §74.6 |
+| `b3_exit_intents` | `id` | uma por posição | append-only | `deadline_at > exit_due_at`, nunca recalculado (I-X-4) |
+| `b3_bracket_learning` | `id` | `(org, account_hash, session_date, symbol)` | mutável | `k` só cresce (§5.3) |
+| `b3_reconciliations` | `id` (auditada só quando suja) | — | append-only | `clean ⇔ divergences = []` |
+| `b3_session_anchors` | `id` | `(org, account_hash, session_date)` | append-only | a âncora do dia, escrita uma vez: um reinício depois de perda relê, nunca re-ancora abaixo (Astra) |
+
+Toda FK entre tabelas B3 é **composta com `organization_id`** e, onde as duas pontas pertencem a uma conta, **com
+`account_hash`** — ticket e `position_id` só são únicos dentro de uma conta, e duas contas da mesma organização passam
+pela mesma RLS: sem a conta na chave, uma SLTP da conta A podia nomear uma época da conta B e uma ordem de B a proposta
+de A (Astra, revisão do diff, must-fix 5; provado com uma segunda conta). É a regra da §15.4, um nível abaixo. `account_hash`/`host_hash` são
+`^[0-9a-f]{64}$` (`CHECK`); nenhum número de conta é gravado (I-S-1).
+
+**Nunca apagadas.** Todas (menos os batimentos) recusam `DELETE` e `TRUNCATE` para **qualquer** papel, dono incluso
+(`b3_never_deleted`); as append-only recusam também `UPDATE` (`b3_append_only`); as de configuração só aceitam a coluna de
+aposentadoria, uma vez (`b3_retire_only` + grant de coluna). **Consequência declarada:** o `ON DELETE CASCADE` de
+`organizations` para numa linha B3 — uma organização com registro do robô não pode ser removida; esse rastro é evidência
+de decisão sobre dinheiro real.
+
+### 74.3 Máquina B e o claim — o que o banco garante e o que fica com a API (R4)
+
+`b3_entry_intents` nasce `proposed` e só anda pela tabela do §3.1 mais as arestas de recuperação do §6.1/§3.6
+(`proposed → expired` quando a instância morreu; `submitting → unknown`; `unknown →` o que a corretora prova ou
+`resolved_manual`). **Nada volta a `approved`/`submitting`** (I-E-2); os sete terminais não mudam mais nada. A decisão
+(`decision`, versões, `spec_pin_id`, `n_final`, `limit_price`, `approved_at`, `expires_at`) é escrita **uma vez**, e
+`expires_at = approved_at + 30 s` **exatamente** (`CHECK`, a regra da casa do §8.4). Os campos do claim
+(`claimed_at`, `claim_instance_id = instance_id`, `claim_fencing_token`, `send_deadline_utc ≤ expires_at`) são escritos
+uma vez: um claim repetido não move nada (`UPDATE … WHERE status = 'approved'` devolve 0 linhas) e a API devolve o claim
+gravado — a idempotência do §3.3 sem depender da autoridade corrente, que pode já ter sido trocada.
+
+**A decisão persistida e as colunas são a mesma decisão.** `decision` é o `RiskDecision` de
+`hunter_risk_b3.decision` (R1, commit `8866278c`) serializado em JSON, com os nomes de campo dele; um `CHECK`
+(`decision_matches_its_columns`) exige as chaves do §8.4, **25** `checks`, `proposal_id` igual, `approved` ⇔
+`approved_at` preenchido e — aprovada — `limits_version`, `grid_version`, `spec_pin_id`, `sizing.n_final` e
+`sizing.limit_price` iguais às colunas que o claim lê. O R1 tipa `limits_version`, `grid_version` e `spec_pin_id` como
+`str`; no banco são `integer`, `integer` e `uuid` (versões contíguas comparadas pelo claim; a FK do pin) e a comparação é
+em `::text` — a R4 converte com `str(...)` na leitura, sem perda.
+
+**O gatilho é a metade de identidade do claim**, para nenhum caminho o contornar: `approved → submitting` trava a linha
+da conta (`FOR UPDATE`), lê `clock_timestamp()` **depois** da trava (o `now()` de uma transação que esperou é velho —
+Astra, must-fix 1) e exige a autoridade da conta com **esta** instância e **este** token, `active`, `entries` e não
+vencida, a aprovação não vencida e o `limits_version` vigente igual ao da decisão; carimba `claimed_at` e confere
+`send_deadline_utc ∈ (claimed_at, min(expires_at, authority_expires_at)]`. Os motivos saem nomeados
+(`authority_mismatch`, `not_armed`, `approval_expired`, `limits_changed`, SQLSTATE 23001). **Fica com a API:** o kill
+switch efetivo (sistema → organização → robô, as travas nessa ordem, na mesma transação) e o `grid_version` — o banco
+não resolve qual grade vale para a data. Concessão, revogação, armamento, troca de limites e de grade também travam a
+linha da conta, então serializam com o claim. Dois executores com o mesmo sinal: um ganha, o outro espera a trava e
+recebe 0 linhas (F32, provado com duas conexões).
+
+**`client_order_id` é coluna gerada pelo banco** (`GENERATED ALWAYS AS (b3_client_order_id(proposal_id)) STORED`,
+único): a função `IMMUTABLE` reproduz o §1.1 byte a byte — 16 caracteres base32 são exatamente os 80 primeiros bits do
+sha256 de `uuid_send(proposal_id)` (= `uuid.bytes` do Python). I-E-4 vale por construção; ninguém escreve outro valor.
+
+### 74.4 Máquina A — uma linha por conta
+
+`b3_robot_authority` tem **uma** linha por conta (contrato §2). Uma concessão nova troca `authority_id` e exige: a
+anterior `revoked`/`expired` ou já vencida pelo relógio do banco; `fencing_token` = anterior + 1 (a primeira é 1);
+`active`, `management`. `granted_at` é carimbado pelo gatilho com `clock_timestamp()` — o valor que o cliente manda é
+ignorado: a âncora do G3 é o relógio do banco/API, não o do PC (provado com `'2000-01-01'`). Dentro de uma concessão nada
+que a ancora muda (instância, host, pregão, token, `granted_at`, `authority_expires_at`): **não há renovação**.
+`revoked`/`expired` são terminais até a próxima concessão. Armar (`→ entries`) exige concessão ativa e não vencida, o
+`limits_version` vigente e um `spec_pin` da mesma conta, e carimba `armed_at`; re-armar é desarmar e armar. `read_only`
+nunca tem linha (`CHECK`). A história das concessões fica em `audit_logs` (cada mudança é auditada) e nas épocas.
+
+### 74.5 Kill switch do escopo robô
+
+Os escopos **sistema** e **organização** são os que já existem (`kill_switch_transitions` e
+`organizations.kill_switch_state`, §7/§18.7). O escopo **robô** mora na conta: `kill_state` (`kill_switch_state`) e o
+**conjunto** de travas `active_causes b3_kill_cause[]` — um conjunto, não uma causa: com `broker_reject_breaker` e depois
+`daily_loss_limit`, a virada do pregão solta só a perda diária (D8) e a trava das rejeições continua (Astra, must-fix 3).
+`kill_state ∈ {TRADING_DISABLED, EMERGENCY} ⇔ active_causes ≠ ∅`. Todo movimento exige, no COMMIT, uma linha de
+`b3_kill_switch_transitions` desta transação com `from_state`/`to_state` e os dois conjuntos iguais (gatilho adiado, a
+forma da §18.7). Os `CHECK` da transição dizem quem pode o quê (§7.2): agente só pede `TRADING_DISABLED`
+(`agent_command`); sair de `EMERGENCY` é só do Everton (`actor_type = 'user'`); qualquer outro ator só solta
+`daily_loss_limit`.
+
+### 74.6 Máquina C, o slot e a SLTP
+
+`closed` é terminal — **menos o slot**: fechar a posição e terminar a requisição são fatos distintos, então P3/P4 ainda
+liberam o slot de uma posição fechada e um `journal_lost` ainda o torna `unknown` (§4.3, §6.5; Astra, must-fix 1). Uma
+saída iniciada termina só em `closed` (I-X-3): de `exiting`/`exit_overdue` só se vai a eles mesmos, `closed` ou
+`unattributed`; e com uma `b3_exit_intents` da posição ela nunca volta a `unprotected`/`protected`/`degraded` — nem
+passando por `unattributed`. **Toda posição em `exiting`/`exit_overdue` tem a sua `b3_exit_intents`** no COMMIT (gatilho
+adiado; a obrigação de saída é durável antes da 1.ª SLTP, §5.2 — Astra, must-fix 3). O motivo da saída não muda, salvo
+para `reversal` (§4.2: lado invertido durante a saída; o prazo continua o da intenção, nunca renovado — Astra, must-fix
+2). O slot é
+**da posição** e atravessa instâncias: volta a `idle` só quando nenhuma requisição da posição está `intended`/`unknown`
+(I-SL-3 — P1, P3 ou P4 resolvem a requisição antes). Um índice único parcial impõe **uma requisição em voo por posição**
+(`status IN ('intended','unknown')`). A requisição nasce `intended` (gravada antes do envio, I-SL-5), `sl > 0` (I-SL-1),
+os campos dela nunca mudam, um status terminal nunca é rebaixado (o replay de uma `intended` não desfaz um `done`), e
+`resolved_manual` exige a linha do Diário do terminal (`p4_evidence IS NOT NULL` e não vazia — um `CHECK` sobre
+coluna anulável aceita `NULL`, por isso o `IS NOT NULL` explícito, nos dois `resolved_manual`; Astra, must-fix 4). Os estados geridos exigem
+`attribution = 'attributed'`; `degraded ⇔ degraded_reason`; `closed ⇔ close_cause, closed_at`.
+
+### 74.7 Auditoria — o contrato para a R4
+
+Toda tabela B3 menos `b3_robot_heartbeats` e `b3_robot_events` tem um gatilho de restrição **adiado** em `INSERT` (e em
+`UPDATE` que muda a linha, nas mutáveis): no COMMIT exige uma linha de `audit_logs` com `organization_id` da linha,
+`entity_type` = **o nome da tabela** e `entity_id` = a identidade da tabela (coluna "Identidade" acima), escrita **por
+esta transação** (`xmin = pg_current_xact_id()::xid`, a prova da §18.7/§20.2; `created_at ≥ now() − 1 dia` só para podar
+partições). `b3_reconciliations` só quando `clean = false` (o desenho §7.1 lista "divergência de reconciliação", não
+cada passe de 5 s). Consequências para quem escreve: **uma linha de auditoria por entidade tocada** (um evento que grava
+negócio, posição e SLTP escreve três, com o mesmo `request_id`); nunca dentro de `SAVEPOINT` (o xid de subtransação dá
+recusa falsa — nunca aprovação falsa); duas mudanças da mesma entidade na mesma transação dividem a prova (é "auditado
+nesta transação", não "cada comando") — antes/depois vão no `before`/`after`.
+
+### 74.7a Os nomes do R1 (`hunter_risk_b3`, commit `8866278c`) e de onde a R4 os lê
+
+| Nome no R1 | No banco |
+|---|---|
+| `RobotOpsState.robot_magics` (`frozenset[int]`) | `SELECT magic FROM b3_strategy_magics WHERE organization_id = :org` — todos os já dados à organização, nunca apagados nem reaproveitados (§1.1) |
+| `RobotOpsState.orphan_sltp_unknown` (`frozenset[str]`, símbolos) | `SELECT DISTINCT p.symbol FROM b3_sltp_requests r JOIN b3_positions p USING (organization_id, account_hash, position_id) WHERE r.status IN ('intended','unknown') AND p.state = 'closed'` — a SLTP órfã incerta de P3′ |
+| `SpecPin.spec_pin_id`, `RiskDecision.spec_pin_id` (`str`) | `b3_spec_pins.id` (`uuid`) → `str(id)` |
+| `RiskLimitsB3.limits_version` (`str`) | `b3_risk_profiles.limits_version` (`integer`) → `str(...)`; **o resto do perfil é `b3_risk_profiles.limits`**, com as chaves exatamente com os nomes de campo do `RiskLimitsB3` (inclusive `spec_unreadable_after_failures`, o nome que o R1 deu às "falhas para `spec_unreadable`") e todo número como string; `limits_version` não vai dentro do JSON — a coluna é a versão |
+| `SessionContext.grid_version` (`str`) | `b3_session_grids.grid_version` (`integer`) → `str(...)` |
+| `RiskDecision` inteiro | `b3_entry_intents.decision` (§74.3) |
+| `DayPnl.anchor_equity`, `anchor_at` | `b3_session_anchors` |
+| `LastReconcile` | a última `b3_reconciliations` da conta |
+| `B3EntryProposal` | `b3_entry_proposals` (mesmos nomes de coluna) |
+
+O banco não valida as chaves do JSON de limites — quem valida é o `RiskLimitsB3` (R1) na edição (R4); o banco recusa
+número JSON e não-objeto.
+
+### 74.8 Grants, pooler, downgrade, volume
+
+**Ordem de travas para a R4 (Astra, revisão do diff).** Os gatilhos travam a linha da conta (`b3_robot_accounts … FOR
+UPDATE`) **depois** de a própria linha alvo já estar travada (um gatilho `BEFORE ROW` dispara com a tupla travada): uma
+transação que atualiza a autoridade e espera a conta, contra outra que travou a conta e vai atualizar a autoridade, é um
+deadlock. Por isso **todo escritor B3 trava sistema → organização → conta explicitamente, antes de qualquer DML**
+(concessão, revogação, armamento, claim, kill switch do robô, troca de limites/grade); a trava do gatilho vira
+reentrante. A aposentadoria de configuração (`UPDATE` da coluna de aposentadoria) não trava a conta no gatilho — ela vem
+junto com o `INSERT` da versão nova, que trava.
+
+**Grants**, três classes congeladas em `ddl/b3_robot.py`: `B3_APP_CONFIG_TABLES` (`SELECT`/`INSERT` + `UPDATE` da coluna
+de aposentadoria), `B3_APP_APPEND_TABLES` (`SELECT`/`INSERT`), `B3_APP_NO_DELETE_TABLES` (`SELECT`/`INSERT`/`UPDATE`) —
+`hunter_app`, a API, é o único escritor; `hunter_worker` tem `SELECT` nas 24 (cão de guarda e relatório); **ninguém tem
+`DELETE`**. Unidas em `test_schema_privileges.py`; o RLS em `test_schema_rls.py`; os enums em `test_migrations.py`.
+"Só o OWNER edita limites" é autorização da API (R4, step-up): o banco não conhece o papel da organização.
+
+**Pooler.** Nada de estado de sessão: as travas de configuração são `pg_advisory_xact_lock` (de transação) e as do claim
+são de linha; o carimbo é `clock_timestamp()`. Leitura em `READ COMMITTED` (cada comando do gatilho vê o que commitou
+antes da trava); um escritor em `REPEATABLE READ` veria um retrato velho depois de esperar — a API não usa.
+
+**Downgrade (§17.7):** recusa enquanto existir **qualquer** linha B3, com `LOCK … ACCESS EXCLUSIVE` antes da contagem e
+**`NO FORCE ROW LEVEL SECURITY` antes de contar** — sem isso um papel de migração que não é superusuário contaria zero
+(a RLS forçada filtra o dono) e apagaria linhas reais; dentro da transação, a recusa desfaz tudo. Sem linhas, derruba
+tabelas, funções e os treze tipos. **Observação não verificada:** as guardas de downgrade da `0006` contam tabelas de
+tenant com RLS forçada sem esse passo; em teste o dono é superusuário e não aparece — merece uma prova com dono comum.
+
+**Volume e retenção:** nenhuma particionada. O pior volume é `b3_reconciliations` (um passe a cada 5 s no pregão, ~6,5
+mil linhas/dia se a R5 gravar todos — estimativa, não medida) e `b3_robot_events`; 1 operação/dia no resto. Sem
+retenção: é evidência.
+
+### 74.9 Desvios em relação ao brief, declarados
+
+1. **Mais tabelas do que a lista da §9 do desenho**: o contrato congelado depois dela nomeia `b3_robot_instances`,
+   `b3_management_epochs`, `b3_sltp_requests`, `b3_exit_intents`, `b3_bracket_learning`, `b3_strategy_magics` e a linha
+   do batimento; a revisão da Astra pediu `b3_session_anchors`, `b3_robot_events` e a conta como trava estável
+   (`b3_robot_accounts`, que também guarda o kill switch do robô). O "armamento" do desenho (`b3_robot_arming`) é a fase
+   `entries` da autoridade, como o contrato §2.2 escreve.
+2. **Mais arquivos do que a lista**: cinco módulos de modelo (orçamento de 350 linhas), `domain/b3_enums.py` +
+   registro em `domain/enums.py`, `ddl/enums.py`, e uma linha em cada um dos três testes de registro
+   (`test_schema_rls`, `test_schema_privileges`, `test_migrations`) que ficariam vermelhos sem ela.
+3. **Grades em `TIME` local de Brasília** com vigência por data, não `timestamptz`: uma grade recorrente não é um
+   instante; o robô converte por data com `zoneinfo` (desenho §7.4).
+4. **Sem `created_by`**: o ator mora em `audit_logs`, que o gatilho torna obrigatório.
+5. **Número JSON recusado em todo o perfil** — a Astra sugeriu permitir inteiros; mantive o contrato §9 ("número JSON
+   recusado"), que é explícito.
+6. **Tipos das versões e do pin diferem do R1** (`str` lá; `integer`/`uuid` aqui), comparados em `::text` (§74.3, §74.7a).
+
+Provado em `packages/core/tests/integration/test_schema_b3.py` (catálogo, enums, tipos, índices, grants, isolamento em
+todas as 24, auditoria, append-only com o dono, versões e sobreposição, máquina A, `client_order_id`, máquina B, claim e
+dois executores, claim esperando uma revogação, kill switch, máquina C e slot, FK de conta, decisão × colunas, downgrade
+recusado e ida e volta limpa, `alembic check` numa cópia de cabeça única). Revisão da Astra: `obsidian/06-DECISIONS/Revisoes-Astra/R3-b3-schema.md`.

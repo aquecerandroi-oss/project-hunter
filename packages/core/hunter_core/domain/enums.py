@@ -28,6 +28,8 @@ import uuid
 from enum import StrEnum
 from typing import Final
 
+from hunter_core.domain.b3_enums import B3_ENUMS
+
 
 class OrganizationRole(StrEnum):
     """``org_role`` — DATABASE.md §2."""
@@ -57,6 +59,11 @@ class KillSwitchState(StrEnum):
     WARNING = "WARNING"
     TRADING_DISABLED = "TRADING_DISABLED"
     EMERGENCY = "EMERGENCY"
+
+
+B3KillState = KillSwitchState
+"""``b3_kill_state`` of docs/RISK_ENGINE_B3.md §1.2 — "mesmo enum do SPOT": the
+same Postgres type (``kill_switch_state``), one enum per concept (DATABASE.md §1, §74)."""
 
 
 class MemberStatus(StrEnum):
@@ -902,4 +909,5 @@ ALL_ENUMS: dict[str, type[StrEnum]] = {
     "notification_channel": AlertChannel,
     "notification_status": NotificationStatus,
     "worker_heartbeat_status": WorkerHeartbeatStatus,
+    **B3_ENUMS,
 }

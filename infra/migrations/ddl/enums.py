@@ -464,6 +464,97 @@ through ``infra/scripts/seed.py``.
 """
 
 
+B3_ENUMS: Final[Mapping[str, tuple[str, ...]]] = {
+    "b3_authority_phase": ("read_only", "management", "entries"),
+    "b3_authority_status": ("active", "revoked", "expired"),
+    "b3_entry_intent_status": (
+        "proposed",
+        "rejected",
+        "approved",
+        "expired",
+        "submitting",
+        "aborted_before_send",
+        "working",
+        "partially_filled",
+        "filled",
+        "cancel_requested",
+        "canceled",
+        "broker_rejected",
+        "unknown",
+        "resolved_manual",
+    ),
+    "b3_unknown_cause": (
+        "claim_ack_lost",
+        "send_no_result",
+        "send_timeout",
+        "ipc_hang",
+        "process_died",
+        "cancel_no_result",
+        "result_not_persisted",
+        "journal_lost",
+        "heartbeat_in_flight",
+    ),
+    "b3_position_state": (
+        "unprotected",
+        "protected",
+        "degraded",
+        "exiting",
+        "exit_overdue",
+        "closed",
+        "unattributed",
+    ),
+    "b3_degraded_reason": (
+        "naked_after_grace",
+        "repair_rejected",
+        "floor_unplaceable",
+        "protection_unknown",
+    ),
+    "b3_sltp_slot": ("idle", "in_flight", "unknown"),
+    "b3_sltp_request_status": (
+        "intended",
+        "not_sent",
+        "done",
+        "rejected",
+        "unknown",
+        "moot",
+        "resolved_manual",
+    ),
+    "b3_exit_reason": (
+        "time_exit",
+        "session_flatten",
+        "emergency",
+        "reversal",
+        "overnight_carry",
+    ),
+    "b3_close_cause": (
+        "server_sl",
+        "server_tp",
+        "bracket_sl",
+        "bracket_tp",
+        "manual",
+        "broker_compulsory",
+        "unexplained",
+    ),
+    "b3_attribution": ("attributed", "foreign", "ambiguous", "unreadable"),
+    "b3_check_state": ("passed", "failed", "unavailable"),
+    "b3_kill_cause": (
+        "daily_loss_limit",
+        "broker_reject_breaker",
+        "reversal_detected",
+        "manual_route",
+        "agent_command",
+        "owner_command",
+        "owner_button",
+    ),
+}
+"""The types ``0071_b3_robot`` adds — ``docs/RISK_ENGINE_B3.md`` §1.2, verbatim. Frozen.
+
+``b3_kill_state`` is deliberately absent: the contract calls it "mesmo enum do
+SPOT", so the columns reuse ``kill_switch_state`` (DATABASE.md §1, one enum per
+concept; §74). The robot's side reuses ``order_side`` for the same reason.
+"""
+
+
 def create_enum_types(types: Mapping[str, Sequence[str]] = INITIAL_ENUMS) -> None:
     """Create the given types with the given labels, before any table uses one."""
     for name, labels in types.items():

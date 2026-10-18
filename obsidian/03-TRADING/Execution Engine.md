@@ -96,6 +96,14 @@ Lições de execução que valem para qualquer corretora com stop guardado no se
   do pregão**, senão R5 passa por motivo errado. Revisão: [[Revisoes-Astra/R2-mt5-adapter|R2-mt5-adapter]]; módulo em
   [[Exchange Adapters]].
 
+- Schema `b3_*` (R3, 17/10/2026; migração `0071_b3_robot`, ainda não commitada; `docs/DATABASE.md` §74) — lições de
+  banco: **fechar a posição e terminar a requisição SLTP são fatos distintos** (o slot de uma posição fechada ainda se
+  move); **a obrigação de saída é linha antes de ser estado** (posição em `exiting` sem `b3_exit_intents` não commita);
+  **um `CHECK` sobre coluna anulável aceita `NULL`** (evidência P4 vazia passava); **a conta entra na chave**, não só a
+  organização (duas contas passam pela mesma RLS); a trava da conta serializa concessão × claim, mas **todo escritor trava
+  sistema → organização → conta antes do DML**, senão o gatilho cria deadlock. Revisão:
+  [[Revisoes-Astra/R3-b3-schema|R3-b3-schema]].
+
 ## Relacionadas
 
 [[Paper Trading]] · [[Risk Engine]] · [[Portfolio]] · [[Workers]] · [[Open Bugs]] ·

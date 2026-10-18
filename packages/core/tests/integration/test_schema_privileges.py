@@ -619,6 +619,8 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(wallet_exceptions_read_only)
         # 0059: market_events (read-only for the app) was never classified — red on HEAD.
         + [cast(str, migration_ddl("market_events").MARKET_EVENTS_TABLE_0059)]
+        # 0071 (R3): the B3 robot's 24 tenant tables, in their three classes (§74).
+        + list(cast(tuple[str, ...], migration_ddl("b3_robot").B3_TENANT_TABLES))
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
