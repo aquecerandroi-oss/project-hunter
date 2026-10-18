@@ -1,9 +1,12 @@
-# Risk Engine B3 — contrato v1.0 (robô MT5 do Everton na Rico)
+# Risk Engine B3 — contrato v1.1 (robô MT5 do Everton na Rico)
 
 **Status: contrato normativo congelado para implementação (tarefa R0a de `docs/design/robo-b3-mt5.md` §9), depois
-de quatro rodadas de revisão da Astra (§15). Nenhum código existe ainda. Nenhum número aqui autoriza dinheiro real.**
+de quatro rodadas de revisão da Astra (§15). A v1.1 alinha o texto ao que R1 (`hunter_risk_b3`, `8866278c`), R2
+(`hunter_exchanges.mt5`, `8ced300c`) e R3 (schema `0071_b3_robot`, `fe381579`) implementaram (changelog §0.1).
+R4, R5 e R7 ainda não existem. Nenhum número aqui autoriza dinheiro real.**
 
-**Versão 1.0, 2026-10-17.** Irmão de `docs/RISK_ENGINE.md` (v2.5, SPOT paper) e de `docs/RISK_ENGINE_MEME.md`
+**Versão 1.1, 2026-10-17** (v1.0 do mesmo dia; documento normativo versionado, editado no lugar — o que mudou e
+por quê está em §0.1). Irmão de `docs/RISK_ENGINE.md` (v2.5, SPOT paper) e de `docs/RISK_ENGINE_MEME.md`
 (v0.1, pump.fun). É o **contrato de coordenação** que quatro tarefas implementam em paralelo, cada uma do seu
 lado da fronteira: R1 (motor puro `hunter_risk_b3`), R2 (adaptador MT5 `hunter_exchanges.mt5`), R5 (serviço
 `services/b3-robot`) e R7 (EA vigia `infra/mt5/HunterVigia.mq5` e `infra/scripts/b3_kill.py`). R3 (schema) e
@@ -29,7 +32,71 @@ motivo; onde a Astra mudou algo nesta tarefa, **[Astra R0a-n]** (síntese em
 
 ---
 
-## 0. O que a base já sabe, e o que isso fixa aqui
+## 0. Changelog e base
+
+### 0.1 v1.1 (2026-10-17) — alinhamento com o que R1, R2 e R3 implementaram
+
+Fontes: `obsidian/06-DECISIONS/Revisoes-Astra/R1-hunter-risk-b3.md`, `R2-mt5-adapter.md`, `R3-b3-schema.md`,
+`docs/DATABASE.md` §74 e o código dos três commits. Cada item: a decisão, o motivo e as seções editadas no lugar.
+Revisão de consistência da Astra desta versão: §15, "v1.1".
+
+**Contradição resolvida**
+
+| # | Decisão | Motivo | Seções |
+|---|---|---|---|
+| C1 | Livro lido com ¬(`0 < bid < ask`) (invertido, cruzado ou com um lado zerado) é check 8 **`failed`** `quote_invalid`. A frase da §8.3 que o punha em `unavailable` caiu. Os checks que precisam de livro utilizável (9, 15, 24) saem `unavailable` `upstream_unavailable:8` sempre que não há livro utilizável, inclusive com o 8 `failed` por `quote_invalid` — salvo uma falha independente da cotação, relatada antes (`stop_missing`, `stop_off_tick`, `stop_wrong_side` no 15; `order_lifecycle_unproven`, `reference_off_tick` no 24) | A convenção da tabela inteira é `failed` = o dado foi lido e diz "não"; `unavailable` = não há dado (`quote_missing`). Livro cruzado ou sem um lado é estado real de mercado na B3 (leilão, ausência de oferta), não falha de leitura. As duas classes reprovam igual: a escolha muda o rótulo da evidência, nunca deixa passar uma entrada. É o que R1 implementou (escolha a) | §8.2 (check 8 e cabeçalho), §8.3 |
+
+**Insumos e nomes acrescentados por R1** (`hunter_risk_b3`, commit `8866278c`)
+
+| # | Decisão | Motivo | Seções |
+|---|---|---|---|
+| C2 | `RobotOpsState.robot_magics: frozenset[int]` é insumo do motor (todos os `magic` já dados à organização, §1.1) | Os checks 10 e 11 separam `foreign_*` de `position_already_open`/`pending_order_present` e a v1.0 não listava insumo que o carregasse. **Não** é prova de atribuição pela cadeia de negócios (§4.5): só escolhe o `reason`; os dois reprovam | §1.1, §8.1, §8.2 (10, 11) |
+| C3 | `SpecPin.spec_pin_id: str` | A decisão grava `spec_pin_id` (§8.4) e precisa vir de algum insumo | §8.1 |
+| C4 | `MarginInputs.order_check: {v: OrderCheckResult{ok: bool, reason: str?}}` | Forma tipada de `ok\|refused(reason)` | §8.1 |
+| C5 | `RobotOpsState.orphan_sltp_unknown: frozenset[str]` = o **conjunto dos símbolos** com SLTP órfã incerta (P3′); o check 11 pergunta `proposal.symbol ∈ orphan_sltp_unknown` | "bool, por símbolo" da v1.0 tem essa forma natural; a R4 lê de `b3_sltp_requests` × `b3_positions` (`docs/DATABASE.md` §74.7a) | §8.1, §8.2 (11) |
+| C6 | `ExitRequest{position_ticket, exit_reason}` é o modelo de `evaluate_exit` | Nome do código; o campo `position_seen` compara o ticket e é só informativo (§8.6) | §8.6 |
+| C7 | A chave "falhas para `spec_unreadable`" chama-se `spec_unreadable_after_failures` | A v1.0 não dava nome; R3/R4 usam o mesmo nome nas chaves do JSON de `b3_risk_profiles.limits` | §9 |
+| C8 | As 11 escolhas de forma de R1 (a–k, nota R1) passam a ser contrato: **(a)** `quote_invalid` `failed` (C1); **(b)** `robot_magics` (C2); **(c)** `orphan_sltp_unknown` como conjunto (C5); **(d)** com `n_final = 0` os checks 16–18 são avaliados em `max(n_final, 1)`, para o teto vencedor reprovar com o próprio `reason`; **(e)** `kill_switch_effective` inclui o `WARNING`/`TRADING_DISABLED` automático da perda do pregão, o check 1 lê só os três escopos persistidos; **(f)** `approved_at`/`expires_at` do JSON preenchidos mesmo reprovado (carimbo não é autorização; as colunas de `b3_entry_intents` só existem aprovado); **(g)** o calendário entra como dado — o motor não importa `hunter_indicators`; **(h)** `broker_reject_breaker` emitido em `triggers[]` com contagem ≥ `max_rejects` e ainda não *latched*; **(i)** `evaluate_exit` com 2 checks informativos; **(j)** checks 6 e 7 seguem o check 5 indisponível (`upstream_unavailable:5`); **(k)** a chave `spec_unreadable_after_failures` (C7) | A Astra concordou com as 11 na revisão de R1; cada uma é a leitura mais conservadora ou a única forma que a v1.0 admitia | §8.1–§8.4, §8.6, §9 |
+| C9 | **Regra única de frescor**: `fresco(ts, máx) ⇔ −2 s ≤ now − ts ≤ máx`, com `now = broker.as_of`, para o carimbo da cotação e `clock.measured_at` (check 8), `day.mark_time` (14), `last_reconcile.at` (20) e `audit.api_last_ok_at` (21); `day.anchor_at` mais de 2 s à frente de `now` = `day_anchor_missing` (14). A tolerância de 2 s é constante do motor, não chave do perfil. **Não** se aplica a `proposal.created_at` (22) | "`now − t ≤ idade`" sozinho aceita qualquer carimbo do futuro: um erro de relógio ou de conversão faria dado velho parecer novo (Astra, revisão de R1, must-fix 5). A proposta é gravada pela API milissegundos depois da leitura da corretora, e a aprovação vence em `as_of + 30 s` de qualquer forma (recusa registrada na nota R1) | §8.2 (cabeçalho, 8, 14, 20, 21), §8.3, §9 |
+
+**Pontos de R2 para R5** (`hunter_exchanges.mt5`, commit `8ced300c`)
+
+| # | Decisão | Motivo | Seções |
+|---|---|---|---|
+| C10 | Um `asyncio.CancelledError` que sai de `send_entry`/`send_sltp`/`cancel_order` é resultado **incerto**: entrada → `unknown` (`send_no_result`), cancelamento → `unknown` (`cancel_no_result`), SLTP → `sltp_slot = unknown`. Nunca "não enviado" | Cancelar o `await` não cancela a chamada ao terminal: o `order_send` pode ter começado e executar depois. O serviço não distingue "cancelado na fila" de "cancelado em curso"; tratar os dois como incertos é o falso positivo conservador. **Custo declarado (Astra, v1.1):** no falso positivo a chamada nunca roda, não há resultado tardio e `drain_late_results()` não o resolve — sobra a resolução da §3.6 ou o ato do Everton, e uma SLTP de reparo assim deixa a posição sem reparo até lá. Por isso **R5 não cancela um envio em curso** (o envio roda protegido de cancelamento; o encerramento ordenado espera o retorno até `ipc_call_timeout_s`); R2 expor de forma atômica "a chamada cancelada não começou" é melhoria pendente | §3.6, §4.3, §11 (F50), §12 |
+| C11 | Recusas locais de `send_sltp` (`Mt5NotSent`, nada partiu): a linha `intended` recebe `not_sent` e o slot fica `idle`. Para a requisição **que carrega o piso**, `sl_wrong_side_of_touch`, `tp_wrong_side_of_touch`, `quote_invalid` e `quote_unreadable` (e `quote_unavailable`) levam a `degraded(floor_unplaceable)`: nenhum envio, alerta `critical` com o motivo do adaptador, rota manual. **Precisão da v1.1:** `sl_wrong_side_of_touch` **refuta** a colocação (fica como na v1.0, sem reparo automático, D17); os outros três dizem só que a colocação **não foi provada** — o passe de reconciliação seguinte relê o toque, e uma leitura válida que prove o piso (e o `tp`) colocável devolve a posição ao reparo. `quote_invalid` na guarda de `send_sltp` tem o significado do check 8: ¬(`0 < bid < ask`). **Depois da revisão da Astra:** (i) isso vale só fora da saída — em `exiting`/`exit_overdue` nenhuma recusa muda o estado (o banco recusa `exiting → degraded`, e a v1.0 §5.1 o pedia): alerta `floor_unplaceable` e o laço de saída relê a cada passo; (ii) o piso exatamente no toque (`floor = bid − d`, `d = trade_stops_level × point`) é colocável, como em `guards.py:132` e na regra do MT5 — a v1.0 dizia `≥` | Enviar sem ver o toque pode pôr o stop do lado errado e transformar o reparo numa saída a mercado (a pergunta D17): por isso nenhum envio. Mas uma leitura do tick que falha uma vez não refuta nada: sem a releitura, uma posição que nasceu sem `sl` (a Rico o descartou) e teve um `tick()` falho na carência ficaria sem stop até o Everton agir. O mesmo nome com o mesmo significado: com só `bid ≤ 0 ∨ ask ≤ 0`, um livro cruzado de leilão (bid 110 / ask 95, último 97) deixa passar um `sl` comprado em 98, acima do preço real — o stop dispara na abertura do leilão | §4.1, §4.2, §5.1, §5.3, §11 (F39, F51), §12 (I-SL-7) |
+| C12 | A pista IPC é **única**. Uma mutação já iniciada cujo `await` saiu (prazo ou cancelamento) deixa a pista `unresolved`: toda mutação nova (entrada, SLTP, cancelamento, inclusive saída) é recusada com `guard_unresolved_send` até o serviço chamar `drain_late_results()`; leituras continuam. Diferente de `ipc_hung`, `unresolved` não é trava até reinício: cai quando o resultado tardio é recolhido. O serviço drena a cada iteração do laço e antes de cada mutação | Uma mutação nova enquanto outra pode estar executando é a corrida A/B da §4.3 entre requisições diferentes; segurar a pista até o resultado chegar a impede sem custo quando o resultado chega | §2.4 (G5), §11 (F4, F50), §12 (I-A-6) |
+| C13 | Resultados tardios são **normalizados**: `LateResult{name, value, raised, last_error, at}`, em que `value` é um `SendOutcome` com `error = "late_result"` para `order_send` e `None` para leituras, `raised` é só o nome do tipo da exceção; o objeto cru do fornecedor nunca é guardado. O serviço grava o resultado tardio contra a sua requisição (SLTP pelo `sltp_request_id`/`request_position_ticket` do `SendOutcome`; entrada e cancelamento por serem a única mutação `unresolved` da pista) e o classifica pela §3.6; para uma SLTP, um veredito terminal tardio é P1 (é o retorno síncrono **daquela** chamada); `raised` ou veredito incerto mantêm `unknown` | Um `account_info` tardio carrega `login` e `server` (I-S-1). O retorno de `order_send` só chega depois da resposta do servidor: a requisição terminou, não pode chegar de novo depois | §3.6, §4.3 (P1), §11 (F4, F15) |
+
+**Fatos de R3** (schema `0071_b3_robot`, commit `fe381579`, `docs/DATABASE.md` §74)
+
+| # | Decisão | Motivo | Seções |
+|---|---|---|---|
+| C14 | `limits_version` e `grid_version` são `integer` e `spec_pin_id` é `uuid` no banco; R1 os tipa `str`. A comparação (claim e `CHECK decision_matches_its_columns`) é em `::text`; a R4 converte com `str(...)` na leitura | Versões contíguas comparadas pelo claim e FK do pin; a conversão é sem perda | §2.2, §3.3, §8.4 |
+| C15 | `b3_kill_state` **não** é tipo novo: as colunas usam `kill_switch_state` e o Python usa `KillSwitchState` | "Mesmo enum do SPOT" na v1.0; um enum por conceito (`docs/DATABASE.md` §1). O nome `b3_kill_state` fica só como rótulo neste documento | §1.2, §7.1 |
+| C16 | Ordem de travas **sistema → organização → conta** (`b3_robot_accounts … FOR UPDATE`), explícita **antes de qualquer DML**, para **todo** escritor B3: concessão, revogação, armamento, claim, kill switch do robô, troca de limites e de grade. O claim lê `clock_timestamp()` **depois** da trava | Os gatilhos travam a conta com a linha alvo já travada; sem a ordem explícita, duas transações em ordens opostas dão deadlock. O `now()` de quem esperou a trava é velho (Astra, R3, must-fix 1) | §3.3, §7.1 |
+| C17 | Armar = a fase `entries` da linha `b3_robot_authority`; não existe tabela de armamento (`b3_robot_arming` do desenho §9). Armar exige concessão ativa e não vencida, o `limits_version` vigente e um `spec_pin` da **mesma conta**; re-armar é desarmar e armar | A v1.0 já escrevia `phase = entries`; o banco impõe | §2.2 |
+| C18 | Tabelas além das nomeadas aqui: `b3_robot_accounts` (a conta registrada, a trava estável da C16 e o kill switch do escopo robô: `kill_state` + o **conjunto** `active_causes b3_kill_cause[]`), `b3_session_anchors` (âncora do pregão escrita uma vez: um reinício relê, nunca re-ancora) e `b3_robot_events` (recibo de ingestão por `event_id` = `Idempotency-Key`, na transação dos efeitos). Batimentos: a última linha **de cada instância** | A virada do pregão solta `daily_loss_limit` sem soltar `broker_reject_breaker` (um conjunto, não uma causa); re-ancorar depois de uma perda esconderia a perda; replay do buffer não pode duplicar efeito; o batimento da nova não pode apagar o da anterior (herança §4.3) | §1.1, §6.7, §7.1, §8.3, §10.2 |
+
+**Nota de R1 para R5**
+
+| # | Decisão | Motivo | Seções |
+|---|---|---|---|
+| C19 | `triggers[]` é **reemitido** em toda decisão enquanto a condição dura e o *latch* persistido não chegou ao motor (`broker_reject_breaker` enquanto `ops.breaker_latched` for falso; `daily_loss_limit` enquanto o check 14 reprovar). R5 aplica a transição de forma **idempotente**: causa já presente em `active_causes` não gera transição nova | O motor é puro e não sabe se a escrita anterior commitou | §7.3, §8.4 |
+| C20 | `evaluate_exit` devolve a decisão **sem carimbo** (`as_of`, `approved_at`, `expires_at` nulos); o serviço carimba ao gravar | O motor não tem relógio, e `evaluate_exit` não recebe instantâneo da corretora | §8.6 |
+
+**Código que discorda da v1.1** (pendência de código aberta por esta versão, não do contrato): R2,
+`packages/exchange-adapters/hunter_exchanges/mt5/guards.py:128` — `quote_invalid` só com `bid ≤ 0 ∨ ask ≤ 0`;
+a v1.1 exige ¬(`0 < bid < ask`) (C11). Melhoria pendente, não discordância: R2 expor se uma chamada cancelada
+começou (`ipc.py:153` abandona a chamada não iniciada sem resultado tardio; C10). Corrigido no texto por causa do
+código (não é pendência de código): a igualdade do piso (§4.2 segue `guards.py:132`, `>` estrito) e a saída que não
+vai a `degraded` (§5.1, §5.3 seguem `infra/migrations/ddl/b3_robot_guards.py:530`).
+
+### 0.2 v1.0 (2026-10-17) — congelamento
+
+Contrato inicial da tarefa R0a, depois de quatro rodadas da Astra (§15).
+
+### 0.3 O que a base já sabe, e o que isso fixa aqui
 
 | Fonte lida (17/10/2026) | O que diz | O que fixa neste contrato |
 |---|---|---|
@@ -42,6 +109,9 @@ motivo; onde a Astra mudou algo nesta tarefa, **[Astra R0a-n]** (síntese em
 | desenho `robo-b3-mt5.md` §1–§10 | o contrato de origem | todos os nomes abaixo |
 | `Dialogos/robo-b3-mt5` (6 rodadas) | um só remetente; saída só pelo colchete; nenhuma mutação sem identidade e autoridade; SLTP incerto bloqueia nova modificação; `unknown` atravessa instâncias | §2–§6 são a tabela única de transições que a Astra pediu na rodada 5 ("fonte única de R0a, API, serviço e runbook") |
 | `Fila de Hipoteses` → H-038 | sinal até O+90, entrada [C−30, C−25], stop 0,5 %, saída por tempo em C; o real não rotula a hipótese | o plug-in é dado de entrada (§8.1); a saída da H-038 em C começa o colchete e grava pretendido × efetivo (§5.6) |
+| `Revisoes-Astra/R1-hunter-risk-b3` (v1.1) | 5 must-fix (margem não positiva, `float` aninhado, custo ausente virando zero, check 8 indisponível sem propagação, carimbo do futuro fresco); 11 escolhas de forma a–k | C1–C9, C19, C20 |
+| `Revisoes-Astra/R2-mt5-adapter` (v1.1) | prazo de chamada IPC não é prazo de ordem; cancelar o `await` não cancela a chamada; objeto cru nunca atravessa a fronteira; piso inexequível recusado antes do terminal | C10–C13 |
+| `Revisoes-Astra/R3-b3-schema` e `docs/DATABASE.md` §74 (v1.1) | `CHECK` passa com `NULL`; fechar a posição não termina a requisição; a conta é parte da identidade; gatilho que trava outra linha cria ordem de travas | C14–C18 |
 
 ## 1. Vocabulário congelado
 
@@ -55,12 +125,13 @@ motivo; onde a Astra mudou algo nesta tarefa, **[Astra R0a-n]** (síntese em
 | `authority_id`, `fencing_token` | UUIDv7 e inteiro crescente por conta | a API, em "Conceder gestão" | o claim de entrada compara o token; a corretora **não** conhece o token (residual declarado, §6.6) |
 | `proposal_id` | UUIDv7 | a API, ao gravar a proposta | chave de idempotência de toda a cadeia de entrada |
 | `client_order_id` | `"HB" + base32_rfc4648(sha256(proposal_id.bytes)).rstrip("=").upper()[:16]` (18 caracteres) | o robô | gravado no `comment` da ordem de entrada; procurado na resolução de `unknown` |
-| `magic` | inteiro de `b3_strategy_magics(strategy_key, strategy_version) → magic`, único por organização, **nunca reaproveitado** | a API, no armamento da versão | atribuição pela cadeia de negócios (§4.5); `robot_magics` = o conjunto de todos os já atribuídos à organização |
+| `magic` | inteiro de `b3_strategy_magics(strategy_key, strategy_version) → magic`, único por organização, **nunca reaproveitado** | a API, no armamento da versão | atribuição pela cadeia de negócios (§4.5); `robot_magics` = o conjunto de todos os já atribuídos à organização — é também insumo do motor (`RobotOpsState.robot_magics`, §8.1), onde só escolhe o `reason` dos checks 10 e 11 `[v1.1 C2]` |
 | `position_id` | `POSITION_IDENTIFIER` da corretora, qualificado pelo `account_hash` | corretora | **identidade da máquina C e do slot SLTP**; chave da cadeia de negócios (`history_deals_get(position=…)`). Não muda durante a vida da posição `[Astra R0a-4]` |
 | `position_ticket` | `POSITION_TICKET` atual | corretora | o ticket que vai em `MqlTradeRequest.position`; **pode mudar** por operação de serviço no servidor, por isso nunca é identidade |
 | `request_position_ticket` | o `position_ticket` efetivamente enviado numa requisição SLTP, imutável | o robô, ao montar a requisição | correlação e prova P3 (§4.3, invariante I-SL-4) |
 | `sltp_request_id` | UUIDv7 por requisição SLTP | o robô, **antes** de enviar | correlação do resultado e da resolução de incerteza (§4.3) |
 | `session_date` | data local do pregão (`America/Sao_Paulo`) | grade | contagens do dia, âncora da perda, vencimento da autoridade |
+| `registered_account_hash` | o `account_hash` esperado, numa linha de `b3_robot_accounts` por conta | o Everton, ao registrar a conta | a linha da conta é também a **trava estável** de todo escritor (§3.3) e guarda o kill switch do escopo robô (§7.1) `[v1.1 C16, C18]` |
 
 ### 1.2 Enums (iguais no Postgres, no Pydantic e no TS gerado)
 
@@ -82,7 +153,8 @@ b3_close_cause           = server_sl | server_tp | bracket_sl | bracket_tp | man
                          | unexplained
 b3_attribution           = attributed | foreign | ambiguous | unreadable
 b3_check_state           = passed | failed | unavailable
-b3_kill_state            = ACTIVE | WARNING | TRADING_DISABLED | EMERGENCY     # mesmo enum do SPOT
+b3_kill_state            = ACTIVE | WARNING | TRADING_DISABLED | EMERGENCY     # mesmo enum do SPOT: no banco é
+                         # kill_switch_state e no Python KillSwitchState; não existe tipo b3_kill_state [v1.1 C15]
 b3_kill_cause            = daily_loss_limit | broker_reject_breaker | reversal_detected | manual_route
                          | agent_command | owner_command | owner_button
 ```
@@ -110,8 +182,8 @@ Nomes compostos usados em alertas e na tela (não são colunas, são derivados):
 | De | Para | Guarda (dado) | Ator | Efeito persistido |
 |---|---|---|---|---|
 | — | `read_only` | partida | robô | `b3_robot_instances(instance_id, host_hash, account_hash_seen, started_at)` + auditoria |
-| `read_only` | `management` | não existe linha `active` para a conta **ou** ela foi revogada antes; `diagnosis.account_hash = registered_account_hash`; `diagnosis.host_hash = authorized_host_hash`; `diagnosis.instance_id` = o concedido; diagnóstico com menos de 60 s; buffer do host entregue (`buffer_len = 0`) ou declarado `journal_lost` (§6.5); pendências da anterior resolvidas **ou** marcadas `unknown` | Everton (OWNER, step-up) | linha `b3_robot_authority{authority_id, account_hash, host_hash, instance_id, session_date, fencing_token = anterior + 1, authority_expires_at = session_end_utc do pregão vigente, status = active, phase = management}` + auditoria |
-| `management` | `entries` | linha `active` desta instância; `last_reconcile.clean`; nenhum `unknown` aberto (intenção ou slot SLTP); os checks estruturais 2, 3, 4, 5, 7, 20, 21, 23 e 24 avaliados agora sem `unavailable` (o check 1 depende do próprio armamento e não entra nesta guarda); tabela de custo vigente; versão de estratégia com nota do Obsidian (§8.1) | Everton (K3, step-up) | `phase = entries`, `armed_at`, `armed_strategy{key, version, params_hash}`, `limits_version`, `spec_pin_id` + auditoria |
+| `read_only` | `management` | não existe linha `active` para a conta **ou** ela foi revogada antes; `diagnosis.account_hash = registered_account_hash`; `diagnosis.host_hash = authorized_host_hash`; `diagnosis.instance_id` = o concedido; diagnóstico com menos de 60 s; buffer do host entregue (`buffer_len = 0`) ou declarado `journal_lost` (§6.5); pendências da anterior resolvidas **ou** marcadas `unknown` | Everton (OWNER, step-up) | linha `b3_robot_authority{authority_id, account_hash, host_hash, instance_id, session_date, fencing_token = anterior + 1, authority_expires_at = session_end_utc do pregão vigente, status = active, phase = management}` + auditoria; `granted_at` é carimbado pelo banco (`clock_timestamp()`), nunca o valor do cliente; o primeiro token da conta é 1 |
+| `management` | `entries` | linha `active` desta instância; `last_reconcile.clean`; nenhum `unknown` aberto (intenção ou slot SLTP); os checks estruturais 2, 3, 4, 5, 7, 20, 21, 23 e 24 avaliados agora sem `unavailable` (o check 1 depende do próprio armamento e não entra nesta guarda); tabela de custo vigente; versão de estratégia com nota do Obsidian (§8.1) | Everton (K3, step-up) | `phase = entries`, `armed_at`, `armed_strategy{key, version, params_hash}`, `limits_version`, `spec_pin_id` + auditoria. **Armar é esta fase**, não uma tabela própria: o banco exige concessão ativa e não vencida, o `limits_version` vigente e um `b3_spec_pins` da **mesma conta**; re-armar é desarmar e armar `[v1.1 C17]` |
 | `entries` | `management` | desarmar; kill efetivo ≥ `TRADING_DISABLED`; K2 desligada observada; spec divergente (check 23) | Everton / robô | `phase = management` + auditoria. **Bloqueio local imediato**, antes de qualquer escrita na API; a escrita vem depois e não condiciona o bloqueio `[Astra R4]` |
 | `management`/`entries` | `revoked` | ato do Everton; a tela só oferece com a instância neutralizada | Everton | `status = revoked`, `revoked_at` |
 | `management`/`entries` | `expired` | `utc_now ≥ authority_expires_at` **ou** `mono_now ≥ authority_mono_deadline` (§2.4) | robô e API, cada um pelo seu relógio | `status = expired`; alerta `critical` se há posição ou residual |
@@ -139,7 +211,7 @@ cancelamento). Falhou qualquer item → nada é enviado, o motivo é gravado.
 | G2 | `instance_id` = o da autoridade em memória, `status = active` | `guard_no_authority` |
 | G3 | `mono_now < authority_mono_deadline` **e** `utc_now < authority_expires_at`. A âncora é o **relógio da API**, não o do PC: a resposta da concessão traz `server_now_utc` e `authority_expires_at`; `authority_mono_deadline = mono_at_grant_request_start + (authority_expires_at − server_now_utc)` — contado do **início** do pedido, então a latência conta contra nós. A âncora é fixada uma vez; releituras e repetições **não** a renovam. A conferência UTC local é só um segundo freio (pode encurtar, nunca alongar) `[Astra R0a-8]`. O relógio monotônico tem de incluir o tempo de suspensão do PC (R5 documenta a fonte e prova com teste) | `guard_authority_expired` |
 | G4 | conta REAL ⇒ K1 presente na partida | `guard_k1_absent` |
-| G5 | nenhuma chamada MT5 de mutação desta instância está pendurada (§11, F4; liga a trava `ipc_hung`) | `guard_ipc_hung` |
+| G5 | nenhuma chamada MT5 de mutação desta instância está pendurada (§11, F4; liga a trava `ipc_hung`) **nem** sem resultado recolhido: uma mutação já iniciada cujo `await` saiu (prazo ou `CancelledError`) deixa a pista única `unresolved` até `drain_late_results()` devolver o seu resultado tardio; `unresolved` **não** é trava até reinício — cai quando o resultado é recolhido (§11, F50) `[v1.1 C12]` | `guard_ipc_hung`, `guard_unresolved_send` |
 | G6 | só para entrada: fase `entries` e o claim de §3.3 ganho | `guard_not_armed` |
 | G7 | só para mutação de posição: a posição está `attributed` **nesta** leitura (§4.5); `unreadable` não herda a atribuição de uma leitura anterior `[Astra R0a-7]` | `guard_not_attributed` |
 
@@ -154,6 +226,7 @@ da casa: §13, item 3.
 
 ```
 proposed ──evaluate──▶ rejected (terminal)
+    │  └──(instância morreu antes da decisão, §6.1)──▶ expired (terminal)
     │
     └──▶ approved ──(30 s sem claim | instância trocada)──▶ expired (terminal)
              │
@@ -188,17 +261,33 @@ dinheiro. Rever se o funil mostrar perdas por recusa transitória.
 ### 3.3 Claim atômico (API)
 
 `POST /api/v1/orgs/{org}/b3/robot/intents/{proposal_id}/claim {instance_id, fencing_token}` executa, numa
-transação, travas na ordem **sistema → organização → robô** (como `docs/RISK_ENGINE.md` §5):
+transação, travas na ordem **sistema → organização → conta** (a linha `b3_robot_accounts` da conta, `FOR UPDATE`;
+como `docs/RISK_ENGINE.md` §5). **A mesma ordem, explícita e antes de qualquer DML, vale para todo escritor B3** —
+concessão, revogação, armamento, claim, kill switch do robô, troca de limites e de grade — porque os gatilhos do
+banco travam a conta com a linha alvo já travada, e duas transações em ordens opostas dariam deadlock
+(`docs/DATABASE.md` §74.8) `[v1.1 C16]`. O instante do claim é `clock_timestamp()` lido **depois** da trava (o
+`now()` de uma transação que esperou é velho):
 
 ```
-UPDATE b3_entry_intents SET status = 'submitting', claimed_at = now(), claim_instance_id = :instance_id
- WHERE proposal_id = :proposal_id AND status = 'approved' AND expires_at > now()
+-- depois das travas sistema → organização → conta; t = clock_timestamp()
+UPDATE b3_entry_intents SET status = 'submitting', claimed_at = t, claim_instance_id = :instance_id,
+                            claim_fencing_token = :token,
+                            send_deadline_utc = least(t + send_budget_s, expires_at, authority_expires_at)
+ WHERE proposal_id = :proposal_id AND status = 'approved' AND expires_at > t
    AND instance_id = :instance_id
    AND EXISTS (authority WHERE instance_id = :instance_id AND fencing_token = :token
-               AND status = 'active' AND phase = 'entries' AND authority_expires_at > now())
+               AND status = 'active' AND phase = 'entries' AND authority_expires_at > t)
    AND kill_effective_in_same_tx IN ('ACTIVE','WARNING')
-   AND limits_version = decision.limits_version AND grid_version = decision.grid_version
+   AND limits_version::text = decision.limits_version AND grid_version::text = decision.grid_version
 ```
+
+**Quem garante o quê `[v1.1 C14, R3]`.** O gatilho do banco é a metade de identidade: autoridade desta instância e
+deste token, `active`, `entries`, não vencida; aprovação não vencida; `limits_version` vigente igual ao da decisão;
+`send_deadline_utc ∈ (claimed_at, min(expires_at, authority_expires_at)]`; recusas `authority_mismatch`,
+`not_armed`, `approval_expired`, `limits_changed`. A API faz o resto na mesma transação: o kill switch efetivo
+(`kill_switch`), o `grid_version` (o banco não resolve qual grade vale para a data; `grid_changed`) e
+`not_approved`. Versões e pin são `integer`/`integer`/`uuid` no banco e `str` no `RiskDecision`; toda comparação é
+em `::text`.
 
 Resposta: `{claimed: true, claimed_at, server_now_utc, send_deadline_utc = min(claimed_at + send_budget_s,
 expires_at, authority_expires_at)}` ou `{claimed: false, reason}` com `reason ∈ {not_approved, approval_expired,
@@ -230,6 +319,7 @@ janela consumida.
 | janela de entrada (check 6 e 22) ainda aberta | `window_closed_before_send` |
 | perda do pregão e margem relidas: `evaluate` de novo com os números de agora (a **própria** intenção excluída das contagens dos checks 11 e 13, §8.2 — sem isso a entrada se reprovaria a si mesma `[Astra R0a-1]`); todos os checks aprovam e o `n_final` de agora é **igual ou maior** que o aprovado (envia-se o aprovado, nunca mais) | `reevaluation_changed_before_send` |
 | `limits_version`, `grid_version` = as da decisão (o claim já conferiu no banco; aqui confere a cópia local) | `limits_changed_before_send` |
+| recusa local do adaptador em `send_entry` (`would_delete_stop`, `would_loosen_stop`, `spec_not_pinned`, `spec_changed`, `spec_unreadable`, `positions_unreadable`, `guard_ipc_hung`, `guard_unresolved_send`) — nada partiu `[v1.1 C12]` | o motivo do adaptador, com o sufixo `_before_send` |
 | `utc_now < send_deadline_utc` **e** `mono_now < send_mono_deadline` | `budget_exhausted_before_send` |
 | sem salto entre relógios (`|Δutc − Δmono| ≤ 1 s` desde o claim) e sem intervalo sem batimento local > `send_budget_s` | `clock_jump_before_send` (e força reconciliação) |
 
@@ -266,7 +356,13 @@ código e o teste que falha se aparecer um par ação × retcode fora dela sem c
 | Classe (todas as ações) | Retornos | Efeito |
 |---|---|---|
 | terminal sem efeito | `REQUOTE`, `REJECT`, `CANCEL`, `INVALID`, `INVALID_VOLUME`, `INVALID_PRICE`, `INVALID_STOPS`, `TRADE_DISABLED`, `MARKET_CLOSED`, `NO_MONEY`, `PRICE_CHANGED`, `PRICE_OFF`, `INVALID_EXPIRATION`, `INVALID_FILL`, `INVALID_ORDER`, `CLIENT_DISABLES_AT`, `SERVER_DISABLES_AT`, `LIMIT_ORDERS`, `LIMIT_VOLUME`, `LIMIT_POSITIONS`, `LONG_ONLY`, `SHORT_ONLY`, `CLOSE_ONLY`, `POSITION_CLOSED`, `FROZEN`, `TOO_MANY_REQUESTS`, `ONLY_REAL`, `HEDGE_PROHIBITED`, `FIFO_CLOSE`, `INVALID_CLOSE_VOLUME`, `CLOSE_ORDER_EXIST`, `REJECT_CANCEL` (todos com prefixo `TRADE_RETCODE_`) | `broker_rejected` (entrada) ou "rejeitado" (SLTP); conta para o disjuntor só na entrada (§7.3) |
-| incerto | `TRADE_RETCODE_TIMEOUT`, `TRADE_RETCODE_CONNECTION`, `TRADE_RETCODE_ERROR`, `TRADE_RETCODE_ORDER_CHANGED`, `TRADE_RETCODE_LOCKED`, qualquer retcode fora da tabela, `order_send` devolvendo `None` (com `last_error()` gravado), exceção, chamada que passa de `ipc_call_timeout_s` | `unknown` (entrada) ou `sltp_slot = unknown` (SLTP) |
+| incerto | `TRADE_RETCODE_TIMEOUT`, `TRADE_RETCODE_CONNECTION`, `TRADE_RETCODE_ERROR`, `TRADE_RETCODE_ORDER_CHANGED`, `TRADE_RETCODE_LOCKED`, qualquer retcode fora da tabela, `order_send` devolvendo `None` (com `last_error()` gravado), exceção, chamada que passa de `ipc_call_timeout_s`, **`asyncio.CancelledError` saindo da chamada de envio** (entrada `send_no_result`, cancelamento `cancel_no_result`) `[v1.1 C10]` | `unknown` (entrada) ou `sltp_slot = unknown` (SLTP) |
+
+**Resultado tardio `[v1.1 C13]`.** Um `order_send` cujo `await` saiu antes do retorno devolve, por
+`drain_late_results()`, um `LateResult` **normalizado** (`value` = `SendOutcome` com `error = "late_result"`; nunca
+o objeto cru do fornecedor; exceção só pelo nome do tipo). Ele é gravado contra a sua requisição e classificado por
+esta tabela como qualquer retorno — a expiração da aprovação não o desfaz (F15). Uma `LateResult` com `raised` ou
+veredito incerto não resolve nada: a requisição continua `unknown`.
 
 **Resolução de uma entrada `unknown`** (nunca reenviar; expirar a aprovação não encerra uma ordem enviada):
 procurar em `orders_get()`, `history_orders_get()` e `history_deals_get()` do pregão inteiro, por ticket (se
@@ -305,7 +401,7 @@ terminada não prova que a posição está protegida.
 | `unattributed` | posição na conta que a §4.5 não atribui ao robô (`foreign`, `ambiguous`, `unreadable`) | **nenhuma**; entradas bloqueadas (check 10), alerta, rota manual |
 | `unprotected` | atribuída, volume > 0, sem `sl` confirmado, dentro de `naked_grace_s` contados de `time_msc` do 1.º negócio da posição | SLTP de reparo (§4.2) |
 | `protected` | atribuída, `sl` lido no servidor, do lado certo, alinhado ao tick, não mais largo que o piso (§4.4) | SLTP só apertando (reparo de divergência) |
-| `degraded` | atribuída e sem proteção confirmada; `degraded_reason ∈ {naked_after_grace, repair_rejected, floor_unplaceable, protection_unknown}` | `naked_after_grace`/`repair_rejected`: SLTP de reparo tentado a cada `reconcile_interval_s`; `floor_unplaceable`/`protection_unknown`: **nenhuma**. Sempre alerta `critical` e rota manual |
+| `degraded` | atribuída e sem proteção confirmada; `degraded_reason ∈ {naked_after_grace, repair_rejected, floor_unplaceable, protection_unknown}` | `naked_after_grace`/`repair_rejected`: SLTP de reparo tentado a cada `reconcile_interval_s`; `floor_unplaceable`/`protection_unknown`: **nenhuma** (em `floor_unplaceable` por colocação **não provada**, só a releitura da §4.2 `[v1.1 C11]`). Sempre alerta `critical` e rota manual |
 | `exiting` | saída pelo colchete em curso (§5) | só SLTP de aperto |
 | `exit_overdue` | `exiting` depois de `bracket_deadline_s` | só SLTP de aperto; alerta `critical` `exit_overdue`; rota manual |
 | `closed` | volume 0, explicado pelos negócios do `position_id` | nenhuma (terminal) |
@@ -318,7 +414,9 @@ terminada não prova que a posição está protegida.
 | — | posição encontrada na partida/reconciliação | `unattributed` ou, se `attributed`, `protected`/`unprotected`/`degraded` pela idade desde `time_msc` | numa partida que encontra posição sem `sl` desde antes, a carência já acabou → `degraded` |
 | `unprotected` | `sl` confirmado | `protected` | |
 | `unprotected` | `naked_grace_s` vencido | `degraded` (`naked_after_grace`) | `naked_position` `critical` |
-| `unprotected`/`degraded` | o piso (§4.4) não pode ser colocado: para comprado `floor ≥ bid − d`, para vendido `floor ≤ ask + d` (o nível estaria do lado errado do toque) | `degraded` (`floor_unplaceable`) | **nenhum reparo automático**, nenhum colchete abaixo do piso; alerta `critical` e rota manual `[Astra R0a-5]`. Colocar um piso mais largo que o original é exceção de risco que só o Everton decide (D17, §9) |
+| `unprotected`/`degraded` | o piso (§4.4) não pode ser colocado: para comprado `floor > bid − d`, para vendido `floor < ask + d`, com `d = trade_stops_level × point` (o nível estaria do lado errado do toque; a igualdade é colocável — é a regra do MT5, `bid − SL ≥ stops_level`, e o stop dispara com toque igual) `[v1.1 C11, Astra]` | `degraded` (`floor_unplaceable`) | **nenhum reparo automático**, nenhum colchete abaixo do piso; alerta `critical` e rota manual `[Astra R0a-5]`. Colocar um piso mais largo que o original é exceção de risco que só o Everton decide (D17, §9). Na prática a recusa vem da guarda de `send_sltp` de R2 antes do terminal: `sl_wrong_side_of_touch` (toque medido com `d = trade_stops_level × point`) — colocação **refutada** |
+| `unprotected`/`degraded` | a requisição de reparo que carrega o piso é recusada localmente por `tp_wrong_side_of_touch`, `quote_invalid` (¬(`0 < bid < ask`)), `quote_unreadable` ou `quote_unavailable` — colocação **não provada** | `degraded` (`floor_unplaceable`) | nada enviado (a linha `intended` recebe `not_sent`, slot `idle`); alerta `critical` com o motivo do adaptador; rota manual `[v1.1 C11]` |
+| `degraded` (`floor_unplaceable` por colocação não provada) | passe de reconciliação seguinte com toque relido válido e piso (e `tp`, ou `tp = 0`) colocável | `unprotected` dentro da carência, senão `degraded` (`naked_after_grace`) | o reparo volta; o motivo e a releitura vão no evento. A recusa `sl_wrong_side_of_touch` não tem esta aresta: continua sem reparo automático (D17) `[v1.1 C11]` |
 | `protected`/`unprotected`/`degraded` (exceto `floor_unplaceable`) | `exit_due` (§5.2) e `sltp_slot = idle` | `exiting` | `exit_started_at`/`exit_deadline_at` gravados antes da 1.ª SLTP da saída (§5.2) |
 | `exiting` | `utc_now ≥ exit_deadline_at` com volume > 0 | `exit_overdue` | o aperto continua; o prazo é limite para **escalar**, não prova de fill. O prazo **nunca** é renovado por reinício `[Astra R0a-9]` |
 | `exiting`/`exit_overdue` | o gatilho desaparece (preço volta, `EMERGENCY` rearmado) | **mesmo estado** | uma saída iniciada só termina em `closed` comprovado |
@@ -330,6 +428,14 @@ terminada não prova que a posição está protegida.
 
 **Exclusões:** o reparador nunca toca posição em `exiting`/`exit_overdue`; uma saída não começa com
 `sltp_slot ≠ idle`; nenhuma ordem direcional de saída existe em estado algum (§5.5).
+
+**Recusa local não é requisição `[v1.1 C11, C12]`.** Todo `Mt5NotSent` do adaptador (guardas de `send_sltp`,
+`guard_ipc_hung`, `guard_unresolved_send`, leitura de posição ou especificação que falhou) acontece **antes** do
+`order_send`: nada partiu, a linha `intended` já durável recebe `not_sent` e o slot fica `idle`. Só a requisição
+que carrega o piso muda o estado da posição (as duas linhas acima), e só fora da saída: em `exiting`/`exit_overdue`
+nenhuma recusa local muda o estado (§5.1, §5.3 passo 3). As linhas `floor_unplaceable` acima valem para
+`unprotected`/`degraded` sem `b3_exit_intents`. A causa (refutada × não provada) vai no evento e no alerta; numa
+partida a classificação é refeita pela leitura (linha "posição encontrada", §4.4), nunca abaixo do piso.
 
 ### 4.3 O slot SLTP — uma requisição por vez, e o que prova o seu fim `[Astra R5, R6]`
 
@@ -348,11 +454,12 @@ API e disco falhando **juntos**, o robô para de mexer em níveis — o `sl` con
 retirado, e a rota é a manual.
 
 `sltp_slot`: `idle → in_flight` ao enviar; `in_flight → idle` com prova; `in_flight → unknown` com resultado
-incerto.
+incerto — inclusive `asyncio.CancelledError` saindo de `send_sltp` e prazo estourado de uma chamada iniciada
+`[v1.1 C10]`.
 
 | Prova de término da **requisição** (lista fechada) | Resultado |
 |---|---|
-| P1 — `order_send` voltou, **para esta requisição** (retorno síncrono), com um retorno terminal **da ação SLTP** (§3.6: `DONE`, `NO_CHANGES` ou terminal sem efeito) | `idle`; nível relido e gravado como confirmado (ou mantido, se rejeitado) |
+| P1 — `order_send` voltou, **para esta requisição** (retorno síncrono), com um retorno terminal **da ação SLTP** (§3.6: `DONE`, `NO_CHANGES` ou terminal sem efeito). Vale também o **resultado tardio** recolhido por `drain_late_results()` com o `sltp_request_id` desta requisição: é o retorno síncrono daquela chamada, que só existe depois da resposta do servidor; o resultado é gravado **antes** de o slot ser liberado, e P1 não limpa `ipc_hung` `[v1.1 C13]` | `idle`; nível relido e gravado como confirmado (ou mantido, se rejeitado) |
 | P3 — a posição está `closed` (volume 0 explicado pelos negócios do `position_id`) **e** `stale_ticket_rejection_proven` (T13: uma SLTP atrasada com o `request_position_ticket` de uma posição fechada é rejeitada mesmo com uma posição nova no mesmo símbolo), fixado no armamento | `idle` (moot) |
 | P3′ — a posição está `closed`, sem `stale_ticket_rejection_proven` | a máquina da posição fecha, mas a requisição vira **SLTP órfã incerta do símbolo**: bloqueia entradas nesse símbolo (check 11, `orphan_sltp_unknown`) até P4 ou até a prova de T13 `[Astra R0a-4]` |
 | P4 — ato do Everton (OWNER, step-up) que registra **evidência terminal correlacionada**: a linha do Diário do terminal com o resultado **daquela** requisição (instante, ticket, níveis, resultado), copiada para o registro; "conferi o Diário" sem a linha não é prova `[Astra R0a-3]` | `idle` |
@@ -452,7 +559,9 @@ vendido:   sl* = ceil_to_tick(ask + d)      tp* = floor_to_tick(bid − d)
            sl_novo = sl* se sl_c = 0, senão min(sl_c, sl*)   tp_novo = tp* se tp_c = 0, senão max(tp_c, tp*)
 envia só se (sl_novo, tp_novo) ≠ (sl_c, tp_c); nunca sl_novo = 0; nunca mais largo que sl_c
 nunca mais largo que o piso (§4.4): comprado sl_novo ≥ floor, vendido sl_novo ≤ floor; se o colchete não
-respeita o piso, nada é enviado e a posição vai a degraded (floor_unplaceable)
+respeita o piso, nada é enviado; a posição CONTINUA em exiting/exit_overdue (uma saída iniciada só termina em
+closed — o banco recusa exiting → degraded), com alerta critical floor_unplaceable, e o laço relê a cada passo
+[v1.1 C11]
 ```
 
 Com `d = 0` o colchete encosta: comprado `sl` no bid e `tp` no ask — o primeiro negócio em qualquer lado do livro
@@ -494,7 +603,11 @@ saída já disparada; ela termina em `closed`.
 2. A cada `bracket_step_s`, se `sltp_slot = idle` e a posição continua aberta: calcula §5.1; envia se apertou.
 3. SLTP rejeitado com `TRADE_RETCODE_INVALID_STOPS` → mantém e relê os níveis; `k ← k + 1` para o pregão
    (gravado em `b3_bracket_learning{session_date, symbol, k}`), até `bracket_max_k`; outros rejeitados → mantém,
-   relê, tenta no próximo passo. **Nunca** contorna rejeição removendo o `sl`.
+   relê, tenta no próximo passo. **Nunca** contorna rejeição removendo o `sl`. Recusa local do adaptador (nada
+   partiu, `not_sent`) → também relê e tenta no próximo passo, **inclusive** quando a requisição recusada carregava
+   o piso: em `exiting`/`exit_overdue` a posição não vai a `degraded` (§4.2 vale só fora da saída); o estado e o
+   prazo da saída ficam, sai alerta `critical` `floor_unplaceable`, e o laço de saída — nunca o reparador — envia
+   quando uma leitura válida provar um colchete colocável que respeite o piso `[v1.1 C11]`.
 4. SLTP incerto → `sltp_slot = unknown` (§4.3): para de modificar, alerta `exit_unknown`, rota manual. Se a
    posição fechar, P3 (ou P3′, que deixa a SLTP órfã bloqueando entradas no símbolo).
 5. Prazo vencido → `exit_overdue`, alerta `critical` no app e no celular (Sentry, D13), entradas bloqueadas; o
@@ -627,7 +740,9 @@ compulsória da Rico nunca é tratada como confirmação de fechamento — só o
 Nunca lido para decidir. Recebe só eventos que a API recusou ou
 não alcançou dentro do orçamento (inclusive as gravações-antes-de-enviar de SLTP e de intenção de saída, §4.3,
 §5.2); reenviado em ordem com `Idempotency-Key = event_id` — na partida, **antes** da concessão de gestão (§6.5
-passo 6); em operação, em segundo plano. Enquanto não vazio, check 21 recusa entradas.
+passo 6); em operação, em segundo plano. Enquanto não vazio, check 21 recusa entradas. A API grava, na mesma
+transação dos efeitos, o recibo `b3_robot_events{event_id}`: um reenvio do mesmo `event_id` não repete efeito
+`[v1.1 C18]`.
 
 **Falha de disco, subordinada à §4.3 `[Astra R0a, r3]`:** (a) gravações **obrigatórias antes do envio** (SLTP e
 intenção de saída) sem confirmação durável — nem ack da API nem `fsync` com sucesso — **impedem o envio** naquele
@@ -653,7 +768,15 @@ Escopos **sistema**, **organização**, **robô**; efetivo = o mais restritivo n
 
 `auto_close_on_emergency = true` é **comportamento fixo do robô B3**, não chave de perfil (diferença declarada,
 §13). A virada do pregão só limpa a trava da perda diária depois de reconciliar; nunca limpa comando,
-rejeições, inversão ou `EMERGENCY`. A concessão de gestão não limpa nada disso: a gestão existe justamente para
+rejeições, inversão ou `EMERGENCY`.
+
+**Onde mora cada escopo `[v1.1 C15, C16, C18]`.** Sistema e organização são os do SPOT (`kill_switch_transitions`,
+`organizations.kill_switch_state`). O escopo robô mora na conta: `b3_robot_accounts.kill_state`
+(`kill_switch_state`, o mesmo enum — não existe tipo `b3_kill_state`) e o **conjunto** `active_causes
+b3_kill_cause[]`, com `kill_state ∈ {TRADING_DISABLED, EMERGENCY} ⇔ active_causes ≠ ∅`; cada movimento grava uma
+linha de `b3_kill_switch_transitions` na mesma transação. É um conjunto porque com `broker_reject_breaker` e depois
+`daily_loss_limit` a virada do pregão solta só a perda diária. O `WARNING` da perda é automático: o motor o
+calcula a cada decisão (`kill_switch_effective`, §8.4), sem depender de linha persistida. Quem escreve trava sistema → organização → conta antes (§3.3). A concessão de gestão não limpa nada disso: a gestão existe justamente para
 proteger e zerar sob essas travas.
 
 ### 7.2 Quem pode o quê (aplicado na API, não no script)
@@ -669,6 +792,12 @@ Conta **só** rejeições terminais (`broker_rejected`) de requisições de **en
 **[R0a]**. Rejeições de SLTP de proteção/saída têm métrica e alerta próprios (`protection_rejected`) e não
 disparam o disjuntor — o colchete aprende `k` por `INVALID_STOPS` (§5.3) e isso não pode travar o dia por
 rearme manual. O disjuntor só bloqueia entradas; nunca afeta saída.
+
+**Aplicação idempotente `[v1.1 C19]`.** O motor emite `broker_reject_breaker` em `triggers[]` em **toda** decisão
+com a contagem da janela ≥ `max_rejects` enquanto `ops.breaker_latched` for falso — isto é, de novo a cada
+avaliação até o *latch* persistido chegar ao motor (ele é puro e não sabe se a escrita anterior commitou). O
+mesmo vale para `daily_loss_limit` enquanto o check 14 reprovar. R5 aplica cada gatilho de forma idempotente:
+causa já presente em `active_causes` não gera transição nova nem auditoria nova.
 
 ## 8. Os 25 checks — o motor puro
 
@@ -691,8 +820,9 @@ Insumos (campos que os checks citam):
 
 ```
 B3EntryProposal  proposal_id, organization_id, instance_id, strategy_key, strategy_version, params_hash,
-                 session_date, window_id, symbol, side (buy|sell), requested_contracts (int ≥ 1),
-                 ref_price, stop_price, target_price?, exit_at_utc?, signal_published_at,
+                 session_date, window_id, symbol, side (buy|sell), requested_contracts (int; < 1 é
+                 recusado pelo check 12, não pelo modelo), ref_price, stop_price? (ausente → check 15
+                 stop_missing), target_price?, exit_at_utc?, signal_published_at,
                  signal_deadline_utc, entry_window_start_utc, entry_window_end_utc, created_at
 BrokerSnapshot   as_of, positions[] {position_id, position_ticket, symbol, side, volume, price_open, sl, tp,
                  magic, time_msc},
@@ -707,28 +837,51 @@ SessionContext   session_date, open_utc, close_utc, flatten_at_utc?, rico_flatte
 CalendarB3       is_holiday, is_shortened, has_grid, current_contract {symbol, root, expiry_date},
                  is_expiry_day, read_ok
 QuoteSnapshot    bid, ask, last, time_utc (carimbo do servidor convertido pelo deslocamento medido), read_ok
-KillSwitchB3     system, organization, robot (b3_kill_state), authority {phase, instance_id,
-                 authority_expires_at}, registered_account_hash, k1_present,
-                 armed_strategy {key, version, params_hash}
+KillSwitchB3     system, organization, robot (KillSwitchState), authority {phase, instance_id?,
+                 authority_expires_at?} (os dois obrigatórios fora de read_only), registered_account_hash,
+                 k1_present, armed_strategy? {key, version, params_hash}
 SpecInputs       pin: SpecPin (fixado no armamento), now: SpecNow (relido) — é o argumento `spec`
+SpecPin          spec_pin_id (str; no banco b3_spec_pins.id uuid) [v1.1 C3], e os campos abaixo, todos
+                 obrigatórios
 SpecPin/SpecNow  trade_tick_size, trade_tick_value, point, digits, volume_min, volume_step, volume_max,
                  trade_mode, filling_mode, expiration_mode, account_margin_mode, terminal_version,
                  package_version, order_lifecycle_proven, comment_preserved, stale_ticket_rejection_proven
-                 (os três últimos vêm das provas T14, T8 e T13, gravadas com a evidência); SpecNow.status (ok|changed|unreadable)
-MarginInputs     per_volume {v: margin_brl}, order_check {v: ok|refused(reason)}, read_ok
+                 (os três últimos vêm das provas T14, T8 e T13, gravadas com a evidência); SpecNow.status
+                 (ok|changed|unreadable; ok exige todos os campos)
+MarginInputs     per_volume {v: margin_brl}, order_check {v: OrderCheckResult{ok, reason?}} [v1.1 C4], read_ok
 RobotOpsState    entries_today, open_entry_intents, unknown_intents (as três já sem a proposta em avaliação),
-                 orphan_sltp_unknown (bool, por símbolo), entry_rejects[] (instantes),
-                 breaker_latched, last_reconcile {at, clean, consistent_passes}, audit {api_last_ok_at,
-                 buffer_len, buffer_writable}, day {anchor_equity, anchor_at, cash_flows_brl,
-                 history_complete, realized_gross_brl, costs_positive_brl, open_mtm_gross_brl,
-                 open_exit_fee_brl, mark_time, equity_delta_brl}, fee_schedule {per_leg_brl, source, valid}
+                 orphan_sltp_unknown (frozenset dos símbolos com SLTP órfã incerta, P3′) [v1.1 C5],
+                 entry_rejects[] (instantes), breaker_latched, last_reconcile? {at, clean, consistent_passes},
+                 audit {api_last_ok_at?, buffer_len, buffer_writable}, day {anchor_equity?, anchor_at?,
+                 cash_flows_brl?, history_complete, realized_gross_brl?, costs_positive_brl?,
+                 open_mtm_gross_brl?, open_exit_fee_brl?, mark_time?, equity_delta_brl?},
+                 fee_schedule {per_leg_brl?, source?, valid}, robot_magics (frozenset[int]) [v1.1 C2]
+ExitRequest      position_ticket, exit_reason (b3_exit_reason) — argumento de evaluate_exit [v1.1 C6]
 ```
+
+`?` = pode faltar; **ausente nunca vira zero**: um campo de custo, perda ou instante ausente torna `unavailable` o
+check que o lê. Um instantâneo com `read_ok = true` exige os campos que os checks leem (o modelo recusa construir
+sem eles).
 
 ### 8.2 A tabela
 
 Todos os checks são gravados em `checks[]` como `{id, name, state, value, limit, input_ts, reason, message}`,
 **mesmo depois da primeira reprovação**. `state ∈ passed | failed | unavailable`; `unavailable` reprova. Um check
-cujo insumo depende de outro indisponível sai `unavailable` com `reason = upstream_unavailable:<id>`.
+cujo insumo depende de outro indisponível sai `unavailable` com `reason = upstream_unavailable:<id>`. Convenção
+`[v1.1 C1]`: `failed` = o dado foi lido e diz "não"; `unavailable` = não há dado utilizável. Dependências
+implementadas (R1): 4 ← 23 (`trade_mode` relido), 6 e 7 ← 5, 9/15/24 ← 8 (sem livro utilizável — `quote_missing`,
+relógio não medido **ou** `quote_invalid` — eles saem `upstream_unavailable:8`; uma falha independente da cotação,
+como `stop_missing` ou `order_lifecycle_unproven`, é relatada antes), 16 ← 14, 18 ← 2; 16 e 17 saem
+`upstream_unavailable:15` só quando a proposta **não tem stop** (não seguem o estado do check 15: com stop conhecido
+e cotação indisponível, 15 fica `unavailable` e 16/17 podem passar — a entrada continua recusada pelo 15).
+
+**Frescor `[v1.1 C9]`.** `fresco(ts, máx) ⇔ −2 s ≤ now − ts ≤ máx`. Vale para `quote.time_utc` e
+`clock.measured_at` (check 8), `day.mark_time` (14), `last_reconcile.at` (20) e `audit.api_last_ok_at` (21);
+`day.anchor_at` mais de 2 s à frente de `now`, ou de outro pregão, é `day_anchor_missing` (14). Os 2 s são
+constante do motor (`FUTURE_TOLERANCE`), não chave do perfil, e não se movem com `max_clock_offset_s`; não valem
+para `proposal.created_at` (22: a proposta é gravada pela API depois da leitura da corretora, e a aprovação vence
+em `as_of + 30 s` de qualquer forma).
+
 **Todos os 25 aplicam-se só a entradas; nenhum bloqueia saída** (§8.6). Notação: `tick = spec.trade_tick_size`,
 `now = broker.as_of`.
 
@@ -737,27 +890,27 @@ cujo insumo depende de outro indisponível sai `unavailable` com `reason = upstr
 | 1 | `kill_switch` | `kill_switch`, `proposal.instance_id`, `now` | `most_restrictive(system, organization, robot) ∈ {ACTIVE, WARNING}` ∧ `authority.phase = entries` ∧ `authority.instance_id = proposal.instance_id` ∧ `now < authority_expires_at` | `kill_switch_trading_disabled`, `kill_switch_emergency`, `entries_not_armed`, `arming_other_instance`, `authority_expired` |
 | 2 | `account_mode` | `account`, `kill_switch.registered_account_hash`, `k1_present` | `account.account_hash = registered_account_hash` ∧ (`trade_mode = demo` ∨ (`trade_mode = real` ∧ `k1_present`)) | `account_mismatch`, `real_account_without_k1`, `account_mode_unsupported` / `account_unreadable` |
 | 3 | `terminal_state` | `broker.terminal` | `connected` ∧ `trade_allowed` ∧ ¬`tradeapi_disabled` | `terminal_disconnected`, `algo_trading_off`, `tradeapi_disabled` / `terminal_unreadable` |
-| 4 | `symbol_whitelist` | `proposal.symbol`, `calendar.current_contract`, `limits.symbol_roots`, `spec.trade_mode` | `symbol = current_contract.symbol` ∧ `current_contract.root ∈ symbol_roots` ∧ `spec.trade_mode = SYMBOL_TRADE_MODE_FULL` ∧ ¬`is_expiry_day` | `symbol_not_current_contract`, `symbol_root_not_allowed`, `symbol_trade_mode_restricted`, `contract_expiry_day` / `contract_calendar_missing` |
+| 4 | `symbol_whitelist` | `proposal.symbol`, `calendar.current_contract`, `limits.symbol_roots`, `spec.trade_mode` | `symbol = current_contract.symbol` ∧ `current_contract.root ∈ symbol_roots` ∧ `spec.trade_mode = SYMBOL_TRADE_MODE_FULL` ∧ ¬`is_expiry_day` | `symbol_not_current_contract`, `symbol_root_not_allowed`, `symbol_trade_mode_restricted`, `contract_expiry_day` / `contract_calendar_missing`, `upstream_unavailable:23` |
 | 5 | `trading_day` | `calendar`, `session.grid_version` | ¬`is_holiday` ∧ `has_grid` (a linha de grade vigente para a data; pregão encurtado só passa com a própria grade cadastrada) | `holiday`, `shortened_session_without_grid` (encurtado e sem grade) / `session_grid_missing` (sem grade, não encurtado), `calendar_unreadable` |
-| 6 | `entry_window` | `session`, `limits.no_entry_first_min`, `proposal.entry_window_*` | `open_utc + no_entry_first_min ≤ now` ∧ (`entry_cutoff_utc` nulo ∨ `now ≤ entry_cutoff_utc`) ∧ `entry_window_start_utc ≤ now ≤ entry_window_end_utc` | `before_entry_window`, `after_entry_cutoff`, `outside_strategy_window` |
-| 7 | `flatten_margin` | `session.flatten_at_utc`, `session.rico_flatten_utc`, `limits.min_minutes_before_flatten`, `limits.flatten_lead_min` | `flatten_at_utc − now ≥ min_minutes_before_flatten` ∧ `flatten_at_utc ≤ rico_flatten_utc − flatten_lead_min` | `too_close_to_flatten`, `flatten_after_rico_cutoff` / `flatten_schedule_unset` (D6 vazio ⇒ nenhuma entrada) |
-| 8 | `quote_fresh` | `quote`, `session.clock`, `limits.max_quote_age_s`, `limits.max_clock_offset_s`, `limits.clock_check_max_age_s` | `0 < bid < ask` ∧ `now − time_utc ≤ max_quote_age_s` ∧ `time_utc − now ≤ 2 s` ∧ `clock.ok` ∧ `now − clock.measured_at ≤ clock_check_max_age_s` ∧ `|offset_ms| ≤ max_clock_offset_s × 1000` | `quote_invalid`, `quote_stale`, `quote_from_future`, `clock_offset_exceeded` / `quote_missing`, `clock_offset_unmeasured` |
+| 6 | `entry_window` | `session`, `limits.no_entry_first_min`, `proposal.entry_window_*` | `open_utc + no_entry_first_min ≤ now` ∧ (`entry_cutoff_utc` nulo ∨ `now ≤ entry_cutoff_utc`) ∧ `entry_window_start_utc ≤ now ≤ entry_window_end_utc` | `before_entry_window`, `after_entry_cutoff`, `outside_strategy_window` / `upstream_unavailable:5` |
+| 7 | `flatten_margin` | `session.flatten_at_utc`, `session.rico_flatten_utc`, `limits.min_minutes_before_flatten`, `limits.flatten_lead_min` | `flatten_at_utc − now ≥ min_minutes_before_flatten` ∧ `flatten_at_utc ≤ rico_flatten_utc − flatten_lead_min` | `too_close_to_flatten`, `flatten_after_rico_cutoff` / `flatten_schedule_unset` (D6 vazio ⇒ nenhuma entrada), `upstream_unavailable:5` |
+| 8 | `quote_fresh` | `quote`, `session.clock`, `limits.max_quote_age_s`, `limits.max_clock_offset_s`, `limits.clock_check_max_age_s` | `0 < bid < ask` ∧ `−2 s ≤ now − time_utc ≤ max_quote_age_s` ∧ `clock.ok` ∧ `fresco(clock.measured_at, clock_check_max_age_s)` ∧ `|offset_ms| ≤ max_clock_offset_s × 1000` | `quote_invalid` (lido com ¬(`0 < bid < ask`): livro invertido, cruzado ou com um lado zerado — **`failed`**, não `unavailable` `[v1.1 C1]`), `quote_stale`, `quote_from_future`, `clock_offset_exceeded` / `quote_missing`, `clock_offset_unmeasured` (inclusive `measured_at` do futuro) |
 | 9 | `spread` | `quote`, `tick`, `limits.max_spread_ticks` | `ask − bid ≤ max_spread_ticks × tick` | `spread_too_wide` / `upstream_unavailable:8` |
-| 10 | `open_positions` | `broker.positions`, atribuição (§4.5) | `len(positions) = 0` (qualquer símbolo, nossa ou não; `max_open_positions = 1` = entrar só zerado) | `position_already_open`, `foreign_position_present` / `positions_unreadable` |
-| 11 | `order_in_flight` | `broker.orders`, `ops.open_entry_intents`, `ops.unknown_intents`, `ops.orphan_sltp_unknown` | `len(orders) = 0` ∧ `open_entry_intents = 0` ∧ `unknown_intents = 0` ∧ nenhuma SLTP órfã incerta no símbolo (§4.3, P3′). As contagens **excluem a própria `proposal_id`** em avaliação (identificada por `proposal_id + instance_id`; depois do claim, também `fencing_token`); toda outra intenção continua bloqueando `[Astra R0a-1]` | `pending_order_present`, `foreign_order_present`, `entry_intent_in_flight`, `entry_intent_unknown`, `orphan_sltp_unknown` / `orders_unreadable` |
+| 10 | `open_positions` | `broker.positions`, `ops.robot_magics` | `len(positions) = 0` (qualquer símbolo, nossa ou não; `max_open_positions = 1` = entrar só zerado) | `foreign_position_present` (alguma posição com `magic ∉ robot_magics`), senão `position_already_open` — o `magic` só escolhe o motivo, não é a atribuição da §4.5 `[v1.1 C2]` / `positions_unreadable` |
+| 11 | `order_in_flight` | `broker.orders`, `ops.open_entry_intents`, `ops.unknown_intents`, `ops.orphan_sltp_unknown`, `ops.robot_magics` | `len(orders) = 0` ∧ `open_entry_intents = 0` ∧ `unknown_intents = 0` ∧ `proposal.symbol ∉ orphan_sltp_unknown` (§4.3, P3′) `[v1.1 C5]`. Ordem dos motivos: ordens (`foreign_order_present` se algum `magic ∉ robot_magics`, senão `pending_order_present`), `entry_intent_unknown`, `entry_intent_in_flight`, `orphan_sltp_unknown`. As contagens **excluem a própria `proposal_id`** em avaliação (identificada por `proposal_id + instance_id`; depois do claim, também `fencing_token`); toda outra intenção continua bloqueando `[Astra R0a-1]` | `pending_order_present`, `foreign_order_present`, `entry_intent_in_flight`, `entry_intent_unknown`, `orphan_sltp_unknown` / `orders_unreadable` |
 | 12 | `contracts_caps` | `proposal.requested_contracts`, `limits.max_contracts_per_order`, `limits.max_contracts_per_position` | `1 ≤ requested ≤ max_contracts_per_order` ∧ `requested ≤ max_contracts_per_position` | `requested_contracts_invalid`, `contracts_cap_exceeded` |
 | 13 | `trades_today` | `ops.entries_today`, `ops.day.history_complete`, `limits.max_trades_per_day` | `entries_today < max_trades_per_day`, com `entries_today = max(nº de intenções do pregão com status ∈ {submitting, working, partially_filled, filled, cancel_requested, unknown, resolved_manual} ou `canceled` com `filled_volume > 0`, nº de negócios de entrada (`DEAL_ENTRY_IN`) com magic ∈ robot_magics no pregão)` — conta o que pode ter gerado exposição, **excluída a própria `proposal_id`** e os negócios da ordem dela (a reavaliação do `pre_send_gate` não cobra a operação duas vezes) | `max_trades_per_day_reached` / `trade_count_unavailable` |
-| 14 | `daily_loss` | `ops.day`, `ops.fee_schedule`, `quote`, `limits.daily_loss_limit_brl`, `limits.pnl_reconcile_tolerance_brl` | `loss < daily_loss_limit_brl` (fórmula §8.3) | `daily_loss_limit` (**aciona** `TRADING_DISABLED`) / `day_anchor_missing`, `session_history_incomplete`, `pnl_reconcile_divergent`, `mark_stale` |
-| 15 | `stop_geometry` | `proposal.stop_price`, `target_price`, `limit_price` (§8.3), `quote`, `tick`, `limits.min_stop_ticks`, `max_stop_ticks` | stop presente; múltiplo de `tick`; compra: `stop < limit_price` ∧ `stop < bid`; venda: `stop > limit_price` ∧ `stop > ask`; `|limit_price − stop| / tick ∈ [min_stop_ticks, max_stop_ticks]`; alvo, se houver, múltiplo de `tick` e do lado certo | `stop_missing`, `stop_off_tick`, `stop_wrong_side`, `stop_already_crossed`, `stop_too_close`, `stop_too_far`, `target_invalid` |
-| 16 | `trade_risk_vs_allowance` | §8.3 | `n_final × risk_per_contract ≤ allowance` (`n_final ≥ 1`) | `trade_risk_exceeds_daily_allowance` / `upstream_unavailable:14`, `fee_schedule_missing` |
-| 17 | `trade_risk_cap` | §8.3, `limits.max_loss_per_trade_brl` | `n_final × risk_per_contract ≤ max_loss_per_trade_brl` | `trade_risk_exceeds_cap` / `fee_schedule_missing` |
-| 18 | `margin` | `margin`, `account`, `spec_pin.account_margin_mode`, `limits.alloc_per_trade_brl`, `margin_use_max_pct` | `account.currency = BRL` ∧ `account.margin_mode = spec_pin.account_margin_mode` ∧ `margin.per_volume[n_final] ≤ min(alloc_per_trade_brl, margin_free × margin_use_max_pct)` ∧ `margin.order_check[n_final] = ok` | `account_currency_not_brl`, `margin_mode_changed`, `margin_exceeds_allocation`, `margin_exceeds_free_margin`, `order_check_refused` / `margin_unavailable` |
+| 14 | `daily_loss` | `ops.day`, `ops.fee_schedule`, `quote`, `limits.daily_loss_limit_brl`, `limits.pnl_reconcile_tolerance_brl` | `loss < daily_loss_limit_brl` (fórmula §8.3) | `daily_loss_limit` (**aciona** `TRADING_DISABLED`) / `day_anchor_missing` (sem âncora, âncora de outro pregão ou do futuro), `session_history_incomplete`, `pnl_reconcile_divergent`, `mark_stale` (`mark_time` não fresco por `max_quote_age_s`) |
+| 15 | `stop_geometry` | `proposal.stop_price`, `target_price`, `limit_price` (§8.3), `quote`, `tick`, `limits.min_stop_ticks`, `max_stop_ticks` | stop presente; múltiplo de `tick`; compra: `stop < limit_price` ∧ `stop < bid`; venda: `stop > limit_price` ∧ `stop > ask`; `|limit_price − stop| / tick ∈ [min_stop_ticks, max_stop_ticks]`; alvo, se houver, múltiplo de `tick` e do lado certo | `stop_missing`, `stop_off_tick`, `stop_wrong_side`, `stop_already_crossed`, `stop_too_close`, `stop_too_far`, `target_invalid` / `upstream_unavailable:8` |
+| 16 | `trade_risk_vs_allowance` | §8.3 | `n_final × risk_per_contract ≤ allowance` (`n_final ≥ 1`) | `trade_risk_exceeds_daily_allowance` / `fee_schedule_missing`, `upstream_unavailable:15` (sem stop), `upstream_unavailable:14` |
+| 17 | `trade_risk_cap` | §8.3, `limits.max_loss_per_trade_brl` | `n_final × risk_per_contract ≤ max_loss_per_trade_brl` | `trade_risk_exceeds_cap` / `fee_schedule_missing`, `upstream_unavailable:15` |
+| 18 | `margin` | `margin`, `account`, `spec_pin.account_margin_mode`, `limits.alloc_per_trade_brl`, `margin_use_max_pct` | `account.currency = BRL` ∧ `account.margin_mode = spec_pin.account_margin_mode` ∧ `margin.per_volume[n_final] ≤ min(alloc_per_trade_brl, margin_free × margin_use_max_pct)` ∧ `margin.order_check[n_final] = ok` | `account_currency_not_brl`, `margin_mode_changed`, `margin_exceeds_allocation`, `margin_exceeds_free_margin`, `order_check_refused` / `upstream_unavailable:2`, `margin_unavailable` (margem ausente ou ≤ 0 no volume, ou sem `order_check`) |
 | 19 | `broker_reject_breaker` | `ops.entry_rejects`, `ops.breaker_latched`, `limits.max_rejects`, `reject_window_s` | ¬`breaker_latched` ∧ `|{r ∈ entry_rejects : now − r ≤ reject_window_s}| < max_rejects` | `broker_reject_breaker` (**aciona** `TRADING_DISABLED`, *latched*) |
-| 20 | `reconciliation_ok` | `ops.last_reconcile`, `limits.reconcile_interval_s` | `clean` ∧ `now − at ≤ 2 × reconcile_interval_s` ∧ `consistent_passes ≥ 2` | `reconciliation_divergent`, `reconciliation_settling` / `reconciliation_stale` |
-| 21 | `audit_path` | `ops.audit`, `limits.entries_api_freshness_s` | `now − api_last_ok_at ≤ entries_api_freshness_s` ∧ `buffer_len = 0` ∧ `buffer_writable` | `audit_api_unreachable`, `audit_buffer_not_empty`, `audit_buffer_unwritable` |
+| 20 | `reconciliation_ok` | `ops.last_reconcile`, `limits.reconcile_interval_s` | `clean` ∧ `fresco(at, 2 × reconcile_interval_s)` ∧ `consistent_passes ≥ 2` | `reconciliation_divergent`, `reconciliation_settling` / `reconciliation_stale` |
+| 21 | `audit_path` | `ops.audit`, `limits.entries_api_freshness_s` | `fresco(api_last_ok_at, entries_api_freshness_s)` ∧ `buffer_len = 0` ∧ `buffer_writable` | `audit_api_unreachable`, `audit_buffer_not_empty`, `audit_buffer_unwritable` |
 | 22 | `signal_validity` | `proposal`, `kill_switch.armed_strategy`, `limits.approval_ttl_s` | `signal_published_at ≤ signal_deadline_utc` ∧ `entry_window_start_utc ≤ now ≤ entry_window_end_utc` ∧ `(key, version, params_hash) = armed_strategy` ∧ `now − created_at ≤ approval_ttl_s`. O carimbo do sinal nunca é renovado; a aprovação vale 30 s; os insumos de mercado valem segundos (check 8) — três relógios separados | `signal_late`, `signal_outside_window`, `strategy_not_armed`, `strategy_version_mismatch`, `params_hash_mismatch`, `proposal_stale` |
-| 23 | `spec_unchanged` | `spec_pin`, `spec_now` | `spec_now.status = ok` ∧ todos os campos de `SpecPin` iguais em `SpecNow` | `spec_changed`, `terminal_version_changed`, `package_version_changed` / `spec_unreadable` (3 falhas seguidas) |
-| 24 | `slippage_guard` | `proposal.ref_price`, `quote`, `tick`, `limits.max_slippage_ticks`, `spec_pin.order_lifecycle_proven` | `order_lifecycle_proven` ∧ `ref_price` múltiplo de `tick` ∧ `|ref_price − toque| ≤ max_slippage_ticks × tick` (toque = `ask` na compra, `bid` na venda); `limit_price` derivado (§8.3), nunca recebido | `order_lifecycle_unproven`, `reference_off_tick`, `reference_drifted` |
+| 23 | `spec_unchanged` | `spec_pin`, `spec_now` | `spec_now.status = ok` ∧ todos os campos de `SpecPin` iguais em `SpecNow` | `spec_changed`, `terminal_version_changed`, `package_version_changed` / `spec_unreadable` (`spec_unreadable_after_failures` falhas seguidas, inicial 3; uma leitura boa igual ao pin limpa `unreadable`, `changed` só se limpa rearmando) |
+| 24 | `slippage_guard` | `proposal.ref_price`, `quote`, `tick`, `limits.max_slippage_ticks`, `spec_pin.order_lifecycle_proven` | `order_lifecycle_proven` ∧ `ref_price` múltiplo de `tick` ∧ `|ref_price − toque| ≤ max_slippage_ticks × tick` (toque = `ask` na compra, `bid` na venda); `limit_price` derivado (§8.3), nunca recebido | `order_lifecycle_unproven`, `reference_off_tick`, `reference_drifted` / `upstream_unavailable:8` |
 | 25 | `equity_floor` | `account.equity`, `limits.equity_floor_brl` | `equity_floor_brl` nulo (gravado `passed`, `limit = null`, "desligado") ∨ `equity ≥ equity_floor_brl` | `equity_below_floor` / `account_unreadable` |
 
 Cada um dos 25 tem, na tabela de testes de R1, **um caso que passa e um que reprova** — e, onde existe
@@ -780,7 +933,11 @@ Contrato da perda do pregão (check 14): cada negócio entra uma vez (chave `dea
 de negociação ficam fora; a soma é conferida contra `equity_delta_brl − cash_flows_brl` do mesmo intervalo, e
 divergência > `pnl_reconcile_tolerance_brl` → `unavailable` `pnl_reconcile_divergent`; a posição aberta desconta
 só a tarifa de saída; sem âncora, sem histórico completo ou com marca mais velha que `max_quote_age_s` →
-`unavailable`. **O número que esconde perda é o zero**: nenhum campo ausente vira 0.
+`unavailable`. **O número que esconde perda é o zero**: nenhum campo ausente vira 0 — `DayDeal.commission` e
+`fee` são obrigatórios, e o mesmo `deal ticket` com conteúdo diferente é recusado (`deal_ticket_conflict`; o
+serviço marca o histórico incompleto). A âncora vem de `b3_session_anchors`, escrita **uma vez** por conta e pregão:
+um reinício depois de uma perda relê a âncora, nunca re-ancora abaixo `[v1.1 C18]`; âncora de outro pregão ou mais
+de 2 s no futuro = `day_anchor_missing` `[v1.1 C9]`.
 
 Sizing:
 
@@ -795,25 +952,46 @@ n_raw   = min(caps.values())
 n       = floor(n_raw × 0,5) se efetivo = WARNING, senão n_raw                            # 1 vira 0
 n_final = normalizado a volume_min / volume_step / volume_max, sempre para baixo
 n_final < 1 → reprovado, decisão com reason "sizing_zero" e o check do teto vencedor reprovado com o seu reason
-depois: checks 16, 17, 18 avaliados com n_final (margem e order_check do volume final)
+depois: checks 16, 17, 18 avaliados em max(n_final, 1) (margem e order_check desse volume) — com n_final = 0 o
+        volume 1 faz o teto vencedor reprovar com o próprio reason [v1.1 C8 d]
 ```
 
 `binding_constraint` = a chave de `caps` que deu `n_raw` (desempate pela ordem acima), ou `warning_halving`
-se o multiplicador mudou `n`, ou `volume_step` se a normalização mudou `n`. Insumos recusados antes do sizing
-(viram `unavailable` no check de origem): valores não finitos ou não positivos, bid/ask invertidos ou zerados,
-moeda ≠ BRL, `margin.per_volume[1]` ausente.
+se o multiplicador mudou `n`, ou `volume_step` se a normalização mudou `n`. O `WARNING` que divide por dois é o
+efetivo **com** o automático da perda (`kill_switch_effective`, §8.4) `[v1.1 C8 e]`.
+
+**Teto não calculável `[v1.1 C1, C8]`.** Se algum teto não pode ser calculado — sem tabela de custo válida, sem
+stop, sem perda do pregão, margem unitária `margin.per_volume[1]` ausente ou ≤ 0, conta ilegível ou moeda ≠ BRL
+para `free_margin` — o teto fica `null`, e então `n_raw = null`, `n_final = 0`, `binding_constraint = null` e **sem**
+`sizing_zero`: os motivos são os dos checks de origem, cada um com o estado da §8.2 (livro invertido ou zerado →
+check 8 `failed` `quote_invalid`; moeda ≠ BRL → check 18 `failed` `account_currency_not_brl`; margem ausente →
+check 18 `unavailable` `margin_unavailable`; sem tabela de custo → 16/17 `unavailable` `fee_schedule_missing`).
+O modelo já recusa na construção `float`, `NaN`/infinito e valores não positivos onde o campo os proíbe. (A v1.0
+punha aqui bid/ask invertidos e moeda ≠ BRL em `unavailable`, contradizendo a tabela; a tabela vale.)
 
 ### 8.4 `RiskDecision`
 
 ```
-{ proposal_id, approved, reasons[] (reason dos checks failed/unavailable, na ordem dos ids; mais "sizing_zero"),
+{ kind (entry|exit), proposal_id, approved,
+  reasons[] (reason dos checks failed/unavailable, na ordem dos ids; mais "sizing_zero"),
   checks[25], sizing {caps, n_raw, n_final, binding_constraint, risk_per_contract_brl, risk_modeled_brl,
   allowance_brl, limit_price, bracket_gap_ticks: null}, kill_switch_effective,
   triggers[] (b3_kill_cause a aplicar: daily_loss_limit | broker_reject_breaker),
   limits_version, grid_version, spec_pin_id, as_of, approved_at = as_of, expires_at = as_of + 30 s }
 ```
 
-O motor **não escreve** nada: `triggers[]` é o que o serviço persiste como transição de kill switch, auditada.
+O motor **não escreve** nada: `triggers[]` é o que o serviço persiste como transição de kill switch, auditada,
+de forma idempotente — o motor reemite o gatilho até o *latch* persistido chegar (§7.3) `[v1.1 C19]`.
+
+**Forma implementada `[v1.1 C8, C14]`.** O modelo recusa construir uma decisão incoerente: `approved` ⇔ todos os
+checks `passed` e `n_final ≥ 1`; `reasons` derivado dos checks; exatamente os 25 nomes na ordem. `approved_at` e
+`expires_at` vêm preenchidos **também na reprovada** (carimbo não é autorização); em `b3_entry_intents`, as colunas
+`approved_at`/`expires_at`/versões/`n_final`/`limit_price` só existem para a aprovada, e o `CHECK
+decision_matches_its_columns` amarra o JSON às colunas (`approved` do JSON ⇔ coluna `approved_at` preenchida).
+`kill_switch_effective` é o mais restritivo entre os três escopos persistidos **e** o estado automático da perda do
+pregão (`WARNING` a partir de `warning_fraction`, `TRADING_DISABLED` no limite); o check 1 lê só os persistidos.
+`limits_version`, `grid_version` e `spec_pin_id` são `str` no JSON e `integer`/`integer`/`uuid` nas colunas,
+comparados em `::text`.
 
 ### 8.5 Invariantes do motor (propriedades, hypothesis)
 
@@ -824,9 +1002,14 @@ perda do pregão com negócio duplicado, comissão negativa e depósito no meio 
 
 ### 8.6 `evaluate_exit`
 
-`evaluate_exit(exit_request{position_ticket, exit_reason}, position, kill_switch) → RiskDecision(approved =
-True)` com checks informativos (`kill_switch` com o efetivo, `position_seen`), nenhum capaz de reprovar. Calculado
-localmente e gravado sem esperar a API (buffer). **O motor de risco nunca bloqueia saída.** O que pode impedir a
+`evaluate_exit(exit_request: ExitRequest{position_ticket, exit_reason}, position: BrokerPosition | None,
+kill_switch) → RiskDecision(kind = exit, approved = True, reasons = [])` com **2** checks informativos
+(`kill_switch` com o efetivo; `position_seen`, `passed` se `position.position_ticket = exit_request.position_ticket`,
+senão `unavailable` `position_not_seen`), nenhum capaz de reprovar `[v1.1 C6, C8 i]`. `position_seen` compara o
+**ticket**, que pode mudar (F38): é evidência, nunca identidade — o serviço grava o `position_id` ao lado da
+decisão. A decisão de saída vem **sem carimbo** (`as_of`, `approved_at`, `expires_at`, `proposal_id`, `sizing` e
+versões nulos): o motor não tem relógio, e o **serviço carimba** ao gravar `[v1.1 C20]`. Calculado localmente e
+gravado sem esperar a API (buffer). **O motor de risco nunca bloqueia saída.** O que pode impedir a
 instância de enviar uma saída é a guarda de mutação (§2.4) e K1 (§13, item 3) — perguntas de identidade, não de
 risco.
 
@@ -860,10 +1043,10 @@ rodar, **não medido**, confirmar com o Everton e medir em T11/T13/T14.
 | `max_open_positions` | 1 | **fixo na v1** (check 10) |
 | `api_heartbeat_s` / `entries_api_freshness_s` | 5 / 15 | padrão do desenho, confirmar com o Everton |
 | `ea_hb_stale_s` | 30 | padrão do desenho, confirmar com o Everton (parâmetro do EA) |
-| `spec_reread_s` / falhas para `spec_unreadable` | 60 / 3 | padrão do desenho, confirmar com o Everton |
+| `spec_reread_s` / `spec_unreadable_after_failures` | 60 / 3 | padrão do desenho, confirmar com o Everton (o nome da segunda chave vem de R1 `[v1.1 C7]`) |
 | `max_slippage_ticks` | 1 | proposta R0a (é o "1 tick de entrada pelo preço-limite" da conta do desenho §3.5) |
 | `max_quote_age_s` | 5 | proposta R0a |
-| `max_clock_offset_s` | 2 | proposta R0a (igual à tolerância de carimbo à frente do check 8) |
+| `max_clock_offset_s` | 2 | proposta R0a (igual, no valor inicial, à tolerância de carimbo à frente da §8.2; a tolerância é constante do motor e não acompanha esta chave `[v1.1 C9]`) |
 | `clock_check_max_age_s` | 900 | proposta R0a (medição a cada 10 min do desenho §7.4, com folga de 5 min) |
 | `max_spread_ticks` | 2 | proposta R0a |
 | `min_stop_ticks` / `max_stop_ticks` | 10 / 400 | proposta R0a (H-038: stop ≈ 1 035 pts ≈ 207 ticks cabe no meio) |
@@ -900,7 +1083,11 @@ aprovado — é exceção de risco que só ele decide.
 Validações na edição (recusa nomeada `limits_invalid:<campo>`): `max_contracts_per_order ≤
 max_contracts_per_position`; `max_loss_per_trade_brl ≤ daily_loss_limit_brl`; `flatten_at_local ≤
 rico_flatten_local − flatten_lead_min`; `min_stop_ticks < max_stop_ticks`; frações em (0, 1]; todo número como
-string decimal no JSON (número JSON recusado, como `RiskModel._refuse_float`).
+string decimal no JSON (número JSON recusado, como `RiskModel._refuse_float`). Implementado em R1 (`RiskLimitsB3`),
+com mais três recusas: `sltp_record_api_ms ≤ sltp_record_budget_ms`, `approval_ttl_s ≠ 30` e
+`max_open_positions ≠ 1` `[v1.1]`. As chaves do JSON `b3_risk_profiles.limits` são exatamente os nomes de campo do
+`RiskLimitsB3`; `limits_version` **não** vai dentro do JSON — é a coluna (`integer`, comparada em `::text`)
+`[v1.1 C7, C14]`.
 
 ## 10. Batimentos
 
@@ -949,7 +1136,9 @@ falha.
 ### 10.2 `hb:b3:robot` — o batimento pela API
 
 `POST /api/v1/orgs/{org}/b3/robot/heartbeat` a cada `api_heartbeat_s`; a API grava `hb:b3:robot` no Redis da VPS
-(TTL 60 s) e a linha mais recente no Postgres. O cão de guarda (R9a) alerta `critical` se faltar por > 30 s
+(TTL 60 s) e, no Postgres, a linha mais recente **de cada instância** (`b3_robot_heartbeats`, chave `instance_id`):
+o primeiro batimento da instância nova não apaga o último da anterior, que a herança da §4.3 lê
+(`heartbeat_in_flight`) `[v1.1 C18]`. O cão de guarda (R9a) alerta `critical` se faltar por > 30 s
 durante o pregão, e com prioridade máxima se o último batimento tinha posição.
 
 ```
@@ -974,7 +1163,7 @@ Cada linha é um teste de R5 com o falso do MT5 (`test_fm_<id>`) e, onde indicad
 | F1 | Python morto, posição `protected` | — (o EA vê `ts` parado) | servidor mantém `sl`; na partida: `read_only` → diagnóstico | não | servidor (stop) e Everton (R3/R4) | EA ≤ 30 s; cão de guarda > 30 s | T3, T10 |
 | F2 | Python morto, sem posição | — | nada | não | — | cão de guarda | T10 |
 | F3 | terminal morto ou desconectado | `initialize` falha ou `connected = False` | todas as leituras `unavailable`; nenhuma mutação possível | não (check 3) | só servidor e Everton | `critical` se havia posição | T16 |
-| F4 | IPC travado (chamada MT5 não volta) | chamada > `ipc_call_timeout_s` | trava local `ipc_hung` (G5): nenhuma mutação nova; o resultado da chamada, se vier, é gravado; se era mutação → `unknown`; reinício pelo Everton | não | nenhuma mutação até reinício | `critical` `ipc_hung` | teste com falso |
+| F4 | IPC travado (chamada MT5 não volta) | chamada > `ipc_call_timeout_s` | trava local `ipc_hung` (G5): nenhuma mutação nova; o resultado da chamada, se vier, chega normalizado por `drain_late_results()` e é gravado contra a sua requisição (§3.6); se era mutação → `unknown` até esse resultado (uma SLTP com veredito terminal tardio é P1); a trava continua até o reinício pelo Everton. Uma chamada que estourou o prazo **sem ter começado** (na fila) é descartada e nunca roda: `Mt5NotSent` `guard_ipc_hung`, nada partiu `[v1.1 C12, C13]` | não | nenhuma mutação até reinício | `critical` `ipc_hung` | teste com falso |
 | F5a | API fora < 15 s | falha HTTP | gestão normal; eventos ao buffer | sim até 15 s, mas claim exige API → na prática não | normal | — | T16 |
 | F5b | API fora > 15 s com posição | idem | `management` mantida até `authority_expires_at` | não (check 21) | colchete e proteção continuam | `critical` (cão de guarda) | T16 |
 | F6 | disco cheio / `fsync` falha, com a API respondendo | erro de escrita | gravações confirmadas pela API; eventos que não precedem envio ficam em memória | não (check 21) | **não atrasada** (a API confirma a gravação obrigatória); com a API também fora → F48 | `critical` `audit_buffer_unwritable` | teste com falso |
@@ -986,7 +1175,7 @@ Cada linha é um teste de R5 com o falso do MT5 (`test_fm_<id>`) e, onde indicad
 | F12 | saída por tempo × stop do servidor | `sl` dispara durante o colchete | colchete só manda SLTP; posição fecha pelo servidor (`server_sl`/`bracket_sl`); nenhuma ordem nossa soma exposição | não | — | — | T13 |
 | F13 | suspenso depois do claim | ao voltar: `mono` e `utc` saltaram | `aborted_before_send` (`budget_exhausted` ou `clock_jump`); se morto, `unknown` | não | — | `warning` | T15 |
 | F14 | suspenso depois da última conferência | — | residual R-1: envio tarde; resultado tratado normalmente; nasce com `sl` | não (check 11 até resultado) | protegida | — | T15 |
-| F15 | `order_send` volta depois da expiração da aprovação | retorno tardio | resultado gravado como veio (`filled`/`working`/…); a expiração não desfaz | não | protegida | `warning` `late_send_result` | teste com falso |
+| F15 | `order_send` volta depois da expiração da aprovação | retorno tardio | resultado gravado como veio (`filled`/`working`/…), já normalizado (`SendOutcome`, `error = "late_result"`, nunca o objeto cru) `[v1.1 C13]`; a expiração não desfaz | não | protegida | `warning` `late_send_result` | teste com falso |
 | F16 | posição manual no mesmo símbolo que deixa a mesma quantidade final | negócio `DEAL_REASON_CLIENT` na cadeia | `unattributed` (`ambiguous`) | não | nenhuma mutação; rota manual | `critical` | T6 |
 | F17 | mudança de limite entre aprovação e envio | versão diferente | claim recusa `limits_changed` ou `limits_changed_before_send` | não nesta janela | — | `info` | teste com falso |
 | F18 | partida com posição desprotegida desde antes | `sl = 0`, `time_msc` antigo | `degraded` direto; nenhuma mutação antes da concessão | não | reparo depois da concessão | `critical` (app + EA) | T16 |
@@ -1010,7 +1199,7 @@ Cada linha é um teste de R5 com o falso do MT5 (`test_fm_<id>`) e, onde indicad
 | F36 | o Everton põe à mão os mesmos níveis de uma SLTP incerta | nível lido = pedido | slot continua `unknown` (nível igual não é prova) | não | nenhuma modificação | `critical` | teste com falso `[Astra R0a-3]` |
 | F37 | posição fecha com SLTP incerta; nova posição no mesmo símbolo | P3 sem `stale_ticket_rejection_proven` | SLTP órfã incerta bloqueia entradas no símbolo (P3′) | não até P4 ou prova T13 | — | `critical` | T13 (A atrasada → P fecha → Q abre → A chega) `[Astra R0a-4]` |
 | F38 | ticket da posição muda por operação de serviço | `position_ticket` novo, mesmo `position_id` | mesma máquina, mesmo slot; envios usam o ticket novo | — | normal | `info` | teste com falso `[Astra R0a-4]` |
-| F39 | posição de um pregão para o outro abre além do stop | `sl = 0`, piso do lado errado do toque | `degraded` (`floor_unplaceable`), nenhum envio | não | nenhuma (D17) | `critical` | teste com falso `[Astra R0a-5]` |
+| F39 | posição de um pregão para o outro abre além do stop | `sl = 0`, piso do lado errado do toque (`sl_wrong_side_of_touch` na guarda de `send_sltp`) | `degraded` (`floor_unplaceable`), nenhum envio | não | nenhuma (D17) | `critical` | teste com falso `[Astra R0a-5]` |
 | F40 | reinício no meio de uma saída | intenção de saída no registro/buffer | prazo original recuperado; se vencido → `exit_overdue`; gatilho que sumiu não cancela a saída | não | colchete com o prazo original | `critical` se vencido | teste com falso `[Astra R0a-9]` |
 | F41 | relógio do PC errado no instante da concessão | `server_now_utc` da API ≠ relógio local | `authority_mono_deadline` ancorado no relógio da API; vencimento real respeitado | — | para no vencimento real | `warning` `clock_offset` | teste com falso `[Astra R0a-8]` |
 | F42 | Python morre e o relógio do PC retrocede | `ts` antigo parece recente | o EA usa `GetTickCount64` desde a última mudança de `(inst, seq)` → batimento parado | — | — | EA ≤ `ea_hb_stale_s` | teste do EA `[Astra R0a-10]` |
@@ -1021,6 +1210,8 @@ Cada linha é um teste de R5 com o falso do MT5 (`test_fm_<id>`) e, onde indicad
 | F47 | claim com resposta perdida e repetição | `claimed: true` repetido | mesmo resultado, um só envio (`send_consumed`) | sim (esta) | — | — | teste com falso + Postgres real |
 | F48 | API e disco falham juntos com posição aberta (inclusive no meio do colchete) | gravação durável não confirmada | nenhuma SLTP enviada; colchete/reparo pausados; último `sl` confirmado fica | não | pausada até uma das duas voltar | `critical` `sltp_durability_lost` | teste com falso (com `fsync` que trava e que falha) `[Astra R0a-2, r2]` |
 | F49 | `EMERGENCY`, 1.ª SLTP da saída rejeitada (nada muda no servidor), processo morre, Everton rearma antes da partida | transição durável de `EMERGENCY` dentro da vida da posição | obrigação de saída recuperada com o `changed_at` original; prazo vencido → `exit_overdue` | não | colchete | `critical` | teste com falso `[Astra R0a-9, r2]` |
+| F50 | `CancelledError` (ou prazo) no `await` de um envio já iniciado — entrada, SLTP ou cancelamento | a chamada continua no terminal; pista `unresolved` | entrada `unknown` (`send_no_result`), cancelamento `unknown` (`cancel_no_result`), SLTP `sltp_slot = unknown`; toda mutação nova recusada (`guard_unresolved_send`) até `drain_late_results()`; o resultado tardio é gravado e classificado (§3.6). Um cancelamento antes de a chamada começar também vira `unknown` (o serviço não distingue; falso positivo conservador) | não | nenhuma mutação até recolher o resultado; depois, conforme o slot | `critical` `entry_unknown` / `protection_unknown` | teste com falso `[v1.1 C10, C12]` |
+| F51 | reparo que carrega o piso recusado pela guarda de `send_sltp` sem refutar a colocação: `quote_unreadable`, `quote_invalid` (inclusive livro cruzado de leilão, bid ≥ ask) ou `tp_wrong_side_of_touch` | `Mt5NotSent`, nada partiu | `intended` → `not_sent`, slot `idle`; `degraded` (`floor_unplaceable`), nenhum envio; no passe seguinte, toque válido e piso colocável → reparo volta (`unprotected`/`naked_after_grace`) | não | reparo só depois de uma leitura que prove a colocação | `critical` | teste com falso (tick que falha uma vez; livro cruzado) `[v1.1 C11]` |
 
 ## 12. Invariantes (cada uma é um teste que falha se quebrar)
 
@@ -1039,6 +1230,8 @@ Cada linha é um teste de R5 com o falso do MT5 (`test_fm_<id>`) e, onde indicad
 | I-X-3 | uma saída iniciada termina só em `closed` comprovado; o prazo nunca é renovado por reinício | R5 (F40) |
 | I-A-4 | travas locais (`account_changed`, `ipc_hung`, `startup_ineligible`) só caem com reinício do processo | R5 (F7) |
 | I-A-5 | nenhuma mutação na partida antes da entrega do buffer e da concessão de gestão | R5 (F34, F43) |
+| I-A-6 | com a pista IPC `unresolved` (mutação iniciada cujo `await` saiu), nenhuma mutação nova até `drain_late_results()`; `CancelledError` num envio nunca é tratado como "não enviado"; o resultado tardio nunca carrega o objeto cru do fornecedor | R2 + R5 (F50) `[v1.1 C10, C12, C13]` |
+| I-SL-7 | nenhuma SLTP enviada sem um toque lido agora com `0 < bid < ask`; `quote_invalid` tem o mesmo significado no check 8 e na guarda de `send_sltp` | R2 + R5 (F51) `[v1.1 C11]` |
 | I-E-5 | a reavaliação do `pre_send_gate` exclui só a própria proposta; outra intenção aberta bloqueia | R1 + R5 (F33) |
 | I-SL-4 | toda SLTP carrega `position` = o `position_ticket` atual, gravado como `request_position_ticket`; máquina e slot são por `position_id`, nunca por ticket | R2 + R5 (F38) |
 | I-X-1 | nenhuma requisição diferente de `TRADE_ACTION_SLTP` para posição aberta, em qualquer caminho de saída | R5 |
@@ -1139,12 +1332,30 @@ para R1/R2/R5/R7, dentro do modelo de falhas declarado" (`.claude/state/astra-re
 O fechamento aprova o contrato como coordenação; **não** certifica a semântica da Rico (T7, T8, T9, T13, T14 decidem)
 e não autoriza dinheiro real (ADR 0007 e as sessões demo).
 
+**v1.1 — revisão curta de consistência contra os três códigos** (`.claude/state/astra-review-R0a-contract-v11.md`,
+estática, sem testes executados). **2 must-fix, os dois aceitos:** (1) a §4.2 dizia que o piso no toque (`floor =
+bid − d`) é inexequível, mas `guards.py:132` recusa só `>` — com `d = 0` e piso = bid o reparo enviaria o nível que o
+contrato mandava não enviar → o contrato segue o código e a regra do MT5 (igualdade colocável), sem trocar o colchete
+encostado da §5.1; (2) a C11 e a v1.0 §5.1 mandavam a posição em saída para `degraded(floor_unplaceable)`, que
+`b3_robot_guards.py:530` recusa (uma saída só termina em `closed`) — implementar literalmente daria rollback → em
+saída o estado e o prazo ficam, sai só o alerta, e o laço de saída relê. **Nice-to-have aceitos:** a C1 ganhou a
+ressalva das falhas independentes da cotação; a dependência "16/17 ← 15" foi corrigida (seguem a ausência de stop, não
+o estado do check 15); o custo do falso positivo da C10 ficou escrito (sem resultado tardio, `drain_late_results()`
+não resolve) e virou regra: R5 não cancela envio em curso. **Concordou** com a aresta de releitura da C11 (exige
+cotação válida, piso preservado e validação antes do envio), com exigir `0 < bid < ask` na guarda de `send_sltp`
+(custo de disponibilidade, conservador) e com a C13 (resultado tardio terminal = P1; persistir antes de liberar o
+slot; P1 não limpa `ipc_hung`). Síntese em `obsidian/06-DECISIONS/Revisoes-Astra/R0a-risk-engine-b3.md`.
+
 ## 16. Fontes
 
 `docs/design/robo-b3-mt5.md` (commit `35b174cd`) e as fontes oficiais da MetaQuotes e da B3 listadas na §13
 dele (lidas em 17/10/2026); `.claude/state/dialogue-robo-b3-mt5.md` (rodadas 1–6); `docs/RISK_ENGINE.md` v2.5;
 `docs/RISK_ENGINE_MEME.md` v0.1; `docs/decisions/0007-robo-b3-mt5-excecao-live.md` (em redação na R0b);
 `docs/plans/MERCADO-TRADICIONAL.md` §1.2–§1.5; `obsidian/11-KNOWLEDGE/Fila de Hipoteses.md` (H-038);
-`obsidian/11-KNOWLEDGE/KB-0149-o-que-a-mesa-real-ensinou.md`; `obsidian/00-HOME.md`. A tabela de retcodes da §3.6
+`obsidian/11-KNOWLEDGE/KB-0149-o-que-a-mesa-real-ensinou.md`; `obsidian/00-HOME.md`. Para a v1.1: o código de R1
+(`packages/risk-core/hunter_risk_b3/`, `8866278c`), R2 (`packages/exchange-adapters/hunter_exchanges/mt5/`,
+`8ced300c`) e R3 (`infra/migrations/versions/0071_b3_robot.py`, `infra/migrations/ddl/b3_robot*.py`,
+`packages/core/hunter_core/db/models/b3*.py`, `fe381579`), `docs/DATABASE.md` §74 e as notas
+`obsidian/06-DECISIONS/Revisoes-Astra/R1-hunter-risk-b3.md`, `R2-mt5-adapter.md` e `R3-b3-schema.md`. A tabela de retcodes da §3.6
 usa os nomes das constantes `TRADE_RETCODE_*` da documentação MQL5 ("Trade Server Return Codes"); a classificação é
 candidata e só fica provada em T9/T13/T14.

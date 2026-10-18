@@ -3,6 +3,7 @@ tags: [revisao-astra, b3, mt5, rico, robo, risco, execucao, maquina-de-estados, 
 date: 2026-10-17
 updated: 2026-10-17
 status: registro
+versao_contrato: "1.1 (17/10/2026) — alinhada a R1/R2/R3; revisão curta da Astra com 2 must-fix aceitos"
 owner: risk-engine-guardian
 decided_on: 2026-10-17
 by: risk-engine-guardian + astra
@@ -88,7 +89,69 @@ que o desenho não deu.
 5. **Excluir a própria proposta** das contagens de "intenção em voo" — senão toda reavaliação antes do envio se
    reprova a si mesma.
 
+## v1.1 (17/10/2026) — o contrato alinhado ao que R1, R2 e R3 implementaram
+
+**Pedido:** publicar a v1.1 de `docs/RISK_ENGINE_B3.md` com o que as três implementações fixaram e uma revisão curta de
+consistência da Astra contra os três códigos (`.claude/state/astra-review-R0a-contract-v11.md`). Changelog completo
+na §0.1 do contrato (C1–C20); documento normativo editado no lugar, não append-only.
+
+**Notas lidas antes e o que mudaram:** [[Revisoes-Astra/R1-hunter-risk-b3|R1]] (as 11 escolhas a–k e as 4 pendências
+para o contrato → C1–C9, C19, C20); [[Revisoes-Astra/R2-mt5-adapter|R2]] (cancelamento, pista `unresolved`, resultado
+tardio normalizado, recusas de toque → C10–C13); [[Revisoes-Astra/R3-b3-schema|R3]] e `docs/DATABASE.md` §74 (tipos,
+enum do kill switch, ordem de travas, armamento, tabelas extras → C14–C18); [[KB-0149-o-que-a-mesa-real-ensinou]] §1
+(custo ausente nunca vira zero → mantido na §8.3 com `DayDeal.commission`/`fee` obrigatórios) e §4.20 (o que para sem
+alarme custa mais → o falso positivo da C10 ficou com custo escrito, não escondido); [[Fila de Hipoteses]] H-038 (o
+stop dispara com toque igual → a igualdade do piso no toque é colocável). Não existe página EXP para a H-038. Nenhuma
+estratégia mudou; [[Mapa de Estrategias]] não foi tocado.
+
+**Decisões principais (motivo no contrato):**
+
+- **C1** — livro invertido/cruzado/zerado é `failed` `quote_invalid` (dado lido que diz "não"; estado real de leilão
+  na B3), não `unavailable`; a frase contrária da §8.3 caiu.
+- **C9** — frescor único `−2 s ≤ now − ts ≤ máx` (marca, relógio, reconciliação, API; âncora do futuro =
+  `day_anchor_missing`); não vale para `created_at`.
+- **C10/C12/C13** — `CancelledError` num envio é `unknown`; a pista única fica `unresolved` até `drain_late_results()`;
+  resultado tardio normalizado e, para SLTP com veredito terminal, é P1.
+- **C11** — recusas de toque da guarda de `send_sltp` na requisição que carrega o piso → `floor_unplaceable`;
+  `sl_wrong_side_of_touch` refuta (sem reparo automático, D17), `quote_*`/`tp_wrong_side_of_touch` só não provam (o
+  passe seguinte relê). `quote_invalid` passa a significar ¬(`0 < bid < ask`) também no adaptador.
+- **C14–C18** — versões e pin comparados em `::text`; `b3_kill_state` = `kill_switch_state`; travas sistema →
+  organização → conta para todo escritor; armar = fase `entries`; `b3_robot_accounts`, `b3_session_anchors`,
+  `b3_robot_events`.
+- **C19/C20** — gatilhos reemitidos até o *latch* chegar (R5 idempotente); `evaluate_exit` sem carimbo (o serviço
+  carimba).
+
+**Revisão da Astra — 2 must-fix, os dois aceitos e reproduzidos no código:** (1) o contrato dizia que o piso no toque
+(`floor = bid − d`) era inexequível, mas `packages/exchange-adapters/hunter_exchanges/mt5/guards.py:132` recusa só `>`
+— o texto passou a seguir o código e a regra do MT5 (`bid − SL ≥ stops_level`); (2) a minha C11 e a §5.1 da v1.0
+mandavam uma posição **em saída** para `degraded`, transição que `infra/migrations/ddl/b3_robot_guards.py:530` recusa
+— em saída o estado e o prazo ficam e o laço de saída relê. Nice-to-have aceitos: ressalva na C1 (falhas
+independentes da cotação vêm antes), dependência 16/17 ← "sem stop" (não o estado do 15), custo do falso positivo da
+C10 escrito e regra nova "R5 não cancela envio em curso". Concordou com a aresta de releitura, com `0 < bid < ask` na
+guarda de `send_sltp` e com resultado tardio = P1 (gravado antes de liberar o slot; não limpa `ipc_hung`).
+
+**Divergência registrada (com o brief, não com a Astra):** o brief pedia "`quote_invalid`/`quote_unreadable` →
+`floor_unplaceable`" sem qualificação. Mantive o mapeamento, mas acrescentei a releitura para as causas que só **não
+provam** a colocação: sem ela, um `tick()` que falha uma vez na carência deixaria uma posição nascida sem `sl` (a Rico
+o descartou) sem stop até o Everton agir.
+
+**Código que discorda da v1.1:** R2 `guards.py:128` (`quote_invalid` só com `bid ≤ 0 ∨ ask ≤ 0`; num leilão com
+livro cruzado, bid 110 / ask 95 e último 97, um `sl` comprado em 98 passa a guarda e dispara na abertura). Melhoria
+pendente: R2 expor se uma chamada cancelada começou (`ipc.py:153`).
+
+**O que a base aprendeu**
+
+1. **Um contrato congelado pode contradizer o banco que o implementa** — a v1.0 mandava `exiting → degraded`, e o
+   gatilho de R3 (I-X-3) recusa. Toda versão nova do contrato tem de ser lida contra os gatilhos, não só contra o
+   motor.
+2. **"Não provado" não é "refutado".** Falha de leitura do toque e toque do lado errado pedem o mesmo "nenhum envio",
+   mas só a refutação justifica travar a proteção até o humano.
+3. **O mesmo nome com dois significados é um defeito.** `quote_invalid` no motor e no adaptador divergiam justamente no
+   caso do livro cruzado.
+
 ## Relacionadas
 
 [[Dialogos/robo-b3-mt5]] · [[Execution Engine]] · [[Risk Engine]] · [[KB-0149-o-que-a-mesa-real-ensinou]] ·
-[[Fila de Hipoteses]] · contrato `docs/RISK_ENGINE_B3.md` · ADR `docs/decisions/0007-robo-b3-mt5-excecao-live.md`
+[[Fila de Hipoteses]] · [[Mapa de Estrategias]] · [[Revisoes-Astra/R1-hunter-risk-b3|R1-hunter-risk-b3]] ·
+[[Revisoes-Astra/R2-mt5-adapter|R2-mt5-adapter]] · [[Revisoes-Astra/R3-b3-schema|R3-b3-schema]] · contrato
+`docs/RISK_ENGINE_B3.md` · ADR `docs/decisions/0007-robo-b3-mt5-excecao-live.md`
