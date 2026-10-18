@@ -871,6 +871,18 @@ def test_the_seed_writes_system_presets_under_a_nosuperuser_owner(owner_db: str)
     assert asyncio.run(_row_counts(owner_db)) == stored
 
 
+PRUNE_NOW = datetime(2025, 7, 1, tzinfo=UTC)
+"""The instant the two integration prune tests plan against.
+
+The migration creates partitions around the *real* clock (two months behind, three ahead), and
+the short retentions (``feature_snapshots``, ``opportunity_history``) put the oldest of those past
+their cutoff once the calendar gets far enough: from 2026-10-17 the run dropped the 2026-09
+partitions together with the stale one and ``dropped == [stale]`` failed. Planning at a fixed
+instant before every migration-made partition makes "what is past retention" depend only on what
+the test plants (2025-01 and 2025-02 ``candles_1m``, whose 90-day retention ended before this
+date), not on the day CI runs."""
+
+
 def test_prune_partitions_plans_per_timeframe(seed_db: str) -> None:
     """Retention is per timeframe, which is the whole point of the LIST level."""
     _use(seed_db)
@@ -911,17 +923,17 @@ def test_prune_partitions_drops_only_what_is_past_retention_and_is_idempotent(
     asyncio.run(_create_stale())
     assert stale in asyncio.run(_partition_names(seed_db))
 
-    planned: list[tuple[str, str]] = asyncio.run(prune_partitions.expired_partitions())
+    before = asyncio.run(_partition_names(seed_db))
+    planned: list[tuple[str, str]] = asyncio.run(prune_partitions.expired_partitions(PRUNE_NOW))
     dropped: list[str] = asyncio.run(prune_partitions.prune(planned))
     remaining = asyncio.run(_partition_names(seed_db))
 
     assert dropped == [stale]
     assert stale not in remaining
-    # nothing inside its retention window went with it
-    assert "candles_1h_2026_09" in remaining
-    assert "audit_logs_2026_09" in remaining
+    # nothing inside its retention window went with it (whatever month the calendar is in)
+    assert remaining == before - {stale}
 
-    again: list[tuple[str, str]] = asyncio.run(prune_partitions.expired_partitions())
+    again: list[tuple[str, str]] = asyncio.run(prune_partitions.expired_partitions(PRUNE_NOW))
     assert again == []
     assert asyncio.run(_partition_names(seed_db)) == remaining
 
@@ -940,7 +952,7 @@ def test_prune_partitions_dry_run_touches_nothing(seed_db: str) -> None:
 
     asyncio.run(_create_stale())
     before = asyncio.run(_partition_names(seed_db))
-    planned: list[tuple[str, str]] = asyncio.run(prune_partitions.expired_partitions())
+    planned: list[tuple[str, str]] = asyncio.run(prune_partitions.expired_partitions(PRUNE_NOW))
 
     assert {name for name, _ in planned} == {"candles_1m_2025_02"}
     assert asyncio.run(_partition_names(seed_db)) == before

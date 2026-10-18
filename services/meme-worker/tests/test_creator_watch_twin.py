@@ -12,9 +12,9 @@ still runs without the exit. Astra, ``H-031b-diff`` nice-to-have 1.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import pytest
@@ -23,12 +23,20 @@ from sqlalchemy import text
 
 from hunter_core.db.session import role_session
 from hunter_meme_worker.config import MemeConfig
-from hunter_meme_worker.creator_watch import CreatorWatchState, creator_watch_once
+from hunter_meme_worker.creator_watch import CreatorWatchState, ata_targets, creator_watch_once
 from hunter_meme_worker.lab import LabContext, LabState, lab_tick
 from hunter_meme_worker.lab_repo_bets import load_open_bets
 from hunter_meme_worker.repo import insert_snapshot
 
-from .test_creator_watch_persistence import NOW, FakeChain, _account, _mint, _radar, _set_creator
+from .test_creator_watch_persistence import (
+    CREATOR,
+    NOW,
+    FakeChain,
+    _account,
+    _mint,
+    _radar,
+    _set_creator,
+)
 from .test_lab_persistence import (
     WORKER,
     FakeQuotes,
@@ -44,6 +52,32 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 pytestmark = pytest.mark.integration
+
+
+class MintChain(FakeChain):
+    """``ctx.chain`` that answers for **one** mint's classic ATA, whatever else is asked.
+
+    The watch reads every open bet and position in the shared database, so a bet
+    another test left open (``creator_watch_persistence`` ends with one) adds
+    addresses to the call. A script that answers a fixed number of slots per cycle
+    (``FakeChain``) then comes back the wrong length and is dropped as malformed —
+    the sale is never stamped and this test fails depending on what ran before it.
+    Answering by address keeps the reading about this test's mint only; the other
+    addresses come back as missing accounts, which is what those rows already are.
+    """
+
+    def __init__(self, mint: str, amounts: Sequence[str]) -> None:
+        super().__init__([])
+        self.address = ata_targets([(mint, CREATOR)])[0][1]
+        self.amounts = list(amounts)
+        self.calls = 0
+
+    async def call(self, method: str, params: list[Any]) -> dict[str, Any]:
+        assert method == "getMultipleAccounts"
+        self.asked.append(list(params[0]))
+        amount = self.amounts[self.calls]
+        self.calls += 1
+        return {"value": [_account(amount) if a == self.address else None for a in params[0]]}
 
 
 @pytest_asyncio.fixture
@@ -90,7 +124,7 @@ async def test_the_twin_sees_the_sale_and_keeps_running(
     opened = await _bet_of(db_session_factory, proposal)
     assert opened["params"]["exit_on_creator_dump"] is False, "the bet says what it runs on"
 
-    chain = FakeChain([[_account("1000"), None], [_account("400"), None]])
+    chain = MintChain(mint, ["1000", "400"])
     ctx, state = _radar(db_session_factory, chain), CreatorWatchState()
     await creator_watch_once(ctx, state)
     await creator_watch_once(ctx, state)

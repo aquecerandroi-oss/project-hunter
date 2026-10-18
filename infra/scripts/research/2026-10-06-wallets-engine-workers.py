@@ -90,8 +90,10 @@ class Children:
         if self.ok:
             from ctypes import wintypes
 
-            self.k32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
-            self.psapi = ctypes.WinDLL("psapi", use_last_error=True)  # type: ignore[attr-defined]
+            # ``Any``: no ``ctypes.WinDLL`` on Linux (CI's pyright), where strict flags every call
+            windll: Any = vars(ctypes)["WinDLL"]
+            self.k32: Any = windll("kernel32", use_last_error=True)
+            self.psapi: Any = windll("psapi", use_last_error=True)
             self.k32.OpenProcess.restype = wintypes.HANDLE
             self.k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
             self.k32.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.c_void_p] * 4

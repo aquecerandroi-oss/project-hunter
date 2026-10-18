@@ -69,9 +69,8 @@ async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_cove
 ) -> None:
     """The brief's reproduction: a real ``BoundedEventQueue``/``StreamConsumer``
     pair, one producer that never stops, one consumer that drains as fast as
-    it can (no artificial slowness). Confirms the hypothesis first (exact
-    equality is rare), then confirms the new rule does not break on it, and
-    that ``covered_until`` only ever advances -- never past what the stamp
+    it can (no artificial slowness). Confirms the new rule does not break on
+    it, and that ``covered_until`` only ever advances -- never past what the stamp
     itself computes as safe, and never freezing on a backlog that is, in
     fact, bounded and fresh."""
     consumer = StreamConsumer(maxsize=10_000)
@@ -104,8 +103,6 @@ async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_cove
     tracker.session_started(["BTCUSDT"])
     redis: Any = redis_client
 
-    exact_equality_hits = 0
-    total_stamps = 0
     covered_untils: list[str] = []
     try:
         loop = asyncio.get_event_loop()
@@ -114,9 +111,6 @@ async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_cove
             await asyncio.sleep(0.05)
             enqueued, evicted = consumer.queue.progress()
             delivered = consumer.delivered
-            total_stamps += 1
-            if enqueued == delivered + evicted:
-                exact_equality_hits += 1
             await tracker.stamp(
                 redis,
                 dropped_events=0,
@@ -132,9 +126,15 @@ async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_cove
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    # Confirms the hypothesis: under continuous flow, exact equality
-    # ("queue fully empty at stamp time") was not the common case.
-    assert exact_equality_hits < total_stamps
+    # NOT asserted: that exact equality ("queue fully empty at stamp time") was
+    # the rare case. That is how the *old* rule failed on the VPS, but whether a
+    # sampler happens to land on an empty queue is a property of the machine's
+    # timing, not of the fix: a fast CI runner drained the queue before every
+    # stamp (20 of 20) and the former `exact_equality_hits < total_stamps`
+    # assertion failed with `20 < 20` on code that was correct. The backlog
+    # rule itself is pinned deterministically below (fresh pending item keeps
+    # advancing; stale/at-the-cut item breaks); this test keeps what is
+    # machine-independent, the outcome under continuous flow.
 
     # The fix: the tracker never latched into a break that outlived it, and
     # the published interval kept advancing instead of freezing at its first

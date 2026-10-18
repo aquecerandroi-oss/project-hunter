@@ -131,5 +131,5 @@ REQUEST_CHANGES com 1 HIGH, 2 MEDIUM e 1 LOW; ela reproduziu três em memória. 
 | LOW. O abandono por cancelamento externo não incrementa `abandoned_total` | **rejeitado:** o contador mede "abandonado ao fim do orçamento"; no cancelamento externo (desligamento) a escrita é cancelada e `CycleHistory.writing` mostra se ainda pende — o `drain` já a espera dentro do orçamento |
 | Concorda: ACK só após sucesso observado e com o token do lote; commit tardio seguido de retry duplica fisicamente (dentro do contrato do leitor); o `drain` não abre outra escrita enquanto a anterior pende | registrado |
 
-Relacionado: [[EXP-M26-grafico-em-moedas-maduras]] · [[06-DECISIONS/Revisoes-Astra/EXP-M26-unblock|EXP-M26-unblock]] ·
+Relacionado: [[EXP-M26-grafico-em-moedas-maduras]] · `EXP-M26-unblock` (nota ainda não commitada; religar o link quando entrar) ·
 [[03-TRADING/Meme/README|Meme]] · [[06-DECISIONS/Revisoes-Astra/Index|Revisões da Astra]]

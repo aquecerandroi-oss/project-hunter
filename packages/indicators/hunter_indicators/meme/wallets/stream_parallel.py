@@ -31,6 +31,7 @@ from __future__ import annotations
 import multiprocessing
 import signal
 import threading
+import time
 from collections.abc import Callable, Generator, Iterable, Iterator, Sequence
 from concurrent.futures import FIRST_COMPLETED, Executor, Future, ProcessPoolExecutor, wait
 from contextlib import contextmanager
@@ -54,6 +55,7 @@ _Job = tuple[str, frozenset[tuple[str, str, int]], _Seeds, _Seeds]
 _CHUNKS_PER_WORKER = 16
 _GRACE_S = 5.0  # a terminated worker exits at once; past this it is killed
 _JOIN_S = 30.0  # after kill
+_POLL_S = 0.01  # between two looks at a worker that was told to die
 _MAX_MINTS_PER_CHUNK = 256  # carry-only mints can cost ~0 and must not all pile into one task
 _worker: tuple[Night, datetime, Fetch] | None = None
 
@@ -131,6 +133,24 @@ def _terminate(proc: BaseProcess) -> None:
         proc.terminate()
 
 
+def _wait_dead(proc: BaseProcess, timeout: float) -> bool:
+    """True once ``proc`` is gone, False if it is still alive ``timeout`` seconds later.
+
+    Not ``join`` + ``is_alive``: ``Popen.poll`` is not thread-safe. When the workers die the
+    executor's manager thread joins the same processes while we do; the thread that loses the
+    ``waitpid`` race gets ECHILD, which ``Popen`` reports as "still running" until the winner has
+    stored the exit code. On a loaded CI container that made a dead worker look alive 0.0 s after
+    the kill ("workers still alive after terminate and kill", reproduced on a 1-CPU Linux
+    container: 2 of 80 stops). Looking again after a sleep (GIL released) lets the winner finish;
+    a worker that really is alive is still reported once ``timeout`` runs out."""
+    deadline = time.monotonic() + timeout
+    while proc.is_alive():
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(_POLL_S)
+    return True
+
+
 @contextmanager
 def _sigint_held() -> Generator[list[int]]:
     """Ctrl+C cannot cut the cleanup short: while inside, SIGINT is recorded instead of raised
@@ -160,10 +180,9 @@ def _stop(procs: list[BaseProcess]) -> None:
                 first = first or exc
         for proc in procs:
             try:
-                proc.join(_GRACE_S)
-                if proc.is_alive():  # terminate did not take: kill, then wait for it
+                if not _wait_dead(proc, _GRACE_S):  # terminate did not take: kill, then wait
                     proc.kill()
-                    proc.join(_JOIN_S)
+                    _wait_dead(proc, _JOIN_S)
             except BaseException as exc:
                 first = first or exc
     alive = [proc.pid for proc in procs if proc.is_alive()]
